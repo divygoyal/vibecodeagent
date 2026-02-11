@@ -1,93 +1,99 @@
 import json
 import os
 import sys
-import uuid
+import subprocess
+import time
 
-CONFIG_PATH = "/home/ubuntu/.openclaw/openclaw.json"
-USER_DATA_ROOT = "/home/ubuntu/.openclaw/workspace/users"
+# Configuration
+USER_DATA_ROOT = "/home/ubuntu/vibecode/users"
+BASE_PORT = 8081
+DOCKER_IMAGE = "coollabsio/openclaw:latest"
 
-def provision_user(github_id, telegram_token=None):
+def get_next_port():
+    """Finds the next available port starting from 8081."""
+    try:
+        result = subprocess.run(["docker", "ps", "--format", "{{.Ports}}"], capture_output=True, text=True)
+        ports_in_use = []
+        for line in result.stdout.splitlines():
+            # Example line: 0.0.0.0:8081->8080/tcp
+            if ":" in line and "->" in line:
+                port = line.split(":")[1].split("->")[0]
+                ports_in_use.append(int(port))
+        
+        current_port = BASE_PORT
+        while current_port in ports_in_use:
+            current_port += 1
+        return current_port
+    except Exception:
+        return BASE_PORT
+
+def provision_user(github_id, telegram_token=None, github_token=None, api_key=None):
     """
-    Provisions a new isolated OpenClaw Agent for a VibeCode user.
+    Spins up a completely isolated OpenClaw Docker container for a user.
     """
-    user_dir = os.path.join(USER_DATA_ROOT, str(github_id))
+    user_id = str(github_id).lower().replace(" ", "_")
+    container_name = f"vc_agent_{user_id}"
+    user_dir = os.path.join(USER_DATA_ROOT, user_id)
     os.makedirs(user_dir, exist_ok=True)
     
-    # Create isolated memory file
-    memory_file = os.path.join(user_dir, "MEMORY.md")
-    if not os.path.exists(memory_file):
-        with open(memory_file, "w") as f:
-            f.write(f"# Memory for User {github_id}\n\nInitialized VibeCode Agent.")
-
-    # Load existing config
-    with open(CONFIG_PATH, "r") as f:
-        config = json.load(f)
-
-    # Check if agent already exists
-    agent_id = f"user_{github_id}"
-    agents_list = config.get("agents", {}).get("list", [])
+    # Ensure Docker is running
+    port = get_next_port()
     
-    existing_agent = next((a for a in agents_list if a["id"] == agent_id), None)
-    
-    if not existing_agent:
-        # Create new isolated agent entry
-        new_agent = {
-            "id": agent_id,
-            "name": f"VibeCode Assistant ({github_id})",
-            "workspace": user_dir,
-            "sandbox": {
-                "mode": "non-main",
-                "workspaceAccess": "rw"
-            },
-            # OPTIMIZATION: Limit context window to prevent TPM exhaustion
-            "contextPruning": {
-                "mode": "cache-ttl",
-                "ttl": "1h",
-                "softTrim": {
-                    "maxChars": 16000,  # ~4k tokens max context
-                    "headChars": 1000,
-                    "tailChars": 2000
-                }
-            },
-            # OPTIMIZATION: Use local embeddings (zero API cost)
-            "memorySearch": {
-                "enabled": True,
-                "provider": "local",
-                "store": {
-                    "path": os.path.join(user_dir, "search.sqlite"),
-                    "vector": {"enabled": True}
-                }
-            }
+    # Base Docker Command
+    cmd = [
+        "docker", "run", "-d",
+        "--name", container_name,
+        "--restart", "always",
+        "-p", f"{port}:8080",
+        "-v", f"{user_dir}:/data",
+        "-e", f"OPENCLAW_WORKSPACE_DIR=/data/workspace",
+        "-e", f"OPENCLAW_STATE_DIR=/data/.openclaw",
+    ]
+
+    # Add API Key (Use ours as default for now if none provided)
+    gemini_key = api_key or os.environ.get("GEMINI_API_KEY")
+    if gemini_key:
+        cmd += ["-e", f"GEMINI_API_KEY={gemini_key}"]
+
+    # Add Telegram Bot Token
+    if telegram_token:
+        cmd += [
+            "-e", f"TELEGRAM_BOT_TOKEN={telegram_token}",
+            "-e", "TELEGRAM_DM_POLICY=pairing"
+        ]
+
+    # Add GitHub Integration
+    if github_token:
+        cmd += ["-e", f"GITHUB_TOKEN={github_token}"]
+
+    # Image
+    cmd.append(DOCKER_IMAGE)
+
+    try:
+        # Check if container already exists
+        check = subprocess.run(["docker", "ps", "-a", "--filter", f"name={container_name}", "--format", "{{.Names}}"], capture_output=True, text=True)
+        if container_name in check.stdout:
+            return {"status": "error", "message": f"Container {container_name} already exists."}
+
+        subprocess.run(cmd, check=True)
+        return {
+            "status": "success",
+            "container": container_name,
+            "port": port,
+            "url": f"http://agent.divygoyal.in:{port}"
         }
-        
-        # If user provided a BYOB token, attach it
-        if telegram_token:
-            new_agent["channels"] = {
-                "telegram": {
-                    "enabled": True,
-                    "botToken": telegram_token,
-                    "dmPolicy": "pairing"
-                }
-            }
-            
-        agents_list.append(new_agent)
-        config["agents"]["list"] = agents_list
-
-        # Write back updated config
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(config, f, indent=2)
-            
-        return {"status": "created", "agent_id": agent_id, "workspace": user_dir}
-    
-    return {"status": "exists", "agent_id": agent_id, "workspace": user_dir}
+    except subprocess.CalledProcessError as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 provision_user.py <github_id> [telegram_token]")
+        print("Usage: python3 provision_user.py <github_id> [telegram_token] [github_token]")
         sys.exit(1)
         
     g_id = sys.argv[1]
     t_token = sys.argv[2] if len(sys.argv) > 2 else None
+    gh_token = sys.argv[3] if len(sys.argv) > 3 else None
     
-    result = provision_user(g_id, t_token)
+    # Use the Gemini Key from the environment
+    result = provision_user(g_id, t_token, gh_token)
     print(json.dumps(result, indent=2))
