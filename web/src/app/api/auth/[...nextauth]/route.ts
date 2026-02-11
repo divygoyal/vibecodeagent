@@ -4,7 +4,7 @@ import { exec } from "child_process"
 import util from "util"
 
 const execPromise = util.promisify(exec)
-const SCRIPT_PATH = "/home/ubuntu/.openclaw/workspace/vibecodeagent_analysis/scripts/provision_user.py";
+const SCRIPT_PATH = "/home/ubuntu/.openclaw/workspace-user_test_user_123/vibecodeagent/scripts/provision_user.py";
 
 export const authOptions: NextAuthOptions = {
   providers: [
