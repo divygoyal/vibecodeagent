@@ -1,11 +1,12 @@
-import NextAuth from "next-auth"
+import NextAuth, { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import { exec } from "child_process"
 import util from "util"
 
 const execPromise = util.promisify(exec)
+const SCRIPT_PATH = "/home/ubuntu/.openclaw/workspace/vibecodeagent_analysis/scripts/provision_user.py";
 
-export const authOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     GithubProvider({
       clientId: process.env.GITHUB_ID ?? "",
@@ -14,11 +15,13 @@ export const authOptions = {
   ],
   events: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === "github") {
+      if (account?.provider === "github" && profile) {
         try {
           // Trigger provisioning script
-          const cmd = `python3 ../scripts/provision_user.py "${profile.id}"`
+          // @ts-ignore - profile.id is known to exist on GitHub profile
+          const cmd = `python3 "${SCRIPT_PATH}" "${profile.id}"`
           await execPromise(cmd)
+          // @ts-ignore
           console.log(`Provisioning triggered for user ${profile.id}`)
         } catch (error) {
           console.error("Provisioning failed:", error)
@@ -31,6 +34,7 @@ export const authOptions = {
       if (token && token.sub) {
         session.user = {
           ...session.user,
+          // @ts-ignore
           id: token.sub,
         }
       }

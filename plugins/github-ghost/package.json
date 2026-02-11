@@ -1,0 +1,9 @@
+{
+  "name": "github-ghost",
+  "version": "1.0.0",
+  "description": "VibeCode GitHub Audit Plugin",
+  "main": "index.js",
+  "dependencies": {
+    "octokit": "^3.1.0"
+  }
+}

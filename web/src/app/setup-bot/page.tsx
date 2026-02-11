@@ -1,10 +1,11 @@
+"use client"
 import { useState } from 'react'
 
 export default function SetupBot() {
   const [token, setToken] = useState('')
   const [status, setStatus] = useState('')
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault()
     setStatus('Configuring...')
     

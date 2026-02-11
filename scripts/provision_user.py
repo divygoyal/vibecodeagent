@@ -38,6 +38,25 @@ def provision_user(github_id, telegram_token=None):
             "sandbox": {
                 "mode": "non-main",
                 "workspaceAccess": "rw"
+            },
+            # OPTIMIZATION: Limit context window to prevent TPM exhaustion
+            "contextPruning": {
+                "mode": "cache-ttl",
+                "ttl": "1h",
+                "softTrim": {
+                    "maxChars": 16000,  # ~4k tokens max context
+                    "headChars": 1000,
+                    "tailChars": 2000
+                }
+            },
+            # OPTIMIZATION: Use local embeddings (zero API cost)
+            "memorySearch": {
+                "enabled": True,
+                "provider": "local",
+                "store": {
+                    "path": os.path.join(user_dir, "search.sqlite"),
+                    "vector": {"enabled": True}
+                }
             }
         }
         
