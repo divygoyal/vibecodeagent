@@ -39,28 +39,10 @@ class DockerManager:
         return user_dir
     
     def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
-        """Create minimal config for user - most settings via env vars"""
-        user_dir = self._get_user_data_dir(github_id)
-        
-        # Minimal OpenClaw config - let env vars handle most settings
-        # OpenClaw's config schema has changed, so we keep it minimal
-        config = {
-            "channels": {
-                "telegram": {
-                    "enabled": True
-                }
-            },
-            "gateway": {
-                "auth": {
-                    "type": "none"
-                }
-            }
-        }
-        
-        # Write to openclaw.json
-        config_path = f"{user_dir}/.openclaw/openclaw.json"
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=2)
+        """Let OpenClaw create its own config - we only use env vars"""
+        # Don't create any config file - let OpenClaw handle it
+        # All configuration is done via environment variables
+        pass
     
     def _copy_plugins(self, github_id: str, enabled_plugins: list) -> None:
         """Copy enabled plugins to user's workspace"""
