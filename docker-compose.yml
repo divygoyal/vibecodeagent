@@ -3,6 +3,14 @@
 # Domain: agent.divygoyal.in
 
 services:
+  # ============= Custom ClawBot Image Builder =============
+  # This builds our custom OpenClaw image with GitHub CLI pre-installed
+  clawbot-image:
+    build: ./clawbot
+    image: clawbot:latest
+    command: ["echo", "Image built successfully"]
+    restart: "no"
+
   # ============= Admin API =============
   admin-api:
     build: ./admin
@@ -14,7 +22,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - TELEGRAM_ADMIN_BOT_TOKEN=${ADMIN_TELEGRAM_BOT_TOKEN}
       - TELEGRAM_ADMIN_CHAT_ID=${ADMIN_TELEGRAM_CHAT_ID}
-      - OPENCLAW_IMAGE=${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+      - OPENCLAW_IMAGE=${OPENCLAW_IMAGE:-clawbot:latest}
       - DATA_DIR=${DATA_DIR:-/home/ubuntu/clawbot-data}
       - MAX_USERS=${MAX_USERS:-50}
       - DEFAULT_RAM_LIMIT=${DEFAULT_RAM_LIMIT:-256m}
