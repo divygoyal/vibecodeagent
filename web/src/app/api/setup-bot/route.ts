@@ -40,6 +40,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
     }
 
+    // Log for debugging (token is masked)
+    console.log(`Setup bot for user ${githubUsername} (${githubId})`)
+    console.log(`GitHub token present: ${githubToken ? 'YES (' + githubToken.substring(0, 8) + '...)' : 'NO'}`)
+
     // Call Admin API to create/update user container
     const response = await fetch(`${ADMIN_API_URL}/api/users`, {
       method: "POST",
@@ -75,19 +79,22 @@ export async function POST(req: Request) {
         })
 
         if (updateResponse.ok) {
-          // Restart container to pick up new token
-          await fetch(`${ADMIN_API_URL}/api/users/${githubId}/container`, {
+          // Start container (this will create it if it doesn't exist, or start if stopped)
+          const containerResponse = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/container`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "X-API-Key": ADMIN_API_KEY
             },
-            body: JSON.stringify({ action: "restart" })
+            body: JSON.stringify({ action: "start" })
           })
 
+          const containerData = await containerResponse.json()
+          console.log(`Container start result for ${githubId}:`, containerData)
+
           return NextResponse.json({ 
-            message: "Bot updated successfully",
-            status: "running"
+            message: "Bot connected and started successfully",
+            status: containerData.status || "running"
           })
         }
       }

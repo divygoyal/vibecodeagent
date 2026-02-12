@@ -67,7 +67,19 @@ export default function Home() {
 
       setSetupStatus('success');
       setBotToken(''); // Clear token for security
-      fetchContainerStatus();
+      
+      // Poll for container status (container may take a few seconds to fully start)
+      let attempts = 0;
+      const pollStatus = async () => {
+        await fetchContainerStatus();
+        attempts++;
+        // Keep polling until container is running or max attempts reached
+        if (attempts < 5 && containerStatus?.status !== 'running') {
+          setTimeout(pollStatus, 2000);
+        }
+      };
+      // Initial delay to let container start
+      setTimeout(pollStatus, 3000);
     } catch (err) {
       setSetupStatus('error');
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong');
