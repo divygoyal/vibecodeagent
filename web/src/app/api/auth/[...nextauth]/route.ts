@@ -1,16 +1,20 @@
 import NextAuth, { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 
-// Admin API for user provisioning
-const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
+// GitHub profile type
+interface GitHubProfile {
+  id: number
+  login: string
+  name?: string
+  email?: string
+  avatar_url?: string
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GithubProvider({
       clientId: process.env.GITHUB_ID ?? "",
       clientSecret: process.env.GITHUB_SECRET ?? "",
-      // Request additional scopes if needed
       authorization: {
         params: {
           scope: "read:user user:email"
@@ -20,10 +24,11 @@ export const authOptions: NextAuthOptions = {
   ],
   
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ account, profile }) {
       // Allow sign in - container creation happens when user sets up bot
-      if (account?.provider === "github") {
-        console.log(`GitHub user signed in: ${profile?.login} (ID: ${profile?.id})`)
+      if (account?.provider === "github" && profile) {
+        const ghProfile = profile as GitHubProfile
+        console.log(`GitHub user signed in: ${ghProfile.login} (ID: ${ghProfile.id})`)
       }
       return true
     },
@@ -31,21 +36,18 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       // Add GitHub ID and username to session
       if (token) {
-        // @ts-expect-error - extending session.user
-        session.user.id = token.githubId || token.sub
-        // @ts-expect-error - extending session.user
-        session.user.username = token.username
+        (session.user as { id?: string }).id = token.githubId as string || token.sub
+        (session.user as { username?: string }).username = token.username as string
       }
       return session
     },
     
-    async jwt({ token, user, profile, account }) {
+    async jwt({ token, profile, account }) {
       // Store GitHub info in JWT token
       if (account?.provider === "github" && profile) {
-        // @ts-expect-error - GitHub profile has id
-        token.githubId = String(profile.id)
-        // @ts-expect-error - GitHub profile has login
-        token.username = profile.login
+        const ghProfile = profile as GitHubProfile
+        token.githubId = String(ghProfile.id)
+        token.username = ghProfile.login
       }
       return token
     },
