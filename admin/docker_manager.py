@@ -26,11 +26,16 @@ class DockerManager:
         return f"{self.base_dir}/{github_id}"
     
     def _ensure_user_dir(self, github_id: str) -> str:
-        """Create user data directory if not exists"""
+        """Create user data directory if not exists with proper permissions"""
         user_dir = self._get_user_data_dir(github_id)
         os.makedirs(user_dir, exist_ok=True)
         os.makedirs(f"{user_dir}/workspace", exist_ok=True)
         os.makedirs(f"{user_dir}/.openclaw", exist_ok=True)
+        
+        # Fix permissions - OpenClaw runs as node user (UID 1000)
+        # Make directories writable by the container user
+        os.system(f"chmod -R 777 {user_dir}")
+        
         return user_dir
     
     def _create_user_config(self, github_id: str, plan: str, custom_rules: Optional[str] = None) -> None:
