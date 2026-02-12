@@ -38,12 +38,13 @@ class DockerManager:
         
         return user_dir
     
-    def _create_user_config(self, github_id: str, plan: str, custom_rules: Optional[str] = None) -> None:
+    def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
         """Create token-optimized config for user"""
         user_dir = self._get_user_data_dir(github_id)
         
-        # Base config - token optimized
+        # OpenClaw config - token optimized with Telegram enabled
         config = {
+            "model": "google/gemini-2.0-flash",  # Use Gemini as primary model
             "heartbeat": {
                 "enabled": False  # Disable heartbeats - major token saver
             },
@@ -55,9 +56,17 @@ class DockerManager:
             "toolOutputTruncation": {
                 "maxChars": 5000
             },
-            "modelRouting": {
-                "simple": "gemini-2.0-flash-lite",  # Cheap for simple tasks
-                "complex": "gemini-2.0-flash"       # Better for complex
+            "gateway": {
+                "auth": "none"  # Disable gateway auth for simplicity
+            },
+            "telegram": {
+                "enabled": True,  # Enable Telegram!
+                "token": telegram_token
+            },
+            "plugins": {
+                "telegram": {
+                    "enabled": True
+                }
             }
         }
         
@@ -68,7 +77,8 @@ class DockerManager:
             except:
                 pass
         
-        config_path = f"{user_dir}/.openclaw/config.json"
+        # Write to openclaw.json (the correct config file name)
+        config_path = f"{user_dir}/.openclaw/openclaw.json"
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
     
@@ -123,8 +133,8 @@ class DockerManager:
         # Ensure directories exist
         user_dir = self._ensure_user_dir(github_id)
         
-        # Create config
-        self._create_user_config(github_id, plan, custom_rules)
+        # Create config with Telegram enabled
+        self._create_user_config(github_id, plan, telegram_token, custom_rules)
         
         # Copy plugins
         if enabled_plugins:
