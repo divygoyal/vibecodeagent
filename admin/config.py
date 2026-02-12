@@ -19,15 +19,16 @@ class Settings(BaseSettings):
     
     # Network
     BASE_PORT: int = 9000  # First user gets 9000, second 9001, etc.
-    MAX_USERS: int = 50    # Max containers on 16GB RAM
+    MAX_USERS: int = 6     # ~6 users at 1GB each on 8GB RAM (leave 2GB for system)
     
     # Resource Limits (per container)
-    MEMORY_LIMIT_FREE: str = "512m"      # Minimum for OpenClaw
-    MEMORY_LIMIT_STARTER: str = "768m"
-    MEMORY_LIMIT_PRO: str = "1g"
+    # OpenClaw needs significant RAM - 1GB minimum, 2GB recommended
+    MEMORY_LIMIT_FREE: str = "1g"        # 1GB for free tier
+    MEMORY_LIMIT_STARTER: str = "2g"     # 2GB for starter
+    MEMORY_LIMIT_PRO: str = "4g"         # 4GB for pro
     CPU_LIMIT_FREE: float = 0.5
-    CPU_LIMIT_STARTER: float = 0.75
-    CPU_LIMIT_PRO: float = 1.0
+    CPU_LIMIT_STARTER: float = 1.0
+    CPU_LIMIT_PRO: float = 2.0
     
     # API Keys (for shared key mode)
     GEMINI_API_KEY: Optional[str] = None
