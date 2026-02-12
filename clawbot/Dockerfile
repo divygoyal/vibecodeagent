@@ -17,17 +17,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create startup script that authenticates gh if GITHUB_TOKEN is present
-RUN echo '#!/bin/bash\n\
-if [ -n "$GITHUB_TOKEN" ]; then\n\
-  echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true\n\
-fi\n\
-exec "$@"' > /usr/local/bin/clawbot-entrypoint.sh && \
-    chmod +x /usr/local/bin/clawbot-entrypoint.sh
-
 # Switch back to node user
 USER node
 
-# Use our custom entrypoint that sets up gh auth
-ENTRYPOINT ["/usr/local/bin/clawbot-entrypoint.sh"]
-CMD ["openclaw"]
+# Keep the original entrypoint - gh will auth on first use with GITHUB_TOKEN env var
