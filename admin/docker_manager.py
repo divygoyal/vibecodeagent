@@ -140,13 +140,6 @@ class DockerManager:
                 environment=env,
                 mem_limit=plan_config["memory_limit"],
                 cpu_quota=int(plan_config["cpu_limit"] * 100000),
-                healthcheck={
-                    "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
-                    "interval": 30000000000,  # 30s in nanoseconds
-                    "timeout": 10000000000,   # 10s
-                    "retries": 3,
-                    "start_period": 60000000000  # 60s
-                },
                 labels={
                     "clawbot.user": github_id,
                     "clawbot.plan": plan,
