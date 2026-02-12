@@ -354,7 +354,7 @@ async def container_action(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
-    """Perform action on user's container (start/stop/restart)"""
+    """Perform action on user's container (start/stop/restart/create)"""
     result = await db.execute(
         select(User).where(User.github_id == github_id)
     )
@@ -364,8 +364,35 @@ async def container_action(
         raise HTTPException(status_code=404, detail="User not found")
     
     if action.action == "start":
+        # First try to start existing container
         result = docker_manager.start_container(github_id)
-        status = "running"
+        
+        # If container doesn't exist, create it
+        if not result["success"] and "not found" in result.get("error", "").lower():
+            # Need to create the container first
+            if not user.telegram_bot_token:
+                return {"success": False, "error": "No Telegram bot token configured. Please set up your bot first."}
+            
+            plan_config = PLANS.get(user.plan, PLANS["free"])
+            result = docker_manager.create_container(
+                github_id=github_id,
+                plan=user.plan,
+                port=user.container_port or await get_next_available_port(db),
+                telegram_token=user.telegram_bot_token,
+                gemini_key=user.gemini_api_key,
+                github_token=user.github_token,
+                custom_rules=user.custom_rules,
+                enabled_plugins=plan_config.get("features", [])
+            )
+            
+            if result["success"]:
+                user.container_id = result["container_id"]
+                user.container_name = result["container_name"]
+                user.container_port = result["port"]
+                await log_container_event(db, user.id, result["container_id"], "create", f"Container recreated")
+        
+        status = "running" if result["success"] else user.container_status
+        
     elif action.action == "stop":
         result = docker_manager.stop_container(github_id)
         status = "stopped"
@@ -378,7 +405,8 @@ async def container_action(
     if result["success"]:
         user.container_status = status
         await db.commit()
-        await log_container_event(db, user.id, user.container_id, action.action)
+        if action.action != "start" or "container_id" not in result:
+            await log_container_event(db, user.id, user.container_id, action.action)
     
     return result
 
