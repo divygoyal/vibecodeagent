@@ -107,15 +107,20 @@ class DockerManager:
         heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}
         node_heap = heap_sizes.get(plan, "768")
         
+        # Generate gateway token
+        import secrets
+        gateway_token = secrets.token_hex(32)
+        
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
-            "OPENCLAW_CHANNELS_TELEGRAM_ENABLED": "true",
             # Model config - use Gemini
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "OPENCLAW_MODEL": "google/gemini-2.0-flash",
+            # Gateway auth - required by OpenClaw
+            "OPENCLAW_GATEWAY_TOKEN": gateway_token,
             # User identification
             "GITHUB_ID": github_id,
             "PLAN": plan,
