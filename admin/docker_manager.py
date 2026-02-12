@@ -72,7 +72,9 @@ class DockerManager:
             },
             "channels": {
                 "telegram": {
-                    "enabled": True
+                    "enabled": True,
+                    "dmPolicy": "open",
+                    "allowFrom": ["*"]
                 }
             },
             "messages": {
