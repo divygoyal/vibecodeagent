@@ -87,7 +87,13 @@ class DockerManager:
             "skills": {
                 "install": {
                     "nodeManager": "bun"
-                }
+                },
+                "allowlist": [
+                    "healthcheck",
+                    "skill-creator", 
+                    "weather",
+                    "github"
+                ]
             }
         }
         
