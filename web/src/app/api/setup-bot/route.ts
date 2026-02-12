@@ -32,6 +32,8 @@ export async function POST(req: Request) {
     const githubId = session.user.id
     // @ts-expect-error - username added in callbacks
     const githubUsername = session.user.username
+    // @ts-expect-error - accessToken added in callbacks
+    const githubToken = session.user.accessToken
     const email = session.user.email
     
     if (!githubId) {
@@ -50,7 +52,8 @@ export async function POST(req: Request) {
         github_username: githubUsername,
         email: email,
         plan: plan || "free",
-        telegram_bot_token: token
+        telegram_bot_token: token,
+        github_token: githubToken  // Pass GitHub access token
       })
     })
 
@@ -66,7 +69,8 @@ export async function POST(req: Request) {
             "X-API-Key": ADMIN_API_KEY
           },
           body: JSON.stringify({
-            telegram_bot_token: token
+            telegram_bot_token: token,
+            github_token: githubToken  // Update GitHub token too
           })
         })
 

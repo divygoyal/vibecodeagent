@@ -10,6 +10,16 @@ interface GitHubProfile {
   avatar_url?: string;
 }
 
+// Extended session user type
+interface ExtendedUser {
+  id?: string;
+  username?: string;
+  accessToken?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GithubProvider({
@@ -17,7 +27,8 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_SECRET ?? "",
       authorization: {
         params: {
-          scope: "read:user user:email"
+          // Added 'repo' scope for repository access
+          scope: "read:user user:email repo"
         }
       }
     }),
@@ -34,9 +45,11 @@ export const authOptions: NextAuthOptions = {
     
     async session({ session, token }) {
       if (token && session.user) {
-        const user = session.user as { id?: string; username?: string };
+        const user = session.user as ExtendedUser;
         user.id = (token.githubId as string) || token.sub;
         user.username = token.username as string;
+        // Include access token in session for API calls
+        user.accessToken = token.accessToken as string;
       }
       return session;
     },
@@ -46,6 +59,8 @@ export const authOptions: NextAuthOptions = {
         const ghProfile = profile as GitHubProfile;
         token.githubId = String(ghProfile.id);
         token.username = ghProfile.login;
+        // Capture GitHub access token
+        token.accessToken = account.access_token;
       }
       return token;
     },
