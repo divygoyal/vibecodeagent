@@ -39,10 +39,62 @@ class DockerManager:
         return user_dir
     
     def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
-        """Let OpenClaw create its own config - we only use env vars"""
-        # Don't create any config file - let OpenClaw handle it
-        # All configuration is done via environment variables
-        pass
+        """Create OpenClaw config file with proper settings"""
+        user_dir = self._get_user_data_dir(github_id)
+        config_path = f"{user_dir}/.openclaw/openclaw.json"
+        
+        # Create config with all required settings
+        # Based on OpenClaw's expected structure
+        config = {
+            "agents": {
+                "defaults": {
+                    "model": {
+                        "primary": "google/gemini-2.0-flash"
+                    },
+                    "compaction": {
+                        "mode": "safeguard"
+                    },
+                    "maxConcurrent": 4,
+                    "subagents": {
+                        "maxConcurrent": 8
+                    }
+                }
+            },
+            "gateway": {
+                "mode": "local"
+            },
+            "plugins": {
+                "entries": {
+                    "telegram": {
+                        "enabled": True
+                    }
+                }
+            },
+            "channels": {
+                "telegram": {
+                    "enabled": True
+                }
+            },
+            "messages": {
+                "ackReactionScope": "group-mentions"
+            },
+            "commands": {
+                "native": "auto",
+                "nativeSkills": "auto"
+            },
+            "skills": {
+                "install": {
+                    "nodeManager": "bun"
+                }
+            }
+        }
+        
+        # Write config file
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        # Ensure proper permissions
+        os.chmod(config_path, 0o666)
     
     def _copy_plugins(self, github_id: str, enabled_plugins: list) -> None:
         """Copy enabled plugins to user's workspace"""
