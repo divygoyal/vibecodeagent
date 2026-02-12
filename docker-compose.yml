@@ -2,8 +2,6 @@
 # Orchestrates Admin API, Web Dashboard, Nginx, and user containers
 # Domain: agent.divygoyal.in
 
-version: "3.8"
-
 services:
   # ============= Admin API =============
   admin-api:
