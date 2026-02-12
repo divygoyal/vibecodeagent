@@ -1,0 +1,77 @@
+# =============================================================================
+#                           CLAWBOT .GITIGNORE
+# =============================================================================
+
+# Environment variables (NEVER commit!)
+.env
+.env.local
+.env.production
+.env.development
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+web/.next/
+web/out/
+web/.vercel
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+nginx/logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+admin/data/
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# SSL certificates (generated locally)
+nginx/ssl/
+*.pem
+*.key
+*.crt
+
+# User data (on VPS)
+clawbot-data/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

@@ -1,23 +1,37 @@
 # MEMORY.md
 
-## Identity & User
-- **User:** Divy (Dinesh).
-- **Agent Name:** Jarvis.
-- **Project:** VibeCode Agent - A SaaS platform for AI Personal Assistants.
-  - Allows users to sign up via GitHub.
-  - BYOB (Bring Your Own Bot) - users provide Telegram tokens.
-  - Integration with GitHub, Google Analytics/Search Console.
-  - Architecture: OpenClaw as the engine, Docker sandboxing.
-- **Domain:** `agent.divygoyal.in`.
-- **Repo:** `https://github.com/divygoyal/vibecodeagent`.
+## Project Context
+- **Project:** VibeCode Agent - Token-optimized AI Personal Assistant SaaS
+- **Owner:** Divy Goyal
+- **Domain:** `agent.divygoyal.in`
+- **Repo:** `https://github.com/divygoyal/vibecodeagent`
+- **Engine:** OpenClaw (https://github.com/openclaw/openclaw)
 
-## Constraints & Preferences
-- **API Limit:** 1 Million TPM (Tokens Per Minute) on Gemini API key.
-- **Optimization Strategy:**
-  - Aggressive compaction/pruning of context.
-  - Local embeddings/memory search to save tokens.
-  - Truncating large tool outputs.
+## Technical Stack
+- **Backend:** OpenClaw in Docker containers (per-user isolation)
+- **Frontend:** Next.js 16 with NextAuth.js
+- **LLM:** Gemini API (1M TPM tier)
+- **Interface:** Telegram (BYOB - Bring Your Own Bot)
+- **Deployment:** Ubuntu VPS with Nginx reverse proxy
+
+## Token Optimization (Critical)
+Applied optimizations to stay within API limits:
+- ✅ Heartbeat disabled (saves ~10K tokens/hour)
+- ✅ Context limited to 32K tokens
+- ✅ Aggressive session compaction
+- ✅ Tool output truncation at 5K chars
+- ✅ Model routing (fast/balanced/smart)
+- ✅ GitHub Ghost plugin with 5-min cache
+- ✅ Thinking/reasoning mode disabled
+
+## Key Files
+- `config/openclaw.json` - Token limits and model routing
+- `scripts/provision_user.py` - User container provisioning
+- `scripts/maintenance.sh` - Session cleanup cron job
+- `plugins/github-ghost/index.js` - Cached GitHub integration
 
 ## History
-- **2026-02-11:** Divy moved from another VPS where data was lost/agent disconnected ("went out of the blue").
-- Previous work involved fixing the web portal (NextAuth/TypeScript), implementing a GitHub Ghost Plugin, and optimizing OpenClaw config for TPM limits.
+- **2026-02-11:** Migration to new VPS, previous data lost
+- **2026-02-12:** Token optimization overhaul completed
+  - Reduced estimated daily usage by ~70%
+  - Added self-deployment scripts for VPS

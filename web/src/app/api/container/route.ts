@@ -6,6 +6,7 @@ import { authOptions } from "../auth/[...nextauth]/route"
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
+// Container actions: start, stop, restart
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   
@@ -14,49 +15,42 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { plan, geminiApiKey, githubToken } = await req.json()
+    const { action } = await req.json()
+
+    if (!["start", "stop", "restart"].includes(action)) {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    }
 
     // @ts-expect-error - id added in callbacks
     const githubId = session.user.id
-    // @ts-expect-error - username added in callbacks  
-    const githubUsername = session.user.username
-    const email = session.user.email
 
-    if (!githubId) {
-      return NextResponse.json({ error: 'GitHub ID not found' }, { status: 400 })
-    }
-
-    // Get current user status
-    const statusResponse = await fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
-      headers: { "X-API-Key": ADMIN_API_KEY }
+    const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/container`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": ADMIN_API_KEY
+      },
+      body: JSON.stringify({ action })
     })
 
-    if (statusResponse.ok) {
-      // User exists - return their status
-      const userData = await statusResponse.json()
-      return NextResponse.json({
-        exists: true,
-        ...userData
-      })
+    const data = await response.json()
+
+    if (!response.ok) {
+      return NextResponse.json({ 
+        error: data.detail || "Container action failed" 
+      }, { status: response.status })
     }
 
-    // User doesn't exist - they need to set up bot first
-    return NextResponse.json({
-      exists: false,
-      message: "Please connect your Telegram bot first"
-    })
+    return NextResponse.json(data)
 
   } catch (err: unknown) {
     const error = err as Error
-    console.error('Provisioning error:', error.message)
-    return NextResponse.json({ 
-      error: 'Internal Server Error', 
-      details: error.message?.substring(0, 100) || 'Unknown error'
-    }, { status: 500 })
+    console.error('Container action error:', error.message)
+    return NextResponse.json({ error: 'Action failed' }, { status: 500 })
   }
 }
 
-// Get user status
+// Get container status
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   
@@ -74,18 +68,17 @@ export async function GET(req: Request) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        return NextResponse.json({ 
-          provisioned: false,
-          message: "Bot not yet configured"
-        })
+        return NextResponse.json({ status: "not_provisioned" })
       }
-      throw new Error("Failed to get user status")
+      throw new Error("Failed to get container status")
     }
 
     const data = await response.json()
     return NextResponse.json({
-      provisioned: true,
-      ...data
+      status: data.container?.status || "unknown",
+      health: data.container?.health || "unknown",
+      memory_usage_mb: data.container?.memory_usage_mb,
+      plan: data.plan
     })
 
   } catch (err: unknown) {

@@ -1,51 +1,64 @@
 import NextAuth, { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
-import { exec } from "child_process"
-import util from "util"
 
-const execPromise = util.promisify(exec)
-const SCRIPT_PATH = "/home/ubuntu/.openclaw/workspace-user_test_user_123/vibecodeagent/scripts/provision_user.py";
+// Admin API for user provisioning
+const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GithubProvider({
       clientId: process.env.GITHUB_ID ?? "",
       clientSecret: process.env.GITHUB_SECRET ?? "",
-    }),
-  ],
-  events: {
-    async signIn({ user, account, profile }) {
-      if (account?.provider === "github" && profile) {
-        try {
-          // Trigger provisioning script
-          // @ts-ignore - profile.id is known to exist on GitHub profile
-          const cmd = `python3 "${SCRIPT_PATH}" "${profile.id}"`
-          await execPromise(cmd)
-          // @ts-ignore
-          console.log(`Provisioning triggered for user ${profile.id}`)
-        } catch (error) {
-          console.error("Provisioning failed:", error)
+      // Request additional scopes if needed
+      authorization: {
+        params: {
+          scope: "read:user user:email"
         }
       }
-    },
-  },
+    }),
+  ],
+  
   callbacks: {
+    async signIn({ user, account, profile }) {
+      // Allow sign in - container creation happens when user sets up bot
+      if (account?.provider === "github") {
+        console.log(`GitHub user signed in: ${profile?.login} (ID: ${profile?.id})`)
+      }
+      return true
+    },
+    
     async session({ session, token }) {
-      if (token && token.sub) {
-        session.user = {
-          ...session.user,
-          // @ts-ignore
-          id: token.sub,
-        }
+      // Add GitHub ID and username to session
+      if (token) {
+        // @ts-expect-error - extending session.user
+        session.user.id = token.githubId || token.sub
+        // @ts-expect-error - extending session.user
+        session.user.username = token.username
       }
       return session
     },
-    async jwt({ token, user }) {
-      if (user) {
-        token.sub = user.id
+    
+    async jwt({ token, user, profile, account }) {
+      // Store GitHub info in JWT token
+      if (account?.provider === "github" && profile) {
+        // @ts-expect-error - GitHub profile has id
+        token.githubId = String(profile.id)
+        // @ts-expect-error - GitHub profile has login
+        token.username = profile.login
       }
       return token
     },
+  },
+  
+  pages: {
+    signIn: "/",
+    error: "/",
+  },
+  
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 }
 

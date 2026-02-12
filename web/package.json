@@ -1,15 +1,16 @@
 {
-  "name": "web",
+  "name": "vibecode-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "next": "16.1.6",
+    "next-auth": "^4.24.5",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

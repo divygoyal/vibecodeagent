@@ -1,0 +1,103 @@
+# ClawBot Platform - Docker Compose
+# Orchestrates Admin API, Web Dashboard, Nginx, and user containers
+# Domain: agent.divygoyal.in
+
+version: "3.8"
+
+services:
+  # ============= Admin API =============
+  admin-api:
+    build: ./admin
+    container_name: clawbot-admin
+    restart: always
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/admin.db
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TELEGRAM_ADMIN_BOT_TOKEN=${ADMIN_TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMIN_CHAT_ID=${ADMIN_TELEGRAM_CHAT_ID}
+      - OPENCLAW_IMAGE=${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+      - DATA_DIR=${DATA_DIR:-/home/ubuntu/clawbot-data}
+      - MAX_USERS=${MAX_USERS:-50}
+      - DEFAULT_RAM_LIMIT=${DEFAULT_RAM_LIMIT:-256m}
+      - DEFAULT_CPU_LIMIT=${DEFAULT_CPU_LIMIT:-0.25}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for container management
+      - ./admin/data:/app/data                      # Persistent database
+      - ${DATA_DIR:-/home/ubuntu/clawbot-data}:${DATA_DIR:-/home/ubuntu/clawbot-data}  # User data
+      - ./templates:/app/templates:ro               # Config templates
+    networks:
+      - clawbot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============= Watchdog Service =============
+  watchdog:
+    build: ./admin
+    container_name: clawbot-watchdog
+    restart: always
+    command: ["python", "watchdog.py"]
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/admin.db
+      - TELEGRAM_ADMIN_BOT_TOKEN=${ADMIN_TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMIN_CHAT_ID=${ADMIN_TELEGRAM_CHAT_ID}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60}
+      - MAX_RESTART_ATTEMPTS=${MAX_RESTART_ATTEMPTS:-3}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./admin/data:/app/data
+    networks:
+      - clawbot-network
+    depends_on:
+      admin-api:
+        condition: service_healthy
+
+  # ============= Web Dashboard =============
+  web:
+    build: ./web
+    container_name: clawbot-web
+    restart: always
+    environment:
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-https://agent.divygoyal.in}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - GITHUB_ID=${GITHUB_ID}
+      - GITHUB_SECRET=${GITHUB_SECRET}
+      - ADMIN_API_URL=http://admin-api:8000
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    networks:
+      - clawbot-network
+    depends_on:
+      admin-api:
+        condition: service_healthy
+
+  # ============= Nginx Reverse Proxy =============
+  nginx:
+    image: nginx:alpine
+    container_name: clawbot-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro         # Let's Encrypt certificates
+      - /var/www/certbot:/var/www/certbot:ro         # ACME challenge directory
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - clawbot-network
+    depends_on:
+      - admin-api
+      - web
+
+networks:
+  clawbot-network:
+    driver: bridge
+    name: clawbot-network
+
+# Named volumes for persistence
+volumes:
+  admin-data:
