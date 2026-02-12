@@ -59,13 +59,11 @@ class DockerManager:
             "gateway": {
                 "auth": "none"  # Disable gateway auth for simplicity
             },
-            "telegram": {
-                "enabled": True,  # Enable Telegram!
-                "token": telegram_token
-            },
-            "plugins": {
+            # New config format: channels.telegram instead of telegram
+            "channels": {
                 "telegram": {
-                    "enabled": True
+                    "enabled": True,
+                    "token": telegram_token
                 }
             }
         }
