@@ -131,10 +131,12 @@ class DockerManager:
         if github_token:
             env["GITHUB_TOKEN"] = github_token
         
-        # Create container
+        # Create container with auto doctor --fix
         try:
             container = self.client.containers.run(
                 settings.OPENCLAW_IMAGE,
+                # Run doctor --fix first, then start normally
+                command=["/bin/sh", "-c", "node /openclaw.mjs doctor --fix && exec node /openclaw.mjs"],
                 name=container_name,
                 detach=True,
                 restart_policy={"Name": "on-failure", "MaximumRetryCount": 3},
