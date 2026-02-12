@@ -22,11 +22,11 @@ class Settings(BaseSettings):
     MAX_USERS: int = 50    # Max containers on 16GB RAM
     
     # Resource Limits (per container)
-    MEMORY_LIMIT_FREE: str = "256m"
-    MEMORY_LIMIT_STARTER: str = "512m"
+    MEMORY_LIMIT_FREE: str = "512m"      # Minimum for OpenClaw
+    MEMORY_LIMIT_STARTER: str = "768m"
     MEMORY_LIMIT_PRO: str = "1g"
-    CPU_LIMIT_FREE: float = 0.25
-    CPU_LIMIT_STARTER: float = 0.5
+    CPU_LIMIT_FREE: float = 0.5
+    CPU_LIMIT_STARTER: float = 0.75
     CPU_LIMIT_PRO: float = 1.0
     
     # API Keys (for shared key mode)
