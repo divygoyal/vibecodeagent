@@ -39,43 +39,25 @@ class DockerManager:
         return user_dir
     
     def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
-        """Create token-optimized config for user"""
+        """Create minimal config for user - most settings via env vars"""
         user_dir = self._get_user_data_dir(github_id)
         
-        # OpenClaw config - token optimized with Telegram enabled
+        # Minimal OpenClaw config - let env vars handle most settings
+        # OpenClaw's config schema has changed, so we keep it minimal
         config = {
-            "model": "google/gemini-2.0-flash",  # Use Gemini as primary model
-            "heartbeat": {
-                "enabled": False  # Disable heartbeats - major token saver
-            },
-            "context": {
-                "maxTokens": 32000,     # Context limit
-                "compactionThreshold": 24000,  # Aggressive compaction
-                "reserveTokens": 4000
-            },
-            "toolOutputTruncation": {
-                "maxChars": 5000
-            },
-            "gateway": {
-                "auth": "none"  # Disable gateway auth for simplicity
-            },
-            # New config format: channels.telegram instead of telegram
             "channels": {
                 "telegram": {
-                    "enabled": True,
-                    "token": telegram_token
+                    "enabled": True
+                }
+            },
+            "gateway": {
+                "auth": {
+                    "type": "none"
                 }
             }
         }
         
-        # Add custom rules if pro plan
-        if plan == "pro" and custom_rules:
-            try:
-                config["customRules"] = json.loads(custom_rules)
-            except:
-                pass
-        
-        # Write to openclaw.json (the correct config file name)
+        # Write to openclaw.json
         config_path = f"{user_dir}/.openclaw/openclaw.json"
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
@@ -143,22 +125,20 @@ class DockerManager:
         heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}
         node_heap = heap_sizes.get(plan, "768")
         
-        # Generate a unique gateway token for this container
-        import secrets
-        gateway_token = secrets.token_hex(16)
-        
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
+            # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
+            "OPENCLAW_CHANNELS_TELEGRAM_ENABLED": "true",
+            # Model config - use Gemini
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
+            "OPENCLAW_MODEL": "google/gemini-2.0-flash",
+            # User identification
             "GITHUB_ID": github_id,
             "PLAN": plan,
-            "NODE_OPTIONS": f"--max-old-space-size={node_heap}",  # Increase JS heap
-            # OpenClaw specific settings
-            "OPENCLAW_GATEWAY_TOKEN": gateway_token,  # Required for gateway auth
-            "OPENCLAW_TELEGRAM_ENABLED": "true",       # Enable Telegram
-            "OPENCLAW_GATEWAY_AUTH": "none",           # Disable gateway auth for simplicity
+            # Node.js memory
+            "NODE_OPTIONS": f"--max-old-space-size={node_heap}",
         }
         
         if github_token:
