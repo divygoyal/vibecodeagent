@@ -126,13 +126,18 @@ class DockerManager:
             self._copy_plugins(github_id, enabled_plugins)
         
         # Environment variables
+        # Calculate Node.js heap size based on plan (leave ~256MB for system)
+        heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}
+        node_heap = heap_sizes.get(plan, "768")
+        
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
             "TELEGRAM_BOT_TOKEN": telegram_token,
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "GITHUB_ID": github_id,
-            "PLAN": plan
+            "PLAN": plan,
+            "NODE_OPTIONS": f"--max-old-space-size={node_heap}"  # Increase JS heap
         }
         
         if github_token:

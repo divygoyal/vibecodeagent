@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     MAX_USERS: int = 6     # ~6 users at 1GB each on 8GB RAM (leave 2GB for system)
     
     # Resource Limits (per container)
-    # OpenClaw needs significant RAM - 1GB minimum, 2GB recommended
-    MEMORY_LIMIT_FREE: str = "1g"        # 1GB for free tier
+    # OpenClaw needs significant RAM - Node.js heap + system overhead
+    MEMORY_LIMIT_FREE: str = "1536m"     # 1.5GB for free tier (768MB heap + overhead)
     MEMORY_LIMIT_STARTER: str = "2g"     # 2GB for starter
     MEMORY_LIMIT_PRO: str = "4g"         # 4GB for pro
     CPU_LIMIT_FREE: float = 0.5
