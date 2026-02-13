@@ -161,4 +161,39 @@ class GoogleAnalytics {
     }
 }
 
+// CLI Handling Logic
+if (require.main === module) {
+    (async () => {
+        const args = process.argv.slice(2);
+        const command = args[0];
+
+        try {
+            const plugin = new GoogleAnalytics();
+
+            if (command === 'list-properties') {
+                const result = await plugin.listProperties();
+                console.log(result);
+            } else if (command === 'get-report') {
+                const propertyId = args[1];
+                const startDate = args[2];
+                const endDate = args[3];
+
+                if (!propertyId) {
+                    console.error("Error: propertyId is required for get-report");
+                    process.exit(1);
+                }
+
+                const result = await plugin.getReport(propertyId, startDate, endDate);
+                console.log(result);
+            } else {
+                console.error("Unknown command. Available: list-properties, get-report");
+                process.exit(1);
+            }
+        } catch (error) {
+            console.error("Error running command:", error.message);
+            process.exit(1);
+        }
+    })();
+}
+
 module.exports = GoogleAnalytics;
