@@ -300,8 +300,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
             connections_json = json.dumps(connections)
             if "github" in connections:
                 skills.append("coding")
+                skills.append("github-ghost") # Explicitly add github plugin if present
             if "google" in connections:
-                skills.append("analytics")
+                skills.append("google-analytics") # Use the plugin name, not generic 'analytics'
         else:
             # Fallback/Legacy: if no connections passed, assume coding (or none?)
             # But likely we want to defaults to coding if we can't determine
