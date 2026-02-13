@@ -189,7 +189,11 @@ async def verify_admin_key(x_api_key: str = Header(...)):
 
 # ============= Pydantic Models =============
 class UserCreate(BaseModel):
-    github_id: str
+    github_id: Optional[str] = None
+    provider: str = "github"
+    provider_id: Optional[str] = None
+    access_token: Optional[str] = None
+    
     github_username: Optional[str] = None
     email: Optional[str] = None
     plan: str = "free"
@@ -205,6 +209,9 @@ class UserUpdate(BaseModel):
     github_token: Optional[str] = None # Input only
     custom_rules: Optional[str] = None
     is_active: Optional[bool] = None
+    # Generic provider update
+    provider: Optional[str] = None
+    access_token: Optional[str] = None
 
 
 class ContainerAction(BaseModel):
@@ -213,8 +220,9 @@ class ContainerAction(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    github_id: str
+    github_id: Optional[str]
     github_username: Optional[str]
+    email: Optional[str]
     plan: str
     container_status: str
     container_port: Optional[int]
@@ -249,6 +257,19 @@ async def log_container_event(db: AsyncSession, user_id: int, container_id: str,
     await db.commit()
 
 
+def sanitize_identifier(identifier: str) -> str:
+    """Sanitize identifier for Docker usage (replace @ and other chars)"""
+    import re
+    # Replace @ with -at- to make it readable but safe
+    safe = identifier.replace("@", "-at-")
+    # Replace any other non-allowed chars with -
+    safe = re.sub(r'[^a-zA-Z0-9_.-]', '-', safe)
+    # Ensure it doesn't start with . or -
+    if safe.startswith('.') or safe.startswith('-'):
+        safe = "u" + safe
+    return safe
+
+
 # ============= User Endpoints =============
 @app.post("/api/users", response_model=UserResponse)
 async def create_user(
@@ -266,10 +287,11 @@ async def create_user(
         if existing:
             raise HTTPException(status_code=409, detail="User already exists (github_id)")
             
-    result = await db.execute(select(User).where(User.email == user_data.email))
-    existing = result.scalar_one_or_none()
-    if existing:
-        raise HTTPException(status_code=409, detail="User already exists (email)")
+    if user_data.email:
+        result = await db.execute(select(User).where(User.email == user_data.email))
+        existing = result.scalar_one_or_none()
+        if existing:
+            raise HTTPException(status_code=409, detail="User already exists (email)")
     
     # Validate plan
     if user_data.plan not in PLANS:
@@ -277,7 +299,8 @@ async def create_user(
     
     # Determine user_identifier for container
     # Prefer github_id for legacy consistency, fallback to email
-    user_identifier = user_data.github_id if user_data.github_id else user_data.email
+    raw_identifier = user_data.github_id if user_data.github_id else user_data.email
+    user_identifier = sanitize_identifier(raw_identifier)
     
     # Get available port
     port = await get_next_available_port(db)
@@ -311,7 +334,7 @@ async def create_user(
     
     # Create user record
     user = User(
-        github_id=user_data.github_id, # Can be None if generic provider
+        github_id=user_identifier, # Store sanitized ID as the key
         github_username=user_data.github_username,
         email=user_data.email,
         plan=user_data.plan,
@@ -334,7 +357,7 @@ async def create_user(
         oauth = OAuthConnection(
             user_id=user.id,
             provider=user_data.provider,
-            provider_account_id=user_data.provider_id,
+            provider_account_id=user_data.provider_id or user_data.github_id or user_data.email,
             access_token=user_data.access_token,
             token_type="bearer",
             created_at=datetime.utcnow(),
@@ -348,8 +371,9 @@ async def create_user(
     
     return UserResponse(
         id=user.id,
-        github_id=user.github_id or "", # handle potential None for response
+        github_id=user.github_id, # handle potential None for response
         github_username=user.github_username,
+        email=user.email,
         plan=user.plan,
         container_status=user.container_status,
         container_port=user.container_port,
@@ -372,6 +396,7 @@ async def list_users(
             id=u.id,
             github_id=u.github_id,
             github_username=u.github_username,
+            email=u.email,
             plan=u.plan,
             container_status=u.container_status,
             container_port=u.container_port,
