@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 
+// Force dynamic rendering — this route requires cookies for session auth
+export const dynamic = 'force-dynamic'
+
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 const ADMIN_GITHUB_ID = process.env.ADMIN_GITHUB_ID || "86590133"
