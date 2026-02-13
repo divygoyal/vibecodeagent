@@ -154,10 +154,10 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     },
                     "workspace": "/data/workspace",
                     "model": {
-                        "primary": "google/gemini-2.0-flash"
+                        "primary": "google/gemini-3-pro-preview"
                     },
                     "models": {
-                        "google/gemini-2.0-flash": {
+                        "google/gemini-3-pro-preview": {
                             "alias": "gemini"
                         }
                     }
@@ -297,7 +297,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config - use Gemini
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
-            "OPENCLAW_MODEL": "google/gemini-2.0-flash",
+            "OPENCLAW_MODEL": "google/gemini-3-pro-preview",
             # User identification
             "GITHUB_ID": github_id,
             "PLAN": plan,
