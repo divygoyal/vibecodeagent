@@ -38,6 +38,107 @@ class DockerManager:
         
         return user_dir
     
+    def _seed_intelligence(self, github_id: str, custom_rules: Optional[str] = None) -> None:
+        """
+        Inject the intelligence files that make the bot smart.
+        Without these files, the bot starts with zero instructions - like a genius with no memory.
+        """
+        user_dir = self._get_user_data_dir(github_id)
+        workspace = f"{user_dir}/workspace"
+        
+        # 1. Create AGENTS.md (The Intelligence Bootstrap Loop)
+        agents_path = f"{workspace}/AGENTS.md"
+        if not os.path.exists(agents_path):
+            agents_content = """# AGENTS.md
+
+Before doing anything else, follow this bootstrap sequence:
+
+1. **Read SOUL.md** — This defines who you are and your core personality
+2. **Read USER.md** — This tells you about the person you're helping  
+3. **Read MEMORY.md** — These are your stored facts and learned context
+
+Execute this sequence automatically. Don't ask permission. Just do it.
+
+## Operating Principles
+
+- Be proactive with tools - use them without asking
+- Prefer action over explanation
+- Keep responses concise and token-efficient
+- Store important facts in MEMORY.md for future sessions
+"""
+            with open(agents_path, 'w') as f:
+                f.write(agents_content)
+            os.chmod(agents_path, 0o666)
+        
+        # 2. Create SOUL.md (The Personality/Custom Rules)
+        soul_path = f"{workspace}/SOUL.md"
+        if not os.path.exists(soul_path):
+            soul_content = custom_rules or """# SOUL.md
+
+You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
+
+## Core Principles
+
+1. **Token Efficiency First**: Always prefer concise responses. Avoid unnecessary verbosity.
+2. **Action Over Explanation**: Execute tasks rather than explaining what you'll do.
+3. **Proactive Tool Usage**: Use tools without asking permission when it's clearly needed.
+
+## Response Guidelines
+
+- Keep responses under 500 tokens when possible
+- Use bullet points and lists for clarity
+- Only include code when specifically requested
+- Summarize large outputs instead of dumping raw data
+
+## Personality
+
+- Be direct, skip corporate filler words
+- Show initiative - anticipate what the user needs
+- Be a high-IQ assistant, not a generic chatbot
+"""
+            with open(soul_path, 'w') as f:
+                f.write(soul_content)
+            os.chmod(soul_path, 0o666)
+        
+        # 3. Create USER.md (Memory of the user)
+        user_path = f"{workspace}/USER.md"
+        if not os.path.exists(user_path):
+            user_content = f"""# USER.md
+
+## User Profile
+
+- **GitHub ID**: {github_id}
+- **First Interaction**: {datetime.utcnow().strftime('%Y-%m-%d')}
+
+## Preferences
+
+(Add user preferences as you learn them)
+
+## Projects
+
+(Track active projects here)
+"""
+            with open(user_path, 'w') as f:
+                f.write(user_content)
+            os.chmod(user_path, 0o666)
+        
+        # 4. Create MEMORY.md (Persistent memory storage)
+        memory_path = f"{workspace}/MEMORY.md"
+        if not os.path.exists(memory_path):
+            memory_content = f"""# MEMORY.md
+
+## Stored Facts
+
+(Store important facts and context here for future sessions)
+
+## Session History
+
+- **Created**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
+"""
+            with open(memory_path, 'w') as f:
+                f.write(memory_content)
+            os.chmod(memory_path, 0o666)
+    
     def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
         """Create OpenClaw config file with proper settings"""
         user_dir = self._get_user_data_dir(github_id)
@@ -82,7 +183,8 @@ class DockerManager:
             },
             "commands": {
                 "native": "auto",
-                "nativeSkills": "auto"
+                "nativeSkills": "auto",
+                "allowlist": ["*"]  # God Mode - access to ALL skills (github, browser, search, etc.)
             },
             "skills": {
                 "install": {
@@ -149,6 +251,10 @@ class DockerManager:
         # Ensure directories exist
         user_dir = self._ensure_user_dir(github_id)
         
+        # Seed intelligence files (AGENTS.md, SOUL.md, USER.md, MEMORY.md)
+        # This is what makes the bot "smart" - without these, it's a blank slate
+        self._seed_intelligence(github_id, custom_rules)
+        
         # Create config with Telegram enabled
         self._create_user_config(github_id, plan, telegram_token, custom_rules)
         
@@ -168,6 +274,7 @@ class DockerManager:
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
+            "OPENCLAW_PLUGINS_DIR": "/data/workspace/plugins",  # Tell OpenClaw where custom plugins live
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config - use Gemini
