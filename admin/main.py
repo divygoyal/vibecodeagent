@@ -278,100 +278,137 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
-    """Create a new user and provision their ClawBot container"""
+    """Create a new user or update existing one (Idempotent upsert)"""
     
-    # Check if user already exists (by email or github_id)
-    if user_data.github_id:
-        result = await db.execute(select(User).where(User.github_id == user_data.github_id))
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise HTTPException(status_code=409, detail="User already exists (github_id)")
-            
+    # 1. Determine the canonical user_identifier
+    # Prioritize: provider_id (stable ID) > github_id > email
+    raw_identifier = user_data.provider_id or user_data.github_id or user_data.email
+    if not raw_identifier:
+        raise HTTPException(status_code=400, detail="Missing user identifier (provider_id, github_id, or email)")
+        
+    user_identifier = sanitize_identifier(raw_identifier)
+
+    # 2. Check if user already exists (by email or github_id)
+    existing_user = None
+    
     if user_data.email:
         result = await db.execute(select(User).where(User.email == user_data.email))
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise HTTPException(status_code=409, detail="User already exists (email)")
-    
-    # Validate plan
-    if user_data.plan not in PLANS:
-        raise HTTPException(status_code=400, detail=f"Invalid plan. Options: {list(PLANS.keys())}")
-    
-    # Determine user_identifier for container
-    # Prefer github_id for legacy consistency, fallback to email
-    raw_identifier = user_data.github_id if user_data.github_id else user_data.email
-    user_identifier = sanitize_identifier(raw_identifier)
-    
-    # Get available port
-    port = await get_next_available_port(db)
-    
-    # Prepare connections for container
-    plan_config = PLANS[user_data.plan]
+        existing_user = result.scalar_one_or_none()
+        
+    if not existing_user and user_data.github_id:
+        result = await db.execute(select(User).where(User.github_id == user_data.github_id))
+        existing_user = result.scalar_one_or_none()
+        
+    # 3. Upsert Logic
+    if existing_user:
+        user = existing_user
+        # Update fields if provided
+        if user_data.telegram_bot_token:
+            user.telegram_bot_token = user_data.telegram_bot_token
+        if user_data.gemini_api_key:
+            user.gemini_api_key = user_data.gemini_api_key
+            
+        # Ensure ID consistency (if migrating from email-id to provider-id)
+        # Note: changing primary key/github_id might break container mapping if container named after old ID
+        # For now, we keep the old github_id if set, to keep container association
+            
+        await db.commit()
+        await db.refresh(user)
+    else:
+        # Create new user
+        
+        # Validate plan
+        if user_data.plan not in PLANS:
+            raise HTTPException(status_code=400, detail=f"Invalid plan. Options: {list(PLANS.keys())}")
+        
+        # Get available port
+        port = await get_next_available_port(db)
+        
+        # Determine container name upfront
+        container_name = docker_manager._get_container_name(user_identifier)
+        
+        user = User(
+            github_id=user_identifier,
+            github_username=user_data.github_username,
+            email=user_data.email,
+            plan=user_data.plan,
+            telegram_bot_token=user_data.telegram_bot_token,
+            gemini_api_key=user_data.gemini_api_key,
+            container_id="pending", 
+            container_name=container_name,
+            container_port=port,
+            container_status="stopped",
+            subscription_start=datetime.utcnow(),
+            enabled_plugins=json.dumps([]) # will be filled by create_container logic mostly?
+        )
+        db.add(user)
+        try:
+            await db.commit()
+            await db.refresh(user)
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    # 4. Ensure Container Exists & Is Running (Idempotent)
+    plan_config = PLANS[user.plan]
     connections = {}
-    
-    # Add the primary provider connection
     if user_data.access_token:
         connections[user_data.provider] = {
             "provider_account_id": user_data.provider_id,
             "access_token": user_data.access_token,
-            "token_type": "bearer",
-            "scope": "unknown" 
+            "token_type": "bearer"
         }
-        
-    # Create container
+
+    # We use the user's stored github_id as the identifier for Docker to ensure consistency
+    # (in case we matched an existing user with a different ID strategy)
+    docker_identifier = user.github_id 
+
     result = docker_manager.create_container(
-        user_identifier=user_identifier,
-        plan=user_data.plan,
-        port=port,
-        telegram_token=user_data.telegram_bot_token,
-        gemini_key=user_data.gemini_api_key,
+        user_identifier=docker_identifier,
+        plan=user.plan,
+        port=user.container_port,
+        telegram_token=user.telegram_bot_token,
+        gemini_key=user.gemini_api_key,
         connections=connections,
         enabled_plugins=plan_config.get("features", [])
     )
     
     if not result["success"]:
-        raise HTTPException(status_code=500, detail=f"Failed to create container: {result['error']}")
-    
-    # Create user record
-    user = User(
-        github_id=user_identifier, # Store sanitized ID as the key
-        github_username=user_data.github_username,
-        email=user_data.email,
-        plan=user_data.plan,
-        telegram_bot_token=user_data.telegram_bot_token,
-        gemini_api_key=user_data.gemini_api_key,
-        container_id=result["container_id"],
-        container_name=result["container_name"],
-        container_port=port,
-        container_status="running",
-        subscription_start=datetime.utcnow(),
-        enabled_plugins=json.dumps(plan_config.get("features", []))
-    )
-    
-    db.add(user)
+        raise HTTPException(status_code=500, detail=f"Container operation failed: {result['error']}")
+
+    # Update container info
+    user.container_id = result.get("container_id", user.container_id)
+    user.container_status = "running"
     await db.commit()
-    await db.refresh(user)
-    
-    # Save OAuthConnection
+
+    # 5. Update OAuth Token
     if user_data.access_token:
-        oauth = OAuthConnection(
-            user_id=user.id,
-            provider=user_data.provider,
-            provider_account_id=user_data.provider_id or user_data.github_id or user_data.email,
-            access_token=user_data.access_token,
-            token_type="bearer",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.add(oauth)
+        # Check existing connection
+        res = await db.execute(select(OAuthConnection).where(
+            OAuthConnection.user_id == user.id,
+            OAuthConnection.provider == user_data.provider
+        ))
+        oauth = res.scalar_one_or_none()
+        
+        if oauth:
+            oauth.access_token = user_data.access_token
+            oauth.updated_at = datetime.utcnow()
+        else:
+            oauth = OAuthConnection(
+                user_id=user.id,
+                provider=user_data.provider,
+                provider_account_id=user_data.provider_id or user_data.github_id or user_data.email,
+                access_token=user_data.access_token,
+                token_type="bearer",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            db.add(oauth)
         await db.commit()
 
-    # Log event
-    await log_container_event(db, user.id, result["container_id"], "create", f"Created with plan: {user_data.plan}")
-    
     return UserResponse(
         id=user.id,
-        github_id=user.github_id, # handle potential None for response
+        github_id=user.github_id or "",
         github_username=user.github_username,
         email=user.email,
         plan=user.plan,
