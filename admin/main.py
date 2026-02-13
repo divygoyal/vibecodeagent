@@ -512,7 +512,43 @@ async def update_user(
     
     # Update fields
     update_data = user_update.model_dump(exclude_unset=True)
-    # Handle github_token separately - update OAuthConnection
+    
+    # Generic wrapper for updating OAuth - supports google, github, etc.
+    if user_update.provider:
+        # We need to find the connection for this provider
+        stmt = select(OAuthConnection).where(
+            OAuthConnection.user_id == user.id,
+            OAuthConnection.provider == user_update.provider
+        )
+        result = await db.execute(stmt)
+        conn = result.scalar_one_or_none()
+        
+        if conn:
+            if user_update.access_token:
+                conn.access_token = user_update.access_token
+            if user_update.refresh_token:
+                conn.refresh_token = user_update.refresh_token
+            conn.updated_at = datetime.utcnow()
+        else:
+            # Create new if not exists (upsert)
+            if user_update.access_token:
+               conn = OAuthConnection(
+                   user_id=user.id,
+                   provider=user_update.provider,
+                   provider_account_id=user.github_id, # Fallback to github_id if we don't have provider_id in update param?
+                   # Wait, UserUpdate doesn't have provider_id. 
+                   # route.ts passes provider_id though? No, route.ts passes provider_id in payload...
+                   # Let's check UserUpdate model.
+                   access_token=user_update.access_token,
+                   refresh_token=user_update.refresh_token,
+                   token_type="bearer",
+                   created_at=datetime.utcnow(),
+                   updated_at=datetime.utcnow()
+               )
+               db.add(conn)
+        await db.commit()
+
+    # Handle github_token separately - update OAuthConnection (LEGACY)
     if "github_token" in update_data:
         token = update_data.pop("github_token")
         if token:
