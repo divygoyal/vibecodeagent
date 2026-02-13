@@ -272,6 +272,7 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
             "OPENCLAW_PLUGINS_DIR": "/data/workspace/plugins",  # Tell OpenClaw where custom plugins live
+            "OPENCLAW_SKILLS_ENABLED": "*",  # GOD MODE: Master override - enables ALL skills
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config - use Gemini
