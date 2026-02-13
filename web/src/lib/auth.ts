@@ -60,7 +60,6 @@ export const authOptions: NextAuthOptions = {
                 user.username = (token.username as string) || (token.name as string);
                 user.accessToken = token.accessToken as string;
                 user.provider = token.provider as string;
-                // @ts-expect-error - Custom property
                 user.refreshToken = token.refreshToken as string;
             }
             return session;
