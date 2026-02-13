@@ -71,10 +71,16 @@ const STATUS_STEPS = [
 function getStatusLevel(botStatus: BotStatus | null): number {
   if (!botStatus || botStatus.status === 'not_provisioned') return -1;
   if (botStatus.status !== 'running') return 0;
-  // Container is running
-  if (botStatus.telegramStatus === 'error' || botStatus.telegramStatus === 'webhook_conflict') return 2;
-  if (botStatus.telegramStatus === 'connected' || botStatus.health === 'healthy') return 3;
-  return 2; // OpenClaw + Telegram initializing
+
+  // Container is running (Step 1 done)
+  // If healthy but not connected -> Step 2 (OpenClaw Ready)
+  // If connected -> Step 3 (Telegram Connected) -> Step 4 (Live)
+
+  if (botStatus.telegramStatus === 'connected') return 3; // All done
+  if (botStatus.telegramStatus === 'error' || botStatus.telegramStatus === 'webhook_conflict') return 2; // Stuck at Telegram
+  if (botStatus.health === 'healthy') return 1; // OpenClaw ready, waiting for Telegram
+
+  return 0; // Just container running
 }
 
 /* ═══════════════════════════════════════════════════════ */
@@ -92,6 +98,7 @@ export default function Home() {
       const res = await fetch('/api/container');
       if (res.ok) {
         const data = await res.json();
+        console.log('Bot Status:', data);
         setBotStatus(data);
         if (data.status === 'running') setSetupStatus('success');
       }
