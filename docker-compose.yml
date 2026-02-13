@@ -29,6 +29,8 @@ services:
       - MAX_USERS=${MAX_USERS:-50}
       - DEFAULT_RAM_LIMIT=${DEFAULT_RAM_LIMIT:-256m}
       - DEFAULT_CPU_LIMIT=${DEFAULT_CPU_LIMIT:-0.25}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for container management
       - ./admin/data:/app/data                      # Persistent database
