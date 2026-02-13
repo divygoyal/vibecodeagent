@@ -11,8 +11,8 @@ class GoogleAnalytics {
                 if (process.env.OPENCLAW_CONNECTIONS) {
                     const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
                     if (connections.google) {
-                        this.config.access_token = connections.google.accessToken;
-                        this.config.refresh_token = connections.google.refreshToken;
+                        this.config.access_token = connections.google.accessToken || connections.google.access_token;
+                        this.config.refresh_token = connections.google.refreshToken || connections.google.refresh_token;
                         console.log("Found Google credentials in environment.");
                     }
                 }
