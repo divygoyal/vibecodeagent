@@ -1,5 +1,5 @@
-# Heartbeat Check (Disabled for Token Optimization)
+# HEARTBEAT.md
 
-**Status**: Heartbeat is disabled to save tokens.
+# Keep this file empty (or with only comments) to skip heartbeat API calls.
 
-If you need periodic checks, enable heartbeat in the config with a long interval (60+ minutes).
+# Add tasks below when you want the agent to check something periodically.

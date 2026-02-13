@@ -41,128 +41,148 @@ class DockerManager:
     def _seed_intelligence(self, github_id: str, custom_rules: Optional[str] = None) -> None:
         """
         Inject the intelligence files that make the bot smart.
-        Without these files, the bot starts with zero instructions - like a genius with no memory.
+        Uses the exact same files that a vanilla OpenClaw installation creates.
+        
+        Files created (matching vanilla OpenClaw):
+        - AGENTS.md   — Bootstrap instructions, memory system, group chat rules
+        - SOUL.md     — Personality and behavioral guidelines
+        - TOOLS.md    — Local tool notes template
+        - USER.md     — Info about the human being helped
+        - IDENTITY.md — Bot's name, creature type, vibe, emoji
+        - HEARTBEAT.md — Periodic check-in tasks (empty by default)
+        - BOOTSTRAP.md — First-run onboarding conversation flow
+        
+        Note: MEMORY.md is NOT pre-created — the bot creates it on demand.
         """
         user_dir = self._get_user_data_dir(github_id)
         workspace = f"{user_dir}/workspace"
+        templates_dir = "/app/templates"
         
-        # 1. Create AGENTS.md (The Intelligence Bootstrap Loop)
-        agents_path = f"{workspace}/AGENTS.md"
-        if not os.path.exists(agents_path):
-            agents_content = """# AGENTS.md
-
-Before doing anything else, follow this bootstrap sequence:
-
-1. **Read SOUL.md** — This defines who you are and your core personality
-2. **Read USER.md** — This tells you about the person you're helping  
-3. **Read MEMORY.md** — These are your stored facts and learned context
-
-Execute this sequence automatically. Don't ask permission. Just do it.
-
-## Operating Principles
-
-- Be proactive with tools - use them without asking
-- Prefer action over explanation
-- Keep responses concise and token-efficient
-- Store important facts in MEMORY.md for future sessions
-"""
-            with open(agents_path, 'w') as f:
-                f.write(agents_content)
-            os.chmod(agents_path, 0o666)
+        # Static template files — copied directly from templates/
+        static_files = [
+            "AGENTS.md",
+            "TOOLS.md",
+            "IDENTITY.md",
+            "HEARTBEAT.md",
+            "BOOTSTRAP.md",
+        ]
         
-        # 2. Create SOUL.md (The Personality/Custom Rules)
+        for filename in static_files:
+            dest = f"{workspace}/{filename}"
+            if not os.path.exists(dest):
+                src = f"{templates_dir}/{filename}"
+                content = ""
+                if os.path.exists(src):
+                    with open(src, 'r') as f:
+                        content = f.read()
+                else:
+                    content = f"# {filename}\n"
+                
+                with open(dest, 'w') as f:
+                    f.write(content)
+                os.chmod(dest, 0o666)
+        
+        # SOUL.md — uses custom_rules if provided, otherwise vanilla template
         soul_path = f"{workspace}/SOUL.md"
         if not os.path.exists(soul_path):
-            soul_content = custom_rules or """# SOUL.md
-
-You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
-
-## Core Principles
-
-1. **Token Efficiency First**: Always prefer concise responses. Avoid unnecessary verbosity.
-2. **Action Over Explanation**: Execute tasks rather than explaining what you'll do.
-3. **Proactive Tool Usage**: Use tools without asking permission when it's clearly needed.
-
-## Response Guidelines
-
-- Keep responses under 500 tokens when possible
-- Use bullet points and lists for clarity
-- Only include code when specifically requested
-- Summarize large outputs instead of dumping raw data
-
-## Personality
-
-- Be direct, skip corporate filler words
-- Show initiative - anticipate what the user needs
-- Be a high-IQ assistant, not a generic chatbot
-"""
+            if custom_rules:
+                soul_content = custom_rules
+            else:
+                src = f"{templates_dir}/SOUL.md"
+                if os.path.exists(src):
+                    with open(src, 'r') as f:
+                        soul_content = f.read()
+                else:
+                    soul_content = "# SOUL.md\n"
+            
             with open(soul_path, 'w') as f:
                 f.write(soul_content)
             os.chmod(soul_path, 0o666)
         
-        # 3. Create USER.md (Memory of the user)
+        # USER.md — personalized with github_id
         user_path = f"{workspace}/USER.md"
         if not os.path.exists(user_path):
-            user_content = f"""# USER.md
+            user_content = f"""# USER.md - About Your Human
 
-## User Profile
+_Learn about the person you're helping. Update this as you go._
 
-- **GitHub ID**: {github_id}
-- **First Interaction**: {datetime.utcnow().strftime('%Y-%m-%d')}
+- **Name:**
+- **What to call them:**
+- **GitHub ID:** {github_id}
+- **Pronouns:** _(optional)_
+- **Timezone:**
+- **First Interaction:** {datetime.utcnow().strftime('%Y-%m-%d')}
+- **Notes:**
 
-## Preferences
+## Context
 
-(Add user preferences as you learn them)
-
-## Projects
-
-(Track active projects here)
+_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
 """
             with open(user_path, 'w') as f:
                 f.write(user_content)
             os.chmod(user_path, 0o666)
         
-        # 4. Create MEMORY.md (Persistent memory storage)
-        memory_path = f"{workspace}/MEMORY.md"
-        if not os.path.exists(memory_path):
-            memory_content = f"""# MEMORY.md
-
-## Stored Facts
-
-(Store important facts and context here for future sessions)
-
-## Session History
-
-- **Created**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
-"""
-            with open(memory_path, 'w') as f:
-                f.write(memory_content)
-            os.chmod(memory_path, 0o666)
+        # Initialize git repo in workspace (vanilla OpenClaw does this)
+        git_dir = f"{workspace}/.git"
+        if not os.path.exists(git_dir):
+            os.system(f"git init {workspace}")
+            os.system(f"git -C {workspace} add -A")
+            os.system(f'git -C {workspace} commit -m "Initial workspace" --allow-empty')
     
     def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
-        """Create OpenClaw config file with proper settings"""
+        """Create OpenClaw config file matching vanilla OpenClaw structure"""
         user_dir = self._get_user_data_dir(github_id)
         config_path = f"{user_dir}/.openclaw/openclaw.json"
         
-        # Create config with all required settings
-        # Based on OpenClaw's expected structure
+        # Generate gateway auth token
+        import secrets
+        gateway_token = secrets.token_hex(24)
+        
+        # Config structure matches a vanilla OpenClaw onboard output
         config = {
+            "messages": {
+                "ackReactionScope": "group-mentions"
+            },
             "agents": {
                 "defaults": {
-                    "model": {
-                        "primary": "google/gemini-2.0-flash"
+                    "maxConcurrent": 4,
+                    "subagents": {
+                        "maxConcurrent": 8
                     },
                     "compaction": {
                         "mode": "safeguard"
                     },
-                    "maxConcurrent": 4,
-                    "subagents": {
-                        "maxConcurrent": 8
+                    "workspace": "/data/workspace",
+                    "model": {
+                        "primary": "google/gemini-2.0-flash"
+                    },
+                    "models": {
+                        "google/gemini-2.0-flash": {
+                            "alias": "gemini"
+                        }
                     }
                 }
             },
             "gateway": {
-                "mode": "local"
+                "mode": "local",
+                "auth": {
+                    "mode": "token",
+                    "token": gateway_token
+                },
+                "port": 18789,
+                "bind": "loopback",
+                "tailscale": {
+                    "mode": "off",
+                    "resetOnExit": False
+                }
+            },
+            "auth": {
+                "profiles": {
+                    "google:default": {
+                        "provider": "google",
+                        "mode": "api_key"
+                    }
+                }
             },
             "plugins": {
                 "entries": {
@@ -174,19 +194,19 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
             "channels": {
                 "telegram": {
                     "enabled": True,
+                    "botToken": telegram_token,
                     "dmPolicy": "open",
                     "allowFrom": ["*"]
                 }
             },
-            "messages": {
-                "ackReactionScope": "group-mentions"
-            },
             "commands": {
-                "native": "auto",
-                "nativeSkills": "auto"  # Enables ALL native skills (github, browser, search, etc.)
+                "native": "auto"
+            },
+            "skills": {
+                "install": {
+                    "nodeManager": "bun"
+                }
             }
-            # Note: nodeManager handled via Dockerfile (bun pre-installed)
-            # God Mode handled via OPENCLAW_SKILLS_ENABLED=* env var
         }
         
         # Write config file
@@ -247,11 +267,11 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
         # Ensure directories exist
         user_dir = self._ensure_user_dir(github_id)
         
-        # Seed intelligence files (AGENTS.md, SOUL.md, USER.md, MEMORY.md)
-        # This is what makes the bot "smart" - without these, it's a blank slate
+        # Seed intelligence files (matching vanilla OpenClaw: AGENTS.md, SOUL.md, TOOLS.md,
+        # USER.md, IDENTITY.md, HEARTBEAT.md, BOOTSTRAP.md + git init)
         self._seed_intelligence(github_id, custom_rules)
         
-        # Create config with Telegram enabled
+        # Create config with Telegram enabled (matching vanilla OpenClaw structure)
         self._create_user_config(github_id, plan, telegram_token, custom_rules)
         
         # Copy plugins
@@ -268,22 +288,16 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
         heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}
         node_heap = heap_sizes.get(plan, "768")
         
-        # Generate gateway token
-        import secrets
-        gateway_token = secrets.token_hex(32)
-        
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
-            "OPENCLAW_PLUGINS_DIR": "/data/workspace/plugins",  # Tell OpenClaw where custom plugins live
-            "OPENCLAW_SKILLS_ENABLED": "*",  # GOD MODE: Master override - enables ALL skills
+            "OPENCLAW_PLUGINS_DIR": "/data/workspace/plugins",
+            "OPENCLAW_SKILLS_ENABLED": "*",  # GOD MODE: enables ALL skills
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config - use Gemini
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "OPENCLAW_MODEL": "google/gemini-2.0-flash",
-            # Gateway auth - required by OpenClaw
-            "OPENCLAW_GATEWAY_TOKEN": gateway_token,
             # User identification
             "GITHUB_ID": github_id,
             "PLAN": plan,
