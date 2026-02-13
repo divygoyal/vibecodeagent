@@ -310,10 +310,26 @@ async def create_user(
         if user_data.gemini_api_key:
             user.gemini_api_key = user_data.gemini_api_key
             
-        # Ensure ID consistency (if migrating from email-id to provider-id)
-        # Note: changing primary key/github_id might break container mapping if container named after old ID
-        # For now, we keep the old github_id if set, to keep container association
+        # Update OAuth credentials if provided (Critical for re-auth/refresh tokens)
+        if user_data.provider and user_data.provider_id:
+            stmt = select(OAuthConnection).where(
+                OAuthConnection.user_id == user.id,
+                OAuthConnection.provider == user_data.provider
+            )
+            result = await db.execute(stmt)
+            oauth = result.scalar_one_or_none()
             
+            if oauth:
+                if user_data.access_token:
+                    oauth.access_token = user_data.access_token
+                if user_data.refresh_token:
+                    oauth.refresh_token = user_data.refresh_token
+                oauth.updated_at = datetime.utcnow()
+                # await db.commit() # Wait until end
+            else:
+                 # Should create if missing? Maybe.
+                 pass
+
         await db.commit()
         await db.refresh(user)
     else:
