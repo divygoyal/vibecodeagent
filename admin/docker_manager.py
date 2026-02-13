@@ -35,6 +35,7 @@ class DockerManager:
         # Fix permissions - OpenClaw runs as node user (UID 1000)
         # Make directories writable by the container user
         os.system(f"chmod -R 777 {user_dir}")
+        os.system(f"chown -R 1000:1000 {user_dir}")  # node user UID inside container
         
         return user_dir
     
