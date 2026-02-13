@@ -13,7 +13,9 @@ services:
 
   # ============= Admin API =============
   admin-api:
-    build: ./admin
+    build: 
+      context: .
+      dockerfile: admin/Dockerfile
     container_name: clawbot-admin
     restart: always
     environment:
@@ -43,7 +45,9 @@ services:
 
   # ============= Watchdog Service =============
   watchdog:
-    build: ./admin
+    build: 
+      context: .
+      dockerfile: admin/Dockerfile
     container_name: clawbot-watchdog
     restart: always
     command: ["python", "watchdog.py"]

@@ -10,13 +10,15 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for caching
-COPY requirements.txt .
+# Copy requirements first for caching (context is root now)
+COPY admin/requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application code configuration templates
+COPY admin/. .
+COPY templates /app/templates
+COPY plugins /app/plugins
 
 # Create data directory
 RUN mkdir -p data
