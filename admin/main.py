@@ -44,9 +44,58 @@ async def lifespan(app: FastAPI):
     import os
     os.makedirs("data", exist_ok=True)
     await init_db()
+    
+    # Auto-sync orphaned containers to DB
+    async with async_session() as session:
+        await sync_orphaned_users(session)
+        
     yield
     # Shutdown
     pass
+
+
+async def sync_orphaned_users(db: AsyncSession):
+    """
+    Recover users from running containers if DB is empty/desynced.
+    This fixes the 'empty admin dashboard' issue after redeploys.
+    """
+    try:
+        print("Syncing orphaned containers...")
+        # Get all containers from Docker
+        containers = docker_manager.get_all_containers()
+        
+        for container_summary in containers:
+            github_id = container_summary.get("github_id")
+            if not github_id:
+                continue
+                
+            # Check if exists in DB
+            result = await db.execute(select(User).where(User.github_id == github_id))
+            existing = result.scalar_one_or_none()
+            
+            if not existing:
+                print(f"Found orphan container for {github_id}, recovering...")
+                data = docker_manager.inspect_container_for_sync(github_id)
+                if data:
+                    user = User(
+                        github_id=data["github_id"],
+                        github_username=data["github_username"],
+                        plan=data["plan"],
+                        telegram_bot_token=data["telegram_bot_token"],
+                        gemini_api_key=data["gemini_api_key"],
+                        github_token=data["github_token"],
+                        container_id=data["container_id"],
+                        container_name=data["container_name"],
+                        container_port=data["container_port"],
+                        container_status="running",
+                        subscription_start=datetime.utcnow(), # Approximate
+                        created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.utcnow()
+                    )
+                    db.add(user)
+                    await db.commit()
+                    print(f"Recovered user {github_id}")
+    except Exception as e:
+        print(f"Sync failed: {e}")
 
 
 # ============= FastAPI App =============

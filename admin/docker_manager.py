@@ -497,5 +497,44 @@ _(What do they care about? What projects are they working on? What annoys them? 
             return {"success": False, "error": str(e)}
 
 
+
+    def inspect_container_for_sync(self, github_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Inspect a container to recover user data for DB sync.
+        Extracts tokens and config from ENV variables and Labels.
+        """
+        container_name = self._get_container_name(github_id)
+        try:
+            container = self.client.containers.get(container_name)
+            labels = container.labels
+            env_list = container.attrs['Config']['Env']
+            env = {e.split('=', 1)[0]: e.split('=', 1)[1] for e in env_list}
+            
+            # Extract port mapping
+            # "Ports": { "8080/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "32768" } ] }
+            ports = container.attrs['NetworkSettings']['Ports']
+            host_port = None
+            if ports and "8080/tcp" in ports and ports["8080/tcp"]:
+                host_port = int(ports["8080/tcp"][0]["HostPort"])
+            
+            return {
+                "github_id": github_id,
+                "github_username": env.get("GITHUB_USERNAME"), # Might not be there, but maybe in labels?
+                "plan": labels.get("clawbot.plan", "free"),
+                "container_id": container.id,
+                "container_name": container_name,
+                "container_port": host_port,
+                "container_status": container.status,
+                "telegram_bot_token": env.get("TELEGRAM_BOT_TOKEN"),
+                "gemini_api_key": env.get("GEMINI_API_KEY"),
+                "github_token": env.get("GITHUB_TOKEN"),
+                "custom_rules": None, # Hard to recover unless we read SOUL.md, skipping for now
+                "created_at": labels.get("clawbot.created")
+            }
+        except Exception as e:
+            print(f"Error inspecting container {container_name}: {e}")
+            return None
+
+
 # Singleton instance
 docker_manager = DockerManager()

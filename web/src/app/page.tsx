@@ -255,9 +255,11 @@ export default function Home() {
                       }`} />
                     <span className={`text-xs font-medium ${statusLevel >= 3 ? 'text-emerald-400' :
                       statusLevel >= 1 ? 'text-amber-400' :
-                        'text-red-400'
+                        'text-zinc-500'
                       }`}>
-                      {statusLevel >= 3 ? 'Live' : statusLevel >= 1 ? 'Initializing' : 'Offline'}
+                      {botStatus?.status === 'running' ? (
+                        statusLevel >= 3 ? 'Live' : statusLevel >= 1 ? 'Initializing' : 'Starting...'
+                      ) : 'Offline'}
                     </span>
                   </div>
                 </div>
@@ -443,7 +445,10 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <p className="text-zinc-600 text-sm">No recent commits</p>
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <p className="text-zinc-500 text-sm mb-1">No recent commits found from GitHub.</p>
+                  <p className="text-zinc-600 text-xs">Verify your token has 'repo' scope if expected.</p>
+                </div>
               )}
             </div>
           </div>
