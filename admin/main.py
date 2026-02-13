@@ -373,8 +373,8 @@ async def create_user(
     if user_data.access_token:
         connections[user_data.provider] = {
             "provider_account_id": user_data.provider_id,
-            "access_token": user_data.access_token,
-            "refresh_token": user_data.refresh_token, # Send refresh token to container
+            "accessToken": user_data.access_token,
+            "refreshToken": user_data.refresh_token,
             "token_type": "bearer"
         }
 
@@ -519,9 +519,6 @@ async def update_user(
     
     # Generic wrapper for updating OAuth - supports google, github, etc.
     if user_update.provider:
-        print(f"DEBUG: Update user provider={user_update.provider}")
-        print(f"DEBUG: refresh_token provided? {bool(user_update.refresh_token)}")
-        
         # We need to find the connection for this provider
         stmt = select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
@@ -531,15 +528,12 @@ async def update_user(
         conn = result.scalar_one_or_none()
         
         if conn:
-            print("DEBUG: Found existing OAuth connection to update")
             if user_update.access_token:
                 conn.access_token = user_update.access_token
             if user_update.refresh_token:
-                print("DEBUG: Updating refresh_token in DB")
                 conn.refresh_token = user_update.refresh_token
             conn.updated_at = datetime.utcnow()
         else:
-            print("DEBUG: Creating NEW OAuth connection")
             # Create new if not exists (upsert)
             if user_update.access_token:
                conn = OAuthConnection(
@@ -704,8 +698,8 @@ async def container_action(
             for c in conns_list:
                 connections[c.provider] = {
                     "provider_account_id": c.provider_account_id,
-                    "access_token": c.access_token,
-                    "refresh_token": c.refresh_token, # Send refresh token to container
+                    "accessToken": c.access_token,
+                    "refreshToken": c.refresh_token,
                     "token_type": c.token_type,
                     "scope": c.scope
                 }
