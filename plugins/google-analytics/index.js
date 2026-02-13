@@ -26,17 +26,41 @@ class GoogleAnalytics {
         if (!this.config.access_token && !this.config.refresh_token) {
             throw new Error("No Google credentials found. Please connect your Google account in the dashboard.");
         }
-        // Initialize OAuth client with credentials
-        // Note: access_token will be refreshed automatically if refresh_token is present
+        // Initialize OAuth client with credentials from environment (injected by DockerManager)
+        // or fallback to process.env (for local dev)
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+            console.error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in environment");
+            // We can't refresh without these, but maybe we have a valid access token?
+            // Proceeding might fail later if token expires.
+        }
+
         const auth = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET
+            clientId,
+            clientSecret
         );
 
         auth.setCredentials({
             access_token: this.config.access_token,
             refresh_token: this.config.refresh_token
         });
+
+        // Proactively check/refresh token to ensure validity
+        // This handles cases where the injected access_token is already expired
+        try {
+            const { token } = await auth.getAccessToken();
+            if (token) {
+                auth.setCredentials({ access_token: token });
+            }
+        } catch (e) {
+            console.error("Failed to refresh Google token:", e.message);
+            // We proceed, but the next call will likely fail 
+            // causing the bot to prompt for re-auth if configured.
+            // But let's throw to make it clear in logs.
+            throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+        }
 
         return auth;
     }

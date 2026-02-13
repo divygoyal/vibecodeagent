@@ -5,10 +5,13 @@ Handles creation, management, and monitoring of user containers
 import docker
 import os
 import json
+import logging
 from typing import Optional, Dict, Any
 from config import settings, PLANS
 from datetime import datetime
 
+# Setup logger
+logger = logging.getLogger(__name__)
 
 class DockerManager:
     """Manages Docker containers for user ClawBots"""
@@ -117,8 +120,6 @@ _Learn about the person you're helping. Update this as you go._
 ## Context
 
 _(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
-## Active Connections
 """
             with open(user_path, 'w') as f:
                 f.write(user_content)
@@ -127,22 +128,27 @@ _(What do they care about? What projects are they working on? What annoys them? 
         # Always ensure Active Connections are up to date (Idempotent update)
         if connections:
              try:
-                 with open(user_path, 'r') as f:
-                     current_content = f.read()
-                 
-                 new_lines = []
-                 if "google" in connections and "Google Analytics" not in current_content:
-                     new_lines.append("- ✅ Google Analytics (Active: Session authenticated via environment)")
-                 if "github" in connections and "GitHub" not in current_content:
-                     new_lines.append("- ✅ GitHub (Active: Authenticated via environment)")
-                 
-                 if new_lines:
-                     if "## Active Connections" not in current_content:
-                         current_content += "\n\n## Active Connections\n"
+                 if os.path.exists(user_path):
+                     with open(user_path, 'r') as f:
+                         content = f.read()
                      
-                     with open(user_path, 'a') as f:
-                         for line in new_lines:
-                             f.write(f"{line}\n")
+                     # Remove existing "Active Connections" section if present to avoid duplication
+                     if "## Active Connections" in content:
+                         content = content.split("## Active Connections")[0].strip()
+                     
+                     # Build new connections section
+                     new_lines = []
+                     if "google" in connections:
+                         new_lines.append("- ✅ Google Analytics (Active: Session authenticated via environment)")
+                     if "github" in connections:
+                         new_lines.append("- ✅ GitHub (Active: Authenticated via environment)")
+                     
+                     if new_lines:
+                         content += "\n\n## Active Connections\n" + "\n".join(new_lines) + "\n"
+                         
+                     with open(user_path, 'w') as f:
+                         f.write(content)
+                     
              except Exception as e:
                  logger.error(f"Failed to update USER.md with connections: {e}")
         
@@ -348,7 +354,10 @@ _(What do they care about? What projects are they working on? What annoys them? 
             # Node.js memory
             "NODE_OPTIONS": f"--max-old-space-size={node_heap}",
             # Generic Connections
-            "OPENCLAW_CONNECTIONS": connections_json
+            "OPENCLAW_CONNECTIONS": connections_json,
+            # OAuth Keys (Required for refresh token flow)
+            "GOOGLE_CLIENT_ID": settings.GOOGLE_CLIENT_ID or "",
+            "GOOGLE_CLIENT_SECRET": settings.GOOGLE_CLIENT_SECRET or ""
         }
         
         # Legacy compat: maintain GITHUB_TOKEN/ID env vars if present in connections

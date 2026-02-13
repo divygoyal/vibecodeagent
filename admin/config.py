@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # API Keys (for shared key mode)
     GEMINI_API_KEY: Optional[str] = None
     
+    # OAuth Credentials (injected into containers)
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    
     # Alerts
     TELEGRAM_ADMIN_BOT_TOKEN: Optional[str] = None
     TELEGRAM_ADMIN_CHAT_ID: Optional[str] = None
