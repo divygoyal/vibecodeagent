@@ -10,9 +10,10 @@ class GoogleAnalytics {
             try {
                 if (process.env.OPENCLAW_CONNECTIONS) {
                     const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
-                    if (connections.google && connections.google.access_token) {
+                    if (connections.google) {
                         this.config.access_token = connections.google.access_token;
-                        console.log("Found Google Access Token in environment.");
+                        this.config.refresh_token = connections.google.refresh_token;
+                        console.log("Found Google credentials in environment.");
                     }
                 }
             } catch (e) {
@@ -22,11 +23,21 @@ class GoogleAnalytics {
     }
 
     async _getAuth() {
-        if (!this.config.access_token) {
-            throw new Error("No Google access token found. Please connect your Google account in the dashboard.");
+        if (!this.config.access_token && !this.config.refresh_token) {
+            throw new Error("No Google credentials found. Please connect your Google account in the dashboard.");
         }
-        const auth = new google.auth.OAuth2();
-        auth.setCredentials({ access_token: this.config.access_token });
+        // Initialize OAuth client with credentials
+        // Note: access_token will be refreshed automatically if refresh_token is present
+        const auth = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+        );
+
+        auth.setCredentials({
+            access_token: this.config.access_token,
+            refresh_token: this.config.refresh_token
+        });
+
         return auth;
     }
 

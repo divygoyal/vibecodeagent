@@ -36,6 +36,8 @@ export async function POST(req: Request) {
     const accessToken = session.user.accessToken
     // @ts-expect-error - provider added in callbacks
     const provider = session.user.provider || "github" // default to github for legacy
+    // @ts-expect-error - refreshToken added in callbacks
+    const refreshToken = session.user.refreshToken
 
     const email = session.user.email
 
@@ -46,6 +48,7 @@ export async function POST(req: Request) {
     // Log for debugging (token is masked)
     console.log(`Setup bot for user ${username} (${userId}) via ${provider}`)
     console.log(`Access token present: ${accessToken ? 'YES' : 'NO'}`)
+    console.log(`Refresh token present: ${refreshToken ? 'YES' : 'NO'}`)
 
     // Prepare payload for Admin API
     const payload: any = {
@@ -57,6 +60,7 @@ export async function POST(req: Request) {
       provider: provider,
       provider_id: String(userId),
       access_token: accessToken,
+      refresh_token: refreshToken,
     }
 
     // Add legacy GitHub fields if applicable
@@ -122,7 +126,8 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             telegram_bot_token: token,
             provider: provider,
-            access_token: accessToken // Update generic token
+            access_token: accessToken, // Update generic token
+            refresh_token: refreshToken // Update refresh token
           })
         })
 

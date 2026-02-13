@@ -19,6 +19,7 @@ interface ExtendedUser {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    refreshToken?: string;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -38,7 +39,9 @@ export const authOptions: NextAuthOptions = {
             allowDangerousEmailAccountLinking: true,
             authorization: {
                 params: {
-                    scope: "openid email profile https://www.googleapis.com/auth/analytics.readonly"
+                    scope: "openid email profile https://www.googleapis.com/auth/analytics.readonly",
+                    access_type: "offline",
+                    prompt: "consent",
                 }
             }
         }),
@@ -57,17 +60,24 @@ export const authOptions: NextAuthOptions = {
                 user.username = (token.username as string) || (token.name as string);
                 user.accessToken = token.accessToken as string;
                 user.provider = token.provider as string;
+                // @ts-expect-error - Custom property
+                user.refreshToken = token.refreshToken as string;
             }
             return session;
         },
 
         async jwt({ token, profile, account }) {
-            if (account && profile) {
+            if (account) {
                 // Initial sign in
                 token.accessToken = account.access_token;
                 token.provider = account.provider;
 
-                if (account.provider === "github") {
+                // Capture refresh token if provided
+                if (account.refresh_token) {
+                    token.refreshToken = account.refresh_token;
+                }
+
+                if (profile && account.provider === "github") {
                     token.username = (profile as any).login;
                 }
             }

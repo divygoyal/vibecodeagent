@@ -193,6 +193,7 @@ class UserCreate(BaseModel):
     provider: str = "github"
     provider_id: Optional[str] = None
     access_token: Optional[str] = None
+    refresh_token: Optional[str] = None # New
     
     github_username: Optional[str] = None
     email: Optional[str] = None
@@ -212,6 +213,7 @@ class UserUpdate(BaseModel):
     # Generic provider update
     provider: Optional[str] = None
     access_token: Optional[str] = None
+    refresh_token: Optional[str] = None # New
 
 
 class ContainerAction(BaseModel):
@@ -641,6 +643,7 @@ async def container_action(
                 connections[c.provider] = {
                     "provider_account_id": c.provider_account_id,
                     "access_token": c.access_token,
+                    "refresh_token": c.refresh_token, # Send refresh token to container
                     "token_type": c.token_type,
                     "scope": c.scope
                 }
