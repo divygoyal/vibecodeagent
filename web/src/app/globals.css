@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --emerald: #34d399;
+  --cyan: #22d3ee;
 }
 
 @theme inline {
@@ -12,15 +14,255 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* ========== Glassmorphism cards ========== */
+.glass-card {
+  background: rgba(24, 24, 27, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(63, 63, 70, 0.5);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(52, 211, 153, 0.3);
+  box-shadow: 0 0 30px rgba(52, 211, 153, 0.05);
+}
+
+.glass-card-static {
+  background: rgba(24, 24, 27, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(63, 63, 70, 0.5);
+  border-radius: 16px;
+}
+
+/* ========== Gradient text ========== */
+.gradient-text {
+  background: linear-gradient(135deg, #34d399 0%, #22d3ee 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========== Pulse animations ========== */
+@keyframes pulse-emerald {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(248, 113, 113, 0); }
+}
+
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
+}
+
+.pulse-live {
+  animation: pulse-emerald 2s ease-in-out infinite;
+}
+
+.pulse-error {
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+.pulse-init {
+  animation: pulse-amber 2s ease-in-out infinite;
+}
+
+/* ========== Status step indicator ========== */
+.status-step {
+  position: relative;
+  padding-left: 28px;
+}
+
+.status-step::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(63, 63, 70, 0.8);
+  transition: all 0.3s ease;
+}
+
+.status-step.active::before {
+  border-color: #34d399;
+  background: #34d399;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.5);
+}
+
+.status-step.pending::before {
+  border-color: rgba(63, 63, 70, 0.5);
+  background: transparent;
+}
+
+.status-step.error::before {
+  border-color: #f87171;
+  background: #f87171;
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.5);
+}
+
+/* ========== GitHub contribution heatmap ========== */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(52, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.heatmap-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(39, 39, 42, 0.8);
+  transition: all 0.15s ease;
+}
+
+.heatmap-cell[data-level="1"] { background: rgba(52, 211, 153, 0.2); }
+.heatmap-cell[data-level="2"] { background: rgba(52, 211, 153, 0.4); }
+.heatmap-cell[data-level="3"] { background: rgba(52, 211, 153, 0.6); }
+.heatmap-cell[data-level="4"] { background: rgba(52, 211, 153, 0.9); }
+
+/* ========== Skeleton loading ========== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(39, 39, 42, 0.5) 25%, rgba(63, 63, 70, 0.5) 50%, rgba(39, 39, 42, 0.5) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ========== Fade in animation ========== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.fade-in-delay-1 { animation-delay: 0.1s; opacity: 0; }
+.fade-in-delay-2 { animation-delay: 0.2s; opacity: 0; }
+.fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
+.fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+/* ========== Scrollbar ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(63, 63, 70, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 82, 91, 0.8);
+}
+
+/* ========== Table styles (admin) ========== */
+.admin-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(161, 161, 170, 1);
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+  position: sticky;
+  top: 0;
+  background: rgba(9, 9, 11, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+.admin-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(39, 39, 42, 0.3);
+}
+
+.admin-table tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(39, 39, 42, 0.5);
+  font-size: 0.875rem;
+}
+
+/* ========== Badge styles ========== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-free {
+  background: rgba(63, 63, 70, 0.5);
+  color: #a1a1aa;
+}
+
+.badge-starter {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.badge-pro {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.badge-running {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+
+.badge-stopped {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.badge-error {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
 }

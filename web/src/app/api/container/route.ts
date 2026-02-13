@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 
 // Admin API configuration  
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
@@ -9,7 +9,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 // Container actions: start, stop, restart
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -36,8 +36,8 @@ export async function POST(req: Request) {
     const data = await response.json()
 
     if (!response.ok) {
-      return NextResponse.json({ 
-        error: data.detail || "Container action failed" 
+      return NextResponse.json({
+        error: data.detail || "Container action failed"
       }, { status: response.status })
     }
 
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 // Get container status
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

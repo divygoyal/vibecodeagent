@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 
 // Admin API configuration
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
@@ -13,16 +13,16 @@ function isValidTelegramToken(token: string): boolean {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
     const { token, plan } = await req.json()
-    
+
     if (!token || !isValidTelegramToken(token)) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Invalid token format",
         hint: "Token should be from @BotFather"
       }, { status: 400 })
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     // @ts-expect-error - accessToken added in callbacks
     const githubToken = session.user.accessToken
     const email = session.user.email
-    
+
     if (!githubId) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
     }
@@ -92,25 +92,25 @@ export async function POST(req: Request) {
           const containerData = await containerResponse.json()
           console.log(`Container start result for ${githubId}:`, containerData)
 
-          return NextResponse.json({ 
+          return NextResponse.json({
             message: "Bot connected and started successfully",
             status: containerData.status || "running"
           })
         }
       }
-      
+
       console.error("Admin API error:", data)
-      return NextResponse.json({ 
-        error: data.detail || "Failed to setup bot" 
+      return NextResponse.json({
+        error: data.detail || "Failed to setup bot"
       }, { status: response.status })
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       message: "Bot connected successfully",
       status: data.container_status,
       port: data.container_port
     })
-    
+
   } catch (error) {
     const err = error as Error
     console.error("Bot setup error:", err.message)

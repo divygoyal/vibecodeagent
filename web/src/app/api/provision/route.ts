@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 
 // Admin API configuration  
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
@@ -8,7 +8,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -49,8 +49,8 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const error = err as Error
     console.error('Provisioning error:', error.message)
-    return NextResponse.json({ 
-      error: 'Internal Server Error', 
+    return NextResponse.json({
+      error: 'Internal Server Error',
       details: error.message?.substring(0, 100) || 'Unknown error'
     }, { status: 500 })
   }
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 // Get user status
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -74,7 +74,7 @@ export async function GET(req: Request) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           provisioned: false,
           message: "Bot not yet configured"
         })
