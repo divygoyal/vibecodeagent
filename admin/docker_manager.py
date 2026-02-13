@@ -120,19 +120,31 @@ _(What do they care about? What projects are they working on? What annoys them? 
 
 ## Active Connections
 """
-            # Append connection info if valid
-            if connections:
-                 if "google" in connections:
-                     user_content += "- ✅ Google Analytics (Active: Session authenticated via environment)\n"
-                 if "github" in connections:
-                     user_content += "- ✅ GitHub (Active: Authenticated via environment)\n"
+            with open(user_path, 'w') as f:
+                f.write(user_content)
+            os.chmod(user_path, 0o666)
 
-            with open(user_path, 'w') as f:
-                f.write(user_content)
-            os.chmod(user_path, 0o666)
-            with open(user_path, 'w') as f:
-                f.write(user_content)
-            os.chmod(user_path, 0o666)
+        # Always ensure Active Connections are up to date (Idempotent update)
+        if connections:
+             try:
+                 with open(user_path, 'r') as f:
+                     current_content = f.read()
+                 
+                 new_lines = []
+                 if "google" in connections and "Google Analytics" not in current_content:
+                     new_lines.append("- ✅ Google Analytics (Active: Session authenticated via environment)")
+                 if "github" in connections and "GitHub" not in current_content:
+                     new_lines.append("- ✅ GitHub (Active: Authenticated via environment)")
+                 
+                 if new_lines:
+                     if "## Active Connections" not in current_content:
+                         current_content += "\n\n## Active Connections\n"
+                     
+                     with open(user_path, 'a') as f:
+                         for line in new_lines:
+                             f.write(f"{line}\n")
+             except Exception as e:
+                 logger.error(f"Failed to update USER.md with connections: {e}")
         
         # Initialize git repo in workspace (vanilla OpenClaw does this)
         git_dir = f"{workspace}/.git"
