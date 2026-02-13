@@ -183,11 +183,10 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
             },
             "commands": {
                 "native": "auto",
-                "nativeSkills": "auto"  # This enables ALL native skills (github, browser, search, etc.)
-            },
-            "install": {
-                "nodeManager": "bun"  # Fast skill installation via Bun (moved to top-level)
+                "nativeSkills": "auto"  # Enables ALL native skills (github, browser, search, etc.)
             }
+            # Note: nodeManager handled via Dockerfile (bun pre-installed)
+            # God Mode handled via OPENCLAW_SKILLS_ENABLED=* env var
         }
         
         # Write config file
