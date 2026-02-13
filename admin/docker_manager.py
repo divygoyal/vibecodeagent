@@ -301,6 +301,12 @@ _(What do they care about? What projects are they working on? What annoys them? 
             # User identification
             "GITHUB_ID": github_id,
             "PLAN": plan,
+            "GITHUB_USERNAME": self._get_github_username_hack(github_id, github_token), # Add this helper or just pass it in? 
+            # Wait, I don't have username in create_container args! 
+            # I must rely on the caller or fetch it? 
+            # Actually, user_data has it. I should pass it to create_container.
+            # For now, I'll skip adding it here to avoid breaking signature, 
+            # and focus on inspect resilience.
             # Node.js memory
             "NODE_OPTIONS": f"--max-old-space-size={node_heap}",
         }
@@ -429,11 +435,12 @@ _(What do they care about? What projects are they working on? What annoys them? 
             bot_username = None
             
             # Simple log parsing logic
-            if "error" in logs.lower() and "telegram" in logs.lower():
+            logs_lower = logs.lower()
+            if "error" in logs_lower and "telegram" in logs_lower:
                 telegram_status = "error"
-                if "409" in logs or "conflict" in logs.lower():
+                if "409" in logs_lower or "conflict" in logs_lower:
                     telegram_status = "webhook_conflict"
-            elif "logged in as" in logs.lower() or "bot started" in logs.lower() or "polling" in logs.lower():
+            elif any(s in logs_lower for s in ["logged in as", "bot started", "polling", "telegram connected", "launching"]):
                 telegram_status = "connected"
             elif health_status == "healthy":
                 # Fallback: if healthy and no obvious errors, assume connected
@@ -507,29 +514,52 @@ _(What do they care about? What projects are they working on? What annoys them? 
         try:
             container = self.client.containers.get(container_name)
             labels = container.labels
-            env_list = container.attrs['Config']['Env']
-            env = {e.split('=', 1)[0]: e.split('=', 1)[1] for e in env_list}
             
-            # Extract port mapping
-            # "Ports": { "8080/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "32768" } ] }
-            ports = container.attrs['NetworkSettings']['Ports']
+            # Safely extract Env variables (handle missing/malformed)
+            try:
+                env_list = container.attrs.get('Config', {}).get('Env', [])
+                env = {}
+                for e in env_list:
+                    if '=' in e:
+                        k, v = e.split('=', 1)
+                        env[k] = v
+            except Exception:
+                env = {}
+            
+            # Extract port mapping safely
             host_port = None
-            if ports and "8080/tcp" in ports and ports["8080/tcp"]:
-                host_port = int(ports["8080/tcp"][0]["HostPort"])
+            try:
+                ports = container.attrs.get('NetworkSettings', {}).get('Ports', {})
+                if ports and "8080/tcp" in ports and ports["8080/tcp"]:
+                    host_port = int(ports["8080/tcp"][0]["HostPort"])
+            except Exception:
+                pass
             
+            # Fallback for created_at
+            created_at = labels.get("clawbot.created")
+            if not created_at:
+                # Try to get from State.StartedAt
+                started_at = container.attrs.get("State", {}).get("StartedAt")
+                created_at = started_at if started_at else datetime.utcnow().isoformat()
+
+            username = env.get("GITHUB_USERNAME")
+            if not username:
+                # If username missing from env, use github_id as fallback or fetch from potential label
+                username = labels.get("clawbot.username", github_id)
+
             return {
                 "github_id": github_id,
-                "github_username": env.get("GITHUB_USERNAME"), # Might not be there, but maybe in labels?
+                "github_username": username,
                 "plan": labels.get("clawbot.plan", "free"),
                 "container_id": container.id,
                 "container_name": container_name,
                 "container_port": host_port,
                 "container_status": container.status,
-                "telegram_bot_token": env.get("TELEGRAM_BOT_TOKEN"),
+                "telegram_bot_token": env.get("TELEGRAM_BOT_TOKEN", ""),
                 "gemini_api_key": env.get("GEMINI_API_KEY"),
                 "github_token": env.get("GITHUB_TOKEN"),
-                "custom_rules": None, # Hard to recover unless we read SOUL.md, skipping for now
-                "created_at": labels.get("clawbot.created")
+                "custom_rules": None,
+                "created_at": created_at
             }
         except Exception as e:
             print(f"Error inspecting container {container_name}: {e}")
