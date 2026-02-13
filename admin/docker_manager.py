@@ -181,9 +181,6 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     "google:default": {
                         "provider": "google",
                         "mode": "api_key"
-                    "google:default": {
-                        "provider": "google",
-                        "mode": "api_key"
                     }
                 }
             },
