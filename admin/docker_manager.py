@@ -35,7 +35,6 @@ class DockerManager:
         # Fix permissions - OpenClaw runs as node user (UID 1000)
         # Make directories writable by the container user
         os.system(f"chmod -R 777 {user_dir}")
-        os.system(f"chown -R 1000:1000 {user_dir}")  # node user UID inside container
         
         return user_dir
     
@@ -258,6 +257,11 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
         # Copy plugins
         if enabled_plugins:
             self._copy_plugins(github_id, enabled_plugins)
+        
+        # Fix ownership AFTER all files are created
+        # The admin API runs as root, but the container runs as node (UID 1000)
+        # Without this, the bot can't read its own intelligence files
+        os.system(f"chown -R 1000:1000 {user_dir}")
         
         # Environment variables
         # Calculate Node.js heap size based on plan (leave ~256MB for system)
