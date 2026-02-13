@@ -65,14 +65,14 @@ PLANS = {
         "memory_limit": settings.MEMORY_LIMIT_STARTER,
         "cpu_limit": settings.CPU_LIMIT_STARTER,
         "max_daily_messages": 500,
-        "features": ["basic_chat", "github_plugin"],
+        "features": ["basic_chat", "github-ghost"],
         "price_usd": 30
     },
     "pro": {
         "memory_limit": settings.MEMORY_LIMIT_PRO,
         "cpu_limit": settings.CPU_LIMIT_PRO,
         "max_daily_messages": 5000,
-        "features": ["basic_chat", "github_plugin", "gsc_plugin", "analytics_plugin", "custom_rules"],
+        "features": ["basic_chat", "github-ghost", "google-search-console", "google-analytics", "custom_rules"],
         "price_usd": 50
     }
 }

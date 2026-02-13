@@ -1,13 +1,13 @@
 import { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
+import GoogleProvider from "next-auth/providers/google";
 
-// GitHub profile type
-interface GitHubProfile {
-    id: number;
-    login: string;
+// Generic profile type
+interface UserProfile {
+    id: string;
     name?: string;
     email?: string;
-    avatar_url?: string;
+    image?: string;
 }
 
 // Extended session user type
@@ -15,6 +15,7 @@ interface ExtendedUser {
     id?: string;
     username?: string;
     accessToken?: string;
+    provider?: string;
     name?: string | null;
     email?: string | null;
     image?: string | null;
@@ -31,33 +32,44 @@ export const authOptions: NextAuthOptions = {
                 }
             }
         }),
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+            allowDangerousEmailAccountLinking: true,
+            authorization: {
+                params: {
+                    scope: "openid email profile https://www.googleapis.com/auth/analytics.readonly"
+                }
+            }
+        }),
     ],
 
     callbacks: {
         async signIn({ account, profile }) {
-            if (account?.provider === "github" && profile) {
-                const ghProfile = profile as GitHubProfile;
-                console.log(`GitHub user signed in: ${ghProfile.login} (ID: ${ghProfile.id})`);
-            }
+            console.log(`User signed in via ${account?.provider}`);
             return true;
         },
 
         async session({ session, token }) {
             if (token && session.user) {
                 const user = session.user as ExtendedUser;
-                user.id = (token.githubId as string) || token.sub;
-                user.username = token.username as string;
+                user.id = token.sub; // Standardize on 'sub' (subject) for ID
+                user.username = (token.username as string) || (token.name as string);
                 user.accessToken = token.accessToken as string;
+                user.provider = token.provider as string;
             }
             return session;
         },
 
         async jwt({ token, profile, account }) {
-            if (account?.provider === "github" && profile) {
-                const ghProfile = profile as GitHubProfile;
-                token.githubId = String(ghProfile.id);
-                token.username = ghProfile.login;
+            if (account && profile) {
+                // Initial sign in
                 token.accessToken = account.access_token;
+                token.provider = account.provider;
+
+                if (account.provider === "github") {
+                    token.username = (profile as any).login;
+                }
             }
             return token;
         },

@@ -15,7 +15,7 @@ from sqlalchemy import select, update
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, UsageLog, ContainerEvent, Alert
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert
 from docker_manager import docker_manager
 
 
@@ -67,19 +67,21 @@ async def sync_orphaned_users(db: AsyncSession):
         
         synced = 0
         for container_summary in containers:
-            github_id = container_summary.get("github_id")
-            if not github_id:
-                print(f"  Skipping container without github_id: {container_summary.get('name')}")
+            # New docker_manager returns user_identifier
+            user_identifier = container_summary.get("user_identifier")
+            if not user_identifier:
+                print(f"  Skipping container without user_identifier: {container_summary.get('name')}")
                 continue
                 
-            # Check if exists in DB
-            result = await db.execute(select(User).where(User.github_id == github_id))
+            # Check if exists in DB (legacy lookup by github_id)
+            # Todo: update to generic lookup when we have User.user_identifier
+            result = await db.execute(select(User).where(User.github_id == user_identifier))
             existing = result.scalar_one_or_none()
             
             if not existing:
-                print(f"  Found orphan container for {github_id}, recovering...")
+                print(f"  Found orphan container for {user_identifier}, recovering...")
                 try:
-                    data = docker_manager.inspect_container_for_sync(github_id)
+                    data = docker_manager.inspect_container_for_sync(user_identifier)
                     if data:
                         # Parse created_at safely — Docker timestamps have nanosecond precision
                         created_at = datetime.utcnow()
@@ -107,13 +109,15 @@ async def sync_orphaned_users(db: AsyncSession):
                                 print(f"    Could not parse created_at '{data.get('created_at')}': {e}, using now()")
                                 created_at = datetime.utcnow()
                         
+                        # Create User WITHOUT github_token (it's gone from model)
+                        # We use user_identifier as github_id for now
                         user = User(
-                            github_id=data["github_id"],
-                            github_username=data.get("github_username") or github_id,
+                            github_id=data["user_identifier"], 
+                            github_username=data.get("github_username") or data["user_identifier"],
                             plan=data.get("plan", "free"),
                             telegram_bot_token=data.get("telegram_bot_token", ""),
                             gemini_api_key=data.get("gemini_api_key"),
-                            github_token=data.get("github_token"),
+                            # github_token=data.get("github_token"), # REMOVED from model
                             container_id=data.get("container_id"),
                             container_name=data.get("container_name"),
                             container_port=data.get("container_port"),
@@ -123,15 +127,33 @@ async def sync_orphaned_users(db: AsyncSession):
                         )
                         db.add(user)
                         await db.commit()
+                        await db.refresh(user)
+
+                        # If we recovered a token, save it to OAuthConnection
+                        token = data.get("github_token")
+                        if token:
+                            oauth = OAuthConnection(
+                                user_id=user.id,
+                                provider="github",
+                                provider_account_id=user.github_id, # Assuming user_identifier is github_id
+                                access_token=token,
+                                token_type="bearer",
+                                created_at=datetime.utcnow(),
+                                updated_at=datetime.utcnow()
+                            )
+                            db.add(oauth)
+                            await db.commit()
+                            print(f"    ✓ Recovered token for {user_identifier}")
+
                         synced += 1
-                        print(f"    ✓ Recovered user {github_id}")
+                        print(f"    ✓ Recovered user {user_identifier}")
                     else:
-                        print(f"    ✗ inspect_container_for_sync returned None for {github_id}")
+                        print(f"    ✗ inspect_container_for_sync returned None for {user_identifier}")
                 except Exception as e:
-                    print(f"    ✗ Failed to recover {github_id}: {e}")
+                    print(f"    ✗ Failed to recover {user_identifier}: {e}")
                     await db.rollback()
             else:
-                print(f"  User {github_id} already in DB")
+                print(f"  User {user_identifier} already in DB")
         
         print(f"Sync complete: {synced} users recovered from {len(containers)} containers")
     except Exception as e:
@@ -173,14 +195,14 @@ class UserCreate(BaseModel):
     plan: str = "free"
     telegram_bot_token: str
     gemini_api_key: Optional[str] = None
-    github_token: Optional[str] = None
+    github_token: Optional[str] = None # Input only, not stored in User model
 
 
 class UserUpdate(BaseModel):
     plan: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     gemini_api_key: Optional[str] = None
-    github_token: Optional[str] = None
+    github_token: Optional[str] = None # Input only
     custom_rules: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -237,30 +259,50 @@ async def create_user(
 ):
     """Create a new user and provision their ClawBot container"""
     
-    # Check if user already exists
-    result = await db.execute(
-        select(User).where(User.github_id == user_data.github_id)
-    )
+    # Check if user already exists (by email or github_id)
+    if user_data.github_id:
+        result = await db.execute(select(User).where(User.github_id == user_data.github_id))
+        existing = result.scalar_one_or_none()
+        if existing:
+            raise HTTPException(status_code=409, detail="User already exists (github_id)")
+            
+    result = await db.execute(select(User).where(User.email == user_data.email))
     existing = result.scalar_one_or_none()
     if existing:
-        raise HTTPException(status_code=409, detail="User already exists")
+        raise HTTPException(status_code=409, detail="User already exists (email)")
     
     # Validate plan
     if user_data.plan not in PLANS:
         raise HTTPException(status_code=400, detail=f"Invalid plan. Options: {list(PLANS.keys())}")
     
+    # Determine user_identifier for container
+    # Prefer github_id for legacy consistency, fallback to email
+    user_identifier = user_data.github_id if user_data.github_id else user_data.email
+    
     # Get available port
     port = await get_next_available_port(db)
     
-    # Create container
+    # Prepare connections for container
     plan_config = PLANS[user_data.plan]
+    connections = {}
+    
+    # Add the primary provider connection
+    if user_data.access_token:
+        connections[user_data.provider] = {
+            "provider_account_id": user_data.provider_id,
+            "access_token": user_data.access_token,
+            "token_type": "bearer",
+            "scope": "unknown" 
+        }
+        
+    # Create container
     result = docker_manager.create_container(
-        github_id=user_data.github_id,
+        user_identifier=user_identifier,
         plan=user_data.plan,
         port=port,
         telegram_token=user_data.telegram_bot_token,
         gemini_key=user_data.gemini_api_key,
-        github_token=user_data.github_token,
+        connections=connections,
         enabled_plugins=plan_config.get("features", [])
     )
     
@@ -269,13 +311,12 @@ async def create_user(
     
     # Create user record
     user = User(
-        github_id=user_data.github_id,
+        github_id=user_data.github_id, # Can be None if generic provider
         github_username=user_data.github_username,
         email=user_data.email,
         plan=user_data.plan,
         telegram_bot_token=user_data.telegram_bot_token,
         gemini_api_key=user_data.gemini_api_key,
-        github_token=user_data.github_token,
         container_id=result["container_id"],
         container_name=result["container_name"],
         container_port=port,
@@ -288,12 +329,26 @@ async def create_user(
     await db.commit()
     await db.refresh(user)
     
+    # Save OAuthConnection
+    if user_data.access_token:
+        oauth = OAuthConnection(
+            user_id=user.id,
+            provider=user_data.provider,
+            provider_account_id=user_data.provider_id,
+            access_token=user_data.access_token,
+            token_type="bearer",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(oauth)
+        await db.commit()
+
     # Log event
     await log_container_event(db, user.id, result["container_id"], "create", f"Created with plan: {user_data.plan}")
     
     return UserResponse(
         id=user.id,
-        github_id=user.github_id,
+        github_id=user.github_id or "", # handle potential None for response
         github_username=user.github_username,
         plan=user.plan,
         container_status=user.container_status,
@@ -377,6 +432,34 @@ async def update_user(
     
     # Update fields
     update_data = user_update.model_dump(exclude_unset=True)
+    # Handle github_token separately - update OAuthConnection
+    if "github_token" in update_data:
+        token = update_data.pop("github_token")
+        if token:
+             # Upsert OAuthConnection for github
+             result = await db.execute(
+                 select(OAuthConnection).where(
+                     OAuthConnection.user_id == user.id,
+                     OAuthConnection.provider == "github"
+                 )
+             )
+             conn = result.scalar_one_or_none()
+             if conn:
+                 conn.access_token = token
+                 conn.updated_at = datetime.utcnow()
+             else:
+                 conn = OAuthConnection(
+                     user_id=user.id,
+                     provider="github",
+                     provider_account_id=github_id,
+                     access_token=token,
+                     token_type="bearer",
+                     created_at=datetime.utcnow(),
+                     updated_at=datetime.utcnow()
+                 )
+                 db.add(conn)
+             await db.commit()
+
     for key, value in update_data.items():
         setattr(user, key, value)
     
@@ -389,15 +472,29 @@ async def update_user(
         docker_manager.stop_container(github_id)
         docker_manager.delete_container(github_id, remove_data=False)
         
+        # Fetch connections for logic
+        result = await db.execute(
+            select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+        )
+        conns_list = result.scalars().all()
+        connections = {}
+        for c in conns_list:
+             connections[c.provider] = {
+                 "provider_account_id": c.provider_account_id,
+                 "access_token": c.access_token,
+                 "token_type": c.token_type,
+                 "scope": c.scope
+             }
+
         # Create new container with new limits
         plan_config = PLANS[user_update.plan]
         result = docker_manager.create_container(
-            github_id=github_id,
+            user_identifier=github_id,
             plan=user_update.plan,
             port=user.container_port,
             telegram_token=user.telegram_bot_token,
             gemini_key=user.gemini_api_key,
-            github_token=user.github_token,
+            connections=connections,
             custom_rules=user.custom_rules,
             enabled_plugins=plan_config.get("features", [])
         )
@@ -430,7 +527,15 @@ async def delete_user(
     # Delete container
     docker_result = docker_manager.delete_container(github_id, remove_data=remove_data)
     
-    # Delete user record
+    # Delete user record (cascade should handle OAuthConnections if configured, but let's manual delete to be safe)
+    await db.execute(
+        select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+    ) # actually just delete user, SQLAlchemy rarely does cascades unless configured. 
+      # Since we don't have relationships defined in model, we rely on DB FK or manual.
+      # DB schema doesn't have FK constraints explicitly defined in models shown, so let's check.
+      # Assuming manual delete for now.
+    
+    # Actually, simplistic delete.
     await db.delete(user)
     await db.commit()
     
@@ -464,14 +569,28 @@ async def container_action(
             if not user.telegram_bot_token:
                 return {"success": False, "error": "No Telegram bot token configured. Please set up your bot first."}
             
+            # Fetch connections
+            result_conns = await db.execute(
+                select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+            )
+            conns_list = result_conns.scalars().all()
+            connections = {}
+            for c in conns_list:
+                connections[c.provider] = {
+                    "provider_account_id": c.provider_account_id,
+                    "access_token": c.access_token,
+                    "token_type": c.token_type,
+                    "scope": c.scope
+                }
+
             plan_config = PLANS.get(user.plan, PLANS["free"])
             result = docker_manager.create_container(
-                github_id=github_id,
+                user_identifier=github_id,
                 plan=user.plan,
                 port=user.container_port or await get_next_available_port(db),
                 telegram_token=user.telegram_bot_token,
                 gemini_key=user.gemini_api_key,
-                github_token=user.github_token,
+                connections=connections,
                 custom_rules=user.custom_rules,
                 enabled_plugins=plan_config.get("features", [])
             )

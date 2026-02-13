@@ -14,9 +14,10 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True)
-    github_id = Column(String(50), unique=True, nullable=False, index=True)
-    github_username = Column(String(100))
-    email = Column(String(255))
+    # Identity
+    email = Column(String(255), unique=True, index=True)  # Primary identity
+    github_id = Column(String(50), unique=True, nullable=True, index=True) # Legacy/Optional
+    github_username = Column(String(100), nullable=True)
     
     # Subscription
     plan = Column(String(20), default="free")  # free, starter, pro
@@ -31,7 +32,7 @@ class User(Base):
     
     # API Keys (user's own keys)
     gemini_api_key = Column(String(255))
-    github_token = Column(String(255))
+    # github_token moved to OAuthConnection table, kept here only for migration temporary
     
     # Custom Config
     custom_rules = Column(Text)  # JSON string of custom rules
@@ -44,6 +45,28 @@ class User(Base):
     restart_count = Column(Integer, default=0)
     
     # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class OAuthConnection(Base):
+    """Generic OAuth connections for any provider (GitHub, Google, WordPress, etc)"""
+    __tablename__ = "oauth_connections"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    provider = Column(String(50), nullable=False)  # github, google, wordpress
+    provider_account_id = Column(String(255), nullable=False)  # ID from provider
+    
+    # Tokens
+    access_token = Column(Text)
+    refresh_token = Column(Text)
+    expires_at = Column(Integer)  # Unix timestamp
+    token_type = Column(String(50))
+    scope = Column(Text)
+    id_token = Column(Text)
+    
+    # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

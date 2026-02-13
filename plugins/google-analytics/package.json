@@ -1,0 +1,9 @@
+{
+  "name": "google-analytics",
+  "version": "1.0.0",
+  "description": "VibeCode Google Analytics Plugin",
+  "main": "index.js",
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  }
+}

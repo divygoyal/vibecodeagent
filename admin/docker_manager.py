@@ -17,17 +17,17 @@ class DockerManager:
         self.client = docker.from_env()
         self.base_dir = "/home/ubuntu/clawbot-data"  # Host path for user data
     
-    def _get_container_name(self, github_id: str) -> str:
+    def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
-        return f"{settings.CONTAINER_PREFIX}_{github_id}"
+        return f"{settings.CONTAINER_PREFIX}_{user_identifier}"
     
-    def _get_user_data_dir(self, github_id: str) -> str:
+    def _get_user_data_dir(self, user_identifier: str) -> str:
         """Get host path for user's data directory"""
-        return f"{self.base_dir}/{github_id}"
+        return f"{self.base_dir}/{user_identifier}"
     
-    def _ensure_user_dir(self, github_id: str) -> str:
+    def _ensure_user_dir(self, user_identifier: str) -> str:
         """Create user data directory if not exists with proper permissions"""
-        user_dir = self._get_user_data_dir(github_id)
+        user_dir = self._get_user_data_dir(user_identifier)
         os.makedirs(user_dir, exist_ok=True)
         os.makedirs(f"{user_dir}/workspace", exist_ok=True)
         os.makedirs(f"{user_dir}/.openclaw", exist_ok=True)
@@ -38,7 +38,7 @@ class DockerManager:
         
         return user_dir
     
-    def _seed_intelligence(self, github_id: str, custom_rules: Optional[str] = None) -> None:
+    def _seed_intelligence(self, user_identifier: str, custom_rules: Optional[str] = None) -> None:
         """
         Inject the intelligence files that make the bot smart.
         Uses the exact same files that a vanilla OpenClaw installation creates.
@@ -54,7 +54,7 @@ class DockerManager:
         
         Note: MEMORY.md is NOT pre-created — the bot creates it on demand.
         """
-        user_dir = self._get_user_data_dir(github_id)
+        user_dir = self._get_user_data_dir(user_identifier)
         workspace = f"{user_dir}/workspace"
         templates_dir = "/app/templates"
         
@@ -99,7 +99,7 @@ class DockerManager:
                 f.write(soul_content)
             os.chmod(soul_path, 0o666)
         
-        # USER.md — personalized with github_id
+        # USER.md — personalized with user_identifier
         user_path = f"{workspace}/USER.md"
         if not os.path.exists(user_path):
             user_content = f"""# USER.md - About Your Human
@@ -108,7 +108,7 @@ _Learn about the person you're helping. Update this as you go._
 
 - **Name:**
 - **What to call them:**
-- **GitHub ID:** {github_id}
+- **User Identifier:** {user_identifier}
 - **Pronouns:** _(optional)_
 - **Timezone:**
 - **First Interaction:** {datetime.utcnow().strftime('%Y-%m-%d')}
@@ -129,9 +129,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
             os.system(f"git -C {workspace} add -A")
             os.system(f'git -C {workspace} commit -m "Initial workspace" --allow-empty')
     
-    def _create_user_config(self, github_id: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
+    def _create_user_config(self, user_identifier: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
         """Create OpenClaw config file matching vanilla OpenClaw structure"""
-        user_dir = self._get_user_data_dir(github_id)
+        user_dir = self._get_user_data_dir(user_identifier)
         config_path = f"{user_dir}/.openclaw/openclaw.json"
         
         # Generate gateway auth token
@@ -181,6 +181,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     "google:default": {
                         "provider": "google",
                         "mode": "api_key"
+                    "google:default": {
+                        "provider": "google",
+                        "mode": "api_key"
                     }
                 }
             },
@@ -216,9 +219,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
         # Ensure proper permissions
         os.chmod(config_path, 0o666)
     
-    def _copy_plugins(self, github_id: str, enabled_plugins: list) -> None:
+    def _copy_plugins(self, user_identifier: str, enabled_plugins: list) -> None:
         """Copy enabled plugins to user's workspace"""
-        user_dir = self._get_user_data_dir(github_id)
+        user_dir = self._get_user_data_dir(user_identifier)
         plugins_dir = f"{user_dir}/workspace/plugins"
         os.makedirs(plugins_dir, exist_ok=True)
         
@@ -233,12 +236,12 @@ _(What do they care about? What projects are they working on? What annoys them? 
     
     def create_container(
         self,
-        github_id: str,
+        user_identifier: str,
         plan: str,
         port: int,
         telegram_token: str,
         gemini_key: Optional[str] = None,
-        github_token: Optional[str] = None,
+        connections: Optional[Dict[str, Any]] = None, # Generic connections dict
         custom_rules: Optional[str] = None,
         enabled_plugins: Optional[list] = None
     ) -> Dict[str, Any]:
@@ -248,7 +251,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
         Returns:
             Dict with container_id and status
         """
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         # Check if container already exists
         try:
@@ -265,48 +268,65 @@ _(What do they care about? What projects are they working on? What annoys them? 
         plan_config = PLANS.get(plan, PLANS["free"])
         
         # Ensure directories exist
-        user_dir = self._ensure_user_dir(github_id)
+        user_dir = self._ensure_user_dir(user_identifier)
         
-        # Seed intelligence files (matching vanilla OpenClaw: AGENTS.md, SOUL.md, TOOLS.md,
-        # USER.md, IDENTITY.md, HEARTBEAT.md, BOOTSTRAP.md + git init)
-        self._seed_intelligence(github_id, custom_rules)
+        # Seed intelligence files
+        self._seed_intelligence(user_identifier, custom_rules)
         
-        # Create config with Telegram enabled (matching vanilla OpenClaw structure)
-        self._create_user_config(github_id, plan, telegram_token, custom_rules)
+        # Create config
+        self._create_user_config(user_identifier, plan, telegram_token, custom_rules)
         
         # Copy plugins
         if enabled_plugins:
-            self._copy_plugins(github_id, enabled_plugins)
+            self._copy_plugins(user_identifier, enabled_plugins)
         
-        # Fix ownership AFTER all files are created
-        # The admin API runs as root, but the container runs as node (UID 1000)
-        # Without this, the bot can't read its own intelligence files
+        # Fix ownership
         os.system(f"chown -R 1000:1000 {user_dir}")
         
         # Environment variables
-        # Calculate Node.js heap size based on plan (leave ~256MB for system)
         heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}
         node_heap = heap_sizes.get(plan, "768")
         
+        # Calculate enabled skills based on connections
+        skills = []
+        connections_json = "{}"
+        if connections:
+            import json
+            connections_json = json.dumps(connections)
+            if "github" in connections:
+                skills.append("coding")
+            if "google" in connections:
+                skills.append("analytics")
+        else:
+            # Fallback/Legacy: if no connections passed, assume coding (or none?)
+            # But likely we want to defaults to coding if we can't determine
+            skills.append("coding")
+
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
             "OPENCLAW_PLUGINS_DIR": "/data/workspace/plugins",
-            "OPENCLAW_SKILLS_ENABLED": "*",  # GOD MODE: enables ALL skills
+            "OPENCLAW_SKILLS_ENABLED": ",".join(skills) if skills else "*", 
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
-            # Model config - use Gemini
+            # Model config
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "OPENCLAW_MODEL": "google/gemini-3-pro-preview",
             # User identification
-            "GITHUB_ID": github_id,
+            "USER_IDENTIFIER": user_identifier,
             "PLAN": plan,
             # Node.js memory
             "NODE_OPTIONS": f"--max-old-space-size={node_heap}",
+            # Generic Connections
+            "OPENCLAW_CONNECTIONS": connections_json
         }
         
-        if github_token:
-            env["GITHUB_TOKEN"] = github_token
+        # Legacy compat: maintain GITHUB_TOKEN/ID env vars if present in connections
+        if connections and "github" in connections:
+             env["GITHUB_TOKEN"] = connections["github"].get("access_token", "")
+             env["GITHUB_ID"] = connections["github"].get("provider_account_id", user_identifier)
+        else:
+             env["GITHUB_ID"] = user_identifier
         
         # Create container - use default entrypoint
         try:
@@ -323,7 +343,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 mem_limit=plan_config["memory_limit"],
                 cpu_quota=int(plan_config["cpu_limit"] * 100000),
                 labels={
-                    "clawbot.user": github_id,
+                    "clawbot.user": user_identifier,
                     "clawbot.plan": plan,
                     "clawbot.created": datetime.utcnow().isoformat()
                 }
@@ -343,9 +363,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 "error": str(e)
             }
     
-    def stop_container(self, github_id: str) -> Dict[str, Any]:
+    def stop_container(self, user_identifier: str) -> Dict[str, Any]:
         """Stop a user's container"""
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         try:
             container = self.client.containers.get(container_name)
@@ -356,9 +376,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
         except docker.errors.APIError as e:
             return {"success": False, "error": str(e)}
     
-    def start_container(self, github_id: str) -> Dict[str, Any]:
+    def start_container(self, user_identifier: str) -> Dict[str, Any]:
         """Start a stopped container"""
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         try:
             container = self.client.containers.get(container_name)
@@ -369,9 +389,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
         except docker.errors.APIError as e:
             return {"success": False, "error": str(e)}
     
-    def restart_container(self, github_id: str) -> Dict[str, Any]:
+    def restart_container(self, user_identifier: str) -> Dict[str, Any]:
         """Restart a container"""
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         try:
             container = self.client.containers.get(container_name)
@@ -382,9 +402,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
         except docker.errors.APIError as e:
             return {"success": False, "error": str(e)}
     
-    def delete_container(self, github_id: str, remove_data: bool = False) -> Dict[str, Any]:
+    def delete_container(self, user_identifier: str, remove_data: bool = False) -> Dict[str, Any]:
         """Delete a container (and optionally its data)"""
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         try:
             container = self.client.containers.get(container_name)
@@ -392,7 +412,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
             container.remove()
             
             if remove_data:
-                user_dir = self._get_user_data_dir(github_id)
+                user_dir = self._get_user_data_dir(user_identifier)
                 os.system(f"rm -rf {user_dir}")
             
             return {"success": True, "status": "deleted"}
@@ -401,9 +421,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
         except docker.errors.APIError as e:
             return {"success": False, "error": str(e)}
     
-    def get_container_status(self, github_id: str) -> Dict[str, Any]:
+    def get_container_status(self, user_identifier: str) -> Dict[str, Any]:
         """Get container health and status"""
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         try:
             container = self.client.containers.get(container_name)
@@ -507,16 +527,16 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 "container_id": container.short_id,
                 "name": container.name,
                 "status": container.status,
-                "github_id": labels.get("clawbot.user"),
+                "user_identifier": labels.get("clawbot.user"),
                 "plan": labels.get("clawbot.plan"),
                 "created": labels.get("clawbot.created")
             })
         
         return result
     
-    def get_container_logs(self, github_id: str, tail: int = 100) -> Dict[str, Any]:
+    def get_container_logs(self, user_identifier: str, tail: int = 100) -> Dict[str, Any]:
         """Get recent logs from a container"""
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         
         try:
             container = self.client.containers.get(container_name)
@@ -528,13 +548,12 @@ _(What do they care about? What projects are they working on? What annoys them? 
             return {"success": False, "error": str(e)}
 
 
-
-    def inspect_container_for_sync(self, github_id: str) -> Optional[Dict[str, Any]]:
+    def inspect_container_for_sync(self, user_identifier: str) -> Optional[Dict[str, Any]]:
         """
         Inspect a container to recover user data for DB sync.
         Extracts tokens and config from ENV variables and Labels.
         """
-        container_name = self._get_container_name(github_id)
+        container_name = self._get_container_name(user_identifier)
         try:
             container = self.client.containers.get(container_name)
             labels = container.labels
@@ -568,11 +587,11 @@ _(What do they care about? What projects are they working on? What annoys them? 
 
             username = env.get("GITHUB_USERNAME")
             if not username:
-                # If username missing from env, use github_id as fallback or fetch from potential label
-                username = labels.get("clawbot.username", github_id)
+                # If username missing from env, use user_identifier as fallback or fetch from potential label
+                username = labels.get("clawbot.username", user_identifier)
 
             return {
-                "github_id": github_id,
+                "user_identifier": user_identifier,
                 "github_username": username,
                 "plan": labels.get("clawbot.plan", "free"),
                 "container_id": container.id,
