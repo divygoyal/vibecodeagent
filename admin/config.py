@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     BASE_PORT: int = 9000  # First user gets 9000, second 9001, etc.
     MAX_USERS: int = 6     # ~6 users at 1GB each on 8GB RAM (leave 2GB for system)
     
+    # Paths
+    PLUGINS_DIR: str = "/home/ubuntu/vibecodeagent/plugins" # Host path for plugins (skills)
+    
     # Resource Limits (per container)
     # OpenClaw needs significant RAM - Node.js heap + system overhead
     MEMORY_LIMIT_FREE: str = "1536m"     # 1.5GB for free tier (768MB heap + overhead)

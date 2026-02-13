@@ -379,7 +379,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 volumes={
                     user_dir: {"bind": "/data", "mode": "rw"},
                     # Also mount plugins to /app/skills/workspace so they are auto-discovered
-                    str(plugins_dir): {"bind": "/app/skills/workspace", "mode": "rw"}
+                    str(settings.PLUGINS_DIR): {"bind": "/app/skills/workspace", "mode": "rw"}
                 },
                 environment=env,
                 mem_limit=plan_config["memory_limit"],
