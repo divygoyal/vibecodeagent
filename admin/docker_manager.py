@@ -251,12 +251,20 @@ _(What do they care about? What projects are they working on? What annoys them? 
         container_name = self._get_container_name(user_identifier)
         
         # Check if container already exists
+        # Check if container already exists
         try:
             existing = self.client.containers.get(container_name)
+            # If exists, we should ensure it's running and maybe update config?
+            # For now, just ensure it's running. IDEMPOTENCY FIX.
+            if existing.status != "running":
+                existing.start()
+            
             return {
-                "success": False,
-                "error": "Container already exists",
-                "container_id": existing.id
+                "success": True,
+                "container_id": existing.id,
+                "container_name": container_name,
+                "status": "running",
+                "message": "Container already exists, ensured running."
             }
         except docker.errors.NotFound:
             pass
