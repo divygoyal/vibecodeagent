@@ -301,12 +301,6 @@ _(What do they care about? What projects are they working on? What annoys them? 
             # User identification
             "GITHUB_ID": github_id,
             "PLAN": plan,
-            "GITHUB_USERNAME": self._get_github_username_hack(github_id, github_token), # Add this helper or just pass it in? 
-            # Wait, I don't have username in create_container args! 
-            # I must rely on the caller or fetch it? 
-            # Actually, user_data has it. I should pass it to create_container.
-            # For now, I'll skip adding it here to avoid breaking signature, 
-            # and focus on inspect resilience.
             # Node.js memory
             "NODE_OPTIONS": f"--max-old-space-size={node_heap}",
         }
@@ -436,19 +430,49 @@ _(What do they care about? What projects are they working on? What annoys them? 
             
             # Simple log parsing logic
             logs_lower = logs.lower()
-            if "error" in logs_lower and "telegram" in logs_lower:
+            has_errors = "error" in logs_lower and "telegram" in logs_lower
+            
+            if has_errors:
                 telegram_status = "error"
                 if "409" in logs_lower or "conflict" in logs_lower:
                     telegram_status = "webhook_conflict"
-            elif any(s in logs_lower for s in ["logged in as", "bot started", "polling", "telegram connected", "launching"]):
+            elif any(s in logs_lower for s in ["logged in as", "bot started", "polling", "telegram connected", "launching", "started", "running", "ready", "listening"]):
                 telegram_status = "connected"
             elif health_status == "healthy":
-                # Fallback: if healthy and no obvious errors, assume connected
                 telegram_status = "connected"
+            elif container.status == "running" and not has_errors:
+                # Fallback: if container is running with no errors in logs,
+                # assume it's connected (handles containers without HEALTHCHECK)
+                import time
+                started_at = container.attrs.get("State", {}).get("StartedAt", "")
+                if started_at:
+                    try:
+                        from datetime import datetime, timezone
+                        # Docker timestamps: 2024-01-15T10:30:00.123456789Z
+                        # Truncate nanoseconds to microseconds for Python parsing
+                        ts = started_at.replace("Z", "+00:00")
+                        if "." in ts:
+                            parts = ts.split(".")
+                            frac = parts[1].split("+")[0].split("-")[0]
+                            tz = "+" + parts[1].split("+")[1] if "+" in parts[1] else "-" + parts[1].split("-")[1] if parts[1].count("-") > 0 else "+00:00"
+                            ts = parts[0] + "." + frac[:6] + tz
+                        start_time = datetime.fromisoformat(ts)
+                        now = datetime.now(timezone.utc)
+                        uptime_seconds = (now - start_time).total_seconds()
+                        if uptime_seconds > 30:
+                            telegram_status = "connected"
+                    except Exception:
+                        # If we can't parse the timestamp, just assume connected
+                        # since the container IS running
+                        telegram_status = "connected"
+                else:
+                    telegram_status = "connected"
                 
-            # Try to extract username: "Logged in as @Username"
+            # Try to extract username from logs
             import re
             user_match = re.search(r"Logged in as @(\w+)", logs, re.IGNORECASE)
+            if not user_match:
+                user_match = re.search(r"@(\w+Bot)", logs, re.IGNORECASE)
             if user_match:
                 bot_username = user_match.group(1)
             

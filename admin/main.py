@@ -63,10 +63,13 @@ async def sync_orphaned_users(db: AsyncSession):
         print("Syncing orphaned containers...")
         # Get all containers from Docker
         containers = docker_manager.get_all_containers()
+        print(f"Found {len(containers)} clawbot containers")
         
+        synced = 0
         for container_summary in containers:
             github_id = container_summary.get("github_id")
             if not github_id:
+                print(f"  Skipping container without github_id: {container_summary.get('name')}")
                 continue
                 
             # Check if exists in DB
@@ -74,28 +77,67 @@ async def sync_orphaned_users(db: AsyncSession):
             existing = result.scalar_one_or_none()
             
             if not existing:
-                print(f"Found orphan container for {github_id}, recovering...")
-                data = docker_manager.inspect_container_for_sync(github_id)
-                if data:
-                    user = User(
-                        github_id=data["github_id"],
-                        github_username=data["github_username"],
-                        plan=data["plan"],
-                        telegram_bot_token=data["telegram_bot_token"],
-                        gemini_api_key=data["gemini_api_key"],
-                        github_token=data["github_token"],
-                        container_id=data["container_id"],
-                        container_name=data["container_name"],
-                        container_port=data["container_port"],
-                        container_status="running",
-                        subscription_start=datetime.utcnow(), # Approximate
-                        created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.utcnow()
-                    )
-                    db.add(user)
-                    await db.commit()
-                    print(f"Recovered user {github_id}")
+                print(f"  Found orphan container for {github_id}, recovering...")
+                try:
+                    data = docker_manager.inspect_container_for_sync(github_id)
+                    if data:
+                        # Parse created_at safely — Docker timestamps have nanosecond precision
+                        created_at = datetime.utcnow()
+                        if data.get("created_at"):
+                            try:
+                                raw = data["created_at"]
+                                # Handle Docker format: 2024-01-15T10:30:00.123456789Z
+                                raw = raw.replace("Z", "+00:00")
+                                if "." in raw:
+                                    parts = raw.split(".")
+                                    # Get fractional part (before timezone)
+                                    rest = parts[1]
+                                    # Split at timezone marker
+                                    for tz_char_idx, c in enumerate(rest):
+                                        if c in "+-" and tz_char_idx > 0:
+                                            frac = rest[:tz_char_idx][:6]  # Truncate to microseconds
+                                            tz_part = rest[tz_char_idx:]
+                                            raw = parts[0] + "." + frac + tz_part
+                                            break
+                                    else:
+                                        # No timezone found, just truncate
+                                        raw = parts[0] + "." + rest[:6]
+                                created_at = datetime.fromisoformat(raw.replace("+00:00", ""))
+                            except Exception as e:
+                                print(f"    Could not parse created_at '{data.get('created_at')}': {e}, using now()")
+                                created_at = datetime.utcnow()
+                        
+                        user = User(
+                            github_id=data["github_id"],
+                            github_username=data.get("github_username") or github_id,
+                            plan=data.get("plan", "free"),
+                            telegram_bot_token=data.get("telegram_bot_token", ""),
+                            gemini_api_key=data.get("gemini_api_key"),
+                            github_token=data.get("github_token"),
+                            container_id=data.get("container_id"),
+                            container_name=data.get("container_name"),
+                            container_port=data.get("container_port"),
+                            container_status="running",
+                            subscription_start=datetime.utcnow(),
+                            created_at=created_at
+                        )
+                        db.add(user)
+                        await db.commit()
+                        synced += 1
+                        print(f"    ✓ Recovered user {github_id}")
+                    else:
+                        print(f"    ✗ inspect_container_for_sync returned None for {github_id}")
+                except Exception as e:
+                    print(f"    ✗ Failed to recover {github_id}: {e}")
+                    await db.rollback()
+            else:
+                print(f"  User {github_id} already in DB")
+        
+        print(f"Sync complete: {synced} users recovered from {len(containers)} containers")
     except Exception as e:
-        print(f"Sync failed: {e}")
+        print(f"Sync failed catastrophically: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # ============= FastAPI App =============
