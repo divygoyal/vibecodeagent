@@ -377,7 +377,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 restart_policy={"Name": "on-failure", "MaximumRetryCount": 3},
                 ports={"8080/tcp": port},
                 volumes={
-                    user_dir: {"bind": "/data", "mode": "rw"}
+                    user_dir: {"bind": "/data", "mode": "rw"},
+                    # Also mount plugins to /app/skills/workspace so they are auto-discovered
+                    str(plugins_dir): {"bind": "/app/skills/workspace", "mode": "rw"}
                 },
                 environment=env,
                 mem_limit=plan_config["memory_limit"],
