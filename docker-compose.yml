@@ -17,7 +17,7 @@ services:
     container_name: clawbot-admin
     restart: always
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./data/admin.db
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/admin.db}
       - ADMIN_API_KEY=${ADMIN_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - TELEGRAM_ADMIN_BOT_TOKEN=${ADMIN_TELEGRAM_BOT_TOKEN}
@@ -48,7 +48,7 @@ services:
     restart: always
     command: ["python", "watchdog.py"]
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./data/admin.db
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/admin.db}
       - TELEGRAM_ADMIN_BOT_TOKEN=${ADMIN_TELEGRAM_BOT_TOKEN}
       - TELEGRAM_ADMIN_CHAT_ID=${ADMIN_TELEGRAM_CHAT_ID}
       - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60}
