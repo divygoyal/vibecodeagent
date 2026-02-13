@@ -418,6 +418,33 @@ _(What do they care about? What projects are they working on? What annoys them? 
             health = container.attrs.get("State", {}).get("Health", {})
             health_status = health.get("Status", "unknown")
             
+            # Parse logs for Telegram status
+            logs = ""
+            try:
+                logs = container.logs(tail=50).decode('utf-8')
+            except:
+                pass
+
+            telegram_status = "initializing"
+            bot_username = None
+            
+            # Simple log parsing logic
+            if "error" in logs.lower() and "telegram" in logs.lower():
+                telegram_status = "error"
+                if "409" in logs or "conflict" in logs.lower():
+                    telegram_status = "webhook_conflict"
+            elif "logged in as" in logs.lower() or "bot started" in logs.lower() or "polling" in logs.lower():
+                telegram_status = "connected"
+            elif health_status == "healthy":
+                # Fallback: if healthy and no obvious errors, assume connected
+                telegram_status = "connected"
+                
+            # Try to extract username: "Logged in as @Username"
+            import re
+            user_match = re.search(r"Logged in as @(\w+)", logs, re.IGNORECASE)
+            if user_match:
+                bot_username = user_match.group(1)
+            
             return {
                 "success": True,
                 "status": container.status,
@@ -425,7 +452,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 "memory_usage_mb": round(mem_usage / (1024 * 1024), 2),
                 "memory_percent": round(mem_percent, 2),
                 "restart_count": container.attrs["RestartCount"],
-                "started_at": container.attrs["State"]["StartedAt"]
+                "started_at": container.attrs["State"]["StartedAt"],
+                "telegram_status": telegram_status,
+                "bot_username": bot_username
             }
             
         except docker.errors.NotFound:
