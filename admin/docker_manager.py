@@ -38,7 +38,7 @@ class DockerManager:
         
         return user_dir
     
-    def _seed_intelligence(self, user_identifier: str, custom_rules: Optional[str] = None) -> None:
+    def _seed_intelligence(self, user_identifier: str, custom_rules: Optional[str] = None, connections: Optional[Dict[str, Any]] = None) -> None:
         """
         Inject the intelligence files that make the bot smart.
         Uses the exact same files that a vanilla OpenClaw installation creates.
@@ -117,7 +117,19 @@ _Learn about the person you're helping. Update this as you go._
 ## Context
 
 _(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
+
+## Active Connections
 """
+            # Append connection info if valid
+            if connections:
+                 if "google" in connections:
+                     user_content += "- ✅ Google Analytics (Active: Session authenticated via environment)\n"
+                 if "github" in connections:
+                     user_content += "- ✅ GitHub (Active: Authenticated via environment)\n"
+
+            with open(user_path, 'w') as f:
+                f.write(user_content)
+            os.chmod(user_path, 0o666)
             with open(user_path, 'w') as f:
                 f.write(user_content)
             os.chmod(user_path, 0o666)
@@ -276,7 +288,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
         user_dir = self._ensure_user_dir(user_identifier)
         
         # Seed intelligence files
-        self._seed_intelligence(user_identifier, custom_rules)
+        self._seed_intelligence(user_identifier, custom_rules, connections)
         
         # Create config
         self._create_user_config(user_identifier, plan, telegram_token, custom_rules)
