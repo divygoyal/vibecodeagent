@@ -342,6 +342,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
             "OPENCLAW_PLUGINS_DIR": "/data/workspace/plugins",
+            "OPENCLAW_SKILLS_DIR": "/data/workspace/plugins", # Fallback for bot skill discovery
             "OPENCLAW_SKILLS_ENABLED": ",".join(skills) if skills else "*", 
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
