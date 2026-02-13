@@ -515,6 +515,9 @@ async def update_user(
     
     # Generic wrapper for updating OAuth - supports google, github, etc.
     if user_update.provider:
+        print(f"DEBUG: Update user provider={user_update.provider}")
+        print(f"DEBUG: refresh_token provided? {bool(user_update.refresh_token)}")
+        
         # We need to find the connection for this provider
         stmt = select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
@@ -524,12 +527,15 @@ async def update_user(
         conn = result.scalar_one_or_none()
         
         if conn:
+            print("DEBUG: Found existing OAuth connection to update")
             if user_update.access_token:
                 conn.access_token = user_update.access_token
             if user_update.refresh_token:
+                print("DEBUG: Updating refresh_token in DB")
                 conn.refresh_token = user_update.refresh_token
             conn.updated_at = datetime.utcnow()
         else:
+            print("DEBUG: Creating NEW OAuth connection")
             # Create new if not exists (upsert)
             if user_update.access_token:
                conn = OAuthConnection(
