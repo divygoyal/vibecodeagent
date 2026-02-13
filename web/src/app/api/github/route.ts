@@ -24,36 +24,31 @@ export async function GET() {
       'Accept': 'application/vnd.github.v3+json'
     }
 
-    // Fetch recent events (commits, pushes, etc.) and repos in parallel
+    // Fetch recent events and repos in parallel
     const [eventsRes, reposRes] = await Promise.all([
-      fetch(`https://api.github.com/users/${username}/events?per_page=30`, { headers }),
+      fetch(`https://api.github.com/users/${username}/events?per_page=50`, { headers }),
       fetch(`https://api.github.com/user/repos?sort=pushed&per_page=8&type=owner`, { headers })
     ])
 
-    // Process events to extract recent commits
-    let recentCommits: Array<{
-      repo: string;
-      message: string;
-      sha: string;
-      date: string;
-      branch: string;
-    }> = []
-
+    // Parse events ONCE and reuse
+    let allEvents: any[] = []
     if (eventsRes.ok) {
-      const events = await eventsRes.json()
-      recentCommits = events
-        .filter((e: any) => e.type === 'PushEvent')
-        .flatMap((e: any) =>
-          (e.payload.commits || []).map((c: any) => ({
-            repo: e.repo.name.split('/')[1] || e.repo.name,
-            message: c.message.split('\n')[0].substring(0, 80),
-            sha: c.sha.substring(0, 7),
-            date: e.created_at,
-            branch: (e.payload.ref || '').replace('refs/heads/', '')
-          }))
-        )
-        .slice(0, 10)
+      allEvents = await eventsRes.json()
     }
+
+    // Extract recent commits from PushEvents
+    const recentCommits = allEvents
+      .filter((e: any) => e.type === 'PushEvent')
+      .flatMap((e: any) =>
+        (e.payload.commits || []).map((c: any) => ({
+          repo: e.repo.name.split('/')[1] || e.repo.name,
+          message: c.message.split('\n')[0].substring(0, 80),
+          sha: c.sha.substring(0, 7),
+          date: e.created_at,
+          branch: (e.payload.ref || '').replace('refs/heads/', '')
+        }))
+      )
+      .slice(0, 10)
 
     // Process repos
     let repos: Array<{
@@ -77,28 +72,31 @@ export async function GET() {
       }))
     }
 
-    // Generate contribution heatmap data (simplified - last 52 weeks)
-    // Use events to approximate daily activity
-    const contributionMap: Record<string, number> = {}
-    if (eventsRes.ok) {
-      const events = await eventsRes.json().catch(() => [])
-      // Re-parse if needed
+    // Build contribution heatmap from real event dates
+    // Create a map of date -> activity count from all events
+    const activityByDate: Record<string, number> = {}
+    for (const event of allEvents) {
+      const dateStr = event.created_at?.split('T')[0]
+      if (dateStr) {
+        activityByDate[dateStr] = (activityByDate[dateStr] || 0) + 1
+      }
     }
 
-    // Generate last 365 days of heatmap data (random-ish based on events)
+    // Generate 365 days of heatmap data
     const heatmap: number[] = []
     const today = new Date()
     for (let i = 364; i >= 0; i--) {
       const date = new Date(today)
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
-      // Check if we have activity on this day from commits
-      const dayActivity = recentCommits.filter(c =>
-        c.date.startsWith(dateStr)
-      ).length
-      if (dayActivity > 3) heatmap.push(4)
-      else if (dayActivity > 0) heatmap.push(dayActivity)
-      else heatmap.push(Math.random() > 0.7 ? Math.ceil(Math.random() * 3) : 0)
+      const count = activityByDate[dateStr] || 0
+
+      // Map activity count to 0-4 level
+      if (count === 0) heatmap.push(0)
+      else if (count <= 2) heatmap.push(1)
+      else if (count <= 5) heatmap.push(2)
+      else if (count <= 10) heatmap.push(3)
+      else heatmap.push(4)
     }
 
     return NextResponse.json({

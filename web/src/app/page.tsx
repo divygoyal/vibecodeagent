@@ -342,7 +342,7 @@ export default function Home() {
                 ) : githubData?.heatmap ? (
                   <div>
                     <div className="overflow-x-auto pb-2">
-                      <div className="heatmap-grid" style={{ minWidth: '680px' }}>
+                      <div className="heatmap-grid">
                         {githubData.heatmap.map((level, i) => (
                           <div key={i} className="heatmap-cell" data-level={level} title={`${level} contributions`} />
                         ))}

@@ -53,18 +53,39 @@ body {
 
 /* ========== Pulse animations ========== */
 @keyframes pulse-emerald {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(52, 211, 153, 0);
+  }
 }
 
 @keyframes pulse-red {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(248, 113, 113, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(248, 113, 113, 0);
+  }
 }
 
 @keyframes pulse-amber {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+  }
 }
 
 .pulse-live {
@@ -118,28 +139,49 @@ body {
 /* ========== GitHub contribution heatmap ========== */
 .heatmap-grid {
   display: grid;
-  grid-template-columns: repeat(52, 1fr);
-  grid-template-rows: repeat(7, 1fr);
-  gap: 2px;
+  grid-template-rows: repeat(7, 12px);
+  grid-auto-flow: column;
+  grid-auto-columns: 12px;
+  gap: 3px;
 }
 
 .heatmap-cell {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 2px;
   background: rgba(39, 39, 42, 0.8);
-  transition: all 0.15s ease;
+  transition: background 0.15s ease;
 }
 
-.heatmap-cell[data-level="1"] { background: rgba(52, 211, 153, 0.2); }
-.heatmap-cell[data-level="2"] { background: rgba(52, 211, 153, 0.4); }
-.heatmap-cell[data-level="3"] { background: rgba(52, 211, 153, 0.6); }
-.heatmap-cell[data-level="4"] { background: rgba(52, 211, 153, 0.9); }
+.heatmap-cell:hover {
+  outline: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.heatmap-cell[data-level="1"] {
+  background: rgba(52, 211, 153, 0.25);
+}
+
+.heatmap-cell[data-level="2"] {
+  background: rgba(52, 211, 153, 0.45);
+}
+
+.heatmap-cell[data-level="3"] {
+  background: rgba(52, 211, 153, 0.65);
+}
+
+.heatmap-cell[data-level="4"] {
+  background: rgba(52, 211, 153, 0.95);
+}
 
 /* ========== Skeleton loading ========== */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
@@ -155,6 +197,7 @@ body {
     opacity: 0;
     transform: translateY(12px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -165,10 +208,25 @@ body {
   animation: fadeInUp 0.5s ease-out forwards;
 }
 
-.fade-in-delay-1 { animation-delay: 0.1s; opacity: 0; }
-.fade-in-delay-2 { animation-delay: 0.2s; opacity: 0; }
-.fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
-.fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
+.fade-in-delay-1 {
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+.fade-in-delay-2 {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.fade-in-delay-3 {
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+
+.fade-in-delay-4 {
+  animation-delay: 0.4s;
+  opacity: 0;
+}
 
 /* ========== Scrollbar ========== */
 ::-webkit-scrollbar {

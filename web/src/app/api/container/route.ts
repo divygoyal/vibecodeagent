@@ -75,10 +75,12 @@ export async function GET(req: Request) {
 
     const data = await response.json()
     return NextResponse.json({
-      status: data.container?.status || "unknown",
+      status: data.container?.status || data.container_status || "unknown",
       health: data.container?.health || "unknown",
       memory_usage_mb: data.container?.memory_usage_mb,
-      plan: data.plan
+      plan: data.plan,
+      telegramStatus: data.container?.telegram_status || data.telegram_status || (data.container?.health === 'healthy' ? 'connected' : undefined),
+      botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username
     })
 
   } catch (err: unknown) {
