@@ -11,6 +11,7 @@ type BotStatus = {
   plan?: string;
   telegramStatus?: string;
   botUsername?: string;
+  telegramBotToken?: string;
 };
 
 type GitHubData = {
@@ -109,9 +110,14 @@ export default function Home() {
         console.log('Bot Status:', data);
         setBotStatus(data);
         if (data.status === 'running') setSetupStatus('success');
+
+        // Prefill token if available from API
+        if (data.telegramBotToken && !botToken && setupStatus !== 'success') {
+          setBotToken(data.telegramBotToken);
+        }
       }
     } catch { /* silent */ }
-  }, []);
+  }, [botToken, setupStatus]);
 
   const fetchGithubData = useCallback(async () => {
     try {
@@ -135,14 +141,16 @@ export default function Home() {
   }, [session, fetchContainerStatus, fetchGithubData]);
 
   const handleSetupBot = async () => {
-    if (!botToken.trim()) { setErrorMsg('Please enter your Telegram bot token'); return; }
+    const tokenToUse = botToken || botStatus?.telegramBotToken;
+    if (!tokenToUse?.trim()) { setErrorMsg('Please enter your Telegram bot token'); return; }
+
     setSetupStatus('loading');
     setErrorMsg('');
     try {
       const res = await fetch('/api/setup-bot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: botToken }),
+        body: JSON.stringify({ token: tokenToUse }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to setup bot');
@@ -363,9 +371,25 @@ export default function Home() {
 
             {/* ─── Integrations Section ─── */}
             <div className="glass-card p-6 fade-in fade-in-delay-2 mb-6">
-              <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-4">
-                Integrations
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
+                  Integrations
+                </h2>
+                {isProvisioned && (
+                  <button
+                    onClick={handleSetupBot}
+                    disabled={setupStatus === 'loading'}
+                    className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                  >
+                    {setupStatus === 'loading' ? (
+                      <span className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <span>↻</span>
+                    )}
+                    Sync Bot
+                  </button>
+                )}
+              </div>
               <div className="flex gap-4">
                 {/* GitHub */}
                 <div className="flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border border-zinc-700/50 flex-1">

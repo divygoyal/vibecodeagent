@@ -80,7 +80,8 @@ export async function GET(req: Request) {
       memory_usage_mb: data.container?.memory_usage_mb,
       plan: data.plan,
       telegramStatus: data.container?.telegram_status || data.telegram_status || (data.container?.health === 'healthy' ? 'connected' : undefined),
-      botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username
+      botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username,
+      telegramBotToken: data.telegram_bot_token
     })
 
   } catch (err: unknown) {
