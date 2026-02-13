@@ -183,13 +183,10 @@ You are **Jarvis**, an elite AI Personal Assistant optimized for developers.
             },
             "commands": {
                 "native": "auto",
-                "nativeSkills": "auto"
+                "nativeSkills": "auto"  # This enables ALL native skills (github, browser, search, etc.)
             },
             "skills": {
-                "enabled": ["*"],  # God Mode - access to ALL skills (github, browser, search, etc.)
-                "install": {
-                    "nodeManager": "bun"
-                }
+                "nodeManager": "bun"  # Fast skill installation via Bun
             }
         }
         
