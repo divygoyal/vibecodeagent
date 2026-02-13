@@ -374,6 +374,7 @@ async def create_user(
         connections[user_data.provider] = {
             "provider_account_id": user_data.provider_id,
             "access_token": user_data.access_token,
+            "refresh_token": user_data.refresh_token, # Send refresh token to container
             "token_type": "bearer"
         }
 
@@ -410,6 +411,8 @@ async def create_user(
         
         if oauth:
             oauth.access_token = user_data.access_token
+            if user_data.refresh_token:
+                oauth.refresh_token = user_data.refresh_token
             oauth.updated_at = datetime.utcnow()
         else:
             oauth = OAuthConnection(
@@ -417,6 +420,7 @@ async def create_user(
                 provider=user_data.provider,
                 provider_account_id=user_data.provider_id or user_data.github_id or user_data.email,
                 access_token=user_data.access_token,
+                refresh_token=user_data.refresh_token,
                 token_type="bearer",
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
