@@ -126,8 +126,6 @@ export async function GET() {
         }
       }
 
-      const pushEvents = allEvents.filter((e: any) => e.type === 'PushEvent');
-
       const recentCommits = await Promise.all(pushEvents.slice(0, 5).map(async (e: any) => {
         try {
           const repoName = e.repo.name; // "owner/repo"
