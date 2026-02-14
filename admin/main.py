@@ -520,6 +520,14 @@ async def get_user(
     # Get live container status (use canonical ID associated with Docker)
     container_status = docker_manager.get_container_status(user.github_id)
     
+    # CRITICAL FIX: If container is not provisioned in Docker, force status to "not_provisioned"
+    # This handles cases where DB says "stopped" but no container exists (e.g. initial creation bug)
+    if container_status.get("status") in ["not_found", "not_provisioned"]:
+         container_status["status"] = "not_provisioned"
+    elif user.container_id == "pending":
+         container_status["status"] = "not_provisioned"
+
+    
     return {
         "id": user.id,
         "github_id": user.github_id,
