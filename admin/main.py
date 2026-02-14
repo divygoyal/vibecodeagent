@@ -432,34 +432,57 @@ async def create_user(
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     # 4. Ensure Container Exists & Is Running (Idempotent)
-    plan_config = PLANS[user.plan]
-    connections = {}
-    
-    # Reload connections from DB to be sure we have everything
-    res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
-    for c in res.scalars().all():
-        connections[c.provider] = {
-            "provider_account_id": c.provider_account_id,
-            "accessToken": c.access_token,
-            "refreshToken": c.refresh_token,
-            "token_type": c.token_type
-        }
+    try:
+        if not user.container_port:
+             print(f"[DEBUG] create_user: existing user has no port, assigning one.")
+             user.container_port = await get_next_available_port(db)
+             # Commit immediately to reserve port
+             await db.commit()
 
-    # We use the user's stored github_id as the identifier for Docker to ensure consistency
-    docker_identifier = user.github_id 
+        plan_config = PLANS[user.plan]
+        connections = {}
+        
+        # Reload connections from DB to be sure we have everything
+        res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
+        for c in res.scalars().all():
+            connections[c.provider] = {
+                "provider_account_id": c.provider_account_id,
+                "accessToken": c.access_token,
+                "refreshToken": c.refresh_token,
+                "token_type": c.token_type
+            }
 
-    result = docker_manager.create_container(
-        user_identifier=docker_identifier,
-        plan=user.plan,
-        port=user.container_port,
-        telegram_token=user.telegram_bot_token,
-        gemini_key=user.gemini_api_key,
-        connections=connections,
-        enabled_plugins=plan_config.get("features", [])
-    )
-    
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=f"Container operation failed: {result['error']}")
+        # We use the user's stored github_id as the identifier for Docker to ensure consistency
+        docker_identifier = user.github_id 
+
+        result = docker_manager.create_container(
+            user_identifier=docker_identifier,
+            plan=user.plan,
+            port=user.container_port,
+            telegram_token=user.telegram_bot_token,
+            gemini_key=user.gemini_api_key,
+            connections=connections,
+            enabled_plugins=plan_config.get("features", [])
+        )
+        
+        if not result["success"]:
+            # Log error but don't crash the whole request if possible, 
+            # though usually we want to know.
+            # However, for setup-bot, we want to return 500 so frontend knows.
+            print(f"[ERROR] Container creation failed: {result.get('error')}")
+            raise HTTPException(status_code=500, detail=f"Container operation failed: {result['error']}")
+
+        # Update container info
+        user.container_id = result.get("container_id", user.container_id)
+        user.container_status = "running"
+        await db.commit()
+
+    except Exception as e:
+        print(f"[ERROR] create_user: Failed to ensure container: {e}")
+        # If we failed here, we still want to return the user so they exist in DB
+        # But frontend setup-bot expects success.
+        # We re-raise so setup-bot sees the error.
+        raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
     # Update container info
     user.container_id = result.get("container_id", user.container_id)
