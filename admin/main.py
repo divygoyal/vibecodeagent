@@ -517,15 +517,17 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Get live container status (use canonical ID associated with Docker)
-    container_status = docker_manager.get_container_status(user.github_id)
-    
+    display_token = user.telegram_bot_token or ""
+
     # CRITICAL FIX: If container is not provisioned in Docker, force status to "not_provisioned"
     # This handles cases where DB says "stopped" but no container exists (e.g. initial creation bug)
     if container_status.get("status") in ["not_found", "not_provisioned"]:
          container_status["status"] = "not_provisioned"
+         display_token = "" # Do not expose token if not provisioned, fixes prefill bug
     elif user.container_id == "pending":
          container_status["status"] = "not_provisioned"
+         display_token = "" # Do not expose token if not provisioned
+
 
     
     return {
