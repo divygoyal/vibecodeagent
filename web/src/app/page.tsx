@@ -579,7 +579,7 @@ export default function Home() {
 
       {/* ─── Footer ─── */}
       <footer className="border-t border-zinc-800/30 px-6 py-4 mt-12 text-center text-xs text-zinc-600">
-        Powered by <a href="https://github.com/nicepkg/openclaw" className="text-emerald-500 hover:underline">OpenClaw</a> 🦞 · Gemini 3 Pro
+        Powered by <a href="https://github.com/nicepkg/openclaw" className="text-emerald-500 hover:underline">OpenClaw</a> 🦞 · v2.2.0
       </footer>
     </div>
   );

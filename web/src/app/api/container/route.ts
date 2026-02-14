@@ -6,6 +6,9 @@ import { authOptions } from "@/lib/auth"
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
+// Force dynamic route to prevent caching
+export const dynamic = 'force-dynamic';
+
 // Container actions: start, stop, restart
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -30,7 +33,8 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         "X-API-Key": ADMIN_API_KEY
       },
-      body: JSON.stringify({ action })
+      body: JSON.stringify({ action }),
+      cache: 'no-store'
     })
 
     const data = await response.json()
@@ -63,7 +67,8 @@ export async function GET(req: Request) {
     const githubId = session.user.id
 
     const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
-      headers: { "X-API-Key": ADMIN_API_KEY }
+      headers: { "X-API-Key": ADMIN_API_KEY },
+      cache: 'no-store'
     })
 
     if (!response.ok) {
