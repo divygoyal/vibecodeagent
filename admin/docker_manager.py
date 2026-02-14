@@ -405,6 +405,40 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 "error": str(e)
             }
     
+    def sync_container(
+        self,
+        user_identifier: str,
+        plan: str,
+        port: int,
+        telegram_token: str,
+        gemini_key: Optional[str] = None,
+        connections: Optional[Dict[str, Any]] = None,
+        custom_rules: Optional[str] = None,
+        enabled_plugins: Optional[list] = None
+    ) -> Dict[str, Any]:
+        """
+        Recreate container with updated credentials (preserves user data).
+        Docker containers cannot update env vars at runtime, so we must
+        stop → delete → recreate to inject new provider tokens.
+        """
+        logger.info(f"Syncing container for {user_identifier} with connections: {list(connections.keys()) if connections else 'none'}")
+        
+        # Stop and delete existing container (keep /data volume)
+        self.stop_container(user_identifier)
+        self.delete_container(user_identifier, remove_data=False)
+        
+        # Recreate with updated connections/env vars
+        return self.create_container(
+            user_identifier=user_identifier,
+            plan=plan,
+            port=port,
+            telegram_token=telegram_token,
+            gemini_key=gemini_key,
+            connections=connections,
+            custom_rules=custom_rules,
+            enabled_plugins=enabled_plugins
+        )
+
     def stop_container(self, user_identifier: str) -> Dict[str, Any]:
         """Stop a user's container"""
         container_name = self._get_container_name(user_identifier)

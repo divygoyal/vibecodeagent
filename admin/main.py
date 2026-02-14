@@ -198,7 +198,7 @@ class UserCreate(BaseModel):
     github_username: Optional[str] = None
     email: Optional[str] = None
     plan: str = "free"
-    telegram_bot_token: str
+    telegram_bot_token: Optional[str] = None  # Optional: not required for pre-bot provider registration
     gemini_api_key: Optional[str] = None
     github_token: Optional[str] = None # Input only, not stored in User model
 
@@ -575,6 +575,15 @@ async def get_user(
 
 
     
+    # Fetch connected OAuth providers
+    oauth_result = await db.execute(
+        select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+    )
+    connected_providers = [
+        {"provider": c.provider, "connected": True}
+        for c in oauth_result.scalars().all()
+    ]
+
     return {
         "id": user.id,
         "github_id": user.github_id,
@@ -587,7 +596,99 @@ async def get_user(
         "subscription_end": user.subscription_end,
         "created_at": user.created_at,
         "telegram_bot_username": container_status.get("bot_username"), # Use container status
-        "telegram_bot_token": user.telegram_bot_token or "" # Expose masked token
+        "telegram_bot_token": user.telegram_bot_token or "", # Expose masked token
+        "connected_providers": connected_providers,
+    }
+
+
+class SyncRequest(BaseModel):
+    provider: str
+    provider_id: str
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+
+
+@app.post("/api/users/{github_id}/sync")
+async def sync_user_container(
+    github_id: str,
+    sync_data: SyncRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Sync a new provider's credentials into the user's bot container.
+    Upserts OAuthConnection, then recreates the container with all connections."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 1. Upsert OAuthConnection for this provider
+    stmt = select(OAuthConnection).where(
+        OAuthConnection.user_id == user.id,
+        OAuthConnection.provider == sync_data.provider
+    )
+    result = await db.execute(stmt)
+    oauth = result.scalar_one_or_none()
+    
+    if oauth:
+        if sync_data.access_token:
+            oauth.access_token = sync_data.access_token
+        if sync_data.refresh_token:
+            oauth.refresh_token = sync_data.refresh_token
+        oauth.updated_at = datetime.utcnow()
+    else:
+        oauth = OAuthConnection(
+            user_id=user.id,
+            provider=sync_data.provider,
+            provider_account_id=sync_data.provider_id,
+            access_token=sync_data.access_token or "",
+            refresh_token=sync_data.refresh_token,
+            token_type="bearer",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(oauth)
+    await db.commit()
+    
+    # 2. If no container/telegram token, just store the connection (pre-bot registration)
+    if not user.telegram_bot_token:
+        return {"success": True, "message": "Provider registered (no bot yet)", "synced": False}
+    
+    # 3. Load ALL connections from DB
+    res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
+    connections = {}
+    for c in res.scalars().all():
+        connections[c.provider] = {
+            "provider_account_id": c.provider_account_id,
+            "accessToken": c.access_token,
+            "refreshToken": c.refresh_token,
+            "token_type": c.token_type
+        }
+    
+    # 4. Sync (recreate) the container with all connections
+    plan_config = PLANS.get(user.plan, PLANS["free"])
+    result = docker_manager.sync_container(
+        user_identifier=user.github_id,
+        plan=user.plan,
+        port=user.container_port,
+        telegram_token=user.telegram_bot_token,
+        gemini_key=user.gemini_api_key,
+        connections=connections,
+        custom_rules=user.custom_rules,
+        enabled_plugins=plan_config.get("features", [])
+    )
+    
+    if result["success"]:
+        user.container_id = result.get("container_id", user.container_id)
+        user.container_status = "running"
+        await db.commit()
+        await log_container_event(db, user.id, user.container_id, "sync", 
+                                  f"Synced provider: {sync_data.provider}")
+    
+    return {
+        "success": result["success"],
+        "synced": result["success"],
+        "message": f"Container synced with {sync_data.provider}" if result["success"] else result.get("error"),
+        "connected_providers": list(connections.keys())
     }
 
 

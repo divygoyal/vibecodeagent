@@ -12,6 +12,7 @@ type BotStatus = {
   telegramStatus?: string;
   botUsername?: string;
   telegramBotToken?: string;
+  connectedProviders?: Array<{ provider: string; connected: boolean }>;
 };
 
 type GitHubData = {
@@ -101,6 +102,8 @@ export default function Home() {
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [githubData, setGithubData] = useState<GitHubData | null>(null);
   const [githubLoading, setGithubLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [providerRegistered, setProviderRegistered] = useState(false);
 
   const fetchContainerStatus = useCallback(async () => {
     try {
@@ -130,6 +133,32 @@ export default function Home() {
     } catch { /* silent */ }
     finally { setGithubLoading(false); }
   }, []);
+
+  // Register provider on load (eagerly stores tokens before bot setup)
+  useEffect(() => {
+    if (session?.user && !providerRegistered) {
+      const registerProvider = async () => {
+        try {
+          const res = await fetch('/api/auth/register-provider', { method: 'POST' });
+          if (res.ok) {
+            const data = await res.json();
+            console.log('Provider registration:', data);
+            // If auto-sync happened (bot existed + new provider), refresh status
+            if (data.synced) {
+              setIsSyncing(true);
+              // Give the container time to restart, then poll
+              setTimeout(async () => {
+                await fetchContainerStatus();
+                setIsSyncing(false);
+              }, 5000);
+            }
+          }
+          setProviderRegistered(true);
+        } catch { /* silent */ }
+      };
+      registerProvider();
+    }
+  }, [session, providerRegistered, fetchContainerStatus]);
 
   useEffect(() => {
     if (session?.user) {
@@ -332,7 +361,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* ─── Setup Form / Sync Panel ─── */}
+            {/* ─── Setup Form / Bot Status ─── */}
             <div className="glass-card p-6 fade-in fade-in-delay-1">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-lg font-semibold">
@@ -374,25 +403,27 @@ export default function Home() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-between bg-zinc-800/30 p-4 rounded-xl border border-zinc-700/30 mt-3">
-                  <div className="flex flex-col">
-                    <p className="text-sm text-zinc-300 font-medium">Bot is ready and active 🚀</p>
-                    <p className="text-xs text-zinc-500 mt-1">
-                      Token is securely stored. Click sync to update integrations.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleSetupBot}
-                    disabled={setupStatus === 'loading'}
-                    className="px-5 py-2.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    {setupStatus === 'loading' ? (
-                      <span className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <span>↻</span>
+                <div className="bg-zinc-800/30 p-4 rounded-xl border border-zinc-700/30 mt-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <p className="text-sm text-zinc-300 font-medium">Bot is ready and active 🚀</p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Token is securely stored. Integrations sync automatically.
+                      </p>
+                    </div>
+                    {isSyncing && (
+                      <div className="flex items-center gap-2 text-xs text-amber-400">
+                        <span className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                        Syncing...
+                      </div>
                     )}
-                    Sync Integrations
-                  </button>
+                  </div>
+                  {/* Locked token display */}
+                  <div className="mt-3 flex items-center gap-2 bg-zinc-900/50 px-4 py-2.5 rounded-lg border border-zinc-700/30">
+                    <span className="text-xs text-zinc-500">Token:</span>
+                    <span className="text-xs text-zinc-400 font-mono tracking-wider">••••••••••••••••••••</span>
+                    <span className="text-[10px] text-zinc-600 ml-auto">🔒 Locked</span>
+                  </div>
                 </div>
               )}
 
@@ -409,53 +440,73 @@ export default function Home() {
                 <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
                   Integrations
                 </h2>
-                {isProvisioned && (
-                  <button
-                    onClick={handleSetupBot}
-                    disabled={setupStatus === 'loading'}
-                    className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                  >
-                    {setupStatus === 'loading' ? (
-                      <span className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <span>↻</span>
-                    )}
-                    Sync Bot
-                  </button>
+                {isSyncing && (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-400">
+                    <span className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    Auto-syncing...
+                  </div>
                 )}
               </div>
               <div className="flex gap-4">
                 {/* GitHub */}
-                <div className="flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border border-zinc-700/50 flex-1">
-                  <div className="text-2xl">🐙</div>
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-zinc-200">GitHub</div>
-                    <div className="text-xs text-zinc-500">
-                      {user?.provider === 'github' ? 'Connected' : 'Not connected'}
+                {(() => {
+                  const isSyncedToBot = botStatus?.connectedProviders?.some(c => c.provider === 'github');
+                  const isCurrentSession = user?.provider === 'github';
+                  return (
+                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border flex-1 ${isSyncedToBot ? 'border-emerald-500/30' : 'border-zinc-700/50'
+                      }`}>
+                      <div className="text-2xl">🐙</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-zinc-200">GitHub</div>
+                        <div className={`text-xs ${isSyncedToBot ? 'text-emerald-400' :
+                            isCurrentSession ? 'text-amber-400' : 'text-zinc-500'
+                          }`}>
+                          {isSyncedToBot ? 'Synced ✓' :
+                            (isCurrentSession && isSyncing) ? 'Syncing...' :
+                              isCurrentSession ? 'Connected' : 'Not connected'}
+                        </div>
+                      </div>
+                      {!isCurrentSession && !isSyncedToBot && (
+                        <button onClick={() => signIn('github')} className="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg transition-colors">
+                          Connect
+                        </button>
+                      )}
+                      {isSyncedToBot && (
+                        <span className="text-emerald-400 text-sm">✓</span>
+                      )}
                     </div>
-                  </div>
-                  {user?.provider !== 'github' && (
-                    <button onClick={() => signIn('github')} className="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg transition-colors">
-                      Connect
-                    </button>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Google */}
-                <div className="flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border border-zinc-700/50 flex-1">
-                  <div className="text-2xl">📊</div>
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-zinc-200">Google</div>
-                    <div className="text-xs text-zinc-500">
-                      {user?.provider === 'google' ? 'Connected' : 'Not connected'}
+                {(() => {
+                  const isSyncedToBot = botStatus?.connectedProviders?.some(c => c.provider === 'google');
+                  const isCurrentSession = user?.provider === 'google';
+                  return (
+                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border flex-1 ${isSyncedToBot ? 'border-emerald-500/30' : 'border-zinc-700/50'
+                      }`}>
+                      <div className="text-2xl">📊</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-zinc-200">Google</div>
+                        <div className={`text-xs ${isSyncedToBot ? 'text-emerald-400' :
+                            isCurrentSession ? 'text-amber-400' : 'text-zinc-500'
+                          }`}>
+                          {isSyncedToBot ? 'Synced ✓' :
+                            (isCurrentSession && isSyncing) ? 'Syncing...' :
+                              isCurrentSession ? 'Connected' : 'Not connected'}
+                        </div>
+                      </div>
+                      {!isCurrentSession && !isSyncedToBot && (
+                        <button onClick={() => signIn('google')} className="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg transition-colors">
+                          Connect
+                        </button>
+                      )}
+                      {isSyncedToBot && (
+                        <span className="text-emerald-400 text-sm">✓</span>
+                      )}
                     </div>
-                  </div>
-                  {user?.provider !== 'google' && (
-                    <button onClick={() => signIn('google')} className="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg transition-colors">
-                      Connect
-                    </button>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             </div>
 
