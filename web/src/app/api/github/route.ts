@@ -126,18 +126,38 @@ export async function GET() {
         }
       }
 
-      const recentCommits = allEvents
-        .filter((e: any) => e.type === 'PushEvent')
-        .flatMap((e: any) =>
-          (e.payload.commits || []).map((c: any) => ({
-            repo: e.repo.name.split('/')[1] || e.repo.name,
-            message: c.message.split('\n')[0].substring(0, 80),
-            sha: c.sha.substring(0, 7),
-            date: e.created_at,
+      const pushEvents = allEvents.filter((e: any) => e.type === 'PushEvent');
+
+      const recentCommits = await Promise.all(pushEvents.slice(0, 5).map(async (e: any) => {
+        try {
+          const repoName = e.repo.name; // "owner/repo"
+          // Use head commit SHA from payload if available, or just fetch latest commits from repo
+          // The payload has 'head' which is the SHA.
+          const sha = e.payload.head;
+
+          if (!sha) return null;
+
+          // Fetch the specific commit details
+          const commitRes = await fetch(`https://api.github.com/repos/${repoName}/commits/${sha}`, { headers });
+          if (!commitRes.ok) return null;
+
+          const commitData = await commitRes.json();
+
+          return {
+            repo: repoName.split('/')[1] || repoName,
+            message: commitData.commit.message.split('\n')[0].substring(0, 80),
+            sha: sha.substring(0, 7),
+            date: commitData.commit.author.date,
             branch: (e.payload.ref || '').replace('refs/heads/', '')
-          }))
-        )
-        .slice(0, 10)
+          };
+        } catch (err) {
+          console.error(`GitHub Debug: Failed to fetch commit details for ${e.repo.name}:`, err);
+          return null;
+        }
+      }));
+
+      // Filter out nulls and flatten
+      const validCommits = recentCommits.filter(c => c !== null);
 
       let repos: any[] = []
       if (reposRes.ok) {
@@ -174,7 +194,7 @@ export async function GET() {
         else heatmap.push(4)
       }
 
-      return NextResponse.json({ commits: recentCommits, repos, heatmap, username })
+      return NextResponse.json({ commits: validCommits, repos, heatmap, username })
 
     } catch (err: unknown) {
       const error = err as Error
