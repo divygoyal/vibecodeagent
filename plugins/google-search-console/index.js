@@ -304,6 +304,10 @@ if (require.main === module) {
             if (command === 'list-sites') {
                 console.log(await plugin.listSites());
 
+            } else if (command === 'list-sites-json') {
+                const sites = await plugin.listSites(true);
+                console.log(JSON.stringify(sites));
+
             } else if (command === 'query') {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }

@@ -55,12 +55,30 @@ class GoogleAnalytics {
     /**
      * List all GA4 properties accessible by the user.
      */
-    async listProperties() {
+    async listProperties(asJson = false) {
         console.log("Listing GA4 properties...");
         try {
             const auth = await this._getAuth();
             const analytics = google.analyticsadmin({ version: 'v1beta', auth });
             const res = await analytics.accountSummaries.list();
+
+            if (asJson) {
+                const properties = [];
+                if (res.data.accountSummaries) {
+                    for (const account of res.data.accountSummaries) {
+                        if (account.propertySummaries) {
+                            for (const prop of account.propertySummaries) {
+                                properties.push({
+                                    displayName: prop.displayName,
+                                    property: prop.property,
+                                    parent: prop.parent
+                                });
+                            }
+                        }
+                    }
+                }
+                return properties;
+            }
 
             if (!res.data.accountSummaries || res.data.accountSummaries.length === 0) {
                 return "No Google Analytics accounts found.";
