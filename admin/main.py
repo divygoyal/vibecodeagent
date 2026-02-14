@@ -531,7 +531,7 @@ async def get_user(
         "subscription_start": user.subscription_start,
         "subscription_end": user.subscription_end,
         "created_at": user.created_at,
-        "telegram_bot_username": user.telegram_bot_username, # Expose bot username
+        "telegram_bot_username": container_status.get("bot_username"), # Use container status
         "telegram_bot_token": user.telegram_bot_token or "" # Expose masked token
     }
 
