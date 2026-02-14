@@ -960,6 +960,64 @@ async def get_user_logs(
     return docker_manager.get_container_logs(user.github_id, tail=tail)
 
 
+# ============= Plugin Exec Endpoint =============
+
+class PluginExecRequest(BaseModel):
+    plugin: str           # "google-analytics" or "google-search-console"
+    command: str           # e.g. "query", "list-properties", "list-sites"
+    args: list[str] = []   # positional args
+    options: dict = {}     # --key value options
+
+ALLOWED_PLUGINS = {"google-analytics", "google-search-console", "github-ghost"}
+
+@app.post("/api/users/{github_id}/exec")
+async def exec_plugin(
+    github_id: str,
+    req: PluginExecRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Execute a plugin command inside the user's container and return output."""
+    if req.plugin not in ALLOWED_PLUGINS:
+        raise HTTPException(status_code=400, detail=f"Plugin '{req.plugin}' not allowed")
+
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    container_name = f"clawbot-{sanitize_identifier(user.github_id)}"
+
+    try:
+        container = docker_manager.client.containers.get(container_name)
+        if container.status != "running":
+            raise HTTPException(status_code=503, detail="Container not running")
+
+        # Build the command: python -m plugins.<plugin>.main <command> <args> <options>
+        cmd = ["python", "-m", f"plugins.{req.plugin}.main", req.command] + req.args
+        for key, value in req.options.items():
+            cmd.append(f"--{key}")
+            if value is not None and value != "":
+                cmd.append(str(value))
+
+        result = container.exec_run(cmd, workdir="/app", demux=True)
+        stdout = result.output[0].decode("utf-8", errors="replace") if result.output[0] else ""
+        stderr = result.output[1].decode("utf-8", errors="replace") if result.output[1] else ""
+
+        # Try to parse stdout as JSON
+        import json as json_lib
+        try:
+            parsed = json_lib.loads(stdout)
+            return {"status": "ok", "data": parsed, "stderr": stderr}
+        except json_lib.JSONDecodeError:
+            return {"status": "ok", "data": stdout, "stderr": stderr}
+
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="Container not found")
+    except Exception as e:
+        logger.error(f"Plugin exec error for {github_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============= Admin Endpoints =============
 @app.get("/api/admin/status")
 async def admin_status(

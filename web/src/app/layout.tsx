@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ClawBot - AI Personal Assistant",
-  description: "Token-optimized AI Personal Assistant powered by OpenClaw",
+  title: "GrowClaw — AI-Powered Growth Intelligence",
+  description: "Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.",
 };
 
 export default function RootLayout({
