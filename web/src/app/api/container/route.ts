@@ -79,20 +79,23 @@ export async function GET(req: Request) {
     }
 
     const data = await response.json()
-    return NextResponse.json({
-      let status = data.container?.status || data.container_status || "unknown";
-      if(status === "not_found") status = "not_provisioned";
-    health: data.container?.health || "unknown",
-      memory_usage_mb: data.container?.memory_usage_mb,
-        plan: data.plan,
-          telegramStatus: data.container?.telegram_status || data.telegram_status || (data.container?.health === 'healthy' ? 'connected' : undefined),
-            botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username,
-              telegramBotToken: data.telegram_bot_token
-  })
+    // Normalizing status
+    let status = data.container?.status || data.container_status || "unknown";
+    if (status === "not_found") status = "not_provisioned";
 
-} catch (err: unknown) {
-  const error = err as Error
-  console.error('Status check error:', error.message)
-  return NextResponse.json({ error: 'Failed to check status' }, { status: 500 })
-}
+    return NextResponse.json({
+      status: status,
+      health: data.container?.health || "unknown",
+      memory_usage_mb: data.container?.memory_usage_mb,
+      plan: data.plan,
+      telegramStatus: data.container?.telegram_status || data.telegram_status || (data.container?.health === 'healthy' ? 'connected' : undefined),
+      botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username,
+      telegramBotToken: data.telegram_bot_token
+    })
+
+  } catch (err: unknown) {
+    const error = err as Error
+    console.error('Status check error:', error.message)
+    return NextResponse.json({ error: 'Failed to check status' }, { status: 500 })
+  }
 }
