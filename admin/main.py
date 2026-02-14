@@ -998,7 +998,6 @@ async def exec_plugin(
         # Build the command: node /app/skills/workspace/<plugin>/index.js <command> <args> <options>
         # Note: Plugins are mounted at /app/skills/workspace inside the container
         cmd = ["node", f"/app/skills/workspace/{req.plugin}/index.js", req.command] + req.args
-        cmd = ["node", f"{plugin_dir}/{req.plugin}/index.js", req.command] + req.args
         for key, value in req.options.items():
             cmd.append(f"--{key}")
             if value is not None and value != "":
@@ -1028,14 +1027,14 @@ async def exec_plugin(
         # Pass environment variables
         env = os.environ.copy()
         
-        logger.info(f"Executing plugin: {' '.join(cmd)}")
+        print(f"Executing plugin: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
         stdout = result.stdout
         stderr = result.stderr
         
-        logger.info(f"Plugin stdout: {stdout[:500]}...") # Log first 500 chars
+        print(f"Plugin stdout: {stdout[:500]}...") # Log first 500 chars
         if stderr:
-            logger.warning(f"Plugin stderr: {stderr}")
+            print(f"Plugin stderr: {stderr}")
 
         # Try to parse stdout as JSON
         import json as json_lib
@@ -1046,7 +1045,7 @@ async def exec_plugin(
             return {"status": "ok", "data": stdout, "stderr": stderr}
 
     except Exception as e:
-        logger.error(f"Plugin exec error for {github_id}: {e}", exc_info=True)
+        print(f"Plugin exec error for {github_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
 
 
