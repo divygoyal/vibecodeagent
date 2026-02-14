@@ -134,18 +134,18 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const section = searchParams.get('section') || 'all'
 
-    const isDev = !ADMIN_API_KEY || ADMIN_API_URL === "http://admin-api:8000"
+    // Production = ADMIN_API_KEY is set (key comes from .env on VPS)
+    const isProduction = !!ADMIN_API_KEY
 
-    // In dev mode, skip auth and return mock data
-    if (!isDev) {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-        }
+    // Auth check — always required in production
+    const session = await getServerSession(authOptions)
+    if (isProduction && !session?.user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     try {
-        if (ADMIN_API_KEY && ADMIN_API_URL !== "http://admin-api:8000") {
+        // In production, proxy to admin API which execs the GSC plugin
+        if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const githubId = session.user.id
             const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
@@ -166,9 +166,11 @@ export async function GET(req: Request) {
                 const data = await response.json()
                 return NextResponse.json(data)
             }
+            // If admin API call fails, fall through to mock data as graceful fallback
+            console.warn('SEO admin API returned:', response.status, response.statusText)
         }
 
-        // Dev mode: return mock data
+        // Dev mode fallback: return mock data
         const result: Record<string, any> = {}
 
         if (section === 'all' || section === 'kpis') result.kpis = generateMockSEOKPIs()

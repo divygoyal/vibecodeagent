@@ -28,9 +28,9 @@ function getMockContainerStatus() {
 // ============= Route handlers =============
 
 export async function POST(req: Request) {
-  const isDev = !ADMIN_API_KEY || ADMIN_API_URL === "http://admin-api:8000"
+  const isProduction = !!ADMIN_API_KEY
 
-  if (!isDev) {
+  if (isProduction) {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -69,9 +69,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  const isDev = !ADMIN_API_KEY || ADMIN_API_URL === "http://admin-api:8000"
+  const isProduction = !!ADMIN_API_KEY
 
-  if (!isDev) {
+  if (isProduction) {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
