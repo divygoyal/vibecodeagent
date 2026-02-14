@@ -107,6 +107,14 @@ export async function GET() {
       let allEvents: any[] = []
       if (eventsRes.ok) {
         allEvents = await eventsRes.json()
+        console.log(`GitHub Debug: Fetched ${allEvents.length} events for user ${username}`);
+        if (allEvents.length > 0) {
+          console.log(`GitHub Debug: Event types: ${allEvents.map((e: any) => e.type).slice(0, 10).join(', ')}`);
+        }
+      } else {
+        console.error(`GitHub Debug: Events fetch failed: ${eventsRes.status} ${eventsRes.statusText}`);
+        const errorText = await eventsRes.text();
+        console.error(`GitHub Debug: Error details: ${errorText}`);
       }
 
       const recentCommits = allEvents
