@@ -29,8 +29,8 @@ function Navbar() {
             animate={{ y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
-                    ? 'bg-[#09090b]/80 backdrop-blur-xl border-b border-white/[0.06]'
-                    : 'bg-transparent'
+                ? 'bg-[#09090b]/80 backdrop-blur-xl border-b border-white/[0.06]'
+                : 'bg-transparent'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -69,13 +69,13 @@ function Navbar() {
                     ) : (
                         <>
                             <button
-                                onClick={() => signIn('google')}
+                                onClick={() => signIn()}
                                 className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
                             >
                                 Sign In
                             </button>
                             <button
-                                onClick={() => signIn('google')}
+                                onClick={() => signIn()}
                                 className="px-4 py-2 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg hover:opacity-90 transition-opacity"
                             >
                                 Start Free
@@ -114,7 +114,7 @@ function Navbar() {
                                 </a>
                             ))}
                             <button
-                                onClick={() => signIn('google')}
+                                onClick={() => signIn()}
                                 className="mt-2 px-4 py-2.5 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg text-center"
                             >
                                 Start Free
