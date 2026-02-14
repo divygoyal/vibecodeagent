@@ -472,6 +472,10 @@ _(What do they care about? What projects are they working on? What annoys them? 
             # Retrieve basic attributes first to check status
             status = container.attrs.get("State", {}).get("Status", "unknown")
 
+            # Initialize stats
+            mem_usage = 0
+            mem_percent = 0
+
             # Only fetch stats if running to avoid overhead/errors
             if status == "running":
                 try:
@@ -480,9 +484,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     mem_limit = stats["memory_stats"].get("limit", 1)
                     mem_percent = (mem_usage / mem_limit) * 100 if mem_limit > 0 else 0
                 except Exception:
-                    mem_percent = 0
-            else:
-                mem_percent = 0
+                    pass
             
             # Get health status
             health = container.attrs.get("State", {}).get("Health", {})
