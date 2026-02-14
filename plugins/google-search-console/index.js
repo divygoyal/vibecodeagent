@@ -428,8 +428,12 @@ if (require.main === module) {
             } else if (command === 'list-sites-json') {
                 const options = parseOptions(1);
                 const plugin = new GoogleSearchConsole(options);
-                const sites = await plugin.listSites(true);
-                console.log(JSON.stringify(sites));
+                try {
+                    const sites = await plugin.listSites(true);
+                    console.log(JSON.stringify(sites));
+                } catch (e) {
+                    console.log(JSON.stringify({ error: e.message }));
+                }
 
             } else if (command === 'query') {
                 const siteUrl = args[1];
@@ -464,8 +468,13 @@ if (require.main === module) {
                 const options = parseOptions(2);
 
                 const plugin = new GoogleSearchConsole(options);
-                const result = await plugin.dashboardJson(siteUrl);
-                console.log(JSON.stringify(result));
+
+                try {
+                    const result = await plugin.dashboardJson(siteUrl);
+                    console.log(JSON.stringify(result));
+                } catch (e) {
+                    console.log(JSON.stringify({ error: e.message }));
+                }
 
             } else if (command === 'get-performance') {
                 // Legacy shortcut

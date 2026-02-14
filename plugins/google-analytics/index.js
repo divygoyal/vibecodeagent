@@ -599,8 +599,12 @@ if (require.main === module) {
                     }
                 }
                 const plugin = new GoogleAnalytics(options);
-                const props = await plugin.listProperties(true);
-                console.log(JSON.stringify(props));
+                try {
+                    const props = await plugin.listProperties(true);
+                    console.log(JSON.stringify(props));
+                } catch (e) {
+                    console.log(JSON.stringify({ error: e.message }));
+                }
 
             } else if (command === 'list-metrics') {
                 const propertyId = args[1];
@@ -666,11 +670,14 @@ if (require.main === module) {
                     }
                 }
 
-                const range = args[2] && !args[2].startsWith('--') ? args[2] : '30d'; // Handle positional range if present, else default
-
+                const range = args[2] && !args[2].startsWith('--') ? args[2] : '30d'; // Handle positional range if present,
                 const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
-                const result = await plugin.dashboardJson(propertyId, range);
-                console.log(JSON.stringify(result));
+                try {
+                    const result = await plugin.dashboardJson(propertyId, range);
+                    console.log(JSON.stringify(result));
+                } catch (e) {
+                    console.log(JSON.stringify({ error: e.message }));
+                }
 
             } else if (command === 'get-report') {
                 // Legacy shortcut
