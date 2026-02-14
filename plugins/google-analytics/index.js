@@ -2,7 +2,6 @@ const { google } = require('googleapis');
 
 class GoogleAnalytics {
     constructor(config) {
-        console.log("Google Analytics Plugin Initializing...");
         this.config = config || {};
 
         // Try to load token from environment if not passed in config
@@ -40,20 +39,11 @@ class GoogleAnalytics {
         });
 
         try {
-            console.log(`Using Client ID: ${clientId ? clientId.substring(0, 15) + '...' : 'undefined'}`);
             // Force refresh to verify credentials validity immediately
-            console.log("Attempting to force refresh access token for GA...");
             const refreshRes = await auth.refreshAccessToken();
-            const token = refreshRes.credentials.access_token;
-            console.log("Token refresh SUCCESS. New token starts with:", token ? token.substring(0, 10) + '...' : 'null');
-
             auth.setCredentials(refreshRes.credentials);
-
         } catch (e) {
             console.error("Failed to refresh Google token:", e.message);
-            if (e.response && e.response.data) {
-                console.error("Error details:", JSON.stringify(e.response.data));
-            }
             throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
         }
 
@@ -64,14 +54,12 @@ class GoogleAnalytics {
      * List all GA4 properties accessible by the user.
      */
     async listProperties(asJson = false) {
-        console.log("Listing GA4 properties...");
         try {
             const auth = await this._getAuth();
             const analytics = google.analyticsadmin({ version: 'v1beta', auth });
             const res = await analytics.accountSummaries.list();
 
-            // DEBUG: Log raw response to stderr so it shows up in admin logs
-            console.error("GA4 Raw Response:", JSON.stringify(res.data, null, 2));
+
 
             if (asJson) {
                 const properties = [];

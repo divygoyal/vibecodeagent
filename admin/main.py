@@ -1045,6 +1045,23 @@ async def exec_plugin(
             parsed = json_lib.loads(stdout)
             return {"status": "ok", "data": parsed, "stderr": stderr}
         except json_lib.JSONDecodeError:
+            # Fallback: Try to find JSON in the output (ignore leading log lines)
+            try:
+                # Find the start of the JSON structure (first { or [)
+                cleaned = stdout.strip()
+                start_index = -1
+                for i, char in enumerate(cleaned):
+                    if char in ['{', '[']:
+                        start_index = i
+                        break
+                
+                if start_index != -1:
+                    json_candidate = cleaned[start_index:]
+                    parsed = json_lib.loads(json_candidate)
+                    return {"status": "ok", "data": parsed, "stderr": stderr}
+            except Exception:
+                pass
+            
             return {"status": "ok", "data": stdout, "stderr": stderr}
 
     except Exception as e:
