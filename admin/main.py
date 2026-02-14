@@ -351,8 +351,18 @@ async def create_user(
                     oauth.refresh_token = user_data.refresh_token
                 oauth.updated_at = datetime.utcnow()
             else:
-                 # Should create if missing? Maybe.
-                 pass
+                 # Create new connection (Link new provider)
+                 oauth = OAuthConnection(
+                    user_id=user.id,
+                    provider=user_data.provider,
+                    provider_account_id=user_data.provider_id,
+                    access_token=user_data.access_token or "", # Allow empty token for linking
+                    refresh_token=user_data.refresh_token,
+                    token_type="bearer",
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                 )
+                 db.add(oauth)
 
         await db.commit()
         await db.refresh(user)
@@ -381,12 +391,28 @@ async def create_user(
             container_port=port,
             container_status="stopped",
             subscription_start=datetime.utcnow(),
-            enabled_plugins=json.dumps([]) # will be filled by create_container logic mostly?
+            enabled_plugins=json.dumps([]) 
         )
         db.add(user)
         try:
             await db.commit()
             await db.refresh(user)
+            
+            # Create OAuth connection for new user
+            if user_data.provider and user_data.provider_id:
+                oauth = OAuthConnection(
+                    user_id=user.id,
+                    provider=user_data.provider,
+                    provider_account_id=user_data.provider_id,
+                    access_token=user_data.access_token or "",
+                    refresh_token=user_data.refresh_token,
+                    token_type="bearer",
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(oauth)
+                await db.commit()
+
         except Exception as e:
             await db.rollback()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -394,16 +420,18 @@ async def create_user(
     # 4. Ensure Container Exists & Is Running (Idempotent)
     plan_config = PLANS[user.plan]
     connections = {}
-    if user_data.access_token:
-        connections[user_data.provider] = {
-            "provider_account_id": user_data.provider_id,
-            "accessToken": user_data.access_token,
-            "refreshToken": user_data.refresh_token,
-            "token_type": "bearer"
+    
+    # Reload connections from DB to be sure we have everything
+    res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
+    for c in res.scalars().all():
+        connections[c.provider] = {
+            "provider_account_id": c.provider_account_id,
+            "accessToken": c.access_token,
+            "refreshToken": c.refresh_token,
+            "token_type": c.token_type
         }
 
     # We use the user's stored github_id as the identifier for Docker to ensure consistency
-    # (in case we matched an existing user with a different ID strategy)
     docker_identifier = user.github_id 
 
     result = docker_manager.create_container(
@@ -423,34 +451,6 @@ async def create_user(
     user.container_id = result.get("container_id", user.container_id)
     user.container_status = "running"
     await db.commit()
-
-    # 5. Update OAuth Token
-    if user_data.access_token:
-        # Check existing connection
-        res = await db.execute(select(OAuthConnection).where(
-            OAuthConnection.user_id == user.id,
-            OAuthConnection.provider == user_data.provider
-        ))
-        oauth = res.scalar_one_or_none()
-        
-        if oauth:
-            oauth.access_token = user_data.access_token
-            if user_data.refresh_token:
-                oauth.refresh_token = user_data.refresh_token
-            oauth.updated_at = datetime.utcnow()
-        else:
-            oauth = OAuthConnection(
-                user_id=user.id,
-                provider=user_data.provider,
-                provider_account_id=user_data.provider_id or user_data.github_id or user_data.email,
-                access_token=user_data.access_token,
-                refresh_token=user_data.refresh_token,
-                token_type="bearer",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            db.add(oauth)
-        await db.commit()
 
     return UserResponse(
         id=user.id,
