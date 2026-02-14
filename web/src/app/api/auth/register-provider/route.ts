@@ -32,28 +32,27 @@ export async function POST() {
             return NextResponse.json({ error: "Missing session data" }, { status: 400 })
         }
 
-        // Call the sync endpoint — it will upsert the OAuthConnection
-        // and recreate the container if a bot is already set up
-        const response = await fetch(`${ADMIN_API_URL}/api/users/${userId}/sync`, {
+        // Call the create_user endpoint — it handles idempotent upsert of user & OAuth connection
+        // This ensures the user exists even if they haven't set up the bot yet
+        const response = await fetch(`${ADMIN_API_URL}/api/users`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "X-API-Key": ADMIN_API_KEY
             },
             body: JSON.stringify({
+                // Use session ID as generic identifier (it will be provider_id)
+                github_id: userId,
                 provider: provider,
                 provider_id: String(userId),
                 access_token: accessToken,
                 refresh_token: refreshToken,
                 email: session.user?.email || undefined,
+                plan: "free"
             })
         })
 
         if (!response.ok) {
-            // If user doesn't exist yet (404), that's fine — they'll be created on bot setup
-            if (response.status === 404) {
-                return NextResponse.json({ registered: false, message: "User not found, will register on bot setup" })
-            }
             const data = await response.json()
             console.error("Register provider error:", data)
             return NextResponse.json({ error: data.detail || "Failed to register provider" }, { status: response.status })
@@ -62,8 +61,8 @@ export async function POST() {
         const data = await response.json()
         return NextResponse.json({
             registered: true,
-            synced: data.synced || false,
-            message: data.message
+            synced: true, // Force sync status to true so frontend refreshes
+            user: data // Return full user object for debugging if needed
         })
 
     } catch (error) {
