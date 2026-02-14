@@ -133,13 +133,14 @@ export default function AnalyticsPage() {
                 const res = await fetch('/api/analytics/properties');
                 if (res.ok) {
                     const data = await res.json();
-                    setProperties(data);
-                    if (data.length > 0) {
-                        setSelectedProperty(data[0].property);
-                    } else if (res.status !== 500) {
-                        // If no properties found (but not error), set empty to trigger mock/empty state?
-                        // Actually, if loaded but empty, we still want to fetch data (which might fallback to mock in dev)
-                        // But in prod with no properties, user should see "Connect GA".
+                    if (Array.isArray(data)) {
+                        setProperties(data);
+                        if (data.length > 0) {
+                            setSelectedProperty(data[0].property);
+                        }
+                    } else {
+                        console.error("Properties API returned non-array:", data);
+                        setProperties([]);
                     }
                 } else {
                     console.warn("Failed to load properties list");
@@ -168,12 +169,13 @@ export default function AnalyticsPage() {
             const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to fetch analytics');
             const data = await res.json();
-            setKpis(data.kpis);
-            setTraffic(data.traffic || []);
-            setSources(data.sources || []);
-            setPages(data.pages || []);
-            setDevices(data.devices || []);
-            setCountries(data.countries || []);
+
+            setKpis(data.kpis || null);
+            setTraffic(Array.isArray(data.traffic) ? data.traffic : []);
+            setSources(Array.isArray(data.sources) ? data.sources : []);
+            setPages(Array.isArray(data.pages) ? data.pages : []);
+            setDevices(Array.isArray(data.devices) ? data.devices : []);
+            setCountries(Array.isArray(data.countries) ? data.countries : []);
         } catch (e: any) {
             setError(e.message);
         } finally {

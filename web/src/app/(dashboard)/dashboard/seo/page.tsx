@@ -123,9 +123,14 @@ export default function SEOPage() {
                 const res = await fetch('/api/seo/sites');
                 if (res.ok) {
                     const data = await res.json();
-                    setSites(data);
-                    if (data.length > 0) {
-                        setSelectedSite(data[0].siteUrl);
+                    if (Array.isArray(data)) {
+                        setSites(data);
+                        if (data.length > 0) {
+                            setSelectedSite(data[0].siteUrl);
+                        }
+                    } else {
+                        console.error("Sites API returned non-array:", data);
+                        setSites([]);
                     }
                 } else {
                     console.warn("Failed to load sites list");
@@ -153,11 +158,12 @@ export default function SEOPage() {
             const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to fetch SEO data');
             const data = await res.json();
-            setKpis(data.kpis);
-            setQueries(data.queries || []);
-            setPages(data.pages || []);
-            setRecommendations(data.recommendations || []);
-            setTrend(data.trend || []);
+
+            setKpis(data.kpis || null);
+            setQueries(Array.isArray(data.queries) ? data.queries : []);
+            setPages(Array.isArray(data.pages) ? data.pages : []);
+            setRecommendations(Array.isArray(data.recommendations) ? data.recommendations : []);
+            setTrend(Array.isArray(data.trend) ? data.trend : []);
         } catch (e: any) {
             setError(e.message);
         } finally {
