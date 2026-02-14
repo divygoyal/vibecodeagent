@@ -252,14 +252,15 @@ _(What do they care about? What projects are they working on? What annoys them? 
         plugins_dir = f"{user_dir}/workspace/plugins"
         os.makedirs(plugins_dir, exist_ok=True)
         
-        # Source plugins directory (mounted from host)
-        source_plugins = "/opt/clawbot/plugins"
+        # Source plugins directory (baked into admin image via Dockerfile)
+        source_plugins = "/app/plugins"
         
         for plugin in enabled_plugins:
             src = f"{source_plugins}/{plugin}"
             dst = f"{plugins_dir}/{plugin}"
-            if os.path.exists(src) and not os.path.exists(dst):
-                os.system(f"cp -r {src} {dst}")
+            if os.path.exists(src):
+                # Always re-copy to ensure latest plugin code (force overwrite)
+                os.system(f"cp -rf {src} {dst}")
     
     def create_container(
         self,
