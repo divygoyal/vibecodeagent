@@ -129,6 +129,13 @@ export async function GET(req: Request) {
 
                     if (listRes.ok) {
                         const listData = await listRes.json()
+
+                        // Check for plugin error response
+                        if (listData.status === "ok" && listData.data && !Array.isArray(listData.data) && (listData.data as any).error) {
+                            console.error("Analytics plugin error:", (listData.data as any).error);
+                            return NextResponse.json({ error: (listData.data as any).error }, { status: 502 });
+                        }
+
                         if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
                             propertyId = listData.data[0].property
                         }
