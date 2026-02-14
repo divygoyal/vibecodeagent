@@ -45,6 +45,7 @@ export async function POST() {
                 provider_id: String(userId),
                 access_token: accessToken,
                 refresh_token: refreshToken,
+                email: session.user?.email || undefined,
             })
         })
 

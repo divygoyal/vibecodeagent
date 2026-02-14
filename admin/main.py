@@ -249,7 +249,7 @@ async def get_next_available_port(db: AsyncSession) -> int:
 
 async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[User]:
     """
-    Find user by github_id OR any connected OAuth provider_account_id.
+    Find user by github_id OR any connected OAuth provider_account_id OR email.
     This handles cases where the user signed up via GitHub (primary ID) 
     but is now accessing via Google (secondary ID).
     """
@@ -276,6 +276,15 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
         if user:
             print(f"[DEBUG] Resolved to user via OAuth: {user.id} ({user.github_id})")
         return user
+    
+    # 3. Fallback: Lookup by email (handles cross-provider identity)
+    if "@" in identifier:
+        print(f"[DEBUG] Trying email lookup for '{identifier}'")
+        email_res = await db.execute(select(User).where(User.email == identifier))
+        user = email_res.scalar_one_or_none()
+        if user:
+            print(f"[DEBUG] Found user by email: {user.id} ({user.email})")
+            return user
         
     print(f"[DEBUG] User not found for identifier: {identifier}")
     return None
@@ -606,6 +615,7 @@ class SyncRequest(BaseModel):
     provider_id: str
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
+    email: Optional[str] = None  # For cross-provider user lookup
 
 
 @app.post("/api/users/{github_id}/sync")
@@ -618,6 +628,9 @@ async def sync_user_container(
     """Sync a new provider's credentials into the user's bot container.
     Upserts OAuthConnection, then recreates the container with all connections."""
     user = await get_user_by_identifier(db, github_id)
+    # Fallback: try email lookup (handles Google users whose session ID != github_id)
+    if not user and sync_data.email:
+        user = await get_user_by_identifier(db, sync_data.email)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
