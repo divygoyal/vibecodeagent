@@ -565,6 +565,13 @@ async def get_user(
     elif user.container_id == "pending":
          container_status["status"] = "initializing" # Treat pending as initializing
 
+    # CRITICAL FIX 2: Even if container is running, if there is NO token, it's not really provisioned
+    # This handles "zombie" containers or containers created without tokens during robustness fixes
+    if not user.telegram_bot_token:
+        container_status["status"] = "not_provisioned"
+        display_token = ""
+
+
 
 
     
