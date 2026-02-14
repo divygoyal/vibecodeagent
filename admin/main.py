@@ -987,7 +987,8 @@ async def exec_plugin(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    container_name = f"clawbot-{sanitize_identifier(user.github_id)}"
+    # Use the docker manager to get the correct container name (handles prefix and separator)
+    container_name = docker_manager._get_container_name(user.github_id)
 
     try:
         container = docker_manager.client.containers.get(container_name)
