@@ -30,11 +30,21 @@ export async function GET(req: Request) {
         })
 
         if (!response.ok) {
-            console.error("Admin API error listing sites:", response.status, response.statusText);
-            return NextResponse.json({ error: "Failed to list sites" }, { status: 500 });
+            const errorText = await response.text();
+            console.error("Admin API error listing sites:", response.status, response.statusText, errorText);
+            return NextResponse.json({ error: "Failed to list sites", details: errorText }, { status: 500 });
         }
 
-        const data = await response.json();
+        const rawText = await response.text();
+        console.log("Admin API raw response:", rawText);
+
+        let data;
+        try {
+            data = JSON.parse(rawText);
+        } catch (e) {
+            console.error("Failed to parse Admin API response:", e);
+            return NextResponse.json({ error: "Invalid JSON from Admin API", raw: rawText }, { status: 500 });
+        }
         // admin api returns { status: "ok", data: [...], ... }
         if (data.status === "ok") {
             return NextResponse.json(data.data);
