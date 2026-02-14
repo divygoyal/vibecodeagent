@@ -379,6 +379,69 @@ class GoogleSearchConsole {
                 position: +(row.position || 0).toFixed(1),
             })).sort((a, b) => a.date.localeCompare(b.date));
 
+            // Generate Recommendations
+            const recommendations = [];
+
+            // 1. Striking Distance (Pos 4-10)
+            const strikingDistance = queryRows.filter(r => (r.position >= 4 && r.position <= 10) && r.impressions > 100);
+            if (strikingDistance.length > 0) {
+                const best = strikingDistance.sort((a, b) => b.impressions - a.impressions)[0];
+                recommendations.push({
+                    id: 'rec-strike-1',
+                    type: 'opportunity',
+                    severity: 'medium',
+                    title: `Striking distance: "${best.keys[0]}"`,
+                    description: `Ranking #${best.position.toFixed(1)} with ${best.impressions} impressions. Small optimization could reach top 3.`,
+                    action: 'Optimize H1/Title and add internal links.',
+                    impact: '+15-20% clicks'
+                });
+            }
+
+            // 2. High Impressions, Low CTR (Pos < 10, CTR < 2%)
+            const lowCtr = pageRows.filter(p => p.position < 10 && (p.ctr * 100) < 2 && p.impressions > 500);
+            if (lowCtr.length > 0) {
+                const worst = lowCtr.sort((a, b) => b.impressions - a.impressions)[0];
+                recommendations.push({
+                    id: 'rec-ctr-1',
+                    type: 'technical',
+                    severity: 'high',
+                    title: `Low CTR on ${worst.keys[0]}`,
+                    description: `High visibility (${worst.impressions} imps) but low clicks (${(worst.ctr * 100).toFixed(1)}%). Title/Desc may not match intent.`,
+                    action: 'Rewrite Meta Title & Description to be more compelling.',
+                    impact: `+${Math.floor(worst.impressions * 0.03)} clicks/mo`
+                });
+            }
+
+            // 3. Page 2 Opportunity (Pos 11-20)
+            const page2 = queryRows.filter(r => (r.position > 10 && r.position <= 20) && r.impressions > 200);
+            if (page2.length > 0) {
+                const top = page2[0];
+                recommendations.push({
+                    id: 'rec-page2-1',
+                    type: 'content_gap',
+                    severity: 'medium',
+                    title: `Page 2 opportunity: "${top.keys[0]}"`,
+                    description: `Ranking #${top.position.toFixed(1)}. You are relevant but not authoritative enough yet.`,
+                    action: 'Expand content length and add related keywords.',
+                    impact: 'Move to Page 1'
+                });
+            }
+
+            // 4. Content Decay (Traffic dropped > 20% vs previous period)
+            if (result.kpis.changeClicks < -20) {
+                recommendations.push({
+                    id: 'rec-decay-1',
+                    type: 'content_decay',
+                    severity: 'high',
+                    title: 'Significant traffic drop detected',
+                    description: `Clicks across site down ${Math.abs(result.kpis.changeClicks)}% vs previous 28 days.`,
+                    action: 'Audit top pages for lost rankings or seasonality.',
+                    impact: 'Recover traffic'
+                });
+            }
+
+            result.recommendations = recommendations;
+
         } catch (e) {
             console.error("Error fetching GSC dashboard data:", e.message);
         }

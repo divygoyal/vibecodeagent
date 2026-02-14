@@ -14,7 +14,9 @@ interface UserProfile {
 interface ExtendedUser {
     id?: string;
     username?: string;
-    accessToken?: string;
+    accessToken?: string; // Legacy/General
+    githubAccessToken?: string; // Specific
+    googleAccessToken?: string; // Specific
     provider?: string;
     name?: string | null;
     email?: string | null;
@@ -61,6 +63,10 @@ export const authOptions: NextAuthOptions = {
                 user.accessToken = token.accessToken as string;
                 user.provider = token.provider as string;
                 user.refreshToken = token.refreshToken as string;
+
+                // Pass provider-specific tokens to session
+                user.githubAccessToken = token.githubAccessToken as string;
+                user.googleAccessToken = token.googleAccessToken as string;
             }
             return session;
         },
@@ -78,6 +84,11 @@ export const authOptions: NextAuthOptions = {
 
                 if (profile && account.provider === "github") {
                     token.username = (profile as any).login;
+                    token.githubAccessToken = account.access_token; // Store specifically
+                }
+
+                if (account.provider === "google") {
+                    token.googleAccessToken = account.access_token; // Store specifically
                 }
             }
             return token;

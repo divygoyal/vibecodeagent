@@ -145,6 +145,34 @@ export async function GET(req: Request) {
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const githubId = session.user.id
+            const mode = searchParams.get('mode')
+
+            // Handle "list" mode for dropdown
+            if (mode === 'list') {
+                try {
+                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
+                        body: JSON.stringify({
+                            plugin: "google-search-console",
+                            command: "list-sites-json",
+                            args: []
+                        }),
+                        cache: 'no-store'
+                    })
+
+                    if (listRes.ok) {
+                        const listData = await listRes.json()
+                        if (listData.status === "ok" && Array.isArray(listData.data)) {
+                            return NextResponse.json(listData.data)
+                        }
+                    }
+                    return NextResponse.json([])
+                } catch (e) {
+                    console.error("List sites error:", e)
+                    return NextResponse.json([])
+                }
+            }
 
             let siteUrl = searchParams.get('siteUrl')
 
