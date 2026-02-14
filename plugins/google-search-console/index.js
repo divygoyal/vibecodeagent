@@ -40,12 +40,20 @@ class GoogleSearchConsole {
         });
 
         try {
-            const { token } = await auth.getAccessToken();
-            if (token) {
-                auth.setCredentials({ access_token: token });
-            }
+            console.log(`Using Client ID: ${clientId ? clientId.substring(0, 15) + '...' : 'undefined'}`);
+            // Force refresh to verify credentials validity immediately
+            console.log("Attempting to force refresh access token...");
+            const refreshRes = await auth.refreshAccessToken();
+            const token = refreshRes.credentials.access_token;
+            console.log("Token refresh SUCCESS. New token starts with:", token ? token.substring(0, 10) + '...' : 'null');
+
+            auth.setCredentials(refreshRes.credentials);
+
         } catch (e) {
             console.error("Failed to refresh Google token:", e.message);
+            if (e.response && e.response.data) {
+                console.error("Error details:", JSON.stringify(e.response.data));
+            }
             throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
         }
 
