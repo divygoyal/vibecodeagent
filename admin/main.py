@@ -520,13 +520,21 @@ async def get_user(
     display_token = user.telegram_bot_token or ""
 
     # CRITICAL FIX: If container is not provisioned in Docker, force status to "not_provisioned"
-    # This handles cases where DB says "stopped" but no container exists (e.g. initial creation bug)
-    if container_status.get("status") in ["not_found", "not_provisioned"]:
-         container_status["status"] = "not_provisioned"
-         display_token = "" # Do not expose token if not provisioned, fixes prefill bug
+    # UNLESS the DB says it should be running (race condition during startup)
+    docker_status = container_status.get("status")
+    
+    if docker_status in ["not_found", "not_provisioned"]:
+        # Check if DB expects it to be running (startup latency)
+        if user.container_status in ["running", "pending", "starting"]:
+            container_status["status"] = "initializing"
+            # Keep token visible if initializing, user might want to verify
+        else:
+            container_status["status"] = "not_provisioned"
+            display_token = "" # Hide if truly not provisioned
+            
     elif user.container_id == "pending":
-         container_status["status"] = "not_provisioned"
-         display_token = "" # Do not expose token if not provisioned
+         container_status["status"] = "initializing" # Treat pending as initializing
+
 
 
     
