@@ -114,26 +114,58 @@ export async function GET(req: Request) {
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const githubId = session.user.id
-            const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-API-Key": ADMIN_API_KEY
-                },
-                body: JSON.stringify({
-                    plugin: "google-analytics",
-                    command: "query",
-                    args: [],
-                    options: { range }
-                }),
-                cache: 'no-store'
-            })
-            if (response.ok) {
-                const data = await response.json()
-                return NextResponse.json(data)
+
+            // Auto-detect property if not provided
+            let propertyId = searchParams.get('propertyId')
+
+            if (!propertyId) {
+                try {
+                    // Fetch properties list
+                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
+                        body: JSON.stringify({
+                            plugin: "google-analytics",
+                            command: "list-properties-json",
+                            args: []
+                        }),
+                        cache: 'no-store'
+                    })
+
+                    if (listRes.ok) {
+                        const listData = await listRes.json()
+                        // Admin API returns { status: "ok", data: [...], stderr: "" }
+                        if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
+                            propertyId = listData.data[0].property
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Failed to auto-detect GA property:", e)
+                }
             }
-            // If admin API call fails, fall through to mock data as graceful fallback
-            console.warn('Analytics admin API returned:', response.status, response.statusText)
+
+            if (propertyId) {
+                const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": ADMIN_API_KEY
+                    },
+                    body: JSON.stringify({
+                        plugin: "google-analytics",
+                        command: "query",
+                        args: [propertyId], // Pass the detected property ID
+                        options: { range }
+                    }),
+                    cache: 'no-store'
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    return NextResponse.json(data)
+                }
+                // If admin API call fails, fall through to mock data as graceful fallback
+                console.warn('Analytics admin API returned:', response.status, response.statusText)
+            }
         }
 
         // Dev mode fallback: return mock data

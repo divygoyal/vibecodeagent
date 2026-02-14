@@ -348,6 +348,10 @@ if (require.main === module) {
             if (command === 'list-properties') {
                 console.log(await plugin.listProperties());
 
+            } else if (command === 'list-properties-json') {
+                const props = await plugin.listProperties(true);
+                console.log(JSON.stringify(props));
+
             } else if (command === 'list-metrics') {
                 const propertyId = args[1];
                 if (!propertyId) { console.error("Error: propertyId required"); process.exit(1); }

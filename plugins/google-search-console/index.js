@@ -55,12 +55,16 @@ class GoogleSearchConsole {
     /**
      * List all verified sites in the user's Search Console.
      */
-    async listSites() {
+    async listSites(asJson = false) {
         console.log("Listing Search Console sites...");
         try {
             const auth = await this._getAuth();
             const searchconsole = google.searchconsole({ version: 'v1', auth });
             const res = await searchconsole.sites.list();
+
+            if (asJson) {
+                return res.data.siteEntry || [];
+            }
 
             if (!res.data.siteEntry || res.data.siteEntry.length === 0) {
                 return "No sites found in your Google Search Console.";

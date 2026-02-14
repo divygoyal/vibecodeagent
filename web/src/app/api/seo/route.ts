@@ -148,26 +148,59 @@ export async function GET(req: Request) {
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const githubId = session.user.id
-            const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-API-Key": ADMIN_API_KEY
-                },
-                body: JSON.stringify({
-                    plugin: "google-search-console",
-                    command: "query",
-                    args: [],
-                    options: {}
-                }),
-                cache: 'no-store'
-            })
-            if (response.ok) {
-                const data = await response.json()
-                return NextResponse.json(data)
+
+            // Auto-detect site if not provided
+            let siteUrl = searchParams.get('siteUrl')
+
+            if (!siteUrl) {
+                try {
+                    // Fetch sites list
+                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
+                        body: JSON.stringify({
+                            plugin: "google-search-console",
+                            command: "list-sites-json",
+                            args: []
+                        }),
+                        cache: 'no-store'
+                    })
+
+                    if (listRes.ok) {
+                        const listData = await listRes.json()
+                        // Admin API returns { status: "ok", data: [...], stderr: "" }
+                        // GSC plugin returns list of site entries
+                        if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
+                            siteUrl = listData.data[0].siteUrl
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Failed to auto-detect GSC site:", e)
+                }
             }
-            // If admin API call fails, fall through to mock data as graceful fallback
-            console.warn('SEO admin API returned:', response.status, response.statusText)
+
+            if (siteUrl) {
+                const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": ADMIN_API_KEY
+                    },
+                    body: JSON.stringify({
+                        plugin: "google-search-console",
+                        command: "query",
+                        args: [siteUrl], // Pass the detected site URL
+                        options: {}
+                    }),
+                    cache: 'no-store'
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    return NextResponse.json(data)
+                }
+                // If admin API call fails, fall through to mock data as graceful fallback
+                console.warn('SEO admin API returned:', response.status, response.statusText)
+            }
         }
 
         // Dev mode fallback: return mock data
