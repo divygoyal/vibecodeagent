@@ -553,15 +553,23 @@ _(What do they care about? What projects are they working on? What annoys them? 
             logs_lower = logs.lower()
             has_errors = "error" in logs_lower and "telegram" in logs_lower
             
-            if has_errors:
-                telegram_status = "error"
-                if "409" in logs_lower or "conflict" in logs_lower:
-                    telegram_status = "webhook_conflict"
-            elif any(s in logs_lower for s in ["logged in as", "bot started", "polling", "telegram connected", "launching", "started", "running", "ready", "listening"]):
-                telegram_status = "connected"
+            # 1. Critical: Check for webhook conflicts (409)
+            if ("error" in logs_lower and "telegram" in logs_lower) and ("409" in logs_lower or "conflict" in logs_lower):
+                telegram_status = "webhook_conflict"
+            
+            # 2. Trust Healthcheck (if container is healthy, it's connected)
             elif health_status == "healthy":
                 telegram_status = "connected"
-            elif container.status == "running" and not has_errors:
+
+            # 3. Check for specific success keywords in logs
+            elif any(s in logs_lower for s in ["logged in as", "bot started", "polling", "telegram connected", "launching", "started", "running", "ready", "listening"]):
+                 telegram_status = "connected"
+
+            # 4. Fallback: Generic error (only if NOT healthy and has explicit error)
+            elif "error" in logs_lower and "telegram" in logs_lower:
+                telegram_status = "error"
+
+            elif container.status == "running":
                 # Fallback: if container is running with no errors in logs,
                 # assume it's connected (handles containers without HEALTHCHECK)
                 import time
