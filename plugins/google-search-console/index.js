@@ -421,9 +421,13 @@ if (require.main === module) {
             const plugin = new GoogleSearchConsole();
 
             if (command === 'list-sites') {
+                const options = parseOptions(1);
+                const plugin = new GoogleSearchConsole(options);
                 console.log(await plugin.listSites());
 
             } else if (command === 'list-sites-json') {
+                const options = parseOptions(1);
+                const plugin = new GoogleSearchConsole(options);
                 const sites = await plugin.listSites(true);
                 console.log(JSON.stringify(sites));
 
@@ -431,11 +435,14 @@ if (require.main === module) {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
                 const options = parseOptions(2);
+                const plugin = new GoogleSearchConsole(options);
                 console.log(await plugin.query(siteUrl, options));
 
             } else if (command === 'list-sitemaps') {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const options = parseOptions(2);
+                const plugin = new GoogleSearchConsole(options);
                 console.log(await plugin.listSitemaps(siteUrl));
 
             } else if (command === 'inspect-url') {
@@ -445,11 +452,18 @@ if (require.main === module) {
                     console.error("Error: siteUrl and inspectionUrl required");
                     process.exit(1);
                 }
+                const options = parseOptions(3);
+                const plugin = new GoogleSearchConsole(options);
                 console.log(await plugin.inspectUrl(siteUrl, inspectionUrl));
 
             } else if (command === 'dashboard-json') {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+
+                // Parse options specifically for dashboard-json to catch auth tokens
+                const options = parseOptions(2);
+
+                const plugin = new GoogleSearchConsole(options);
                 const result = await plugin.dashboardJson(siteUrl);
                 console.log(JSON.stringify(result));
 

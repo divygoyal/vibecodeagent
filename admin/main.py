@@ -1003,6 +1003,27 @@ async def exec_plugin(
             if value is not None and value != "":
                 cmd.append(str(value))
 
+        # Inject OAuth tokens if available
+        # Find Google tokens for analytics/search-console plugins
+        if req.plugin in ["google-analytics", "google-search-console"]:
+            from .models import OAuthConnection  # Import here to avoid circular imports if any
+            from sqlalchemy import select
+            
+            stmt = select(OAuthConnection).where(
+                OAuthConnection.user_id == user.id,
+                OAuthConnection.provider == "google"
+            )
+            result = await db.execute(stmt)
+            oauth = result.scalars().first()
+            
+            if oauth:
+                if oauth.access_token:
+                    cmd.append("--accessToken")
+                    cmd.append(oauth.access_token)
+                if oauth.refresh_token:
+                    cmd.append("--refreshToken")
+                    cmd.append(oauth.refresh_token)
+
         result = container.exec_run(cmd, workdir="/app", demux=True)
         stdout = result.output[0].decode("utf-8", errors="replace") if result.output[0] else ""
         stderr = result.output[1].decode("utf-8", errors="replace") if result.output[1] else ""

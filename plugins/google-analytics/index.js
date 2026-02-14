@@ -580,9 +580,25 @@ if (require.main === module) {
             const plugin = new GoogleAnalytics();
 
             if (command === 'list-properties') {
+                const options = {};
+                for (let i = 1; i < args.length; i++) {
+                    if (args[i].startsWith('--') && i + 1 < args.length) {
+                        options[args[i].substring(2)] = args[i + 1];
+                        i++;
+                    }
+                }
+                const plugin = new GoogleAnalytics(options);
                 console.log(await plugin.listProperties());
 
             } else if (command === 'list-properties-json') {
+                const options = {};
+                for (let i = 1; i < args.length; i++) {
+                    if (args[i].startsWith('--') && i + 1 < args.length) {
+                        options[args[i].substring(2)] = args[i + 1];
+                        i++;
+                    }
+                }
+                const plugin = new GoogleAnalytics(options);
                 const props = await plugin.listProperties(true);
                 console.log(JSON.stringify(props));
 
@@ -634,12 +650,25 @@ if (require.main === module) {
                         }
                     }
                 }
+                const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
                 console.log(await plugin.realtime(propertyId, options));
 
             } else if (command === 'dashboard-json') {
                 const propertyId = args[1];
                 if (!propertyId) { console.error("Error: propertyId required"); process.exit(1); }
-                const range = args[2] || '30d';
+
+                // Parse options specifically for dashboard-json to catch auth tokens
+                const options = {};
+                for (let i = 2; i < args.length; i++) {
+                    if (args[i].startsWith('--') && i + 1 < args.length) {
+                        options[args[i].substring(2)] = args[i + 1];
+                        i++;
+                    }
+                }
+
+                const range = args[2] && !args[2].startsWith('--') ? args[2] : '30d'; // Handle positional range if present, else default
+
+                const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
                 const result = await plugin.dashboardJson(propertyId, range);
                 console.log(JSON.stringify(result));
 
