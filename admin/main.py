@@ -253,22 +253,31 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
     This handles cases where the user signed up via GitHub (primary ID) 
     but is now accessing via Google (secondary ID).
     """
+    print(f"[DEBUG] get_user_by_identifier: Looking for '{identifier}'")
+
     # 1. Try direct lookup (legacy/primary ID)
     result = await db.execute(select(User).where(User.github_id == identifier))
     user = result.scalar_one_or_none()
     
     if user:
+        print(f"[DEBUG] Found user by github_id: {user.id} ({user.github_id})")
         return user
 
     # 2. Fallback: Lookup via OAuthConnection
+    print(f"[DEBUG] User not found by github_id, trying OAuthConnection for '{identifier}'")
     stmt = select(OAuthConnection).where(OAuthConnection.provider_account_id == identifier)
     oauth_res = await db.execute(stmt)
     oauth = oauth_res.scalars().first()
     
     if oauth:
+        print(f"[DEBUG] Found OAuthConnection: user_id={oauth.user_id}, provider={oauth.provider}")
         user_res = await db.execute(select(User).where(User.id == oauth.user_id))
-        return user_res.scalar_one_or_none()
+        user = user_res.scalar_one_or_none()
+        if user:
+            print(f"[DEBUG] Resolved to user via OAuth: {user.id} ({user.github_id})")
+        return user
         
+    print(f"[DEBUG] User not found for identifier: {identifier}")
     return None
 
 
@@ -314,6 +323,7 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Missing user identifier (provider_id, github_id, or email)")
         
     user_identifier = sanitize_identifier(raw_identifier)
+    print(f"[DEBUG] create_user: raw='{raw_identifier}', sanitized='{user_identifier}', email='{user_data.email}'")
 
     # 2. Check if user already exists (by email or github_id)
     existing_user = None
@@ -321,10 +331,14 @@ async def create_user(
     if user_data.email:
         result = await db.execute(select(User).where(User.email == user_data.email))
         existing_user = result.scalar_one_or_none()
+        if existing_user:
+            print(f"[DEBUG] Found existing user by email: {existing_user.id} ({existing_user.github_id})")
         
     if not existing_user and user_data.github_id:
         result = await db.execute(select(User).where(User.github_id == user_data.github_id))
         existing_user = result.scalar_one_or_none()
+        if existing_user:
+            print(f"[DEBUG] Found existing user by github_id: {existing_user.id}")
         
     # 3. Upsert Logic
     if existing_user:
@@ -452,6 +466,7 @@ async def create_user(
     user.container_status = "running"
     await db.commit()
 
+    print(f"[DEBUG] create_user: Success. user_id={user.id}, github_id={user.github_id}, container={user.container_status}")
     return UserResponse(
         id=user.id,
         github_id=user.github_id or "",
