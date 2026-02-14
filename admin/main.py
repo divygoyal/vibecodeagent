@@ -403,7 +403,7 @@ async def create_user(
             container_id="pending", 
             container_name=container_name,
             container_port=port,
-            container_status="stopped",
+            container_status="not_provisioned", # Start as not_provisioned so UI shows setup flow
             subscription_start=datetime.utcnow(),
             enabled_plugins=json.dumps([]) 
         )
