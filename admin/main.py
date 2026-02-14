@@ -1006,7 +1006,7 @@ async def exec_plugin(
         # Inject OAuth tokens if available
         # Find Google tokens for analytics/search-console plugins
         if req.plugin in ["google-analytics", "google-search-console"]:
-            from .models import OAuthConnection  # Import here to avoid circular imports if any
+            from models import OAuthConnection  # Absolute import for uvicorn execution
             from sqlalchemy import select
             
             stmt = select(OAuthConnection).where(
@@ -1039,8 +1039,8 @@ async def exec_plugin(
     except docker.errors.NotFound:
         raise HTTPException(status_code=404, detail="Container not found")
     except Exception as e:
-        logger.error(f"Plugin exec error for {github_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Plugin exec error for {github_id}: {e}") # Use print instead of logger
+        raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
 
 
 # ============= Admin Endpoints =============
