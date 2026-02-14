@@ -95,10 +95,10 @@ export const authOptions: NextAuthOptions = {
         },
     },
 
-    pages: {
-        signIn: "/",
-        error: "/",
-    },
+    // pages: {
+    //     signIn: "/",
+    //     error: "/",
+    // },
 
     session: {
         strategy: "jwt",
