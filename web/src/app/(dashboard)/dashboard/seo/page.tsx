@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
-    ArrowUpRight, RefreshCcw, Loader2, Zap, Target, BookOpen
+    ArrowUpRight, RefreshCcw, Loader2, Zap, Target, BookOpen, ChevronDown
 } from 'lucide-react';
 
 interface SEOKPIs {
@@ -57,6 +57,11 @@ interface TrendPoint {
     position: number;
 }
 
+interface Site {
+    siteUrl: string;
+    permissionLevel: string;
+}
+
 function ChangeIndicator({ value, suffix = '%', invert = false }: { value: number; suffix?: string; invert?: boolean }) {
     const positive = invert ? value <= 0 : value >= 0;
     return (
@@ -105,11 +110,47 @@ export default function SEOPage() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
+    // Site selector state
+    const [sites, setSites] = useState<Site[]>([]);
+    const [selectedSite, setSelectedSite] = useState('');
+    const [sitesLoading, setSitesLoading] = useState(true);
+
+    // Initial load: Fetch Sites
+    useEffect(() => {
+        async function loadSites() {
+            setSitesLoading(true);
+            try {
+                const res = await fetch('/api/seo/sites');
+                if (res.ok) {
+                    const data = await res.json();
+                    setSites(data);
+                    if (data.length > 0) {
+                        setSelectedSite(data[0].siteUrl);
+                    }
+                } else {
+                    console.warn("Failed to load sites list");
+                }
+            } catch (e) {
+                console.error("Error loading sites:", e);
+            } finally {
+                setSitesLoading(false);
+            }
+        }
+        loadSites();
+    }, []);
+
     const fetchData = async () => {
+        if (sitesLoading) return;
+
         setLoading(true);
         setError('');
         try {
-            const res = await fetch('/api/seo?section=all');
+            let url = `/api/seo?section=all`;
+            if (selectedSite) {
+                url += `&siteUrl=${encodeURIComponent(selectedSite)}`;
+            }
+
+            const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to fetch SEO data');
             const data = await res.json();
             setKpis(data.kpis);
@@ -124,17 +165,23 @@ export default function SEOPage() {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    // Trigger fetch on site selection change
+    useEffect(() => {
+        if (!sitesLoading) {
+            fetchData();
+        }
+    }, [selectedSite, sitesLoading]);
 
-    if (loading) {
+    if (loading && !kpis) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+                <span className="ml-3 text-zinc-400 text-sm">Loading SEO Data...</span>
             </div>
         );
     }
 
-    if (error) {
+    if (error && !kpis) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                 <p className="text-red-400 text-sm">{error}</p>
@@ -148,14 +195,40 @@ export default function SEOPage() {
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white">SEO Intelligence</h1>
                     <p className="text-sm text-zinc-500 mt-1">Search Console data with AI-powered insights</p>
                 </div>
-                <button onClick={fetchData} className="p-2 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">
-                    <RefreshCcw className="w-4 h-4 text-zinc-400" />
-                </button>
+
+                <div className="flex items-center gap-3">
+                    {/* Site Selector */}
+                    <div className="relative">
+                        <select
+                            value={selectedSite}
+                            onChange={(e) => setSelectedSite(e.target.value)}
+                            disabled={sitesLoading || sites.length === 0}
+                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition min-w-[200px]"
+                        >
+                            {sitesLoading ? (
+                                <option>Loading sites...</option>
+                            ) : sites.length === 0 ? (
+                                <option value="">No sites found</option>
+                            ) : (
+                                sites.map(s => (
+                                    <option key={s.siteUrl} value={s.siteUrl}>
+                                        {s.siteUrl}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                    </div>
+
+                    <button onClick={fetchData} className="p-2 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition" title="Refresh Data">
+                        <RefreshCcw className={`w-4 h-4 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
             </div>
 
             {/* KPI Cards */}
@@ -353,8 +426,8 @@ export default function SEOPage() {
                                         </td>
                                         <td className="text-right">
                                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${p.status === 'healthy' ? 'bg-emerald-400/10 text-emerald-400' :
-                                                    p.status === 'warning' ? 'bg-amber-400/10 text-amber-400' :
-                                                        'bg-red-400/10 text-red-400'
+                                                p.status === 'warning' ? 'bg-amber-400/10 text-amber-400' :
+                                                    'bg-red-400/10 text-red-400'
                                                 }`}>
                                                 {p.status}
                                             </span>
@@ -369,3 +442,4 @@ export default function SEOPage() {
         </div>
     );
 }
+

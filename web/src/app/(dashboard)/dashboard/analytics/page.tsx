@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, RefreshCcw, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, RefreshCcw, Loader2, ChevronDown } from 'lucide-react';
 import WorldMap from '@/components/WorldMap';
 
 interface KPIs {
@@ -53,6 +53,11 @@ interface CountryData {
     country: string;
     users: number;
     percentage: number;
+}
+
+interface Property {
+    property: string;
+    displayName: string;
 }
 
 const PIE_COLORS = ['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#60a5fa', '#94a3b8'];
@@ -115,11 +120,52 @@ export default function AnalyticsPage() {
     const [error, setError] = useState('');
     const [range, setRange] = useState('30d');
 
+    // Properties selector state
+    const [properties, setProperties] = useState<Property[]>([]);
+    const [selectedProperty, setSelectedProperty] = useState('');
+    const [propsLoading, setPropsLoading] = useState(true);
+
+    // Initial load: Fetch Properties
+    useEffect(() => {
+        async function loadProperties() {
+            setPropsLoading(true);
+            try {
+                const res = await fetch('/api/analytics/properties');
+                if (res.ok) {
+                    const data = await res.json();
+                    setProperties(data);
+                    if (data.length > 0) {
+                        setSelectedProperty(data[0].property);
+                    } else if (res.status !== 500) {
+                        // If no properties found (but not error), set empty to trigger mock/empty state?
+                        // Actually, if loaded but empty, we still want to fetch data (which might fallback to mock in dev)
+                        // But in prod with no properties, user should see "Connect GA".
+                    }
+                } else {
+                    console.warn("Failed to load properties list");
+                }
+            } catch (e) {
+                console.error("Error loading properties:", e);
+            } finally {
+                setPropsLoading(false);
+            }
+        }
+        loadProperties();
+    }, []);
+
+    // Fetch Analytics Data
     const fetchData = async () => {
+        if (propsLoading) return;
+
         setLoading(true);
         setError('');
         try {
-            const res = await fetch(`/api/analytics?range=${range}&section=all`);
+            let url = `/api/analytics?range=${range}&section=all`;
+            if (selectedProperty) {
+                url += `&propertyId=${selectedProperty}`;
+            }
+
+            const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to fetch analytics');
             const data = await res.json();
             setKpis(data.kpis);
@@ -135,17 +181,23 @@ export default function AnalyticsPage() {
         }
     };
 
-    useEffect(() => { fetchData(); }, [range]);
+    // Trigger fetch on range change OR property selection change
+    useEffect(() => {
+        if (!propsLoading) {
+            fetchData();
+        }
+    }, [range, selectedProperty, propsLoading]);
 
-    if (loading) {
+    if (loading && !kpis) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+                <span className="ml-3 text-zinc-400 text-sm">Loading Analytics...</span>
             </div>
         );
     }
 
-    if (error) {
+    if (error && !kpis) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                 <p className="text-red-400 text-sm">{error}</p>
@@ -159,12 +211,37 @@ export default function AnalyticsPage() {
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Analytics</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Google Analytics 4 data for your connected property</p>
+                    <p className="text-sm text-zinc-500 mt-1">Google Analytics 4 data</p>
                 </div>
-                <div className="flex items-center gap-3">
+
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Property Selector */}
+                    <div className="relative">
+                        <select
+                            value={selectedProperty}
+                            onChange={(e) => setSelectedProperty(e.target.value)}
+                            disabled={propsLoading || properties.length === 0}
+                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition min-w-[180px]"
+                        >
+                            {propsLoading ? (
+                                <option>Loading properties...</option>
+                            ) : properties.length === 0 ? (
+                                <option value="">No properties found</option>
+                            ) : (
+                                properties.map(p => (
+                                    <option key={p.property} value={p.property}>
+                                        {p.displayName}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                    </div>
+
+                    {/* Range Selector */}
                     <div className="flex bg-white/[0.03] border border-white/[0.06] rounded-lg overflow-hidden">
                         {['7d', '30d', '90d'].map(r => (
                             <button
@@ -176,8 +253,9 @@ export default function AnalyticsPage() {
                             </button>
                         ))}
                     </div>
-                    <button onClick={fetchData} className="p-2 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">
-                        <RefreshCcw className="w-4 h-4 text-zinc-400" />
+
+                    <button onClick={fetchData} className="p-2 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition" title="Refresh Data">
+                        <RefreshCcw className={`w-4 h-4 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </div>
@@ -343,3 +421,4 @@ export default function AnalyticsPage() {
         </div>
     );
 }
+
