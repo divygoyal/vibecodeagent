@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
 import json
+import docker
+import logging
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
