@@ -117,6 +117,15 @@ export async function GET() {
         console.error(`GitHub Debug: Error details: ${errorText}`);
       }
 
+      const pushEvents = allEvents.filter((e: any) => e.type === 'PushEvent');
+      if (pushEvents.length > 0) {
+        console.log(`GitHub Debug: First PushEvent payload keys: ${Object.keys(pushEvents[0].payload).join(', ')}`);
+        console.log(`GitHub Debug: First PushEvent commits count: ${pushEvents[0].payload.commits?.length ?? 'undefined'}`);
+        if (pushEvents[0].payload.commits && pushEvents[0].payload.commits.length > 0) {
+          console.log(`GitHub Debug: First commit sample: ${JSON.stringify(pushEvents[0].payload.commits[0])}`);
+        }
+      }
+
       const recentCommits = allEvents
         .filter((e: any) => e.type === 'PushEvent')
         .flatMap((e: any) =>
