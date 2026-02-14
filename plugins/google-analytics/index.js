@@ -62,6 +62,9 @@ class GoogleAnalytics {
             const analytics = google.analyticsadmin({ version: 'v1beta', auth });
             const res = await analytics.accountSummaries.list();
 
+            // DEBUG: Log raw response to stderr so it shows up in admin logs
+            console.error("GA4 Raw Response:", JSON.stringify(res.data, null, 2));
+
             if (asJson) {
                 const properties = [];
                 if (res.data.accountSummaries) {

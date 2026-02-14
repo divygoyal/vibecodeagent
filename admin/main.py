@@ -998,6 +998,7 @@ async def exec_plugin(
         # Build the command: node /app/skills/workspace/<plugin>/index.js <command> <args> <options>
         # Note: Plugins are mounted at /app/skills/workspace inside the container
         cmd = ["node", f"/app/skills/workspace/{req.plugin}/index.js", req.command] + req.args
+        cmd = ["node", f"{plugin_dir}/{req.plugin}/index.js", req.command] + req.args
         for key, value in req.options.items():
             cmd.append(f"--{key}")
             if value is not None and value != "":
@@ -1024,9 +1025,17 @@ async def exec_plugin(
                     cmd.append("--refreshToken")
                     cmd.append(oauth.refresh_token)
 
-        result = container.exec_run(cmd, workdir="/app", demux=True)
-        stdout = result.output[0].decode("utf-8", errors="replace") if result.output[0] else ""
-        stderr = result.output[1].decode("utf-8", errors="replace") if result.output[1] else ""
+        # Pass environment variables
+        env = os.environ.copy()
+        
+        logger.info(f"Executing plugin: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        stdout = result.stdout
+        stderr = result.stderr
+        
+        logger.info(f"Plugin stdout: {stdout[:500]}...") # Log first 500 chars
+        if stderr:
+            logger.warning(f"Plugin stderr: {stderr}")
 
         # Try to parse stdout as JSON
         import json as json_lib
@@ -1036,10 +1045,8 @@ async def exec_plugin(
         except json_lib.JSONDecodeError:
             return {"status": "ok", "data": stdout, "stderr": stderr}
 
-    except docker.errors.NotFound:
-        raise HTTPException(status_code=404, detail="Container not found")
     except Exception as e:
-        print(f"Plugin exec error for {github_id}: {e}") # Use print instead of logger
+        logger.error(f"Plugin exec error for {github_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
 
 
