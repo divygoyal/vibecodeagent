@@ -247,6 +247,31 @@ async def get_next_available_port(db: AsyncSession) -> int:
     raise HTTPException(status_code=503, detail="No available ports - max users reached")
 
 
+async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[User]:
+    """
+    Find user by github_id OR any connected OAuth provider_account_id.
+    This handles cases where the user signed up via GitHub (primary ID) 
+    but is now accessing via Google (secondary ID).
+    """
+    # 1. Try direct lookup (legacy/primary ID)
+    result = await db.execute(select(User).where(User.github_id == identifier))
+    user = result.scalar_one_or_none()
+    
+    if user:
+        return user
+
+    # 2. Fallback: Lookup via OAuthConnection
+    stmt = select(OAuthConnection).where(OAuthConnection.provider_account_id == identifier)
+    oauth_res = await db.execute(stmt)
+    oauth = oauth_res.scalars().first()
+    
+    if oauth:
+        user_res = await db.execute(select(User).where(User.id == oauth.user_id))
+        return user_res.scalar_one_or_none()
+        
+    return None
+
+
 async def log_container_event(db: AsyncSession, user_id: int, container_id: str, event_type: str, details: str = None):
     """Log a container lifecycle event"""
     event = ContainerEvent(
@@ -325,7 +350,6 @@ async def create_user(
                 if user_data.refresh_token:
                     oauth.refresh_token = user_data.refresh_token
                 oauth.updated_at = datetime.utcnow()
-                # await db.commit() # Wait until end
             else:
                  # Should create if missing? Maybe.
                  pass
@@ -473,16 +497,13 @@ async def get_user(
     _: bool = Depends(verify_admin_key)
 ):
     """Get user details with container status"""
-    result = await db.execute(
-        select(User).where(User.github_id == github_id)
-    )
-    user = result.scalar_one_or_none()
+    user = await get_user_by_identifier(db, github_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Get live container status
-    container_status = docker_manager.get_container_status(github_id)
+    # Get live container status (use canonical ID associated with Docker)
+    container_status = docker_manager.get_container_status(user.github_id)
     
     return {
         "id": user.id,
@@ -494,7 +515,9 @@ async def get_user(
         "container": container_status,
         "subscription_start": user.subscription_start,
         "subscription_end": user.subscription_end,
-        "created_at": user.created_at
+        "created_at": user.created_at,
+        "telegram_bot_username": user.telegram_bot_username, # Expose bot username
+        "telegram_bot_token": user.telegram_bot_token or "" # Expose masked token
     }
 
 
@@ -506,10 +529,7 @@ async def update_user(
     _: bool = Depends(verify_admin_key)
 ):
     """Update user settings (plan upgrade, API keys, etc.)"""
-    result = await db.execute(
-        select(User).where(User.github_id == github_id)
-    )
-    user = result.scalar_one_or_none()
+    user = await get_user_by_identifier(db, github_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -589,8 +609,8 @@ async def update_user(
     # If plan changed, need to recreate container with new limits
     if user_update.plan and user_update.plan != user.plan:
         # Stop old container
-        docker_manager.stop_container(github_id)
-        docker_manager.delete_container(github_id, remove_data=False)
+        docker_manager.stop_container(user.github_id)
+        docker_manager.delete_container(user.github_id, remove_data=False)
         
         # Fetch connections for logic
         result = await db.execute(
@@ -609,7 +629,7 @@ async def update_user(
         # Create new container with new limits
         plan_config = PLANS[user_update.plan]
         result = docker_manager.create_container(
-            user_identifier=github_id,
+            user_identifier=user.github_id,
             plan=user_update.plan,
             port=user.container_port,
             telegram_token=user.telegram_bot_token,
@@ -636,16 +656,13 @@ async def delete_user(
     _: bool = Depends(verify_admin_key)
 ):
     """Delete user and their container"""
-    result = await db.execute(
-        select(User).where(User.github_id == github_id)
-    )
-    user = result.scalar_one_or_none()
+    user = await get_user_by_identifier(db, github_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     # Delete container
-    docker_result = docker_manager.delete_container(github_id, remove_data=remove_data)
+    docker_result = docker_manager.delete_container(user.github_id, remove_data=remove_data)
     
     # Delete user record (cascade should handle OAuthConnections if configured, but let's manual delete to be safe)
     await db.execute(
@@ -671,17 +688,17 @@ async def container_action(
     _: bool = Depends(verify_admin_key)
 ):
     """Perform action on user's container (start/stop/restart/create)"""
-    result = await db.execute(
-        select(User).where(User.github_id == github_id)
-    )
-    user = result.scalar_one_or_none()
+    user = await get_user_by_identifier(db, github_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Use canonical ID for Docker operations
+    target_id = user.github_id
+
     if action.action == "start":
         # First try to start existing container
-        result = docker_manager.start_container(github_id)
+        result = docker_manager.start_container(target_id)
         
         # If container doesn't exist, create it
         if not result["success"] and "not found" in result.get("error", "").lower():
@@ -706,7 +723,7 @@ async def container_action(
 
             plan_config = PLANS.get(user.plan, PLANS["free"])
             result = docker_manager.create_container(
-                user_identifier=github_id,
+                user_identifier=target_id,
                 plan=user.plan,
                 port=user.container_port or await get_next_available_port(db),
                 telegram_token=user.telegram_bot_token,
@@ -725,10 +742,10 @@ async def container_action(
         status = "running" if result["success"] else user.container_status
         
     elif action.action == "stop":
-        result = docker_manager.stop_container(github_id)
+        result = docker_manager.stop_container(target_id)
         status = "stopped"
     elif action.action == "restart":
-        result = docker_manager.restart_container(github_id)
+        result = docker_manager.restart_container(target_id)
         status = "running"
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -750,7 +767,13 @@ async def get_user_logs(
     _: bool = Depends(verify_admin_key)
 ):
     """Get container logs for debugging"""
-    return docker_manager.get_container_logs(github_id, tail=tail)
+    # Just forward to docker manager directly if we assume ID is correct?
+    # No, better to verify user exists first and use canonical ID.
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+         raise HTTPException(status_code=404, detail="User not found")
+         
+    return docker_manager.get_container_logs(user.github_id, tail=tail)
 
 
 # ============= Admin Endpoints =============
