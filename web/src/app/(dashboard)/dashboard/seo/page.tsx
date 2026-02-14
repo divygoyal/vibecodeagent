@@ -156,7 +156,10 @@ export default function SEOPage() {
             }
 
             const res = await fetch(url);
-            if (!res.ok) throw new Error('Failed to fetch SEO data');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Failed to fetch SEO data (${res.status})`);
+            }
             const data = await res.json();
 
             setKpis(data.kpis || null);

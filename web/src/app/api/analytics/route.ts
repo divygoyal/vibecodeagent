@@ -7,7 +7,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export const dynamic = 'force-dynamic';
 
-// ============= Mock data for local development =============
+// ============= Mock data for local development only =============
 
 function generateMockTrafficData() {
     const data = [];
@@ -97,30 +97,25 @@ function generateMockKPIs() {
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
-    const range = searchParams.get('range') || '30d'      // 7d, 30d, 90d
-    const section = searchParams.get('section') || 'all'   // traffic, sources, pages, devices, countries, kpis, all
+    const range = searchParams.get('range') || '30d'
+    const section = searchParams.get('section') || 'all'
 
-    // Production = ADMIN_API_KEY is set (key comes from .env on VPS)
     const isProduction = !!ADMIN_API_KEY
 
-    // Auth check — always required in production
     const session = await getServerSession(authOptions)
     if (isProduction && !session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     try {
-        // In production, proxy to admin API which execs the GA plugin
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const githubId = session.user.id
 
-            // Auto-detect property if not provided
             let propertyId = searchParams.get('propertyId')
 
             if (!propertyId) {
                 try {
-                    // Fetch properties list
                     const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
@@ -134,7 +129,6 @@ export async function GET(req: Request) {
 
                     if (listRes.ok) {
                         const listData = await listRes.json()
-                        // Admin API returns { status: "ok", data: [...], stderr: "" }
                         if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
                             propertyId = listData.data[0].property
                         }
@@ -144,32 +138,52 @@ export async function GET(req: Request) {
                 }
             }
 
-            if (propertyId) {
-                const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-API-Key": ADMIN_API_KEY
-                    },
-                    body: JSON.stringify({
-                        plugin: "google-analytics",
-                        command: "query",
-                        args: [propertyId], // Pass the detected property ID
-                        options: { range }
-                    }),
-                    cache: 'no-store'
-                })
-                if (response.ok) {
-                    const data = await response.json()
-                    return NextResponse.json(data)
-                }
-                // If admin API call fails, fall through to mock data as graceful fallback
-                console.warn('Analytics admin API returned:', response.status, response.statusText)
+            if (!propertyId) {
+                return NextResponse.json(
+                    { error: "No Google Analytics property found. Please connect Google Analytics in your integrations." },
+                    { status: 404 }
+                )
             }
+
+            const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-API-Key": ADMIN_API_KEY
+                },
+                body: JSON.stringify({
+                    plugin: "google-analytics",
+                    command: "dashboard-json",
+                    args: [propertyId, range],
+                    options: {}
+                }),
+                cache: 'no-store'
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                console.error('Analytics admin API error:', response.status, errorText)
+                return NextResponse.json(
+                    { error: "Failed to fetch analytics from Google" },
+                    { status: 502 }
+                )
+            }
+
+            const adminData = await response.json()
+
+            if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
+                return NextResponse.json(adminData.data)
+            }
+
+            console.error('Analytics plugin error:', adminData.stderr || 'Unknown error')
+            return NextResponse.json(
+                { error: adminData.stderr || "Analytics plugin returned unexpected data" },
+                { status: 502 }
+            )
         }
 
-        // Dev mode fallback: return mock data
-        const result: Record<string, any> = {}
+        // Dev mode only: return mock data
+        const result: Record<string, unknown> = {}
 
         if (section === 'all' || section === 'kpis') result.kpis = generateMockKPIs()
         if (section === 'all' || section === 'traffic') result.traffic = generateMockTrafficData()

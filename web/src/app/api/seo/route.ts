@@ -7,7 +7,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export const dynamic = 'force-dynamic';
 
-// ============= Mock data for local development =============
+// ============= Mock data for local development only =============
 
 function generateMockQueries() {
     return [
@@ -134,27 +134,22 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const section = searchParams.get('section') || 'all'
 
-    // Production = ADMIN_API_KEY is set (key comes from .env on VPS)
     const isProduction = !!ADMIN_API_KEY
 
-    // Auth check — always required in production
     const session = await getServerSession(authOptions)
     if (isProduction && !session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     try {
-        // In production, proxy to admin API which execs the GSC plugin
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const githubId = session.user.id
 
-            // Auto-detect site if not provided
             let siteUrl = searchParams.get('siteUrl')
 
             if (!siteUrl) {
                 try {
-                    // Fetch sites list
                     const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
@@ -168,8 +163,6 @@ export async function GET(req: Request) {
 
                     if (listRes.ok) {
                         const listData = await listRes.json()
-                        // Admin API returns { status: "ok", data: [...], stderr: "" }
-                        // GSC plugin returns list of site entries
                         if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
                             siteUrl = listData.data[0].siteUrl
                         }
@@ -179,32 +172,52 @@ export async function GET(req: Request) {
                 }
             }
 
-            if (siteUrl) {
-                const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-API-Key": ADMIN_API_KEY
-                    },
-                    body: JSON.stringify({
-                        plugin: "google-search-console",
-                        command: "query",
-                        args: [siteUrl], // Pass the detected site URL
-                        options: {}
-                    }),
-                    cache: 'no-store'
-                })
-                if (response.ok) {
-                    const data = await response.json()
-                    return NextResponse.json(data)
-                }
-                // If admin API call fails, fall through to mock data as graceful fallback
-                console.warn('SEO admin API returned:', response.status, response.statusText)
+            if (!siteUrl) {
+                return NextResponse.json(
+                    { error: "No Google Search Console site found. Please connect Search Console in your integrations." },
+                    { status: 404 }
+                )
             }
+
+            const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-API-Key": ADMIN_API_KEY
+                },
+                body: JSON.stringify({
+                    plugin: "google-search-console",
+                    command: "dashboard-json",
+                    args: [siteUrl],
+                    options: {}
+                }),
+                cache: 'no-store'
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                console.error('SEO admin API error:', response.status, errorText)
+                return NextResponse.json(
+                    { error: "Failed to fetch SEO data from Google" },
+                    { status: 502 }
+                )
+            }
+
+            const adminData = await response.json()
+
+            if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
+                return NextResponse.json(adminData.data)
+            }
+
+            console.error('SEO plugin error:', adminData.stderr || 'Unknown error')
+            return NextResponse.json(
+                { error: adminData.stderr || "SEO plugin returned unexpected data" },
+                { status: 502 }
+            )
         }
 
-        // Dev mode fallback: return mock data
-        const result: Record<string, any> = {}
+        // Dev mode only: return mock data
+        const result: Record<string, unknown> = {}
 
         if (section === 'all' || section === 'kpis') result.kpis = generateMockSEOKPIs()
         if (section === 'all' || section === 'queries') result.queries = generateMockQueries()

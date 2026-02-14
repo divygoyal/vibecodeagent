@@ -89,14 +89,18 @@ export default function DashboardOverview() {
       }
       if (analyticsRes?.ok) {
         const data = await analyticsRes.json();
-        setAnalyticsKPIs(data.kpis);
-        setTrafficData(data.traffic || []);
+        if (!data.error) {
+          setAnalyticsKPIs(data.kpis);
+          setTrafficData(Array.isArray(data.traffic) ? data.traffic : []);
+        }
       }
       if (seoRes?.ok) {
         const data = await seoRes.json();
-        setSeoKPIs(data.kpis);
-        setSearchTrend(data.trend || []);
-        setRecommendations((data.recommendations || []).slice(0, 3));
+        if (!data.error) {
+          setSeoKPIs(data.kpis);
+          setSearchTrend(Array.isArray(data.trend) ? data.trend : []);
+          setRecommendations((Array.isArray(data.recommendations) ? data.recommendations : []).slice(0, 3));
+        }
       }
     } catch { /* silent */ }
     finally { setLoading(false); }

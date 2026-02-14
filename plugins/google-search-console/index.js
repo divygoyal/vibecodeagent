@@ -268,6 +268,125 @@ class GoogleSearchConsole {
             return `Error inspecting URL: ${error.message}`;
         }
     }
+    /**
+     * Dashboard JSON — returns all structured data the frontend SEO dashboard needs.
+     */
+    async dashboardJson(siteUrl) {
+        const result = { kpis: null, queries: [], pages: [], trend: [], recommendations: [] };
+
+        let auth, searchconsole;
+        try {
+            auth = await this._getAuth();
+            searchconsole = google.searchconsole({ version: 'v1', auth });
+        } catch (e) {
+            console.error("Authentication failed:", e.message);
+            return result;
+        }
+
+        const now = new Date();
+        const startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 28);
+        const prevStart = new Date(now);
+        prevStart.setDate(prevStart.getDate() - 56);
+        const prevEnd = new Date(now);
+        prevEnd.setDate(prevEnd.getDate() - 29);
+
+        const fmt = d => d.toISOString().split('T')[0];
+
+        const runQuery = async (dims, start, end, limit = 100) => {
+            const res = await searchconsole.searchanalytics.query({
+                siteUrl,
+                requestBody: {
+                    startDate: fmt(start),
+                    endDate: fmt(end),
+                    dimensions: dims,
+                    rowLimit: limit,
+                    type: 'web',
+                },
+            });
+            return res.data.rows || [];
+        };
+
+        try {
+            const [currentRows, prevRows, queryRows, pageRows] = await Promise.all([
+                runQuery(['date'], startDate, now, 1000),
+                runQuery(['date'], prevStart, prevEnd, 1000),
+                runQuery(['query'], startDate, now, 12),
+                runQuery(['page'], startDate, now, 10),
+            ]);
+
+            let totalClicks = 0, totalImpressions = 0, totalPos = 0, curCount = 0;
+            for (const row of currentRows) {
+                totalClicks += row.clicks || 0;
+                totalImpressions += row.impressions || 0;
+                totalPos += row.position || 0;
+                curCount++;
+            }
+
+            let prevClicks = 0, prevImpressions = 0, prevPos = 0, prevCount = 0;
+            for (const row of prevRows) {
+                prevClicks += row.clicks || 0;
+                prevImpressions += row.impressions || 0;
+                prevPos += row.position || 0;
+                prevCount++;
+            }
+
+            const pctChange = (cur, prev) => prev > 0 ? +((cur - prev) / prev * 100).toFixed(1) : 0;
+            const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+            const avgPos = curCount > 0 ? totalPos / curCount : 0;
+            const prevAvgCtr = prevImpressions > 0 ? (prevClicks / prevImpressions) * 100 : 0;
+            const prevAvgPos = prevCount > 0 ? prevPos / prevCount : 0;
+
+            result.kpis = {
+                totalClicks,
+                totalImpressions,
+                avgCTR: +avgCtr.toFixed(1),
+                avgPosition: +avgPos.toFixed(1),
+                indexedPages: pageRows.length,
+                crawlErrors: 0,
+                changeClicks: pctChange(totalClicks, prevClicks),
+                changeImpressions: pctChange(totalImpressions, prevImpressions),
+                changeCTR: +(avgCtr - prevAvgCtr).toFixed(1),
+                changePosition: +(avgPos - prevAvgPos).toFixed(1),
+            };
+
+            result.queries = queryRows.map(row => ({
+                query: row.keys[0],
+                clicks: row.clicks || 0,
+                impressions: row.impressions || 0,
+                ctr: +((row.ctr || 0) * 100).toFixed(1),
+                position: +(row.position || 0).toFixed(1),
+            }));
+
+            result.pages = pageRows.map(row => {
+                const pos = row.position || 0;
+                let status = 'healthy';
+                if (pos > 20) status = 'decay';
+                else if (pos > 10) status = 'warning';
+                return {
+                    page: row.keys[0],
+                    clicks: row.clicks || 0,
+                    impressions: row.impressions || 0,
+                    ctr: +((row.ctr || 0) * 100).toFixed(1),
+                    position: +pos.toFixed(1),
+                    status,
+                };
+            });
+
+            result.trend = currentRows.map(row => ({
+                date: row.keys[0],
+                clicks: row.clicks || 0,
+                impressions: row.impressions || 0,
+                ctr: +((row.ctr || 0) * 100).toFixed(1),
+                position: +(row.position || 0).toFixed(1),
+            })).sort((a, b) => a.date.localeCompare(b.date));
+
+        } catch (e) {
+            console.error("Error fetching GSC dashboard data:", e.message);
+        }
+
+        return result;
+    }
 }
 
 // CLI Handling
@@ -327,6 +446,12 @@ if (require.main === module) {
                     process.exit(1);
                 }
                 console.log(await plugin.inspectUrl(siteUrl, inspectionUrl));
+
+            } else if (command === 'dashboard-json') {
+                const siteUrl = args[1];
+                if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const result = await plugin.dashboardJson(siteUrl);
+                console.log(JSON.stringify(result));
 
             } else if (command === 'get-performance') {
                 // Legacy shortcut

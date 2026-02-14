@@ -167,7 +167,10 @@ export default function AnalyticsPage() {
             }
 
             const res = await fetch(url);
-            if (!res.ok) throw new Error('Failed to fetch analytics');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Failed to fetch analytics (${res.status})`);
+            }
             const data = await res.json();
 
             setKpis(data.kpis || null);
