@@ -995,8 +995,9 @@ async def exec_plugin(
         if container.status != "running":
             raise HTTPException(status_code=503, detail="Container not running")
 
-        # Build the command: python -m plugins.<plugin>.main <command> <args> <options>
-        cmd = ["python", "-m", f"plugins.{req.plugin}.main", req.command] + req.args
+        # Build the command: node /app/skills/workspace/<plugin>/index.js <command> <args> <options>
+        # Note: Plugins are mounted at /app/skills/workspace inside the container
+        cmd = ["node", f"/app/skills/workspace/{req.plugin}/index.js", req.command] + req.args
         for key, value in req.options.items():
             cmd.append(f"--{key}")
             if value is not None and value != "":
