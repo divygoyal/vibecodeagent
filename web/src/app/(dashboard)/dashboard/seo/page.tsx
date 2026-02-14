@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
-    ArrowUpRight, RefreshCcw, Loader2, Zap, Target, BookOpen, ChevronDown
+    ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2
 } from 'lucide-react';
+import { useSeoData, useSiteList } from '@/lib/useDashboardData';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -57,10 +58,19 @@ interface TrendPoint {
     position: number;
 }
 
-interface Site {
-    siteUrl: string;
-    permissionLevel: string;
-}
+const severityConfig: Record<string, { bg: string; border: string; icon: any; badge: string }> = {
+    high: { bg: 'bg-red-500/5', border: 'border-red-500/20', icon: AlertTriangle, badge: 'bg-red-500/10 text-red-400' },
+    medium: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', icon: FileWarning, badge: 'bg-amber-500/10 text-amber-400' },
+    low: { bg: 'bg-blue-500/5', border: 'border-blue-500/20', icon: Lightbulb, badge: 'bg-blue-500/10 text-blue-400' },
+};
+
+const typeIcons: Record<string, any> = {
+    content_decay: BookOpen,
+    keyword_gap: Target,
+    technical: Zap,
+    cannibalization: Shuffle,
+    opportunity: CheckCircle2,
+};
 
 function ChangeIndicator({ value, suffix = '%', invert = false }: { value: number; suffix?: string; invert?: boolean }) {
     const positive = invert ? value <= 0 : value >= 0;
@@ -86,102 +96,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     );
 };
 
-const severityConfig: Record<string, { bg: string; border: string; icon: any; badge: string }> = {
-    high: { bg: 'bg-red-500/5', border: 'border-red-500/20', icon: AlertTriangle, badge: 'bg-red-500/10 text-red-400' },
-    medium: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', icon: FileWarning, badge: 'bg-amber-500/10 text-amber-400' },
-    low: { bg: 'bg-blue-500/5', border: 'border-blue-500/20', icon: Lightbulb, badge: 'bg-blue-500/10 text-blue-400' },
-};
-
-const typeIcons: Record<string, any> = {
-    content_decay: BookOpen,
-    keyword_gap: Target,
-    technical: Zap,
-    cannibalization: Shuffle,
-    opportunity: CheckCircle2,
-};
-
 export default function SEOPage() {
-    const [kpis, setKpis] = useState<SEOKPIs | null>(null);
-    const [queries, setQueries] = useState<Query[]>([]);
-    const [pages, setPages] = useState<SEOPage[]>([]);
-    const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-    const [trend, setTrend] = useState<TrendPoint[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    // 1. Fetch Sites
+    const { sites, isLoading: sitesLoading } = useSiteList();
+    const [selectedSite, setSelectedSite] = useState('');
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
-    // Site selector state
-    const [sites, setSites] = useState<Site[]>([]);
-    const [selectedSite, setSelectedSite] = useState('');
-    const [sitesLoading, setSitesLoading] = useState(true);
-
-    // Initial load: Fetch Sites
+    // Auto-select first site
     useEffect(() => {
-        async function loadSites() {
-            setSitesLoading(true);
-            try {
-                const res = await fetch('/api/seo/sites');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        setSites(data);
-                        if (data.length > 0) {
-                            setSelectedSite(data[0].siteUrl);
-                        }
-                    } else {
-                        console.error("Sites API returned non-array:", data);
-                        setSites([]);
-                    }
-                } else {
-                    console.warn("Failed to load sites list");
-                }
-            } catch (e) {
-                console.error("Error loading sites:", e);
-            } finally {
-                setSitesLoading(false);
-            }
+        if (sites.length > 0 && !selectedSite) {
+            setSelectedSite(sites[0].siteUrl);
         }
-        loadSites();
-    }, []);
+    }, [sites, selectedSite]);
 
-    const fetchData = async () => {
-        if (sitesLoading) return;
+    // 2. Fetch SEO Data
+    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite);
 
-        setLoading(true);
-        setError('');
-        try {
-            let url = `/api/seo?section=all`;
-            if (selectedSite) {
-                url += `&siteUrl=${encodeURIComponent(selectedSite)}`;
-            }
-
-            const res = await fetch(url);
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `Failed to fetch SEO data (${res.status})`);
-            }
-            const data = await res.json();
-
-            setKpis(data.kpis || null);
-            setQueries(Array.isArray(data.queries) ? data.queries : []);
-            setPages(Array.isArray(data.pages) ? data.pages : []);
-            setRecommendations(Array.isArray(data.recommendations) ? data.recommendations : []);
-            setTrend(Array.isArray(data.trend) ? data.trend : []);
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Trigger fetch on site selection change
-    useEffect(() => {
-        if (!sitesLoading) {
-            fetchData();
-        }
-    }, [selectedSite, sitesLoading]);
-
-    if (loading && !kpis) {
+    if (isLoading && !seoData) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
@@ -190,16 +121,23 @@ export default function SEOPage() {
         );
     }
 
-    if (error && !kpis) {
+    if (isError && !seoData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <p className="text-red-400 text-sm">{error}</p>
-                <button onClick={fetchData} className="px-4 py-2 bg-white/[0.05] border border-white/[0.1] rounded-lg text-sm text-zinc-300 hover:bg-white/[0.08] transition">
-                    Try Again
-                </button>
+                <p className="text-red-400 text-sm">Failed to load SEO data</p>
             </div>
         );
     }
+
+    // Extract Data
+    const kpis: SEOKPIs | null = seoData?.kpis || null;
+    const queries: Query[] = Array.isArray(seoData?.queries) ? seoData.queries : [];
+    const pages: SEOPage[] = Array.isArray(seoData?.pages) ? seoData.pages : [];
+    const recommendations: Recommendation[] = Array.isArray(seoData?.recommendations) ? seoData.recommendations : [];
+    const trend: TrendPoint[] = Array.isArray(seoData?.trend) ? seoData.trend : [];
+
+    // Alias for UI replacement
+    const loading = isLoading;
 
     return (
         <div className="space-y-6 p-6">
@@ -226,17 +164,13 @@ export default function SEOPage() {
                             ) : (
                                 sites.map(s => (
                                     <option key={s.siteUrl} value={s.siteUrl}>
-                                        {s.siteUrl}
+                                        {s.siteUrl.replace('sc-domain:', '')}
                                     </option>
                                 ))
                             )}
                         </select>
                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
                     </div>
-
-                    <button onClick={fetchData} className="p-2 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition" title="Refresh Data">
-                        <RefreshCcw className={`w-4 h-4 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
                 </div>
             </div>
 

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, RefreshCcw, Loader2, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, ChevronDown, Loader2 } from 'lucide-react';
 import WorldMap from '@/components/WorldMap';
+import { useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
 
 interface KPIs {
     totalUsers: number;
@@ -53,11 +54,6 @@ interface CountryData {
     country: string;
     users: number;
     percentage: number;
-}
-
-interface Property {
-    property: string;
-    displayName: string;
 }
 
 const PIE_COLORS = ['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#60a5fa', '#94a3b8'];
@@ -110,90 +106,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function AnalyticsPage() {
-    const [kpis, setKpis] = useState<KPIs | null>(null);
-    const [traffic, setTraffic] = useState<TrafficPoint[]>([]);
-    const [sources, setSources] = useState<Source[]>([]);
-    const [pages, setPages] = useState<TopPage[]>([]);
-    const [devices, setDevices] = useState<DeviceData[]>([]);
-    const [countries, setCountries] = useState<CountryData[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    // 1. Fetch Properties
+    const { properties, isLoading: propsLoading } = usePropertyList();
+    const [selectedProperty, setSelectedProperty] = useState('');
     const [range, setRange] = useState('30d');
 
-    // Properties selector state
-    const [properties, setProperties] = useState<Property[]>([]);
-    const [selectedProperty, setSelectedProperty] = useState('');
-    const [propsLoading, setPropsLoading] = useState(true);
-
-    // Initial load: Fetch Properties
+    // Auto-select first property
     useEffect(() => {
-        async function loadProperties() {
-            setPropsLoading(true);
-            try {
-                const res = await fetch('/api/analytics/properties');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        setProperties(data);
-                        if (data.length > 0) {
-                            setSelectedProperty(data[0].property);
-                        }
-                    } else {
-                        console.error("Properties API returned non-array:", data);
-                        setProperties([]);
-                    }
-                } else {
-                    console.warn("Failed to load properties list");
-                }
-            } catch (e) {
-                console.error("Error loading properties:", e);
-            } finally {
-                setPropsLoading(false);
-            }
+        if (properties.length > 0 && !selectedProperty) {
+            setSelectedProperty(properties[0].property);
         }
-        loadProperties();
-    }, []);
+    }, [properties, selectedProperty]);
 
-    // Fetch Analytics Data
-    const fetchData = async () => {
-        if (propsLoading) return;
+    // 2. Fetch Analytics Data
+    const { data: analyticsData, isLoading, isError } = useAnalyticsData('all', selectedProperty);
 
-        setLoading(true);
-        setError('');
-        try {
-            let url = `/api/analytics?range=${range}&section=all`;
-            if (selectedProperty) {
-                url += `&propertyId=${selectedProperty}`;
-            }
-
-            const res = await fetch(url);
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `Failed to fetch analytics (${res.status})`);
-            }
-            const data = await res.json();
-
-            setKpis(data.kpis || null);
-            setTraffic(Array.isArray(data.traffic) ? data.traffic : []);
-            setSources(Array.isArray(data.sources) ? data.sources : []);
-            setPages(Array.isArray(data.pages) ? data.pages : []);
-            setDevices(Array.isArray(data.devices) ? data.devices : []);
-            setCountries(Array.isArray(data.countries) ? data.countries : []);
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Trigger fetch on range change OR property selection change
-    useEffect(() => {
-        if (!propsLoading) {
-            fetchData();
-        }
-    }, [range, selectedProperty, propsLoading]);
-
-    if (loading && !kpis) {
+    if (isLoading && !analyticsData) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
@@ -202,16 +130,21 @@ export default function AnalyticsPage() {
         );
     }
 
-    if (error && !kpis) {
+    if (isError && !analyticsData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <p className="text-red-400 text-sm">{error}</p>
-                <button onClick={fetchData} className="px-4 py-2 bg-white/[0.05] border border-white/[0.1] rounded-lg text-sm text-zinc-300 hover:bg-white/[0.08] transition">
-                    Try Again
-                </button>
+                <p className="text-red-400 text-sm">Failed to load analytics data</p>
             </div>
         );
     }
+
+    // Extract Data
+    const kpis: KPIs | null = analyticsData?.kpis || null;
+    const traffic: TrafficPoint[] = Array.isArray(analyticsData?.traffic) ? analyticsData.traffic : [];
+    const sources: Source[] = Array.isArray(analyticsData?.sources) ? analyticsData.sources : [];
+    const pages: TopPage[] = Array.isArray(analyticsData?.pages) ? analyticsData.pages : [];
+    const devices: DeviceData[] = Array.isArray(analyticsData?.devices) ? analyticsData.devices : [];
+    const countries: CountryData[] = Array.isArray(analyticsData?.countries) ? analyticsData.countries : [];
 
     return (
         <div className="space-y-6 p-6">
@@ -258,10 +191,6 @@ export default function AnalyticsPage() {
                             </button>
                         ))}
                     </div>
-
-                    <button onClick={fetchData} className="p-2 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition" title="Refresh Data">
-                        <RefreshCcw className={`w-4 h-4 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
                 </div>
             </div>
 

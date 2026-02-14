@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   AreaChart, Area, ResponsiveContainer
@@ -9,47 +9,9 @@ import {
 import {
   Bot, BarChart3, Search, GitBranch, TrendingUp, TrendingDown,
   ArrowUpRight, Zap, Activity, MousePointer, Eye, Users, Hash,
-  Loader2, AlertTriangle, CheckCircle2, Lightbulb, Globe, ChevronDown, Layout
+  AlertTriangle, Lightbulb, Globe, ChevronDown
 } from 'lucide-react';
-
-/* ─── types ─── */
-type BotStatus = {
-  status: string;
-  health: string;
-  telegramStatus?: string;
-  botUsername?: string;
-  connectedProviders?: Array<{ provider: string; connected: boolean }>;
-};
-
-type AnalyticsKPIs = {
-  totalUsers: number;
-  totalSessions: number;
-  totalPageViews: number;
-  changeUsers: number;
-  changeSessions: number;
-  changePageViews: number;
-};
-
-type SEOKPIs = {
-  totalClicks: number;
-  totalImpressions: number;
-  avgCTR: number;
-  avgPosition: number;
-  changeClicks: number;
-  changePosition: number;
-};
-
-type Recommendation = {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  description: string;
-  impact: string;
-};
-
-type GSC_Site = { siteUrl: string; permissionLevel: string };
-type GA_Property = { displayName: string; property: string; parent: string };
+import { useContainerStatus, useGitHubData, useAnalyticsData, useSeoData, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 
 /* ─── helpers ─── */
 function timeAgo(dateStr: string): string {
@@ -72,123 +34,46 @@ function Skeleton({ className }: { className?: string }) {
 export default function DashboardOverview() {
   const { data: session } = useSession();
 
-  // State
-  const [sites, setSites] = useState<GSC_Site[]>([]);
-  const [properties, setProperties] = useState<GA_Property[]>([]);
+  // 1. Fetch Lists
+  const { sites, isLoading: sitesLoading } = useSiteList();
+  const { properties } = usePropertyList();
+
+  // State for selection
   const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>('');
 
-  const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
-  const [recentCommits, setRecentCommits] = useState<Array<{
-    repo: string; message: string; sha: string; date: string; branch: string;
-  }>>([]);
-
-  const [analyticsKPIs, setAnalyticsKPIs] = useState<AnalyticsKPIs | null>(null);
-  const [seoKPIs, setSeoKPIs] = useState<SEOKPIs | null>(null);
-  const [trafficData, setTrafficData] = useState<any[]>([]);
-  const [searchTrend, setSearchTrend] = useState<any[]>([]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-
-  const [initLoading, setInitLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // 1. Initial Load: Fetch Lists & Bot Status
+  // Auto-select first site when loaded
   useEffect(() => {
-    async function init() {
-      try {
-        const [sitesRes, propsRes, statusRes, ghRes] = await Promise.all([
-          fetch('/api/seo?mode=list').catch(() => null),
-          fetch('/api/analytics?mode=list').catch(() => null),
-          fetch('/api/container').catch(() => null),
-          fetch('/api/github').catch(() => null)
-        ]);
-
-        if (sitesRes?.ok) {
-          const data = await sitesRes.json();
-          if (Array.isArray(data)) {
-            setSites(data);
-            if (data.length > 0) setSelectedSiteUrl(data[0].siteUrl);
-          }
-        }
-
-        if (propsRes?.ok) {
-          const data = await propsRes.json();
-          if (Array.isArray(data)) setProperties(data);
-        }
-
-        if (statusRes?.ok) setBotStatus(await statusRes.json());
-
-        if (ghRes?.ok) {
-          const data = await ghRes.json();
-          setRecentCommits(data.commits?.slice(0, 5) || []);
-        }
-
-      } catch (e) { console.error(e); }
-      finally { setInitLoading(false); }
+    if (sites.length > 0 && !selectedSiteUrl) {
+      setSelectedSiteUrl(sites[0].siteUrl);
     }
-    init();
-  }, []);
+  }, [sites, selectedSiteUrl]);
 
-  // 2. Data Fetching when Site Changes
-  const fetchData = useCallback(async () => {
-    if (!selectedSiteUrl) return;
+  // Derived Property ID
+  const domain = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('/', '');
+  const matchedProp = properties.find(p =>
+    p.displayName.toLowerCase().includes(domain.split('.')[0])
+  ) || properties[0]; // Fallback to first
 
-    setRefreshing(true);
-    try {
-      // Intelligent Property Matching
-      // Try to find a GA property that matches the GSC site URL
-      // Logic: Does property displayName contain domain parts?
-      // Simplified: Just pick first property for now if no obvious match, 
-      // or we could add a manual mapper later.
-      // For this implementation, we will try to match loosely or default to first.
+  // 2. Fetch Data (Dependent on selection)
+  const { botStatus } = useContainerStatus();
+  const { commits, isLoading: ghLoading } = useGitHubData();
 
-      const domain = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('/', '');
-      const matchedProp = properties.find(p =>
-        p.displayName.toLowerCase().includes(domain.split('.')[0])
-      ) || properties[0];
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property);
+  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl);
 
-      const propIdParam = matchedProp ? `&propertyId=${matchedProp.property}` : '';
-      const siteParam = `&siteUrl=${encodeURIComponent(selectedSiteUrl)}`;
+  // Extract Data
+  const analyticsKPIs = analyticsData?.kpis;
+  const trafficData = Array.isArray(analyticsData?.traffic) ? analyticsData.traffic : [];
 
-      const [analyticsRes, seoRes] = await Promise.all([
-        fetch(`/api/analytics?section=all${propIdParam}`).catch(() => null),
-        fetch(`/api/seo?section=all${siteParam}`).catch(() => null),
-      ]);
-
-      if (analyticsRes?.ok) {
-        const data = await analyticsRes.json();
-        if (!data.error) {
-          setAnalyticsKPIs(data.kpis);
-          setTrafficData(Array.isArray(data.traffic) ? data.traffic : []);
-        } else {
-          setAnalyticsKPIs(null); // Clear data on error
-        }
-      }
-
-      if (seoRes?.ok) {
-        const data = await seoRes.json();
-        if (!data.error) {
-          setSeoKPIs(data.kpis);
-          setSearchTrend(Array.isArray(data.trend) ? data.trend : []);
-          setRecommendations((Array.isArray(data.recommendations) ? data.recommendations : []).slice(0, 3));
-        } else {
-          setSeoKPIs(null);
-        }
-      }
-    } catch { /* silent */ }
-    finally { setRefreshing(false); }
-  }, [selectedSiteUrl, properties]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const seoKPIs = seoData?.kpis;
+  const searchTrend = Array.isArray(seoData?.trend) ? seoData.trend : [];
+  const recommendations = (Array.isArray(seoData?.recommendations) ? seoData.recommendations : []).slice(0, 3);
 
   const isLive = botStatus?.status === 'running' && botStatus?.telegramStatus === 'connected';
 
-  // --- Render Helpers ---
-
-  // Loading overrides only specific parts, not whole page
-  const isLoading = initLoading;
-  const isRef = refreshing;
+  // Loading States
+  const isInit = sitesLoading && !selectedSiteUrl;
+  const isRef = analyticsLoading || seoLoading;
 
   return (
     <div className="space-y-6 p-6">
@@ -212,13 +97,13 @@ export default function DashboardOverview() {
             <select
               value={selectedSiteUrl}
               onChange={(e) => setSelectedSiteUrl(e.target.value)}
-              disabled={isLoading}
+              disabled={isInit}
               className="appearance-none bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg pl-9 pr-10 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-w-[220px]"
             >
-              {isLoading ? (
+              {isInit ? (
                 <option>Loading sites...</option>
               ) : sites.length > 0 ? (
-                sites.map(site => (
+                sites.map((site: any) => (
                   <option key={site.siteUrl} value={site.siteUrl}>{site.siteUrl.replace('sc-domain:', '')}</option>
                 ))
               ) : (
@@ -245,7 +130,7 @@ export default function DashboardOverview() {
           label="Total Users"
           value={analyticsKPIs?.totalUsers}
           change={analyticsKPIs?.changeUsers}
-          sparkData={trafficData.map(d => ({ v: d.activeUsers }))}
+          sparkData={trafficData.map((d: any) => ({ v: d.activeUsers }))}
           sparkColor="#34d399"
           href="/dashboard/analytics"
         />
@@ -255,7 +140,7 @@ export default function DashboardOverview() {
           label="Page Views"
           value={analyticsKPIs?.totalPageViews}
           change={analyticsKPIs?.changePageViews}
-          sparkData={trafficData.map(d => ({ v: d.pageViews }))}
+          sparkData={trafficData.map((d: any) => ({ v: d.pageViews }))}
           sparkColor="#22d3ee"
           href="/dashboard/analytics"
         />
@@ -265,7 +150,7 @@ export default function DashboardOverview() {
           label="Search Clicks"
           value={seoKPIs?.totalClicks}
           change={seoKPIs?.changeClicks}
-          sparkData={searchTrend.map(d => ({ v: d.clicks }))}
+          sparkData={searchTrend.map((d: any) => ({ v: d.clicks }))}
           sparkColor="#a78bfa"
           href="/dashboard/seo"
         />
@@ -276,7 +161,7 @@ export default function DashboardOverview() {
           value={seoKPIs?.avgPosition}
           change={seoKPIs?.changePosition}
           invertChange
-          sparkData={searchTrend.map(d => ({ v: d.position }))}
+          sparkData={searchTrend.map((d: any) => ({ v: d.position }))}
           sparkColor="#fbbf24"
           href="/dashboard/seo"
         />
@@ -298,14 +183,14 @@ export default function DashboardOverview() {
           </div>
 
           <div className="space-y-2 flex-1">
-            {initLoading ? (
+            {ghLoading ? (
               <>
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
               </>
-            ) : recentCommits.length > 0 ? (
-              recentCommits.map((commit, i) => (
+            ) : commits.length > 0 ? (
+              commits.map((commit: any, i: number) => (
                 <div key={`${commit.sha}-${i}`} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.03] transition-colors group">
                   <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-mono text-[10px]">
                     {commit.sha}
@@ -344,13 +229,13 @@ export default function DashboardOverview() {
                 <Skeleton className="h-16 w-full" />
               </>
             ) : recommendations.length > 0 ? (
-              recommendations.map(rec => (
+              recommendations.map((rec: any) => (
                 <div key={rec.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04] transition-all group">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white">{rec.title}</h3>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rec.severity === 'high' ? 'bg-red-500/10 text-red-400' :
-                        rec.severity === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                          'bg-blue-500/10 text-blue-400'
+                      rec.severity === 'medium' ? 'bg-amber-500/10 text-amber-400' :
+                        'bg-blue-500/10 text-blue-400'
                       }`}>
                       {rec.impact}
                     </span>

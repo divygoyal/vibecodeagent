@@ -73,14 +73,31 @@ export async function GET() {
       // @ts-expect-error - username added in callbacks
       const username = session.user.username
 
+      console.log("GitHub API Debug: Using token:", accessToken ? accessToken.substring(0, 10) + "..." : "None");
+
       if (!accessToken) {
+        console.error("GitHub API Error: No access token found in session.");
         return NextResponse.json({ error: "No GitHub token" }, { status: 400 })
       }
 
       const headers = {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/vnd.github.v3+json'
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github.v3+json',
+      };
+
+      // 1. Get User Data if username missing
+      let user = username;
+      if (!user) {
+        const userRes = await fetch('https://api.github.com/user', { headers });
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          user = userData.login;
+        } else {
+          console.error("GitHub API Error: Failed to fetch user profile", await userRes.text());
+        }
       }
+
+      console.log("GitHub API Debug: Fetching data for user:", user);
 
       const [eventsRes, reposRes] = await Promise.all([
         fetch(`https://api.github.com/users/${username}/events?per_page=50`, { headers }),
