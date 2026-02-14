@@ -1,0 +1,9 @@
+{
+  "name": "google-search-console",
+  "version": "1.0.0",
+  "description": "Google Search Console plugin for VibeCode Agent",
+  "main": "index.js",
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  }
+}

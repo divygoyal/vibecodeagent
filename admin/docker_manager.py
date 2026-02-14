@@ -332,7 +332,8 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 skills.append("coding")
                 skills.append("github-ghost") # Explicitly add github plugin if present
             if "google" in connections:
-                skills.append("google-analytics") # Use the plugin name, not generic 'analytics'
+                skills.append("google-analytics")
+                skills.append("google-search-console")
         else:
             # Fallback/Legacy: if no connections passed, assume coding (or none?)
             # But likely we want to defaults to coding if we can't determine

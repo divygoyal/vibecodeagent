@@ -447,19 +447,19 @@ export default function Home() {
                   </div>
                 )}
               </div>
-              <div className="flex gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 {/* GitHub */}
                 {(() => {
                   const isSyncedToBot = botStatus?.connectedProviders?.some(c => c.provider === 'github');
                   const isCurrentSession = user?.provider === 'github';
                   return (
-                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border flex-1 ${isSyncedToBot ? 'border-emerald-500/30' : 'border-zinc-700/50'
+                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border ${isSyncedToBot ? 'border-emerald-500/30' : 'border-zinc-700/50'
                       }`}>
                       <div className="text-2xl">🐙</div>
                       <div className="flex-1">
                         <div className="font-medium text-sm text-zinc-200">GitHub</div>
                         <div className={`text-xs ${isSyncedToBot ? 'text-emerald-400' :
-                            isCurrentSession ? 'text-amber-400' : 'text-zinc-500'
+                          isCurrentSession ? 'text-amber-400' : 'text-zinc-500'
                           }`}>
                           {isSyncedToBot ? 'Synced ✓' :
                             (isCurrentSession && isSyncing) ? 'Syncing...' :
@@ -483,13 +483,13 @@ export default function Home() {
                   const isSyncedToBot = botStatus?.connectedProviders?.some(c => c.provider === 'google');
                   const isCurrentSession = user?.provider === 'google';
                   return (
-                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border flex-1 ${isSyncedToBot ? 'border-emerald-500/30' : 'border-zinc-700/50'
+                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border ${isSyncedToBot ? 'border-emerald-500/30' : 'border-zinc-700/50'
                       }`}>
-                      <div className="text-2xl">📊</div>
+                      <div className="text-2xl">🔑</div>
                       <div className="flex-1">
                         <div className="font-medium text-sm text-zinc-200">Google</div>
                         <div className={`text-xs ${isSyncedToBot ? 'text-emerald-400' :
-                            isCurrentSession ? 'text-amber-400' : 'text-zinc-500'
+                          isCurrentSession ? 'text-amber-400' : 'text-zinc-500'
                           }`}>
                           {isSyncedToBot ? 'Synced ✓' :
                             (isCurrentSession && isSyncing) ? 'Syncing...' :
@@ -502,6 +502,64 @@ export default function Home() {
                         </button>
                       )}
                       {isSyncedToBot && (
+                        <span className="text-emerald-400 text-sm">✓</span>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Google Analytics */}
+                {(() => {
+                  const googleSynced = botStatus?.connectedProviders?.some(c => c.provider === 'google');
+                  const googleInSession = user?.provider === 'google';
+                  return (
+                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border ${googleSynced ? 'border-emerald-500/30' : 'border-zinc-700/50'
+                      }`}>
+                      <div className="text-2xl">📊</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-zinc-200">Analytics</div>
+                        <div className={`text-xs ${googleSynced ? 'text-emerald-400' :
+                          googleInSession ? 'text-amber-400' : 'text-zinc-500'
+                          }`}>
+                          {googleSynced ? 'Available ✓' :
+                            googleInSession ? 'Pending sync' : 'Connect Google first'}
+                        </div>
+                      </div>
+                      {!googleSynced && !googleInSession && (
+                        <button onClick={() => signIn('google')} className="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg transition-colors">
+                          Connect
+                        </button>
+                      )}
+                      {googleSynced && (
+                        <span className="text-emerald-400 text-sm">✓</span>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Google Search Console */}
+                {(() => {
+                  const googleSynced = botStatus?.connectedProviders?.some(c => c.provider === 'google');
+                  const googleInSession = user?.provider === 'google';
+                  return (
+                    <div className={`flex items-center gap-3 bg-zinc-800/50 px-4 py-3 rounded-xl border ${googleSynced ? 'border-emerald-500/30' : 'border-zinc-700/50'
+                      }`}>
+                      <div className="text-2xl">🔍</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-zinc-200">Search Console</div>
+                        <div className={`text-xs ${googleSynced ? 'text-emerald-400' :
+                          googleInSession ? 'text-amber-400' : 'text-zinc-500'
+                          }`}>
+                          {googleSynced ? 'Available ✓' :
+                            googleInSession ? 'Pending sync' : 'Connect Google first'}
+                        </div>
+                      </div>
+                      {!googleSynced && !googleInSession && (
+                        <button onClick={() => signIn('google')} className="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg transition-colors">
+                          Connect
+                        </button>
+                      )}
+                      {googleSynced && (
                         <span className="text-emerald-400 text-sm">✓</span>
                       )}
                     </div>
