@@ -140,13 +140,13 @@ _(What do they care about? What projects are they working on? What annoys them? 
                      new_lines = []
                      if "google" in connections:
                          new_lines.append("- ✅ **Google Analytics** — Authenticated via OAuth. Tokens are in `OPENCLAW_CONNECTIONS` env var.")
-                         new_lines.append("  - Run: `node /data/workspace/plugins/google-analytics/index.js list-properties` to list GA4 properties")
-                         new_lines.append("  - Run: `node /data/workspace/plugins/google-analytics/index.js get-report <propertyId> [startDate] [endDate]` for traffic reports")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to list GA4 properties")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js get-report <propertyId> [startDate] [endDate]` for traffic reports")
                          new_lines.append("- ✅ **Google Search Console** — Authenticated via OAuth (same Google token).")
-                         new_lines.append("  - Run: `node /data/workspace/plugins/google-search-console/index.js list-sites` to list verified sites")
-                         new_lines.append("  - Run: `node /data/workspace/plugins/google-search-console/index.js get-performance <siteUrl> [startDate] [endDate]` for search performance")
-                         new_lines.append("  - Run: `node /data/workspace/plugins/google-search-console/index.js get-top-queries <siteUrl> [startDate] [limit]` for top search queries")
-                         new_lines.append("  - Run: `node /data/workspace/plugins/google-search-console/index.js get-index-status <siteUrl>` for index coverage")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to list verified sites")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js get-performance <siteUrl> [startDate] [endDate]` for search performance")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js get-top-queries <siteUrl> [startDate] [limit]` for top search queries")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js get-index-status <siteUrl>` for index coverage")
                      if "github" in connections:
                          new_lines.append("- ✅ **GitHub** — Authenticated via OAuth. Token is in `OPENCLAW_CONNECTIONS` env var.")
                          new_lines.append("  - You can clone repos, create commits, push code, and manage PRs using git CLI and GitHub API.")
