@@ -69,7 +69,7 @@ export async function GET() {
 
     try {
       // @ts-expect-error - accessToken added in callbacks
-      const accessToken = session.user.githubAccessToken || session.user.accessToken
+      const accessToken = session.user.githubAccessToken
       // @ts-expect-error - username added in callbacks
       const username = session.user.username
 
