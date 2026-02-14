@@ -1,39 +1,56 @@
 ---
 name: google-search-console
-description: Access Google Search Console data (list sites, search performance, index coverage) for the connected user.
+description: Query Google Search Console data — search queries, pages, countries, devices, URL inspection, and more
 ---
 
-# Google Search Console
+# Google Search Console Plugin
 
-Use this skill to fetch search performance data, index coverage, and list verified sites from the user's Google Search Console.
+Full access to the Google Search Console API. Query any search analytics data with any combination of dimensions and filters.
 
-## Tools
+## Commands
 
-### List Sites
-List all verified sites in the user's Search Console account.
-`node /data/workspace/plugins/google-search-console/index.js list-sites`
+### `list-sites`
+List all verified sites in your Search Console account.
 
-### Get Performance
-Get search performance report (clicks, impressions, CTR, position) for a site.
-Arguments:
-- `siteUrl`: The site URL as shown in Search Console (e.g., 'sc-domain:example.com' or 'https://example.com/').
-- `startDate` (optional): Start date (YYYY-MM-DD). Defaults to 28 days ago.
-- `endDate` (optional): End date (YYYY-MM-DD). Defaults to today.
+### `query <siteUrl> [options]`
+**The main command.** Run any search analytics query with arbitrary dimensions, filters, search types, and date ranges.
 
-`node /data/workspace/plugins/google-search-console/index.js get-performance <siteUrl> [startDate] [endDate]`
+Options:
+- `--dimensions query,page,country,device,date` — comma-separated dimensions
+- `--startDate 2024-01-01` — start date (YYYY-MM-DD)
+- `--endDate 2024-01-31` — end date (YYYY-MM-DD)
+- `--limit 100` — max rows (up to 25000)
+- `--startRow 0` — pagination offset
+- `--type web` — search type: web, image, video, news, discover, googleNews
+- `--aggregationType auto` — auto, byProperty, byPage
+- `--dataState all` — final (default) or all (includes fresh/partial data)
+- `--filters '[{"dimension":"query","operator":"contains","expression":"seo"}]'` — JSON array of dimension filters
 
-### Get Top Queries
-Get top search queries for a site.
-Arguments:
-- `siteUrl`: The site URL.
-- `startDate` (optional): Start date. Defaults to 28 days ago.
-- `limit` (optional): Number of queries to return. Defaults to 25.
+Filter Operators: `contains`, `equals`, `notContains`, `notEquals`, `includingRegex`, `excludingRegex`
 
-`node /data/workspace/plugins/google-search-console/index.js get-top-queries <siteUrl> [startDate] [limit]`
+### `inspect-url <siteUrl> <url>`
+Get detailed index status for a specific URL: indexing state, last crawl time, mobile usability, rich results.
 
-### Get Index Status
-Get index coverage summary for a site.
-Arguments:
-- `siteUrl`: The site URL.
+### `list-sitemaps <siteUrl>`
+List all sitemaps submitted for a site.
 
-`node /data/workspace/plugins/google-search-console/index.js get-index-status <siteUrl>`
+### Legacy shortcuts (still work):
+- `get-performance <siteUrl> [start] [end]` — daily clicks/impressions over time
+- `get-top-queries <siteUrl> [start] [limit]` — top queries by clicks
+- `get-index-status <siteUrl>` — sitemap overview
+
+## Examples
+```
+query sc-domain:example.com --dimensions query --limit 50
+query sc-domain:example.com --dimensions page --limit 20 --type web
+query sc-domain:example.com --dimensions country,device --startDate 2024-01-01
+query sc-domain:example.com --dimensions query --filters '[{"dimension":"query","operator":"contains","expression":"seo"}]'
+query sc-domain:example.com --dimensions page,query --limit 100 --aggregationType byPage
+inspect-url sc-domain:example.com https://example.com/my-page
+```
+
+## Available Dimensions
+`query`, `page`, `country`, `device`, `date`, `searchAppearance`
+
+## Search Types
+`web`, `image`, `video`, `news`, `discover`, `googleNews`

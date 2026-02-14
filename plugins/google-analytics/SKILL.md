@@ -1,23 +1,48 @@
 ---
 name: google-analytics
-description: Access Google Analytics 4 data (list properties, get reports) for the connected user.
+description: Query Google Analytics 4 data — traffic, users, engagement, conversions, and more
 ---
 
-# Google Analytics
+# Google Analytics Plugin
 
-Use this skill to fetch traffic reports and list properties from the user's Google Analytics account.
+Full access to the Google Analytics 4 Data API. Run any report with any combination of dimensions and metrics.
 
-## Tools
+## Commands
 
-### List Properties
-Run this command to list all available GA4 properties and their IDs.
-`node /data/workspace/plugins/google-analytics/index.js list-properties`
+### `list-properties`
+List all GA4 properties you have access to. Use this to find the property ID.
 
-### Get Report
-Run this command to get a traffic report for a specific property.
-Arguments:
-- `propertyId`: The GA4 property ID (e.g., 'properties/123456789').
-- `startDate` (optional): Start date (YYYY-MM-DD or '30daysAgo', '7daysAgo'). Defaults to '7daysAgo'.
-- `endDate` (optional): End date (YYYY-MM-DD or 'today'). Defaults to 'today'.
+### `list-metrics <propertyId>`
+Show all available dimensions and metrics for a property. Use this when you need to discover what you can query.
 
-`node /data/workspace/plugins/google-analytics/index.js get-report <propertyId> [startDate] [endDate]`
+### `query <propertyId> [options]`
+**The main command.** Run any GA4 report with arbitrary dimensions, metrics, filters, ordering, and date ranges.
+
+Options:
+- `--dimensions date,country,deviceCategory` — comma-separated dimension names
+- `--metrics activeUsers,sessions,bounceRate` — comma-separated metric names
+- `--startDate 30daysAgo` — start date (YYYY-MM-DD or relative like 7daysAgo, yesterday)
+- `--endDate today` — end date
+- `--limit 100` — max rows to return
+- `--orderBy activeUsers` — sort by this metric or dimension
+- `--orderDirection desc` — sort direction (asc or desc)
+
+### `realtime <propertyId> [options]`
+Get realtime active users. Supports `--dimensions` and `--metrics`.
+
+### `get-report <propertyId> [startDate] [endDate]`
+Quick traffic report shortcut (date × activeUsers × sessions).
+
+## Examples
+```
+query 123456789 --dimensions country --metrics activeUsers,sessions --startDate 30daysAgo
+query 123456789 --dimensions pagePath --metrics screenPageViews --orderBy screenPageViews --limit 20
+query 123456789 --dimensions deviceCategory,browser --metrics sessions,bounceRate
+realtime 123456789 --dimensions country --metrics activeUsers
+```
+
+## Common Dimensions
+`date`, `country`, `city`, `deviceCategory`, `browser`, `operatingSystem`, `pagePath`, `pageTitle`, `sessionSource`, `sessionMedium`, `sessionCampaignName`, `newVsReturning`, `language`
+
+## Common Metrics
+`activeUsers`, `sessions`, `screenPageViews`, `bounceRate`, `averageSessionDuration`, `conversions`, `totalRevenue`, `engagedSessions`, `engagementRate`, `eventCount`, `newUsers`

@@ -139,14 +139,17 @@ _(What do they care about? What projects are they working on? What annoys them? 
                      # Build new connections section with explicit tool instructions
                      new_lines = []
                      if "google" in connections:
-                         new_lines.append("- ✅ **Google Analytics** — Authenticated via OAuth. Tokens are in `OPENCLAW_CONNECTIONS` env var.")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to list GA4 properties")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js get-report <propertyId> [startDate] [endDate]` for traffic reports")
-                         new_lines.append("- ✅ **Google Search Console** — Authenticated via OAuth (same Google token).")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to list verified sites")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js get-performance <siteUrl> [startDate] [endDate]` for search performance")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js get-top-queries <siteUrl> [startDate] [limit]` for top search queries")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js get-index-status <siteUrl>` for index coverage")
+                         new_lines.append("- ✅ **Google Analytics** — Full API access via OAuth.")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js` (no args) to see ALL available commands and examples")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to find property IDs")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <mets> ...` for ANY custom report")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId>` for live data")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId>` to discover all dimensions & metrics")
+                         new_lines.append("- ✅ **Google Search Console** — Full API access via OAuth.")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js` (no args) to see ALL available commands and examples")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to find site URLs")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> --dimensions <dims> --filters <json> ...` for ANY search analytics report")
+                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url>` for URL index status")
                      if "github" in connections:
                          new_lines.append("- ✅ **GitHub** — Authenticated via OAuth. Token is in `OPENCLAW_CONNECTIONS` env var.")
                          new_lines.append("  - You can clone repos, create commits, push code, and manage PRs using git CLI and GitHub API.")
