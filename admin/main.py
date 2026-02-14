@@ -542,6 +542,13 @@ async def get_user(
     
     display_token = user.telegram_bot_token or ""
 
+    # Get container status from Docker
+    try:
+        container_status = docker_manager.get_container_status(user.github_id)
+    except Exception as e:
+        print(f"[ERROR] Failed to get container status for {user.github_id}: {e}")
+        container_status = {"status": "error", "error": str(e)}
+
     # CRITICAL FIX: If container is not provisioned in Docker, force status to "not_provisioned"
     # UNLESS the DB says it should be running (race condition during startup)
     docker_status = container_status.get("status")
