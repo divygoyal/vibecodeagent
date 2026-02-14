@@ -403,7 +403,11 @@ if (require.main === module) {
                 if (arg.startsWith('--') && i + 1 < args.length) {
                     const key = arg.substring(2);
                     const value = args[++i];
-                    if (key === 'dimensions') {
+                    if (key === 'accessToken') {
+                        options.access_token = value;
+                    } else if (key === 'refreshToken') {
+                        options.refresh_token = value;
+                    } else if (key === 'dimensions') {
                         options[key] = value.split(',');
                     } else if (key === 'limit' || key === 'startRow') {
                         options[key] = parseInt(value, 10);
