@@ -1035,7 +1035,8 @@ async def exec_plugin(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
-    """Execute a plugin command inside the user's container and return output."""
+    """Execute a plugin command. Google plugins run as local subprocesses (no container needed).
+    Bot-specific plugins require a running container."""
     if req.plugin not in ALLOWED_PLUGINS:
         raise HTTPException(status_code=400, detail=f"Plugin '{req.plugin}' not allowed")
 
@@ -1043,17 +1044,22 @@ async def exec_plugin(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Use the docker manager to get the correct container name (handles prefix and separator)
-    container_name = docker_manager._get_container_name(user.github_id)
-
-    try:
+    # Google plugins run locally using OAuth tokens from DB — no container needed
+    # Only bot-specific plugins (e.g. github-ghost) require a running container
+    CONTAINER_REQUIRED_PLUGINS = {"github-ghost"}
+    
+    if req.plugin in CONTAINER_REQUIRED_PLUGINS:
+        container_name = docker_manager._get_container_name(user.github_id)
         try:
             container = docker_manager.client.containers.get(container_name)
+            if container.status != "running":
+                raise HTTPException(status_code=503, detail="Container not running")
+        except HTTPException:
+            raise
         except Exception:
             raise HTTPException(status_code=503, detail="Container not provisioned. Set up your bot first.")
-        if container.status != "running":
-            raise HTTPException(status_code=503, detail="Container not running")
 
+    try:
         # Build the command: node /app/plugins/<plugin>/index.js <command> <args> <options>
         cmd = ["node", f"/app/plugins/{req.plugin}/index.js", req.command] + req.args
         for key, value in req.options.items():

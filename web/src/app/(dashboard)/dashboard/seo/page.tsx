@@ -8,8 +8,7 @@ import {
     ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2
 } from 'lucide-react';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
-import Link from 'next/link';
-import { Bot } from 'lucide-react';
+import { signIn } from 'next-auth/react';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -99,12 +98,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function SEOPage() {
-    // 0. Check container status first
-    const { botStatus, isLoading: containerLoading } = useContainerStatus();
-    const botRunning = botStatus?.status === 'running';
+    // 0. Check Google connection (SEO plugins run locally, no container needed)
+    const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
 
-    // 1. Fetch Sites (only when bot running)
-    const { sites, isLoading: sitesLoading } = useSiteList(botRunning);
+    // 1. Fetch Sites (only when Google connected)
+    const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
     const [selectedSite, setSelectedSite] = useState('');
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
@@ -115,21 +113,21 @@ export default function SEOPage() {
         }
     }, [sites, selectedSite]);
 
-    // 2. Fetch SEO Data (only when bot running)
-    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, botRunning);
+    // 2. Fetch SEO Data (only when Google connected)
+    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, hasGoogleConnection);
 
-    // Show setup prompt if bot not running
-    if (!containerLoading && !botRunning) {
+    // Show connect prompt if Google not connected
+    if (!containerLoading && !hasGoogleConnection) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                    <Bot className="w-8 h-8 text-emerald-400" />
+                    <Search className="w-8 h-8 text-emerald-400" />
                 </div>
-                <h2 className="text-xl font-semibold text-white">Set up your bot first</h2>
-                <p className="text-sm text-zinc-400 text-center max-w-md">Connect your Telegram bot to start viewing Search Console data.</p>
-                <Link href="/dashboard/bot" className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm">
-                    Go to Bot Setup
-                </Link>
+                <h2 className="text-xl font-semibold text-white">Connect Google to view SEO data</h2>
+                <p className="text-sm text-zinc-400 text-center max-w-md">Sign in with your Google account to access Search Console data.</p>
+                <button onClick={() => signIn('google')} className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm">
+                    Connect Google
+                </button>
             </div>
         );
     }

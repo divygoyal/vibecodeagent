@@ -28,8 +28,15 @@ function useRegisteredSWR(url: string | null, options = {}) {
 
 export function useContainerStatus() {
     const { data, error, isLoading, mutate } = useRegisteredSWR('/api/container');
+
+    // Derive Google connection status from connectedProviders
+    const hasGoogleConnection = data?.connectedProviders?.some(
+        (c: { provider: string }) => c.provider === 'google'
+    ) || false;
+
     return {
         botStatus: data,
+        hasGoogleConnection,
         isLoading,
         isError: error,
         refresh: mutate

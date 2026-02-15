@@ -36,13 +36,13 @@ export default function DashboardOverview() {
   const { data: session } = useSession();
   const { isRegistering, isRegistered, registrationError } = useRegistration();
 
-  // 1. Container status first — everything depends on this
-  const { botStatus, isLoading: containerLoading } = useContainerStatus();
+  // 1. Container status + Google connection check
+  const { botStatus, hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
   const botRunning = botStatus?.status === 'running';
 
-  // 2. Only fetch lists when bot is running (otherwise exec will fail)
-  const { sites, isLoading: sitesLoading } = useSiteList(botRunning);
-  const { properties } = usePropertyList(botRunning);
+  // 2. Fetch lists when Google is connected (plugins run locally, no container needed)
+  const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
+  const { properties } = usePropertyList(hasGoogleConnection);
 
   // State for selection
   const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>('');
@@ -60,11 +60,11 @@ export default function DashboardOverview() {
     p.displayName.toLowerCase().includes(domain.split('.')[0])
   ) || properties[0]; // Fallback to first
 
-  // 3. Fetch Data — only when bot is running
+  // 3. Fetch Data — analytics/SEO need Google connection (not container)
   const { commits, isLoading: ghLoading, hasGitHubConnection } = useGitHubData();
 
-  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, botRunning);
-  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, botRunning);
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, hasGoogleConnection);
+  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, hasGoogleConnection);
 
   // Extract Data
   const analyticsKPIs = analyticsData?.kpis;
@@ -77,7 +77,7 @@ export default function DashboardOverview() {
   const isLive = botRunning && botStatus?.telegramStatus === 'connected';
 
   // Loading States - include registration state
-  const isInit = isRegistering || containerLoading || (botRunning && sitesLoading && !selectedSiteUrl);
+  const isInit = isRegistering || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSiteUrl);
   const isRef = analyticsLoading || seoLoading;
 
   // Show registration error if any
@@ -157,23 +157,33 @@ export default function DashboardOverview() {
         </div>
       </div>
 
-      {/* Setup Prompt - shown when bot is not running */}
-      {!containerLoading && !botRunning && (
+      {/* Setup Prompt - shown when Google not connected */}
+      {!containerLoading && !hasGoogleConnection && (
         <div className="bg-gradient-to-r from-emerald-500/[0.08] to-cyan-500/[0.08] border border-emerald-500/20 rounded-2xl p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-              <Bot className="w-6 h-6 text-emerald-400" />
+              <BarChart3 className="w-6 h-6 text-emerald-400" />
             </div>
             <div className="flex-1">
-              <h3 className="text-white font-semibold mb-1">Set up your Telegram bot to unlock analytics</h3>
-              <p className="text-sm text-zinc-400">Connect your bot to start tracking Google Analytics, Search Console, and more.</p>
+              <h3 className="text-white font-semibold mb-1">Connect Google to unlock analytics</h3>
+              <p className="text-sm text-zinc-400">Sign in with Google to view Analytics, Search Console, and SEO insights.</p>
             </div>
-            <Link
-              href="/dashboard/bot"
+            <button
+              onClick={() => signIn('google')}
               className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm flex-shrink-0"
             >
-              Set Up Bot
-            </Link>
+              Connect Google
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bot setup prompt - shown when Google connected but bot not running */}
+      {!containerLoading && hasGoogleConnection && !botRunning && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <Bot className="w-5 h-5 text-zinc-500" />
+            <p className="text-sm text-zinc-400 flex-1">Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="text-emerald-400 hover:text-emerald-300">Set up your bot →</Link></p>
           </div>
         </div>
       )}
