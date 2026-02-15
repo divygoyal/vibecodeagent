@@ -378,27 +378,28 @@ function KPICard({
   const positive = change !== undefined ? (invertChange ? change <= 0 : change >= 0) : true;
   const showValue = value !== undefined && value !== null;
 
-  return (
-    <Link href={href} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.12] transition-all group relative overflow-hidden">
-      {loading && (
-        <div className="absolute inset-0 z-10 bg-zinc-900/50 backdrop-blur-[1px] flex flex-col justify-between p-4">
-          <div className="flex justify-between">
-            <Skeleton className="w-8 h-8 rounded-lg" />
-            <Skeleton className="w-12 h-4 rounded-full" />
-          </div>
-          <Skeleton className="w-24 h-8 rounded-md my-2" />
-          <Skeleton className="w-16 h-3 rounded-md" />
-          <div className="h-8 w-full mt-auto opacity-20">
-            <Skeleton className="w-full h-full" />
-          </div>
+  // Show skeleton OR content — never both overlapping
+  if (loading && !showValue) {
+    return (
+      <Link href={href} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-4">
+        <div className="flex justify-between mb-2">
+          <Skeleton className="w-8 h-8 rounded-lg" />
+          <Skeleton className="w-12 h-4 rounded-full" />
         </div>
-      )}
+        <Skeleton className="w-24 h-7 rounded-md mb-1" />
+        <Skeleton className="w-16 h-3 rounded-md mb-2" />
+        <Skeleton className="w-full h-8 rounded-md opacity-30" />
+      </Link>
+    );
+  }
 
+  return (
+    <Link href={href} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.12] transition-all group">
       <div className="flex items-center justify-between mb-2">
         <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
           <Icon className="w-4 h-4 text-zinc-400 group-hover:text-white transition-colors" />
         </div>
-        {!loading && change !== undefined && (
+        {change !== undefined && (
           <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
             {positive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
             {change > 0 ? '+' : ''}{change}%
@@ -411,7 +412,7 @@ function KPICard({
       </div>
       <div className="text-[10px] text-zinc-500 mb-2 font-medium tracking-wide uppercase">{label}</div>
 
-      {sparkData.length > 0 && !loading && (
+      {sparkData.length > 0 && (
         <div className="h-8">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparkData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>

@@ -1,10 +1,17 @@
 import useSWR from 'swr';
 import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
 
-const fetcher = (url: string) => fetch(url).then((res) => {
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+const fetcher = async (url: string) => {
+    const res = await fetch(url);
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const error: any = new Error(body.error || `HTTP error! status: ${res.status}`);
+        error.info = body;
+        error.status = res.status;
+        throw error;
+    }
     return res.json();
-});
+};
 
 // Options to prevent aggressive re-fetching but allow retries on error
 const swrOptions = {
@@ -44,14 +51,14 @@ export function useContainerStatus() {
 }
 
 export function useGitHubData() {
-    const { data, error, isLoading, mutate } = useRegisteredSWR('/api/github');
+    const { data, error, isLoading, mutate } = useRegisteredSWR('/api/github', {
+        errorRetryCount: 0, // Don't retry 400s — they won't self-resolve
+    });
     
-    // Check if error is due to no GitHub token (not connected)
-    // Error could be HTTP 400 with GITHUB_NOT_CONNECTED code or message containing "No GitHub token"
-    const errorData = error?.info || error?.message || '';
-    const hasGitHubConnection = !error || 
-        (data && !data.error) || 
-        (typeof errorData === 'string' && !errorData.includes('GITHUB_NOT_CONNECTED') && !errorData.includes('No GitHub token'));
+    // Detect "not connected" from the preserved error body
+    const isNotConnected = error?.info?.code === 'GITHUB_NOT_CONNECTED' ||
+        error?.status === 400;
+    const hasGitHubConnection = !isNotConnected && !error;
     
     return {
         commits: data?.commits || [],
