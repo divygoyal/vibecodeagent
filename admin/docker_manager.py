@@ -174,6 +174,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
     
     def _create_user_config(self, user_identifier: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
         """Create OpenClaw config file matching vanilla OpenClaw structure"""
+        telegram_token = telegram_token or ""
         user_dir = self._get_user_data_dir(user_identifier)
         config_path = f"{user_dir}/.openclaw/openclaw.json"
         
