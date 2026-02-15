@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     // @ts-expect-error - accessToken added in callbacks
     const accessToken = session.user.accessToken
     // @ts-expect-error - provider added in callbacks
-    const provider = session.user.provider || "github" // default to github for legacy
+    const provider = session.user.provider
     // @ts-expect-error - refreshToken added in callbacks
     const refreshToken = session.user.refreshToken
 

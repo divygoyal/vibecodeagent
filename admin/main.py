@@ -196,7 +196,7 @@ async def verify_admin_key(x_api_key: str = Header(...)):
 # ============= Pydantic Models =============
 class UserCreate(BaseModel):
     github_id: Optional[str] = None
-    provider: str = "github"
+    provider: Optional[str] = None
     provider_id: Optional[str] = None
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None # New

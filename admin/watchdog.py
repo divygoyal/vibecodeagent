@@ -65,7 +65,8 @@ class Watchdog:
                 "status": status,
                 "health": health_status,
                 "running": status == "running",
-                "healthy": health_status in ["healthy", "starting"],
+                # Treat "unknown" (no HEALTHCHECK defined) as healthy if it is running
+                "healthy": health_status in ["healthy", "starting"] or (health_status == "unknown" and status == "running"),
                 "restart_count": container.attrs.get("RestartCount", 0)
             }
             
