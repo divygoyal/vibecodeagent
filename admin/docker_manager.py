@@ -125,45 +125,50 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 f.write(user_content)
             os.chmod(user_path, 0o666)
 
-        # Always ensure Active Connections are up to date (Idempotent update)
-        if connections:
-             try:
-                 if os.path.exists(user_path):
-                     with open(user_path, 'r') as f:
-                         content = f.read()
-                     
-                     # Remove existing "Active Connections" section if present to avoid duplication
-                     if "## Active Connections" in content:
-                         content = content.split("## Active Connections")[0].strip()
-                     
-                     # Build new connections section with explicit tool instructions
-                     new_lines = []
-                     if "google" in connections:
-                         new_lines.append("- ✅ **Google Analytics** — Full API access via OAuth.")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js` (no args) to see ALL available commands and examples")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to find property IDs")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <mets> ...` for ANY custom report")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId>` for live data")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId>` to discover all dimensions & metrics")
-                         new_lines.append("- ✅ **Google Search Console** — Full API access via OAuth.")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js` (no args) to see ALL available commands and examples")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to find site URLs")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> --dimensions <dims> --filters <json> ...` for ANY search analytics report")
-                         new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url>` for URL index status")
-                     if "github" in connections:
-                         new_lines.append("- ✅ **GitHub** — Authenticated via OAuth. Token is in `OPENCLAW_CONNECTIONS` env var.")
-                         new_lines.append("  - You can clone repos, create commits, push code, and manage PRs using git CLI and GitHub API.")
-                     
-                     if new_lines:
-                         content += "\n\n## Active Connections\n\n"
-                         content += "**IMPORTANT:** Always use the actual commands below to fetch real data. NEVER fabricate or hallucinate analytics/search data.\n\n"
-                         content += "\n".join(new_lines) + "\n"
-                         
-                     with open(user_path, 'w') as f:
-                         f.write(content)
-                     
-             except Exception as e:
-                 logger.error(f"Failed to update USER.md with connections: {e}")
+        # Always ensure Active Connections section in USER.md is up to date (Idempotent update)
+        # This runs on EVERY sync/create to reflect the current state of connections
+        try:
+            if os.path.exists(user_path):
+                with open(user_path, 'r') as f:
+                    content = f.read()
+                
+                # Remove existing "Active Connections" section if present to avoid duplication
+                if "## Active Connections" in content:
+                    content = content.split("## Active Connections")[0].strip()
+                
+                # Build new connections section with explicit tool instructions
+                new_lines = []
+                if connections and "google" in connections:
+                    new_lines.append("- ✅ **Google Analytics** — Full API access via OAuth.")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js` (no args) to see ALL available commands and examples")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to find property IDs")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <mets> ...` for ANY custom report")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId>` for live data")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId>` to discover all dimensions & metrics")
+                    new_lines.append("- ✅ **Google Search Console** — Full API access via OAuth.")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js` (no args) to see ALL available commands and examples")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to find site URLs")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> --dimensions <dims> --filters <json> ...` for ANY search analytics report")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url>` for URL index status")
+                if connections and "github" in connections:
+                    new_lines.append("- ✅ **GitHub** — Authenticated via OAuth. Token is in `OPENCLAW_CONNECTIONS` env var.")
+                    new_lines.append("  - You can clone repos, create commits, push code, and manage PRs using git CLI and GitHub API.")
+                
+                if new_lines:
+                    content += "\n\n## Active Connections\n\n"
+                    content += "**IMPORTANT:** Always use the actual commands below to fetch real data. NEVER fabricate or hallucinate analytics/search data.\n\n"
+                    content += "\n".join(new_lines) + "\n"
+                else:
+                    content += "\n\n## Active Connections\n\n"
+                    content += "_No integrations connected yet. Ask your human to connect GitHub or Google from the dashboard._\n"
+                    
+                with open(user_path, 'w') as f:
+                    f.write(content)
+                
+                logger.info(f"Updated USER.md connections for {user_identifier}: {list(connections.keys()) if connections else 'none'}")
+                
+        except Exception as e:
+            logger.error(f"Failed to update USER.md with connections: {e}")
         
         # Initialize git repo in workspace (vanilla OpenClaw does this)
         git_dir = f"{workspace}/.git"

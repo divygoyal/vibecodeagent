@@ -247,7 +247,7 @@ export default function BotPage() {
                     {isSyncing && (
                         <div className="flex items-center gap-1.5 text-xs text-amber-400">
                             <Loader2 className="w-3 h-3 animate-spin" />
-                            Auto-syncing...
+                            Syncing...
                         </div>
                     )}
                 </div>
@@ -257,8 +257,8 @@ export default function BotPage() {
                     <IntegrationCard
                         icon={<Github className="w-5 h-5" />}
                         name="GitHub"
-                        synced={botStatus?.connectedProviders?.some(c => c.provider === 'github') || false}
-                        currentSession={user?.provider === 'github'}
+                        connected={botStatus?.connectedProviders?.some(c => c.provider === 'github') || false}
+                        botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
                         onConnect={() => signIn('github')}
                     />
@@ -266,30 +266,30 @@ export default function BotPage() {
                     <IntegrationCard
                         icon={<Chrome className="w-5 h-5" />}
                         name="Google"
-                        synced={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
-                        currentSession={user?.provider === 'google'}
+                        connected={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
+                        botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
                         onConnect={() => signIn('google')}
                     />
-                    {/* Analytics */}
+                    {/* Analytics (depends on Google) */}
                     <IntegrationCard
                         icon={<BarChart3 className="w-5 h-5" />}
                         name="Analytics"
-                        synced={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
-                        currentSession={user?.provider === 'google'}
+                        connected={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
+                        botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
                         onConnect={() => signIn('google')}
-                        dependsOn="Connect Google first"
+                        dependsOn={!(botStatus?.connectedProviders?.some(c => c.provider === 'google')) ? 'Connect Google first' : undefined}
                     />
-                    {/* Search Console */}
+                    {/* Search Console (depends on Google) */}
                     <IntegrationCard
                         icon={<Search className="w-5 h-5" />}
                         name="Search Console"
-                        synced={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
-                        currentSession={user?.provider === 'google'}
+                        connected={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
+                        botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
                         onConnect={() => signIn('google')}
-                        dependsOn="Connect Google first"
+                        dependsOn={!(botStatus?.connectedProviders?.some(c => c.provider === 'google')) ? 'Connect Google first' : undefined}
                     />
                 </div>
             </div>
@@ -298,33 +298,42 @@ export default function BotPage() {
 }
 
 function IntegrationCard({
-    icon, name, synced, currentSession, isSyncing, onConnect, dependsOn
+    icon, name, connected, botRunning, isSyncing, onConnect, dependsOn
 }: {
     icon: React.ReactNode;
     name: string;
-    synced: boolean;
-    currentSession: boolean;
+    connected: boolean;
+    botRunning: boolean;
     isSyncing: boolean;
     onConnect: () => void;
     dependsOn?: string;
 }) {
+    // Synced = connected in DB AND bot container is running (memory + env updated)
+    const synced = connected && botRunning;
+    // Stored = connected in DB but bot not running yet
+    const stored = connected && !botRunning;
+
     return (
-        <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${synced ? 'bg-emerald-500/[0.04] border-emerald-500/[0.15]' : 'bg-white/[0.01] border-white/[0.06]'
+        <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${synced ? 'bg-emerald-500/[0.04] border-emerald-500/[0.15]' :
+            stored ? 'bg-amber-500/[0.04] border-amber-500/[0.15]' :
+            'bg-white/[0.01] border-white/[0.06]'
             }`}>
-            <div className={`flex-shrink-0 ${synced ? 'text-emerald-400' : 'text-zinc-500'}`}>
+            <div className={`flex-shrink-0 ${synced ? 'text-emerald-400' : stored ? 'text-amber-400' : 'text-zinc-500'}`}>
                 {icon}
             </div>
             <div className="flex-1">
                 <div className="font-medium text-sm text-zinc-200">{name}</div>
-                <div className={`text-xs ${synced ? 'text-emerald-400' : currentSession ? 'text-amber-400' : 'text-zinc-500'
+                <div className={`text-xs ${synced ? 'text-emerald-400' :
+                    stored ? 'text-amber-400' :
+                    'text-zinc-500'
                     }`}>
                     {synced ? 'Synced ✓' :
-                        (currentSession && isSyncing) ? 'Syncing...' :
-                            currentSession ? 'Connected' :
+                        (stored && isSyncing) ? 'Syncing...' :
+                            stored ? 'Connected (will sync with bot)' :
                                 dependsOn || 'Not connected'}
                 </div>
             </div>
-            {!currentSession && !synced && (
+            {!connected && (
                 <button
                     onClick={onConnect}
                     className="text-xs bg-white/[0.06] hover:bg-white/[0.1] px-3 py-1.5 rounded-lg transition-colors text-zinc-300"
