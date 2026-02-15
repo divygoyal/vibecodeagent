@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, ChevronDown, Loader2 } from 'lucide-react';
 import WorldMap from '@/components/WorldMap';
-import { useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
+import { useAnalyticsData, usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
+import Link from 'next/link';
+import { Bot } from 'lucide-react';
 
 interface KPIs {
     totalUsers: number;
@@ -106,8 +108,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function AnalyticsPage() {
-    // 1. Fetch Properties
-    const { properties, isLoading: propsLoading } = usePropertyList();
+    // 0. Check container status first
+    const { botStatus, isLoading: containerLoading } = useContainerStatus();
+    const botRunning = botStatus?.status === 'running';
+
+    // 1. Fetch Properties (only when bot running)
+    const { properties, isLoading: propsLoading } = usePropertyList(botRunning);
     const [selectedProperty, setSelectedProperty] = useState('');
     const [range, setRange] = useState('30d');
 
@@ -118,10 +124,26 @@ export default function AnalyticsPage() {
         }
     }, [properties, selectedProperty]);
 
-    // 2. Fetch Analytics Data
-    const { data: analyticsData, isLoading, isError } = useAnalyticsData('all', selectedProperty);
+    // 2. Fetch Analytics Data (only when bot running)
+    const { data: analyticsData, isLoading, isError } = useAnalyticsData('all', selectedProperty, botRunning);
 
-    if (isLoading && !analyticsData) {
+    // Show setup prompt if bot not running
+    if (!containerLoading && !botRunning) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                    <Bot className="w-8 h-8 text-emerald-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-white">Set up your bot first</h2>
+                <p className="text-sm text-zinc-400 text-center max-w-md">Connect your Telegram bot to start viewing Google Analytics data.</p>
+                <Link href="/dashboard/bot" className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm">
+                    Go to Bot Setup
+                </Link>
+            </div>
+        );
+    }
+
+    if ((isLoading || containerLoading) && !analyticsData) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />

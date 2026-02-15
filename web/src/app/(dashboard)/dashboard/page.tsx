@@ -36,9 +36,13 @@ export default function DashboardOverview() {
   const { data: session } = useSession();
   const { isRegistering, isRegistered, registrationError } = useRegistration();
 
-  // 1. Fetch Lists
-  const { sites, isLoading: sitesLoading } = useSiteList();
-  const { properties } = usePropertyList();
+  // 1. Container status first — everything depends on this
+  const { botStatus, isLoading: containerLoading } = useContainerStatus();
+  const botRunning = botStatus?.status === 'running';
+
+  // 2. Only fetch lists when bot is running (otherwise exec will fail)
+  const { sites, isLoading: sitesLoading } = useSiteList(botRunning);
+  const { properties } = usePropertyList(botRunning);
 
   // State for selection
   const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>('');
@@ -56,12 +60,11 @@ export default function DashboardOverview() {
     p.displayName.toLowerCase().includes(domain.split('.')[0])
   ) || properties[0]; // Fallback to first
 
-  // 2. Fetch Data (Dependent on selection)
-  const { botStatus } = useContainerStatus();
+  // 3. Fetch Data — only when bot is running
   const { commits, isLoading: ghLoading, hasGitHubConnection } = useGitHubData();
 
-  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property);
-  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl);
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, botRunning);
+  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, botRunning);
 
   // Extract Data
   const analyticsKPIs = analyticsData?.kpis;
@@ -71,10 +74,10 @@ export default function DashboardOverview() {
   const searchTrend = Array.isArray(seoData?.trend) ? seoData.trend : [];
   const recommendations = (Array.isArray(seoData?.recommendations) ? seoData.recommendations : []).slice(0, 3);
 
-  const isLive = botStatus?.status === 'running' && botStatus?.telegramStatus === 'connected';
+  const isLive = botRunning && botStatus?.telegramStatus === 'connected';
 
   // Loading States - include registration state
-  const isInit = isRegistering || (sitesLoading && !selectedSiteUrl);
+  const isInit = isRegistering || containerLoading || (botRunning && sitesLoading && !selectedSiteUrl);
   const isRef = analyticsLoading || seoLoading;
 
   // Show registration error if any
@@ -153,6 +156,27 @@ export default function DashboardOverview() {
           </span>
         </div>
       </div>
+
+      {/* Setup Prompt - shown when bot is not running */}
+      {!containerLoading && !botRunning && (
+        <div className="bg-gradient-to-r from-emerald-500/[0.08] to-cyan-500/[0.08] border border-emerald-500/20 rounded-2xl p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-white font-semibold mb-1">Set up your Telegram bot to unlock analytics</h3>
+              <p className="text-sm text-zinc-400">Connect your bot to start tracking Google Analytics, Search Console, and more.</p>
+            </div>
+            <Link
+              href="/dashboard/bot"
+              className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm flex-shrink-0"
+            >
+              Set Up Bot
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

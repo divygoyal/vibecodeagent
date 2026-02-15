@@ -7,7 +7,9 @@ import {
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
     ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2
 } from 'lucide-react';
-import { useSeoData, useSiteList } from '@/lib/useDashboardData';
+import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
+import Link from 'next/link';
+import { Bot } from 'lucide-react';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -97,8 +99,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function SEOPage() {
-    // 1. Fetch Sites
-    const { sites, isLoading: sitesLoading } = useSiteList();
+    // 0. Check container status first
+    const { botStatus, isLoading: containerLoading } = useContainerStatus();
+    const botRunning = botStatus?.status === 'running';
+
+    // 1. Fetch Sites (only when bot running)
+    const { sites, isLoading: sitesLoading } = useSiteList(botRunning);
     const [selectedSite, setSelectedSite] = useState('');
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
@@ -109,10 +115,26 @@ export default function SEOPage() {
         }
     }, [sites, selectedSite]);
 
-    // 2. Fetch SEO Data
-    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite);
+    // 2. Fetch SEO Data (only when bot running)
+    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, botRunning);
 
-    if (isLoading && !seoData) {
+    // Show setup prompt if bot not running
+    if (!containerLoading && !botRunning) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                    <Bot className="w-8 h-8 text-emerald-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-white">Set up your bot first</h2>
+                <p className="text-sm text-zinc-400 text-center max-w-md">Connect your Telegram bot to start viewing Search Console data.</p>
+                <Link href="/dashboard/bot" className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm">
+                    Go to Bot Setup
+                </Link>
+            </div>
+        );
+    }
+
+    if ((isLoading || containerLoading) && !seoData) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />

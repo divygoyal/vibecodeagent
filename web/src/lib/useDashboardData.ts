@@ -57,11 +57,11 @@ export function useGitHubData() {
     };
 }
 
-export function useAnalyticsData(section: string, propertyId?: string) {
+export function useAnalyticsData(section: string, propertyId?: string, enabled = true) {
     const query = propertyId ? `&propertyId=${propertyId}` : '';
-    const url = section ? `/api/analytics?section=${section}${query}` : null;
+    const url = (section && enabled) ? `/api/analytics?section=${section}${query}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
-        dedupingInterval: 60000, // 60s client-side dedup (server caches for 3 min)
+        dedupingInterval: 60000,
     });
     
     return {
@@ -72,11 +72,11 @@ export function useAnalyticsData(section: string, propertyId?: string) {
     };
 }
 
-export function useSeoData(section: string, siteUrl?: string) {
+export function useSeoData(section: string, siteUrl?: string, enabled = true) {
     const query = siteUrl ? `&siteUrl=${encodeURIComponent(siteUrl)}` : '';
-    const url = section ? `/api/seo?section=${section}${query}` : null;
+    const url = (section && enabled) ? `/api/seo?section=${section}${query}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
-        dedupingInterval: 60000, // 60s client-side dedup (server caches for 3 min)
+        dedupingInterval: 60000,
     });
     
     return {
@@ -87,10 +87,11 @@ export function useSeoData(section: string, siteUrl?: string) {
     };
 }
 
-export function useSiteList() {
-    const { data, error, isLoading, mutate } = useRegisteredSWR('/api/seo?mode=list', {
-        dedupingInterval: 300000 // Cache site list for 5 mins
-    });
+export function useSiteList(enabled = true) {
+    const { data, error, isLoading, mutate } = useRegisteredSWR(
+        enabled ? '/api/seo?mode=list' : null,
+        { dedupingInterval: 300000 }
+    );
     
     return {
         sites: Array.isArray(data) ? data : [],
@@ -100,10 +101,11 @@ export function useSiteList() {
     };
 }
 
-export function usePropertyList() {
-    const { data, error, isLoading, mutate } = useRegisteredSWR('/api/analytics?mode=list', {
-        dedupingInterval: 300000 // Cache property list for 5 mins
-    });
+export function usePropertyList(enabled = true) {
+    const { data, error, isLoading, mutate } = useRegisteredSWR(
+        enabled ? '/api/analytics?mode=list' : null,
+        { dedupingInterval: 300000 }
+    );
     
     return {
         properties: Array.isArray(data) ? data : [],

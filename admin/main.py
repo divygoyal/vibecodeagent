@@ -1047,7 +1047,10 @@ async def exec_plugin(
     container_name = docker_manager._get_container_name(user.github_id)
 
     try:
-        container = docker_manager.client.containers.get(container_name)
+        try:
+            container = docker_manager.client.containers.get(container_name)
+        except Exception:
+            raise HTTPException(status_code=503, detail="Container not provisioned. Set up your bot first.")
         if container.status != "running":
             raise HTTPException(status_code=503, detail="Container not running")
 
