@@ -38,12 +38,21 @@ export function useContainerStatus() {
 
 export function useGitHubData() {
     const { data, error, isLoading, mutate } = useRegisteredSWR('/api/github');
+    
+    // Check if error is due to no GitHub token (not connected)
+    // Error could be HTTP 400 with GITHUB_NOT_CONNECTED code or message containing "No GitHub token"
+    const errorData = error?.info || error?.message || '';
+    const hasGitHubConnection = !error || 
+        (data && !data.error) || 
+        (typeof errorData === 'string' && !errorData.includes('GITHUB_NOT_CONNECTED') && !errorData.includes('No GitHub token'));
+    
     return {
         commits: data?.commits || [],
         repos: data?.repos || [],
         heatmap: data?.heatmap || [],
         isLoading,
         isError: error,
+        hasGitHubConnection,
         refresh: mutate
     };
 }

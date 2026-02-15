@@ -371,7 +371,7 @@ async def create_user(
                 OAuthConnection.provider == user_data.provider
             )
             result = await db.execute(stmt)
-            oauth = result.scalar_one_or_none()
+            oauth = result.scalars().first()  # Use first() to handle multiple connections gracefully
             
             if oauth:
                 if user_data.access_token:
@@ -646,7 +646,7 @@ async def sync_user_container(
         OAuthConnection.provider == sync_data.provider
     )
     result = await db.execute(stmt)
-    oauth = result.scalar_one_or_none()
+    oauth = result.scalars().first()
     
     if oauth:
         if sync_data.access_token:
@@ -735,7 +735,7 @@ async def update_user(
             OAuthConnection.provider == user_update.provider
         )
         result = await db.execute(stmt)
-        conn = result.scalar_one_or_none()
+        conn = result.scalars().first()
         
         if conn:
             if user_update.access_token:
@@ -773,7 +773,7 @@ async def update_user(
                      OAuthConnection.provider == "github"
                  )
              )
-             conn = result.scalar_one_or_none()
+             conn = result.scalars().first()
              if conn:
                  conn.access_token = token
                  conn.updated_at = datetime.utcnow()

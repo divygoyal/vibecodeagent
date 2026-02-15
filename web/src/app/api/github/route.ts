@@ -77,7 +77,7 @@ export async function GET() {
 
       if (!accessToken) {
         console.error("GitHub API Error: No access token found in session.");
-        return NextResponse.json({ error: "No GitHub token" }, { status: 400 })
+        return NextResponse.json({ error: "No GitHub token", code: "GITHUB_NOT_CONNECTED" }, { status: 400 })
       }
 
       const headers = {

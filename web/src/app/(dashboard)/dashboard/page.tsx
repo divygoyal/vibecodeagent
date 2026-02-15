@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -9,7 +9,7 @@ import {
 import {
   Bot, BarChart3, Search, GitBranch, TrendingUp, TrendingDown,
   ArrowUpRight, Zap, Activity, MousePointer, Eye, Users, Hash,
-  AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2
+  AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2, Github
 } from 'lucide-react';
 import { useContainerStatus, useGitHubData, useAnalyticsData, useSeoData, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
@@ -58,7 +58,7 @@ export default function DashboardOverview() {
 
   // 2. Fetch Data (Dependent on selection)
   const { botStatus } = useContainerStatus();
-  const { commits, isLoading: ghLoading } = useGitHubData();
+  const { commits, isLoading: ghLoading, hasGitHubConnection } = useGitHubData();
 
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property);
   const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl);
@@ -221,6 +221,20 @@ export default function DashboardOverview() {
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
               </>
+            ) : !hasGitHubConnection ? (
+              <div className="h-full flex flex-col items-center justify-center py-8 text-center">
+                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mb-3">
+                  <Github className="w-6 h-6 text-zinc-500" />
+                </div>
+                <p className="text-sm text-zinc-400 mb-1">GitHub not connected</p>
+                <p className="text-xs text-zinc-600 mb-4">Connect your GitHub account to see commits</p>
+                <button
+                  onClick={() => signIn('github')}
+                  className="px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors text-sm font-medium"
+                >
+                  Connect GitHub
+                </button>
+              </div>
             ) : commits.length > 0 ? (
               commits.map((commit: any, i: number) => (
                 <div key={`${commit.sha}-${i}`} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.03] transition-colors group">
