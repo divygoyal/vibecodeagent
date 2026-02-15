@@ -49,7 +49,7 @@ services:
   watchdog:
     build: 
       context: .
-      dockerfile: admin/Dockerfile
+      dockerfile: admin/Watchdog.Dockerfile
     container_name: clawbot-watchdog
     restart: always
     command: ["python", "watchdog.py"]
