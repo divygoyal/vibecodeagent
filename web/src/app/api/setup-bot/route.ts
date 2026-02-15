@@ -8,7 +8,8 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 // Validate Telegram bot token format
 function isValidTelegramToken(token: string): boolean {
-  return /^\d{8,10}:[A-Za-z0-9_-]{35}$/.test(token)
+  // Token format: numbers:alphanumeric string (typically 35+ chars after colon)
+  return /^\d+:[A-Za-z0-9_-]{30,}$/.test(token)
 }
 
 export async function POST(req: Request) {
@@ -166,7 +167,18 @@ export async function POST(req: Request) {
 
   } catch (error) {
     const err = error as Error
-    console.error("Bot setup error:", err.message)
-    return NextResponse.json({ error: "Failed to connect bot" }, { status: 500 })
+    console.error("Bot setup error:", err.message, err.stack)
+    
+    // Provide more specific error messages
+    let errorMessage = "Failed to connect bot"
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed')) {
+      errorMessage = "Backend API is unreachable. Please try again later."
+    } else if (err.message.includes('timeout')) {
+      errorMessage = "Request timed out. Please try again."
+    } else if (err.message.includes('Invalid token')) {
+      errorMessage = err.message
+    }
+    
+    return NextResponse.json({ error: errorMessage, details: err.message }, { status: 500 })
   }
 }

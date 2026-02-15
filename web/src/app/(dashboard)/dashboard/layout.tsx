@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -9,6 +9,21 @@ import {
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
     Book, Newspaper, History
 } from 'lucide-react';
+
+// Registration context to coordinate registration with data fetching
+interface RegistrationContextType {
+    isRegistered: boolean;
+    isRegistering: boolean;
+    registrationError: string | null;
+}
+
+const RegistrationContext = createContext<RegistrationContextType>({
+    isRegistered: false,
+    isRegistering: true,
+    registrationError: null,
+});
+
+export const useRegistration = () => useContext(RegistrationContext);
 
 const sidebarItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
@@ -34,15 +49,54 @@ export default function DashboardLayout({
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    // Auto-register session with backend on any dashboard page load
-    const [registered, setRegistered] = useState(false);
+    // Registration state with proper tracking
+    const [registrationState, setRegistrationState] = useState<RegistrationContextType>({
+        isRegistered: false,
+        isRegistering: true,
+        registrationError: null,
+    });
 
     useEffect(() => {
-        if (session?.user && !registered) {
-            setRegistered(true);
-            fetch('/api/auth/register-provider', { method: 'POST' }).catch(() => { });
+        if (session?.user && !registrationState.isRegistered) {
+            const registerProvider = async () => {
+                try {
+                    setRegistrationState(prev => ({ ...prev, isRegistering: true, registrationError: null }));
+                    
+                    const res = await fetch('/api/auth/register-provider', { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (res.ok) {
+                        setRegistrationState({
+                            isRegistered: true,
+                            isRegistering: false,
+                            registrationError: null,
+                        });
+                    } else {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data.error || 'Failed to register provider');
+                    }
+                } catch (err) {
+                    console.error('Registration error:', err);
+                    setRegistrationState({
+                        isRegistered: false,
+                        isRegistering: false,
+                        registrationError: err instanceof Error ? err.message : 'Registration failed',
+                    });
+                }
+            };
+            
+            registerProvider();
+        } else if (!session?.user) {
+            // Reset state when no session
+            setRegistrationState({
+                isRegistered: false,
+                isRegistering: true,
+                registrationError: null,
+            });
         }
-    }, [session, registered]);
+    }, [session, registrationState.isRegistered]);
 
     return (
         <div className="min-h-screen bg-[#09090b] text-white flex">
@@ -194,7 +248,9 @@ export default function DashboardLayout({
                 {/* Page content */}
                 <main className="flex-1 p-6 overflow-y-auto">
                     <div className="max-w-7xl mx-auto">
-                        {children}
+                        <RegistrationContext.Provider value={registrationState}>
+                            {children}
+                        </RegistrationContext.Provider>
                     </div>
                 </main>
             </div>

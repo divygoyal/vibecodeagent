@@ -6,6 +6,7 @@ import {
     Bot, CheckCircle2, AlertCircle, Loader2, Lock,
     MessageSquare, Github, Chrome, BarChart3, Search
 } from 'lucide-react';
+import { useRegistration } from '../layout';
 
 /* ─── types ─── */
 type BotStatus = {
@@ -37,6 +38,7 @@ function getStatusLevel(botStatus: BotStatus | null): number {
 
 export default function BotPage() {
     const { data: session } = useSession();
+    const { isRegistered, isRegistering } = useRegistration();
     const user = session?.user as {
         name?: string | null; email?: string | null; image?: string | null; provider?: string;
     } | undefined;
@@ -46,7 +48,6 @@ export default function BotPage() {
     const [errorMsg, setErrorMsg] = useState('');
     const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [providerRegistered, setProviderRegistered] = useState(false);
 
     const fetchContainerStatus = useCallback(async () => {
         try {
@@ -62,35 +63,14 @@ export default function BotPage() {
         } catch { /* silent */ }
     }, [botToken, setupStatus]);
 
+    // Fetch status when registration completes
     useEffect(() => {
-        if (session?.user && !providerRegistered) {
-            const registerProvider = async () => {
-                try {
-                    const res = await fetch('/api/auth/register-provider', { method: 'POST' });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.synced) {
-                            setIsSyncing(true);
-                            setTimeout(async () => {
-                                await fetchContainerStatus();
-                                setIsSyncing(false);
-                            }, 5000);
-                        }
-                    }
-                    setProviderRegistered(true);
-                } catch { /* silent */ }
-            };
-            registerProvider();
-        }
-    }, [session, providerRegistered, fetchContainerStatus]);
-
-    useEffect(() => {
-        if (session?.user) {
+        if (session?.user && isRegistered && !isRegistering) {
             fetchContainerStatus();
             const interval = setInterval(fetchContainerStatus, 15000);
             return () => clearInterval(interval);
         }
-    }, [session, fetchContainerStatus]);
+    }, [session, isRegistered, isRegistering, fetchContainerStatus]);
 
     const handleSetupBot = async () => {
         const tokenToUse = botToken || botStatus?.telegramBotToken;

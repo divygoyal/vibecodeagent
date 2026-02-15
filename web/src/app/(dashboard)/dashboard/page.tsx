@@ -9,9 +9,10 @@ import {
 import {
   Bot, BarChart3, Search, GitBranch, TrendingUp, TrendingDown,
   ArrowUpRight, Zap, Activity, MousePointer, Eye, Users, Hash,
-  AlertTriangle, Lightbulb, Globe, ChevronDown
+  AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2
 } from 'lucide-react';
 import { useContainerStatus, useGitHubData, useAnalyticsData, useSeoData, useSiteList, usePropertyList } from '@/lib/useDashboardData';
+import { useRegistration } from './layout';
 
 /* ─── helpers ─── */
 function timeAgo(dateStr: string): string {
@@ -33,6 +34,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export default function DashboardOverview() {
   const { data: session } = useSession();
+  const { isRegistering, isRegistered, registrationError } = useRegistration();
 
   // 1. Fetch Lists
   const { sites, isLoading: sitesLoading } = useSiteList();
@@ -71,9 +73,39 @@ export default function DashboardOverview() {
 
   const isLive = botStatus?.status === 'running' && botStatus?.telegramStatus === 'connected';
 
-  // Loading States
-  const isInit = sitesLoading && !selectedSiteUrl;
+  // Loading States - include registration state
+  const isInit = isRegistering || (sitesLoading && !selectedSiteUrl);
   const isRef = analyticsLoading || seoLoading;
+
+  // Show registration error if any
+  if (registrationError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+          <AlertTriangle className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-white mb-2">Registration Failed</h2>
+        <p className="text-zinc-400 max-w-md">{registrationError}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Show loading while registering
+  if (isRegistering && !isRegistered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
+        <h2 className="text-xl font-semibold text-white mb-2">Setting up your dashboard...</h2>
+        <p className="text-zinc-400">This may take a few seconds</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">

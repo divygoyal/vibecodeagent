@@ -796,6 +796,61 @@ async def update_user(
     user.updated_at = datetime.utcnow()
     await db.commit()
     
+    # If telegram_bot_token changed and container exists, recreate it with new token
+    if user_update.telegram_bot_token:
+        print(f"[DEBUG] Telegram token updated for user {user.github_id}, recreating container...")
+        
+        # Fetch connections for container recreation
+        result_conns = await db.execute(
+            select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+        )
+        conns_list = result_conns.scalars().all()
+        connections = {}
+        for c in conns_list:
+            connections[c.provider] = {
+                "provider_account_id": c.provider_account_id,
+                "accessToken": c.access_token,
+                "refreshToken": c.refresh_token,
+                "token_type": c.token_type,
+                "scope": c.scope
+            }
+        
+        # Stop and delete existing container
+        docker_manager.stop_container(user.github_id)
+        docker_manager.delete_container(user.github_id, remove_data=False)
+        
+        # Create new container with updated token
+        plan_config = PLANS.get(user.plan, PLANS["free"])
+        result = docker_manager.create_container(
+            user_identifier=user.github_id,
+            plan=user.plan,
+            port=user.container_port or await get_next_available_port(db),
+            telegram_token=user.telegram_bot_token,
+            gemini_key=user.gemini_api_key,
+            connections=connections,
+            custom_rules=user.custom_rules,
+            enabled_plugins=plan_config.get("features", [])
+        )
+        
+        if result["success"]:
+            user.container_id = result["container_id"]
+            user.container_name = result.get("container_name", user.container_name)
+            user.container_port = result.get("port", user.container_port)
+            user.container_status = "running"
+            await db.commit()
+            await log_container_event(db, user.id, result["container_id"], "update", 
+                                      "Container recreated with new bot token")
+            return {
+                "success": True, 
+                "message": "Bot token updated and container restarted",
+                "container_status": "running"
+            }
+        else:
+            # Container creation failed
+            user.container_status = "error"
+            await db.commit()
+            raise HTTPException(status_code=500, detail=f"Failed to restart container: {result.get('error')}")
+    
     # If plan changed, need to recreate container with new limits
     if user_update.plan and user_update.plan != user.plan:
         # Stop old container
