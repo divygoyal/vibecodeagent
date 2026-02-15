@@ -1130,6 +1130,36 @@ async def exec_plugin(
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
 
 
+# ============= OAuth Token Retrieval =============
+@app.get("/api/users/{github_id}/oauth/{provider}")
+async def get_user_oauth_token(
+    github_id: str,
+    provider: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Return stored OAuth tokens for a user's provider (used by Next.js API routes as fallback)."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(OAuthConnection).where(
+            OAuthConnection.user_id == user.id,
+            OAuthConnection.provider == provider
+        )
+    )
+    oauth = result.scalars().first()
+    if not oauth or not (oauth.access_token and oauth.access_token.strip()):
+        raise HTTPException(status_code=404, detail=f"No {provider} connection found")
+
+    return {
+        "provider": oauth.provider,
+        "access_token": oauth.access_token,
+        "refresh_token": oauth.refresh_token,
+    }
+
+
 # ============= User Deletion =============
 @app.delete("/api/users/{github_id}")
 async def delete_user(

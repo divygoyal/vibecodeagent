@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
-import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard } from '@/lib/googleApi'
+import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
@@ -111,10 +111,22 @@ export async function GET(req: Request) {
 
     try {
         if (isProduction && session?.user) {
-            // Get Google tokens directly from JWT (no admin API roundtrip)
+            // @ts-expect-error - id added in callbacks
+            const userId = session.user.id
+
+            // Get Google tokens from JWT first, fall back to admin DB
             const jwt = await getToken({ req: req as any }) as any
-            const googleAccess = jwt?.googleAccessToken as string | undefined
-            const googleRefresh = jwt?.googleRefreshToken as string | undefined
+            let googleAccess = jwt?.googleAccessToken as string | undefined
+            let googleRefresh = jwt?.googleRefreshToken as string | undefined
+
+            // Fallback: fetch from admin DB (handles case where user signed in with GitHub)
+            if (!googleAccess && !googleRefresh) {
+                const dbTokens = await fetchGoogleTokensFromDb(userId)
+                if (dbTokens) {
+                    googleAccess = dbTokens.accessToken
+                    googleRefresh = dbTokens.refreshToken
+                }
+            }
 
             if (!googleAccess && !googleRefresh) {
                 return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })
@@ -129,8 +141,6 @@ export async function GET(req: Request) {
                 return NextResponse.json({ error: "Google authentication failed. Please re-sign in." }, { status: 401 })
             }
 
-            // @ts-expect-error - id added in callbacks
-            const userId = session.user.id
             const mode = searchParams.get('mode')
 
             // Helper: fetch property list (cached)

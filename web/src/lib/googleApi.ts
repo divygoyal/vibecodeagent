@@ -7,9 +7,35 @@
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
 // In-memory token cache: refreshToken → { accessToken, expiresAt }
 const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
+
+/**
+ * Fetch stored Google OAuth tokens from admin DB.
+ * Used as fallback when JWT doesn't have Google tokens
+ * (e.g., user signed in with GitHub but previously connected Google).
+ */
+export async function fetchGoogleTokensFromDb(
+    userId: string
+): Promise<{ accessToken: string; refreshToken?: string } | null> {
+    if (!ADMIN_API_KEY) return null;
+    try {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/oauth/google`, {
+            headers: { 'X-API-Key': ADMIN_API_KEY },
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token || undefined,
+        };
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Get a valid Google access token, refreshing if necessary.
@@ -283,7 +309,6 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
 // ─── Google Search Console API ───
 
 const GSC_BASE = 'https://www.googleapis.com/webmasters/v3';
-const GSC_SEARCH = 'https://searchconsole.googleapis.com/v1';
 
 /**
  * List all verified Search Console sites.
@@ -308,7 +333,7 @@ async function runGSCQuery(
         rowLimit: limit,
         type: 'web',
     };
-    return gaFetch(`${GSC_SEARCH}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body);
+    return gaFetch(`${GSC_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body);
 }
 
 /**

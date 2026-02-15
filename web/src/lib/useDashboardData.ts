@@ -58,8 +58,7 @@ export function useGitHubData() {
     // Detect connection state from the preserved error body
     const errorCode = error?.info?.code;
     const isNotConnected = errorCode === 'GITHUB_NOT_CONNECTED';
-    const isSessionExpired = errorCode === 'GITHUB_SESSION_EXPIRED';
-    const hasGitHubConnection = !isNotConnected && !isSessionExpired && !error;
+    const hasGitHubConnection = !isNotConnected && !error;
     
     return {
         commits: data?.commits || [],
@@ -68,7 +67,6 @@ export function useGitHubData() {
         isLoading,
         isError: error,
         hasGitHubConnection,
-        isSessionExpired, // GitHub connected in DB but no token in current session
         refresh: mutate
     };
 }

@@ -61,7 +61,7 @@ export default function DashboardOverview() {
   ) || properties[0]; // Fallback to first
 
   // 3. Fetch Data — analytics/SEO need Google connection (not container)
-  const { commits, isLoading: ghLoading, hasGitHubConnection, isSessionExpired: ghSessionExpired } = useGitHubData();
+  const { commits, isLoading: ghLoading, hasGitHubConnection } = useGitHubData();
 
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, hasGoogleConnection);
   const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, hasGoogleConnection);
@@ -261,18 +261,16 @@ export default function DashboardOverview() {
                   <Github className="w-6 h-6 text-zinc-500" />
                 </div>
                 <p className="text-sm text-zinc-400 mb-1">
-                  {ghSessionExpired ? 'GitHub session expired' : 'GitHub not connected'}
+                  GitHub not connected
                 </p>
                 <p className="text-xs text-zinc-600 mb-4">
-                  {ghSessionExpired 
-                    ? 'Sign in with GitHub again to view your commits' 
-                    : 'Connect your GitHub account to see commits'}
+                  Connect your GitHub account to see commits
                 </p>
                 <button
                   onClick={() => signIn('github')}
                   className="px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors text-sm font-medium"
                 >
-                  {ghSessionExpired ? 'Sign in with GitHub' : 'Connect GitHub'}
+                  Connect GitHub
                 </button>
               </div>
             ) : commits.length > 0 ? (
