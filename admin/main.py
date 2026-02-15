@@ -1130,6 +1130,38 @@ async def exec_plugin(
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
 
 
+# ============= User Deletion =============
+@app.delete("/api/users/{github_id}")
+async def delete_user(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Delete a user, their container, and all workspace data (clean slate)."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 1. Stop and remove container + workspace data
+    try:
+        docker_manager.delete_container(user.github_id, remove_data=True)
+        print(f"[INFO] Deleted container and data for {user.github_id}")
+    except Exception as e:
+        print(f"[WARN] Container cleanup failed for {user.github_id}: {e}")
+
+    # 2. Delete OAuth connections
+    from models import OAuthConnection
+    await db.execute(
+        OAuthConnection.__table__.delete().where(OAuthConnection.user_id == user.id)
+    )
+
+    # 3. Delete user record
+    await db.delete(user)
+    await db.commit()
+
+    return {"status": "deleted", "github_id": github_id}
+
+
 # ============= Admin Endpoints =============
 @app.get("/api/admin/status")
 async def admin_status(

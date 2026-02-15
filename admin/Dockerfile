@@ -22,6 +22,10 @@ COPY admin/. .
 COPY templates /app/templates
 COPY plugins /app/plugins
 
+# Pre-install plugin dependencies (eliminates Node.js cold-start on exec calls)
+RUN cd /app/plugins/google-analytics && npm install --production 2>/dev/null || true
+RUN cd /app/plugins/google-search-console && npm install --production 2>/dev/null || true
+
 # Create data directory
 RUN mkdir -p data
 

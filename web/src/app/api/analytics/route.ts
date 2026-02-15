@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
+import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
+import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard } from '@/lib/googleApi'
 
-const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export const dynamic = 'force-dynamic';
@@ -110,35 +111,39 @@ export async function GET(req: Request) {
 
     try {
         if (isProduction && session?.user) {
+            // Get Google tokens directly from JWT (no admin API roundtrip)
+            const jwt = await getToken({ req: req as any }) as any
+            const googleAccess = jwt?.googleAccessToken as string | undefined
+            const googleRefresh = jwt?.googleRefreshToken as string | undefined
+
+            if (!googleAccess && !googleRefresh) {
+                return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })
+            }
+
+            // Get a valid access token (refreshes if expired, cached in-memory)
+            let token: string
+            try {
+                token = await getValidAccessToken(googleAccess, googleRefresh)
+            } catch (e) {
+                console.error("Google token refresh failed:", e)
+                return NextResponse.json({ error: "Google authentication failed. Please re-sign in." }, { status: 401 })
+            }
+
             // @ts-expect-error - id added in callbacks
-            const githubId = session.user.id
+            const userId = session.user.id
             const mode = searchParams.get('mode')
 
             // Helper: fetch property list (cached)
             const fetchPropertyList = () => cachedFetch(
-                `ga:properties:${githubId}`,
+                `ga:properties:${userId}`,
                 CACHE_TTL.PROPERTY_LIST,
-                async () => {
-                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-                        body: JSON.stringify({ plugin: "google-analytics", command: "list-properties-json", args: [] }),
-                        cache: 'no-store'
-                    })
-                    if (listRes.ok) {
-                        const listData = await listRes.json()
-                        if (listData.status === "ok" && Array.isArray(listData.data)) return listData.data
-                        if (listData.status === "ok" && listData.data?.error) return { error: listData.data.error }
-                    }
-                    return []
-                }
+                () => listAnalyticsProperties(token)
             )
 
             // Handle "list" mode for dropdown
             if (mode === 'list') {
                 try {
                     const properties = await fetchPropertyList()
-                    if (properties?.error) return NextResponse.json({ error: properties.error }, { status: 502 })
                     return NextResponse.json(Array.isArray(properties) ? properties : [])
                 } catch (e) {
                     console.error("List properties error:", e)
@@ -151,9 +156,6 @@ export async function GET(req: Request) {
             if (!propertyId) {
                 try {
                     const properties = await fetchPropertyList()
-                    if (properties?.error) {
-                        return NextResponse.json({ error: properties.error }, { status: 502 })
-                    }
                     if (Array.isArray(properties) && properties.length > 0) {
                         propertyId = properties[0].property
                     }
@@ -170,38 +172,17 @@ export async function GET(req: Request) {
             }
 
             // Fetch dashboard data (cached for 3 min per property+range)
-            const cacheKey = `ga:dashboard:${githubId}:${propertyId}:${range}:${section}`
+            const cacheKey = `ga:dashboard:${userId}:${propertyId}:${range}:${section}`
             const dashboardData = await cachedFetch(
                 cacheKey,
                 CACHE_TTL.DASHBOARD_DATA,
                 async () => {
-                    const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-API-Key": ADMIN_API_KEY
-                        },
-                        body: JSON.stringify({
-                            plugin: "google-analytics",
-                            command: "dashboard-json",
-                            args: [propertyId, range],
-                            options: {}
-                        }),
-                        cache: 'no-store'
-                    })
-
-                    if (!response.ok) {
-                        const errorText = await response.text()
-                        console.error('Analytics admin API error:', response.status, errorText)
-                        return { __error: "Failed to fetch analytics from Google" }
+                    try {
+                        return await fetchAnalyticsDashboard(token, propertyId!, range)
+                    } catch (e: any) {
+                        console.error('Analytics direct API error:', e.message)
+                        return { __error: e.message || "Failed to fetch analytics from Google" }
                     }
-
-                    const adminData = await response.json()
-                    if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
-                        return adminData.data
-                    }
-                    console.error('Analytics plugin error:', adminData.stderr || 'Unknown error')
-                    return { __error: adminData.stderr || "Analytics plugin returned unexpected data" }
                 }
             )
 

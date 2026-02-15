@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
+import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
+import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard } from '@/lib/googleApi'
 
-const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export const dynamic = 'force-dynamic';
@@ -144,35 +145,39 @@ export async function GET(req: Request) {
 
     try {
         if (isProduction && session?.user) {
+            // Get Google tokens directly from JWT (no admin API roundtrip)
+            const jwt = await getToken({ req: req as any }) as any
+            const googleAccess = jwt?.googleAccessToken as string | undefined
+            const googleRefresh = jwt?.googleRefreshToken as string | undefined
+
+            if (!googleAccess && !googleRefresh) {
+                return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })
+            }
+
+            // Get a valid access token (refreshes if expired, cached in-memory)
+            let token: string
+            try {
+                token = await getValidAccessToken(googleAccess, googleRefresh)
+            } catch (e) {
+                console.error("Google token refresh failed:", e)
+                return NextResponse.json({ error: "Google authentication failed. Please re-sign in." }, { status: 401 })
+            }
+
             // @ts-expect-error - id added in callbacks
-            const githubId = session.user.id
+            const userId = session.user.id
             const mode = searchParams.get('mode')
 
             // Helper: fetch site list (cached)
             const fetchSiteList = () => cachedFetch(
-                `gsc:sites:${githubId}`,
+                `gsc:sites:${userId}`,
                 CACHE_TTL.PROPERTY_LIST,
-                async () => {
-                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-                        body: JSON.stringify({ plugin: "google-search-console", command: "list-sites-json", args: [] }),
-                        cache: 'no-store'
-                    })
-                    if (listRes.ok) {
-                        const listData = await listRes.json()
-                        if (listData.status === "ok" && Array.isArray(listData.data)) return listData.data
-                        if (listData.status === "ok" && listData.data?.error) return { error: listData.data.error }
-                    }
-                    return []
-                }
+                () => listSearchConsoleSites(token)
             )
 
             // Handle "list" mode for dropdown
             if (mode === 'list') {
                 try {
                     const sites = await fetchSiteList()
-                    if (sites?.error) return NextResponse.json({ error: sites.error }, { status: 502 })
                     return NextResponse.json(Array.isArray(sites) ? sites : [])
                 } catch (e) {
                     console.error("List sites error:", e)
@@ -185,9 +190,6 @@ export async function GET(req: Request) {
             if (!siteUrl) {
                 try {
                     const sites = await fetchSiteList()
-                    if (sites?.error) {
-                        return NextResponse.json({ error: sites.error }, { status: 502 })
-                    }
                     if (Array.isArray(sites) && sites.length > 0) {
                         siteUrl = sites[0].siteUrl
                     }
@@ -204,38 +206,17 @@ export async function GET(req: Request) {
             }
 
             // Fetch dashboard data (cached for 3 min per site+section)
-            const cacheKey = `gsc:dashboard:${githubId}:${siteUrl}:${section}`
+            const cacheKey = `gsc:dashboard:${userId}:${siteUrl}:${section}`
             const dashboardData = await cachedFetch(
                 cacheKey,
                 CACHE_TTL.DASHBOARD_DATA,
                 async () => {
-                    const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-API-Key": ADMIN_API_KEY
-                        },
-                        body: JSON.stringify({
-                            plugin: "google-search-console",
-                            command: "dashboard-json",
-                            args: [siteUrl],
-                            options: {}
-                        }),
-                        cache: 'no-store'
-                    })
-
-                    if (!response.ok) {
-                        const errorText = await response.text()
-                        console.error('SEO admin API error:', response.status, errorText)
-                        return { __error: "Failed to fetch SEO data from Google" }
+                    try {
+                        return await fetchSeoDashboard(token, siteUrl!)
+                    } catch (e: any) {
+                        console.error('SEO direct API error:', e.message)
+                        return { __error: e.message || "Failed to fetch SEO data from Google" }
                     }
-
-                    const adminData = await response.json()
-                    if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
-                        return adminData.data
-                    }
-                    console.error('SEO plugin error:', adminData.stderr || 'Unknown error')
-                    return { __error: adminData.stderr || "SEO plugin returned unexpected data" }
                 }
             )
 
