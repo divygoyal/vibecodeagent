@@ -472,15 +472,16 @@ async def create_user(
         plan_config = PLANS[user.plan]
         connections = {}
         
-        # Reload ALL connections from DB to pass to container
+        # Reload ALL connections from DB — only include those with valid tokens
         res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
         for c in res.scalars().all():
-            connections[c.provider] = {
-                "provider_account_id": c.provider_account_id,
-                "accessToken": c.access_token,
-                "refreshToken": c.refresh_token,
-                "token_type": c.token_type
-            }
+            if c.access_token and c.access_token.strip():
+                connections[c.provider] = {
+                    "provider_account_id": c.provider_account_id,
+                    "accessToken": c.access_token,
+                    "refreshToken": c.refresh_token,
+                    "token_type": c.token_type
+                }
 
         docker_identifier = user.github_id 
 
@@ -597,13 +598,14 @@ async def get_user(
 
 
     
-    # Fetch connected OAuth providers
+    # Fetch connected OAuth providers (only those with valid tokens)
     oauth_result = await db.execute(
         select(OAuthConnection).where(OAuthConnection.user_id == user.id)
     )
     connected_providers = [
         {"provider": c.provider, "connected": True}
         for c in oauth_result.scalars().all()
+        if c.access_token and c.access_token.strip()  # Only include if token is non-empty
     ]
 
     return {
@@ -679,16 +681,17 @@ async def sync_user_container(
     if not user.telegram_bot_token:
         return {"success": True, "message": "Provider registered (no bot yet)", "synced": False}
     
-    # 3. Load ALL connections from DB
+    # 3. Load ALL connections from DB (only valid tokens)
     res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
     connections = {}
     for c in res.scalars().all():
-        connections[c.provider] = {
-            "provider_account_id": c.provider_account_id,
-            "accessToken": c.access_token,
-            "refreshToken": c.refresh_token,
-            "token_type": c.token_type
-        }
+        if c.access_token and c.access_token.strip():
+            connections[c.provider] = {
+                "provider_account_id": c.provider_account_id,
+                "accessToken": c.access_token,
+                "refreshToken": c.refresh_token,
+                "token_type": c.token_type
+            }
     
     # 4. Sync (recreate) the container with all connections
     plan_config = PLANS.get(user.plan, PLANS["free"])
@@ -807,18 +810,19 @@ async def update_user(
     if user_update.telegram_bot_token:
         print(f"[DEBUG] Telegram token updated for user {user.github_id}, syncing container...")
         
-        # Fetch ALL connections for container recreation
+        # Fetch connections with valid tokens for container recreation
         result_conns = await db.execute(
             select(OAuthConnection).where(OAuthConnection.user_id == user.id)
         )
         connections = {}
         for c in result_conns.scalars().all():
-            connections[c.provider] = {
-                "provider_account_id": c.provider_account_id,
-                "accessToken": c.access_token,
-                "refreshToken": c.refresh_token,
-                "token_type": c.token_type
-            }
+            if c.access_token and c.access_token.strip():
+                connections[c.provider] = {
+                    "provider_account_id": c.provider_account_id,
+                    "accessToken": c.access_token,
+                    "refreshToken": c.refresh_token,
+                    "token_type": c.token_type
+                }
         
         plan_config = PLANS.get(user.plan, PLANS["free"])
         result = docker_manager.sync_container(
@@ -857,12 +861,13 @@ async def update_user(
         )
         connections = {}
         for c in result_conns.scalars().all():
-            connections[c.provider] = {
-                "provider_account_id": c.provider_account_id,
-                "accessToken": c.access_token,
-                "refreshToken": c.refresh_token,
-                "token_type": c.token_type
-            }
+            if c.access_token and c.access_token.strip():
+                connections[c.provider] = {
+                    "provider_account_id": c.provider_account_id,
+                    "accessToken": c.access_token,
+                    "refreshToken": c.refresh_token,
+                    "token_type": c.token_type
+                }
 
         plan_config = PLANS[user_update.plan]
         result = docker_manager.sync_container(

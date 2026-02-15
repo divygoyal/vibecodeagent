@@ -34,22 +34,27 @@ export async function POST() {
 
         // Call the create_user endpoint — it handles idempotent upsert of user & OAuth connection
         // This ensures the user exists even if they haven't set up the bot yet
+        const payload: any = {
+            provider: provider,
+            provider_id: String(userId),
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            email: session.user?.email || undefined,
+            plan: "free"
+        }
+
+        // Only send github_id for GitHub provider — prevents Google users getting misidentified
+        if (provider === 'github') {
+            payload.github_id = String(userId)
+        }
+
         const response = await fetch(`${ADMIN_API_URL}/api/users`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "X-API-Key": ADMIN_API_KEY
             },
-            body: JSON.stringify({
-                // Use session ID as generic identifier (it will be provider_id)
-                github_id: userId,
-                provider: provider,
-                provider_id: String(userId),
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                email: session.user?.email || undefined,
-                plan: "free"
-            })
+            body: JSON.stringify(payload)
         })
 
         if (!response.ok) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -147,27 +148,32 @@ export async function GET(req: Request) {
             const githubId = session.user.id
             const mode = searchParams.get('mode')
 
-            // Handle "list" mode for dropdown
-            if (mode === 'list') {
-                try {
+            // Helper: fetch site list (cached)
+            const fetchSiteList = () => cachedFetch(
+                `gsc:sites:${githubId}`,
+                CACHE_TTL.PROPERTY_LIST,
+                async () => {
                     const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-                        body: JSON.stringify({
-                            plugin: "google-search-console",
-                            command: "list-sites-json",
-                            args: []
-                        }),
+                        body: JSON.stringify({ plugin: "google-search-console", command: "list-sites-json", args: [] }),
                         cache: 'no-store'
                     })
-
                     if (listRes.ok) {
                         const listData = await listRes.json()
-                        if (listData.status === "ok" && Array.isArray(listData.data)) {
-                            return NextResponse.json(listData.data)
-                        }
+                        if (listData.status === "ok" && Array.isArray(listData.data)) return listData.data
+                        if (listData.status === "ok" && listData.data?.error) return { error: listData.data.error }
                     }
-                    return NextResponse.json([])
+                    return []
+                }
+            )
+
+            // Handle "list" mode for dropdown
+            if (mode === 'list') {
+                try {
+                    const sites = await fetchSiteList()
+                    if (sites?.error) return NextResponse.json({ error: sites.error }, { status: 502 })
+                    return NextResponse.json(Array.isArray(sites) ? sites : [])
                 } catch (e) {
                     console.error("List sites error:", e)
                     return NextResponse.json([])
@@ -178,29 +184,12 @@ export async function GET(req: Request) {
 
             if (!siteUrl) {
                 try {
-                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-                        body: JSON.stringify({
-                            plugin: "google-search-console",
-                            command: "list-sites-json",
-                            args: []
-                        }),
-                        cache: 'no-store'
-                    })
-
-                    if (listRes.ok) {
-                        const listData = await listRes.json()
-
-                        // Check for plugin error response
-                        if (listData.status === "ok" && listData.data && !Array.isArray(listData.data) && (listData.data as any).error) {
-                            console.error("SEO plugin error:", (listData.data as any).error);
-                            return NextResponse.json({ error: (listData.data as any).error }, { status: 502 });
-                        }
-
-                        if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
-                            siteUrl = listData.data[0].siteUrl
-                        }
+                    const sites = await fetchSiteList()
+                    if (sites?.error) {
+                        return NextResponse.json({ error: sites.error }, { status: 502 })
+                    }
+                    if (Array.isArray(sites) && sites.length > 0) {
+                        siteUrl = sites[0].siteUrl
                     }
                 } catch (e) {
                     console.warn("Failed to auto-detect GSC site:", e)
@@ -214,41 +203,46 @@ export async function GET(req: Request) {
                 )
             }
 
-            const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-API-Key": ADMIN_API_KEY
-                },
-                body: JSON.stringify({
-                    plugin: "google-search-console",
-                    command: "dashboard-json",
-                    args: [siteUrl],
-                    options: {}
-                }),
-                cache: 'no-store'
-            })
+            // Fetch dashboard data (cached for 3 min per site+section)
+            const cacheKey = `gsc:dashboard:${githubId}:${siteUrl}:${section}`
+            const dashboardData = await cachedFetch(
+                cacheKey,
+                CACHE_TTL.DASHBOARD_DATA,
+                async () => {
+                    const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-API-Key": ADMIN_API_KEY
+                        },
+                        body: JSON.stringify({
+                            plugin: "google-search-console",
+                            command: "dashboard-json",
+                            args: [siteUrl],
+                            options: {}
+                        }),
+                        cache: 'no-store'
+                    })
 
-            if (!response.ok) {
-                const errorText = await response.text()
-                console.error('SEO admin API error:', response.status, errorText)
-                return NextResponse.json(
-                    { error: "Failed to fetch SEO data from Google" },
-                    { status: 502 }
-                )
-            }
+                    if (!response.ok) {
+                        const errorText = await response.text()
+                        console.error('SEO admin API error:', response.status, errorText)
+                        return { __error: "Failed to fetch SEO data from Google" }
+                    }
 
-            const adminData = await response.json()
-
-            if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
-                return NextResponse.json(adminData.data)
-            }
-
-            console.error('SEO plugin error:', adminData.stderr || 'Unknown error')
-            return NextResponse.json(
-                { error: adminData.stderr || "SEO plugin returned unexpected data" },
-                { status: 502 }
+                    const adminData = await response.json()
+                    if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
+                        return adminData.data
+                    }
+                    console.error('SEO plugin error:', adminData.stderr || 'Unknown error')
+                    return { __error: adminData.stderr || "SEO plugin returned unexpected data" }
+                }
             )
+
+            if (dashboardData?.__error) {
+                return NextResponse.json({ error: dashboardData.__error }, { status: 502 })
+            }
+            return NextResponse.json(dashboardData)
         }
 
         // Dev mode only: return mock data

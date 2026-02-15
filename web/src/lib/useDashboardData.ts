@@ -60,7 +60,9 @@ export function useGitHubData() {
 export function useAnalyticsData(section: string, propertyId?: string) {
     const query = propertyId ? `&propertyId=${propertyId}` : '';
     const url = section ? `/api/analytics?section=${section}${query}` : null;
-    const { data, error, isLoading, mutate } = useRegisteredSWR(url);
+    const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
+        dedupingInterval: 60000, // 60s client-side dedup (server caches for 3 min)
+    });
     
     return {
         data,
@@ -73,7 +75,9 @@ export function useAnalyticsData(section: string, propertyId?: string) {
 export function useSeoData(section: string, siteUrl?: string) {
     const query = siteUrl ? `&siteUrl=${encodeURIComponent(siteUrl)}` : '';
     const url = section ? `/api/seo?section=${section}${query}` : null;
-    const { data, error, isLoading, mutate } = useRegisteredSWR(url);
+    const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
+        dedupingInterval: 60000, // 60s client-side dedup (server caches for 3 min)
+    });
     
     return {
         data,

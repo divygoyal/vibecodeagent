@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -113,27 +114,32 @@ export async function GET(req: Request) {
             const githubId = session.user.id
             const mode = searchParams.get('mode')
 
-            // Handle "list" mode for dropdown
-            if (mode === 'list') {
-                try {
+            // Helper: fetch property list (cached)
+            const fetchPropertyList = () => cachedFetch(
+                `ga:properties:${githubId}`,
+                CACHE_TTL.PROPERTY_LIST,
+                async () => {
                     const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-                        body: JSON.stringify({
-                            plugin: "google-analytics",
-                            command: "list-properties-json",
-                            args: []
-                        }),
+                        body: JSON.stringify({ plugin: "google-analytics", command: "list-properties-json", args: [] }),
                         cache: 'no-store'
                     })
-
                     if (listRes.ok) {
                         const listData = await listRes.json()
-                        if (listData.status === "ok" && Array.isArray(listData.data)) {
-                            return NextResponse.json(listData.data)
-                        }
+                        if (listData.status === "ok" && Array.isArray(listData.data)) return listData.data
+                        if (listData.status === "ok" && listData.data?.error) return { error: listData.data.error }
                     }
-                    return NextResponse.json([])
+                    return []
+                }
+            )
+
+            // Handle "list" mode for dropdown
+            if (mode === 'list') {
+                try {
+                    const properties = await fetchPropertyList()
+                    if (properties?.error) return NextResponse.json({ error: properties.error }, { status: 502 })
+                    return NextResponse.json(Array.isArray(properties) ? properties : [])
                 } catch (e) {
                     console.error("List properties error:", e)
                     return NextResponse.json([])
@@ -144,29 +150,12 @@ export async function GET(req: Request) {
 
             if (!propertyId) {
                 try {
-                    const listRes = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-                        body: JSON.stringify({
-                            plugin: "google-analytics",
-                            command: "list-properties-json",
-                            args: []
-                        }),
-                        cache: 'no-store'
-                    })
-
-                    if (listRes.ok) {
-                        const listData = await listRes.json()
-
-                        // Check for plugin error response
-                        if (listData.status === "ok" && listData.data && !Array.isArray(listData.data) && (listData.data as any).error) {
-                            console.error("Analytics plugin error:", (listData.data as any).error);
-                            return NextResponse.json({ error: (listData.data as any).error }, { status: 502 });
-                        }
-
-                        if (listData.status === "ok" && Array.isArray(listData.data) && listData.data.length > 0) {
-                            propertyId = listData.data[0].property
-                        }
+                    const properties = await fetchPropertyList()
+                    if (properties?.error) {
+                        return NextResponse.json({ error: properties.error }, { status: 502 })
+                    }
+                    if (Array.isArray(properties) && properties.length > 0) {
+                        propertyId = properties[0].property
                     }
                 } catch (e) {
                     console.warn("Failed to auto-detect GA property:", e)
@@ -180,41 +169,46 @@ export async function GET(req: Request) {
                 )
             }
 
-            const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-API-Key": ADMIN_API_KEY
-                },
-                body: JSON.stringify({
-                    plugin: "google-analytics",
-                    command: "dashboard-json",
-                    args: [propertyId, range],
-                    options: {}
-                }),
-                cache: 'no-store'
-            })
+            // Fetch dashboard data (cached for 3 min per property+range)
+            const cacheKey = `ga:dashboard:${githubId}:${propertyId}:${range}:${section}`
+            const dashboardData = await cachedFetch(
+                cacheKey,
+                CACHE_TTL.DASHBOARD_DATA,
+                async () => {
+                    const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/exec`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-API-Key": ADMIN_API_KEY
+                        },
+                        body: JSON.stringify({
+                            plugin: "google-analytics",
+                            command: "dashboard-json",
+                            args: [propertyId, range],
+                            options: {}
+                        }),
+                        cache: 'no-store'
+                    })
 
-            if (!response.ok) {
-                const errorText = await response.text()
-                console.error('Analytics admin API error:', response.status, errorText)
-                return NextResponse.json(
-                    { error: "Failed to fetch analytics from Google" },
-                    { status: 502 }
-                )
-            }
+                    if (!response.ok) {
+                        const errorText = await response.text()
+                        console.error('Analytics admin API error:', response.status, errorText)
+                        return { __error: "Failed to fetch analytics from Google" }
+                    }
 
-            const adminData = await response.json()
-
-            if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
-                return NextResponse.json(adminData.data)
-            }
-
-            console.error('Analytics plugin error:', adminData.stderr || 'Unknown error')
-            return NextResponse.json(
-                { error: adminData.stderr || "Analytics plugin returned unexpected data" },
-                { status: 502 }
+                    const adminData = await response.json()
+                    if (adminData.status === "ok" && adminData.data && typeof adminData.data === 'object') {
+                        return adminData.data
+                    }
+                    console.error('Analytics plugin error:', adminData.stderr || 'Unknown error')
+                    return { __error: adminData.stderr || "Analytics plugin returned unexpected data" }
+                }
             )
+
+            if (dashboardData?.__error) {
+                return NextResponse.json({ error: dashboardData.__error }, { status: 502 })
+            }
+            return NextResponse.json(dashboardData)
         }
 
         // Dev mode only: return mock data
