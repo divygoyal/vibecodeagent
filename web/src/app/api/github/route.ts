@@ -69,14 +69,38 @@ export async function GET() {
 
     try {
       // @ts-expect-error - accessToken added in callbacks
-      const accessToken = session.user.githubAccessToken
+      let accessToken = session.user.githubAccessToken
       // @ts-expect-error - username added in callbacks
-      const username = session.user.username
+      let username = session.user.username
 
-      console.log("GitHub API Debug: Using token:", accessToken ? accessToken.substring(0, 10) + "..." : "None");
-
+      // If session doesn't have GitHub token (e.g. signed in with Google),
+      // check if GitHub was previously connected via the admin DB
       if (!accessToken) {
-        console.error("GitHub API Error: No access token found in session.");
+        try {
+          // @ts-expect-error - id added in callbacks
+          const userId = session.user.id
+          const containerRes = await fetch(`${ADMIN_API_URL}/api/users/${userId}`, {
+            headers: { "X-API-Key": ADMIN_API_KEY }
+          })
+          if (containerRes.ok) {
+            const userData = await containerRes.json()
+            const githubConn = userData.connected_providers?.find(
+              (c: any) => c.provider === 'github'
+            )
+            if (!githubConn) {
+              return NextResponse.json({ error: "No GitHub token", code: "GITHUB_NOT_CONNECTED" }, { status: 400 })
+            }
+            // GitHub is connected in DB but we don't have the token in session.
+            // The admin DB has the token but we can't access it directly from this route.
+            // User needs to re-authenticate with GitHub to use GitHub features in this session.
+            return NextResponse.json({ 
+              error: "GitHub connected but session expired. Please re-sign in with GitHub.", 
+              code: "GITHUB_SESSION_EXPIRED" 
+            }, { status: 400 })
+          }
+        } catch (e) {
+          console.error("GitHub API: Failed to check admin DB:", e)
+        }
         return NextResponse.json({ error: "No GitHub token", code: "GITHUB_NOT_CONNECTED" }, { status: 400 })
       }
 

@@ -73,22 +73,29 @@ export const authOptions: NextAuthOptions = {
 
         async jwt({ token, profile, account }) {
             if (account) {
-                // Initial sign in
+                // New sign-in: reset ALL provider-specific tokens first.
+                // This prevents old tokens from leaking across sessions
+                // (e.g. signing in with Google after a previous GitHub session).
+                // The admin DB persists tokens across sessions — session only
+                // needs the CURRENT provider's token for immediate API calls.
                 token.accessToken = account.access_token;
                 token.provider = account.provider;
+                token.githubAccessToken = undefined;
+                token.googleAccessToken = undefined;
+                token.username = undefined;
+                token.refreshToken = undefined;
 
-                // Capture refresh token if provided
                 if (account.refresh_token) {
                     token.refreshToken = account.refresh_token;
                 }
 
                 if (profile && account.provider === "github") {
                     token.username = (profile as any).login;
-                    token.githubAccessToken = account.access_token; // Store specifically
+                    token.githubAccessToken = account.access_token;
                 }
 
                 if (account.provider === "google") {
-                    token.googleAccessToken = account.access_token; // Store specifically
+                    token.googleAccessToken = account.access_token;
                 }
             }
             return token;

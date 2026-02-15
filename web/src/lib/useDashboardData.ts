@@ -55,10 +55,11 @@ export function useGitHubData() {
         errorRetryCount: 0, // Don't retry 400s — they won't self-resolve
     });
     
-    // Detect "not connected" from the preserved error body
-    const isNotConnected = error?.info?.code === 'GITHUB_NOT_CONNECTED' ||
-        error?.status === 400;
-    const hasGitHubConnection = !isNotConnected && !error;
+    // Detect connection state from the preserved error body
+    const errorCode = error?.info?.code;
+    const isNotConnected = errorCode === 'GITHUB_NOT_CONNECTED';
+    const isSessionExpired = errorCode === 'GITHUB_SESSION_EXPIRED';
+    const hasGitHubConnection = !isNotConnected && !isSessionExpired && !error;
     
     return {
         commits: data?.commits || [],
@@ -67,6 +68,7 @@ export function useGitHubData() {
         isLoading,
         isError: error,
         hasGitHubConnection,
+        isSessionExpired, // GitHub connected in DB but no token in current session
         refresh: mutate
     };
 }
