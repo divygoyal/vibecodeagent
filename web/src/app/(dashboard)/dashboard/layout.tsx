@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -33,6 +33,16 @@ export default function DashboardLayout({
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+
+    // Auto-register session with backend on any dashboard page load
+    const [registered, setRegistered] = useState(false);
+
+    useEffect(() => {
+        if (session?.user && !registered) {
+            setRegistered(true);
+            fetch('/api/auth/register-provider', { method: 'POST' }).catch(() => { });
+        }
+    }, [session, registered]);
 
     return (
         <div className="min-h-screen bg-[#09090b] text-white flex">
