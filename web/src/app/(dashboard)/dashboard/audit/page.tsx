@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Search, Loader2, AlertTriangle, AlertCircle, Info, CheckCircle2,
     Globe, Clock, FileText, Image, Link2, Code2, Shield, Share2,
-    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink
+    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink, Zap
 } from 'lucide-react';
 import type { AuditReport, AuditIssue, Severity } from '@/lib/siteAudit';
+import { useContainerStatus, useSiteList, useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
 
 // ─── Severity config ───
 const severityConfig: Record<Severity, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
@@ -153,6 +154,18 @@ export default function AuditPage() {
     const [error, setError] = useState('');
     const [filter, setFilter] = useState<FilterMode>('all');
 
+    // Fetch user's own sites and pages for quick-audit suggestions
+    const { hasGoogleConnection } = useContainerStatus();
+    const { sites } = useSiteList(hasGoogleConnection);
+    const { properties } = usePropertyList(hasGoogleConnection);
+    const [selectedProp, setSelectedProp] = useState('');
+    useEffect(() => {
+        if (properties.length > 0 && !selectedProp) setSelectedProp(properties[0].property);
+    }, [properties, selectedProp]);
+    const { data: analyticsData } = useAnalyticsData('all', selectedProp, hasGoogleConnection);
+    const userPages: string[] = (analyticsData?.pages || []).slice(0, 8).map((p: any) => p.page);
+    const userSiteUrl = sites.length > 0 ? sites[0].siteUrl.replace('sc-domain:', 'https://') : '';
+
     const runAudit = async () => {
         if (!url.trim()) return;
         setLoading(true);
@@ -219,6 +232,7 @@ export default function AuditPage() {
                     />
                 </div>
                 <button
+                    data-audit-btn
                     onClick={runAudit}
                     disabled={loading || !url.trim()}
                     className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-emerald-500 text-black font-semibold rounded-xl transition-colors flex items-center gap-2"
@@ -236,6 +250,34 @@ export default function AuditPage() {
                     )}
                 </button>
             </div>
+
+            {/* ─── Quick Audit: User's Own Pages ─── */}
+            {userSiteUrl && userPages.length > 0 && !report && !loading && (
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Zap className="w-4 h-4 text-emerald-400" />
+                        <h3 className="text-sm font-semibold text-white">Quick Audit Your Pages</h3>
+                        <span className="text-[10px] text-zinc-500 ml-1">Click any page to audit it instantly</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {userPages.map((page, i) => {
+                            const fullUrl = page.startsWith('http') ? page : `${userSiteUrl}${page}`;
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={() => { setUrl(fullUrl); }}
+                                    onDoubleClick={() => { setUrl(fullUrl); setTimeout(() => { document.querySelector<HTMLButtonElement>('[data-audit-btn]')?.click(); }, 50); }}
+                                    className="px-3 py-1.5 text-xs text-zinc-400 hover:text-emerald-400 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:border-emerald-500/20 hover:bg-emerald-500/[0.05] transition-all truncate max-w-[220px]"
+                                    title={`Audit ${fullUrl}`}
+                                >
+                                    {page}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p className="text-[10px] text-zinc-600 mt-2">Click to fill URL, then press Audit. Double-click to audit immediately.</p>
+                </div>
+            )}
 
             {/* ─── Error ─── */}
             {error && (

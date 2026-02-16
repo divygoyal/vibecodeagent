@@ -103,7 +103,7 @@ export default function DashboardLayout({
         <div className="min-h-screen bg-[#09090b] text-white flex">
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
-                className={`hidden lg:flex flex-col border-r border-white/[0.06] bg-[#0c0c10] transition-all duration-300 ${collapsed ? 'w-[68px]' : 'w-[240px]'
+                className={`hidden lg:flex flex-col border-r border-white/[0.06] bg-[#0c0c10] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
                     }`}
             >
                 {/* Logo */}

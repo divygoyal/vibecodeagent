@@ -109,6 +109,39 @@ export default function SEOPage() {
     const [selectedSite, setSelectedSite] = useState('');
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
+    // SEO Tools state
+    const [activeTool, setActiveTool] = useState<string | null>(null);
+    const [toolLoading, setToolLoading] = useState(false);
+    const [toolResult, setToolResult] = useState<any>(null);
+    // Schema tool
+    const [schemaUrl, setSchemaUrl] = useState('');
+    const [schemaType, setSchemaType] = useState('Article');
+    // Blog tool
+    const [blogTopic, setBlogTopic] = useState('');
+    const [blogKeywords, setBlogKeywords] = useState('');
+    // Keyword tool
+    const [kwSiteUrl, setKwSiteUrl] = useState('');
+    // Linking tool uses existing pages data
+
+    const runTool = async (tool: string, input: any) => {
+        setToolLoading(true);
+        setToolResult(null);
+        try {
+            const res = await fetch('/api/seo-tools', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tool, input }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            setToolResult(data);
+        } catch (err: any) {
+            setToolResult({ error: err.message });
+        } finally {
+            setToolLoading(false);
+        }
+    };
+
     // Auto-select first site
     useEffect(() => {
         if (sites.length > 0 && !selectedSite) {
@@ -310,54 +343,173 @@ export default function SEOPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* Programmatic SEO */}
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-violet-500/20 transition-all group cursor-pointer">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center mb-3 group-hover:bg-violet-500/20 transition">
-                            <Layers className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">Programmatic SEO</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Auto-generate hundreds of SEO-optimized pages from your data templates. Target long-tail keywords at scale.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-violet-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> Coming Soon
-                        </div>
-                    </div>
-
                     {/* AI Blog Generation */}
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-emerald-500/20 transition-all group cursor-pointer">
+                    <button onClick={() => { setActiveTool(activeTool === 'blog' ? null : 'blog'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'blog' ? 'border-emerald-500/30 bg-emerald-500/[0.05]' : 'border-white/[0.06] hover:border-emerald-500/20'}`}>
                         <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3 group-hover:bg-emerald-500/20 transition">
                             <PenTool className="w-4 h-4 text-emerald-400" />
                         </div>
                         <h4 className="text-sm font-semibold text-white mb-1">AI Blog Writer</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Generate SEO-optimized blog posts with proper headings, meta tags, internal links, and schema markup built-in.</p>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Generate SEO-optimized blog posts with headings, meta tags, internal links, and schema markup.</p>
                         <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> Coming Soon
+                            <Sparkles className="w-3 h-3" /> {activeTool === 'blog' ? 'Active' : 'Click to use'}
                         </div>
-                    </div>
-
-                    {/* AI Internal Linking */}
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-cyan-500/20 transition-all group cursor-pointer">
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500/20 transition">
-                            <Link2 className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">AI Smart Linking</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Automatically discover and suggest internal links between your pages. Build topical authority with zero manual effort.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-cyan-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> Coming Soon
-                        </div>
-                    </div>
+                    </button>
 
                     {/* Auto Keyword Research */}
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-amber-500/20 transition-all group cursor-pointer">
+                    <button onClick={() => { setActiveTool(activeTool === 'keywords' ? null : 'keywords'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'keywords' ? 'border-amber-500/30 bg-amber-500/[0.05]' : 'border-white/[0.06] hover:border-amber-500/20'}`}>
                         <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500/20 transition">
                             <Brain className="w-4 h-4 text-amber-400" />
                         </div>
                         <h4 className="text-sm font-semibold text-white mb-1">Auto Keyword Research</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">AI finds untapped keyword opportunities by analyzing your competitors, search trends, and content gaps automatically.</p>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">AI finds untapped keyword opportunities by analyzing competitors, search trends, and content gaps.</p>
                         <div className="mt-3 flex items-center gap-1 text-[10px] text-amber-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> Coming Soon
+                            <Sparkles className="w-3 h-3" /> {activeTool === 'keywords' ? 'Active' : 'Click to use'}
                         </div>
-                    </div>
+                    </button>
+
+                    {/* AI Internal Linking */}
+                    <button onClick={() => { setActiveTool(activeTool === 'linking' ? null : 'linking'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'linking' ? 'border-cyan-500/30 bg-cyan-500/[0.05]' : 'border-white/[0.06] hover:border-cyan-500/20'}`}>
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500/20 transition">
+                            <Link2 className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-1">AI Smart Linking</h4>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Discover and suggest internal links between your pages to build topical authority.</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] text-cyan-400 font-medium">
+                            <Sparkles className="w-3 h-3" /> {activeTool === 'linking' ? 'Active' : 'Click to use'}
+                        </div>
+                    </button>
+
+                    {/* Schema Markup Generator */}
+                    <button onClick={() => { setActiveTool(activeTool === 'schema' ? null : 'schema'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'schema' ? 'border-violet-500/30 bg-violet-500/[0.05]' : 'border-white/[0.06] hover:border-violet-500/20'}`}>
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center mb-3 group-hover:bg-violet-500/20 transition">
+                            <FileText className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-1">Schema Generator</h4>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Auto-generate JSON-LD structured data for FAQ, Article, Product, HowTo pages.</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] text-violet-400 font-medium">
+                            <Sparkles className="w-3 h-3" /> {activeTool === 'schema' ? 'Active' : 'Click to use'}
+                        </div>
+                    </button>
                 </div>
+
+                {/* ─── Active Tool Panel ─── */}
+                {activeTool && (
+                    <div className="mt-4 bg-white/[0.02] border border-white/[0.08] rounded-xl p-5">
+                        {/* Blog Writer Panel */}
+                        {activeTool === 'blog' && (
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-semibold text-white flex items-center gap-2"><PenTool className="w-4 h-4 text-emerald-400" /> AI Blog Writer</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <input value={blogTopic} onChange={e => setBlogTopic(e.target.value)} placeholder="Blog topic (e.g. How to improve Core Web Vitals)" className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30" />
+                                    <input value={blogKeywords} onChange={e => setBlogKeywords(e.target.value)} placeholder="Target keywords (comma separated)" className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30" />
+                                </div>
+                                <button onClick={() => runTool('blog', { topic: blogTopic, keywords: blogKeywords })} disabled={toolLoading || !blogTopic.trim()} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2">
+                                    {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Generate Blog Post
+                                </button>
+                                {toolResult?.content && (
+                                    <div className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[400px] overflow-y-auto">
+                                        <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono">{toolResult.content}</pre>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Keyword Research Panel */}
+                        {activeTool === 'keywords' && (
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-semibold text-white flex items-center gap-2"><Brain className="w-4 h-4 text-amber-400" /> Auto Keyword Research</h4>
+                                <div className="flex gap-3">
+                                    <input value={kwSiteUrl} onChange={e => setKwSiteUrl(e.target.value)} placeholder="Your site URL (e.g. example.com)" className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/30" />
+                                    <button onClick={() => runTool('keywords', { siteUrl: kwSiteUrl || selectedSite, currentKeywords: queries.slice(0, 5).map((q: any) => q.query).join(', ') })} disabled={toolLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2">
+                                        {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Find Keywords
+                                    </button>
+                                </div>
+                                {toolResult?.keywords?.length > 0 && (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                            <thead>
+                                                <tr className="text-zinc-500 border-b border-white/[0.06]">
+                                                    <th className="text-left pb-2 font-medium">Keyword</th>
+                                                    <th className="text-right pb-2 font-medium">Volume</th>
+                                                    <th className="text-right pb-2 font-medium">Difficulty</th>
+                                                    <th className="text-right pb-2 font-medium hidden sm:table-cell">Intent</th>
+                                                    <th className="text-right pb-2 font-medium hidden md:table-cell">Content Type</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {toolResult.keywords.map((kw: any, i: number) => (
+                                                    <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                                                        <td className="py-2 text-zinc-300 font-medium">{kw.keyword}</td>
+                                                        <td className="py-2 text-right text-zinc-400">{kw.volume?.toLocaleString()}</td>
+                                                        <td className="py-2 text-right"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${kw.difficulty === 'Low' ? 'bg-emerald-500/10 text-emerald-400' : kw.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'}`}>{kw.difficulty}</span></td>
+                                                        <td className="py-2 text-right text-zinc-500 hidden sm:table-cell">{kw.intent}</td>
+                                                        <td className="py-2 text-right text-zinc-500 hidden md:table-cell">{kw.contentType}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Smart Linking Panel */}
+                        {activeTool === 'linking' && (
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-semibold text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-cyan-400" /> AI Smart Linking</h4>
+                                <p className="text-xs text-zinc-500">Analyzes your {pages.length} pages and suggests internal linking opportunities.</p>
+                                <button onClick={() => runTool('linking', { pages: pages.map((p: any) => ({ page: p.page, title: p.page })) })} disabled={toolLoading || pages.length === 0} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2">
+                                    {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />} Analyze Links
+                                </button>
+                                {toolResult?.links?.length > 0 && (
+                                    <div className="space-y-2">
+                                        {toolResult.links.map((link: any, i: number) => (
+                                            <div key={i} className="bg-black/20 border border-white/[0.04] rounded-lg p-3">
+                                                <div className="flex items-center gap-2 text-xs mb-1">
+                                                    <span className="text-zinc-400 truncate">{link.source}</span>
+                                                    <ArrowUpRight className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                                                    <span className="text-cyan-400 truncate">{link.target}</span>
+                                                </div>
+                                                <div className="text-[11px] text-zinc-500">Anchor: <span className="text-emerald-400 font-medium">&quot;{link.anchor}&quot;</span></div>
+                                                <div className="text-[10px] text-zinc-600 mt-1">{link.reason}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Schema Generator Panel */}
+                        {activeTool === 'schema' && (
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-semibold text-white flex items-center gap-2"><FileText className="w-4 h-4 text-violet-400" /> Schema Markup Generator</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <input value={schemaUrl} onChange={e => setSchemaUrl(e.target.value)} placeholder="Page URL" className="sm:col-span-2 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/30" />
+                                    <select value={schemaType} onChange={e => setSchemaType(e.target.value)} className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none">
+                                        {['Article', 'FAQ', 'Product', 'HowTo', 'WebPage', 'Organization', 'LocalBusiness', 'BreadcrumbList'].map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <button onClick={() => runTool('schema', { pageUrl: schemaUrl, pageType: schemaType })} disabled={toolLoading} className="px-4 py-2 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2">
+                                    {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} Generate Schema
+                                </button>
+                                {toolResult?.schema && (
+                                    <div className="relative">
+                                        <button onClick={() => { navigator.clipboard.writeText(toolResult.schema); }} className="absolute top-2 right-2 px-2 py-1 text-[10px] bg-white/[0.06] hover:bg-white/[0.1] rounded text-zinc-400 transition">Copy</button>
+                                        <pre className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[300px] overflow-y-auto text-xs text-violet-300 font-mono whitespace-pre-wrap">{toolResult.schema}</pre>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Error display */}
+                        {toolResult?.error && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg mt-3">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                                <span className="text-xs text-red-400">{toolResult.error}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* ─── Deep SEO Intelligence Features ─── */}
@@ -370,15 +522,18 @@ export default function SEOPage() {
                         </div>
                         <h4 className="text-sm font-semibold text-white">Content Decay Detector</h4>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Monitors your top-performing pages and alerts you when traffic starts declining so you can refresh content before rankings drop.</p>
+                    <p className="text-xs text-zinc-500 mb-3">Monitors your top-performing pages and alerts when traffic declines so you can refresh content before rankings drop.</p>
                     {pages.length > 0 ? (
                         <div className="space-y-1.5">
-                            {pages.slice(0, 3).map((p, i) => (
+                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).slice(0, 3).map((p, i) => (
                                 <div key={i} className="flex items-center justify-between text-xs">
                                     <span className="text-zinc-400 truncate max-w-[60%]">{p.page}</span>
-                                    <span className={`font-medium ${p.position <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>pos {p.position.toFixed(1)}</span>
+                                    <span className="text-red-400 font-medium">pos {p.position.toFixed(1)}</span>
                                 </div>
                             ))}
+                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length === 0 && (
+                                <span className="text-[11px] text-emerald-400">No decaying content detected</span>
+                            )}
                         </div>
                     ) : (
                         <span className="text-[11px] text-zinc-600">Connect Google to detect decaying content</span>
@@ -393,20 +548,22 @@ export default function SEOPage() {
                         </div>
                         <h4 className="text-sm font-semibold text-white">Cannibalization Scanner</h4>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Detects when multiple pages compete for the same keywords, splitting your ranking power. Suggests merge or differentiate strategies.</p>
-                    <span className="text-[11px] text-zinc-600">Analyzed from your Search Console data</span>
-                </div>
-
-                {/* Schema Markup Generator */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                            <FileText className="w-4 h-4 text-violet-400" />
+                    <p className="text-xs text-zinc-500 mb-3">Detects when multiple pages compete for the same keywords, splitting ranking power.</p>
+                    {queries.length > 0 ? (
+                        <div className="space-y-1.5">
+                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).slice(0, 3).map((q: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between text-xs">
+                                    <span className="text-zinc-400 truncate max-w-[60%]">{q.query}</span>
+                                    <span className="text-amber-400 font-medium">pos {q.position}</span>
+                                </div>
+                            ))}
+                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length === 0 && (
+                                <span className="text-[11px] text-emerald-400">No cannibalization issues found</span>
+                            )}
                         </div>
-                        <h4 className="text-sm font-semibold text-white">Schema Markup Generator</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Auto-generate JSON-LD structured data for your pages — FAQ, HowTo, Article, Product, Breadcrumb — to win rich snippets.</p>
-                    <span className="text-[11px] text-violet-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                    ) : (
+                        <span className="text-[11px] text-zinc-600">Analyzed from your Search Console data</span>
+                    )}
                 </div>
 
                 {/* Competitor Gap Analysis */}
@@ -417,8 +574,15 @@ export default function SEOPage() {
                         </div>
                         <h4 className="text-sm font-semibold text-white">Competitor Gap Analysis</h4>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Discover keywords your competitors rank for that you don&apos;t. AI suggests content to close the gap and steal their traffic.</p>
-                    <span className="text-[11px] text-cyan-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                    <p className="text-xs text-zinc-500 mb-3">Keywords your competitors rank for that you don&apos;t. Use the Keyword Research tool above to discover gaps.</p>
+                    {queries.length > 0 ? (
+                        <div className="text-xs text-zinc-400">
+                            <span className="text-emerald-400 font-bold">{queries.length}</span> keywords tracked.
+                            <span className="text-amber-400 font-bold ml-2">{queries.filter((q: any) => q.position > 10).length}</span> outside top 10.
+                        </div>
+                    ) : (
+                        <span className="text-[11px] text-zinc-600">Connect Google to analyze gaps</span>
+                    )}
                 </div>
 
                 {/* Core Web Vitals Monitor */}
@@ -427,22 +591,45 @@ export default function SEOPage() {
                         <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                             <Cpu className="w-4 h-4 text-emerald-400" />
                         </div>
-                        <h4 className="text-sm font-semibold text-white">Core Web Vitals Monitor</h4>
+                        <h4 className="text-sm font-semibold text-white">Core Web Vitals</h4>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Track LCP, FID, CLS across all pages. Get instant alerts when performance degrades and AI-generated fix suggestions.</p>
-                    <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                    <p className="text-xs text-zinc-500 mb-3">Use the Audit tool to check LCP, FID, CLS for any page. Navigate to Audit from the sidebar.</p>
+                    <a href="/dashboard/audit" className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 hover:underline"><ArrowUpRight className="w-3 h-3" /> Open Audit Tool</a>
                 </div>
 
-                {/* Rank Tracker */}
+                {/* Daily Rank Tracker */}
                 <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
                             <BarChart3 className="w-4 h-4 text-pink-400" />
                         </div>
-                        <h4 className="text-sm font-semibold text-white">Daily Rank Tracker</h4>
+                        <h4 className="text-sm font-semibold text-white">Rank Tracking</h4>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Track your keyword positions daily with SERP feature detection — featured snippets, PAA, knowledge panels, and local packs.</p>
-                    <span className="text-[11px] text-pink-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                    <p className="text-xs text-zinc-500 mb-3">Your keyword positions from Search Console data. Updated with each data refresh.</p>
+                    {queries.length > 0 ? (
+                        <div className="space-y-1.5">
+                            {queries.slice(0, 3).map((q: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between text-xs">
+                                    <span className="text-zinc-400 truncate max-w-[55%]">{q.query}</span>
+                                    <span className={`font-medium ${q.position <= 5 ? 'text-emerald-400' : q.position <= 10 ? 'text-amber-400' : 'text-red-400'}`}>#{q.position}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <span className="text-[11px] text-zinc-600">Connect Google to track rankings</span>
+                    )}
+                </div>
+
+                {/* Programmatic SEO */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                            <Layers className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Programmatic SEO</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Use the Blog Writer + Keyword Research tools above to generate content at scale for long-tail keywords.</p>
+                    <span className="text-[11px] text-violet-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Use tools above</span>
                 </div>
             </div>
 

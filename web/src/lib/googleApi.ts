@@ -396,6 +396,84 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
     return result;
 }
 
+// ─── GA4 Real-Time API ───
+
+/**
+ * Fetch real-time active users with country, city, device, and page dimensions.
+ * Uses the GA4 Data API runRealtimeReport endpoint.
+ */
+export async function fetchRealtimeVisitors(token: string, propertyId: string) {
+    const pid = cleanPropertyId(propertyId);
+    const result: any = { activeUsers: 0, byCountry: [], byCity: [], byDevice: [], byPage: [] };
+
+    // Run all real-time queries in parallel
+    const [totalData, countryData, cityData, deviceData, pageData] = await Promise.all([
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            metrics: [{ name: 'activeUsers' }],
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'country' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 20,
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'city' }, { name: 'country' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 20,
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'deviceCategory' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 10,
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'unifiedScreenName' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 15,
+        }).catch(() => null),
+    ]);
+
+    // Total active users
+    if (totalData?.rows?.[0]) {
+        result.activeUsers = parseInt(totalData.rows[0].metricValues[0].value) || 0;
+    }
+
+    // By country
+    if (countryData?.rows) {
+        result.byCountry = countryData.rows.map((row: any) => ({
+            country: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    // By city + country
+    if (cityData?.rows) {
+        result.byCity = cityData.rows.map((row: any) => ({
+            city: row.dimensionValues[0].value,
+            country: row.dimensionValues[1].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    // By device
+    if (deviceData?.rows) {
+        result.byDevice = deviceData.rows.map((row: any) => ({
+            device: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    // By page
+    if (pageData?.rows) {
+        result.byPage = pageData.rows.map((row: any) => ({
+            page: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    return result;
+}
+
 // ─── Google Search Console API ───
 
 const GSC_BASE = 'https://www.googleapis.com/webmasters/v3';

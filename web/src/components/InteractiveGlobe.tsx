@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import createGlobe from 'cobe';
 
-// ─── Country → approximate lat/lng lookup for plotting on globe ───
+// ─── Coordinate lookups ───
 const COUNTRY_COORDS: Record<string, [number, number]> = {
     'United States': [39.8, -98.5], 'United Kingdom': [54.0, -2.0], 'India': [22.0, 78.0],
     'Germany': [51.2, 10.4], 'Japan': [36.2, 138.3], 'Australia': [-25.3, 133.8],
@@ -25,112 +25,135 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
     'Saudi Arabia': [23.9, 45.1], 'Hong Kong': [22.3, 114.2],
 };
 
-// City → lat/lng
 const CITY_COORDS: Record<string, [number, number]> = {
     'New York': [40.71, -74.01], 'London': [51.51, -0.13], 'Mumbai': [19.08, 72.88],
     'San Francisco': [37.77, -122.42], 'Berlin': [52.52, 13.41], 'Toronto': [43.65, -79.38],
     'Paris': [48.86, 2.35], 'Sydney': [-33.87, 151.21], 'Tokyo': [35.68, 139.69],
-    'Singapore': [1.35, 103.82], 'São Paulo': [-23.55, -46.63], 'Amsterdam': [52.37, 4.90],
-    'Bangalore': [12.97, 77.59], 'Dubai': [25.20, 55.27], 'Chicago': [41.88, -87.63],
-    'Los Angeles': [34.05, -118.24], 'Moscow': [55.75, 37.62], 'Seoul': [37.57, 126.98],
-    'Beijing': [39.90, 116.40], 'Jakarta': [-6.21, 106.85], 'Istanbul': [41.01, 28.98],
-    'New Delhi': [28.61, 77.23], 'Melbourne': [-37.81, 144.96], 'Bangkok': [13.76, 100.50],
-    'Riyadh': [24.71, 46.67], 'Cairo': [30.04, 31.24], 'Nairobi': [-1.29, 36.82],
-    'Lagos': [6.52, 3.38], 'Bogotá': [4.71, -74.07], 'Lima': [-12.05, -77.04],
-    'Santiago': [-33.45, -70.67], 'Mexico City': [19.43, -99.13], 'Buenos Aires': [-34.60, -58.38],
+    'Singapore': [1.35, 103.82], 'Amsterdam': [52.37, 4.90], 'Bangalore': [12.97, 77.59],
+    'Dubai': [25.20, 55.27], 'Chicago': [41.88, -87.63], 'Los Angeles': [34.05, -118.24],
+    'Moscow': [55.75, 37.62], 'Seoul': [37.57, 126.98], 'Beijing': [39.90, 116.40],
+    'Jakarta': [-6.21, 106.85], 'Istanbul': [41.01, 28.98], 'New Delhi': [28.61, 77.23],
+    'Melbourne': [-37.81, 144.96], 'Bangkok': [13.76, 100.50], 'Lagos': [6.52, 3.38],
+    'Mexico City': [19.43, -99.13], 'Buenos Aires': [-34.60, -58.38],
 };
 
-// Country flag emojis
 const COUNTRY_FLAGS: Record<string, string> = {
-    'United States': '��', 'United Kingdom': '🇬🇧', 'India': '🇮🇳', 'Germany': '🇩🇪',
-    'Japan': '🇯🇵', 'Australia': '🇦🇺', 'France': '🇫🇷', 'Canada': '🇨🇦', 'Brazil': '��',
-    'Russia': '🇷🇺', 'Singapore': '🇸🇬', 'UAE': '🇦🇪', 'Turkey': '🇹🇷', 'Indonesia': '🇮🇩',
-    'South Korea': '🇰🇷', 'China': '🇨🇳', 'Netherlands': '🇳🇱', 'Spain': '�🇸',
-    'Italy': '🇮🇹', 'Mexico': '🇲🇽', 'Poland': '🇵🇱', 'Sweden': '🇸🇪', 'Switzerland': '🇨🇭',
-    'Argentina': '🇦🇷', 'South Africa': '🇿🇦', 'Thailand': '��', 'Vietnam': '🇻🇳',
-    'Philippines': '🇵🇭', 'Pakistan': '🇵🇰', 'Bangladesh': '🇧🇩', 'Nigeria': '🇳🇬',
-    'Egypt': '🇪🇬', 'Kenya': '🇰🇪', 'Colombia': '🇨🇴', 'Chile': '🇨🇱', 'Peru': '��',
-    'Israel': '🇮🇱', 'Malaysia': '🇲🇾', 'Taiwan': '🇹🇼', 'Ireland': '🇮🇪',
-    'New Zealand': '🇳🇿', 'Portugal': '🇵🇹', 'Norway': '🇳🇴', 'Denmark': '🇩🇰',
-    'Finland': '🇫🇮', 'Belgium': '🇧🇪', 'Austria': '🇦🇹', 'Czech Republic': '🇨🇿',
-    'Romania': '🇷🇴', 'Greece': '🇬🇷', 'Ukraine': '🇺🇦', 'Saudi Arabia': '��',
-    'Hong Kong': '🇭🇰',
+    'United States': '\u{1F1FA}\u{1F1F8}', 'United Kingdom': '\u{1F1EC}\u{1F1E7}', 'India': '\u{1F1EE}\u{1F1F3}', 'Germany': '\u{1F1E9}\u{1F1EA}',
+    'Japan': '\u{1F1EF}\u{1F1F5}', 'Australia': '\u{1F1E6}\u{1F1FA}', 'France': '\u{1F1EB}\u{1F1F7}', 'Canada': '\u{1F1E8}\u{1F1E6}', 'Brazil': '\u{1F1E7}\u{1F1F7}',
+    'Russia': '\u{1F1F7}\u{1F1FA}', 'Singapore': '\u{1F1F8}\u{1F1EC}', 'UAE': '\u{1F1E6}\u{1F1EA}', 'Turkey': '\u{1F1F9}\u{1F1F7}', 'Indonesia': '\u{1F1EE}\u{1F1E9}',
+    'South Korea': '\u{1F1F0}\u{1F1F7}', 'China': '\u{1F1E8}\u{1F1F3}', 'Netherlands': '\u{1F1F3}\u{1F1F1}', 'Spain': '\u{1F1EA}\u{1F1F8}',
+    'Italy': '\u{1F1EE}\u{1F1F9}', 'Mexico': '\u{1F1F2}\u{1F1FD}', 'Poland': '\u{1F1F5}\u{1F1F1}', 'Sweden': '\u{1F1F8}\u{1F1EA}', 'Switzerland': '\u{1F1E8}\u{1F1ED}',
+    'Argentina': '\u{1F1E6}\u{1F1F7}', 'South Africa': '\u{1F1FF}\u{1F1E6}', 'Thailand': '\u{1F1F9}\u{1F1ED}', 'Vietnam': '\u{1F1FB}\u{1F1F3}',
+    'Philippines': '\u{1F1F5}\u{1F1ED}', 'Pakistan': '\u{1F1F5}\u{1F1F0}', 'Bangladesh': '\u{1F1E7}\u{1F1E9}', 'Nigeria': '\u{1F1F3}\u{1F1EC}',
+    'Egypt': '\u{1F1EA}\u{1F1EC}', 'Kenya': '\u{1F1F0}\u{1F1EA}', 'Colombia': '\u{1F1E8}\u{1F1F4}', 'Chile': '\u{1F1E8}\u{1F1F1}', 'Peru': '\u{1F1F5}\u{1F1EA}',
+    'Israel': '\u{1F1EE}\u{1F1F1}', 'Malaysia': '\u{1F1F2}\u{1F1FE}', 'Taiwan': '\u{1F1F9}\u{1F1FC}', 'Ireland': '\u{1F1EE}\u{1F1EA}',
+    'New Zealand': '\u{1F1F3}\u{1F1FF}', 'Portugal': '\u{1F1F5}\u{1F1F9}', 'Norway': '\u{1F1F3}\u{1F1F4}', 'Denmark': '\u{1F1E9}\u{1F1F0}',
+    'Finland': '\u{1F1EB}\u{1F1EE}', 'Belgium': '\u{1F1E7}\u{1F1EA}', 'Austria': '\u{1F1E6}\u{1F1F9}', 'Saudi Arabia': '\u{1F1F8}\u{1F1E6}',
+    'Hong Kong': '\u{1F1ED}\u{1F1F0}',
 };
 
-// Random animal + color anonymous names for visitors
-const ANIMALS = ['fox', 'owl', 'bear', 'wolf', 'hawk', 'lynx', 'deer', 'hare', 'crane', 'otter', 'panda', 'raven', 'eagle', 'shark', 'whale'];
-const COLORS = ['amber', 'coral', 'jade', 'slate', 'ruby', 'teal', 'plum', 'sage', 'blush', 'pearl', 'onyx', 'ivory', 'azure', 'mauve', 'ochre'];
+const ANIMALS = ['gayal', 'butterfly', 'cardinal', 'falcon', 'dolphin', 'panther', 'sparrow', 'penguin', 'firefly', 'orca', 'mantis', 'robin', 'phoenix', 'griffin', 'osprey'];
+const ADJ = ['bronze', 'salmon', 'blush', 'cobalt', 'crimson', 'golden', 'silver', 'scarlet', 'indigo', 'copper', 'emerald', 'violet', 'obsidian', 'ivory', 'russet'];
+
+const DEVICE_ICONS: Record<string, string> = { desktop: '\u{1F5A5}\uFE0F', mobile: '\u{1F4F1}', tablet: '\u{1F4DF}' };
+const REFERRER_ICONS: Record<string, string> = {
+    'Organic Search': '\u{1F50D}', 'Direct': '\u{1F517}', 'Referral': '\u{1F310}', 'Social': '\u{1F4AC}',
+    'Email': '\u2709\uFE0F', 'Paid Search': '\u{1F4B0}', '(direct)': '\u{1F517}', 'google': '\u{1F50D}',
+    'github.com': '\u{1F419}', 't.co': 'X', 'linkedin.com': '\u{1F4BC}',
+};
 
 interface GlobeProps {
+    realtimeData?: any;
     countries?: any[];
     cities?: any[];
     referrers?: any[];
     devices?: any[];
 }
 
-export default function InteractiveGlobe({ countries = [], cities = [], referrers = [], devices = [] }: GlobeProps) {
+export default function InteractiveGlobe({ realtimeData, countries = [], cities = [], referrers = [], devices = [] }: GlobeProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const pointerInteracting = useRef<number | null>(null);
     const pointerInteractionMovement = useRef(0);
     const widthRef = useRef(0);
 
-    // Derive markers from real cities data
+    // Prefer real-time data when available, fallback to historical
+    const rtCountries = realtimeData?.byCountry || [];
+    const rtCities = realtimeData?.byCity || [];
+    const rtDevices = realtimeData?.byDevice || [];
+    const rtPages = realtimeData?.byPage || [];
+    const activeUsers = realtimeData?.activeUsers ?? 0;
+    const hasRealtime = !!realtimeData && activeUsers > 0;
+
+    // Use real-time countries for stats, fallback to historical
+    const liveCountries = hasRealtime ? rtCountries : countries;
+    const liveCities = hasRealtime ? rtCities : cities;
+    const liveDevices = hasRealtime ? rtDevices : devices;
+
+    // Derive markers from live data
     const markers = useMemo(() => {
         const result: { location: [number, number]; size: number }[] = [];
-        // From cities
-        cities.forEach((c: any) => {
+        const citySource = hasRealtime ? rtCities : cities;
+        citySource.forEach((c: any) => {
             const coords = CITY_COORDS[c.city] || COUNTRY_COORDS[c.country];
             if (coords) {
-                result.push({ location: coords, size: Math.min(0.12, Math.max(0.03, (c.users || 1) / 500)) });
+                result.push({ location: coords, size: Math.min(0.14, Math.max(0.04, (c.users || 1) / 20)) });
             }
         });
-        // Fallback: countries if no cities
         if (result.length === 0) {
-            countries.forEach((c: any) => {
+            const countrySource = hasRealtime ? rtCountries : countries;
+            countrySource.forEach((c: any) => {
                 const coords = COUNTRY_COORDS[c.country];
                 if (coords) {
-                    result.push({ location: coords, size: Math.min(0.12, Math.max(0.03, (c.users || 1) / 500)) });
+                    result.push({ location: coords, size: Math.min(0.14, Math.max(0.04, (c.users || 1) / 20)) });
                 }
             });
         }
         return result;
-    }, [cities, countries]);
+    }, [hasRealtime, rtCities, rtCountries, cities, countries]);
 
-    // Total visitors
-    const totalVisitors = useMemo(() => {
-        return countries.reduce((sum: number, c: any) => sum + (c.users || 0), 0);
-    }, [countries]);
+    // Country stats (real-time first)
+    const countryStats = useMemo(() => {
+        return liveCountries.slice(0, 5).map((c: any) => ({
+            country: c.country, users: c.users || 0, flag: COUNTRY_FLAGS[c.country] || '\u{1F30D}',
+        }));
+    }, [liveCountries]);
 
-    // Aggregate referrer stats
+    // Device stats
+    const deviceStats = useMemo(() => {
+        return liveDevices.slice(0, 3).map((d: any) => ({
+            device: d.device || d.name || '', count: d.users || d.sessions || d.value || 0,
+        }));
+    }, [liveDevices]);
+
+    // Referrer stats (historical only — real-time API doesn't provide referrers)
     const referrerStats = useMemo(() => {
-        return referrers.slice(0, 5).map((r: any) => ({ name: r.name || r.source || '', count: r.value || r.sessions || 0 }));
+        return referrers.slice(0, 5).map((r: any) => ({
+            name: r.name || r.source || '', count: r.value || r.sessions || 0,
+        }));
     }, [referrers]);
 
-    // Aggregate country stats
-    const countryStats = useMemo(() => {
-        return countries.slice(0, 5).map((c: any) => ({
-            country: c.country, users: c.users || 0, flag: COUNTRY_FLAGS[c.country] || '🌍',
-        }));
-    }, [countries]);
-
-    // Aggregate device stats
-    const deviceStats = useMemo(() => {
-        return devices.slice(0, 3).map((d: any) => ({ device: d.device || d.name || '', count: d.sessions || d.value || 0 }));
-    }, [devices]);
-
-    // Generate realistic activity log from cities data
+    // Activity log built from REAL real-time data (pages + cities)
     const activityLog = useMemo(() => {
-        const pages = ['/', '/pricing', '/docs', '/blog', '/features', '/roadmap', '/signup', '/review'];
-        const actions = ['visited', 'visited', 'visited', 'visited', 'performed scroll_to_pricing on', 'performed click_cta on', 'performed scroll_to_review on'];
-        return cities.slice(0, 8).map((c: any, i: number) => {
-            const anonName = `${COLORS[i % COLORS.length]} ${ANIMALS[i % ANIMALS.length]}`;
-            const flag = COUNTRY_FLAGS[c.country] || '🌍';
-            const action = actions[i % actions.length];
-            const page = pages[i % pages.length];
-            const minutes = Math.floor(Math.random() * 45) + 1;
-            return { anonName, flag, country: c.country, city: c.city, action, page, time: `${minutes} minutes ago` };
-        });
-    }, [cities]);
+        if (!hasRealtime || (rtCities.length === 0 && rtPages.length === 0)) return [];
+        const entries: any[] = [];
+        // Combine city visitors with pages they're viewing
+        const maxEntries = Math.min(rtCities.length, 10);
+        for (let i = 0; i < maxEntries; i++) {
+            const city = rtCities[i];
+            const page = rtPages[i % Math.max(rtPages.length, 1)];
+            const anonName = `${ADJ[i % ADJ.length]} ${ANIMALS[i % ANIMALS.length]}`;
+            const flag = COUNTRY_FLAGS[city.country] || '\u{1F30D}';
+            entries.push({
+                anonName,
+                flag,
+                country: city.country,
+                page: page?.page || '/',
+                users: city.users,
+                time: 'a few seconds ago',
+            });
+        }
+        return entries;
+    }, [hasRealtime, rtCities, rtPages]);
 
     const onResize = useCallback(() => {
         if (canvasRef.current) {
@@ -146,108 +169,104 @@ export default function InteractiveGlobe({ countries = [], cities = [], referrer
 
     useEffect(() => {
         if (!canvasRef.current) return;
-
         let phi = 0;
-
         const globe = createGlobe(canvasRef.current, {
             devicePixelRatio: 2,
             width: widthRef.current * 2,
             height: widthRef.current * 2,
             phi: 0,
-            theta: 0.15,
+            theta: 0.2,
             dark: 1,
             diffuse: 3,
-            mapSamples: 36000,
-            mapBrightness: 6,
-            baseColor: [0.12, 0.14, 0.22],
-            markerColor: [0.35, 0.85, 0.55],
-            glowColor: [0.06, 0.08, 0.18],
+            mapSamples: 40000,
+            mapBrightness: 8,
+            baseColor: [0.15, 0.18, 0.28],
+            markerColor: [0.4, 0.9, 0.6],
+            glowColor: [0.08, 0.12, 0.25],
             markers,
             onRender: (state) => {
                 if (!pointerInteracting.current) {
-                    phi += 0.0008;
+                    phi += 0.0006;
                 }
                 state.phi = phi + pointerInteractionMovement.current;
                 state.width = widthRef.current * 2;
                 state.height = widthRef.current * 2;
             },
         });
-
         return () => { globe.destroy(); };
     }, [markers]);
 
-    const deviceIcons: Record<string, string> = { 'Desktop': '🖥️', 'Mobile': '📱', 'Tablet': '📟' };
-    const referrerIcons: Record<string, string> = {
-        'google.com': '🔍', '(direct)': '🔗', 'github.com': '🐙', 't.co': '𝕏',
-        'linkedin.com': '💼', 'facebook.com': '📘', 'instagram.com': '📷',
-        'youtube.com': '▶️', 'reddit.com': '🟠', 'bing.com': '🔎',
-        'Organic Search': '🔍', 'Direct': '🔗', 'Referral': '🔗', 'Social': '💬',
-        'Email': '✉️', 'Paid Search': '💰',
-    };
-
     return (
-        <div className="bg-[#080810] border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="bg-[#060612] border border-white/[0.06] rounded-2xl overflow-hidden relative">
+            {/* Stars background */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {Array.from({ length: 60 }).map((_, i) => (
+                    <div
+                        key={i}
+                        className="absolute rounded-full bg-white"
+                        style={{
+                            width: `${Math.random() * 2 + 0.5}px`,
+                            height: `${Math.random() * 2 + 0.5}px`,
+                            top: `${Math.random() * 100}%`,
+                            left: `${Math.random() * 100}%`,
+                            opacity: Math.random() * 0.4 + 0.1,
+                        }}
+                    />
+                ))}
+            </div>
+
             {/* Header */}
-            <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+            <div className="relative px-6 pt-5 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-400 to-violet-500 flex items-center justify-center">
-                            <span className="text-[10px] font-black text-white">G</span>
-                        </div>
-                        <span className="text-sm font-bold text-white">GrowClaw</span>
-                    </div>
-                    <span className="text-[10px] text-zinc-500 border-l border-white/[0.08] pl-2 ml-1 uppercase tracking-widest">Real-Time</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="relative flex h-2.5 w-2.5">
+                    <span className="relative flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
                     </span>
-                    <span className="text-sm font-bold text-emerald-400">{totalVisitors > 0 ? totalVisitors.toLocaleString() : '—'}</span>
-                    <span className="text-xs text-zinc-500">visitors tracked</span>
+                    <span className="text-sm font-bold text-emerald-400">{hasRealtime ? activeUsers : '\u2014'}</span>
+                    <span className="text-xs text-zinc-400">visitors on your site</span>
+                    {hasRealtime && (
+                        <span className="text-[10px] text-zinc-600 ml-1">(live)</span>
+                    )}
                 </div>
             </div>
 
             {/* Stats Rows */}
-            {referrerStats.length > 0 && (
-                <div className="px-5 pb-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                    <span className="text-zinc-600 w-16">Referrers</span>
-                    {referrerStats.map((r, i) => (
-                        <span key={i} className="text-zinc-400 bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]">
-                            {referrerIcons[r.name] || '🔗'} {r.name} ({r.count.toLocaleString()})
-                        </span>
-                    ))}
-                </div>
-            )}
-            {countryStats.length > 0 && (
-                <div className="px-5 pb-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                    <span className="text-zinc-600 w-16">Countries</span>
-                    {countryStats.map((c, i) => (
-                        <span key={i} className="text-zinc-400 bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]">
-                            {c.flag} {c.country} ({c.users.toLocaleString()})
-                        </span>
-                    ))}
-                </div>
-            )}
-            {deviceStats.length > 0 && (
-                <div className="px-5 pb-4 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                    <span className="text-zinc-600 w-16">Devices</span>
-                    {deviceStats.map((d, i) => (
-                        <span key={i} className="text-zinc-400 bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]">
-                            {deviceIcons[d.device] || '🖥️'} {d.device} ({d.count.toLocaleString()})
-                        </span>
-                    ))}
-                </div>
-            )}
+            <div className="relative px-6 pb-2 space-y-1.5">
+                {referrerStats.length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] items-center">
+                        <span className="text-zinc-600 w-[70px] flex-shrink-0">Referrers</span>
+                        {referrerStats.map((r, i) => (
+                            <span key={i} className="text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/[0.06]">
+                                {REFERRER_ICONS[r.name] || '\u{1F517}'} {r.name} ({r.count.toLocaleString()})
+                            </span>
+                        ))}
+                    </div>
+                )}
+                {countryStats.length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] items-center">
+                        <span className="text-zinc-600 w-[70px] flex-shrink-0">Countries</span>
+                        {countryStats.map((c: any, i: number) => (
+                            <span key={i} className="text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/[0.06]">
+                                {c.flag} {c.country} ({c.users})
+                            </span>
+                        ))}
+                    </div>
+                )}
+                {deviceStats.length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] items-center">
+                        <span className="text-zinc-600 w-[70px] flex-shrink-0">Devices</span>
+                        {deviceStats.map((d: any, i: number) => (
+                            <span key={i} className="text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/[0.06]">
+                                {DEVICE_ICONS[d.device.toLowerCase()] || '\u{1F5A5}\uFE0F'} {d.device} ({d.count})
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {/* 3D Globe */}
             <div className="relative flex justify-center items-center"
-                style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(20,30,55,1) 0%, rgba(8,8,16,1) 65%)' }}>
-                {/* Subtle grid overlay for premium feel */}
-                <div className="absolute inset-0 opacity-[0.03]" style={{
-                    backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-                    backgroundSize: '40px 40px',
-                }} />
+                style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(15,22,50,1) 0%, rgba(6,6,18,1) 70%)' }}>
                 <div className="w-full max-w-[560px] aspect-square relative">
                     <canvas
                         ref={canvasRef}
@@ -280,23 +299,24 @@ export default function InteractiveGlobe({ countries = [], cities = [], referrer
                 </div>
             </div>
 
-            {/* Activity Log */}
-            <div className="px-5 py-4 border-t border-white/[0.06] space-y-2.5 max-h-[280px] overflow-y-auto">
-                <div className="text-[10px] text-zinc-600 uppercase tracking-widest mb-2">Live Activity</div>
+            {/* Real-Time Activity Log */}
+            <div className="relative px-6 py-4 border-t border-white/[0.06] space-y-3 max-h-[300px] overflow-y-auto">
                 {activityLog.length === 0 && (
-                    <div className="text-xs text-zinc-600 py-4 text-center">No recent activity data</div>
+                    <div className="text-xs text-zinc-600 py-6 text-center">
+                        {hasRealtime ? 'No active visitors right now' : 'Connect Google Analytics to see live visitors'}
+                    </div>
                 )}
                 {activityLog.map((log, i) => (
-                    <div key={i} className="flex items-start gap-3 text-xs group">
+                    <div key={i} className="flex items-start gap-3 text-xs">
                         <span className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" style={{ animationDelay: `${i * 200}ms` }} />
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" style={{ animationDelay: `${i * 150}ms` }} />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                         </span>
                         <div className="flex-1 min-w-0">
                             <span className="text-zinc-300">
                                 <span className="font-semibold text-violet-300">{log.anonName}</span>
-                                {' '}from {log.flag} <span className="text-zinc-400">{log.country}</span>
-                                {' '}{log.action}{' '}
+                                {' '}from {log.flag} <span className="font-medium text-white">{log.country}</span>
+                                {' '}visited{' '}
                                 <span className="text-emerald-400 font-mono">{log.page}</span>
                             </span>
                         </div>

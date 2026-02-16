@@ -9,7 +9,7 @@ import {
     ArrowUpRight, RefreshCw, Target, Languages
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
-import { useAnalyticsData, usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
+import { useAnalyticsData, usePropertyList, useContainerStatus, useRealtimeData } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
 
 const InteractiveGlobe = dynamic(() => import('@/components/InteractiveGlobe'), { ssr: false });
@@ -216,6 +216,8 @@ export default function AnalyticsPage() {
 
     // Pass range to the hook so data refetches when range changes
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
+    // Real-time data for the globe (auto-refreshes every 15s)
+    const { data: realtimeData } = useRealtimeData(selectedProperty, hasGoogleConnection);
 
     // Show connect prompt if Google not connected
     if (!containerLoading && !hasGoogleConnection) {
@@ -513,6 +515,7 @@ export default function AnalyticsPage() {
 
             {/* ─── Real-Time Visitors Globe ─── */}
             <InteractiveGlobe
+                realtimeData={realtimeData}
                 countries={countries}
                 cities={cities}
                 referrers={referrers}

@@ -128,6 +128,21 @@ export function useSiteList(enabled = true) {
     };
 }
 
+export function useRealtimeData(propertyId?: string, enabled = true) {
+    const url = (propertyId && enabled) ? `/api/analytics/realtime?property=${propertyId}` : null;
+    const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
+        dedupingInterval: 10000,
+        refreshInterval: 15000, // Auto-refresh every 15s for real-time feel
+    });
+
+    return {
+        data,
+        isLoading,
+        isError: error,
+        refresh: mutate
+    };
+}
+
 export function usePropertyList(enabled = true) {
     const { data, error, isLoading, mutate } = useRegisteredSWR(
         enabled ? '/api/analytics?mode=list' : null,
