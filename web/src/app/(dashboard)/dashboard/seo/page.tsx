@@ -5,7 +5,9 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
-    ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download
+    ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download,
+    Bot, PenTool, Link2, Sparkles, Brain, Radar, BarChart3, Globe,
+    FileText, Layers, Activity, Shield, Clock, Cpu
 } from 'lucide-react';
 import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
@@ -291,6 +293,156 @@ export default function SEOPage() {
                             </div>
                         );
                     })}
+                </div>
+            </div>
+
+            {/* ─── SEO Robot / AI SEO Bot ─── */}
+            <div className="bg-gradient-to-br from-violet-500/[0.04] to-emerald-500/[0.04] border border-violet-500/[0.12] rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                        <Bot className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-bold text-white">SEO Robot</h3>
+                        <p className="text-[11px] text-zinc-500">AI-powered SEO automation engine</p>
+                    </div>
+                    <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 font-semibold border border-violet-500/20">BETA</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Programmatic SEO */}
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-violet-500/20 transition-all group cursor-pointer">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center mb-3 group-hover:bg-violet-500/20 transition">
+                            <Layers className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-1">Programmatic SEO</h4>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Auto-generate hundreds of SEO-optimized pages from your data templates. Target long-tail keywords at scale.</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] text-violet-400 font-medium">
+                            <Sparkles className="w-3 h-3" /> Coming Soon
+                        </div>
+                    </div>
+
+                    {/* AI Blog Generation */}
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-emerald-500/20 transition-all group cursor-pointer">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3 group-hover:bg-emerald-500/20 transition">
+                            <PenTool className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-1">AI Blog Writer</h4>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Generate SEO-optimized blog posts with proper headings, meta tags, internal links, and schema markup built-in.</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                            <Sparkles className="w-3 h-3" /> Coming Soon
+                        </div>
+                    </div>
+
+                    {/* AI Internal Linking */}
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-cyan-500/20 transition-all group cursor-pointer">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500/20 transition">
+                            <Link2 className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-1">AI Smart Linking</h4>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Automatically discover and suggest internal links between your pages. Build topical authority with zero manual effort.</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] text-cyan-400 font-medium">
+                            <Sparkles className="w-3 h-3" /> Coming Soon
+                        </div>
+                    </div>
+
+                    {/* Auto Keyword Research */}
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-amber-500/20 transition-all group cursor-pointer">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500/20 transition">
+                            <Brain className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-1">Auto Keyword Research</h4>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">AI finds untapped keyword opportunities by analyzing your competitors, search trends, and content gaps automatically.</p>
+                        <div className="mt-3 flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+                            <Sparkles className="w-3 h-3" /> Coming Soon
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ─── Deep SEO Intelligence Features ─── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Content Decay Detector */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                            <Activity className="w-4 h-4 text-red-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Content Decay Detector</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Monitors your top-performing pages and alerts you when traffic starts declining so you can refresh content before rankings drop.</p>
+                    {pages.length > 0 ? (
+                        <div className="space-y-1.5">
+                            {pages.slice(0, 3).map((p, i) => (
+                                <div key={i} className="flex items-center justify-between text-xs">
+                                    <span className="text-zinc-400 truncate max-w-[60%]">{p.page}</span>
+                                    <span className={`font-medium ${p.position <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>pos {p.position.toFixed(1)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <span className="text-[11px] text-zinc-600">Connect Google to detect decaying content</span>
+                    )}
+                </div>
+
+                {/* Keyword Cannibalization */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <Shuffle className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Cannibalization Scanner</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Detects when multiple pages compete for the same keywords, splitting your ranking power. Suggests merge or differentiate strategies.</p>
+                    <span className="text-[11px] text-zinc-600">Analyzed from your Search Console data</span>
+                </div>
+
+                {/* Schema Markup Generator */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                            <FileText className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Schema Markup Generator</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Auto-generate JSON-LD structured data for your pages — FAQ, HowTo, Article, Product, Breadcrumb — to win rich snippets.</p>
+                    <span className="text-[11px] text-violet-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                </div>
+
+                {/* Competitor Gap Analysis */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                            <Radar className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Competitor Gap Analysis</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Discover keywords your competitors rank for that you don&apos;t. AI suggests content to close the gap and steal their traffic.</p>
+                    <span className="text-[11px] text-cyan-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                </div>
+
+                {/* Core Web Vitals Monitor */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <Cpu className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Core Web Vitals Monitor</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Track LCP, FID, CLS across all pages. Get instant alerts when performance degrades and AI-generated fix suggestions.</p>
+                    <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
+                </div>
+
+                {/* Rank Tracker */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                            <BarChart3 className="w-4 h-4 text-pink-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Daily Rank Tracker</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Track your keyword positions daily with SERP feature detection — featured snippets, PAA, knowledge panels, and local packs.</p>
+                    <span className="text-[11px] text-pink-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Coming Soon</span>
                 </div>
             </div>
 

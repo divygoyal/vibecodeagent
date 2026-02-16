@@ -82,6 +82,7 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - ADMIN_API_URL=http://admin-api:8000
       - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     networks:
       - clawbot-network
     depends_on:

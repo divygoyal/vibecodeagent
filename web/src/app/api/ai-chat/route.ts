@@ -5,6 +5,11 @@ import { authOptions } from '@/lib/auth';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
+// Debug: log whether key is present at startup (not the key itself)
+if (typeof globalThis !== 'undefined') {
+    console.log('[AI Chat] GEMINI_API_KEY configured:', !!GEMINI_API_KEY, 'length:', GEMINI_API_KEY.length);
+}
+
 export const dynamic = 'force-dynamic';
 
 const SYSTEM_PROMPT = `You are an expert AI SEO Advisor and Analytics Assistant for GrowClaw, an all-in-one SEO and analytics platform. Your role is to:
@@ -39,8 +44,9 @@ export async function POST(req: Request) {
         }
 
         if (!GEMINI_API_KEY) {
+            console.warn('[AI Chat] No GEMINI_API_KEY found in environment. Using fallback responses.');
             return NextResponse.json({
-                response: generateFallbackResponse(message, analyticsContext, seoContext),
+                response: generateFallbackResponse(message, analyticsContext, seoContext, false),
             });
         }
 
@@ -122,7 +128,7 @@ export async function POST(req: Request) {
             const errText = await res.text();
             console.error('Gemini API error:', res.status, errText);
             return NextResponse.json({
-                response: generateFallbackResponse(message, analyticsContext, seoContext),
+                response: `I encountered an error connecting to the AI service (${res.status}). Please verify your GEMINI_API_KEY is valid.\n\nIn the meantime, here's what I can tell you:\n\n${generateFallbackResponse(message, analyticsContext, seoContext, true)}`,
             });
         }
 
@@ -138,7 +144,7 @@ export async function POST(req: Request) {
 }
 
 // Fallback responses when Gemini API key is not configured
-function generateFallbackResponse(message: string, analytics: any, seo: any): string {
+function generateFallbackResponse(message: string, analytics: any, seo: any, hasKey = false): string {
     const msg = message.toLowerCase();
 
     if (msg.includes('bounce') && analytics?.kpis) {
@@ -176,5 +182,13 @@ function generateFallbackResponse(message: string, analytics: any, seo: any): st
         }
     }
 
-    return `I'd be happy to help you analyze your website performance! Here's what I can assist with:\n\n- **Traffic Analysis** — Understanding your visitor patterns\n- **SEO Recommendations** — Improving search rankings\n- **Content Strategy** — What to write next\n- **Technical SEO** — Site health and performance\n- **Competitor Insights** — How to outperform competitors\n\nTry asking specific questions like "Which pages have the highest bounce rate?" or "How can I improve my organic traffic?"\n\n*Note: For AI-powered responses, configure your GEMINI_API_KEY in the environment variables.*`;
+    const hint = hasKey
+        ? '\n\n*Your GEMINI_API_KEY is configured but the AI service returned an error. Check the server logs for details.*'
+        : '\n\n*Note: Add GEMINI_API_KEY to your environment variables (and ensure the web container has it in docker-compose.yml) for AI-powered responses.*';
+
+    return `I can help you analyze your website performance! Try asking about:\n\n- **Bounce rates** — "Which pages have the highest bounce rate?"
+- **Traffic sources** — "What are my top traffic sources?"
+- **SEO tips** — "How can I improve my ranking?"
+- **Geo data** — "Which countries bring the most users?"
+- **Devices** — "How is my mobile vs desktop traffic?"${hint}`;
 }

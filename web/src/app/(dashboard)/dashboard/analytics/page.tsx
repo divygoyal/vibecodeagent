@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
-    TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Globe, Monitor,
-    Smartphone, Tablet, ChevronDown, ChevronUp, Loader2, Download, CalendarDays,
-    ArrowUpRight, RefreshCw, Target, GitBranch, Footprints, Languages
+    TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Globe,
+    ChevronDown, ChevronUp, Loader2, Download, CalendarDays,
+    ArrowUpRight, RefreshCw, Target, Languages
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useAnalyticsData, usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
@@ -43,7 +43,7 @@ const GRANULARITY_OPTIONS = [
     { value: 'monthly', label: 'Monthly' },
 ];
 
-const BAR_COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#fff7ed', '#f97316', '#fb923c'];
+const BAR_COLORS = ['#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#c4b5fd', '#ddd6fe', '#a78bfa', '#8b5cf6'];
 
 // ─── Reusable Components ───
 
@@ -158,7 +158,7 @@ function TabbedDataPanel({ title, tabs, data, renderRow, renderHeader, showDetai
 
 // ─── Horizontal Bar Row Component ───
 
-function BarRow({ label, value, maxValue, color = '#f97316', suffix, icon }: {
+function BarRow({ label, value, maxValue, color = '#a78bfa', suffix, icon }: {
     label: string; value: number; maxValue: number; color?: string; suffix?: string; icon?: React.ReactNode;
 }) {
     const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
@@ -178,43 +178,25 @@ function BarRow({ label, value, maxValue, color = '#f97316', suffix, icon }: {
     );
 }
 
-// ─── Goals / Funnels / Journeys Mock Data ───
+// ─── Traffic aggregation helper for granularity ───
 
-const MOCK_GOALS = [
-    { name: 'scroll_to_problem', count: 6100, percentage: 56.38 },
-    { name: 'scroll_to_solution', count: 4400, percentage: 40.37 },
-    { name: 'scroll_to_review', count: 3600, percentage: 33.04 },
-    { name: 'scroll_to_pricing', count: 2900, percentage: 27.02 },
-    { name: 'click_cta_button', count: 2400, percentage: 22.08 },
-    { name: 'scroll_to_faq', count: 1700, percentage: 16.08 },
-    { name: 'signup_started', count: 1200, percentage: 11.04 },
-    { name: 'signup_completed', count: 890, percentage: 8.22 },
-];
-
-const MOCK_FUNNELS = [
-    { step: 'Landing Page', users: 10900, dropoff: 0 },
-    { step: 'Viewed Pricing', users: 4200, dropoff: 61.5 },
-    { step: 'Started Signup', users: 1200, dropoff: 71.4 },
-    { step: 'Completed Signup', users: 890, dropoff: 25.8 },
-    { step: 'First Action', users: 654, dropoff: 26.5 },
-];
-
-const MOCK_JOURNEYS = [
-    { path: '/ → /pricing → /signup', users: 456, convRate: 12.3 },
-    { path: '/ → /features → /pricing → /signup', users: 234, convRate: 18.7 },
-    { path: '/blog/* → / → /pricing', users: 189, convRate: 8.4 },
-    { path: '/ → /docs → /pricing', users: 167, convRate: 15.2 },
-    { path: '/roadmap → / → /signup', users: 98, convRate: 22.1 },
-    { path: '/ → /review → /pricing → /signup', users: 87, convRate: 28.6 },
-];
-
-const MOCK_USER_SEGMENTS = [
-    { segment: 'New Users', users: 6234, sessions: 7890, bounceRate: 38.2, avgDuration: 142 },
-    { segment: 'Returning Users', users: 5170, sessions: 11200, bounceRate: 22.1, avgDuration: 312 },
-    { segment: 'Power Users (5+ visits)', users: 1234, sessions: 8900, bounceRate: 8.4, avgDuration: 560 },
-    { segment: 'Mobile Users', users: 3567, sessions: 4200, bounceRate: 42.1, avgDuration: 98 },
-    { segment: 'Desktop Users', users: 6842, sessions: 9100, bounceRate: 28.5, avgDuration: 245 },
-];
+function aggregateTraffic(traffic: any[], granularity: string): any[] {
+    if (!traffic.length || granularity === 'daily') return traffic;
+    const bucketSize = granularity === 'weekly' ? 7 : 30;
+    const buckets: any[] = [];
+    for (let i = 0; i < traffic.length; i += bucketSize) {
+        const slice = traffic.slice(i, i + bucketSize);
+        if (slice.length === 0) break;
+        buckets.push({
+            date: slice[0].date,
+            activeUsers: Math.round(slice.reduce((s: number, d: any) => s + (d.activeUsers || 0), 0) / slice.length),
+            sessions: Math.round(slice.reduce((s: number, d: any) => s + (d.sessions || 0), 0) / slice.length),
+            pageViews: Math.round(slice.reduce((s: number, d: any) => s + (d.pageViews || 0), 0) / slice.length),
+            bounceRate: +(slice.reduce((s: number, d: any) => s + (d.bounceRate || 0), 0) / slice.length).toFixed(1),
+        });
+    }
+    return buckets;
+}
 
 // ─── Main Page ───
 
@@ -401,15 +383,15 @@ export default function AnalyticsPage() {
                 <h3 className="text-sm font-semibold text-white mb-4">Traffic Trend</h3>
                 <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={traffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                        <AreaChart data={aggregateTraffic(traffic, granularity)} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="gradUsers" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
                                     <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id="gradSessions" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -417,7 +399,7 @@ export default function AnalyticsPage() {
                             <YAxis tick={{ fontSize: 10, fill: '#71717a' }} />
                             <Tooltip content={<CustomTooltip />} />
                             <Area type="monotone" dataKey="activeUsers" name="Visitors" stroke="#34d399" fill="url(#gradUsers)" strokeWidth={2} />
-                            <Area type="monotone" dataKey="sessions" name="Sessions" stroke="#f97316" fill="url(#gradSessions)" strokeWidth={2} />
+                            <Area type="monotone" dataKey="sessions" name="Sessions" stroke="#a78bfa" fill="url(#gradSessions)" strokeWidth={2} />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
@@ -529,93 +511,13 @@ export default function AnalyticsPage() {
                 />
             </div>
 
-            {/* ─── Goals / Funnels / Journeys / User Segments ─── */}
-            <TabbedDataPanel
-                tabs={[
-                    { key: 'goal', label: 'Goal' },
-                    { key: 'funnel', label: 'Funnel' },
-                    { key: 'user', label: 'User Segments' },
-                    { key: 'journey', label: 'Journey' },
-                ]}
-                data={{
-                    goal: MOCK_GOALS,
-                    funnel: MOCK_FUNNELS,
-                    user: MOCK_USER_SEGMENTS,
-                    journey: MOCK_JOURNEYS,
-                }}
-                renderRow={(item, i, tabKey) => {
-                    if (tabKey === 'goal') {
-                        return (
-                            <div key={i} className="flex items-center gap-3 group hover:bg-white/[0.02] rounded-lg px-2 py-1.5 -mx-2 transition">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs text-zinc-300 font-mono">{item.name}</span>
-                                        <span className="text-xs text-zinc-400 tabular-nums">{formatNumber(item.count)} ({item.percentage}%)</span>
-                                    </div>
-                                    <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full bg-emerald-500/70 transition-all duration-500" style={{ width: `${item.percentage}%` }} />
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    }
-                    if (tabKey === 'funnel') {
-                        const maxUsers = MOCK_FUNNELS[0]?.users || 1;
-                        const pct = (item.users / maxUsers) * 100;
-                        return (
-                            <div key={i} className="flex items-center gap-3 hover:bg-white/[0.02] rounded-lg px-2 py-2 -mx-2 transition">
-                                <span className="w-6 text-center text-xs text-zinc-600 font-bold">{i + 1}</span>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs text-zinc-300">{item.step}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-zinc-400 tabular-nums">{formatNumber(item.users)}</span>
-                                            {item.dropoff > 0 && (
-                                                <span className="text-[10px] text-red-400">-{item.dropoff}%</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-500" style={{ width: `${pct}%` }} />
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    }
-                    if (tabKey === 'user') {
-                        return (
-                            <div key={i} className="flex items-center justify-between hover:bg-white/[0.02] rounded-lg px-2 py-2 -mx-2 transition">
-                                <span className="text-xs text-zinc-300 font-medium">{item.segment}</span>
-                                <div className="flex items-center gap-4 text-xs tabular-nums">
-                                    <span className="text-zinc-400">{formatNumber(item.users)} users</span>
-                                    <span className="text-zinc-500">{item.bounceRate}% bounce</span>
-                                    <span className="text-zinc-500">{formatDuration(item.avgDuration)}</span>
-                                </div>
-                            </div>
-                        );
-                    }
-                    if (tabKey === 'journey') {
-                        return (
-                            <div key={i} className="flex items-center justify-between hover:bg-white/[0.02] rounded-lg px-2 py-2 -mx-2 transition">
-                                <span className="text-xs text-zinc-300 font-mono truncate max-w-[60%]">{item.path}</span>
-                                <div className="flex items-center gap-3 text-xs tabular-nums">
-                                    <span className="text-zinc-400">{item.users} users</span>
-                                    <span className="text-emerald-400 font-medium">{item.convRate}% conv</span>
-                                </div>
-                            </div>
-                        );
-                    }
-                    return null;
-                }}
-                renderHeader={(tabKey) => {
-                    if (tabKey === 'goal') return <span>+ Add goals</span>;
-                    return null;
-                }}
-                showDetailsButton={false}
-            />
-
             {/* ─── Real-Time Visitors Globe ─── */}
-            <InteractiveGlobe />
+            <InteractiveGlobe
+                countries={countries}
+                cities={cities}
+                referrers={referrers}
+                devices={devices}
+            />
 
             {/* ─── Top Pages Table (detailed) ─── */}
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
@@ -653,6 +555,184 @@ export default function AnalyticsPage() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* ─── Advanced Analytics Intelligence ─── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Engagement Score */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                            <Target className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Engagement Score</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Composite metric combining session duration, pages/session, scroll depth, and return visits into a single 0-100 score.</p>
+                    {kpis ? (() => {
+                        const score = Math.min(100, Math.round(
+                            (Math.min(kpis.avgSessionDuration / 300, 1) * 30) +
+                            (Math.min(kpis.pagesPerSession / 5, 1) * 25) +
+                            (Math.max(0, 1 - kpis.avgBounceRate / 100) * 25) +
+                            (Math.min((kpis.returningUsers || 0) / Math.max(kpis.totalUsers, 1), 1) * 20)
+                        ));
+                        const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
+                        const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
+                        return (
+                            <div>
+                                <div className="flex items-end gap-2 mb-2">
+                                    <span className={`text-3xl font-bold ${color}`}>{score}</span>
+                                    <span className="text-xs text-zinc-500 mb-1">/ 100</span>
+                                </div>
+                                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${bg} transition-all duration-700`} style={{ width: `${score}%` }} />
+                                </div>
+                            </div>
+                        );
+                    })() : <span className="text-[11px] text-zinc-600">Loading...</span>}
+                </div>
+
+                {/* Content Velocity Tracker */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Content Velocity</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Tracks which pages are gaining traffic fastest — identifies your viral and rising content before competitors notice.</p>
+                    {pages.length > 0 ? (
+                        <div className="space-y-1.5">
+                            {pages.slice(0, 4).map((p: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between text-xs">
+                                    <span className="text-zinc-400 truncate max-w-[55%]">{p.page}</span>
+                                    <span className="text-cyan-400 font-medium tabular-nums">{p.views?.toLocaleString()} views</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : <span className="text-[11px] text-zinc-600">Connect to see velocity</span>}
+                </div>
+
+                {/* Bounce Rate Heatmap */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <ArrowUpRight className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Bounce Rate by Page</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Visual heatmap of bounce rates across your top pages — instantly spot which pages need UX improvements.</p>
+                    {pages.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                            {pages.slice(0, 12).map((p: any, i: number) => {
+                                const br = p.bounceRate || 0;
+                                const bg = br > 60 ? 'bg-red-500/30' : br > 40 ? 'bg-amber-500/30' : 'bg-emerald-500/30';
+                                return (
+                                    <div key={i} className={`${bg} rounded px-1.5 py-0.5 text-[10px] text-zinc-300 font-mono`} title={`${p.page}: ${br}%`}>
+                                        {br}%
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : <span className="text-[11px] text-zinc-600">No data</span>}
+                </div>
+
+                {/* Audience Loyalty Index */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                            <Users className="w-4 h-4 text-pink-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Audience Loyalty Index</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Measures how sticky your audience is — ratio of returning vs new users, session frequency, and multi-page engagement.</p>
+                    {kpis ? (() => {
+                        const returning = kpis.returningUsers || 0;
+                        const total = kpis.totalUsers || 1;
+                        const loyaltyPct = Math.round((returning / total) * 100);
+                        return (
+                            <div className="flex items-center gap-4">
+                                <div className="flex-1">
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-zinc-500">New</span>
+                                        <span className="text-zinc-500">Returning</span>
+                                    </div>
+                                    <div className="h-3 bg-white/[0.04] rounded-full overflow-hidden flex">
+                                        <div className="h-full bg-violet-500/50 transition-all" style={{ width: `${100 - loyaltyPct}%` }} />
+                                        <div className="h-full bg-emerald-500/50 transition-all" style={{ width: `${loyaltyPct}%` }} />
+                                    </div>
+                                    <div className="flex justify-between text-[10px] mt-1">
+                                        <span className="text-violet-400">{100 - loyaltyPct}%</span>
+                                        <span className="text-emerald-400">{loyaltyPct}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })() : <span className="text-[11px] text-zinc-600">Loading...</span>}
+                </div>
+
+                {/* Traffic Source Diversity */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <Globe className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Source Diversity Score</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Measures how diversified your traffic sources are. Low diversity = risky dependency on a single channel.</p>
+                    {channels.length > 0 ? (() => {
+                        const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+                        const shares = channels.map((c: any) => (c.value || 0) / Math.max(total, 1));
+                        const entropy = -shares.reduce((s: number, p: number) => s + (p > 0 ? p * Math.log2(p) : 0), 0);
+                        const maxEntropy = Math.log2(Math.max(channels.length, 1));
+                        const diversityScore = Math.round((entropy / Math.max(maxEntropy, 0.01)) * 100);
+                        const color = diversityScore >= 60 ? 'text-emerald-400' : diversityScore >= 35 ? 'text-amber-400' : 'text-red-400';
+                        return (
+                            <div>
+                                <span className={`text-2xl font-bold ${color}`}>{diversityScore}</span>
+                                <span className="text-xs text-zinc-500 ml-1">/ 100</span>
+                                <div className="mt-2 space-y-1">
+                                    {channels.slice(0, 3).map((c: any, i: number) => (
+                                        <div key={i} className="flex items-center justify-between text-[11px]">
+                                            <span className="text-zinc-400">{c.name}</span>
+                                            <span className="text-zinc-500">{Math.round(((c.value || 0) / Math.max(total, 1)) * 100)}%</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })() : <span className="text-[11px] text-zinc-600">No channel data</span>}
+                </div>
+
+                {/* Geographic Concentration */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                            <Languages className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-white">Geo Concentration Risk</h4>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-3">Warns when traffic is too concentrated in one region — suggests localization and international SEO opportunities.</p>
+                    {countries.length > 0 ? (() => {
+                        const total = countries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+                        const topPct = Math.round(((countries[0]?.users || 0) / Math.max(total, 1)) * 100);
+                        const risk = topPct > 70 ? 'High' : topPct > 45 ? 'Medium' : 'Low';
+                        const color = risk === 'High' ? 'text-red-400' : risk === 'Medium' ? 'text-amber-400' : 'text-emerald-400';
+                        return (
+                            <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-sm font-bold ${color}`}>{risk} Risk</span>
+                                    <span className="text-xs text-zinc-500">— {topPct}% from {countries[0]?.country}</span>
+                                </div>
+                                {countries.slice(0, 4).map((c: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between text-[11px] py-0.5">
+                                        <span className="text-zinc-400">{c.country}</span>
+                                        <span className="text-zinc-500 tabular-nums">{Math.round(((c.users || 0) / Math.max(total, 1)) * 100)}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })() : <span className="text-[11px] text-zinc-600">No geo data</span>}
                 </div>
             </div>
 
