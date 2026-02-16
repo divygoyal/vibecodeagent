@@ -5,7 +5,7 @@ import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard, Bot, BarChart3, Search, Settings,
+    LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
     Book, Newspaper, History
 } from 'lucide-react';
@@ -30,6 +30,7 @@ const sidebarItems = [
     { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
     { icon: Search, label: 'SEO', href: '/dashboard/seo' },
+    { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
 

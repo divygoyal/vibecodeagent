@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, ChevronDown, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, ArrowUpRight, Globe, Monitor, Smartphone, Tablet, ChevronDown, Loader2, Download } from 'lucide-react';
+import { exportAnalyticsData } from '@/lib/exportUtils';
 import WorldMap from '@/components/WorldMap';
 import { useAnalyticsData, usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
@@ -198,6 +199,16 @@ export default function AnalyticsPage() {
                         </select>
                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
                     </div>
+
+                    {/* Export Button */}
+                    <button
+                        onClick={() => exportAnalyticsData(analyticsData)}
+                        disabled={!analyticsData}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors disabled:opacity-30"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        Export
+                    </button>
 
                     {/* Range Selector */}
                     <div className="flex bg-white/[0.03] border border-white/[0.06] rounded-lg overflow-hidden">

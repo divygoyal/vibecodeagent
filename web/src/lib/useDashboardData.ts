@@ -101,6 +101,19 @@ export function useSeoData(section: string, siteUrl?: string, enabled = true) {
     };
 }
 
+export function useInsights(enabled = true) {
+    const { data, error, isLoading } = useRegisteredSWR(
+        enabled ? '/api/insights' : null,
+        { dedupingInterval: 300000, errorRetryCount: 1 }
+    );
+    
+    return {
+        insights: data?.insights || [],
+        isLoading,
+        isError: error,
+    };
+}
+
 export function useSiteList(enabled = true) {
     const { data, error, isLoading, mutate } = useRegisteredSWR(
         enabled ? '/api/seo?mode=list' : null,

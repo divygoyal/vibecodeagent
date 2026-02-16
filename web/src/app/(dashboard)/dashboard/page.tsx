@@ -9,9 +9,9 @@ import {
 import {
   Bot, BarChart3, Search, GitBranch, TrendingUp, TrendingDown,
   ArrowUpRight, Zap, Activity, MousePointer, Eye, Users, Hash,
-  AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2, Github
+  AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2, Github, ScanSearch
 } from 'lucide-react';
-import { useContainerStatus, useGitHubData, useAnalyticsData, useSeoData, useSiteList, usePropertyList } from '@/lib/useDashboardData';
+import { useContainerStatus, useGitHubData, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
 
 /* ─── helpers ─── */
@@ -65,6 +65,7 @@ export default function DashboardOverview() {
 
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, hasGoogleConnection);
   const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, hasGoogleConnection);
+  const { insights, isLoading: insightsLoading } = useInsights(hasGoogleConnection);
 
   // Extract Data
   const analyticsKPIs = analyticsData?.kpis;
@@ -293,44 +294,54 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* AI Insights */}
+        {/* SEO & Analytics Insights */}
         <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex flex-col h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-400" />
-              AI Insights
+              Insights
             </h2>
-            <Link href="/dashboard/seo" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
-              Optimize →
+            <Link href="/dashboard/audit" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+              Run Audit →
             </Link>
           </div>
 
           <div className="space-y-3 flex-1">
-            {isRef ? (
+            {insightsLoading ? (
               <>
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
               </>
-            ) : recommendations.length > 0 ? (
-              recommendations.map((rec: any) => (
-                <div key={rec.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04] transition-all group">
+            ) : insights.length > 0 ? (
+              insights.slice(0, 4).map((insight: any) => (
+                <div key={insight.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04] transition-all group">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white">{rec.title}</h3>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rec.severity === 'high' ? 'bg-red-500/10 text-red-400' :
-                      rec.severity === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                        'bg-blue-500/10 text-blue-400'
+                    <div className="flex items-center gap-2">
+                      {insight.type === 'opportunity' && <Lightbulb className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
+                      {insight.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                      {insight.type === 'achievement' && <TrendingUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
+                      {insight.type === 'trend' && <Activity className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />}
+                      <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white">{insight.title}</h3>
+                    </div>
+                    {insight.metric && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+                        insight.priority === 'high' ? 'bg-red-500/10 text-red-400' :
+                        insight.priority === 'medium' ? 'bg-amber-500/10 text-amber-400' :
+                        'bg-emerald-500/10 text-emerald-400'
                       }`}>
-                      {rec.impact}
-                    </span>
+                        {insight.metric}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-zinc-500 line-clamp-2">{rec.description}</p>
+                  <p className="text-xs text-zinc-500 line-clamp-2 pl-5.5">{insight.description}</p>
                 </div>
               ))
             ) : (
               <div className="h-full flex flex-col items-center justify-center py-8 text-zinc-500">
-                <p className="text-sm">No critical insights</p>
-                <p className="text-xs mt-1">Check back after more data arrives</p>
+                <Lightbulb className="w-8 h-8 text-zinc-700 mb-2" />
+                <p className="text-sm">No insights yet</p>
+                <p className="text-xs mt-1">{hasGoogleConnection ? 'Check back as data accumulates' : 'Connect Google to get insights'}</p>
               </div>
             )}
           </div>
@@ -338,7 +349,7 @@ export default function DashboardOverview() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <ActionCard
           href="/dashboard/bot"
           icon={Bot}
@@ -356,9 +367,16 @@ export default function DashboardOverview() {
         <ActionCard
           href="/dashboard/seo"
           icon={Search}
-          title="SEO Assistant"
+          title="SEO"
           description="Keywords & Rankings"
           color="violet"
+        />
+        <ActionCard
+          href="/dashboard/audit"
+          icon={ScanSearch}
+          title="Site Audit"
+          description="50+ SEO Checks"
+          color="amber"
         />
       </div>
     </div>
@@ -448,6 +466,7 @@ function ActionCard({
     emerald: 'from-emerald-400 to-emerald-600',
     cyan: 'from-cyan-400 to-blue-500',
     violet: 'from-violet-400 to-purple-600',
+    amber: 'from-amber-400 to-orange-500',
   };
 
   return (

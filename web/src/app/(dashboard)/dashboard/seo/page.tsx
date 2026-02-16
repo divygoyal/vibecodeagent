@@ -5,8 +5,9 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
-    ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2
+    ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download
 } from 'lucide-react';
+import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
 
@@ -169,6 +170,16 @@ export default function SEOPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Export Button */}
+                    <button
+                        onClick={() => exportSeoData(seoData)}
+                        disabled={!seoData}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors disabled:opacity-30"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        Export
+                    </button>
+
                     {/* Site Selector */}
                     <div className="relative">
                         <select
