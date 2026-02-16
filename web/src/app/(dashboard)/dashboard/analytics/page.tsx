@@ -12,6 +12,7 @@ import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useAnalyticsData, usePropertyList, useContainerStatus, useRealtimeData } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import { useRegistration } from '../layout';
 
 const InteractiveGlobe = dynamic(() => import('@/components/InteractiveGlobe'), { ssr: false });
 
@@ -86,16 +87,39 @@ function formatNumber(n: number): string {
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-zinc-900 border border-white/[0.1] rounded-lg px-3 py-2 shadow-xl">
-            <p className="text-xs text-zinc-400 mb-1">{label}</p>
-            {payload.map((entry: any, i: number) => (
-                <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
-                    {entry.name}: {entry.value.toLocaleString()}
-                </p>
-            ))}
+        <div className="bg-[#0c0c10] border border-white/[0.12] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
+            <p className="text-xs font-semibold text-white mb-2">{label}</p>
+            <div className="space-y-1.5">
+                {payload.map((entry: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-sm" style={{ background: entry.color }} />
+                            <span className="text-[11px] text-zinc-400">{entry.name}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-white tabular-nums">{entry.value.toLocaleString()}</span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
+
+// ─── Active Filter Badge ───
+
+function FilterBadge({ label, onClear }: { label: string; onClear: () => void }) {
+    return (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.1] border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+            <span>Filtered: {label}</span>
+            <button onClick={onClear} className="hover:text-white transition ml-1">&times;</button>
+        </div>
+    );
+}
+
+// ─── Cross-filter types ───
+interface CrossFilter {
+    dimension: 'country' | 'channel' | 'browser' | 'device' | 'os' | 'source' | 'page' | null;
+    value: string;
+}
 
 // ─── Tabbed Data Panel (like the screenshot) ───
 
@@ -158,22 +182,48 @@ function TabbedDataPanel({ title, tabs, data, renderRow, renderHeader, showDetai
 
 // ─── Horizontal Bar Row Component ───
 
-function BarRow({ label, value, maxValue, color = '#a78bfa', suffix, icon }: {
+function BarRow({ label, value, maxValue, color = '#a78bfa', suffix, icon, extra, onClick, isActive, dimmed }: {
     label: string; value: number; maxValue: number; color?: string; suffix?: string; icon?: React.ReactNode;
+    extra?: Record<string, string | number>; onClick?: () => void; isActive?: boolean; dimmed?: boolean;
 }) {
     const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
+    const [hovered, setHovered] = useState(false);
     return (
-        <div className="flex items-center gap-3 group hover:bg-white/[0.02] rounded-lg px-2 py-1.5 -mx-2 transition">
+        <div
+            className={`flex items-center gap-3 group rounded-lg px-2 py-1.5 -mx-2 transition relative ${
+                onClick ? 'cursor-pointer' : ''
+            } ${isActive ? 'bg-emerald-500/[0.06] ring-1 ring-emerald-500/20' : 'hover:bg-white/[0.02]'} ${dimmed ? 'opacity-40' : ''}`}
+            onClick={onClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+        >
             {icon && <span className="text-sm flex-shrink-0">{icon}</span>}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-zinc-300 truncate">{label}</span>
+                    <span className={`text-xs truncate ${isActive ? 'text-emerald-300 font-semibold' : 'text-zinc-300'}`}>{label}</span>
                     <span className="text-xs text-zinc-400 font-medium tabular-nums ml-2">{formatNumber(value)}{suffix}</span>
                 </div>
                 <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(pct, 1)}%`, background: color }} />
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(pct, 1)}%`, background: isActive ? '#34d399' : color }} />
                 </div>
             </div>
+            {/* Rich hover tooltip */}
+            {hovered && extra && Object.keys(extra).length > 0 && (
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 pointer-events-none">
+                    <div className="bg-[#0c0c10] border border-white/[0.12] rounded-xl px-4 py-3 shadow-2xl min-w-[180px]">
+                        <p className="text-xs font-semibold text-white mb-2 truncate max-w-[200px]">{label}</p>
+                        <div className="space-y-1">
+                            {Object.entries(extra).map(([k, v]) => (
+                                <div key={k} className="flex items-center justify-between gap-4 text-[11px]">
+                                    <span className="text-zinc-500">{k}</span>
+                                    <span className="text-zinc-200 font-medium tabular-nums">{typeof v === 'number' ? v.toLocaleString() : v}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="w-2 h-2 bg-[#0c0c10] border-r border-b border-white/[0.12] rotate-45 mx-auto -mt-1" />
+                </div>
+            )}
         </div>
     );
 }
@@ -203,16 +253,26 @@ function aggregateTraffic(traffic: any[], granularity: string): any[] {
 export default function AnalyticsPage() {
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
-    const [selectedProperty, setSelectedProperty] = useState('');
+    const { selectedProperty, setSelectedProperty } = useRegistration();
     const [range, setRange] = useState('30d');
     const [granularity, setGranularity] = useState('daily');
     const [showRangeDropdown, setShowRangeDropdown] = useState(false);
+    const [crossFilter, setCrossFilter] = useState<CrossFilter>({ dimension: null, value: '' });
+
+    const toggleFilter = (dimension: CrossFilter['dimension'], value: string) => {
+        setCrossFilter(prev =>
+            prev.dimension === dimension && prev.value === value
+                ? { dimension: null, value: '' }
+                : { dimension, value }
+        );
+    };
+    const clearFilter = () => setCrossFilter({ dimension: null, value: '' });
 
     useEffect(() => {
         if (properties.length > 0 && !selectedProperty) {
             setSelectedProperty(properties[0].property);
         }
-    }, [properties, selectedProperty]);
+    }, [properties, selectedProperty, setSelectedProperty]);
 
     // Pass range to the hook so data refetches when range changes
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
@@ -367,6 +427,11 @@ export default function AnalyticsPage() {
                 </div>
             </div>
 
+            {/* ─── Active Filter Badge ─── */}
+            {crossFilter.dimension && (
+                <FilterBadge label={`${crossFilter.dimension}: ${crossFilter.value}`} onClear={clearFilter} />
+            )}
+
             {/* ─── KPI Cards (7 metrics like the screenshot) ─── */}
             {kpis && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -409,7 +474,7 @@ export default function AnalyticsPage() {
 
             {/* ─── Sources & Geography (side by side tabbed panels) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left: Channel / Referrer / Campaign / Keyword */}
+                {/* Left: Channel / Referrer / Source / Language */}
                 <TabbedDataPanel
                     tabs={[
                         { key: 'channel', label: 'Channel' },
@@ -424,19 +489,30 @@ export default function AnalyticsPage() {
                         language: languages,
                     }}
                     renderRow={(item, i, tabKey) => {
-                        const max = tabKey === 'channel' ? maxChannel : tabKey === 'referrer' ? maxReferrer : (item.value || 1);
                         const topVal = tabKey === 'channel' ? maxChannel : tabKey === 'referrer' ? maxReferrer : (sources[0]?.sessions || languages[0]?.value || 1);
+                        const itemName = item.name || item.source || '';
+                        const dim = tabKey === 'channel' ? 'channel' as const : tabKey === 'source' ? 'source' as const : null;
+                        const isActive = dim && crossFilter.dimension === dim && crossFilter.value === itemName;
+                        const dimmed = crossFilter.dimension !== null && !isActive;
                         return (
                             <BarRow
                                 key={i}
-                                label={item.name || item.source || ''}
+                                label={itemName}
                                 value={item.value || item.sessions || 0}
                                 maxValue={topVal}
                                 color={BAR_COLORS[i % BAR_COLORS.length]}
+                                onClick={dim ? () => toggleFilter(dim, itemName) : undefined}
+                                isActive={!!isActive}
+                                dimmed={!!dimmed}
+                                extra={{
+                                    Visitors: item.value || item.sessions || 0,
+                                    ...(item.percentage ? { 'Share': `${item.percentage}%` } : {}),
+                                    ...(item.users ? { Users: item.users } : {}),
+                                }}
                             />
                         );
                     }}
-                    renderHeader={(tabKey) => <span>Visitors %</span>}
+                    renderHeader={(tabKey) => <span>Visitors ↓</span>}
                 />
 
                 {/* Right: Country / Region / City */}
@@ -451,16 +527,30 @@ export default function AnalyticsPage() {
                         region: regions.map((r: any) => ({ name: `${r.region}, ${r.country}`, value: r.users })),
                         city: cities.map((c: any) => ({ name: `${c.city}, ${c.country}`, value: c.users })),
                     }}
-                    renderRow={(item, i) => (
-                        <BarRow
-                            key={i}
-                            label={item.name}
-                            value={item.value}
-                            maxValue={maxCountry}
-                            color={BAR_COLORS[i % BAR_COLORS.length]}
-                        />
-                    )}
-                    renderHeader={() => <span>Visitors %</span>}
+                    renderRow={(item, i, tabKey) => {
+                        const itemName = item.name || '';
+                        const dim = tabKey === 'country' ? 'country' as const : null;
+                        const isActive = dim && crossFilter.dimension === dim && crossFilter.value === itemName;
+                        const dimmed = crossFilter.dimension !== null && !isActive;
+                        const total = countries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+                        return (
+                            <BarRow
+                                key={i}
+                                label={itemName}
+                                value={item.value}
+                                maxValue={maxCountry}
+                                color={BAR_COLORS[i % BAR_COLORS.length]}
+                                onClick={dim ? () => toggleFilter(dim, itemName) : undefined}
+                                isActive={!!isActive}
+                                dimmed={!!dimmed}
+                                extra={{
+                                    Visitors: item.value,
+                                    Share: total > 0 ? `${Math.round((item.value / total) * 100)}%` : '—',
+                                }}
+                            />
+                        );
+                    }}
+                    renderHeader={() => <span>Visitors ↓</span>}
                 />
             </div>
 
@@ -473,19 +563,33 @@ export default function AnalyticsPage() {
                         { key: 'entry', label: 'Entry page' },
                     ]}
                     data={{
-                        page: pages.map((p: any) => ({ name: p.page, value: p.views, bounceRate: p.bounceRate, avgTime: p.avgTime })),
+                        page: pages.map((p: any) => ({ name: p.page, value: p.views, bounceRate: p.bounceRate, avgTime: p.avgTime, uniqueViews: p.uniqueViews })),
                         entry: entryPages.map((p: any) => ({ name: p.page, value: p.sessions, bounceRate: p.bounceRate })),
                     }}
-                    renderRow={(item, i, tabKey) => (
-                        <BarRow
-                            key={i}
-                            label={item.name}
-                            value={item.value}
-                            maxValue={tabKey === 'page' ? maxPage : maxEntryPage}
-                            color={BAR_COLORS[i % BAR_COLORS.length]}
-                        />
-                    )}
-                    renderHeader={() => <span>Visitors %</span>}
+                    renderRow={(item, i, tabKey) => {
+                        const dim = 'page' as const;
+                        const isActive = crossFilter.dimension === dim && crossFilter.value === item.name;
+                        const dimmed = crossFilter.dimension !== null && !isActive;
+                        return (
+                            <BarRow
+                                key={i}
+                                label={item.name}
+                                value={item.value}
+                                maxValue={tabKey === 'page' ? maxPage : maxEntryPage}
+                                color={BAR_COLORS[i % BAR_COLORS.length]}
+                                onClick={() => toggleFilter(dim, item.name)}
+                                isActive={isActive}
+                                dimmed={dimmed}
+                                extra={{
+                                    [tabKey === 'page' ? 'Views' : 'Sessions']: item.value,
+                                    ...(item.bounceRate != null ? { 'Bounce Rate': `${item.bounceRate}%` } : {}),
+                                    ...(item.avgTime ? { 'Avg Time': item.avgTime } : {}),
+                                    ...(item.uniqueViews ? { 'Unique': item.uniqueViews } : {}),
+                                }}
+                            />
+                        );
+                    }}
+                    renderHeader={() => <span>Visitors ↓</span>}
                 />
 
                 {/* Browser / OS / Device */}
@@ -500,16 +604,30 @@ export default function AnalyticsPage() {
                         os: operatingSystems,
                         device: devices.map((d: any) => ({ name: d.device, value: d.sessions, users: d.users, percentage: d.percentage })),
                     }}
-                    renderRow={(item, i) => (
-                        <BarRow
-                            key={i}
-                            label={item.name || item.device || ''}
-                            value={item.value || item.sessions || 0}
-                            maxValue={maxBrowser}
-                            color={BAR_COLORS[i % BAR_COLORS.length]}
-                        />
-                    )}
-                    renderHeader={() => <span>Visitors %</span>}
+                    renderRow={(item, i, tabKey) => {
+                        const dim = tabKey === 'browser' ? 'browser' as const : tabKey === 'os' ? 'os' as const : 'device' as const;
+                        const itemName = item.name || item.device || '';
+                        const isActive = crossFilter.dimension === dim && crossFilter.value === itemName;
+                        const dimmed = crossFilter.dimension !== null && !isActive;
+                        return (
+                            <BarRow
+                                key={i}
+                                label={itemName}
+                                value={item.value || item.sessions || 0}
+                                maxValue={maxBrowser}
+                                color={BAR_COLORS[i % BAR_COLORS.length]}
+                                onClick={() => toggleFilter(dim, itemName)}
+                                isActive={isActive}
+                                dimmed={dimmed}
+                                extra={{
+                                    Sessions: item.value || item.sessions || 0,
+                                    ...(item.percentage ? { Share: `${item.percentage}%` } : {}),
+                                    ...(item.users ? { Users: item.users } : {}),
+                                }}
+                            />
+                        );
+                    }}
+                    renderHeader={() => <span>Visitors ↓</span>}
                 />
             </div>
 
@@ -639,7 +757,7 @@ export default function AnalyticsPage() {
                                 })}
                             </div>
                             {pages.some((p: any) => (p.bounceRate || 0) > 60) && (
-                                <div className="mt-2"><FixWithBotButton label="Improve UX" size="sm" variant="ghost" context="Bot will optimize high-bounce pages for better engagement" /></div>
+                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get deep bounce rate analysis and UX improvement recommendations" /></div>
                             )}
                         </div>
                     ) : <span className="text-[11px] text-zinc-600">No data</span>}
@@ -739,7 +857,7 @@ export default function AnalyticsPage() {
                                     </div>
                                 ))}
                                 {risk !== 'Low' && (
-                                    <div className="mt-2"><FixWithBotButton label="Expand Reach" size="sm" variant="ghost" context="Bot will suggest international SEO and localization strategies" /></div>
+                                    <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get detailed geo-expansion analysis and localization strategies" /></div>
                                 )}
                             </div>
                         );

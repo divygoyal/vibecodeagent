@@ -175,18 +175,18 @@ export default function InteractiveGlobe({ realtimeData, countries = [], cities 
             width: widthRef.current * 2,
             height: widthRef.current * 2,
             phi: 0,
-            theta: 0.2,
+            theta: 0.15,
             dark: 1,
-            diffuse: 3,
-            mapSamples: 40000,
-            mapBrightness: 8,
-            baseColor: [0.15, 0.18, 0.28],
-            markerColor: [0.4, 0.9, 0.6],
-            glowColor: [0.08, 0.12, 0.25],
+            diffuse: 6,
+            mapSamples: 60000,
+            mapBrightness: 4,
+            baseColor: [0.12, 0.15, 0.25],
+            markerColor: [0.3, 0.85, 0.55],
+            glowColor: [0.04, 0.08, 0.2],
             markers,
             onRender: (state) => {
                 if (!pointerInteracting.current) {
-                    phi += 0.0006;
+                    phi += 0.0004;
                 }
                 state.phi = phi + pointerInteractionMovement.current;
                 state.width = widthRef.current * 2;
@@ -196,67 +196,66 @@ export default function InteractiveGlobe({ realtimeData, countries = [], cities 
         return () => { globe.destroy(); };
     }, [markers]);
 
-    return (
-        <div className="bg-[#060612] border border-white/[0.06] rounded-2xl overflow-hidden relative">
-            {/* Stars background */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                {Array.from({ length: 60 }).map((_, i) => (
-                    <div
-                        key={i}
-                        className="absolute rounded-full bg-white"
-                        style={{
-                            width: `${Math.random() * 2 + 0.5}px`,
-                            height: `${Math.random() * 2 + 0.5}px`,
-                            top: `${Math.random() * 100}%`,
-                            left: `${Math.random() * 100}%`,
-                            opacity: Math.random() * 0.4 + 0.1,
-                        }}
-                    />
-                ))}
-            </div>
+    // Generate avatar colors from name
+    const avatarGradients = [
+        'from-rose-400 to-orange-400',
+        'from-violet-400 to-pink-400',
+        'from-cyan-400 to-blue-400',
+        'from-emerald-400 to-teal-400',
+        'from-amber-400 to-red-400',
+        'from-indigo-400 to-purple-400',
+        'from-lime-400 to-green-400',
+        'from-fuchsia-400 to-rose-400',
+    ];
 
-            {/* Header */}
-            <div className="relative px-6 pt-5 pb-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
-                    </span>
-                    <span className="text-sm font-bold text-emerald-400">{hasRealtime ? activeUsers : '\u2014'}</span>
-                    <span className="text-xs text-zinc-400">visitors on your site</span>
-                    {hasRealtime && (
-                        <span className="text-[10px] text-zinc-600 ml-1">(live)</span>
-                    )}
+    return (
+        <div className="bg-[#04060e] border border-white/[0.06] rounded-2xl overflow-hidden relative">
+            {/* Header — DataFast style */}
+            <div className="relative px-6 pt-5 pb-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">GrowClaw</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-zinc-400 font-medium">REAL-TIME</span>
+                    </div>
+                    <div className="h-4 w-px bg-white/[0.1]" />
+                    <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                        </span>
+                        <span className="text-sm font-bold text-emerald-400">{hasRealtime ? activeUsers : 0}</span>
+                        <span className="text-xs text-zinc-500">visitors on your site</span>
+                    </div>
                 </div>
             </div>
 
-            {/* Stats Rows */}
-            <div className="relative px-6 pb-2 space-y-1.5">
+            {/* Compact Stats Chips */}
+            <div className="relative px-6 pb-3 space-y-2 z-10">
                 {referrerStats.length > 0 && (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] items-center">
+                    <div className="flex flex-wrap gap-2 text-[11px] items-center">
                         <span className="text-zinc-600 w-[70px] flex-shrink-0">Referrers</span>
                         {referrerStats.map((r, i) => (
-                            <span key={i} className="text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/[0.06]">
+                            <span key={i} className="text-zinc-300 bg-white/[0.06] px-2.5 py-1 rounded-lg border border-white/[0.06] font-medium">
                                 {REFERRER_ICONS[r.name] || '\u{1F517}'} {r.name} ({r.count.toLocaleString()})
                             </span>
                         ))}
                     </div>
                 )}
                 {countryStats.length > 0 && (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] items-center">
+                    <div className="flex flex-wrap gap-2 text-[11px] items-center">
                         <span className="text-zinc-600 w-[70px] flex-shrink-0">Countries</span>
                         {countryStats.map((c: any, i: number) => (
-                            <span key={i} className="text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/[0.06]">
+                            <span key={i} className="text-zinc-300 bg-white/[0.06] px-2.5 py-1 rounded-lg border border-white/[0.06] font-medium">
                                 {c.flag} {c.country} ({c.users})
                             </span>
                         ))}
                     </div>
                 )}
                 {deviceStats.length > 0 && (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] items-center">
+                    <div className="flex flex-wrap gap-2 text-[11px] items-center">
                         <span className="text-zinc-600 w-[70px] flex-shrink-0">Devices</span>
                         {deviceStats.map((d: any, i: number) => (
-                            <span key={i} className="text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/[0.06]">
+                            <span key={i} className="text-zinc-300 bg-white/[0.06] px-2.5 py-1 rounded-lg border border-white/[0.06] font-medium">
                                 {DEVICE_ICONS[d.device.toLowerCase()] || '\u{1F5A5}\uFE0F'} {d.device} ({d.count})
                             </span>
                         ))}
@@ -264,10 +263,10 @@ export default function InteractiveGlobe({ realtimeData, countries = [], cities 
                 )}
             </div>
 
-            {/* 3D Globe */}
+            {/* 3D Globe — larger, darker, richer */}
             <div className="relative flex justify-center items-center"
-                style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(15,22,50,1) 0%, rgba(6,6,18,1) 70%)' }}>
-                <div className="w-full max-w-[560px] aspect-square relative">
+                style={{ background: 'radial-gradient(ellipse at 50% 35%, rgba(10,16,40,1) 0%, rgba(4,6,14,1) 75%)' }}>
+                <div className="w-full max-w-[640px] aspect-square relative">
                     <canvas
                         ref={canvasRef}
                         className="w-full h-full cursor-grab active:cursor-grabbing"
@@ -299,30 +298,38 @@ export default function InteractiveGlobe({ realtimeData, countries = [], cities 
                 </div>
             </div>
 
-            {/* Real-Time Activity Log */}
-            <div className="relative px-6 py-4 border-t border-white/[0.06] space-y-3 max-h-[300px] overflow-y-auto">
+            {/* Real-Time Activity Log — DataFast style with avatars */}
+            <div className="relative px-6 py-4 border-t border-white/[0.06] space-y-2.5 max-h-[320px] overflow-y-auto">
                 {activityLog.length === 0 && (
-                    <div className="text-xs text-zinc-600 py-6 text-center">
+                    <div className="text-xs text-zinc-600 py-8 text-center">
                         {hasRealtime ? 'No active visitors right now' : 'Connect Google Analytics to see live visitors'}
                     </div>
                 )}
                 {activityLog.map((log, i) => (
-                    <div key={i} className="flex items-start gap-3 text-xs">
-                        <span className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" style={{ animationDelay: `${i * 150}ms` }} />
+                    <div key={i} className="flex items-center gap-3 text-xs group">
+                        <span className="relative flex h-2 w-2 flex-shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" style={{ animationDelay: `${i * 200}ms` }} />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                         </span>
+                        <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} flex items-center justify-center flex-shrink-0 shadow-lg`}>
+                            <span className="text-[10px] text-white font-bold">{log.anonName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}</span>
+                        </div>
                         <div className="flex-1 min-w-0">
                             <span className="text-zinc-300">
-                                <span className="font-semibold text-violet-300">{log.anonName}</span>
-                                {' '}from {log.flag} <span className="font-medium text-white">{log.country}</span>
+                                <span className="font-semibold text-white">{log.anonName}</span>
+                                {' '}from {log.flag} <span className="font-medium text-zinc-200">{log.country}</span>
                                 {' '}visited{' '}
-                                <span className="text-emerald-400 font-mono">{log.page}</span>
+                                <span className="text-emerald-400 font-mono text-[11px]">{log.page}</span>
                             </span>
                         </div>
-                        <span className="text-zinc-600 whitespace-nowrap flex-shrink-0 text-[10px]">{log.time}</span>
+                        <span className="text-zinc-700 whitespace-nowrap flex-shrink-0 text-[10px]">{log.time}</span>
                     </div>
                 ))}
+            </div>
+
+            {/* Powered by footer */}
+            <div className="px-6 py-2 border-t border-white/[0.04] flex justify-end">
+                <span className="text-[9px] text-zinc-700">Powered by GrowClaw</span>
             </div>
         </div>
     );

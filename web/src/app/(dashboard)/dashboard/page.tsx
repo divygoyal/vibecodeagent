@@ -237,60 +237,33 @@ export default function DashboardOverview() {
       {/* Two-column: Activity + AI Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-        {/* Recent Commits */}
+        {/* Quick Actions */}
         <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex flex-col h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-              <GitBranch className="w-4 h-4 text-emerald-500" />
-              Recent Commits
+              <Zap className="w-4 h-4 text-emerald-500" />
+              Quick Actions
             </h2>
-            <Link href="#" className="text-xs text-zinc-500 hover:text-white transition-colors">
-              View All
-            </Link>
           </div>
 
           <div className="space-y-2 flex-1">
-            {ghLoading ? (
-              <>
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </>
-            ) : !hasGitHubConnection ? (
-              <div className="h-full flex flex-col items-center justify-center py-8">
-                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mb-3">
-                  <Github className="w-6 h-6 text-zinc-500" />
+            {[
+              { label: 'Run Site Audit', desc: 'Check your site for SEO issues', href: '/dashboard/audit', icon: ScanSearch, color: 'text-cyan-400' },
+              { label: 'View Analytics', desc: 'Dive into your traffic data', href: '/dashboard/analytics', icon: BarChart3, color: 'text-emerald-400' },
+              { label: 'SEO Performance', desc: 'Search Console insights', href: '/dashboard/seo', icon: Search, color: 'text-amber-400' },
+              { label: 'Connect Your Bot', desc: 'Get deep analysis via Telegram', href: '/dashboard/bot', icon: Bot, color: 'text-violet-400' },
+            ].map((action, i) => (
+              <Link key={i} href={action.href} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.03] transition-colors group">
+                <div className={`flex-shrink-0 w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center ${action.color}`}>
+                  <action.icon className="w-4 h-4" />
                 </div>
-                <p className="text-sm text-zinc-400 mb-1">
-                  GitHub not connected
-                </p>
-                <p className="text-xs text-zinc-600 mb-4">
-                  Connect your GitHub account to see commits
-                </p>
-                <button
-                  onClick={() => signIn('github')}
-                  className="px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors text-sm font-medium"
-                >
-                  Connect GitHub
-                </button>
-              </div>
-            ) : commits.length > 0 ? (
-              commits.map((commit: any, i: number) => (
-                <div key={`${commit.sha}-${i}`} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.03] transition-colors group">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-mono text-[10px]">
-                    {commit.sha}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-300 truncate group-hover:text-white transition-colors">{commit.message}</p>
-                    <p className="text-[10px] text-zinc-600">{timeAgo(commit.date)} • {commit.branch}</p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-zinc-300 group-hover:text-white transition-colors">{action.label}</p>
+                  <p className="text-[10px] text-zinc-600">{action.desc}</p>
                 </div>
-              ))
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center py-8 text-zinc-500">
-                <p className="text-sm">No activity found</p>
-              </div>
-            )}
+                <ArrowUpRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+              </Link>
+            ))}
           </div>
         </div>
 

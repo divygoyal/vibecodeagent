@@ -12,23 +12,25 @@ if (typeof globalThis !== 'undefined') {
 
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_PROMPT = `You are an expert AI SEO Advisor and Analytics Assistant for GrowClaw, an all-in-one SEO and analytics platform. Your role is to:
+const SYSTEM_PROMPT = `You are GrowClaw's deep analytics intelligence — an expert-level SEO strategist, data analyst, and growth advisor with access to the user's real Google Analytics 4 and Google Search Console data. You think like a senior growth consultant at a top agency.
 
-1. Analyze the user's website analytics data and provide actionable insights
-2. Suggest SEO improvements based on their data
-3. Answer questions about their traffic, conversions, and user behavior
-4. Recommend content strategies based on top-performing pages and keywords
-5. Identify growth opportunities and potential issues
-6. Compare metrics and explain trends
+## Your Capabilities
+1. **Deep Analytics Analysis** — Analyze traffic patterns, user segments, engagement metrics, conversion funnels, and behavioral data. Cross-reference dimensions (e.g., which countries have the worst bounce rates, which channels drive the most engaged users).
+2. **Advanced SEO Intelligence** — Analyze search queries, click-through rates, average positions, impressions. Identify keyword cannibalization, content decay, ranking opportunities, and technical SEO issues.
+3. **Actionable Growth Strategy** — Don't just report numbers. Provide specific, prioritized action items with estimated impact. Think like a consultant billing $500/hr.
+4. **Trend Detection** — Spot patterns, anomalies, seasonal changes, and correlations across metrics. Flag things the user might miss.
+5. **Competitive Insights** — Based on the data patterns, infer competitive positioning and suggest strategies.
 
-Guidelines:
-- Be concise but thorough. Use bullet points for readability.
-- Always reference specific numbers from the data when available.
-- Provide actionable recommendations, not just observations.
-- If you don't have enough data, say so and suggest what data would help.
-- Use a professional but friendly tone.
-- Format responses with markdown-like structure (bold key points, use lists).
-- When suggesting improvements, prioritize by potential impact.`;
+## Response Style
+- **Lead with the insight, not the number.** Instead of "Your bounce rate is 65%", say "Your bounce rate of 65% is significantly above the industry average of ~45%, suggesting your landing pages aren't matching search intent."
+- **Be specific and data-driven.** Always cite exact numbers from the provided data. Cross-reference multiple dimensions.
+- **Prioritize by impact.** Use 🔴 Critical, 🟡 Important, 🟢 Opportunity labels.
+- **Give concrete next steps.** Not "improve your SEO" but "Target the keyword 'X' — you're at position 12 with 500 impressions but only 2% CTR. Optimizing your meta title could realistically 3x your clicks."
+- **Use structured formatting:** Headers, bullet points, bold key metrics, tables when comparing data.
+- **Be conversational but authoritative.** Sound like a brilliant analyst who genuinely cares about the user's growth.
+- **When data is limited**, clearly state what you can and can't infer, and suggest specific actions to get better data.
+- **Cross-analyze dimensions:** If asked about a country, also mention what devices/browsers/channels are popular there. If asked about a page, mention its SEO performance too.
+- **Proactively surface insights** the user didn't ask about if the data reveals something important.`;
 
 export async function POST(req: Request) {
     try {
@@ -50,44 +52,87 @@ export async function POST(req: Request) {
             });
         }
 
-        // Build context from analytics data
+        // Build rich context from analytics data
         let dataContext = '';
         if (analyticsContext) {
-            dataContext += '\n\n--- ANALYTICS DATA ---\n';
+            dataContext += '\n\n═══ GOOGLE ANALYTICS 4 DATA ═══\n';
             if (analyticsContext.kpis) {
                 const k = analyticsContext.kpis;
-                dataContext += `KPIs: ${k.totalUsers?.toLocaleString()} users (${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}%), ${k.totalSessions?.toLocaleString()} sessions, ${k.totalPageViews?.toLocaleString()} pageviews, ${k.avgBounceRate}% bounce rate, avg session ${Math.floor((k.avgSessionDuration || 0) / 60)}m ${(k.avgSessionDuration || 0) % 60}s\n`;
+                dataContext += `\n📊 KPI Summary:\n`;
+                dataContext += `  Users: ${k.totalUsers?.toLocaleString()} (${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}% vs previous period)\n`;
+                dataContext += `  Sessions: ${k.totalSessions?.toLocaleString()} (${k.changeSessions > 0 ? '+' : ''}${k.changeSessions}%)\n`;
+                dataContext += `  Page Views: ${k.totalPageViews?.toLocaleString()} (${k.changePageViews > 0 ? '+' : ''}${k.changePageViews}%)\n`;
+                dataContext += `  Bounce Rate: ${k.avgBounceRate}% (${k.changeBounceRate > 0 ? '+' : ''}${k.changeBounceRate}%)\n`;
+                dataContext += `  Avg Session Duration: ${Math.floor((k.avgSessionDuration || 0) / 60)}m ${Math.round((k.avgSessionDuration || 0) % 60)}s\n`;
+                dataContext += `  New Users: ${k.newUsers?.toLocaleString()} | Returning: ${k.returningUsers?.toLocaleString()}\n`;
+                dataContext += `  Pages/Session: ${k.pagesPerSession}\n`;
             }
             if (analyticsContext.topSources?.length) {
-                dataContext += `Top Sources: ${analyticsContext.topSources.map((s: any) => `${s.source} (${s.sessions} sessions, ${s.percentage}%)`).join(', ')}\n`;
+                dataContext += `\n🔗 Traffic Sources (top ${analyticsContext.topSources.length}):\n`;
+                analyticsContext.topSources.forEach((s: any, i: number) => {
+                    dataContext += `  ${i+1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)\n`;
+                });
             }
             if (analyticsContext.topPages?.length) {
-                dataContext += `Top Pages: ${analyticsContext.topPages.map((p: any) => `${p.page} (${p.views} views, ${p.bounceRate}% bounce)`).join(', ')}\n`;
+                dataContext += `\n📄 Top Pages (top ${analyticsContext.topPages.length}):\n`;
+                analyticsContext.topPages.forEach((p: any, i: number) => {
+                    dataContext += `  ${i+1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}\n`;
+                });
             }
             if (analyticsContext.topCountries?.length) {
-                dataContext += `Top Countries: ${analyticsContext.topCountries.map((c: any) => `${c.country} (${c.users} users)`).join(', ')}\n`;
+                dataContext += `\n🌍 Countries (top ${analyticsContext.topCountries.length}):\n`;
+                analyticsContext.topCountries.forEach((c: any, i: number) => {
+                    dataContext += `  ${i+1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''}\n`;
+                });
             }
             if (analyticsContext.devices?.length) {
-                dataContext += `Devices: ${analyticsContext.devices.map((d: any) => `${d.device} (${d.percentage}%)`).join(', ')}\n`;
+                dataContext += `\n📱 Devices: ${analyticsContext.devices.map((d: any) => `${d.device}: ${d.percentage}%`).join(' | ')}\n`;
             }
             if (analyticsContext.browsers?.length) {
-                dataContext += `Browsers: ${analyticsContext.browsers.map((b: any) => `${b.name} (${b.percentage}%)`).join(', ')}\n`;
+                dataContext += `🌐 Browsers: ${analyticsContext.browsers.map((b: any) => `${b.name}: ${b.percentage}%`).join(' | ')}\n`;
             }
             if (analyticsContext.channels?.length) {
-                dataContext += `Channels: ${analyticsContext.channels.map((c: any) => `${c.name} (${c.percentage}%)`).join(', ')}\n`;
+                dataContext += `📡 Channels: ${analyticsContext.channels.map((c: any) => `${c.name}: ${c.value || c.percentage}${c.percentage ? '%' : ''}`).join(' | ')}\n`;
+            }
+            if (analyticsContext.referrers?.length) {
+                dataContext += `\n🔀 Referrers (top ${analyticsContext.referrers.length}):\n`;
+                analyticsContext.referrers.forEach((r: any, i: number) => {
+                    dataContext += `  ${i+1}. ${r.name} — ${r.value} sessions\n`;
+                });
+            }
+            if (analyticsContext.cities?.length) {
+                dataContext += `\n🏙️ Cities: ${analyticsContext.cities.slice(0, 8).map((c: any) => `${c.city}, ${c.country} (${c.users})`).join(' | ')}\n`;
+            }
+            if (analyticsContext.languages?.length) {
+                dataContext += `🗣️ Languages: ${analyticsContext.languages.slice(0, 5).map((l: any) => `${l.name}: ${l.value}`).join(' | ')}\n`;
             }
         }
         if (seoContext) {
-            dataContext += '\n--- SEO DATA ---\n';
+            dataContext += '\n═══ GOOGLE SEARCH CONSOLE DATA ═══\n';
             if (seoContext.kpis) {
                 const k = seoContext.kpis;
-                dataContext += `SEO KPIs: ${k.totalClicks} clicks (${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}%), ${k.totalImpressions} impressions, ${k.avgCTR}% CTR, avg position ${k.avgPosition}\n`;
+                dataContext += `\n🔍 Search Performance:\n`;
+                dataContext += `  Total Clicks: ${k.totalClicks?.toLocaleString()} (${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}%)\n`;
+                dataContext += `  Total Impressions: ${k.totalImpressions?.toLocaleString()}\n`;
+                dataContext += `  Average CTR: ${k.avgCTR}%\n`;
+                dataContext += `  Average Position: ${k.avgPosition}\n`;
+                if (k.indexedPages) dataContext += `  Indexed Pages: ${k.indexedPages}\n`;
+                if (k.crawlErrors) dataContext += `  Crawl Errors: ${k.crawlErrors}\n`;
             }
             if (seoContext.topQueries?.length) {
-                dataContext += `Top Queries: ${seoContext.topQueries.map((q: any) => `"${q.query}" (${q.clicks} clicks, pos ${q.position})`).join(', ')}\n`;
+                dataContext += `\n🎯 Search Queries (top ${seoContext.topQueries.length}):\n`;
+                seoContext.topQueries.forEach((q: any, i: number) => {
+                    dataContext += `  ${i+1}. "${q.query}" — ${q.clicks} clicks, ${q.impressions} impressions, ${q.ctr || '?'}% CTR, pos ${q.position}\n`;
+                });
+            }
+            if (seoContext.topPages?.length) {
+                dataContext += `\n📊 Top Search Pages (top ${seoContext.topPages.length}):\n`;
+                seoContext.topPages.forEach((p: any, i: number) => {
+                    dataContext += `  ${i+1}. ${p.page} — ${p.clicks} clicks, pos ${p.position}\n`;
+                });
             }
             if (seoContext.recommendations?.length) {
-                dataContext += `Recommendations: ${seoContext.recommendations.map((r: any) => r.title).join('; ')}\n`;
+                dataContext += `\n💡 Active Recommendations: ${seoContext.recommendations.map((r: any) => `[${r.severity}] ${r.title}`).join('; ')}\n`;
             }
         }
 
@@ -116,10 +161,10 @@ export async function POST(req: Request) {
             body: JSON.stringify({
                 contents,
                 generationConfig: {
-                    temperature: 0.7,
+                    temperature: 0.75,
                     topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 1024,
+                    maxOutputTokens: 2048,
                 },
             }),
         });

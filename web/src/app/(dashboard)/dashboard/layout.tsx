@@ -18,12 +18,20 @@ interface RegistrationContextType {
     isRegistered: boolean;
     isRegistering: boolean;
     registrationError: string | null;
+    selectedProperty: string;
+    setSelectedProperty: (v: string) => void;
+    selectedSite: string;
+    setSelectedSite: (v: string) => void;
 }
 
 const RegistrationContext = createContext<RegistrationContextType>({
     isRegistered: false,
     isRegistering: true,
     registrationError: null,
+    selectedProperty: '',
+    setSelectedProperty: () => {},
+    selectedSite: '',
+    setSelectedSite: () => {},
 });
 
 export const useRegistration = () => useContext(RegistrationContext);
@@ -52,12 +60,14 @@ export default function DashboardLayout({
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [selectedProperty, setSelectedProperty] = useState('');
+    const [selectedSite, setSelectedSite] = useState('');
 
     // Registration state with proper tracking
-    const [registrationState, setRegistrationState] = useState<RegistrationContextType>({
+    const [registrationState, setRegistrationState] = useState({
         isRegistered: false,
         isRegistering: true,
-        registrationError: null,
+        registrationError: null as string | null,
     });
 
     useEffect(() => {
@@ -252,7 +262,7 @@ export default function DashboardLayout({
                 {/* Page content */}
                 <main className="flex-1 p-6 overflow-y-auto">
                     <div className="max-w-7xl mx-auto">
-                        <RegistrationContext.Provider value={registrationState}>
+                        <RegistrationContext.Provider value={{ ...registrationState, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite }}>
                             {children}
                         </RegistrationContext.Provider>
                     </div>
