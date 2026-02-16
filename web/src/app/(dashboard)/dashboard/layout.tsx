@@ -4,6 +4,9 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
@@ -255,6 +258,9 @@ export default function DashboardLayout({
                     </div>
                 </main>
             </div>
+
+            {/* Global AI Chatbot — available on every page */}
+            <AIChatbot />
 
             {/* ─── Mobile sidebar overlay ─── */}
             {mobileOpen && (

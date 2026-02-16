@@ -4,7 +4,9 @@ import { signIn, useSession } from 'next-auth/react';
 import { useState, useEffect, useCallback } from 'react';
 import {
     Bot, CheckCircle2, AlertCircle, Loader2, Lock,
-    MessageSquare, Github, Chrome, BarChart3, Search
+    MessageSquare, Github, Chrome, BarChart3, Search,
+    Zap, PenTool, Bug, DollarSign, Globe, Link2,
+    FileText, Shield, Sparkles, ArrowRight, ExternalLink
 } from 'lucide-react';
 import { useRegistration } from '../layout';
 
@@ -104,13 +106,78 @@ export default function BotPage() {
     const isProvisioned = botStatus?.status && botStatus.status !== 'not_provisioned';
     const statusLevel = getStatusLevel(botStatus);
 
+    const PLATFORMS = [
+        { name: 'Slack', icon: '💬', color: 'bg-purple-500/10 border-purple-500/20 text-purple-400', desc: 'Get alerts, run commands, manage tasks directly from Slack channels' },
+        { name: 'Stripe', icon: '💳', color: 'bg-violet-500/10 border-violet-500/20 text-violet-400', desc: 'Check revenue, refunds, subscriptions, and payment analytics' },
+        { name: 'WordPress', icon: '📝', color: 'bg-blue-500/10 border-blue-500/20 text-blue-400', desc: 'Publish posts, update pages, manage plugins, fix site issues' },
+        { name: 'Shopify', icon: '🛒', color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', desc: 'Track orders, manage products, check store performance' },
+        { name: 'Notion', icon: '📓', color: 'bg-zinc-500/10 border-zinc-500/20 text-zinc-300', desc: 'Create docs, update databases, sync project notes' },
+        { name: 'Vercel', icon: '▲', color: 'bg-zinc-500/10 border-zinc-500/20 text-zinc-300', desc: 'Deploy, rollback, check build status, manage domains' },
+        { name: 'Cloudflare', icon: '☁️', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400', desc: 'Manage DNS, purge cache, check analytics, handle security' },
+        { name: 'Linear', icon: '🔷', color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400', desc: 'Create issues, track sprints, manage project boards' },
+        { name: 'Discord', icon: '🎮', color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400', desc: 'Moderate channels, send updates, manage community' },
+        { name: 'Supabase', icon: '⚡', color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', desc: 'Query databases, manage auth, check API usage' },
+        { name: 'AWS', icon: '☁️', color: 'bg-amber-500/10 border-amber-500/20 text-amber-400', desc: 'Manage S3, Lambda, EC2 instances, check billing' },
+        { name: 'Figma', icon: '🎨', color: 'bg-pink-500/10 border-pink-500/20 text-pink-400', desc: 'Export assets, check design updates, manage components' },
+        { name: 'HubSpot', icon: '🟠', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400', desc: 'Track leads, manage CRM, automate marketing workflows' },
+        { name: 'Jira', icon: '📋', color: 'bg-blue-500/10 border-blue-500/20 text-blue-400', desc: 'Manage tickets, update sprints, track bugs and stories' },
+        { name: 'Mailchimp', icon: '📧', color: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400', desc: 'Send campaigns, manage lists, check email analytics' },
+    ];
+
+    const BOT_CAPABILITIES = [
+        { icon: PenTool, label: 'Write Articles', desc: 'Generate SEO-optimized blog posts, landing pages, and content directly on your site', color: 'text-emerald-400' },
+        { icon: Bug, label: 'Fix Critical Bugs', desc: 'Detect and auto-fix broken links, 404s, schema errors, and code issues on your website', color: 'text-red-400' },
+        { icon: DollarSign, label: 'Check Revenue', desc: 'Ask "What\'s today\'s revenue?" and get instant Stripe/Shopify sales data', color: 'text-violet-400' },
+        { icon: Globe, label: 'SEO Optimization', desc: 'Auto-optimize meta tags, generate schema markup, fix crawl errors, improve rankings', color: 'text-cyan-400' },
+        { icon: Link2, label: 'Smart Internal Linking', desc: 'Automatically find and create internal links across your content for better SEO', color: 'text-amber-400' },
+        { icon: Shield, label: 'Security Monitoring', desc: 'Monitor uptime, SSL certs, security headers, and get instant alerts', color: 'text-pink-400' },
+        { icon: FileText, label: 'Content Management', desc: 'Update WordPress pages, publish drafts, schedule posts — all via chat', color: 'text-blue-400' },
+        { icon: BarChart3, label: 'Analytics Reports', desc: 'Get daily/weekly reports on traffic, conversions, and performance trends', color: 'text-indigo-400' },
+    ];
+
     return (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-4xl">
             <div>
-                <h1 className="text-2xl font-bold text-white mb-1">Bot Setup</h1>
+                <h1 className="text-2xl font-bold text-white mb-1">Your Personal Bot</h1>
                 <p className="text-sm text-zinc-500">
-                    Connect your Telegram bot and manage integrations.
+                    Connect platforms, automate tasks, and let your AI assistant handle everything — from writing articles to fixing bugs to checking revenue.
                 </p>
+            </div>
+
+            {/* ─── What Your Bot Can Do ─── */}
+            <div className="bg-gradient-to-br from-emerald-500/[0.04] to-violet-500/[0.04] border border-emerald-500/[0.12] rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <Sparkles className="w-5 h-5 text-black" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-bold text-white">What Your Bot Can Do</h3>
+                        <p className="text-[11px] text-zinc-500">Just chat with your bot — it handles everything automatically</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {BOT_CAPABILITIES.map((cap, i) => (
+                        <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.12] transition-all">
+                            <cap.icon className={`w-5 h-5 ${cap.color} mb-2`} />
+                            <h4 className="text-sm font-semibold text-white mb-1">{cap.label}</h4>
+                            <p className="text-[11px] text-zinc-500 leading-relaxed">{cap.desc}</p>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-4 p-4 bg-black/20 border border-white/[0.06] rounded-xl">
+                    <div className="flex items-start gap-3">
+                        <MessageSquare className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm text-zinc-300 font-medium mb-1">How it works</p>
+                            <p className="text-xs text-zinc-500 leading-relaxed">
+                                1. Connect your Telegram bot below &nbsp;→&nbsp; 2. Link the platforms you use &nbsp;→&nbsp; 3. Chat with your bot naturally.
+                                Say things like <span className="text-emerald-400 font-mono">&quot;publish a blog about SEO tips&quot;</span>,
+                                <span className="text-emerald-400 font-mono">&quot;what&apos;s today&apos;s Stripe revenue?&quot;</span>, or
+                                <span className="text-emerald-400 font-mono">&quot;fix the broken links on my site&quot;</span> — your bot will handle it end-to-end.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Bot Status Pipeline */}
@@ -291,6 +358,37 @@ export default function BotPage() {
                         onConnect={() => signIn('google')}
                         dependsOn={!(botStatus?.connectedProviders?.some(c => c.provider === 'google')) ? 'Connect Google first' : undefined}
                     />
+                </div>
+            </div>
+
+            {/* ─── Connect More Platforms ─── */}
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 className="text-lg font-semibold text-white">Connect Any Platform</h2>
+                        <p className="text-xs text-zinc-500 mt-1">Your bot connects to these platforms. Just follow the steps your bot gives you in chat — it will auto-configure everything.</p>
+                    </div>
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">15 Platforms</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                    {PLATFORMS.map((p, i) => (
+                        <div key={i} className={`flex items-start gap-3 p-4 rounded-xl border transition-all hover:bg-white/[0.02] cursor-pointer ${p.color}`}>
+                            <span className="text-xl flex-shrink-0 mt-0.5">{p.icon}</span>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-white">{p.name}</span>
+                                </div>
+                                <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{p.desc}</p>
+                            </div>
+                            <span className="text-[10px] text-zinc-600 whitespace-nowrap flex-shrink-0 mt-1">via Bot</span>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
+                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Tell your bot <span className="text-emerald-400 font-mono">&quot;connect Slack&quot;</span> or <span className="text-emerald-400 font-mono">&quot;connect Stripe&quot;</span> and it will guide you through each step automatically.</span>
                 </div>
             </div>
         </div>

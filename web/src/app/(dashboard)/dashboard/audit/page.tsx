@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { AuditReport, AuditIssue, Severity } from '@/lib/siteAudit';
 import { useContainerStatus, useSiteList, useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
+import FixWithBotButton from '@/components/FixWithBotButton';
 
 // ─── Severity config ───
 const severityConfig: Record<Severity, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
@@ -80,7 +81,10 @@ function IssueRow({ issue }: { issue: AuditIssue }) {
                     {issue.recommendation && (
                         <div className="flex items-start gap-2 text-xs text-emerald-400/80 bg-emerald-500/[0.05] rounded-lg px-3 py-2">
                             <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                            <span>{issue.recommendation}</span>
+                            <span className="flex-1">{issue.recommendation}</span>
+                            {(issue.severity === 'critical' || issue.severity === 'warning') && (
+                                <FixWithBotButton label="Fix" size="sm" variant="ghost" context={`Bot will fix: ${issue.title}`} />
+                            )}
                         </div>
                     )}
                 </div>
@@ -374,6 +378,9 @@ export default function AuditPage() {
                             )}
                         </div>
                         <div className="flex items-center gap-2">
+                            {(report.summary.critical > 0 || report.summary.warning > 0) && (
+                                <FixWithBotButton label="Fix All Issues" size="md" variant="solid" context="Your bot will auto-fix critical and warning issues on this page" />
+                            )}
                             <button
                                 onClick={() => exportAuditCSV(report)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors"

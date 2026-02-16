@@ -12,6 +12,7 @@ import {
 import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
+import FixWithBotButton from '@/components/FixWithBotButton';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -320,6 +321,7 @@ export default function SEOPage() {
                                         <p className="text-xs text-zinc-400 mb-2">{rec.description}</p>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] text-emerald-400 font-medium">→ {rec.action}</span>
+                                            <FixWithBotButton label="Fix" size="sm" variant="ghost" context={`Bot will: ${rec.action}`} />
                                         </div>
                                     </div>
                                 </div>
@@ -407,9 +409,15 @@ export default function SEOPage() {
                                     {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Generate Blog Post
                                 </button>
                                 {toolResult?.content && (
-                                    <div className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[400px] overflow-y-auto">
-                                        <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono">{toolResult.content}</pre>
-                                    </div>
+                                    <>
+                                        <div className="flex items-center gap-2">
+                                            <FixWithBotButton label="Publish to Site" size="md" variant="solid" context="Bot will publish this blog post directly to your WordPress/CMS" />
+                                            <button onClick={() => navigator.clipboard.writeText(toolResult.content)} className="px-3 py-1.5 text-xs text-zinc-400 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">Copy</button>
+                                        </div>
+                                        <div className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[400px] overflow-y-auto">
+                                            <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono">{toolResult.content}</pre>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
@@ -462,19 +470,26 @@ export default function SEOPage() {
                                     {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />} Analyze Links
                                 </button>
                                 {toolResult?.links?.length > 0 && (
-                                    <div className="space-y-2">
-                                        {toolResult.links.map((link: any, i: number) => (
-                                            <div key={i} className="bg-black/20 border border-white/[0.04] rounded-lg p-3">
-                                                <div className="flex items-center gap-2 text-xs mb-1">
-                                                    <span className="text-zinc-400 truncate">{link.source}</span>
-                                                    <ArrowUpRight className="w-3 h-3 text-cyan-400 flex-shrink-0" />
-                                                    <span className="text-cyan-400 truncate">{link.target}</span>
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-zinc-500">{toolResult.links.length} link suggestions found</span>
+                                            <FixWithBotButton label="Apply All Links" size="sm" variant="solid" context="Bot will add all suggested internal links to your site automatically" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            {toolResult.links.map((link: any, i: number) => (
+                                                <div key={i} className="bg-black/20 border border-white/[0.04] rounded-lg p-3">
+                                                    <div className="flex items-center gap-2 text-xs mb-1">
+                                                        <span className="text-zinc-400 truncate">{link.source}</span>
+                                                        <ArrowUpRight className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                                                        <span className="text-cyan-400 truncate">{link.target}</span>
+                                                        <span className="ml-auto flex-shrink-0"><FixWithBotButton label="Apply" size="sm" variant="ghost" context={`Add link from ${link.source} to ${link.target}`} /></span>
+                                                    </div>
+                                                    <div className="text-[11px] text-zinc-500">Anchor: <span className="text-emerald-400 font-medium">&quot;{link.anchor}&quot;</span></div>
+                                                    <div className="text-[10px] text-zinc-600 mt-1">{link.reason}</div>
                                                 </div>
-                                                <div className="text-[11px] text-zinc-500">Anchor: <span className="text-emerald-400 font-medium">&quot;{link.anchor}&quot;</span></div>
-                                                <div className="text-[10px] text-zinc-600 mt-1">{link.reason}</div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
@@ -493,10 +508,13 @@ export default function SEOPage() {
                                     {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} Generate Schema
                                 </button>
                                 {toolResult?.schema && (
-                                    <div className="relative">
-                                        <button onClick={() => { navigator.clipboard.writeText(toolResult.schema); }} className="absolute top-2 right-2 px-2 py-1 text-[10px] bg-white/[0.06] hover:bg-white/[0.1] rounded text-zinc-400 transition">Copy</button>
+                                    <>
+                                        <div className="flex items-center gap-2">
+                                            <FixWithBotButton label="Add to Site" size="sm" variant="solid" context="Bot will inject this schema markup into your page automatically" />
+                                            <button onClick={() => navigator.clipboard.writeText(toolResult.schema)} className="px-3 py-1.5 text-xs text-zinc-400 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">Copy</button>
+                                        </div>
                                         <pre className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[300px] overflow-y-auto text-xs text-violet-300 font-mono whitespace-pre-wrap">{toolResult.schema}</pre>
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         )}
@@ -531,6 +549,9 @@ export default function SEOPage() {
                                     <span className="text-red-400 font-medium">pos {p.position.toFixed(1)}</span>
                                 </div>
                             ))}
+                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length > 0 && (
+                                <div className="mt-2"><FixWithBotButton label="Refresh Content" size="sm" variant="ghost" context="Bot will refresh and optimize decaying pages" /></div>
+                            )}
                             {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length === 0 && (
                                 <span className="text-[11px] text-emerald-400">No decaying content detected</span>
                             )}
@@ -557,6 +578,9 @@ export default function SEOPage() {
                                     <span className="text-amber-400 font-medium">pos {q.position}</span>
                                 </div>
                             ))}
+                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length > 0 && (
+                                <div className="mt-2"><FixWithBotButton label="Fix Cannibalization" size="sm" variant="ghost" context="Bot will merge or differentiate competing pages" /></div>
+                            )}
                             {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length === 0 && (
                                 <span className="text-[11px] text-emerald-400">No cannibalization issues found</span>
                             )}

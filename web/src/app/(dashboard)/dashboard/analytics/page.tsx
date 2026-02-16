@@ -11,9 +11,9 @@ import {
 import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useAnalyticsData, usePropertyList, useContainerStatus, useRealtimeData } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
+import FixWithBotButton from '@/components/FixWithBotButton';
 
 const InteractiveGlobe = dynamic(() => import('@/components/InteractiveGlobe'), { ssr: false });
-const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 
 // ─── Types ───
 
@@ -626,16 +626,21 @@ export default function AnalyticsPage() {
                     </div>
                     <p className="text-xs text-zinc-500 mb-3">Visual heatmap of bounce rates across your top pages — instantly spot which pages need UX improvements.</p>
                     {pages.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                            {pages.slice(0, 12).map((p: any, i: number) => {
-                                const br = p.bounceRate || 0;
-                                const bg = br > 60 ? 'bg-red-500/30' : br > 40 ? 'bg-amber-500/30' : 'bg-emerald-500/30';
-                                return (
-                                    <div key={i} className={`${bg} rounded px-1.5 py-0.5 text-[10px] text-zinc-300 font-mono`} title={`${p.page}: ${br}%`}>
-                                        {br}%
-                                    </div>
-                                );
-                            })}
+                        <div>
+                            <div className="flex flex-wrap gap-1">
+                                {pages.slice(0, 12).map((p: any, i: number) => {
+                                    const br = p.bounceRate || 0;
+                                    const bg = br > 60 ? 'bg-red-500/30' : br > 40 ? 'bg-amber-500/30' : 'bg-emerald-500/30';
+                                    return (
+                                        <div key={i} className={`${bg} rounded px-1.5 py-0.5 text-[10px] text-zinc-300 font-mono`} title={`${p.page}: ${br}%`}>
+                                            {br}%
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {pages.some((p: any) => (p.bounceRate || 0) > 60) && (
+                                <div className="mt-2"><FixWithBotButton label="Improve UX" size="sm" variant="ghost" context="Bot will optimize high-bounce pages for better engagement" /></div>
+                            )}
                         </div>
                     ) : <span className="text-[11px] text-zinc-600">No data</span>}
                 </div>
@@ -733,14 +738,14 @@ export default function AnalyticsPage() {
                                         <span className="text-zinc-500 tabular-nums">{Math.round(((c.users || 0) / Math.max(total, 1)) * 100)}%</span>
                                     </div>
                                 ))}
+                                {risk !== 'Low' && (
+                                    <div className="mt-2"><FixWithBotButton label="Expand Reach" size="sm" variant="ghost" context="Bot will suggest international SEO and localization strategies" /></div>
+                                )}
                             </div>
                         );
                     })() : <span className="text-[11px] text-zinc-600">No geo data</span>}
                 </div>
             </div>
-
-            {/* ─── AI SEO Advisor Chatbot ─── */}
-            <AIChatbot analyticsData={analyticsData} />
         </div>
     );
 }
