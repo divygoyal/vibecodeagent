@@ -520,7 +520,7 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     // 45. Text size / readability (basic)
     const smallTextElements = $('body *').filter((_, el) => {
         const fontSize = $(el).css('font-size');
-        return fontSize && parseInt(fontSize) < 12;
+        return !!fontSize && parseInt(fontSize) < 12;
     }).length;
     // We can't reliably detect computed styles, so skip this one
 
