@@ -95,6 +95,121 @@ function generateMockKPIs() {
     };
 }
 
+function generateMockBrowsers() {
+    return [
+        { name: 'Chrome', value: 6732, users: 5890, percentage: 59.0 },
+        { name: 'Safari', value: 2312, users: 2100, percentage: 20.3 },
+        { name: 'Firefox', value: 987, users: 876, percentage: 8.7 },
+        { name: 'Edge', value: 654, users: 590, percentage: 5.7 },
+        { name: 'Instagram', value: 440, users: 410, percentage: 3.9 },
+        { name: 'Opera', value: 156, users: 140, percentage: 1.4 },
+        { name: 'Samsung Internet', value: 86, users: 78, percentage: 0.8 },
+        { name: 'Chrome WebView', value: 37, users: 32, percentage: 0.3 },
+    ];
+}
+
+function generateMockOS() {
+    return [
+        { name: 'Windows', value: 4567, users: 4100, percentage: 40.1 },
+        { name: 'macOS', value: 2890, users: 2650, percentage: 25.4 },
+        { name: 'iOS', value: 1876, users: 1720, percentage: 16.5 },
+        { name: 'Android', value: 1432, users: 1300, percentage: 12.6 },
+        { name: 'Linux', value: 543, users: 490, percentage: 4.8 },
+        { name: 'Chrome OS', value: 96, users: 87, percentage: 0.8 },
+    ];
+}
+
+function generateMockChannels() {
+    return [
+        { name: 'Organic Search', value: 4821, users: 4200, percentage: 42.3 },
+        { name: 'Direct', value: 2134, users: 1890, percentage: 18.7 },
+        { name: 'Referral', value: 1567, users: 1400, percentage: 13.7 },
+        { name: 'Social', value: 1456, users: 1320, percentage: 12.8 },
+        { name: 'Email', value: 612, users: 540, percentage: 5.4 },
+        { name: 'Paid Search', value: 432, users: 390, percentage: 3.8 },
+        { name: 'Display', value: 213, users: 190, percentage: 1.9 },
+        { name: 'Affiliates', value: 169, users: 150, percentage: 1.5 },
+    ];
+}
+
+function generateMockReferrers() {
+    return [
+        { name: 'google.com', value: 4821, users: 4200, percentage: 42.3 },
+        { name: '(direct)', value: 2134, users: 1890, percentage: 18.7 },
+        { name: 'github.com', value: 1567, users: 1400, percentage: 13.7 },
+        { name: 't.co', value: 1023, users: 920, percentage: 9.0 },
+        { name: 'linkedin.com', value: 834, users: 750, percentage: 7.3 },
+        { name: 'facebook.com', value: 317, users: 280, percentage: 2.8 },
+        { name: 'youtube.com', value: 243, users: 210, percentage: 2.1 },
+        { name: 'reddit.com', value: 198, users: 170, percentage: 1.7 },
+        { name: 'bing.com', value: 165, users: 145, percentage: 1.4 },
+        { name: 'instagram.com', value: 102, users: 90, percentage: 0.9 },
+    ];
+}
+
+function generateMockCities() {
+    return [
+        { city: 'New York', country: 'United States', users: 1234 },
+        { city: 'London', country: 'United Kingdom', users: 987 },
+        { city: 'Mumbai', country: 'India', users: 876 },
+        { city: 'San Francisco', country: 'United States', users: 765 },
+        { city: 'Berlin', country: 'Germany', users: 654 },
+        { city: 'Toronto', country: 'Canada', users: 543 },
+        { city: 'Paris', country: 'France', users: 432 },
+        { city: 'Sydney', country: 'Australia', users: 321 },
+        { city: 'Tokyo', country: 'Japan', users: 298 },
+        { city: 'Singapore', country: 'Singapore', users: 276 },
+        { city: 'São Paulo', country: 'Brazil', users: 254 },
+        { city: 'Amsterdam', country: 'Netherlands', users: 243 },
+        { city: 'Bangalore', country: 'India', users: 231 },
+        { city: 'Dubai', country: 'UAE', users: 198 },
+        { city: 'Chicago', country: 'United States', users: 187 },
+    ];
+}
+
+function generateMockRegions() {
+    return [
+        { region: 'California', country: 'United States', users: 2134 },
+        { region: 'England', country: 'United Kingdom', users: 1456 },
+        { region: 'Maharashtra', country: 'India', users: 1234 },
+        { region: 'New York', country: 'United States', users: 1098 },
+        { region: 'Ontario', country: 'Canada', users: 876 },
+        { region: 'Bavaria', country: 'Germany', users: 654 },
+        { region: 'New South Wales', country: 'Australia', users: 543 },
+        { region: 'Île-de-France', country: 'France', users: 432 },
+        { region: 'Texas', country: 'United States', users: 398 },
+        { region: 'Karnataka', country: 'India', users: 365 },
+    ];
+}
+
+function generateMockEntryPages() {
+    return [
+        { page: '/', sessions: 10234, users: 8900, bounceRate: 32.1, percentage: 45.2 },
+        { page: '/roadmap', sessions: 338, users: 290, bounceRate: 28.5, percentage: 1.5 },
+        { page: '/course', sessions: 134, users: 112, bounceRate: 22.3, percentage: 0.6 },
+        { page: '/review', sessions: 39, users: 34, bounceRate: 18.9, percentage: 0.2 },
+        { page: '/pricing', sessions: 16, users: 14, bounceRate: 41.2, percentage: 0.1 },
+        { page: '/affiliates', sessions: 10, users: 9, bounceRate: 35.6, percentage: 0.04 },
+        { page: '/blog/seo-tips', sessions: 8, users: 7, bounceRate: 15.4, percentage: 0.04 },
+        { page: '/docs/getting-started', sessions: 5, users: 4, bounceRate: 12.1, percentage: 0.02 },
+    ];
+}
+
+function generateMockLanguages() {
+    return [
+        { name: 'English', value: 6543, users: 5890, percentage: 57.4 },
+        { name: 'Spanish', value: 1234, users: 1100, percentage: 10.8 },
+        { name: 'French', value: 987, users: 890, percentage: 8.7 },
+        { name: 'German', value: 876, users: 790, percentage: 7.7 },
+        { name: 'Portuguese', value: 654, users: 590, percentage: 5.7 },
+        { name: 'Japanese', value: 432, users: 390, percentage: 3.8 },
+        { name: 'Hindi', value: 321, users: 290, percentage: 2.8 },
+        { name: 'Chinese', value: 198, users: 175, percentage: 1.7 },
+        { name: 'Korean', value: 87, users: 78, percentage: 0.8 },
+        { name: 'Dutch', value: 72, users: 64, percentage: 0.6 },
+    ];
+}
+
 // ============= Route handler =============
 
 export async function GET(req: Request) {
@@ -211,6 +326,14 @@ export async function GET(req: Request) {
         if (section === 'all' || section === 'pages') result.pages = generateMockTopPages()
         if (section === 'all' || section === 'devices') result.devices = generateMockDevices()
         if (section === 'all' || section === 'countries') result.countries = generateMockCountries()
+        if (section === 'all' || section === 'browsers') result.browsers = generateMockBrowsers()
+        if (section === 'all' || section === 'os') result.operatingSystems = generateMockOS()
+        if (section === 'all' || section === 'channels') result.channels = generateMockChannels()
+        if (section === 'all' || section === 'referrers') result.referrers = generateMockReferrers()
+        if (section === 'all' || section === 'cities') result.cities = generateMockCities()
+        if (section === 'all' || section === 'regions') result.regions = generateMockRegions()
+        if (section === 'all' || section === 'entryPages') result.entryPages = generateMockEntryPages()
+        if (section === 'all' || section === 'languages') result.languages = generateMockLanguages()
 
         return NextResponse.json(result)
 

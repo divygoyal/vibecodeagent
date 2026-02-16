@@ -170,24 +170,54 @@ async function runGAReport(
  * Mirrors the plugin's dashboardJson() method.
  */
 export async function fetchAnalyticsDashboard(token: string, propertyId: string, range = '30d') {
-    const result: any = { kpis: null, traffic: [], sources: [], pages: [], devices: [], countries: [] };
+    const result: any = {
+        kpis: null, traffic: [], sources: [], pages: [], devices: [], countries: [],
+        browsers: [], operatingSystems: [], channels: [], referrers: [],
+        cities: [], regions: [], entryPages: [], languages: [],
+    };
     const pid = cleanPropertyId(propertyId);
 
-    const rangeMap: Record<string, string> = { '7d': '7daysAgo', '30d': '28daysAgo', '90d': '90daysAgo' };
+    const rangeMap: Record<string, string> = {
+        'today': 'today', 'yesterday': 'yesterday',
+        '7d': '7daysAgo', '14d': '14daysAgo', '30d': '28daysAgo',
+        '90d': '90daysAgo', '6m': '180daysAgo', '12m': '365daysAgo',
+    };
     const startDate = rangeMap[range] || '28daysAgo';
-    const prevRangeMap: Record<string, string> = { '7d': '14daysAgo', '30d': '56daysAgo', '90d': '180daysAgo' };
+    const endDate = (range === 'yesterday') ? 'yesterday' : 'today';
+
+    const prevRangeMap: Record<string, string> = {
+        'today': 'yesterday', 'yesterday': '2daysAgo',
+        '7d': '14daysAgo', '14d': '28daysAgo', '30d': '56daysAgo',
+        '90d': '180daysAgo', '6m': '365daysAgo', '12m': '730daysAgo',
+    };
     const prevStartDate = prevRangeMap[range] || '56daysAgo';
-    const prevEndDateMap: Record<string, string> = { '7d': '8daysAgo', '30d': '29daysAgo', '90d': '91daysAgo' };
+    const prevEndDateMap: Record<string, string> = {
+        'today': 'yesterday', 'yesterday': '2daysAgo',
+        '7d': '8daysAgo', '14d': '15daysAgo', '30d': '29daysAgo',
+        '90d': '91daysAgo', '6m': '181daysAgo', '12m': '366daysAgo',
+    };
     const prevEndDate = prevEndDateMap[range] || '29daysAgo';
 
     // Run all queries in parallel for speed
-    const [currentTotals, prevTotals, sourcesData, pagesData, devicesData, countriesData] = await Promise.all([
-        runGAReport(token, pid, ['date'], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration', 'newUsers'], startDate, 'today', 1000),
+    const [
+        currentTotals, prevTotals, sourcesData, pagesData, devicesData, countriesData,
+        browsersData, osData, channelsData, referrersData, citiesData, regionsData,
+        entryPagesData, languagesData
+    ] = await Promise.all([
+        runGAReport(token, pid, ['date'], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration', 'newUsers'], startDate, endDate, 1000),
         runGAReport(token, pid, ['date'], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate'], prevStartDate, prevEndDate, 1000),
-        runGAReport(token, pid, ['sessionSource', 'sessionMedium'], ['sessions'], startDate, 'today', 20, 'sessions').catch(() => null),
-        runGAReport(token, pid, ['pagePath', 'pageTitle'], ['screenPageViews', 'averageSessionDuration', 'bounceRate'], startDate, 'today', 10, 'screenPageViews').catch(() => null),
-        runGAReport(token, pid, ['deviceCategory'], ['sessions'], startDate, 'today', 10, 'sessions').catch(() => null),
-        runGAReport(token, pid, ['country'], ['activeUsers'], startDate, 'today', 10, 'activeUsers').catch(() => null),
+        runGAReport(token, pid, ['sessionSource', 'sessionMedium'], ['sessions', 'activeUsers'], startDate, endDate, 50, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['pagePath', 'pageTitle'], ['screenPageViews', 'averageSessionDuration', 'bounceRate', 'activeUsers'], startDate, endDate, 50, 'screenPageViews').catch(() => null),
+        runGAReport(token, pid, ['deviceCategory'], ['sessions', 'activeUsers'], startDate, endDate, 10, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['country'], ['activeUsers', 'sessions'], startDate, endDate, 50, 'activeUsers').catch(() => null),
+        runGAReport(token, pid, ['browser'], ['sessions', 'activeUsers'], startDate, endDate, 20, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['operatingSystem'], ['sessions', 'activeUsers'], startDate, endDate, 20, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['sessionDefaultChannelGroup'], ['sessions', 'activeUsers'], startDate, endDate, 20, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['sessionSource'], ['sessions', 'activeUsers'], startDate, endDate, 30, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['city', 'country'], ['activeUsers'], startDate, endDate, 30, 'activeUsers').catch(() => null),
+        runGAReport(token, pid, ['region', 'country'], ['activeUsers'], startDate, endDate, 30, 'activeUsers').catch(() => null),
+        runGAReport(token, pid, ['landingPagePlusQueryString'], ['sessions', 'activeUsers', 'bounceRate'], startDate, endDate, 30, 'sessions').catch(() => null),
+        runGAReport(token, pid, ['language'], ['activeUsers', 'sessions'], startDate, endDate, 20, 'activeUsers').catch(() => null),
     ]);
 
     // KPIs + Traffic
@@ -251,13 +281,27 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
     };
     result.traffic.sort((a: any, b: any) => a.date.localeCompare(b.date));
 
-    // Sources
+    // Helper to parse dimension-metric rows into [{name, value, users?, percentage}]
+    const parseDimMetric = (data: any, dimKey: string, metricIndex = 0, usersIndex?: number) => {
+        if (!data?.rows) return [];
+        let total = 0;
+        const raw = data.rows.map((row: any) => {
+            const val = parseInt(row.metricValues[metricIndex].value) || 0;
+            total += val;
+            const users = usersIndex !== undefined ? (parseInt(row.metricValues[usersIndex].value) || 0) : undefined;
+            return { name: row.dimensionValues[0].value, value: val, users };
+        });
+        return raw.map((r: any) => ({ ...r, percentage: total > 0 ? +((r.value / total) * 100).toFixed(1) : 0 }));
+    };
+
+    // Sources (combined source / medium)
     if (sourcesData?.rows) {
         let total = 0;
         const raw = sourcesData.rows.map((row: any) => {
             const sessions = parseInt(row.metricValues[0].value) || 0;
+            const users = parseInt(row.metricValues[1].value) || 0;
             total += sessions;
-            return { source: `${row.dimensionValues[0].value} / ${row.dimensionValues[1].value}`, sessions };
+            return { source: `${row.dimensionValues[0].value} / ${row.dimensionValues[1].value}`, sessions, users };
         });
         result.sources = raw.map((r: any) => ({ ...r, percentage: total > 0 ? +((r.sessions / total) * 100).toFixed(1) : 0 }));
     }
@@ -273,7 +317,7 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
                 page: row.dimensionValues[0].value,
                 title: row.dimensionValues[1].value || row.dimensionValues[0].value,
                 views,
-                uniqueViews: Math.round(views * 0.8),
+                uniqueViews: parseInt(row.metricValues[3]?.value) || Math.round(views * 0.8),
                 avgTime: `${m}:${s.toString().padStart(2, '0')}`,
                 bounceRate: +((parseFloat(row.metricValues[2].value) || 0) * 100).toFixed(1),
             };
@@ -287,7 +331,7 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
             const sessions = parseInt(row.metricValues[0].value) || 0;
             total += sessions;
             const name = row.dimensionValues[0].value;
-            return { device: name.charAt(0).toUpperCase() + name.slice(1), sessions };
+            return { device: name.charAt(0).toUpperCase() + name.slice(1), sessions, users: parseInt(row.metricValues[1].value) || 0 };
         });
         result.devices = raw.map((r: any) => ({ ...r, percentage: total > 0 ? +((r.sessions / total) * 100).toFixed(1) : 0 }));
     }
@@ -298,10 +342,56 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
         const raw = countriesData.rows.map((row: any) => {
             const users = parseInt(row.metricValues[0].value) || 0;
             total += users;
-            return { country: row.dimensionValues[0].value, users };
+            return { country: row.dimensionValues[0].value, users, sessions: parseInt(row.metricValues[1].value) || 0 };
         });
         result.countries = raw.map((r: any) => ({ ...r, percentage: total > 0 ? +((r.users / total) * 100).toFixed(1) : 0 }));
     }
+
+    // Browsers
+    result.browsers = parseDimMetric(browsersData, 'browser', 0, 1);
+    // Operating Systems
+    result.operatingSystems = parseDimMetric(osData, 'operatingSystem', 0, 1);
+    // Channels (default channel grouping)
+    result.channels = parseDimMetric(channelsData, 'sessionDefaultChannelGroup', 0, 1);
+    // Referrers (source only)
+    result.referrers = parseDimMetric(referrersData, 'sessionSource', 0, 1);
+
+    // Cities
+    if (citiesData?.rows) {
+        result.cities = citiesData.rows.map((row: any) => ({
+            city: row.dimensionValues[0].value,
+            country: row.dimensionValues[1].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    // Regions
+    if (regionsData?.rows) {
+        result.regions = regionsData.rows.map((row: any) => ({
+            region: row.dimensionValues[0].value,
+            country: row.dimensionValues[1].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    // Entry/Landing Pages
+    if (entryPagesData?.rows) {
+        let total = 0;
+        const raw = entryPagesData.rows.map((row: any) => {
+            const sessions = parseInt(row.metricValues[0].value) || 0;
+            total += sessions;
+            return {
+                page: row.dimensionValues[0].value,
+                sessions,
+                users: parseInt(row.metricValues[1].value) || 0,
+                bounceRate: +((parseFloat(row.metricValues[2].value) || 0) * 100).toFixed(1),
+            };
+        });
+        result.entryPages = raw.map((r: any) => ({ ...r, percentage: total > 0 ? +((r.sessions / total) * 100).toFixed(1) : 0 }));
+    }
+
+    // Languages
+    result.languages = parseDimMetric(languagesData, 'language', 0, 1);
 
     return result;
 }

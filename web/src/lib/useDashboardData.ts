@@ -71,9 +71,9 @@ export function useGitHubData() {
     };
 }
 
-export function useAnalyticsData(section: string, propertyId?: string, enabled = true) {
+export function useAnalyticsData(section: string, propertyId?: string, enabled = true, range = '30d') {
     const query = propertyId ? `&propertyId=${propertyId}` : '';
-    const url = (section && enabled) ? `/api/analytics?section=${section}${query}` : null;
+    const url = (section && enabled) ? `/api/analytics?section=${section}${query}&range=${range}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 60000,
     });
