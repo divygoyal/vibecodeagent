@@ -272,6 +272,35 @@ _(What do they care about? What projects are they working on? What annoys them? 
         # Ensure proper permissions
         os.chmod(config_path, 0o666)
     
+    def _create_auth_profiles(self, user_identifier: str, gemini_api_key: str) -> None:
+        """Create auth-profiles.json that OpenClaw reads for provider API keys.
+        
+        OpenClaw's auth system works in two parts:
+        1. openclaw.json -> auth.profiles declares profile shape (provider + mode)
+        2. agents/<id>/agent/auth-profiles.json stores the actual credentials
+        
+        Without this file, OpenClaw errors:
+        'No API key found for provider "google"'
+        """
+        user_dir = self._get_user_data_dir(user_identifier)
+        agent_dir = f"{user_dir}/.openclaw/agents/main/agent"
+        os.makedirs(agent_dir, exist_ok=True)
+        
+        auth_profiles = {
+            "google:default": {
+                "provider": "google",
+                "mode": "api_key",
+                "apiKey": gemini_api_key
+            }
+        }
+        
+        auth_path = f"{agent_dir}/auth-profiles.json"
+        with open(auth_path, 'w') as f:
+            json.dump(auth_profiles, f, indent=2)
+        os.chmod(auth_path, 0o666)
+        
+        logger.info(f"Created auth-profiles.json for {user_identifier}")
+    
     def _copy_plugins(self, user_identifier: str, enabled_plugins: list) -> None:
         """Copy enabled plugins to user's workspace"""
         user_dir = self._get_user_data_dir(user_identifier)
@@ -337,6 +366,13 @@ _(What do they care about? What projects are they working on? What annoys them? 
         
         # Create config
         self._create_user_config(user_identifier, plan, telegram_token, custom_rules)
+        
+        # Create auth-profiles.json with the actual API key
+        resolved_gemini_key = gemini_key or settings.GEMINI_API_KEY
+        if resolved_gemini_key:
+            self._create_auth_profiles(user_identifier, resolved_gemini_key)
+        else:
+            logger.warning(f"No GEMINI_API_KEY available for {user_identifier} — auth-profiles.json not created")
         
         # Copy plugins
         if enabled_plugins:
