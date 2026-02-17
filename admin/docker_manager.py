@@ -19,6 +19,7 @@ class DockerManager:
     def __init__(self):
         self.client = docker.from_env()
         self.base_dir = settings.DATA_DIR  # Host path for user data
+        self._shared_plugins_dir = self._ensure_shared_plugins()
     
     def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
@@ -47,6 +48,40 @@ class DockerManager:
             os.system(f"chmod -R 777 '{user_dir}'")
         
         return user_dir
+    
+    def _ensure_shared_plugins(self) -> str:
+        """Ensure plugins are available on the host for bot container mounts.
+        
+        On Coolify/Docker deployments, the configured PLUGINS_DIR may not exist
+        on the host (it's baked into the admin image at /app/plugins).
+        Copy them to DATA_DIR/_shared_plugins/ so sibling bot containers can
+        access them via a host volume mount.
+        """
+        source_plugins = "/app/plugins"
+        shared_dir = f"{self.base_dir}/_shared_plugins"
+        
+        # If configured PLUGINS_DIR exists on the host, use it directly
+        if os.path.exists(settings.PLUGINS_DIR) and os.listdir(settings.PLUGINS_DIR):
+            return settings.PLUGINS_DIR
+        
+        # Otherwise, copy from baked-in plugins to shared host path
+        if os.path.exists(source_plugins):
+            os.makedirs(shared_dir, exist_ok=True)
+            for plugin in os.listdir(source_plugins):
+                src = f"{source_plugins}/{plugin}"
+                dst = f"{shared_dir}/{plugin}"
+                if os.path.isdir(src):
+                    os.system(f"cp -rf {src} {dst}")
+            logger.info(f"Copied plugins from {source_plugins} to {shared_dir}")
+            try:
+                os.chmod(shared_dir, 0o777)
+            except Exception:
+                pass
+            return shared_dir
+        
+        # Fallback: use configured dir (may fail, but log it)
+        logger.warning(f"No plugins found at {source_plugins} or {settings.PLUGINS_DIR}")
+        return settings.PLUGINS_DIR
     
     def _seed_intelligence(self, user_identifier: str, custom_rules: Optional[str] = None, connections: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -447,7 +482,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 volumes={
                     user_dir: {"bind": "/data", "mode": "rw"},
                     # Also mount plugins to /app/skills/workspace so they are auto-discovered
-                    str(settings.PLUGINS_DIR): {"bind": "/app/skills/workspace", "mode": "rw"}
+                    self._shared_plugins_dir: {"bind": "/app/skills/workspace", "mode": "rw"}
                 },
                 environment=env,
                 mem_limit=plan_config["memory_limit"],
