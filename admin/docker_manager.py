@@ -38,6 +38,8 @@ class DockerManager:
         # Pre-create the agent dir tree that auth-profiles.json writes into,
         # so _create_auth_profiles never fails with missing parent dirs.
         os.makedirs(f"{user_dir}/.openclaw/agents/main/agent", exist_ok=True)
+        # Canvas directory — OpenClaw's canvas service mounts here at startup
+        os.makedirs(f"{user_dir}/.openclaw/canvas", exist_ok=True)
 
         # OpenClaw needs to write to /data/.openclaw (mounted from host).
         # Ensure directory is writable for typical non-root container users.
@@ -100,11 +102,20 @@ class DockerManager:
         - HEARTBEAT.md — Periodic check-in tasks (empty by default)
         - BOOTSTRAP.md — First-run onboarding conversation flow
         
-        Note: MEMORY.md is NOT pre-created — the bot creates it on demand.
+        Note: MEMORY.md IS pre-created (empty stub) because AGENTS.md
+        instructs the bot to read it on every session start.
         """
         user_dir = self._get_user_data_dir(user_identifier)
         workspace = f"{user_dir}/workspace"
         templates_dir = "/app/templates"
+        
+        # Pre-create the memory/ directory (AGENTS.md references memory/YYYY-MM-DD.md)
+        memory_dir = f"{workspace}/memory"
+        os.makedirs(memory_dir, exist_ok=True)
+        try:
+            os.chmod(memory_dir, 0o777)
+        except Exception:
+            pass
         
         # Static template files — copied directly from templates/
         static_files = [
@@ -129,6 +140,14 @@ class DockerManager:
                 with open(dest, 'w') as f:
                     f.write(content)
                 os.chmod(dest, 0o666)
+        
+        # MEMORY.md — empty stub so the bot doesn't get ENOENT on first read.
+        # AGENTS.md line 16: "If in MAIN SESSION: Also read MEMORY.md"
+        memory_path = f"{workspace}/MEMORY.md"
+        if not os.path.exists(memory_path):
+            with open(memory_path, 'w') as f:
+                f.write("# MEMORY.md\n\n_Your long-term memory. Update this as you learn about your human._\n")
+            os.chmod(memory_path, 0o666)
         
         # SOUL.md — uses custom_rules if provided, otherwise vanilla template
         soul_path = f"{workspace}/SOUL.md"
