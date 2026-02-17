@@ -45,27 +45,16 @@ export default function RealtimePage() {
     const [activeCountry, setActiveCountry] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
 
-    // Prevent hydration mismatch: render nothing meaningful until client is mounted
     useEffect(() => { setMounted(true); }, []);
 
-    if (!mounted || (isLoading && !realtimeData)) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                    <span className="text-zinc-500 text-sm">Connecting to real-time stream...</span>
-                </div>
-            </div>
-        );
-    }
-
+    // ─── Derive safe primitives from API data (always, before any early return) ───
     const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : 0;
     const byCountry: any[] = Array.isArray(realtimeData?.byCountry) ? realtimeData.byCountry : [];
     const byCity: any[] = Array.isArray(realtimeData?.byCity) ? realtimeData.byCity : [];
     const byDevice: any[] = Array.isArray(realtimeData?.byDevice) ? realtimeData.byDevice : [];
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
 
-    // Build activity feed (coerce all values to safe primitives)
+    // ─── ALL useMemo hooks MUST run on every render (React rules of hooks) ───
     const activityFeed = useMemo(() => {
         return byCity.slice(0, 20).map((c: any, i: number) => ({
             name: ANON_NAMES[i % ANON_NAMES.length],
@@ -78,49 +67,60 @@ export default function RealtimePage() {
         }));
     }, [byCity, byPage, byDevice]);
 
-    // Mini bar chart data (deterministic — no Math.random to avoid hydration errors)
     const barData = useMemo(() => {
         return Array.from({ length: 60 }, (_, i) => {
-            const seed = Math.sin(i * 7.13 + 3.17) * 0.5; // deterministic pseudo-random [-0.5, 0.5]
+            const seed = Math.sin(i * 7.13 + 3.17) * 0.5;
             return Math.max(1, Math.round(activeUsers + seed * activeUsers * 0.35));
         });
     }, [activeUsers]);
 
-    const maxBar = Math.max(...barData, 1);
-
-    // Filter data by active country
-    const filteredByCountry = activeCountry
-        ? byCountry.filter((c: any) => c.country === activeCountry)
-        : byCountry;
-    const filteredByPage = activeCountry
-        ? byPage // Can't filter pages by country in realtime API, show all
-        : byPage;
-
-    // Realtime intelligence messages
     const intelligence = useMemo(() => {
         const msgs: string[] = [];
         if (byDevice.length > 0) {
-            const total = byDevice.reduce((s: number, d: any) => s + d.users, 0);
-            const mobile = byDevice.find((d: any) => d.device?.toLowerCase() === 'mobile');
+            const total = byDevice.reduce((s: number, d: any) => s + (Number(d.users) || 0), 0);
+            const mobile = byDevice.find((d: any) => String(d.device ?? '').toLowerCase() === 'mobile');
             if (mobile && total > 0) {
-                const pct = Math.round((mobile.users / total) * 100);
-                if (pct > 50) msgs.push(`📱 Mobile dominating at ${pct}% of active traffic`);
+                const pct = Math.round(((Number(mobile.users) || 0) / total) * 100);
+                if (pct > 50) msgs.push(`Mobile dominating at ${pct}% of active traffic`);
             }
         }
         if (byCountry.length > 0) {
             const top = byCountry[0];
-            const total = byCountry.reduce((s: number, c: any) => s + c.users, 0);
-            const pct = Math.round((top.users / total) * 100);
-            msgs.push(`🌍 ${top.country} leads with ${pct}% of live visitors`);
+            const total = byCountry.reduce((s: number, c: any) => s + (Number(c.users) || 0), 0);
+            if (total > 0) {
+                const pct = Math.round(((Number(top.users) || 0) / total) * 100);
+                msgs.push(`${String(top.country ?? 'Unknown')} leads with ${pct}% of live visitors`);
+            }
         }
         if (byPage.length > 0) {
-            msgs.push(`📄 Top page: ${byPage[0]?.page} (${byPage[0]?.users} active)`);
+            msgs.push(`Top page: ${String(byPage[0]?.page ?? '/')} (${Number(byPage[0]?.users) || 0} active)`);
         }
         if (activeUsers > 10) {
-            msgs.push(`🔥 ${activeUsers} concurrent visitors — above average activity`);
+            msgs.push(`${activeUsers} concurrent visitors — above average activity`);
         }
         return msgs;
     }, [byCountry, byDevice, byPage, activeUsers]);
+
+    // ─── Now safe to early-return (all hooks already called) ───
+    if (!mounted || (isLoading && !realtimeData)) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                    <span className="text-zinc-500 text-sm">Connecting to real-time stream...</span>
+                </div>
+            </div>
+        );
+    }
+
+    const maxBar = Math.max(...barData, 1);
+
+    const filteredByCountry = activeCountry
+        ? byCountry.filter((c: any) => c.country === activeCountry)
+        : byCountry;
+    const filteredByPage = activeCountry
+        ? byPage
+        : byPage;
 
     const handleBubbleClick = (name: string) => {
         setActiveCountry(prev => prev === name ? null : name);
