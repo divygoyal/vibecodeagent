@@ -1,16 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
     TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer,
-    ChevronDown, ChevronUp, Loader2, Download, ArrowUpRight, RefreshCw, Search, Target, Globe
+    Loader2, Download, RefreshCw, Target, Globe
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
+import AnimatedCounter from '@/components/analytics/AnimatedCounter';
+import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
+import AIInsightEngine from '@/components/analytics/AIInsightEngine';
+import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
+import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
 
 // ─── Helpers ───
 
@@ -57,33 +63,29 @@ const ChartTooltip = ({ active, payload, label }: any) => {
     );
 };
 
+const CARD = 'bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border border-white/[0.06] rounded-2xl hover:border-white/[0.1] transition-all duration-200';
+
 // ─── Main Overview Page ───
 
 export default function AnalyticsPage() {
     const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
+    const { filters, toggleFilter } = useFilterStore();
+    const [drilldown, setDrilldown] = useState<any>(null);
 
-    if (isLoading && !analyticsData) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-                <span className="ml-3 text-zinc-500 text-sm">Loading analytics...</span>
-            </div>
-        );
-    }
+    if (isLoading && !analyticsData) return <SkeletonDashboard />;
 
     if (isError && !analyticsData) {
         return (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <p className="text-red-400 text-sm">Failed to load analytics data</p>
-                <button onClick={() => refresh()} className="text-xs text-emerald-400 hover:underline">Retry</button>
+                <button onClick={() => refresh()} className="text-xs text-blue-400 hover:underline">Retry</button>
             </div>
         );
     }
 
     const kpis = analyticsData?.kpis;
     const traffic: any[] = analyticsData?.traffic || [];
-    const sources: any[] = analyticsData?.sources || [];
     const pages: any[] = analyticsData?.pages || [];
     const devices: any[] = analyticsData?.devices || [];
     const countries: any[] = analyticsData?.countries || [];
@@ -95,38 +97,49 @@ export default function AnalyticsPage() {
     const entryPages: any[] = analyticsData?.entryPages || [];
     const languages: any[] = analyticsData?.languages || [];
 
+    // Drilldown handler (right-click or double-click)
+    const openDrilldown = (dimension: keyof DashboardFilters, value: string, metrics?: any[], breakdown?: any[], topPages?: any[]) => {
+        setDrilldown({ title: value, dimension, value, metrics, breakdown, topPages });
+    };
+
     return (
-        <div className="space-y-6">
-            {/* ─── KPI Strip ─── */}
+        <div className="space-y-5">
+            {/* ─── KPI Strip with animated counters ─── */}
             {kpis && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                     {[
-                        { label: 'Visitors', value: formatNumber(kpis.totalUsers), change: kpis.changeUsers, color: 'border-emerald-500/20' },
-                        { label: 'Sessions', value: formatNumber(kpis.totalSessions), change: kpis.changeSessions, color: 'border-cyan-500/20' },
-                        { label: 'Page Views', value: formatNumber(kpis.totalPageViews), change: kpis.changePageViews, color: 'border-blue-500/20' },
-                        { label: 'Bounce Rate', value: `${kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', color: 'border-amber-500/20' },
-                        { label: 'Session Time', value: formatDuration(kpis.avgSessionDuration), change: 0, color: 'border-purple-500/20' },
-                        { label: 'New Users', value: formatNumber(kpis.newUsers), change: 0, color: 'border-pink-500/20' },
-                        { label: 'Pages/Session', value: String(kpis.pagesPerSession), change: 0, color: 'border-orange-500/20' },
-                    ].map((kpi, i) => (
-                        <div key={i} className={`bg-[#0c0c14] border ${kpi.color} rounded-xl p-3.5 hover:bg-white/[0.02] transition group`}>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">{kpi.label}</span>
+                        { label: 'Visitors', raw: kpis.totalUsers, change: kpis.changeUsers, glow: 'shadow-blue-500/[0.04]', border: 'border-blue-500/15' },
+                        { label: 'Sessions', raw: kpis.totalSessions, change: kpis.changeSessions, glow: 'shadow-cyan-500/[0.04]', border: 'border-cyan-500/15' },
+                        { label: 'Page Views', raw: kpis.totalPageViews, change: kpis.changePageViews, glow: 'shadow-indigo-500/[0.04]', border: 'border-indigo-500/15' },
+                        { label: 'Bounce Rate', formatted: `${kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', glow: 'shadow-amber-500/[0.04]', border: 'border-amber-500/15' },
+                        { label: 'Session Time', formatted: formatDuration(kpis.avgSessionDuration), change: 0, glow: 'shadow-purple-500/[0.04]', border: 'border-purple-500/15' },
+                        { label: 'New Users', raw: kpis.newUsers, change: 0, glow: 'shadow-pink-500/[0.04]', border: 'border-pink-500/15' },
+                        { label: 'Pages/Session', formatted: String(kpis.pagesPerSession), change: 0, glow: 'shadow-orange-500/[0.04]', border: 'border-orange-500/15' },
+                    ].map((kpi: any, i) => (
+                        <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.04 }}
+                            className={`bg-[rgba(255,255,255,0.02)] border ${kpi.border} rounded-2xl p-3.5 hover:bg-white/[0.03] hover:${kpi.glow} hover:shadow-lg transition-all duration-200`}
+                        >
+                            <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{kpi.label}</span>
+                            <div className="text-xl font-bold text-white tabular-nums mt-1">
+                                {kpi.raw != null ? <AnimatedCounter value={kpi.raw} formatter={formatNumber} /> : kpi.formatted}
                             </div>
-                            <div className="text-xl font-bold text-white tabular-nums">{kpi.value}</div>
                             <div className="mt-1"><ChangeIndicator value={kpi.change} suffix={kpi.suffix} /></div>
-                        </div>
+                        </motion.div>
                     ))}
                 </div>
             )}
 
             {/* ─── Traffic Trend ─── */}
-            <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-5`}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-semibold text-white">Unique Visitors</h3>
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => refresh()} className="p-1 text-zinc-600 hover:text-emerald-400 transition"><RefreshCw className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1 text-zinc-600 hover:text-white transition"><Download className="w-3.5 h-3.5" /></button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => refresh()} className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-white/[0.04] transition"><RefreshCw className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition"><Download className="w-3.5 h-3.5" /></button>
                     </div>
                 </div>
                 <div className="h-[260px]">
@@ -134,165 +147,110 @@ export default function AnalyticsPage() {
                         <AreaChart data={traffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="gU" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.25} />
-                                    <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.2} />
+                                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.15} />
                                     <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#52525b' }} tickFormatter={(v: string) => v.slice(5)} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#52525b' }} axisLine={false} tickLine={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#3f3f46' }} tickFormatter={(v: string) => v.slice(5)} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
                             <Tooltip content={<ChartTooltip />} />
-                            <Area type="monotone" dataKey="activeUsers" name="Visitors" stroke="#34d399" fill="url(#gU)" strokeWidth={2} dot={false} />
+                            <Area type="monotone" dataKey="activeUsers" name="Visitors" stroke="#3b82f6" fill="url(#gU)" strokeWidth={2} dot={false} />
                             <Area type="monotone" dataKey="sessions" name="Sessions" stroke="#818cf8" fill="url(#gS)" strokeWidth={1.5} dot={false} />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
-            </div>
+            </motion.div>
 
-            {/* ─── Referrers & Pages (side by side tables like Pirsch) ─── */}
+            {/* ─── AI Insights ─── */}
+            <AIInsightEngine kpis={kpis} countries={countries} channels={channels} pages={pages} devices={devices} browsers={browsers} referrers={referrers} />
+
+            {/* ─── Referrers & Pages ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Referrers */}
-                <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+                <div className={`${CARD} p-5`}>
                     <h3 className="text-sm font-semibold text-white mb-3">Referrers</h3>
                     <AnalyticsTable
                         data={referrers}
                         searchKey={(item: any) => item.name}
                         searchPlaceholder="Search referrers..."
                         maxRows={12}
+                        onRowClick={(item: any) => toggleFilter('referrer', item.name)}
+                        activeRow={(item: any) => filters.referrer.includes(item.name)}
                         columns={[
-                            {
-                                key: 'referrer', label: 'Referrer', sortable: true,
-                                getValue: (item: any) => item.name,
-                                render: (item: any) => (
-                                    <div className="flex items-center gap-2">
-                                        <ReferrerIcon referrer={item.name} />
-                                        <span className="text-zinc-300 text-xs truncate max-w-[200px]">{item.name}</span>
-                                    </div>
-                                ),
-                            },
-                            {
-                                key: 'events', label: 'Events', align: 'right' as const, sortable: true,
-                                getValue: (item: any) => item.value,
-                                render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span>,
-                            },
-                            {
-                                key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true,
-                                getValue: (item: any) => item.users || 0,
-                                render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span>,
-                            },
+                            { key: 'referrer', label: 'Referrer', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2"><ReferrerIcon referrer={item.name} /><span className="text-zinc-300 text-xs truncate max-w-[180px]">{item.name}</span></div>) },
+                            { key: 'events', label: 'Events', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span> },
+                            { key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.users || 0, render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span> },
                         ]}
                         defaultSort={{ key: 'events', dir: 'desc' }}
                     />
                 </div>
 
-                {/* Top Pages */}
-                <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+                <div className={`${CARD} p-5`}>
                     <h3 className="text-sm font-semibold text-white mb-3">Top Pages</h3>
                     <AnalyticsTable
                         data={pages}
                         searchKey={(item: any) => item.page}
                         searchPlaceholder="Search pages..."
                         maxRows={12}
+                        onRowClick={(item: any) => toggleFilter('page', item.page)}
+                        activeRow={(item: any) => filters.page.includes(item.page)}
                         columns={[
-                            {
-                                key: 'page', label: 'Path', sortable: true,
-                                getValue: (item: any) => item.page,
-                                render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[220px] block">{item.page}</span>,
-                            },
-                            {
-                                key: 'views', label: 'Views', align: 'right' as const, sortable: true,
-                                getValue: (item: any) => item.views,
-                                render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.views?.toLocaleString()}</span>,
-                            },
-                            {
-                                key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true,
-                                getValue: (item: any) => item.bounceRate || 0,
-                                render: (item: any) => (
-                                    <span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                        {item.bounceRate}%
-                                    </span>
-                                ),
-                            },
+                            { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[200px] block">{item.page}</span> },
+                            { key: 'views', label: 'Views', align: 'right' as const, sortable: true, getValue: (item: any) => item.views, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.views?.toLocaleString()}</span> },
+                            { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
                         ]}
                         defaultSort={{ key: 'views', dir: 'desc' }}
                     />
                 </div>
             </div>
 
-            {/* ─── Geo & Devices (side by side tables) ─── */}
+            {/* ─── Geo & Tech ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Geo: Country / City */}
-                <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
-                    <GeoPanel countries={countries} cities={cities} />
+                <div className={`${CARD} p-5`}>
+                    <GeoPanel countries={countries} cities={cities} onDrilldown={openDrilldown} />
                 </div>
-
-                {/* Devices / Browser / OS */}
-                <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+                <div className={`${CARD} p-5`}>
                     <TechPanel devices={devices} browsers={browsers} operatingSystems={operatingSystems} />
                 </div>
             </div>
 
-            {/* ─── Channels & Languages (side by side) ─── */}
+            {/* ─── Channels & Languages ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Channels */}
-                <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+                <div className={`${CARD} p-5`}>
                     <h3 className="text-sm font-semibold text-white mb-3">Channels</h3>
                     <AnalyticsTable
-                        data={channels}
-                        showSearch={false}
+                        data={channels} showSearch={false}
+                        onRowClick={(item: any) => toggleFilter('channel', item.name)}
+                        activeRow={(item: any) => filters.channel.includes(item.name)}
                         columns={[
-                            {
-                                key: 'name', label: 'Channel', sortable: true,
-                                getValue: (item: any) => item.name,
-                                render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span>,
-                            },
-                            {
-                                key: 'value', label: 'Visitors', align: 'right' as const, sortable: true,
-                                getValue: (item: any) => item.value,
-                                render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span>,
-                            },
-                            {
-                                key: 'pct', label: '%', align: 'right' as const,
-                                render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span>,
-                            },
+                            { key: 'name', label: 'Channel', sortable: true, getValue: (item: any) => item.name, render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span> },
+                            { key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span> },
+                            { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span> },
                         ]}
                         defaultSort={{ key: 'value', dir: 'desc' }}
                     />
                 </div>
 
-                {/* Languages */}
-                <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+                <div className={`${CARD} p-5`}>
                     <h3 className="text-sm font-semibold text-white mb-3">Languages</h3>
                     <AnalyticsTable
-                        data={languages}
-                        showSearch={false}
+                        data={languages} showSearch={false}
                         columns={[
-                            {
-                                key: 'name', label: 'Language', sortable: true,
-                                getValue: (item: any) => item.name,
-                                render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span>,
-                            },
-                            {
-                                key: 'value', label: 'Visitors', align: 'right' as const, sortable: true,
-                                getValue: (item: any) => item.value,
-                                render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span>,
-                            },
-                            {
-                                key: 'pct', label: '%', align: 'right' as const,
-                                render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span>,
-                            },
+                            { key: 'name', label: 'Language', sortable: true, getValue: (item: any) => item.name, render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span> },
+                            { key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span> },
+                            { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span> },
                         ]}
                         defaultSort={{ key: 'value', dir: 'desc' }}
                     />
                 </div>
             </div>
 
-            {/* ─── Entry Pages (full-width table) ─── */}
-            <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+            {/* ─── Entry Pages ─── */}
+            <div className={`${CARD} p-5`}>
                 <h3 className="text-sm font-semibold text-white mb-3">Entry Pages</h3>
                 <AnalyticsTable
                     data={entryPages}
@@ -300,30 +258,10 @@ export default function AnalyticsPage() {
                     searchPlaceholder="Search entry pages..."
                     maxRows={15}
                     columns={[
-                        {
-                            key: 'page', label: 'Path', sortable: true,
-                            getValue: (item: any) => item.page,
-                            render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[300px] block">{item.page}</span>,
-                        },
-                        {
-                            key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.sessions,
-                            render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.sessions?.toLocaleString()}</span>,
-                        },
-                        {
-                            key: 'users', label: 'Users', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.users || 0,
-                            render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span>,
-                        },
-                        {
-                            key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.bounceRate || 0,
-                            render: (item: any) => (
-                                <span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                    {item.bounceRate}%
-                                </span>
-                            ),
-                        },
+                        { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[300px] block">{item.page}</span> },
+                        { key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.sessions, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.sessions?.toLocaleString()}</span> },
+                        { key: 'users', label: 'Users', align: 'right' as const, sortable: true, getValue: (item: any) => item.users || 0, render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span> },
+                        { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
                     ]}
                     defaultSort={{ key: 'sessions', dir: 'desc' }}
                 />
@@ -335,22 +273,23 @@ export default function AnalyticsPage() {
                 <LoyaltyCard kpis={kpis} />
                 <DiversityCard channels={channels} />
             </div>
+
+            {/* ─── Drilldown Drawer ─── */}
+            <DrilldownDrawer open={!!drilldown} onClose={() => setDrilldown(null)} data={drilldown} />
         </div>
     );
 }
 
 // ─── Sub-components ───
 
-function GeoPanel({ countries, cities }: { countries: any[]; cities: any[] }) {
+function GeoPanel({ countries, cities, onDrilldown }: { countries: any[]; cities: any[]; onDrilldown: Function }) {
     const [tab, setTab] = useState<'country' | 'city'>('country');
-    const data = tab === 'country' ? countries : cities;
+    const { filters, toggleFilter } = useFilterStore();
     return (
         <div>
             <div className="flex items-center gap-3 mb-3">
                 <h3 className="text-sm font-semibold text-white">Geo</h3>
-                <div className="flex items-center text-[10px]">
-                    {countries.slice(0, 6).map((c: any, i: number) => <CountryFlag key={i} country={c.country} />)}
-                </div>
+                <div className="flex items-center">{countries.slice(0, 6).map((c: any, i: number) => <CountryFlag key={i} country={c.country} />)}</div>
             </div>
             <div className="flex gap-1 mb-3">
                 {(['country', 'city'] as const).map(t => (
@@ -367,27 +306,14 @@ function GeoPanel({ countries, cities }: { countries: any[]; cities: any[] }) {
                 searchKey={(item: any) => item.name}
                 searchPlaceholder="Search..."
                 maxRows={15}
+                onRowClick={(item: any) => {
+                    if (tab === 'country') toggleFilter('country', item.name);
+                }}
+                activeRow={(item: any) => tab === 'country' && filters.country.includes(item.name)}
                 columns={[
-                    {
-                        key: 'name', label: tab === 'country' ? 'Country / City' : 'City', sortable: true,
-                        getValue: (item: any) => item.name,
-                        render: (item: any) => (
-                            <div className="flex items-center gap-2">
-                                <CountryFlag country={item.name.split(',')[0]} />
-                                <span className="text-zinc-300 text-xs truncate max-w-[180px]">{item.name}</span>
-                            </div>
-                        ),
-                    },
-                    {
-                        key: 'events', label: 'Events', align: 'right' as const, sortable: true,
-                        getValue: (item: any) => item.events,
-                        render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.events?.toLocaleString()}</span>,
-                    },
-                    {
-                        key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true,
-                        getValue: (item: any) => item.sessions,
-                        render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.sessions ? item.sessions.toLocaleString() : '—'}</span>,
-                    },
+                    { key: 'name', label: tab === 'country' ? 'Country' : 'City', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2"><CountryFlag country={item.name.split(',')[0]} /><span className="text-zinc-300 text-xs truncate max-w-[160px]">{item.name}</span></div>) },
+                    { key: 'events', label: 'Events', align: 'right' as const, sortable: true, getValue: (item: any) => item.events, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.events?.toLocaleString()}</span> },
+                    { key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.sessions, render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.sessions ? item.sessions.toLocaleString() : '—'}</span> },
                 ]}
                 defaultSort={{ key: 'events', dir: 'desc' }}
             />
@@ -397,9 +323,11 @@ function GeoPanel({ countries, cities }: { countries: any[]; cities: any[] }) {
 
 function TechPanel({ devices, browsers, operatingSystems }: { devices: any[]; browsers: any[]; operatingSystems: any[] }) {
     const [tab, setTab] = useState<'device' | 'browser' | 'os'>('device');
-    const data = tab === 'device' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, users: d.users, pct: d.percentage }))
-        : tab === 'browser' ? browsers.map((b: any) => ({ name: b.name, value: b.value, users: b.users, pct: b.percentage }))
-        : operatingSystems.map((o: any) => ({ name: o.name, value: o.value, users: o.users, pct: o.percentage }));
+    const { filters, toggleFilter } = useFilterStore();
+    const data = tab === 'device' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, pct: d.percentage }))
+        : tab === 'browser' ? browsers.map((b: any) => ({ name: b.name, value: b.value, pct: b.percentage }))
+        : operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }));
+    const dim = tab === 'device' ? 'device' : tab === 'browser' ? 'browser' : 'os';
 
     return (
         <div>
@@ -412,28 +340,13 @@ function TechPanel({ devices, browsers, operatingSystems }: { devices: any[]; br
                 ))}
             </div>
             <AnalyticsTable
-                data={data}
-                showSearch={false}
+                data={data} showSearch={false}
+                onRowClick={(item: any) => toggleFilter(dim, item.name)}
+                activeRow={(item: any) => filters[dim].includes(item.name)}
                 columns={[
-                    {
-                        key: 'name', label: 'Name', sortable: true,
-                        getValue: (item: any) => item.name,
-                        render: (item: any) => (
-                            <div className="flex items-center gap-2">
-                                {tab === 'device' ? <DeviceIcon device={item.name} /> : tab === 'browser' ? <BrowserIcon browser={item.name} /> : <OSIcon os={item.name} />}
-                                <span className="text-zinc-300 text-xs">{item.name}</span>
-                            </div>
-                        ),
-                    },
-                    {
-                        key: 'value', label: 'Sessions', align: 'right' as const, sortable: true,
-                        getValue: (item: any) => item.value,
-                        render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span>,
-                    },
-                    {
-                        key: 'pct', label: '%', align: 'right' as const,
-                        render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.pct}%</span>,
-                    },
+                    { key: 'name', label: 'Name', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2">{tab === 'device' ? <DeviceIcon device={item.name} /> : tab === 'browser' ? <BrowserIcon browser={item.name} /> : <OSIcon os={item.name} />}<span className="text-zinc-300 text-xs">{item.name}</span></div>) },
+                    { key: 'value', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span> },
+                    { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.pct}%</span> },
                 ]}
                 defaultSort={{ key: 'value', dir: 'desc' }}
             />
@@ -444,27 +357,22 @@ function TechPanel({ devices, browsers, operatingSystems }: { devices: any[]; br
 function EngagementCard({ kpis }: { kpis: any }) {
     if (!kpis) return null;
     const score = Math.min(100, Math.round(
-        (Math.min(kpis.avgSessionDuration / 300, 1) * 30) +
-        (Math.min(kpis.pagesPerSession / 5, 1) * 25) +
-        (Math.max(0, 1 - kpis.avgBounceRate / 100) * 25) +
-        (Math.min((kpis.returningUsers || 0) / Math.max(kpis.totalUsers, 1), 1) * 20)
+        (Math.min(kpis.avgSessionDuration / 300, 1) * 30) + (Math.min(kpis.pagesPerSession / 5, 1) * 25) +
+        (Math.max(0, 1 - kpis.avgBounceRate / 100) * 25) + (Math.min((kpis.returningUsers || 0) / Math.max(kpis.totalUsers, 1), 1) * 20)
     ));
     const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
     const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
     return (
-        <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-                <Target className="w-4 h-4 text-violet-400" />
-                <h4 className="text-sm font-semibold text-white">Engagement Score</h4>
-            </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-[rgba(255,255,255,0.02)] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+            <div className="flex items-center gap-2 mb-3"><Target className="w-4 h-4 text-violet-400" /><h4 className="text-sm font-semibold text-white">Engagement Score</h4></div>
             <div className="flex items-end gap-2 mb-2">
-                <span className={`text-3xl font-bold ${color}`}>{score}</span>
+                <AnimatedCounter value={score} className={`text-3xl font-bold ${color}`} />
                 <span className="text-xs text-zinc-600 mb-1">/ 100</span>
             </div>
             <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${bg}`} style={{ width: `${score}%` }} />
+                <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ duration: 0.8 }} className={`h-full rounded-full ${bg}`} />
             </div>
-        </div>
+        </motion.div>
     );
 }
 
@@ -474,24 +382,18 @@ function LoyaltyCard({ kpis }: { kpis: any }) {
     const total = kpis.totalUsers || 1;
     const loyaltyPct = Math.round((returning / total) * 100);
     return (
-        <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-                <Users className="w-4 h-4 text-pink-400" />
-                <h4 className="text-sm font-semibold text-white">Audience Loyalty</h4>
-            </div>
-            <div className="flex justify-between text-xs mb-1">
-                <span className="text-zinc-600">New</span>
-                <span className="text-zinc-600">Returning</span>
-            </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-[rgba(255,255,255,0.02)] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+            <div className="flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-pink-400" /><h4 className="text-sm font-semibold text-white">Audience Loyalty</h4></div>
+            <div className="flex justify-between text-xs mb-1"><span className="text-zinc-600">New</span><span className="text-zinc-600">Returning</span></div>
             <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
-                <div className="h-full bg-violet-500/50" style={{ width: `${100 - loyaltyPct}%` }} />
-                <div className="h-full bg-emerald-500/50" style={{ width: `${loyaltyPct}%` }} />
+                <motion.div initial={{ width: 0 }} animate={{ width: `${100 - loyaltyPct}%` }} transition={{ duration: 0.6 }} className="h-full bg-violet-500/50" />
+                <motion.div initial={{ width: 0 }} animate={{ width: `${loyaltyPct}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full bg-emerald-500/50" />
             </div>
             <div className="flex justify-between text-[10px] mt-1.5">
                 <span className="text-violet-400 font-medium">{100 - loyaltyPct}% new</span>
                 <span className="text-emerald-400 font-medium">{loyaltyPct}% returning</span>
             </div>
-        </div>
+        </motion.div>
     );
 }
 
@@ -504,13 +406,10 @@ function DiversityCard({ channels }: { channels: any[] }) {
     const score = Math.round((entropy / Math.max(maxEntropy, 0.01)) * 100);
     const color = score >= 60 ? 'text-emerald-400' : score >= 35 ? 'text-amber-400' : 'text-red-400';
     return (
-        <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-                <Globe className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-sm font-semibold text-white">Source Diversity</h4>
-            </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[rgba(255,255,255,0.02)] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+            <div className="flex items-center gap-2 mb-3"><Globe className="w-4 h-4 text-blue-400" /><h4 className="text-sm font-semibold text-white">Source Diversity</h4></div>
             <div className="flex items-end gap-1 mb-3">
-                <span className={`text-3xl font-bold ${color}`}>{score}</span>
+                <AnimatedCounter value={score} className={`text-3xl font-bold ${color}`} />
                 <span className="text-xs text-zinc-600 mb-1">/ 100</span>
             </div>
             <div className="space-y-1">
@@ -521,6 +420,6 @@ function DiversityCard({ channels }: { channels: any[] }) {
                     </div>
                 ))}
             </div>
-        </div>
+        </motion.div>
     );
 }
