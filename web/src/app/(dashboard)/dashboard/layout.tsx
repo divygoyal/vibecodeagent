@@ -29,9 +29,9 @@ const RegistrationContext = createContext<RegistrationContextType>({
     isRegistering: true,
     registrationError: null,
     selectedProperty: '',
-    setSelectedProperty: () => {},
+    setSelectedProperty: () => { },
     selectedSite: '',
-    setSelectedSite: () => {},
+    setSelectedSite: () => { },
 });
 
 export const useRegistration = () => useContext(RegistrationContext);
@@ -77,53 +77,58 @@ export default function DashboardLayout({
         document.documentElement.setAttribute('data-theme', next);
     };
 
-    // Registration state with proper tracking
-    const [registrationState, setRegistrationState] = useState({
-        isRegistered: false,
-        isRegistering: true,
-        registrationError: null as string | null,
+    // Registration state — check sessionStorage first to avoid re-registering on refresh
+    const [registrationState, setRegistrationState] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const cached = sessionStorage.getItem('tc-registered');
+            if (cached === 'true') {
+                return { isRegistered: true, isRegistering: false, registrationError: null as string | null };
+            }
+        }
+        return { isRegistered: false, isRegistering: true, registrationError: null as string | null };
     });
 
     useEffect(() => {
-        if (session?.user && !registrationState.isRegistered) {
-            const registerProvider = async () => {
-                try {
-                    setRegistrationState(prev => ({ ...prev, isRegistering: true, registrationError: null }));
-                    
-                    const res = await fetch('/api/auth/register-provider', { 
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    
-                    if (res.ok) {
-                        setRegistrationState({
-                            isRegistered: true,
-                            isRegistering: false,
-                            registrationError: null,
-                        });
-                    } else {
-                        const data = await res.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to register provider');
-                    }
-                } catch (err) {
-                    console.error('Registration error:', err);
-                    setRegistrationState({
-                        isRegistered: false,
-                        isRegistering: false,
-                        registrationError: err instanceof Error ? err.message : 'Registration failed',
-                    });
-                }
-            };
-            
-            registerProvider();
-        } else if (!session?.user) {
+        // Skip if already registered (persisted in sessionStorage)
+        if (registrationState.isRegistered) return;
+        if (!session?.user) {
             // Reset state when no session
-            setRegistrationState({
-                isRegistered: false,
-                isRegistering: true,
-                registrationError: null,
-            });
+            setRegistrationState({ isRegistered: false, isRegistering: true, registrationError: null });
+            return;
         }
+
+        const registerProvider = async () => {
+            try {
+                setRegistrationState(prev => ({ ...prev, isRegistering: true, registrationError: null }));
+
+                const res = await fetch('/api/auth/register-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (res.ok) {
+                    // Persist in sessionStorage so refresh doesn't re-trigger
+                    sessionStorage.setItem('tc-registered', 'true');
+                    setRegistrationState({
+                        isRegistered: true,
+                        isRegistering: false,
+                        registrationError: null,
+                    });
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'Failed to register provider');
+                }
+            } catch (err) {
+                console.error('Registration error:', err);
+                setRegistrationState({
+                    isRegistered: false,
+                    isRegistering: false,
+                    registrationError: err instanceof Error ? err.message : 'Registration failed',
+                });
+            }
+        };
+
+        registerProvider();
     }, [session, registrationState.isRegistered]);
 
     return (
@@ -141,7 +146,7 @@ export default function DashboardLayout({
                         </div>
                         {!collapsed && (
                             <span className="text-base font-bold text-white whitespace-nowrap">
-                                Grow<span className="text-emerald-400">Claw</span>
+                                Traffic<span className="text-emerald-400">Claw</span>
                             </span>
                         )}
                     </Link>
@@ -308,7 +313,7 @@ export default function DashboardLayout({
                                     <Zap className="w-4 h-4 text-black" strokeWidth={3} />
                                 </div>
                                 <span className="text-base font-bold text-white">
-                                    Grow<span className="text-emerald-400">Claw</span>
+                                    Traffic<span className="text-emerald-400">Claw</span>
                                 </span>
                             </Link>
                             <button

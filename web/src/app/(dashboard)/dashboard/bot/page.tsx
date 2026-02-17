@@ -248,40 +248,45 @@ export default function BotPage() {
                 </div>
 
                 {!isProvisioned ? (
-                    <>
-                        <p className="text-zinc-500 text-sm mb-5">
-                            Follow these steps to create your bot and get the token:
-                        </p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
+                        {/* Left column — Instructions + Input */}
+                        <div>
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="w-10 h-10 rounded-full bg-[#229ED9] flex items-center justify-center">
+                                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-white fill-current"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.492-1.302.48-.428-.013-1.252-.242-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
+                                </div>
+                                <h3 className="text-lg font-semibold text-white">Connect Telegram</h3>
+                            </div>
 
-                        {/* Video Tutorial */}
-                        <div className="mb-6 rounded-xl overflow-hidden border border-white/[0.08] bg-black/20">
-                            <video
-                                src="/videos/demobotfather.mp4"
-                                controls
-                                className="w-full h-auto max-h-[400px]"
-                                poster="/images/video-poster.jpg" // Optional: You might want to add a poster image later
-                            >
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-
-                        {/* Instructions */}
-                        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-5 mb-6 text-sm text-zinc-300 space-y-3">
-                            <h3 className="font-semibold text-white mb-2">How to get your bot token?</h3>
-                            <ol className="list-decimal pl-5 space-y-2">
-                                <li>Open Telegram and search for <strong className="text-emerald-400">@BotFather</strong>.</li>
-                                <li>Start a chat and type <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-200">/newbot</code>.</li>
-                                <li>Follow the prompts to name your bot and choose a username (must end in 'bot').</li>
-                                <li>BotFather will send you a message with your <strong>HTTP API Token</strong>. Copy the entire token string.</li>
-                                <li>Paste the token in the field below and click <strong>Connect</strong>.</li>
+                            <h4 className="text-sm font-semibold text-zinc-300 mb-3">How to get your bot token?</h4>
+                            <ol className="space-y-3 text-sm text-zinc-400 mb-6">
+                                <li className="flex gap-3">
+                                    <span className="text-emerald-400 font-bold shrink-0">1.</span>
+                                    <span>Open Telegram and go to <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline underline-offset-2 font-semibold hover:text-emerald-300">@BotFather</a>.</span>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="text-emerald-400 font-bold shrink-0">2.</span>
+                                    <span>Start a chat and type <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-200 text-xs">/newbot</code> .</span>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="text-emerald-400 font-bold shrink-0">3.</span>
+                                    <span>Follow the prompts to name your bot and choose a username.</span>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="text-emerald-400 font-bold shrink-0">4.</span>
+                                    <span>BotFather will send you a message with your bot token. Copy the entire token (it looks like a long string of numbers and letters).</span>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="text-emerald-400 font-bold shrink-0">5.</span>
+                                    <span>Paste the token in the field below and click Save &amp; Connect.</span>
+                                </li>
                             </ol>
-                        </div>
 
-                        <div className="flex gap-3">
+                            <label className="text-sm font-medium text-zinc-400 mb-2 block">Enter bot token</label>
                             <input
-                                type="password"
-                                placeholder="Paste your bot token here"
-                                className="flex-1 bg-[#0c0c10] border border-white/[0.08] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all placeholder:text-zinc-600"
+                                type="text"
+                                placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+                                className="w-full bg-[#0c0c10] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all placeholder:text-zinc-600 mb-4 font-mono"
                                 value={botToken}
                                 onChange={(e) => setBotToken(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSetupBot()}
@@ -289,17 +294,44 @@ export default function BotPage() {
                             <button
                                 onClick={handleSetupBot}
                                 disabled={setupStatus === 'loading'}
-                                className="px-6 py-3 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-90 disabled:opacity-50 rounded-xl text-sm font-semibold transition-all text-black"
+                                className="w-full py-3.5 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-90 disabled:opacity-50 rounded-xl text-sm font-semibold transition-all text-black flex items-center justify-center gap-2"
                             >
                                 {setupStatus === 'loading' ? (
-                                    <span className="flex items-center gap-2">
+                                    <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         Connecting...
-                                    </span>
-                                ) : 'Connect'}
+                                    </>
+                                ) : (
+                                    <>
+                                        Save & Connect
+                                        <CheckCircle2 className="w-4 h-4" />
+                                    </>
+                                )}
                             </button>
                         </div>
-                    </>
+
+                        {/* Right column — Phone mockup with video */}
+                        <div className="flex items-start justify-center">
+                            <div className="relative w-[260px]">
+                                {/* Phone frame */}
+                                <div className="relative bg-[#1a1a1f] rounded-[2.5rem] p-2 shadow-2xl shadow-black/50 border border-white/[0.08]">
+                                    {/* Notch */}
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-[#1a1a1f] rounded-b-2xl z-10" />
+                                    {/* Screen */}
+                                    <div className="rounded-[2rem] overflow-hidden bg-black">
+                                        <video
+                                            src="/videos/demobotfather.mp4"
+                                            autoPlay
+                                            muted
+                                            loop
+                                            playsInline
+                                            className="w-full h-auto"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 ) : (
                     <div className="bg-[#0c0c10] p-4 rounded-xl border border-white/[0.06] mt-3">
                         <div className="flex items-center justify-between">
