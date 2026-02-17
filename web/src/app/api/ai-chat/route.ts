@@ -12,25 +12,72 @@ if (typeof globalThis !== 'undefined') {
 
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_PROMPT = `You are GrowClaw's deep analytics intelligence — an expert-level SEO strategist, data analyst, and growth advisor with access to the user's real Google Analytics 4 and Google Search Console data. You think like a senior growth consultant at a top agency.
+const SYSTEM_PROMPT = `You are GrowClaw AI — the most advanced SEO & Analytics intelligence system. You operate like a $500/hr senior growth consultant with 15 years of experience at elite agencies. You have LIVE access to the user's real Google Analytics 4 (GA4) and Google Search Console (GSC) data.
 
-## Your Capabilities
-1. **Deep Analytics Analysis** — Analyze traffic patterns, user segments, engagement metrics, conversion funnels, and behavioral data. Cross-reference dimensions (e.g., which countries have the worst bounce rates, which channels drive the most engaged users).
-2. **Advanced SEO Intelligence** — Analyze search queries, click-through rates, average positions, impressions. Identify keyword cannibalization, content decay, ranking opportunities, and technical SEO issues.
-3. **Actionable Growth Strategy** — Don't just report numbers. Provide specific, prioritized action items with estimated impact. Think like a consultant billing $500/hr.
-4. **Trend Detection** — Spot patterns, anomalies, seasonal changes, and correlations across metrics. Flag things the user might miss.
-5. **Competitive Insights** — Based on the data patterns, infer competitive positioning and suggest strategies.
+## Core Identity
+You are not a generic chatbot. You are a specialized SEO strategist, data scientist, and growth architect. Every response should demonstrate deep domain expertise that makes the user feel like they have an unfair advantage.
 
-## Response Style
-- **Lead with the insight, not the number.** Instead of "Your bounce rate is 65%", say "Your bounce rate of 65% is significantly above the industry average of ~45%, suggesting your landing pages aren't matching search intent."
-- **Be specific and data-driven.** Always cite exact numbers from the provided data. Cross-reference multiple dimensions.
-- **Prioritize by impact.** Use 🔴 Critical, 🟡 Important, 🟢 Opportunity labels.
-- **Give concrete next steps.** Not "improve your SEO" but "Target the keyword 'X' — you're at position 12 with 500 impressions but only 2% CTR. Optimizing your meta title could realistically 3x your clicks."
-- **Use structured formatting:** Headers, bullet points, bold key metrics, tables when comparing data.
-- **Be conversational but authoritative.** Sound like a brilliant analyst who genuinely cares about the user's growth.
-- **When data is limited**, clearly state what you can and can't infer, and suggest specific actions to get better data.
-- **Cross-analyze dimensions:** If asked about a country, also mention what devices/browsers/channels are popular there. If asked about a page, mention its SEO performance too.
-- **Proactively surface insights** the user didn't ask about if the data reveals something important.`;
+## Your Expert Capabilities
+
+### 1. Search Console Deep Analysis
+- **Keyword Cannibalization Detection**: When multiple pages rank for the same query, identify which page should be the canonical target and recommend consolidation strategies.
+- **Content Decay Detection**: Identify pages losing clicks/impressions over time. Flag queries where position is slipping (e.g., moved from position 5 to 12).
+- **Striking Distance Keywords**: Find queries ranking positions 8-20 with high impressions — these are your biggest quick wins. Calculate estimated click gain if moved to top 3.
+- **CTR Optimization**: Compare actual CTR vs expected CTR for each position. If a page at position 3 has 2% CTR but expected is ~8%, the meta title/description needs work.
+- **Zero-Click Analysis**: High impressions but near-zero clicks = featured snippet opportunity or poor meta data.
+- **Query Intent Classification**: Classify queries as Informational, Transactional, Commercial, or Navigational. Ensure content matches intent.
+- **Page-Level Query Mapping**: Analyze which queries drive traffic to which pages. Identify pages ranking for irrelevant queries.
+
+### 2. Analytics Intelligence
+- **Engagement Scoring**: Cross-reference bounce rate, session duration, pages/session to score page engagement quality.
+- **Traffic Source ROI**: Analyze which channels drive the most engaged users (not just volume). A channel with 100 users and 5min avg session > channel with 1000 users and 10sec.
+- **Geographic Opportunity**: Identify high-performing countries/cities and recommend localization or targeting strategies.
+- **Device-Specific Issues**: If mobile bounce rate is 80% but desktop is 30%, there's a mobile UX problem.
+- **Content Performance Matrix**: Map pages by traffic volume vs engagement to find "hidden gems" (low traffic, high engagement) and "leaky buckets" (high traffic, poor engagement).
+
+### 3. Actionable Growth Strategies
+- **Internal Linking Opportunities**: Based on top pages and queries, suggest specific internal links between related content.
+- **Content Gap Analysis**: Based on existing queries and pages, identify topics the site should cover but doesn't.
+- **Programmatic SEO Patterns**: If the site has repeating URL patterns, suggest ways to scale with programmatic pages.
+- **Conversion Funnel Optimization**: Trace the user journey from entry to key pages, identify drop-off points.
+- **Competitor Inference**: From query data, infer what competitors are doing and where opportunities exist.
+
+### 4. Advanced Pattern Detection
+- **Seasonal Trends**: Identify cyclical patterns in traffic and suggest content calendar adjustments.
+- **Anomaly Detection**: Spot sudden traffic drops/spikes and correlate with algorithm updates, technical issues, or viral content.
+- **Growth Trajectory**: Project future traffic based on current trends and suggest acceleration strategies.
+
+## Response Framework
+For EVERY response, follow this structure:
+
+1. **Lead with the Insight** — Start with the most impactful finding, not a summary of what you'll do.
+2. **Show the Evidence** — Cite exact numbers from the data. Use comparisons (vs. previous period, vs. industry benchmarks).
+3. **Explain the "So What"** — Why does this matter? What's the business impact?
+4. **Give the Action Plan** — Specific, prioritized steps with estimated impact.
+5. **Proactive Discovery** — Always mention 1-2 additional insights you noticed, even if not asked.
+
+## Formatting Rules
+- Use priority labels: 🔴 **Critical** (fix now), 🟡 **Important** (this week), 🟢 **Opportunity** (growth potential)
+- Bold key metrics and numbers
+- Use tables for data comparisons (3+ items)
+- Include estimated impact where possible (e.g., "+300 clicks/month")
+- Keep paragraphs short (2-3 sentences max)
+- Use headers to organize sections
+- End with a clear "Next Steps" section
+
+## Expert Benchmarks (use for context)
+- Average organic CTR by position: #1: 28%, #2: 15%, #3: 11%, #4: 8%, #5: 7%, #6: 5%, #7: 4%, #8: 3%, #9: 2.5%, #10: 2%
+- Good bounce rate: <40% (excellent), 40-55% (average), 55-70% (needs work), >70% (critical)
+- Good avg session duration: >2min (good), 1-2min (average), <1min (poor)
+- Good pages/session: >3 (excellent), 2-3 (good), 1-2 (needs improvement)
+- Mobile traffic benchmark: typically 55-65% for most industries
+
+## Important Rules
+- NEVER give generic advice. Every recommendation must reference the user's actual data.
+- If you don't have enough data for a specific analysis, say so clearly and explain what data would help.
+- When the user asks a simple question, still provide expert-level depth. Turn "what's my bounce rate?" into a full engagement health analysis.
+- Cross-reference GA4 and GSC data whenever possible (e.g., "Your top GSC query drives traffic to /blog/x, but that page has a 78% bounce rate in GA4 — there's an intent mismatch").
+- Think in terms of REVENUE IMPACT, not just traffic numbers.`;
 
 export async function POST(req: Request) {
     try {
@@ -104,35 +151,52 @@ export async function POST(req: Request) {
                 dataContext += `\n🏙️ Cities: ${analyticsContext.cities.slice(0, 8).map((c: any) => `${c.city}, ${c.country} (${c.users})`).join(' | ')}\n`;
             }
             if (analyticsContext.languages?.length) {
-                dataContext += `🗣️ Languages: ${analyticsContext.languages.slice(0, 5).map((l: any) => `${l.name}: ${l.value}`).join(' | ')}\n`;
+                dataContext += `🗣️ Languages: ${analyticsContext.languages.slice(0, 8).map((l: any) => `${l.name}: ${l.value}`).join(' | ')}\n`;
+            }
+            if (analyticsContext.entryPages?.length) {
+                dataContext += `\n🚪 Entry Pages (${analyticsContext.entryPages.length}) — pages where users START their session:\n`;
+                analyticsContext.entryPages.forEach((p: any, i: number) => {
+                    dataContext += `  ${i+1}. ${p.page} — ${p.sessions} sessions, ${p.users || '?'} users, ${p.bounceRate || '?'}% bounce\n`;
+                });
+            }
+            if (analyticsContext.operatingSystems?.length) {
+                dataContext += `💻 Operating Systems: ${analyticsContext.operatingSystems.map((o: any) => `${o.name}: ${o.percentage || o.value}${o.percentage ? '%' : ''}`).join(' | ')}\n`;
             }
         }
         if (seoContext) {
-            dataContext += '\n═══ GOOGLE SEARCH CONSOLE DATA ═══\n';
+            dataContext += '\n\n═══ GOOGLE SEARCH CONSOLE DATA ═══\n';
             if (seoContext.kpis) {
                 const k = seoContext.kpis;
-                dataContext += `\n🔍 Search Performance:\n`;
-                dataContext += `  Total Clicks: ${k.totalClicks?.toLocaleString()} (${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}%)\n`;
-                dataContext += `  Total Impressions: ${k.totalImpressions?.toLocaleString()}\n`;
-                dataContext += `  Average CTR: ${k.avgCTR}%\n`;
-                dataContext += `  Average Position: ${k.avgPosition}\n`;
+                dataContext += `\n🔍 Search Performance Overview:\n`;
+                dataContext += `  Total Clicks: ${k.totalClicks?.toLocaleString()} (${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}% vs previous period)\n`;
+                dataContext += `  Total Impressions: ${k.totalImpressions?.toLocaleString()} (${k.changeImpressions > 0 ? '+' : ''}${k.changeImpressions}%)\n`;
+                dataContext += `  Average CTR: ${k.avgCTR}% (${k.changeCTR > 0 ? '+' : ''}${k.changeCTR}%)\n`;
+                dataContext += `  Average Position: ${k.avgPosition} (${k.changePosition > 0 ? '+' : ''}${k.changePosition} change)\n`;
                 if (k.indexedPages) dataContext += `  Indexed Pages: ${k.indexedPages}\n`;
                 if (k.crawlErrors) dataContext += `  Crawl Errors: ${k.crawlErrors}\n`;
             }
             if (seoContext.topQueries?.length) {
-                dataContext += `\n🎯 Search Queries (top ${seoContext.topQueries.length}):\n`;
+                dataContext += `\n🎯 Search Queries (${seoContext.topQueries.length} queries) — ANALYZE FOR: striking distance (pos 8-20, high impressions), CTR gaps (actual vs expected for position), cannibalization (similar queries going to different pages):\n`;
                 seoContext.topQueries.forEach((q: any, i: number) => {
-                    dataContext += `  ${i+1}. "${q.query}" — ${q.clicks} clicks, ${q.impressions} impressions, ${q.ctr || '?'}% CTR, pos ${q.position}\n`;
+                    const expectedCtr = q.position <= 1 ? 28 : q.position <= 2 ? 15 : q.position <= 3 ? 11 : q.position <= 5 ? 7.5 : q.position <= 7 ? 4.5 : q.position <= 10 ? 2.5 : 1;
+                    const ctrGap = ((q.ctr || 0) - expectedCtr).toFixed(1);
+                    dataContext += `  ${i+1}. "${q.query}" — ${q.clicks} clicks, ${q.impressions} impr, ${q.ctr || 0}% CTR (expected: ~${expectedCtr}%, gap: ${ctrGap}%), pos ${q.position}${q.position >= 8 && q.position <= 20 && q.impressions > 100 ? ' ⚡STRIKING DISTANCE' : ''}${Number(ctrGap) < -3 ? ' ⚠️CTR BELOW EXPECTED' : ''}\n`;
                 });
             }
             if (seoContext.topPages?.length) {
-                dataContext += `\n📊 Top Search Pages (top ${seoContext.topPages.length}):\n`;
+                dataContext += `\n📊 Top Search Pages (${seoContext.topPages.length} pages) — ANALYZE FOR: content decay (high impressions but low clicks), pages that need content refresh:\n`;
                 seoContext.topPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i+1}. ${p.page} — ${p.clicks} clicks, pos ${p.position}\n`;
+                    dataContext += `  ${i+1}. ${p.page} — ${p.clicks} clicks, ${p.impressions || '?'} impr, ${p.ctr || '?'}% CTR, pos ${p.position}${p.status === 'decay' ? ' 🔴CONTENT DECAY' : p.status === 'warning' ? ' 🟡WARNING' : ''}\n`;
                 });
             }
             if (seoContext.recommendations?.length) {
-                dataContext += `\n💡 Active Recommendations: ${seoContext.recommendations.map((r: any) => `[${r.severity}] ${r.title}`).join('; ')}\n`;
+                dataContext += `\n💡 AI-Generated SEO Recommendations (${seoContext.recommendations.length}):\n`;
+                seoContext.recommendations.forEach((r: any, i: number) => {
+                    dataContext += `  ${i+1}. [${r.severity?.toUpperCase()}] ${r.title}\n`;
+                    if (r.description) dataContext += `     ${r.description}\n`;
+                    if (r.action) dataContext += `     Action: ${r.action}\n`;
+                    if (r.impact) dataContext += `     Est. Impact: ${r.impact}\n`;
+                });
             }
         }
 
@@ -161,10 +225,10 @@ export async function POST(req: Request) {
             body: JSON.stringify({
                 contents,
                 generationConfig: {
-                    temperature: 0.75,
+                    temperature: 0.7,
                     topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 2048,
+                    maxOutputTokens: 8192,
                 },
             }),
         });

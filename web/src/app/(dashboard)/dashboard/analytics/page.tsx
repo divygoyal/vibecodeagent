@@ -4,14 +4,14 @@ import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import {
     TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Layers,
-    Download, RefreshCw, Target, Globe, Bot,
+    Download, RefreshCw, Target, Globe, Bot, Clock, Search,
     Filter as FilterIcon, MapPin, BarChart3, UserPlus
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
-import { useAnalyticsData } from '@/lib/useDashboardData';
+import { useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
@@ -92,9 +92,13 @@ const ChartTooltip = ({ active, payload, label }: any) => {
 const CARD = 'bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border border-white/[0.06] rounded-2xl hover:border-white/[0.1] transition-all duration-200';
 
 // ─── Main Overview Page ───
+// Traffic Sources donut colors
+const SOURCE_COLORS = ['#34d399', '#3b82f6', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c'];
+
 export default function AnalyticsPage() {
     const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
+    const { data: seoData } = useSeoData('all', undefined, hasGoogleConnection);
     const { filters, toggleFilter } = useFilterStore();
     const [drilldown, setDrilldown] = useState<any>(null);
 
@@ -230,108 +234,176 @@ export default function AnalyticsPage() {
     // Use filtered KPIs when filters active, otherwise original
     const displayKpis = filteredKpis || kpis;
 
+    // Prepare traffic sources data for donut chart
+    const sourceData = useMemo(() => {
+        if (!channels.length) return [];
+        const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+        return channels.slice(0, 6).map((c: any) => ({
+            name: String(c.name || 'Other'),
+            value: c.value || 0,
+            pct: total > 0 ? Math.round(((c.value || 0) / total) * 100) : 0,
+        }));
+    }, [channels]);
+
+    // GSC queries
+    const seoQueries: any[] = seoData?.queries || [];
+
     return (
         <div className="space-y-5">
-            {/* ─── KPI Cards (matches reference: dark bg, sparkline, big number, % change) ─── */}
+            {/* ─── KPI Cards (clean, matching reference) ─── */}
             {kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                        { label: 'TOTAL USERS', raw: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, icon: Users, sparkKey: 'activeUsers', sparkColor: '#34d399' },
-                        { label: 'PAGE VIEWS', raw: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, icon: Eye, sparkKey: 'pageViews', sparkColor: '#22d3ee' },
-                        { label: 'SESSIONS', raw: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, icon: BarChart3, sparkKey: 'sessions', sparkColor: '#a78bfa' },
-                        { label: 'BOUNCE RATE', formatted: `${displayKpis?.avgBounceRate ?? kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', icon: MousePointer, sparkKey: 'bounceRate', sparkColor: '#fbbf24', invert: true },
-                    ].map((k: any, i) => {
-                        const sparkData = traffic.map((d: any) => ({ v: d[k.sparkKey] || 0 }));
-                        return (
-                            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                                className="bg-[#111116] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors relative overflow-hidden">
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center">
-                                        <k.icon className="w-4 h-4 text-zinc-500" />
-                                    </div>
-                                    <Change value={k.change} suffix={k.suffix} />
-                                </div>
-                                <div className="text-[28px] font-bold text-white tabular-nums leading-tight mt-2">
-                                    {k.raw != null ? <AnimatedCounter value={k.raw} formatter={fmt} /> : k.formatted}
-                                </div>
-                                <div className="text-[10px] text-zinc-500 font-medium tracking-wider mt-1 mb-3">{k.label}</div>
-                                {sparkData.length > 0 && (
-                                    <div className="h-[32px] -mx-1">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={sparkData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id={`kpi-${i}`} x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor={k.sparkColor} stopOpacity={0.25} />
-                                                        <stop offset="95%" stopColor={k.sparkColor} stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <Area type="monotone" dataKey="v" stroke={k.sparkColor} fill={`url(#kpi-${i})`} strokeWidth={1.5} dot={false} />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                )}
-                            </motion.div>
-                        );
-                    })}
+                        { label: 'Active Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, formatted: false },
+                        { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, formatted: false },
+                        { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, formatted: true, suffix: '%' },
+                        { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, formatted: true, isDuration: true },
+                    ].map((k: any, i) => (
+                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                            className={`${CARD} p-5`}>
+                            <p className="text-xs text-zinc-500 mb-3">{k.label}</p>
+                            <div className="text-[32px] font-bold text-white tabular-nums leading-none mb-2">
+                                {k.isDuration ? fmtDur(k.value) : k.formatted ? `${k.value}${k.suffix || ''}` : <AnimatedCounter value={k.value} formatter={fmt} />}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Change value={k.change} suffix="% vs last period" />
+                            </div>
+                        </motion.div>
+                    ))}
                 </div>
             )}
 
-            {/* ─── Traffic Trend ─── */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-5`}>
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <h3 className="text-sm font-semibold text-white">Unique Visitors</h3>
-                        {anyFilterActive && (
-                            <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5">
-                                <FilterIcon className="w-2.5 h-2.5" /> Filtered view
-                            </span>
-                        )}
+            {/* ─── Traffic Trend + Traffic Sources (side by side) ─── */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+                {/* Traffic Trend chart — 3/5 width */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-5 lg:col-span-3`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-sm font-semibold text-white">Traffic Trend</h3>
+                            {anyFilterActive && (
+                                <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5">
+                                    <FilterIcon className="w-2.5 h-2.5" /> Filtered
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px]">
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Users</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400" /> Sessions</span>
+                            <button onClick={() => refresh()} className="p-1 rounded text-zinc-600 hover:text-blue-400 transition ml-1"><RefreshCw className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1 rounded text-zinc-600 hover:text-white transition"><Download className="w-3.5 h-3.5" /></button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                        <button onClick={() => refresh()} className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-white/[0.04] transition"><RefreshCw className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition"><Download className="w-3.5 h-3.5" /></button>
+                    <div className="h-[260px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                                <defs>
+                                    <linearGradient id="gU" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.15} />
+                                        <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#3f3f46' }} tickFormatter={(v: string) => { const d = new Date(v); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
+                                <Tooltip content={<ChartTooltip />} />
+                                <Area type="monotone" dataKey="activeUsers" name="Users" stroke="#34d399" fill="url(#gU)" strokeWidth={2} dot={false} />
+                                <Area type="monotone" dataKey="sessions" name="Sessions" stroke="#22d3ee" fill="url(#gS)" strokeWidth={1.5} dot={false} />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
-                </div>
-                <div className="h-[240px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                            <defs>
-                                <linearGradient id="gU" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.12} />
-                                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#3f3f46' }} tickFormatter={(v: string) => v.slice(5)} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Area type="monotone" dataKey="activeUsers" name="Visitors" stroke="#3b82f6" fill="url(#gU)" strokeWidth={2} dot={false} />
-                            <Area type="monotone" dataKey="sessions" name="Sessions" stroke="#818cf8" fill="url(#gS)" strokeWidth={1.5} dot={false} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </motion.div>
+                </motion.div>
 
-            {/* ─── Ask the Bot Banner ─── */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-                className="bg-gradient-to-r from-blue-500/[0.06] via-cyan-500/[0.04] to-violet-500/[0.06] border border-blue-500/15 rounded-2xl p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center">
-                        <Bot className="w-4.5 h-4.5 text-blue-400" />
+                {/* Traffic Sources donut — 2/5 width */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-5 lg:col-span-2`}>
+                    <h3 className="text-sm font-semibold text-white mb-4">Traffic Sources</h3>
+                    {sourceData.length > 0 ? (
+                        <div className="flex flex-col items-center">
+                            <div className="h-[180px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={50} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
+                                            {sourceData.map((_: any, idx: number) => (
+                                                <Cell key={idx} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(v: any) => (v ?? 0).toLocaleString()} contentStyle={{ background: '#0a0a12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-2 w-full max-w-[280px]">
+                                {sourceData.map((s: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
+                                        <span className="text-[11px] text-zinc-400 truncate">{s.name}</span>
+                                        <span className="text-[11px] text-white font-semibold ml-auto tabular-nums">{s.pct}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">No source data</div>
+                    )}
+                </motion.div>
+            </div>
+
+            {/* ─── Top Search Queries from GSC ─── */}
+            {seoQueries.length > 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-5`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-white">Top Search Queries</h3>
+                        <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
+                            <Search className="w-3 h-3" /> From Google Search Console
+                        </span>
                     </div>
-                    <div>
-                        <p className="text-sm font-semibold text-white">Have questions about your analytics?</p>
-                        <p className="text-[11px] text-zinc-500 mt-0.5">Ask our AI Bot anything — traffic trends, audience insights, growth tips, and more.</p>
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-white/[0.06]">
+                                    <th className="text-left text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 pr-4">Query</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">Clicks</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">Impressions</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">CTR</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 pl-4">Position</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {seoQueries.slice(0, 10).map((q: any, i: number) => {
+                                    const maxClicks = Math.max(...seoQueries.slice(0, 10).map((x: any) => x.clicks || 0), 1);
+                                    const barW = Math.round(((q.clicks || 0) / maxClicks) * 100);
+                                    return (
+                                        <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
+                                            <td className="py-3 pr-4">
+                                                <span className="text-xs text-zinc-300">{String(q.query || '')}</span>
+                                            </td>
+                                            <td className="py-3 px-4">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <div className="w-[80px] h-[5px] bg-white/[0.04] rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full bg-emerald-500/50" style={{ width: `${barW}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-white font-semibold tabular-nums min-w-[40px] text-right">{(q.clicks || 0).toLocaleString()}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-right">
+                                                <span className="text-xs text-zinc-400 tabular-nums">{(q.impressions || 0).toLocaleString()}</span>
+                                            </td>
+                                            <td className="py-3 px-4 text-right">
+                                                <span className={`text-xs font-medium tabular-nums ${(q.ctr || 0) >= 5 ? 'text-emerald-400' : 'text-zinc-400'}`}>{q.ctr || 0}%</span>
+                                            </td>
+                                            <td className="py-3 pl-4 text-right">
+                                                <span className="text-xs text-zinc-400 tabular-nums">{q.position || 0}</span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-                <Link href="/dashboard/bot" className="px-4 py-2 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 hover:text-blue-300 transition whitespace-nowrap">
-                    Ask the Bot →
-                </Link>
-            </motion.div>
+                </motion.div>
+            )}
 
             {/* ─── Referrers & Pages (with progress bars + filtering) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
