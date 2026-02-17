@@ -29,7 +29,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: "Hi! I'm your AI SEO Advisor. I can analyze your analytics data, suggest improvements, and answer questions about your site's performance. What would you like to know?",
+            content: "Hey! 👋 Connect with me to get detailed answers about your analytics, SEO performance, traffic sources, and more. Ask me anything about your website data!",
             timestamp: new Date(),
         },
     ]);
@@ -124,7 +124,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                         </div>
                         <div>
                             <h3 className="text-sm font-semibold text-white">AI SEO Advisor</h3>
-                            <p className="text-[10px] text-zinc-500">Powered by Gemini</p>
+                            <p className="text-[10px] text-zinc-500">Your AI Growth Assistant</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5">

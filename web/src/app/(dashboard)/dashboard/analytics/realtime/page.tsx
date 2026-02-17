@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRealtimeData } from '@/lib/useDashboardData';
@@ -43,8 +43,12 @@ export default function RealtimePage() {
     const { selectedProperty, hasGoogleConnection } = useAnalyticsContext();
     const { data: realtimeData, isLoading } = useRealtimeData(selectedProperty, hasGoogleConnection);
     const [activeCountry, setActiveCountry] = useState<string | null>(null);
+    const [mounted, setMounted] = useState(false);
 
-    if (isLoading && !realtimeData) {
+    // Prevent hydration mismatch: render nothing meaningful until client is mounted
+    useEffect(() => { setMounted(true); }, []);
+
+    if (!mounted || (isLoading && !realtimeData)) {
         return (
             <div className="flex items-center justify-center py-20">
                 <div className="flex flex-col items-center gap-3">
@@ -158,8 +162,8 @@ export default function RealtimePage() {
                         <div className="flex items-center gap-3 mb-2">
                             {byDevice.map((d: any, i: number) => (
                                 <div key={i} className="flex items-center gap-1 text-[11px] text-blue-400">
-                                    {DEVICE_ICONS[d.device?.toLowerCase()] || <Monitor className="w-3.5 h-3.5" />}
-                                    <span className="tabular-nums font-bold">{d.users}</span>
+                                    {DEVICE_ICONS[String(d.device || '').toLowerCase()] || <Monitor className="w-3.5 h-3.5" />}
+                                    <span className="tabular-nums font-bold">{String(d.users ?? 0)}</span>
                                 </div>
                             ))}
                         </div>
@@ -215,9 +219,9 @@ export default function RealtimePage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-[11px] font-semibold text-white truncate">{log.event.replace('_', ' ')}</span>
+                                            <span className="text-[11px] font-semibold text-white truncate">{String(log.event || '').replace('_', ' ')}</span>
                                             <span className="text-[10px] text-zinc-600">·</span>
-                                            <span className="text-[10px] text-emerald-400 font-mono truncate">{log.page}</span>
+                                            <span className="text-[10px] text-emerald-400 font-mono truncate">{String(log.page || '/')}</span>
                                         </div>
                                         <div className="flex items-center gap-1.5 mt-0.5">
                                             {/* Referrer/device icons */}

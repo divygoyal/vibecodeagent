@@ -109,12 +109,6 @@ export default function SettingsPage() {
                 <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Connected Services</h2>
                 <div className="space-y-3">
                     <ServiceRow
-                        name="GitHub"
-                        description={session?.user?.name ? `@${session.user.name}` : 'Not connected'}
-                        connected={!!session?.user}
-                        icon="🐙"
-                    />
-                    <ServiceRow
                         name="Google Analytics"
                         description="GA4 property linked"
                         connected={true}
@@ -163,23 +157,6 @@ export default function SettingsPage() {
                         checked={notifications.botErrors}
                         onChange={() => toggleNotification('botErrors')}
                     />
-                </div>
-            </div>
-
-            {/* API Key */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">API Access</h2>
-                <p className="text-xs text-zinc-500 mb-3">Use your API key to access GrowClaw data programmatically.</p>
-                <div className="flex items-center gap-2">
-                    <div className="flex-1 font-mono text-sm bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 text-zinc-400 overflow-hidden">
-                        {showKey ? fakeApiKey : '•'.repeat(32)}
-                    </div>
-                    <button onClick={() => setShowKey(!showKey)} className="p-2.5 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">
-                        {showKey ? <EyeOff className="w-4 h-4 text-zinc-400" /> : <Eye className="w-4 h-4 text-zinc-400" />}
-                    </button>
-                    <button onClick={handleCopy} className="p-2.5 bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">
-                        {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-zinc-400" />}
-                    </button>
                 </div>
             </div>
 

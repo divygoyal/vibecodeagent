@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import {
     TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Layers,
     Download, RefreshCw, Target, Globe, Bot,
@@ -162,57 +162,83 @@ export default function AnalyticsPage() {
 
     const anyFilterActive = Object.values(filters).some(arr => arr.length > 0);
 
+    // ─── Filtered KPIs: recalculate from dimension data when filters active ───
+    const filteredKpis = useMemo(() => {
+        if (!kpis || !anyFilterActive) return null;
+        // Sum users from filtered countries (best proxy for filtered totals)
+        const sumUsers = fCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+        const sumSessions = fCountries.reduce((s: number, c: any) => s + (c.sessions || 0), 0);
+        const sumPageViews = fPages.reduce((s: number, p: any) => s + (p.views || 0), 0);
+        return {
+            totalUsers: filters.country.length > 0 ? sumUsers : kpis.totalUsers,
+            totalSessions: filters.country.length > 0 ? sumSessions : kpis.totalSessions,
+            totalPageViews: filters.page.length > 0 ? sumPageViews : kpis.totalPageViews,
+            avgBounceRate: kpis.avgBounceRate,
+        };
+    }, [kpis, anyFilterActive, fCountries, fPages, filters]);
+
+    // ─── Filtered traffic for chart ───
+    const chartTraffic = useMemo(() => {
+        if (!anyFilterActive) return traffic;
+        // When country filter active, scale traffic proportionally
+        if (filters.country.length > 0 && kpis) {
+            const ratio = (filteredKpis?.totalUsers || 0) / Math.max(kpis.totalUsers, 1);
+            return traffic.map((d: any) => ({
+                ...d,
+                activeUsers: Math.round((d.activeUsers || 0) * ratio),
+                sessions: Math.round((d.sessions || 0) * ratio),
+                pageViews: Math.round((d.pageViews || 0) * ratio),
+            }));
+        }
+        return traffic;
+    }, [traffic, anyFilterActive, filters, kpis, filteredKpis]);
+
+    // Use filtered KPIs when filters active, otherwise original
+    const displayKpis = filteredKpis || kpis;
+
     return (
         <div className="space-y-5">
-            {/* ─── KPI Cards (professional, matches SEO style) ─── */}
+            {/* ─── KPI Cards (matches reference: dark bg, sparkline, big number, % change) ─── */}
             {kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                        { label: 'Visitors', raw: kpis.totalUsers, change: kpis.changeUsers, icon: Users, iconBg: 'bg-blue-400/10', iconColor: 'text-blue-400' },
-                        { label: 'Sessions', raw: kpis.totalSessions, change: kpis.changeSessions, icon: BarChart3, iconBg: 'bg-cyan-400/10', iconColor: 'text-cyan-400' },
-                        { label: 'Page Views', raw: kpis.totalPageViews, change: kpis.changePageViews, icon: Eye, iconBg: 'bg-violet-400/10', iconColor: 'text-violet-400' },
-                        { label: 'Bounce Rate', formatted: `${kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', icon: MousePointer, iconBg: 'bg-amber-400/10', iconColor: 'text-amber-400' },
-                    ].map((k: any, i) => (
-                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                            className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className={`w-9 h-9 rounded-xl ${k.iconBg} flex items-center justify-center`}>
-                                    <k.icon className={`w-4 h-4 ${k.iconColor}`} />
-                                </div>
-                                <Change value={k.change} suffix={k.suffix} />
-                            </div>
-                            <div className="text-2xl font-bold text-white tabular-nums">
-                                {k.raw != null ? <AnimatedCounter value={k.raw} formatter={fmt} /> : k.formatted}
-                            </div>
-                            <div className="text-xs text-zinc-500 mt-1">{k.label}</div>
-                        </motion.div>
-                    ))}
-                </div>
-            )}
-
-            {/* ─── Secondary KPIs (smaller row) ─── */}
-            {kpis && (
-                <div className="grid grid-cols-3 gap-3">
-                    {[
-                        { label: 'Avg. Duration', value: fmtDur(kpis.avgSessionDuration), icon: Timer, iconBg: 'bg-purple-400/10', iconColor: 'text-purple-400' },
-                        { label: 'New Users', raw: kpis.newUsers, icon: UserPlus, iconBg: 'bg-pink-400/10', iconColor: 'text-pink-400' },
-                        { label: 'Pages/Session', value: String(kpis.pagesPerSession), icon: Layers, iconBg: 'bg-emerald-400/10', iconColor: 'text-emerald-400' },
-                    ].map((k: any, i) => (
-                        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.04 }}
-                            className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.1] transition-colors">
-                            <div className="flex items-center gap-2.5">
-                                <div className={`w-8 h-8 rounded-lg ${k.iconBg} flex items-center justify-center flex-shrink-0`}>
-                                    <k.icon className={`w-3.5 h-3.5 ${k.iconColor}`} />
-                                </div>
-                                <div>
-                                    <div className="text-lg font-bold text-white tabular-nums">
-                                        {k.raw != null ? <AnimatedCounter value={k.raw} formatter={fmt} /> : k.value}
+                        { label: 'TOTAL USERS', raw: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, icon: Users, sparkKey: 'activeUsers', sparkColor: '#34d399' },
+                        { label: 'PAGE VIEWS', raw: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, icon: Eye, sparkKey: 'pageViews', sparkColor: '#22d3ee' },
+                        { label: 'SESSIONS', raw: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, icon: BarChart3, sparkKey: 'sessions', sparkColor: '#a78bfa' },
+                        { label: 'BOUNCE RATE', formatted: `${displayKpis?.avgBounceRate ?? kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', icon: MousePointer, sparkKey: 'bounceRate', sparkColor: '#fbbf24', invert: true },
+                    ].map((k: any, i) => {
+                        const sparkData = traffic.map((d: any) => ({ v: d[k.sparkKey] || 0 }));
+                        return (
+                            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                                className="bg-[#111116] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors relative overflow-hidden">
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center">
+                                        <k.icon className="w-4 h-4 text-zinc-500" />
                                     </div>
-                                    <div className="text-[10px] text-zinc-500">{k.label}</div>
+                                    <Change value={k.change} suffix={k.suffix} />
                                 </div>
-                            </div>
-                        </motion.div>
-                    ))}
+                                <div className="text-[28px] font-bold text-white tabular-nums leading-tight mt-2">
+                                    {k.raw != null ? <AnimatedCounter value={k.raw} formatter={fmt} /> : k.formatted}
+                                </div>
+                                <div className="text-[10px] text-zinc-500 font-medium tracking-wider mt-1 mb-3">{k.label}</div>
+                                {sparkData.length > 0 && (
+                                    <div className="h-[32px] -mx-1">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={sparkData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id={`kpi-${i}`} x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor={k.sparkColor} stopOpacity={0.25} />
+                                                        <stop offset="95%" stopColor={k.sparkColor} stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <Area type="monotone" dataKey="v" stroke={k.sparkColor} fill={`url(#kpi-${i})`} strokeWidth={1.5} dot={false} />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
+                            </motion.div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -222,8 +248,8 @@ export default function AnalyticsPage() {
                     <div className="flex items-center gap-3">
                         <h3 className="text-sm font-semibold text-white">Unique Visitors</h3>
                         {anyFilterActive && (
-                            <span className="text-[9px] text-zinc-600 bg-white/[0.03] border border-white/[0.06] rounded-md px-2 py-0.5">
-                                Chart shows unfiltered trend
+                            <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5">
+                                <FilterIcon className="w-2.5 h-2.5" /> Filtered view
                             </span>
                         )}
                     </div>
@@ -234,7 +260,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="h-[240px]">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={traffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                        <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="gU" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
