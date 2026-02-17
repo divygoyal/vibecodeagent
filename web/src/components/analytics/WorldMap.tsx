@@ -1,19 +1,66 @@
 'use client';
 
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Mercator projection helpers (pure math, no library)
-function lngToX(lng: number, width: number): number {
-    return ((lng + 180) / 360) * width;
-}
-function latToY(lat: number, height: number): number {
-    const latRad = (lat * Math.PI) / 180;
-    const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
-    return (height / 2) - (height * mercN) / (2 * Math.PI);
+// ─── Mercator Projection (bounded) ───
+const MAP_W = 960;
+const MAP_H = 500;
+const LON_MIN = -170, LON_MAX = 190;
+const LAT_MIN = -58, LAT_MAX = 82;
+const LAT_MIN_R = (LAT_MIN * Math.PI) / 180;
+const MERC_MIN = Math.log(Math.tan(Math.PI / 4 + LAT_MIN_R / 2));
+const LAT_MAX_R = (LAT_MAX * Math.PI) / 180;
+const MERC_MAX = Math.log(Math.tan(Math.PI / 4 + LAT_MAX_R / 2));
+
+function project(lon: number, lat: number): [number, number] {
+    const cLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
+    const x = ((lon - LON_MIN) / (LON_MAX - LON_MIN)) * MAP_W;
+    const r = (cLat * Math.PI) / 180;
+    const m = Math.log(Math.tan(Math.PI / 4 + r / 2));
+    const y = MAP_H - ((m - MERC_MIN) / (MERC_MAX - MERC_MIN)) * MAP_H;
+    return [x, y];
 }
 
-// Country → approximate lat/lng for bubble placement
+// ─── Minimal TopoJSON Decoder (zero-dependency) ───
+function decodeTopo(topo: any): string[] {
+    if (!topo?.transform || !topo?.arcs) return [];
+    const { scale, translate } = topo.transform;
+    const arcs = topo.arcs.map((arc: number[][]) => {
+        let x = 0, y = 0;
+        return arc.map(([dx, dy]: number[]) => {
+            x += dx; y += dy;
+            return [x * scale[0] + translate[0], y * scale[1] + translate[1]];
+        });
+    });
+    const resolve = (idx: number) => idx >= 0 ? arcs[idx] : [...arcs[~idx]].reverse();
+    const ring = (ids: number[]) => {
+        const pts: number[][] = [];
+        ids.forEach(i => { const a = resolve(i); pts.push(...(pts.length ? a.slice(1) : a)); });
+        return pts;
+    };
+    const toPath = (coords: number[][]) => {
+        if (!coords.length) return '';
+        return coords.map(([lon, lat], i) => {
+            const [px, py] = project(lon, lat);
+            return `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`;
+        }).join('') + 'Z';
+    };
+    const paths: string[] = [];
+    const land = topo.objects.land;
+    const geoms = land.geometries || [land];
+    geoms.forEach((g: any) => {
+        const walk = (a: any, depth: number) => {
+            if (depth === 0) paths.push(toPath(ring(a)));
+            else a.forEach((s: any) => walk(s, depth - 1));
+        };
+        if (g.type === 'Polygon') walk(g.arcs, 1);
+        else if (g.type === 'MultiPolygon') walk(g.arcs, 2);
+    });
+    return paths;
+}
+
+// ─── Coordinates ───
 const COUNTRY_COORDS: Record<string, [number, number]> = {
     'India': [78.96, 20.59], 'United States': [-95.71, 37.09], 'Brazil': [-51.93, -14.24],
     'United Kingdom': [-1.17, 52.36], 'Germany': [10.45, 51.17], 'France': [2.21, 46.23],
@@ -46,9 +93,7 @@ const CITY_COORDS: Record<string, [number, number]> = {
     'Chicago': [-87.63, 41.88], 'Houston': [-95.37, 29.76],
 };
 
-// Minimal world landmass outline (simplified, ~50 points per continent shape)
-// This is a very simplified world outline for the dark map background
-const WORLD_PATH = 'M186,114l2,-3l4,-1l3,2l1,4l-2,3l-4,1l-3,-2zM124,96l12,-8l8,2l6,8l-1,9l-7,6l-10,1l-7,-4l-3,-8zM280,68l20,-5l15,7l8,15l-3,14l-12,9l-16,1l-12,-7l-5,-13zM350,95l8,-2l12,4l6,10l-1,8l-8,5l-10,-1l-7,-6l-3,-9zM440,110l15,-8l20,3l12,12l-2,15l-14,10l-18,0l-12,-10l-4,-14zM500,60l30,-15l25,5l15,20l-5,22l-20,12l-28,0l-18,-15l-4,-20z';
+const TOPO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
 
 interface WorldMapProps {
     byCountry: { country: string; users: number }[];
@@ -57,81 +102,55 @@ interface WorldMapProps {
     activeCountry?: string | null;
 }
 
-const MAP_W = 900;
-const MAP_H = 500;
-
 const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, activeCountry }: WorldMapProps) {
+    const [landPaths, setLandPaths] = useState<string[]>([]);
     const [tooltip, setTooltip] = useState<{ name: string; users: number; x: number; y: number } | null>(null);
+
+    // Fetch real world map on mount
+    useEffect(() => {
+        let cancel = false;
+        fetch(TOPO_URL)
+            .then(r => r.json())
+            .then(topo => { if (!cancel) setLandPaths(decodeTopo(topo)); })
+            .catch(() => {});
+        return () => { cancel = true; };
+    }, []);
 
     const bubbles = useMemo(() => {
         const result: { name: string; x: number; y: number; users: number; type: 'country' | 'city' }[] = [];
-
-        // City bubbles
-        if (byCity && byCity.length > 0) {
+        if (byCity?.length) {
             byCity.forEach(c => {
-                const coords = CITY_COORDS[c.city];
-                if (coords) {
-                    result.push({
-                        name: `${c.city}, ${c.country}`,
-                        x: lngToX(coords[0], MAP_W),
-                        y: latToY(coords[1], MAP_H),
-                        users: c.users,
-                        type: 'city',
-                    });
-                }
+                const co = CITY_COORDS[c.city];
+                if (co) { const [x, y] = project(co[0], co[1]); result.push({ name: `${c.city}, ${c.country}`, x, y, users: c.users, type: 'city' }); }
             });
         }
-
-        // Country bubbles
         byCountry.forEach(c => {
-            const coords = COUNTRY_COORDS[c.country];
-            if (coords) {
-                result.push({
-                    name: c.country,
-                    x: lngToX(coords[0], MAP_W),
-                    y: latToY(coords[1], MAP_H),
-                    users: c.users,
-                    type: 'country',
-                });
-            }
+            const co = COUNTRY_COORDS[c.country];
+            if (co) { const [x, y] = project(co[0], co[1]); result.push({ name: c.country, x, y, users: c.users, type: 'country' }); }
         });
-
         return result;
     }, [byCountry, byCity]);
 
     const maxUsers = Math.max(...bubbles.map(b => b.users), 1);
-    const getR = (users: number) => Math.max(4, Math.min(22, (users / maxUsers) * 22));
+    const getR = (u: number) => Math.max(5, Math.min(26, (u / maxUsers) * 26));
 
     return (
         <div className="relative w-full h-full select-none overflow-hidden">
-            <svg
-                viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-                className="w-full h-full"
-                style={{ background: 'transparent' }}
-            >
-                {/* Grid lines */}
-                {Array.from({ length: 19 }).map((_, i) => {
-                    const x = (i * MAP_W) / 18;
-                    return <line key={`v${i}`} x1={x} y1={0} x2={x} y2={MAP_H} stroke="rgba(255,255,255,0.03)" strokeWidth={0.5} />;
-                })}
-                {Array.from({ length: 10 }).map((_, i) => {
-                    const y = (i * MAP_H) / 9;
-                    return <line key={`h${i}`} x1={0} y1={y} x2={MAP_W} y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth={0.5} />;
-                })}
+            <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                <rect width={MAP_W} height={MAP_H} fill="#0c0c18" />
 
-                {/* Simplified continent shapes as rectangles for visual structure */}
-                {/* North America */}
-                <ellipse cx={lngToX(-100, MAP_W)} cy={latToY(45, MAP_H)} rx={80} ry={55} fill="#151525" stroke="#1e1e35" strokeWidth={0.5} opacity={0.8} />
-                {/* South America */}
-                <ellipse cx={lngToX(-58, MAP_W)} cy={latToY(-15, MAP_H)} rx={40} ry={60} fill="#151525" stroke="#1e1e35" strokeWidth={0.5} opacity={0.8} />
-                {/* Europe */}
-                <ellipse cx={lngToX(15, MAP_W)} cy={latToY(50, MAP_H)} rx={45} ry={30} fill="#151525" stroke="#1e1e35" strokeWidth={0.5} opacity={0.8} />
-                {/* Africa */}
-                <ellipse cx={lngToX(20, MAP_W)} cy={latToY(5, MAP_H)} rx={40} ry={55} fill="#151525" stroke="#1e1e35" strokeWidth={0.5} opacity={0.8} />
-                {/* Asia */}
-                <ellipse cx={lngToX(90, MAP_W)} cy={latToY(40, MAP_H)} rx={80} ry={45} fill="#151525" stroke="#1e1e35" strokeWidth={0.5} opacity={0.8} />
-                {/* Oceania */}
-                <ellipse cx={lngToX(135, MAP_W)} cy={latToY(-25, MAP_H)} rx={35} ry={25} fill="#151525" stroke="#1e1e35" strokeWidth={0.5} opacity={0.8} />
+                {/* Subtle grid */}
+                {Array.from({ length: 37 }).map((_, i) => (
+                    <line key={`v${i}`} x1={(i * MAP_W) / 36} y1={0} x2={(i * MAP_W) / 36} y2={MAP_H} stroke="rgba(255,255,255,0.02)" strokeWidth={0.3} />
+                ))}
+                {Array.from({ length: 19 }).map((_, i) => (
+                    <line key={`h${i}`} x1={0} y1={(i * MAP_H) / 18} x2={MAP_W} y2={(i * MAP_H) / 18} stroke="rgba(255,255,255,0.02)" strokeWidth={0.3} />
+                ))}
+
+                {/* Real landmasses from TopoJSON */}
+                {landPaths.map((d, i) => (
+                    <path key={i} d={d} fill="#1a1a30" stroke="#2a2a48" strokeWidth={0.4} strokeLinejoin="round" />
+                ))}
 
                 {/* Bubbles */}
                 {bubbles.map((b, i) => {
@@ -139,45 +158,29 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
                     const isActive = activeCountry && b.name.includes(activeCountry);
                     const isDimmed = activeCountry && !isActive;
                     const color = isActive ? '#34d399' : '#3b82f6';
-
                     return (
                         <g key={`${b.name}-${i}`}>
-                            {/* Pulse ring */}
-                            <circle cx={b.x} cy={b.y} r={r + 5} fill="none" stroke={color} strokeWidth={0.8} opacity={0.25}>
-                                <animate attributeName="r" values={`${r + 2};${r + 10};${r + 2}`} dur={`${2 + (i % 5) * 0.4}s`} repeatCount="indefinite" />
-                                <animate attributeName="opacity" values="0.3;0.05;0.3" dur={`${2 + (i % 5) * 0.4}s`} repeatCount="indefinite" />
+                            <circle cx={b.x} cy={b.y} r={r} fill="none" stroke={color} strokeWidth={0.6}>
+                                <animate attributeName="r" values={`${r};${r + 9};${r}`} dur={`${2 + (i % 4) * 0.5}s`} repeatCount="indefinite" />
+                                <animate attributeName="opacity" values="0.4;0;0.4" dur={`${2 + (i % 4) * 0.5}s`} repeatCount="indefinite" />
                             </circle>
-                            {/* Glow */}
-                            <circle cx={b.x} cy={b.y} r={r * 1.8} fill={color} opacity={isDimmed ? 0.02 : 0.06} />
-                            {/* Main bubble */}
+                            <circle cx={b.x} cy={b.y} r={r * 2} fill={color} opacity={isDimmed ? 0.01 : 0.05} />
                             <circle
                                 cx={b.x} cy={b.y} r={r}
-                                fill={color}
-                                fillOpacity={isDimmed ? 0.12 : 0.55}
-                                stroke={color}
-                                strokeWidth={1.2}
-                                strokeOpacity={isDimmed ? 0.08 : 0.7}
-                                className="cursor-pointer"
-                                style={{ transition: 'all 0.3s ease' }}
+                                fill={color} fillOpacity={isDimmed ? 0.1 : 0.55}
+                                stroke={color} strokeWidth={isDimmed ? 0.4 : 1.2} strokeOpacity={isDimmed ? 0.1 : 0.8}
+                                className="cursor-pointer" style={{ transition: 'all 0.3s' }}
                                 onClick={() => onBubbleClick?.(b.name.split(',')[0].trim(), b.type)}
                                 onMouseEnter={(e) => {
-                                    const svg = (e.target as SVGCircleElement).closest('svg');
-                                    const rect = svg?.getBoundingClientRect();
-                                    if (rect) {
-                                        setTooltip({ name: b.name, users: b.users, x: e.clientX - rect.left, y: e.clientY - rect.top });
-                                    }
+                                    const rect = (e.target as SVGElement).closest('svg')?.getBoundingClientRect();
+                                    if (rect) setTooltip({ name: b.name, users: b.users, x: e.clientX - rect.left, y: e.clientY - rect.top });
                                 }}
                                 onMouseLeave={() => setTooltip(null)}
                             />
-                            {/* Number label */}
-                            {b.users > 1 && r >= 8 && (
-                                <text
-                                    x={b.x} y={b.y}
-                                    textAnchor="middle" dominantBaseline="central"
-                                    fill="white" fontSize={Math.max(7, r * 0.55)} fontWeight="bold"
-                                    className="pointer-events-none select-none"
-                                    style={{ textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}
-                                >
+                            {b.users > 0 && r >= 9 && (
+                                <text x={b.x} y={b.y} textAnchor="middle" dominantBaseline="central"
+                                    fill="white" fontSize={Math.max(8, r * 0.5)} fontWeight="bold"
+                                    className="pointer-events-none" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
                                     {b.users}
                                 </text>
                             )}
@@ -193,7 +196,7 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="absolute pointer-events-none z-30 bg-[#0a0a14] border border-white/[0.12] rounded-xl px-3 py-2 shadow-2xl"
+                        className="absolute pointer-events-none z-30 bg-[#0a0a14]/95 backdrop-blur-sm border border-white/[0.12] rounded-xl px-3 py-2 shadow-2xl"
                         style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
                     >
                         <p className="text-xs font-semibold text-white">{tooltip.name}</p>
