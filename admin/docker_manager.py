@@ -35,6 +35,9 @@ class DockerManager:
         os.makedirs(user_dir, exist_ok=True)
         os.makedirs(f"{user_dir}/workspace", exist_ok=True)
         os.makedirs(f"{user_dir}/.openclaw", exist_ok=True)
+        # Pre-create the agent dir tree that auth-profiles.json writes into,
+        # so _create_auth_profiles never fails with missing parent dirs.
+        os.makedirs(f"{user_dir}/.openclaw/agents/main/agent", exist_ok=True)
 
         # OpenClaw needs to write to /data/.openclaw (mounted from host).
         # Ensure directory is writable for typical non-root container users.

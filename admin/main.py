@@ -890,31 +890,6 @@ async def update_user(
     return {"success": True, "message": "User updated"}
 
 
-@app.delete("/api/users/{github_id}")
-async def delete_user(
-    github_id: str,
-    remove_data: bool = False,
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_admin_key)
-):
-    """Delete user and their container"""
-    user = await get_user_by_identifier(db, github_id)
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Delete container
-    docker_result = docker_manager.delete_container(user.github_id, remove_data=remove_data)
-    
-    # Delete OAuth connections explicitly (avoid orphan rows; enables clean re-signup)
-    await db.execute(delete(OAuthConnection).where(OAuthConnection.user_id == user.id))
-
-    # Delete user record
-    await db.delete(user)
-    await db.commit()
-    
-    return {"success": True, "message": "User deleted", "container": docker_result}
-
 
 # ============= Container Endpoints =============
 @app.post("/api/users/{github_id}/container")
