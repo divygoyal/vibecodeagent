@@ -250,8 +250,33 @@ export default function BotPage() {
                 {!isProvisioned ? (
                     <>
                         <p className="text-zinc-500 text-sm mb-5">
-                            Create a bot via <code className="text-xs bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">@BotFather</code> on Telegram, then paste the token below.
+                            Follow these steps to create your bot and get the token:
                         </p>
+
+                        {/* Video Tutorial */}
+                        <div className="mb-6 rounded-xl overflow-hidden border border-white/[0.08] bg-black/20">
+                            <video
+                                src="/videos/demobotfather.mp4"
+                                controls
+                                className="w-full h-auto max-h-[400px]"
+                                poster="/images/video-poster.jpg" // Optional: You might want to add a poster image later
+                            >
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-5 mb-6 text-sm text-zinc-300 space-y-3">
+                            <h3 className="font-semibold text-white mb-2">How to get your bot token?</h3>
+                            <ol className="list-decimal pl-5 space-y-2">
+                                <li>Open Telegram and search for <strong className="text-emerald-400">@BotFather</strong>.</li>
+                                <li>Start a chat and type <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-200">/newbot</code>.</li>
+                                <li>Follow the prompts to name your bot and choose a username (must end in 'bot').</li>
+                                <li>BotFather will send you a message with your <strong>HTTP API Token</strong>. Copy the entire token string.</li>
+                                <li>Paste the token in the field below and click <strong>Connect</strong>.</li>
+                            </ol>
+                        </div>
+
                         <div className="flex gap-3">
                             <input
                                 type="password"
@@ -399,7 +424,7 @@ function IntegrationCard({
     return (
         <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${synced ? 'bg-emerald-500/[0.04] border-emerald-500/[0.15]' :
             stored ? 'bg-amber-500/[0.04] border-amber-500/[0.15]' :
-            'bg-white/[0.01] border-white/[0.06]'
+                'bg-white/[0.01] border-white/[0.06]'
             }`}>
             <div className={`flex-shrink-0 ${synced ? 'text-emerald-400' : stored ? 'text-amber-400' : 'text-zinc-500'}`}>
                 {icon}
@@ -408,7 +433,7 @@ function IntegrationCard({
                 <div className="font-medium text-sm text-zinc-200">{name}</div>
                 <div className={`text-xs ${synced ? 'text-emerald-400' :
                     stored ? 'text-amber-400' :
-                    'text-zinc-500'
+                        'text-zinc-500'
                     }`}>
                     {synced ? 'Synced ✓' :
                         (stored && isSyncing) ? 'Syncing...' :

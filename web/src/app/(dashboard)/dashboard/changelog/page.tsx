@@ -97,7 +97,7 @@ export default function ChangelogPage() {
         <div className="max-w-3xl mx-auto p-6 space-y-8">
             <div>
                 <h1 className="text-2xl font-bold text-white mb-1">Changelog</h1>
-                <p className="text-sm text-zinc-500">What&apos;s new in GrowClaw — updates, features, and fixes.</p>
+                <p className="text-sm text-zinc-500">What&apos;s new in TrafficClaw — updates, features, and fixes.</p>
             </div>
 
             <div className="relative">

@@ -82,7 +82,7 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
 
         const res = await fetch(url, {
             headers: {
-                'User-Agent': 'GrowClaw-AuditBot/1.0 (SEO Audit Tool)',
+                'User-Agent': 'TrafficClaw-AuditBot/1.0 (SEO Audit Tool)',
                 'Accept': 'text/html,application/xhtml+xml',
             },
             redirect: 'follow',
@@ -582,7 +582,7 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
         if (urlObj.search.length > 0 && urlObj.search.includes('&')) {
             issues.push({ id: 'seo-url-params', category: 'SEO', title: 'URL has query parameters', description: 'Dynamic URLs with parameters are harder for search engines.', severity: 'info', recommendation: 'Consider using clean, static URLs when possible.' });
         }
-    } catch {}
+    } catch { }
 
     // 54. Deprecated HTML tags
     const deprecatedTags = ['center', 'font', 'marquee', 'blink', 'big', 'strike'];

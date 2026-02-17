@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // ============= Mock data for local development =============
 
 function generateMockCommits() {
-  const repos = ['growclaw-web', 'growclaw-bot', 'seo-engine', 'analytics-core'];
+  const repos = ['trafficclaw-web', 'trafficclaw-bot', 'seo-engine', 'analytics-core'];
   const messages = [
     'fix: resolve SEO scoring regression in content decay module',
     'feat: add real-time keyword tracking dashboard',
@@ -36,8 +36,8 @@ function generateMockCommits() {
 
 function generateMockRepos() {
   return [
-    { name: 'growclaw-web', description: 'GrowClaw SaaS frontend — Next.js', language: 'TypeScript', stars: 42, updated: new Date().toISOString(), url: '#' },
-    { name: 'growclaw-bot', description: 'Telegram bot engine with AI integrations', language: 'Python', stars: 28, updated: new Date().toISOString(), url: '#' },
+    { name: 'trafficclaw-web', description: 'TrafficClaw SaaS frontend — Next.js', language: 'TypeScript', stars: 42, updated: new Date().toISOString(), url: '#' },
+    { name: 'trafficclaw-bot', description: 'Telegram bot engine with AI integrations', language: 'Python', stars: 28, updated: new Date().toISOString(), url: '#' },
     { name: 'seo-engine', description: 'Content decay detection & keyword gap analysis', language: 'Python', stars: 15, updated: new Date().toISOString(), url: '#' },
     { name: 'analytics-core', description: 'GA4 + GSC data pipeline', language: 'TypeScript', stars: 9, updated: new Date().toISOString(), url: '#' },
   ];
@@ -220,6 +220,6 @@ export async function GET() {
     commits: generateMockCommits(),
     repos: generateMockRepos(),
     heatmap: generateMockHeatmap(),
-    username: 'growclaw-dev'
+    username: 'trafficclaw-dev'
   })
 }

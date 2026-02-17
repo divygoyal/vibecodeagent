@@ -214,7 +214,7 @@ export default function InteractiveGlobe({ realtimeData, countries = [], cities 
             <div className="relative px-6 pt-5 pb-4 flex items-center justify-between z-10">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">GrowClaw</span>
+                        <span className="text-sm font-bold text-white">TrafficClaw</span>
                         <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-zinc-400 font-medium">REAL-TIME</span>
                     </div>
                     <div className="h-4 w-px bg-white/[0.1]" />
@@ -329,7 +329,7 @@ export default function InteractiveGlobe({ realtimeData, countries = [], cities 
 
             {/* Powered by footer */}
             <div className="px-6 py-2 border-t border-white/[0.04] flex justify-end">
-                <span className="text-[9px] text-zinc-700">Powered by GrowClaw</span>
+                <span className="text-[9px] text-zinc-700">Powered by TrafficClaw</span>
             </div>
         </div>
     );

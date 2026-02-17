@@ -69,7 +69,7 @@ export default function DocsPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">Getting Started</h1>
                             <p className="text-zinc-400 text-sm leading-relaxed">
-                                GrowClaw is your AI-powered growth engine. Connect your Telegram bot,
+                                TrafficClaw is your AI-powered growth engine. Connect your Telegram bot,
                                 link Google Analytics and Search Console, and let AI help you grow your online presence.
                             </p>
                         </div>
@@ -101,7 +101,7 @@ export default function DocsPage() {
                     <>
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">Bot Setup</h1>
-                            <p className="text-zinc-400 text-sm">How to create and configure your GrowClaw Telegram bot.</p>
+                            <p className="text-zinc-400 text-sm">How to create and configure your TrafficClaw Telegram bot.</p>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
                             <h2 className="text-lg font-semibold text-white">Creating a Bot via BotFather</h2>
@@ -109,7 +109,7 @@ export default function DocsPage() {
                             <CodeBlock code={`/newbot\n# Follow the prompts to name your bot\n# Copy the API token provided`} />
                             <p className="text-sm text-zinc-400">
                                 Paste the token into the <strong className="text-white">Bot Setup</strong> page in your dashboard.
-                                GrowClaw will provision a container and connect your bot automatically.
+                                TrafficClaw will provision a container and connect your bot automatically.
                             </p>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
@@ -134,7 +134,7 @@ export default function DocsPage() {
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
                             <h2 className="text-lg font-semibold text-white">Connecting GA4</h2>
                             <p className="text-sm text-zinc-400">
-                                Sign in with Google on the Bot Setup page. GrowClaw will automatically detect
+                                Sign in with Google on the Bot Setup page. TrafficClaw will automatically detect
                                 your GA4 properties and start pulling data.
                             </p>
                             <h3 className="text-sm font-semibold text-white mt-4">Metrics tracked</h3>
@@ -174,12 +174,12 @@ export default function DocsPage() {
                     <>
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">API Reference</h1>
-                            <p className="text-zinc-400 text-sm">Access GrowClaw data programmatically.</p>
+                            <p className="text-zinc-400 text-sm">Access TrafficClaw data programmatically.</p>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
                             <h2 className="text-lg font-semibold text-white">Authentication</h2>
                             <p className="text-sm text-zinc-400">Include your API key in the header:</p>
-                            <CodeBlock code={`curl -H "Authorization: Bearer grc_sk_your_key" \\\n  https://api.growclaw.com/v1/analytics`} />
+                            <CodeBlock code={`curl -H "Authorization: Bearer grc_sk_your_key" \\\n  https://api.trafficclaw.com/v1/analytics`} />
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
                             <h2 className="text-lg font-semibold text-white">Endpoints</h2>
@@ -197,7 +197,7 @@ export default function DocsPage() {
                     <>
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">Integrations</h1>
-                            <p className="text-zinc-400 text-sm">Connect GrowClaw with your favorite tools.</p>
+                            <p className="text-zinc-400 text-sm">Connect TrafficClaw with your favorite tools.</p>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <IntegrationItem emoji="🐙" name="GitHub" desc="Sync repos, track commits, deploy" status="Available" />

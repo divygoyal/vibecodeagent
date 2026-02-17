@@ -12,7 +12,7 @@ if (typeof globalThis !== 'undefined') {
 
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_PROMPT = `You are GrowClaw AI — the most advanced SEO & Analytics intelligence system. You operate like a $500/hr senior growth consultant with 15 years of experience at elite agencies. You have LIVE access to the user's real Google Analytics 4 (GA4) and Google Search Console (GSC) data.
+const SYSTEM_PROMPT = `You are TrafficClaw AI — the most advanced SEO & Analytics intelligence system. You operate like a $500/hr senior growth consultant with 15 years of experience at elite agencies. You have LIVE access to the user's real Google Analytics 4 (GA4) and Google Search Console (GSC) data.
 
 ## Core Identity
 You are not a generic chatbot. You are a specialized SEO strategist, data scientist, and growth architect. Every response should demonstrate deep domain expertise that makes the user feel like they have an unfair advantage.
@@ -117,19 +117,19 @@ export async function POST(req: Request) {
             if (analyticsContext.topSources?.length) {
                 dataContext += `\n🔗 Traffic Sources (top ${analyticsContext.topSources.length}):\n`;
                 analyticsContext.topSources.forEach((s: any, i: number) => {
-                    dataContext += `  ${i+1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)\n`;
+                    dataContext += `  ${i + 1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)\n`;
                 });
             }
             if (analyticsContext.topPages?.length) {
                 dataContext += `\n📄 Top Pages (top ${analyticsContext.topPages.length}):\n`;
                 analyticsContext.topPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i+1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}\n`;
+                    dataContext += `  ${i + 1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}\n`;
                 });
             }
             if (analyticsContext.topCountries?.length) {
                 dataContext += `\n🌍 Countries (top ${analyticsContext.topCountries.length}):\n`;
                 analyticsContext.topCountries.forEach((c: any, i: number) => {
-                    dataContext += `  ${i+1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''}\n`;
+                    dataContext += `  ${i + 1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''}\n`;
                 });
             }
             if (analyticsContext.devices?.length) {
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
             if (analyticsContext.referrers?.length) {
                 dataContext += `\n🔀 Referrers (top ${analyticsContext.referrers.length}):\n`;
                 analyticsContext.referrers.forEach((r: any, i: number) => {
-                    dataContext += `  ${i+1}. ${r.name} — ${r.value} sessions\n`;
+                    dataContext += `  ${i + 1}. ${r.name} — ${r.value} sessions\n`;
                 });
             }
             if (analyticsContext.cities?.length) {
@@ -156,7 +156,7 @@ export async function POST(req: Request) {
             if (analyticsContext.entryPages?.length) {
                 dataContext += `\n🚪 Entry Pages (${analyticsContext.entryPages.length}) — pages where users START their session:\n`;
                 analyticsContext.entryPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i+1}. ${p.page} — ${p.sessions} sessions, ${p.users || '?'} users, ${p.bounceRate || '?'}% bounce\n`;
+                    dataContext += `  ${i + 1}. ${p.page} — ${p.sessions} sessions, ${p.users || '?'} users, ${p.bounceRate || '?'}% bounce\n`;
                 });
             }
             if (analyticsContext.operatingSystems?.length) {
@@ -180,19 +180,19 @@ export async function POST(req: Request) {
                 seoContext.topQueries.forEach((q: any, i: number) => {
                     const expectedCtr = q.position <= 1 ? 28 : q.position <= 2 ? 15 : q.position <= 3 ? 11 : q.position <= 5 ? 7.5 : q.position <= 7 ? 4.5 : q.position <= 10 ? 2.5 : 1;
                     const ctrGap = ((q.ctr || 0) - expectedCtr).toFixed(1);
-                    dataContext += `  ${i+1}. "${q.query}" — ${q.clicks} clicks, ${q.impressions} impr, ${q.ctr || 0}% CTR (expected: ~${expectedCtr}%, gap: ${ctrGap}%), pos ${q.position}${q.position >= 8 && q.position <= 20 && q.impressions > 100 ? ' ⚡STRIKING DISTANCE' : ''}${Number(ctrGap) < -3 ? ' ⚠️CTR BELOW EXPECTED' : ''}\n`;
+                    dataContext += `  ${i + 1}. "${q.query}" — ${q.clicks} clicks, ${q.impressions} impr, ${q.ctr || 0}% CTR (expected: ~${expectedCtr}%, gap: ${ctrGap}%), pos ${q.position}${q.position >= 8 && q.position <= 20 && q.impressions > 100 ? ' ⚡STRIKING DISTANCE' : ''}${Number(ctrGap) < -3 ? ' ⚠️CTR BELOW EXPECTED' : ''}\n`;
                 });
             }
             if (seoContext.topPages?.length) {
                 dataContext += `\n📊 Top Search Pages (${seoContext.topPages.length} pages) — ANALYZE FOR: content decay (high impressions but low clicks), pages that need content refresh:\n`;
                 seoContext.topPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i+1}. ${p.page} — ${p.clicks} clicks, ${p.impressions || '?'} impr, ${p.ctr || '?'}% CTR, pos ${p.position}${p.status === 'decay' ? ' 🔴CONTENT DECAY' : p.status === 'warning' ? ' 🟡WARNING' : ''}\n`;
+                    dataContext += `  ${i + 1}. ${p.page} — ${p.clicks} clicks, ${p.impressions || '?'} impr, ${p.ctr || '?'}% CTR, pos ${p.position}${p.status === 'decay' ? ' 🔴CONTENT DECAY' : p.status === 'warning' ? ' 🟡WARNING' : ''}\n`;
                 });
             }
             if (seoContext.recommendations?.length) {
                 dataContext += `\n💡 AI-Generated SEO Recommendations (${seoContext.recommendations.length}):\n`;
                 seoContext.recommendations.forEach((r: any, i: number) => {
-                    dataContext += `  ${i+1}. [${r.severity?.toUpperCase()}] ${r.title}\n`;
+                    dataContext += `  ${i + 1}. [${r.severity?.toUpperCase()}] ${r.title}\n`;
                     if (r.description) dataContext += `     ${r.description}\n`;
                     if (r.action) dataContext += `     Action: ${r.action}\n`;
                     if (r.impact) dataContext += `     Est. Impact: ${r.impact}\n`;
@@ -258,11 +258,10 @@ function generateFallbackResponse(message: string, analytics: any, seo: any, has
 
     if (msg.includes('bounce') && analytics?.kpis) {
         const pages = analytics.topPages?.filter((p: any) => p.bounceRate > 40) || [];
-        return `Based on your data, your average bounce rate is ${analytics.kpis.avgBounceRate}%.\n\n${
-            pages.length > 0
+        return `Based on your data, your average bounce rate is ${analytics.kpis.avgBounceRate}%.\n\n${pages.length > 0
                 ? `Pages with high bounce rates:\n${pages.map((p: any) => `- ${p.page}: ${p.bounceRate}%`).join('\n')}\n\nRecommendations:\n- Improve page load speed\n- Make content more engaging above the fold\n- Add clear CTAs\n- Ensure mobile responsiveness`
                 : 'Your pages seem to have reasonable bounce rates. Keep monitoring and A/B testing to improve further.'
-        }`;
+            }`;
     }
 
     if (msg.includes('traffic') || msg.includes('source')) {

@@ -18,7 +18,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'ai-seo-automation',
         title: 'How AI is Revolutionizing SEO Automation in 2026',
-        excerpt: 'Discover how GrowClaw uses AI to detect content decay, find keyword gaps, and generate optimization strategies — all from your Telegram bot.',
+        excerpt: 'Discover how TrafficClaw uses AI to detect content decay, find keyword gaps, and generate optimization strategies — all from your Telegram bot.',
         date: 'Feb 14, 2026',
         readTime: '6 min read',
         category: 'AI & SEO',
@@ -28,7 +28,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'telegram-bot-devops',
         title: 'Managing Your Website from Telegram: A DevOps Guide',
-        excerpt: 'Learn how to deploy changes, monitor analytics, and get real-time alerts — all from a single Telegram conversation with your GrowClaw bot.',
+        excerpt: 'Learn how to deploy changes, monitor analytics, and get real-time alerts — all from a single Telegram conversation with your TrafficClaw bot.',
         date: 'Feb 12, 2026',
         readTime: '8 min read',
         category: 'Engineering',
@@ -38,7 +38,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'analytics-dashboard-deep-dive',
         title: 'Building a Real-Time Analytics Dashboard with GA4',
-        excerpt: 'How we built GrowClaw\'s analytics dashboard using the GA4 Data API, including traffic trends, source attribution, and the interactive world map.',
+        excerpt: 'How we built TrafficClaw\'s analytics dashboard using the GA4 Data API, including traffic trends, source attribution, and the interactive world map.',
         date: 'Feb 10, 2026',
         readTime: '10 min read',
         category: 'Product',
@@ -48,7 +48,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'content-decay-detection',
         title: 'Content Decay: Catching Declining Pages Before It\'s Too Late',
-        excerpt: 'GrowClaw\'s AI monitors your pages for traffic decline and position drops, alerting you via Telegram before you lose significant organic traffic.',
+        excerpt: 'TrafficClaw\'s AI monitors your pages for traffic decline and position drops, alerting you via Telegram before you lose significant organic traffic.',
         date: 'Feb 8, 2026',
         readTime: '5 min read',
         category: 'SEO Strategy',
@@ -58,7 +58,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'growth-hacking-with-bots',
         title: '5 Growth Hacks Using AI-Powered Telegram Bots',
-        excerpt: 'From automated keyword tracking to real-time competitor analysis — five actionable strategies to accelerate your website growth with GrowClaw.',
+        excerpt: 'From automated keyword tracking to real-time competitor analysis — five actionable strategies to accelerate your website growth with TrafficClaw.',
         date: 'Feb 6, 2026',
         readTime: '7 min read',
         category: 'Growth',

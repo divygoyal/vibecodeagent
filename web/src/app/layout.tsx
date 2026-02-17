@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GrowClaw — AI-Powered Growth Intelligence",
+  title: "TrafficClaw — AI-Powered Growth Intelligence",
   description: "Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.",
 };
 

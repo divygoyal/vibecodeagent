@@ -56,7 +56,7 @@ export default function SettingsPage() {
                         </div>
                     )}
                     <div className="flex-1">
-                        <div className="text-lg font-semibold text-white">{session?.user?.name || 'GrowClaw User'}</div>
+                        <div className="text-lg font-semibold text-white">{session?.user?.name || 'TrafficClaw User'}</div>
                         <div className="text-sm text-zinc-500 flex items-center gap-1.5">
                             <Mail className="w-3.5 h-3.5" />
                             {session?.user?.email || 'Not available'}
@@ -157,7 +157,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <div className="text-white font-medium text-sm">Sign Out</div>
-                            <div className="text-xs text-zinc-500 mt-0.5">Sign out of your GrowClaw account</div>
+                            <div className="text-xs text-zinc-500 mt-0.5">Sign out of your TrafficClaw account</div>
                         </div>
                         <button
                             onClick={() => signOut({ callbackUrl: '/' })}

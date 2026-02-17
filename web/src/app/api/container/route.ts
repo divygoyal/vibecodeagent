@@ -16,7 +16,7 @@ function getMockContainerStatus() {
     memory_usage_mb: 128,
     plan: 'free',
     telegramStatus: 'connected',
-    botUsername: 'GrowClawDevBot',
+    botUsername: 'TrafficClawDevBot',
     telegramBotToken: '',
     connectedProviders: [
       { provider: 'github', connected: true },

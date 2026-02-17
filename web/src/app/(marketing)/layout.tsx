@@ -40,7 +40,7 @@ function Navbar() {
                         <Zap className="w-4 h-4 text-black" strokeWidth={3} />
                     </div>
                     <span className="text-lg font-bold text-white tracking-tight">
-                        Grow<span className="text-emerald-400">Claw</span>
+                        Traffic<span className="text-emerald-400">Claw</span>
                     </span>
                 </Link>
 

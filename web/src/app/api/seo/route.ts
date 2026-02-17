@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 function generateMockQueries() {
     return [
-        { query: 'growclaw seo tool', clicks: 892, impressions: 12400, ctr: 7.2, position: 3.2 },
+        { query: 'trafficclaw seo tool', clicks: 892, impressions: 12400, ctr: 7.2, position: 3.2 },
         { query: 'automated seo bot', clicks: 634, impressions: 9800, ctr: 6.5, position: 4.1 },
         { query: 'telegram analytics bot', clicks: 521, impressions: 7650, ctr: 6.8, position: 5.3 },
         { query: 'google analytics automation', clicks: 456, impressions: 8900, ctr: 5.1, position: 6.7 },

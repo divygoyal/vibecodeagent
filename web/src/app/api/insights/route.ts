@@ -296,7 +296,7 @@ function getMockInsights(): Insight[] {
     return [
         {
             id: 'mock-1', type: 'opportunity', title: 'Low CTR keywords with high impressions',
-            description: '"growclaw seo tool" gets 1,200 impressions but only 2.1% CTR. Improve your title/meta description.',
+            description: '"trafficclaw seo tool" gets 1,200 impressions but only 2.1% CTR. Improve your title/meta description.',
             metric: '4 keywords', priority: 'high', category: 'seo',
         },
         {

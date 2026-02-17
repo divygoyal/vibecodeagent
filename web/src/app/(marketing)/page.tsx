@@ -142,7 +142,7 @@ function Hero() {
                     transition={{ duration: 0.6, delay: 0.25 }}
                     className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed"
                 >
-                    GrowClaw gives you an AI agent that monitors your analytics, detects SEO issues,
+                    TrafficClaw gives you an AI agent that monitors your analytics, detects SEO issues,
                     and fixes your code — all through a simple Telegram chat.
                 </motion.p>
 
@@ -186,7 +186,7 @@ function Hero() {
                                 <div className="w-3 h-3 rounded-full bg-amber-500/70" />
                                 <div className="w-3 h-3 rounded-full bg-emerald-500/70" />
                             </div>
-                            <span className="text-xs text-zinc-500 ml-2 font-mono">GrowClaw Agent · Telegram</span>
+                            <span className="text-xs text-zinc-500 ml-2 font-mono">TrafficClaw Agent · Telegram</span>
                         </div>
 
                         {/* Chat messages */}
@@ -194,11 +194,11 @@ function Hero() {
                             <ChatMessage sender="You" avatar="👤" delay={0.6}>
                                 Show me my top search queries this week
                             </ChatMessage>
-                            <ChatMessage sender="GrowClaw" avatar="🤖" delay={1.2} isBot>
+                            <ChatMessage sender="TrafficClaw" avatar="🤖" delay={1.2} isBot>
                                 <span className="text-zinc-400">Running:</span>{' '}
                                 <span className="text-cyan-400">gsc query --dimensions query --limit 5</span>
                             </ChatMessage>
-                            <ChatMessage sender="GrowClaw" avatar="🤖" delay={1.8} isBot>
+                            <ChatMessage sender="TrafficClaw" avatar="🤖" delay={1.8} isBot>
                                 <div className="mt-2 text-emerald-400">
                                     📊 Top 5 Queries (Last 7 Days)
                                 </div>
@@ -223,7 +223,7 @@ function Hero() {
                             <ChatMessage sender="You" avatar="👤" delay={2.4}>
                                 The CTR on &quot;website performance&quot; is low. Fix the meta title.
                             </ChatMessage>
-                            <ChatMessage sender="GrowClaw" avatar="🤖" delay={3.0} isBot>
+                            <ChatMessage sender="TrafficClaw" avatar="🤖" delay={3.0} isBot>
                                 <span className="text-emerald-400">✓ Updated meta title</span> on /blog/website-performance
                                 <br />
                                 <span className="text-zinc-400">Committed to</span>{' '}
@@ -336,7 +336,7 @@ function Features() {
                     </h2>
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
                         Stop switching between Google Analytics, Search Console, and your IDE.
-                        GrowClaw brings everything into one intelligent interface.
+                        TrafficClaw brings everything into one intelligent interface.
                     </p>
                 </motion.div>
 
@@ -611,7 +611,7 @@ function Comparison() {
 
                             {/* New way */}
                             <div className="p-5 rounded-xl bg-emerald-500/[0.04] border border-emerald-500/[0.1] text-sm text-zinc-300">
-                                <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider block mb-2">With GrowClaw</span>
+                                <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider block mb-2">With TrafficClaw</span>
                                 {item.growclaw}
                             </div>
                         </motion.div>
@@ -631,7 +631,7 @@ function Testimonials() {
         {
             name: 'Sarah Chen',
             role: 'Founder, TechStack.io',
-            text: 'GrowClaw found keyword cannibalization issues we missed for months. Our organic traffic jumped 34% after the bot fixed our meta tags.',
+            text: 'TrafficClaw found keyword cannibalization issues we missed for months. Our organic traffic jumped 34% after the bot fixed our meta tags.',
             avatar: '👩‍💻',
             stars: 5,
         },
@@ -892,7 +892,7 @@ function HowItWorks() {
         {
             step: '02',
             title: 'Deploy Your AI Bot',
-            description: 'Paste your Telegram bot token and GrowClaw spins up a personal AI agent in under 2 minutes.',
+            description: 'Paste your Telegram bot token and TrafficClaw spins up a personal AI agent in under 2 minutes.',
             icon: Bot,
             gradient: 'from-cyan-400 to-blue-500',
             details: ['Telegram integration', 'Natural language', 'Always online'],
@@ -1069,19 +1069,19 @@ function Footer() {
                         <Zap className="w-3 h-3 text-black" strokeWidth={3} />
                     </div>
                     <span className="text-sm font-bold text-white">
-                        Grow<span className="text-emerald-400">Claw</span>
+                        Traffic<span className="text-emerald-400">Claw</span>
                     </span>
                 </div>
 
                 <div className="flex items-center gap-6 text-sm text-zinc-500">
-                    <a href="#" className="hover:text-zinc-300 transition-colors">Privacy</a>
-                    <a href="#" className="hover:text-zinc-300 transition-colors">Terms</a>
-                    <a href="#" className="hover:text-zinc-300 transition-colors">Docs</a>
-                    <a href="mailto:support@growclaw.com" className="hover:text-zinc-300 transition-colors">Contact</a>
+                    <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
+                    <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
+                    <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>
+                    <a href="mailto:support@trafficclaw.com" className="hover:text-zinc-300 transition-colors">Contact</a>
                 </div>
 
                 <div className="text-xs text-zinc-600">
-                    © 2025 GrowClaw. All rights reserved.
+                    © 2026 TrafficClaw. All rights reserved.
                 </div>
             </div>
         </footer>
