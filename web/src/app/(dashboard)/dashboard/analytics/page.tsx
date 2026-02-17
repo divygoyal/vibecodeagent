@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
     TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Layers,
     Download, RefreshCw, Target, Globe, Bot,
@@ -162,36 +162,70 @@ export default function AnalyticsPage() {
 
     const anyFilterActive = Object.values(filters).some(arr => arr.length > 0);
 
-    // ─── Filtered KPIs: recalculate from dimension data when filters active ───
+    // ─── Cross-filter: recalculate KPIs from whichever dimension is filtered ───
     const filteredKpis = useMemo(() => {
         if (!kpis || !anyFilterActive) return null;
-        // Sum users from filtered countries (best proxy for filtered totals)
-        const sumUsers = fCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
-        const sumSessions = fCountries.reduce((s: number, c: any) => s + (c.sessions || 0), 0);
-        const sumPageViews = fPages.reduce((s: number, p: any) => s + (p.views || 0), 0);
-        return {
-            totalUsers: filters.country.length > 0 ? sumUsers : kpis.totalUsers,
-            totalSessions: filters.country.length > 0 ? sumSessions : kpis.totalSessions,
-            totalPageViews: filters.page.length > 0 ? sumPageViews : kpis.totalPageViews,
-            avgBounceRate: kpis.avgBounceRate,
-        };
-    }, [kpis, anyFilterActive, fCountries, fPages, filters]);
 
-    // ─── Filtered traffic for chart ───
-    const chartTraffic = useMemo(() => {
-        if (!anyFilterActive) return traffic;
-        // When country filter active, scale traffic proportionally
-        if (filters.country.length > 0 && kpis) {
-            const ratio = (filteredKpis?.totalUsers || 0) / Math.max(kpis.totalUsers, 1);
-            return traffic.map((d: any) => ({
-                ...d,
-                activeUsers: Math.round((d.activeUsers || 0) * ratio),
-                sessions: Math.round((d.sessions || 0) * ratio),
-                pageViews: Math.round((d.pageViews || 0) * ratio),
-            }));
+        // Calculate the proportion of users captured by each active filter dimension
+        // Use the smallest ratio (most restrictive filter) as our scaling factor
+        let ratio = 1;
+
+        if (filters.country.length > 0) {
+            const filteredUsers = fCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+            const totalUsers = countries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+            ratio = Math.min(ratio, totalUsers > 0 ? filteredUsers / totalUsers : 0);
         }
-        return traffic;
-    }, [traffic, anyFilterActive, filters, kpis, filteredKpis]);
+        if (filters.page.length > 0) {
+            const filteredViews = fPages.reduce((s: number, p: any) => s + (p.views || 0), 0);
+            const totalViews = pages.reduce((s: number, p: any) => s + (p.views || 0), 0);
+            ratio = Math.min(ratio, totalViews > 0 ? filteredViews / totalViews : 0);
+        }
+        if (filters.device.length > 0) {
+            const filteredSessions = fDevices.reduce((s: number, d: any) => s + (d.sessions || 0), 0);
+            const totalSessions = devices.reduce((s: number, d: any) => s + (d.sessions || 0), 0);
+            ratio = Math.min(ratio, totalSessions > 0 ? filteredSessions / totalSessions : 0);
+        }
+        if (filters.browser.length > 0) {
+            const filteredVal = fBrowsers.reduce((s: number, b: any) => s + (b.value || 0), 0);
+            const totalVal = browsers.reduce((s: number, b: any) => s + (b.value || 0), 0);
+            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+        }
+        if (filters.channel.length > 0) {
+            const filteredVal = fChannels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+            const totalVal = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+        }
+        if (filters.referrer.length > 0) {
+            const filteredVal = fReferrers.reduce((s: number, r: any) => s + (r.value || 0), 0);
+            const totalVal = referrers.reduce((s: number, r: any) => s + (r.value || 0), 0);
+            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+        }
+        if (filters.os.length > 0) {
+            const filteredVal = fOS.reduce((s: number, o: any) => s + (o.value || 0), 0);
+            const totalVal = operatingSystems.reduce((s: number, o: any) => s + (o.value || 0), 0);
+            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+        }
+
+        return {
+            totalUsers: Math.round(kpis.totalUsers * ratio),
+            totalSessions: Math.round(kpis.totalSessions * ratio),
+            totalPageViews: Math.round(kpis.totalPageViews * ratio),
+            avgBounceRate: kpis.avgBounceRate,
+            _ratio: ratio, // keep for chart scaling
+        };
+    }, [kpis, anyFilterActive, filters, fCountries, fPages, fDevices, fBrowsers, fChannels, fReferrers, fOS, countries, pages, devices, browsers, channels, referrers, operatingSystems]);
+
+    // ─── Filtered traffic for chart: scale proportionally using the filter ratio ───
+    const chartTraffic = useMemo(() => {
+        if (!anyFilterActive || !filteredKpis) return traffic;
+        const r = filteredKpis._ratio;
+        return traffic.map((d: any) => ({
+            ...d,
+            activeUsers: Math.round((d.activeUsers || 0) * r),
+            sessions: Math.round((d.sessions || 0) * r),
+            pageViews: Math.round((d.pageViews || 0) * r),
+        }));
+    }, [traffic, anyFilterActive, filteredKpis]);
 
     // Use filtered KPIs when filters active, otherwise original
     const displayKpis = filteredKpis || kpis;

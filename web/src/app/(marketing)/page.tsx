@@ -154,7 +154,7 @@ function Hero() {
                     className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
                 >
                     <button
-                        onClick={() => signIn()}
+                        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                         className="group px-8 py-3.5 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300"
                     >
                         Start Free — No Credit Card
@@ -792,7 +792,7 @@ function Pricing() {
                             </div>
 
                             <button
-                                onClick={() => signIn()}
+                                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 ${plan.highlighted
                                     ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_24px_rgba(52,211,153,0.3)]'
                                     : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
@@ -1043,7 +1043,7 @@ function FinalCTA() {
                             Start free — no credit card required.
                         </p>
                         <button
-                            onClick={() => signIn('google')}
+                            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="group px-10 py-4 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
                         >
                             Start Growing — It&apos;s Free

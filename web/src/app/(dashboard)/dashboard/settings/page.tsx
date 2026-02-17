@@ -3,8 +3,8 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import {
-    User, Mail, Bell, LogOut, Shield, Globe, Key,
-    CheckCircle2, ExternalLink, Copy, Eye, EyeOff, ChevronRight
+    User, Mail, LogOut,
+    CheckCircle2, ChevronRight
 } from 'lucide-react';
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
@@ -20,8 +20,6 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 
 export default function SettingsPage() {
     const { data: session } = useSession();
-    const [showKey, setShowKey] = useState(false);
-    const [copied, setCopied] = useState(false);
     const [notifications, setNotifications] = useState({
         seoAlerts: true,
         weeklyReport: true,
@@ -31,14 +29,6 @@ export default function SettingsPage() {
 
     const toggleNotification = (key: keyof typeof notifications) => {
         setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    const fakeApiKey = 'grc_sk_1a2b3c4d5e6f7g8h9i0j...';
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(fakeApiKey);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
     };
 
     return (

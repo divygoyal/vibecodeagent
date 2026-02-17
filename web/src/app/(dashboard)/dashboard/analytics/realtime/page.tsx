@@ -65,16 +65,16 @@ export default function RealtimePage() {
     const byDevice: any[] = Array.isArray(realtimeData?.byDevice) ? realtimeData.byDevice : [];
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
 
-    // Build activity feed
+    // Build activity feed (coerce all values to safe primitives)
     const activityFeed = useMemo(() => {
         return byCity.slice(0, 20).map((c: any, i: number) => ({
             name: ANON_NAMES[i % ANON_NAMES.length],
-            country: c.country,
-            city: c.city,
-            page: byPage[i % Math.max(byPage.length, 1)]?.page || '/',
-            users: c.users,
+            country: String(c.country ?? ''),
+            city: String(c.city ?? ''),
+            page: String(byPage[i % Math.max(byPage.length, 1)]?.page ?? '/'),
+            users: Number(c.users) || 0,
             event: EVENT_TYPES[i % EVENT_TYPES.length],
-            device: byDevice[i % Math.max(byDevice.length, 1)]?.device || 'desktop',
+            device: String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop'),
         }));
     }, [byCity, byPage, byDevice]);
 
@@ -288,10 +288,10 @@ export default function RealtimePage() {
                     <div className="bg-[rgba(255,255,255,0.02)] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
                         <div className="flex items-center gap-3 mb-3">
                             <h3 className="text-sm font-semibold text-white">Geo</h3>
-                            <div className="flex">{byCountry.slice(0, 6).map((c: any, i: number) => <CountryFlag key={i} country={c.country} />)}</div>
+                            <div className="flex">{byCountry.slice(0, 6).map((c: any, i: number) => <CountryFlag key={i} country={String(c.country ?? '')} />)}</div>
                         </div>
                         <AnalyticsTable
-                            data={filteredByCountry.map((c: any) => ({ name: c.country, events: c.users, sessions: c.users }))}
+                            data={filteredByCountry.map((c: any) => ({ name: String(c.country ?? ''), events: Number(c.users) || 0, sessions: Number(c.users) || 0 }))}
                             showSearch={false}
                             onRowClick={(item: any) => handleBubbleClick(item.name)}
                             activeRow={(item: any) => item.name === activeCountry}
@@ -325,7 +325,7 @@ export default function RealtimePage() {
                     <div className="bg-[rgba(255,255,255,0.02)] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
                         <h3 className="text-sm font-semibold text-white mb-3">Active Pages</h3>
                         <AnalyticsTable
-                            data={filteredByPage.map((p: any) => ({ path: p.page, events: p.users, sessions: p.users }))}
+                            data={filteredByPage.map((p: any) => ({ path: String(p.page ?? '/'), events: Number(p.users) || 0, sessions: Number(p.users) || 0 }))}
                             searchKey={(item: any) => item.path}
                             searchPlaceholder="Search pages..."
                             columns={[
@@ -367,12 +367,12 @@ export default function RealtimePage() {
                                 >
                                     <div className="flex items-center gap-2 mb-2">
                                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-                                            {DEVICE_ICONS[d.device?.toLowerCase()] || <Monitor className="w-4 h-4" />}
+                                            {DEVICE_ICONS[String(d.device ?? '').toLowerCase()] || <Monitor className="w-4 h-4" />}
                                         </div>
-                                        <span className="text-xs text-zinc-400 capitalize">{d.device}</span>
+                                        <span className="text-xs text-zinc-400 capitalize">{String(d.device ?? 'unknown')}</span>
                                     </div>
                                     <div className="flex items-end justify-between">
-                                        <AnimatedCounter value={d.users} className="text-2xl font-bold text-white tabular-nums" />
+                                        <AnimatedCounter value={Number(d.users) || 0} className="text-2xl font-bold text-white tabular-nums" />
                                         <span className="text-xs text-blue-400 font-medium tabular-nums">{pct}%</span>
                                     </div>
                                     <div className="mt-2 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">

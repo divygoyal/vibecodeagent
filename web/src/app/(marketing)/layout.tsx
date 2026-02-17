@@ -69,13 +69,13 @@ function Navbar() {
                     ) : (
                         <>
                             <button
-                                onClick={() => signIn()}
+                                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                                 className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
                             >
                                 Sign In
                             </button>
                             <button
-                                onClick={() => signIn()}
+                                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                                 className="px-4 py-2 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg hover:opacity-90 transition-opacity"
                             >
                                 Start Free
@@ -114,7 +114,7 @@ function Navbar() {
                                 </a>
                             ))}
                             <button
-                                onClick={() => signIn()}
+                                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                                 className="mt-2 px-4 py-2.5 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg text-center"
                             >
                                 Start Free
