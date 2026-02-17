@@ -10,7 +10,7 @@ const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false }
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
-    Book, Newspaper, History
+    Book, Newspaper, History, Sun, Moon
 } from 'lucide-react';
 
 // Registration context to coordinate registration with data fetching
@@ -62,6 +62,20 @@ export default function DashboardLayout({
     const [mobileOpen, setMobileOpen] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState('');
     const [selectedSite, setSelectedSite] = useState('');
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+    // Persist theme to localStorage and apply to <html>
+    useEffect(() => {
+        const saved = localStorage.getItem('gc-theme') as 'dark' | 'light' | null;
+        if (saved) { setTheme(saved); document.documentElement.setAttribute('data-theme', saved); }
+    }, []);
+
+    const toggleTheme = () => {
+        const next = theme === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+        localStorage.setItem('gc-theme', next);
+        document.documentElement.setAttribute('data-theme', next);
+    };
 
     // Registration state with proper tracking
     const [registrationState, setRegistrationState] = useState({
@@ -245,6 +259,14 @@ export default function DashboardLayout({
 
                     {/* Right side */}
                     <div className="flex items-center gap-3">
+                        {/* Theme toggle */}
+                        <button
+                            onClick={toggleTheme}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                        >
+                            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                        </button>
                         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/[0.15]">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             <span className="text-[10px] font-medium text-emerald-400">Free Plan</span>

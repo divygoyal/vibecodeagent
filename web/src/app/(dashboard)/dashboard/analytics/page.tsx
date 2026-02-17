@@ -2,11 +2,13 @@
 
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
-    TrendingUp, TrendingDown, Users, Loader2, Download, RefreshCw, Target, Globe,
-    Filter as FilterIcon, MapPin
+    TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Layers,
+    Download, RefreshCw, Target, Globe, Bot,
+    Filter as FilterIcon, MapPin, BarChart3, UserPlus
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
@@ -15,7 +17,6 @@ import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/co
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
-import AIInsightEngine from '@/components/analytics/AIInsightEngine';
 import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
 import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
 
@@ -163,28 +164,53 @@ export default function AnalyticsPage() {
 
     return (
         <div className="space-y-5">
-            {/* ─── KPI Strip ─── */}
+            {/* ─── KPI Cards (professional, matches SEO style) ─── */}
             {kpis && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                        { label: 'Visitors', raw: kpis.totalUsers, change: kpis.changeUsers, color: 'text-blue-400', border: 'border-blue-500/15', bg: 'bg-blue-500' },
-                        { label: 'Sessions', raw: kpis.totalSessions, change: kpis.changeSessions, color: 'text-cyan-400', border: 'border-cyan-500/15', bg: 'bg-cyan-500' },
-                        { label: 'Page Views', raw: kpis.totalPageViews, change: kpis.changePageViews, color: 'text-indigo-400', border: 'border-indigo-500/15', bg: 'bg-indigo-500' },
-                        { label: 'Bounce Rate', formatted: `${kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', color: 'text-amber-400', border: 'border-amber-500/15', bg: 'bg-amber-500' },
-                        { label: 'Avg. Duration', formatted: fmtDur(kpis.avgSessionDuration), change: 0, color: 'text-purple-400', border: 'border-purple-500/15', bg: 'bg-purple-500' },
-                        { label: 'New Users', raw: kpis.newUsers, change: 0, color: 'text-pink-400', border: 'border-pink-500/15', bg: 'bg-pink-500' },
-                        { label: 'Pages/Session', formatted: String(kpis.pagesPerSession), change: 0, color: 'text-orange-400', border: 'border-orange-500/15', bg: 'bg-orange-500' },
+                        { label: 'Visitors', raw: kpis.totalUsers, change: kpis.changeUsers, icon: Users, iconBg: 'bg-blue-400/10', iconColor: 'text-blue-400' },
+                        { label: 'Sessions', raw: kpis.totalSessions, change: kpis.changeSessions, icon: BarChart3, iconBg: 'bg-cyan-400/10', iconColor: 'text-cyan-400' },
+                        { label: 'Page Views', raw: kpis.totalPageViews, change: kpis.changePageViews, icon: Eye, iconBg: 'bg-violet-400/10', iconColor: 'text-violet-400' },
+                        { label: 'Bounce Rate', formatted: `${kpis.avgBounceRate}%`, change: kpis.changeBounceRate, suffix: '%', icon: MousePointer, iconBg: 'bg-amber-400/10', iconColor: 'text-amber-400' },
                     ].map((k: any, i) => (
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                            className={`bg-[rgba(255,255,255,0.02)] border ${k.border} rounded-2xl p-3.5 hover:bg-white/[0.03] transition-all duration-200 group`}>
-                            <div className="flex items-center gap-1.5 mb-1">
-                                <div className={`w-1 h-1 rounded-full ${k.bg}`} />
-                                <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{k.label}</span>
+                            className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className={`w-9 h-9 rounded-xl ${k.iconBg} flex items-center justify-center`}>
+                                    <k.icon className={`w-4 h-4 ${k.iconColor}`} />
+                                </div>
+                                <Change value={k.change} suffix={k.suffix} />
                             </div>
-                            <div className={`text-xl font-bold tabular-nums mt-1 ${k.color} group-hover:text-white transition-colors`}>
+                            <div className="text-2xl font-bold text-white tabular-nums">
                                 {k.raw != null ? <AnimatedCounter value={k.raw} formatter={fmt} /> : k.formatted}
                             </div>
-                            <div className="mt-1"><Change value={k.change} suffix={k.suffix} /></div>
+                            <div className="text-xs text-zinc-500 mt-1">{k.label}</div>
+                        </motion.div>
+                    ))}
+                </div>
+            )}
+
+            {/* ─── Secondary KPIs (smaller row) ─── */}
+            {kpis && (
+                <div className="grid grid-cols-3 gap-3">
+                    {[
+                        { label: 'Avg. Duration', value: fmtDur(kpis.avgSessionDuration), icon: Timer, iconBg: 'bg-purple-400/10', iconColor: 'text-purple-400' },
+                        { label: 'New Users', raw: kpis.newUsers, icon: UserPlus, iconBg: 'bg-pink-400/10', iconColor: 'text-pink-400' },
+                        { label: 'Pages/Session', value: String(kpis.pagesPerSession), icon: Layers, iconBg: 'bg-emerald-400/10', iconColor: 'text-emerald-400' },
+                    ].map((k: any, i) => (
+                        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.04 }}
+                            className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.1] transition-colors">
+                            <div className="flex items-center gap-2.5">
+                                <div className={`w-8 h-8 rounded-lg ${k.iconBg} flex items-center justify-center flex-shrink-0`}>
+                                    <k.icon className={`w-3.5 h-3.5 ${k.iconColor}`} />
+                                </div>
+                                <div>
+                                    <div className="text-lg font-bold text-white tabular-nums">
+                                        {k.raw != null ? <AnimatedCounter value={k.raw} formatter={fmt} /> : k.value}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-500">{k.label}</div>
+                                </div>
+                            </div>
                         </motion.div>
                     ))}
                 </div>
@@ -230,8 +256,22 @@ export default function AnalyticsPage() {
                 </div>
             </motion.div>
 
-            {/* ─── AI Insights ─── */}
-            <AIInsightEngine kpis={kpis} countries={countries} channels={channels} pages={pages} devices={devices} browsers={browsers} referrers={referrers} />
+            {/* ─── Ask the Bot Banner ─── */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+                className="bg-gradient-to-r from-blue-500/[0.06] via-cyan-500/[0.04] to-violet-500/[0.06] border border-blue-500/15 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                        <Bot className="w-4.5 h-4.5 text-blue-400" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold text-white">Have questions about your analytics?</p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">Ask our AI Bot anything — traffic trends, audience insights, growth tips, and more.</p>
+                    </div>
+                </div>
+                <Link href="/dashboard/bot" className="px-4 py-2 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 hover:text-blue-300 transition whitespace-nowrap">
+                    Ask the Bot →
+                </Link>
+            </motion.div>
 
             {/* ─── Referrers & Pages (with progress bars + filtering) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

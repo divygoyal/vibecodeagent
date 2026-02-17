@@ -55,11 +55,11 @@ export default function RealtimePage() {
         );
     }
 
-    const activeUsers = realtimeData?.activeUsers || 0;
-    const byCountry: any[] = realtimeData?.byCountry || [];
-    const byCity: any[] = realtimeData?.byCity || [];
-    const byDevice: any[] = realtimeData?.byDevice || [];
-    const byPage: any[] = realtimeData?.byPage || [];
+    const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : 0;
+    const byCountry: any[] = Array.isArray(realtimeData?.byCountry) ? realtimeData.byCountry : [];
+    const byCity: any[] = Array.isArray(realtimeData?.byCity) ? realtimeData.byCity : [];
+    const byDevice: any[] = Array.isArray(realtimeData?.byDevice) ? realtimeData.byDevice : [];
+    const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
 
     // Build activity feed
     const activityFeed = useMemo(() => {
@@ -74,10 +74,11 @@ export default function RealtimePage() {
         }));
     }, [byCity, byPage, byDevice]);
 
-    // Mini bar chart data
+    // Mini bar chart data (deterministic — no Math.random to avoid hydration errors)
     const barData = useMemo(() => {
         return Array.from({ length: 60 }, (_, i) => {
-            return Math.max(0, activeUsers + Math.floor((Math.random() - 0.5) * activeUsers * 0.4));
+            const seed = Math.sin(i * 7.13 + 3.17) * 0.5; // deterministic pseudo-random [-0.5, 0.5]
+            return Math.max(1, Math.round(activeUsers + seed * activeUsers * 0.35));
         });
     }, [activeUsers]);
 

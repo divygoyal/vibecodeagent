@@ -47,6 +47,57 @@ export const AnalyticsContext = React.createContext<{
 
 export const useAnalyticsContext = () => React.useContext(AnalyticsContext);
 
+// ─── Custom Property Dropdown ───
+function PropertyDropdown({ properties, value, onChange }: { properties: any[]; value: string; onChange: (v: string) => void }) {
+    const [open, setOpen] = useState(false);
+    const current = properties.find((p: any) => p.property === value);
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setOpen(!open)}
+                className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] hover:border-white/[0.12] transition min-w-[140px]"
+            >
+                <div className="w-4 h-4 rounded bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="w-2.5 h-2.5 text-blue-400" />
+                </div>
+                <span className="truncate max-w-[160px] font-medium">{current?.displayName || current?.property || 'Select property'}</span>
+                <ChevronDown className={`w-3 h-3 text-zinc-500 ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+                    <div className="absolute left-0 mt-1.5 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/40 py-1.5 min-w-[220px] overflow-hidden">
+                        <div className="px-3 pb-1.5 pt-0.5">
+                            <span className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">Properties</span>
+                        </div>
+                        {properties.map((p: any) => (
+                            <button
+                                key={p.property}
+                                onClick={() => { onChange(p.property); setOpen(false); }}
+                                className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2.5 transition ${
+                                    value === p.property
+                                        ? 'text-blue-400 bg-blue-500/[0.08]'
+                                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${
+                                    value === p.property ? 'bg-blue-500/20' : 'bg-white/[0.04]'
+                                }`}>
+                                    <BarChart3 className="w-3 h-3" />
+                                </div>
+                                <span className="truncate font-medium">{p.displayName || p.property}</span>
+                                {value === p.property && (
+                                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 export default function AnalyticsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
@@ -95,20 +146,13 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                     <div className="flex items-center justify-between py-3">
                         <div className="flex items-center gap-3">
                             <h1 className="text-lg font-bold text-white tracking-tight">Analytics</h1>
-                            {/* Property selector */}
-                            {properties.length > 1 && (
-                                <div className="relative">
-                                    <select
-                                        value={selectedProperty}
-                                        onChange={e => setSelectedProperty(e.target.value)}
-                                        className="text-[11px] bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-300 focus:outline-none focus:border-blue-500/30 appearance-none pr-7"
-                                    >
-                                        {properties.map((p: any) => (
-                                            <option key={p.property} value={p.property}>{p.displayName || p.property}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 pointer-events-none" />
-                                </div>
+                            {/* Property selector (custom dropdown) */}
+                            {properties.length > 0 && (
+                                <PropertyDropdown
+                                    properties={properties}
+                                    value={selectedProperty}
+                                    onChange={setSelectedProperty}
+                                />
                             )}
                         </div>
 
