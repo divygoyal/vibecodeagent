@@ -17,7 +17,7 @@ import requests
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
@@ -906,15 +906,10 @@ async def delete_user(
     # Delete container
     docker_result = docker_manager.delete_container(user.github_id, remove_data=remove_data)
     
-    # Delete user record (cascade should handle OAuthConnections if configured, but let's manual delete to be safe)
-    await db.execute(
-        select(OAuthConnection).where(OAuthConnection.user_id == user.id)
-    ) # actually just delete user, SQLAlchemy rarely does cascades unless configured. 
-      # Since we don't have relationships defined in model, we rely on DB FK or manual.
-      # DB schema doesn't have FK constraints explicitly defined in models shown, so let's check.
-      # Assuming manual delete for now.
-    
-    # Actually, simplistic delete.
+    # Delete OAuth connections explicitly (avoid orphan rows; enables clean re-signup)
+    await db.execute(delete(OAuthConnection).where(OAuthConnection.user_id == user.id))
+
+    # Delete user record
     await db.delete(user)
     await db.commit()
     

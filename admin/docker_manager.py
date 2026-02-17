@@ -18,7 +18,7 @@ class DockerManager:
     
     def __init__(self):
         self.client = docker.from_env()
-        self.base_dir = "/home/ubuntu/clawbot-data"  # Host path for user data
+        self.base_dir = settings.DATA_DIR  # Host path for user data
     
     def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
@@ -34,10 +34,17 @@ class DockerManager:
         os.makedirs(user_dir, exist_ok=True)
         os.makedirs(f"{user_dir}/workspace", exist_ok=True)
         os.makedirs(f"{user_dir}/.openclaw", exist_ok=True)
-        
-        # Fix permissions - OpenClaw runs as node user (UID 1000)
-        # Make directories writable by the container user
-        os.system(f"chmod -R 777 {user_dir}")
+
+        # OpenClaw needs to write to /data/.openclaw (mounted from host).
+        # Ensure directory is writable for typical non-root container users.
+        try:
+            os.chmod(user_dir, 0o777)
+            os.chmod(f"{user_dir}/workspace", 0o777)
+            os.chmod(f"{user_dir}/.openclaw", 0o777)
+        except Exception as e:
+            logger.warning(f"Could not chmod user_dir for {user_identifier}: {e}")
+            # Best-effort fallback
+            os.system(f"chmod -R 777 '{user_dir}'")
         
         return user_dir
     
@@ -336,7 +343,11 @@ _(What do they care about? What projects are they working on? What annoys them? 
             self._copy_plugins(user_identifier, enabled_plugins)
         
         # Fix ownership
-        os.system(f"chown -R 1000:1000 {user_dir}")
+        try:
+            # Best-effort: if the container runs as UID 1000, this avoids EACCES.
+            os.system(f"chown -R 1000:1000 '{user_dir}'")
+        except Exception as e:
+            logger.warning(f"Could not chown user_dir for {user_identifier}: {e}")
         
         # Environment variables
         heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}

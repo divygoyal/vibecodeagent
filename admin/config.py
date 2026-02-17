@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     
     # Paths
     PLUGINS_DIR: str = "/home/ubuntu/vibecodeagent/plugins" # Host path for plugins (skills)
+    DATA_DIR: str = "/home/ubuntu/clawbot-data"  # Host path for per-user /data volumes
     
     # Resource Limits (per container)
     # OpenClaw needs significant RAM - Node.js heap + system overhead
