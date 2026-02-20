@@ -17,7 +17,7 @@ import requests
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
@@ -34,6 +34,13 @@ async def init_db():
     """Initialize database tables"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Auto-migrate new columns for existing SQLite databases
+        for col, col_def in [("credits", "INTEGER DEFAULT 100"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'")]:
+            try:
+                await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
+            except Exception:
+                pass
 
 
 async def get_db():
