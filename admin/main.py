@@ -368,8 +368,10 @@ async def create_user(
     # 3. Upsert Logic
     if existing_user:
         user = existing_user
+        print(f"[DEBUG_TOKEN] Found user={user.id}. Current DB token='{user.telegram_bot_token}'. Incoming token='{user_data.telegram_bot_token}'")
         # Update fields if provided
         if user_data.telegram_bot_token:
+            print(f"[DEBUG_TOKEN] Assigning token! (Old: {user.telegram_bot_token} -> New: {user_data.telegram_bot_token})")
             user.telegram_bot_token = user_data.telegram_bot_token
         if user_data.gemini_api_key:
             user.gemini_api_key = user_data.gemini_api_key
@@ -527,7 +529,7 @@ async def create_user(
         print(f"[ERROR] create_user: Failed to ensure container: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
-    print(f"[DEBUG] create_user: Success. user_id={user.id}, github_id={user.github_id}, container={user.container_status}")
+    print(f"[DEBUG_TOKEN] create_user: Success. user_id={user.id}, github_id={user.github_id}, container={user.container_status}, token_exists={bool(user.telegram_bot_token)}")
     return UserResponse(
         id=user.id,
         github_id=user.github_id or "",
@@ -574,11 +576,14 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
-    """Get user details with container status"""
+    """Get user status including container health"""
+    print(f"[DEBUG_TOKEN] GET /api/users/{github_id} called")
     user = await get_user_by_identifier(db, github_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    print(f"[DEBUG_TOKEN] get_user: DB token for {github_id} is: '{user.telegram_bot_token}'")
     
     display_token = user.telegram_bot_token or ""
 
