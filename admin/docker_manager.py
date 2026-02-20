@@ -517,7 +517,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     "telegram": {
                         "enabled": bool(telegram_token),
                         "token": telegram_token or "",
-                        "allowFrom": ["*"]
+                        "allowFrom": []
                     }
                 },
                 "providers": {
