@@ -738,9 +738,21 @@ _(What do they care about? What projects are they working on? What annoys them? 
             # Parse logs for Telegram status
             logs = ""
             try:
-                logs = container.logs(tail=50).decode('utf-8')
+                # Catch more logs to diagnose immediate crashes
+                logs = container.logs(tail=200).decode('utf-8')
             except:
                 pass
+
+            # If the container crashed, aggressively log it into the health check
+            if status in ["exited", "restarting", "created", "dead"]:
+                # Expose the last lines of the log in the telegram_status field or a new error field
+                return {
+                    "success": True,
+                    "status": status,
+                    "health": "unknown",
+                    "error": logs[-500:] if logs else "No logs available. Container crashed silently.",
+                    "telegram_status": "error"
+                }
 
             telegram_status = "initializing"
             bot_username = None
