@@ -28,7 +28,7 @@ class DockerManager:
     
     def _ensure_nanobot_image(self) -> None:
         """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
-        tag = "trafficclaw/nanobot:latest"
+        tag = "trafficclaw/nanobot:v2"
         try:
             self.client.images.get(tag)
         except docker.errors.ImageNotFound:
@@ -55,7 +55,7 @@ ENV HOME=/data
 RUN mkdir -p /app/skills/workspace
 EXPOSE 8080
 ENTRYPOINT ["nanobot"]
-CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
+CMD ["gateway", "--port", "8080"]
 '''
                 try:
                     for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
@@ -568,7 +568,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
              env["GITHUB_ID"] = user_identifier
         
         # Create container - select image and memory limit based on engine
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:latest"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v2"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 200 * 1024 * 1024
 
         # Set up volumes based on the engine
