@@ -372,6 +372,8 @@ async def create_user(
             user.telegram_bot_token = user_data.telegram_bot_token
         if user_data.gemini_api_key:
             user.gemini_api_key = user_data.gemini_api_key
+        if user_data.bot_engine:
+            user.bot_engine = user_data.bot_engine
             
         # Update OAuth credentials if provided (Critical for re-auth/refresh tokens)
         if user_data.provider and user_data.provider_id:
@@ -424,6 +426,7 @@ async def create_user(
             plan=user_data.plan,
             telegram_bot_token=user_data.telegram_bot_token,
             gemini_api_key=user_data.gemini_api_key,
+            bot_engine=user_data.bot_engine or "openclaw",
             container_id="pending", 
             container_name=container_name,
             container_port=port,
