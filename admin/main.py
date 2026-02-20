@@ -468,7 +468,8 @@ async def create_user(
             container_status=user.container_status or "not_provisioned",
             container_port=user.container_port,
             is_active=user.is_active,
-            created_at=user.created_at
+            created_at=user.created_at,
+            bot_engine=user.bot_engine or "openclaw"
         )
 
     # 5. Ensure Container Exists & Is Running (only when we have a telegram token)
@@ -532,7 +533,8 @@ async def create_user(
         container_status=user.container_status,
         container_port=user.container_port,
         is_active=user.is_active,
-        created_at=user.created_at
+        created_at=user.created_at,
+        bot_engine=user.bot_engine or "openclaw"
     )
 
 
@@ -555,7 +557,8 @@ async def list_users(
             container_status=u.container_status,
             container_port=u.container_port,
             is_active=u.is_active,
-            created_at=u.created_at
+            created_at=u.created_at,
+            bot_engine=u.bot_engine or "openclaw"
         )
         for u in users
     ]
