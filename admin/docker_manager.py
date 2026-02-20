@@ -516,7 +516,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 "channels": {
                     "telegram": {
                         "enabled": bool(telegram_token),
-                        "botToken": telegram_token or "",
+                        "token": telegram_token or "",
                         "allowFrom": ["*"]
                     }
                 },
