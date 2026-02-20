@@ -213,6 +213,7 @@ class UserCreate(BaseModel):
     plan: str = "free"
     telegram_bot_token: Optional[str] = None  # Optional: not required for pre-bot provider registration
     gemini_api_key: Optional[str] = None
+    bot_engine: Optional[str] = None # Support bot_engine during creation
     github_token: Optional[str] = None # Input only, not stored in User model
 
 
