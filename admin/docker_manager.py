@@ -527,8 +527,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     }
                 },
                 "agents": {
-                    "default": {
-                        "provider": "gemini",
+                    "defaults": {
                         "model": "gemini-3-pro-preview"
                     }
                 }
