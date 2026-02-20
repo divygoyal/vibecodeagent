@@ -26,10 +26,10 @@ const swrOptions = {
 // Hook that waits for registration before enabling the SWR key
 function useRegisteredSWR(url: string | null, options = {}) {
     const { isRegistered, isRegistering } = useRegistration();
-    
+
     // Only fetch if registered and URL is provided
     const key = isRegistered && !isRegistering ? url : null;
-    
+
     return useSWR(key, fetcher, { ...swrOptions, ...options });
 }
 
@@ -54,12 +54,12 @@ export function useGitHubData() {
     const { data, error, isLoading, mutate } = useRegisteredSWR('/api/github', {
         errorRetryCount: 0, // Don't retry 400s — they won't self-resolve
     });
-    
+
     // Detect connection state from the preserved error body
     const errorCode = error?.info?.code;
     const isNotConnected = errorCode === 'GITHUB_NOT_CONNECTED';
     const hasGitHubConnection = !isNotConnected && !error;
-    
+
     return {
         commits: data?.commits || [],
         repos: data?.repos || [],
@@ -77,7 +77,7 @@ export function useAnalyticsData(section: string, propertyId?: string, enabled =
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 60000,
     });
-    
+
     return {
         data,
         isLoading,
@@ -92,7 +92,7 @@ export function useSeoData(section: string, siteUrl?: string, enabled = true) {
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 60000,
     });
-    
+
     return {
         data,
         isLoading,
@@ -106,7 +106,7 @@ export function useInsights(enabled = true) {
         enabled ? '/api/insights' : null,
         { dedupingInterval: 300000, errorRetryCount: 1 }
     );
-    
+
     return {
         insights: data?.insights || [],
         isLoading,
@@ -119,7 +119,7 @@ export function useSiteList(enabled = true) {
         enabled ? '/api/seo?mode=list' : null,
         { dedupingInterval: 300000 }
     );
-    
+
     return {
         sites: Array.isArray(data) ? data : [],
         isLoading,
@@ -148,11 +148,25 @@ export function usePropertyList(enabled = true) {
         enabled ? '/api/analytics?mode=list' : null,
         { dedupingInterval: 300000 }
     );
-    
+
     return {
         properties: Array.isArray(data) ? data : [],
         isLoading,
         isError: error,
         refresh: mutate
+    };
+}
+
+export function useCredits() {
+    const { data, error, isLoading, mutate } = useRegisteredSWR('/api/credits', {
+        dedupingInterval: 30000,
+        refreshInterval: 30000,
+    });
+
+    return {
+        credits: data?.credits ?? null,
+        isLoading,
+        isError: error,
+        refresh: mutate,
     };
 }

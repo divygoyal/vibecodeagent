@@ -220,6 +220,7 @@ class UserUpdate(BaseModel):
     provider: Optional[str] = None
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None # New
+    bot_engine: Optional[str] = None
 
 
 class ContainerAction(BaseModel):
@@ -236,6 +237,7 @@ class UserResponse(BaseModel):
     container_port: Optional[int]
     is_active: bool
     created_at: datetime
+    bot_engine: str
 
 
 # ============= Helpers =============
@@ -494,7 +496,8 @@ async def create_user(
             gemini_key=user.gemini_api_key,
             connections=connections,
             custom_rules=user.custom_rules,
-            enabled_plugins=plan_config.get("features", [])
+            enabled_plugins=plan_config.get("features", []),
+            bot_engine=user.bot_engine
         )
         
         if not result["success"]:
@@ -703,7 +706,8 @@ async def sync_user_container(
         gemini_key=user.gemini_api_key,
         connections=connections,
         custom_rules=user.custom_rules,
-        enabled_plugins=plan_config.get("features", [])
+        enabled_plugins=plan_config.get("features", []),
+        bot_engine=user.bot_engine
     )
     
     if result["success"]:
@@ -833,7 +837,8 @@ async def update_user(
             gemini_key=user.gemini_api_key,
             connections=connections,
             custom_rules=user.custom_rules,
-            enabled_plugins=plan_config.get("features", [])
+            enabled_plugins=plan_config.get("features", []),
+            bot_engine=user.bot_engine
         )
         
         if result["success"]:
@@ -878,7 +883,8 @@ async def update_user(
             gemini_key=user.gemini_api_key,
             connections=connections,
             custom_rules=user.custom_rules,
-            enabled_plugins=plan_config.get("features", [])
+            enabled_plugins=plan_config.get("features", []),
+            bot_engine=user.bot_engine
         )
         
         if result["success"]:
@@ -889,6 +895,72 @@ async def update_user(
     
     return {"success": True, "message": "User updated"}
 
+
+# ============= Credit System Endpoints =============
+class CreditDeductRequest(BaseModel):
+    amount: int = 10  # Default cost per AI chat message
+
+class CreditAddRequest(BaseModel):
+    amount: int
+    reason: Optional[str] = "purchase"
+    payment_id: Optional[str] = None
+
+@app.get("/api/users/{github_id}/credits")
+async def get_user_credits(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Get user's credit balance"""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"credits": user.credits or 0, "user_id": user.id}
+
+
+@app.post("/api/users/{github_id}/credits/deduct")
+async def deduct_user_credits(
+    github_id: str,
+    request: CreditDeductRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Deduct credits for AI chat usage"""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    current = user.credits or 0
+    if current < request.amount:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+    
+    user.credits = current - request.amount
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+    
+    return {"credits": user.credits, "deducted": request.amount}
+
+
+@app.post("/api/users/{github_id}/credits/add")
+async def add_user_credits(
+    github_id: str,
+    request: CreditAddRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Add credits to user (after purchase or admin grant)"""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    current = user.credits or 0
+    user.credits = current + request.amount
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+    
+    print(f"[CREDITS] Added {request.amount} credits to user {user.github_id}. New balance: {user.credits}. Reason: {request.reason}")
+    return {"credits": user.credits, "added": request.amount, "reason": request.reason}
 
 
 # ============= Container Endpoints =============
@@ -942,7 +1014,8 @@ async def container_action(
                 gemini_key=user.gemini_api_key,
                 connections=connections,
                 custom_rules=user.custom_rules,
-                enabled_plugins=plan_config.get("features", [])
+                enabled_plugins=plan_config.get("features", []),
+                bot_engine=user.bot_engine
             )
             
             if result["success"]:

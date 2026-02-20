@@ -383,7 +383,8 @@ _(What do they care about? What projects are they working on? What annoys them? 
         gemini_key: Optional[str] = None,
         connections: Optional[Dict[str, Any]] = None, # Generic connections dict
         custom_rules: Optional[str] = None,
-        enabled_plugins: Optional[list] = None
+        enabled_plugins: Optional[list] = None,
+        bot_engine: str = "openclaw"
     ) -> Dict[str, Any]:
         """
         Create a new ClawBot container for a user
@@ -463,6 +464,34 @@ _(What do they care about? What projects are they working on? What annoys them? 
             # But likely we want to defaults to coding if we can't determine
             skills.append("coding")
 
+        if bot_engine == "nanobot":
+            nanobot_dir = os.path.join(user_dir, ".nanobot")
+            os.makedirs(nanobot_dir, exist_ok=True)
+            nanobot_config = {
+                "channels": {
+                    "telegram": {
+                        "enabled": bool(telegram_token),
+                        "bot_token": telegram_token or "",
+                        "allowed_users": []
+                    }
+                },
+                "providers": {
+                    "gemini": {
+                        "enabled": True,
+                        "api_key": gemini_key or settings.GEMINI_API_KEY
+                    }
+                },
+                "agents": {
+                    "default": {
+                        "provider": "gemini",
+                        "model": "gemini-3-pro-preview"
+                    }
+                }
+            }
+            with open(os.path.join(nanobot_dir, "config.json"), "w", encoding="utf-8") as f:
+                import json
+                json.dump(nanobot_config, f, indent=4)
+
         env = {
             "OPENCLAW_WORKSPACE_DIR": "/data/workspace",
             "OPENCLAW_STATE_DIR": "/data/.openclaw",
@@ -493,21 +522,31 @@ _(What do they care about? What projects are they working on? What annoys them? 
         else:
              env["GITHUB_ID"] = user_identifier
         
-        # Create container - use default entrypoint
+        # Create container - select image and memory limit based on engine
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:latest"
+        mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 200 * 1024 * 1024
+
+        # Set up volumes based on the engine
+        volumes_config = {
+            user_dir: {"bind": "/data", "mode": "rw"}
+        }
+        
+        if bot_engine == "openclaw":
+            volumes_config[self._shared_plugins_dir] = {"bind": "/app/skills/workspace", "mode": "rw"}
+        else:
+            # Mount the user-scoped plugins directly to where Nanobot looks for them
+            volumes_config[f"{user_dir}/workspace/plugins"] = {"bind": "/data/.nanobot/workspace/skills", "mode": "rw"}
+
         try:
             container = self.client.containers.run(
-                settings.OPENCLAW_IMAGE,
+                image_name,
                 name=container_name,
                 detach=True,
                 restart_policy={"Name": "on-failure", "MaximumRetryCount": 3},
                 ports={"8080/tcp": port},
-                volumes={
-                    user_dir: {"bind": "/data", "mode": "rw"},
-                    # Also mount plugins to /app/skills/workspace so they are auto-discovered
-                    self._shared_plugins_dir: {"bind": "/app/skills/workspace", "mode": "rw"}
-                },
+                volumes=volumes_config,
                 environment=env,
-                mem_limit=plan_config["memory_limit"],
+                mem_limit=mem_limit_bytes,
                 cpu_quota=int(plan_config["cpu_limit"] * 100000),
                 labels={
                     "clawbot.user": user_identifier,
@@ -539,7 +578,8 @@ _(What do they care about? What projects are they working on? What annoys them? 
         gemini_key: Optional[str] = None,
         connections: Optional[Dict[str, Any]] = None,
         custom_rules: Optional[str] = None,
-        enabled_plugins: Optional[list] = None
+        enabled_plugins: Optional[list] = None,
+        bot_engine: str = "openclaw"
     ) -> Dict[str, Any]:
         """
         Recreate container with updated credentials (preserves user data).
@@ -561,7 +601,8 @@ _(What do they care about? What projects are they working on? What annoys them? 
             gemini_key=gemini_key,
             connections=connections,
             custom_rules=custom_rules,
-            enabled_plugins=enabled_plugins
+            enabled_plugins=enabled_plugins,
+            bot_engine=bot_engine
         )
 
     def stop_container(self, user_identifier: str) -> Dict[str, Any]:

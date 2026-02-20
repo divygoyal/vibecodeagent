@@ -7,11 +7,13 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
+const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
-    Book, Newspaper, History, Sun, Moon
+    Book, Newspaper, History, Sun, Moon, Coins
 } from 'lucide-react';
+import { useCredits } from '@/lib/useDashboardData';
 
 // Registration context to coordinate registration with data fetching
 interface RegistrationContextType {
@@ -58,11 +60,13 @@ export default function DashboardLayout({
 }) {
     const { data: session } = useSession();
     const pathname = usePathname();
+    const { credits } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState('');
     const [selectedSite, setSelectedSite] = useState('');
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+    const [showWelcome, setShowWelcome] = useState(false);
 
     // Persist theme to localStorage and apply to <html>
     useEffect(() => {
@@ -114,6 +118,11 @@ export default function DashboardLayout({
                         isRegistering: false,
                         registrationError: null,
                     });
+                    // Show credit welcome animation on FIRST EVER signup
+                    if (!localStorage.getItem('tc-welcomed')) {
+                        localStorage.setItem('tc-welcomed', 'true');
+                        setShowWelcome(true);
+                    }
                 } else {
                     const data = await res.json().catch(() => ({}));
                     throw new Error(data.error || 'Failed to register provider');
@@ -272,6 +281,20 @@ export default function DashboardLayout({
                         >
                             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                         </button>
+                        {/* Credits badge */}
+                        {credits !== null && (
+                            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${credits < 20
+                                ? 'bg-red-500/[0.08] border-red-500/[0.15]'
+                                : credits < 50
+                                    ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
+                                    : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
+                                }`}>
+                                <Coins className={`w-3 h-3 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
+                                    }`} />
+                                <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
+                                    }`}>{credits} credits</span>
+                            </div>
+                        )}
                         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/[0.15]">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             <span className="text-[10px] font-medium text-emerald-400">Free Plan</span>
@@ -298,6 +321,11 @@ export default function DashboardLayout({
 
             {/* Global AI Chatbot — available on every page */}
             <AIChatbot />
+
+            {/* Credit welcome animation (first signup only) */}
+            {showWelcome && (
+                <CreditWelcome credits={100} onDismiss={() => setShowWelcome(false)} />
+            )}
 
             {/* ─── Mobile sidebar overlay ─── */}
             {mobileOpen && (

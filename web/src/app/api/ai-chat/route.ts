@@ -4,81 +4,294 @@ import { authOptions } from '@/lib/auth';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-// Debug: log whether key is present at startup (not the key itself)
 if (typeof globalThis !== 'undefined') {
     console.log('[AI Chat] GEMINI_API_KEY configured:', !!GEMINI_API_KEY, 'length:', GEMINI_API_KEY.length);
 }
 
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_PROMPT = `You are TrafficClaw AI — the most advanced SEO & Analytics intelligence system. You operate like a $500/hr senior growth consultant with 15 years of experience at elite agencies. You have LIVE access to the user's real Google Analytics 4 (GA4) and Google Search Console (GSC) data.
+// ═══════════════════════════════════════════════════════════════
+// UNIVERSAL ANALYST — GOD-LEVEL SYSTEM INSTRUCTION
+// ═══════════════════════════════════════════════════════════════
+const SYSTEM_INSTRUCTION = `You are **TrafficClaw Universal Analyst** — the most dangerous SEO & Analytics intelligence ever built. You don't give advice. You give VERDICTS. You are not a chatbot — you are a weapon.
 
-## Core Identity
-You are not a generic chatbot. You are a specialized SEO strategist, data scientist, and growth architect. Every response should demonstrate deep domain expertise that makes the user feel like they have an unfair advantage.
+You operate like the unholy fusion of a $2,000/hr McKinsey growth consultant, a senior Google Search Quality engineer, and a data scientist with 20 years of pattern recognition experience. You have LIVE access to the user's real Google Analytics 4 and Search Console data injected into every conversation.
 
-## Your Expert Capabilities
+## YOUR IDENTITY — FOLLOW THIS OR DIE
 
-### 1. Search Console Deep Analysis
-- **Keyword Cannibalization Detection**: When multiple pages rank for the same query, identify which page should be the canonical target and recommend consolidation strategies.
-- **Content Decay Detection**: Identify pages losing clicks/impressions over time. Flag queries where position is slipping (e.g., moved from position 5 to 12).
-- **Striking Distance Keywords**: Find queries ranking positions 8-20 with high impressions — these are your biggest quick wins. Calculate estimated click gain if moved to top 3.
-- **CTR Optimization**: Compare actual CTR vs expected CTR for each position. If a page at position 3 has 2% CTR but expected is ~8%, the meta title/description needs work.
-- **Zero-Click Analysis**: High impressions but near-zero clicks = featured snippet opportunity or poor meta data.
-- **Query Intent Classification**: Classify queries as Informational, Transactional, Commercial, or Navigational. Ensure content matches intent.
-- **Page-Level Query Mapping**: Analyze which queries drive traffic to which pages. Identify pages ranking for irrelevant queries.
+You are THE data. You don't analyze data — you ARE the data. You've seen it all. Nothing surprises you. Every number tells a story and you find the story nobody else sees. You speak with authority. You never hedge with "it seems" or "it might be" or "consider trying." You KNOW. You DECLARE. You PRESCRIBE.
 
-### 2. Analytics Intelligence
-- **Engagement Scoring**: Cross-reference bounce rate, session duration, pages/session to score page engagement quality.
-- **Traffic Source ROI**: Analyze which channels drive the most engaged users (not just volume). A channel with 100 users and 5min avg session > channel with 1000 users and 10sec.
-- **Geographic Opportunity**: Identify high-performing countries/cities and recommend localization or targeting strategies.
-- **Device-Specific Issues**: If mobile bounce rate is 80% but desktop is 30%, there's a mobile UX problem.
-- **Content Performance Matrix**: Map pages by traffic volume vs engagement to find "hidden gems" (low traffic, high engagement) and "leaky buckets" (high traffic, poor engagement).
+**Persona Rules:**
+- If the user sends a casual message like "hey" or "what's up" → Respond warmly BUT immediately pivot to a killer insight from their data. "Hey! 👋 Quick — while I have you, I noticed your bounce rate on /pricing spiked to 78% and I need to tell you why that's costing you ~$2,400/month in lost conversions."
+- If the user asks a simple question → Deliver 10x more value than expected. "What's my bounce rate?" → Full engagement autopsy with page-by-page diagnosis and revenue impact.
+- If the user asks something vague → Read between the lines, pick the most impactful interpretation, and run with it. Be bold.
+- NEVER use phrases like: "I'd recommend", "You might want to", "Have you considered", "It appears that". Instead use: "Do this NOW", "This is bleeding money", "Here's the fix", "This is your #1 priority".
 
-### 3. Actionable Growth Strategies
-- **Internal Linking Opportunities**: Based on top pages and queries, suggest specific internal links between related content.
-- **Content Gap Analysis**: Based on existing queries and pages, identify topics the site should cover but doesn't.
-- **Programmatic SEO Patterns**: If the site has repeating URL patterns, suggest ways to scale with programmatic pages.
-- **Conversion Funnel Optimization**: Trace the user journey from entry to key pages, identify drop-off points.
-- **Competitor Inference**: From query data, infer what competitors are doing and where opportunities exist.
+## EXPERT CAPABILITIES — WHAT MAKES YOU GOD-LEVEL
 
-### 4. Advanced Pattern Detection
-- **Seasonal Trends**: Identify cyclical patterns in traffic and suggest content calendar adjustments.
-- **Anomaly Detection**: Spot sudden traffic drops/spikes and correlate with algorithm updates, technical issues, or viral content.
-- **Growth Trajectory**: Project future traffic based on current trends and suggest acceleration strategies.
+### 1. THE FIVE UNIVERSAL PATTERNS (Run these mentally on EVERY response)
 
-## Response Framework
-For EVERY response, follow this structure:
+**Pattern 1: Hidden Gems** — Pages with LOW traffic but HIGH engagement (bounce rate <35%, session duration >3min). These are your best content. The user needs to drive more traffic here.
 
-1. **Lead with the Insight** — Start with the most impactful finding, not a summary of what you'll do.
-2. **Show the Evidence** — Cite exact numbers from the data. Use comparisons (vs. previous period, vs. industry benchmarks).
-3. **Explain the "So What"** — Why does this matter? What's the business impact?
-4. **Give the Action Plan** — Specific, prioritized steps with estimated impact.
-5. **Proactive Discovery** — Always mention 1-2 additional insights you noticed, even if not asked.
+**Pattern 2: Striking Distance** — Queries ranking positions 8-20 with >100 impressions. These are 50% of the way to page 1. Small optimizations = massive click gains. Calculate the estimated clicks they'd get at position 3 vs current.
 
-## Formatting Rules
-- Use priority labels: 🔴 **Critical** (fix now), 🟡 **Important** (this week), 🟢 **Opportunity** (growth potential)
-- Bold key metrics and numbers
-- Use tables for data comparisons (3+ items)
-- Include estimated impact where possible (e.g., "+300 clicks/month")
-- Keep paragraphs short (2-3 sentences max)
+**Pattern 3: Content Decay** — Pages where impressions are stable or growing but clicks are declining. The SERP result is becoming stale. Meta title/description refresh needed.
+
+**Pattern 4: Technical Sabotage** — Mobile bounce rate >60% when desktop is <40% = mobile UX disaster. Pages with >3s load time. Missing H1s. Duplicate titles. Cannibalization.
+
+**Pattern 5: Cannibalization** — Multiple pages ranking for the same query cluster. One page cannibalizes another. The fix: consolidate, redirect, or differentiate intent.
+
+### 2. CTR INTELLIGENCE (Use these benchmarks for EVERY query analysis)
+Position 1: 28-32% CTR expected
+Position 2: 15-18% CTR expected  
+Position 3: 10-13% CTR expected
+Position 4-5: 6-9% CTR expected
+Position 6-7: 4-5% CTR expected
+Position 8-10: 2-3% CTR expected
+
+If actual CTR is MORE than 3 percentage points below expected → META TITLE/DESCRIPTION IS BAD. Call it out.
+If actual CTR is MORE than 2 percentage points above expected → The meta is exceptionally good. Acknowledge it.
+
+### 3. REVENUE THINKING
+Always translate metrics to money. Use these conversions:
+- Average value per organic click: $0.50-$2.00 depending on intent
+- Transactional queries (buy, price, best, review): $2-5 per click
+- Informational queries: $0.10-0.50 per click  
+- A 1-position improvement in top 10 = roughly 2-4% CTR gain
+- Use the formula: (impressions × CTR_gain × $value_per_click) = monthly revenue impact
+
+### 4. CROSS-REFERENCING (This is your SUPERPOWER)
+Always cross-reference GA4 and GSC data:
+- "Your #1 GSC query sends traffic to /blog/x, but GA4 shows that page has a 76% bounce rate → INTENT MISMATCH. The searcher wants [X] but your page delivers [Y]."
+- "Your highest-engagement page (4.2min avg session) only gets 12 clicks from Search. Zero internal links point to it. You're HIDING your best content."
+- "Mobile users from India are 34% of your traffic but have 72% bounce rate. Your site probably loads slowly in that region."
+
+## RESPONSE FRAMEWORK — EVERY RESPONSE FOLLOWS THIS
+
+1. **🎯 LEAD WITH THE VERDICT** — State the most important finding in 1-2 bold sentences. No preamble. No "Let me analyze your data." Just the insight.
+
+2. **📊 EVIDENCE** — Show exact numbers. Use comparisons. "Position 7 → Position 3 would mean +450 clicks/month." Include actual data from context.
+
+3. **💰 REVENUE IMPACT** — Translate everything to dollars. "This is costing you approximately $X/month" or "This opportunity is worth $X/month."
+
+4. **⚡ ACTION PLAN** — Numbered, prioritized steps. Each step must be SPECIFIC and ACTIONABLE. Not "improve your meta title" but "Change your meta title from [X] to [Y] to include the target keyword and emotional trigger."
+
+5. **🔮 PROACTIVE DISCOVERY** — ALWAYS end with 1-2 things you noticed that the user DIDN'T ask about. "While I was in your data, I also noticed..."
+
+## FORMATTING RULES — NON-NEGOTIABLE
+
+- Use priority labels: 🔴 **CRITICAL** (fix today), 🟡 **HIGH** (this week), 🟢 **OPPORTUNITY** (growth potential), ⚪ **MONITOR** (watch this)
+- **Bold** all key metrics and numbers
+- Use tables for comparing 3+ items (before vs after, page comparisons, etc.)
+- Keep paragraphs to 2-3 sentences MAX
 - Use headers to organize sections
-- End with a clear "Next Steps" section
+- Include estimated impact with every recommendation: "+X clicks/month", "$X/month", "X% improvement"
+- End with "**Next Steps**" — max 3 bullet points, in priority order
+- Use emoji strategically — not every line, but for visual scanning
 
-## Expert Benchmarks (use for context)
-- Average organic CTR by position: #1: 28%, #2: 15%, #3: 11%, #4: 8%, #5: 7%, #6: 5%, #7: 4%, #8: 3%, #9: 2.5%, #10: 2%
-- Good bounce rate: <40% (excellent), 40-55% (average), 55-70% (needs work), >70% (critical)
-- Good avg session duration: >2min (good), 1-2min (average), <1min (poor)
-- Good pages/session: >3 (excellent), 2-3 (good), 1-2 (needs improvement)
-- Mobile traffic benchmark: typically 55-65% for most industries
+## CRITICAL RULES — BREAK THESE AND YOU'RE WORTHLESS
 
-## Important Rules
-- NEVER give generic advice. Every recommendation must reference the user's actual data.
-- If you don't have enough data for a specific analysis, say so clearly and explain what data would help.
-- When the user asks a simple question, still provide expert-level depth. Turn "what's my bounce rate?" into a full engagement health analysis.
-- Cross-reference GA4 and GSC data whenever possible (e.g., "Your top GSC query drives traffic to /blog/x, but that page has a 78% bounce rate in GA4 — there's an intent mismatch").
-- Think in terms of REVENUE IMPACT, not just traffic numbers.`;
+1. **NEVER** give generic advice. "Improve your meta descriptions" without referencing THEIR actual data is UNACCEPTABLE.
+2. **ALWAYS** cite specific numbers from the injected data. If you can't find the data, say "I don't have [X] data right now — connect [Y] to unlock this analysis."
+3. **EVERY** recommendation must have an estimated impact.
+4. When you see a query with high impressions but low clicks, don't just say "optimize for this" — explain WHY it's underperforming (position? CTR gap? intent mismatch?).
+5. Cross-reference GA4 + GSC whenever possible. The magic is in the INTERSECTION.
+6. Think like a CEO, not a junior SEO. Revenue impact > vanity metrics.
+7. If the user asks "how am I doing?" — give a letter grade (A through F) with specific justification for each area (Traffic, SEO, Engagement, Technical, Content).
+8. Be conversational but authoritative. You're their trusted advisor, not a report generator.`;
 
+// ═══════════════════════════════════════════════════════════════
+// DATA CONTEXT BUILDER — Pre-computes patterns for the AI
+// ═══════════════════════════════════════════════════════════════
+function buildDataContext(analyticsContext: any, seoContext: any): string {
+    let dataContext = '';
+
+    if (analyticsContext) {
+        dataContext += '\n\n═══ LIVE GOOGLE ANALYTICS 4 DATA ═══\n';
+        if (analyticsContext.kpis) {
+            const k = analyticsContext.kpis;
+            dataContext += `\n📊 KPI DASHBOARD:\n`;
+            dataContext += `  Users: ${k.totalUsers?.toLocaleString()} (${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}% vs prev period)\n`;
+            dataContext += `  Sessions: ${k.totalSessions?.toLocaleString()} (${k.changeSessions > 0 ? '+' : ''}${k.changeSessions}%)\n`;
+            dataContext += `  Page Views: ${k.totalPageViews?.toLocaleString()} (${k.changePageViews > 0 ? '+' : ''}${k.changePageViews}%)\n`;
+            dataContext += `  Bounce Rate: ${k.avgBounceRate}% (${k.changeBounceRate > 0 ? '+' : ''}${k.changeBounceRate}%) ${Number(k.avgBounceRate) > 55 ? '⚠️ HIGH' : Number(k.avgBounceRate) < 35 ? '✅ EXCELLENT' : ''}\n`;
+            dataContext += `  Avg Session Duration: ${Math.floor((k.avgSessionDuration || 0) / 60)}m ${Math.round((k.avgSessionDuration || 0) % 60)}s ${(k.avgSessionDuration || 0) < 60 ? '🔴 CRITICAL' : (k.avgSessionDuration || 0) > 120 ? '✅ GOOD' : ''}\n`;
+            dataContext += `  New Users: ${k.newUsers?.toLocaleString()} | Returning: ${k.returningUsers?.toLocaleString()}\n`;
+            dataContext += `  Pages/Session: ${k.pagesPerSession} ${Number(k.pagesPerSession) < 1.5 ? '⚠️ LOW' : Number(k.pagesPerSession) > 3 ? '✅ EXCELLENT' : ''}\n`;
+        }
+        if (analyticsContext.topSources?.length) {
+            dataContext += `\n🔗 Traffic Sources (${analyticsContext.topSources.length}):\n`;
+            analyticsContext.topSources.forEach((s: any, i: number) => {
+                dataContext += `  ${i + 1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)\n`;
+            });
+        }
+        if (analyticsContext.topPages?.length) {
+            dataContext += `\n📄 Top Pages — ANALYZE FOR HIDDEN GEMS (low traffic + high engagement) AND LEAKY BUCKETS (high traffic + poor engagement):\n`;
+            analyticsContext.topPages.forEach((p: any, i: number) => {
+                const bounceNum = parseFloat(p.bounceRate) || 0;
+                const flag = bounceNum > 70 ? ' 🔴LEAKY' : bounceNum < 30 ? ' 🟢HIDDEN_GEM' : '';
+                dataContext += `  ${i + 1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}${flag}\n`;
+            });
+        }
+        if (analyticsContext.topCountries?.length) {
+            dataContext += `\n🌍 Countries (${analyticsContext.topCountries.length}):\n`;
+            analyticsContext.topCountries.forEach((c: any, i: number) => {
+                dataContext += `  ${i + 1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''}\n`;
+            });
+        }
+        if (analyticsContext.devices?.length) {
+            dataContext += `\n📱 Devices: ${analyticsContext.devices.map((d: any) => `${d.device}: ${d.percentage}%`).join(' | ')}\n`;
+            // Check for mobile vs desktop disparity
+            const mobile = analyticsContext.devices.find((d: any) => d.device?.toLowerCase() === 'mobile');
+            const desktop = analyticsContext.devices.find((d: any) => d.device?.toLowerCase() === 'desktop');
+            if (mobile && desktop) {
+                dataContext += `  📌 Mobile/Desktop Split: ${mobile.percentage}% / ${desktop.percentage}%\n`;
+            }
+        }
+        if (analyticsContext.browsers?.length) {
+            dataContext += `🌐 Browsers: ${analyticsContext.browsers.map((b: any) => `${b.name}: ${b.percentage}%`).join(' | ')}\n`;
+        }
+        if (analyticsContext.channels?.length) {
+            dataContext += `📡 Channels: ${analyticsContext.channels.map((c: any) => `${c.name}: ${c.value || c.percentage}${c.percentage ? '%' : ''}`).join(' | ')}\n`;
+        }
+        if (analyticsContext.referrers?.length) {
+            dataContext += `\n🔀 Referrers (${analyticsContext.referrers.length}):\n`;
+            analyticsContext.referrers.forEach((r: any, i: number) => {
+                dataContext += `  ${i + 1}. ${r.name} — ${r.value} sessions\n`;
+            });
+        }
+        if (analyticsContext.cities?.length) {
+            dataContext += `\n🏙️ Cities: ${analyticsContext.cities.slice(0, 8).map((c: any) => `${c.city}, ${c.country} (${c.users})`).join(' | ')}\n`;
+        }
+        if (analyticsContext.languages?.length) {
+            dataContext += `🗣️ Languages: ${analyticsContext.languages.slice(0, 8).map((l: any) => `${l.name}: ${l.value}`).join(' | ')}\n`;
+        }
+        if (analyticsContext.entryPages?.length) {
+            dataContext += `\n🚪 Entry Pages — where users START their session:\n`;
+            analyticsContext.entryPages.forEach((p: any, i: number) => {
+                dataContext += `  ${i + 1}. ${p.page} — ${p.sessions} sessions, ${p.users || '?'} users, ${p.bounceRate || '?'}% bounce\n`;
+            });
+        }
+        if (analyticsContext.operatingSystems?.length) {
+            dataContext += `💻 OS: ${analyticsContext.operatingSystems.map((o: any) => `${o.name}: ${o.percentage || o.value}${o.percentage ? '%' : ''}`).join(' | ')}\n`;
+        }
+    }
+
+    if (seoContext) {
+        dataContext += '\n\n═══ LIVE GOOGLE SEARCH CONSOLE DATA ═══\n';
+        if (seoContext.kpis) {
+            const k = seoContext.kpis;
+            dataContext += `\n🔍 Search Performance:\n`;
+            dataContext += `  Total Clicks: ${k.totalClicks?.toLocaleString()} (${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}%)\n`;
+            dataContext += `  Total Impressions: ${k.totalImpressions?.toLocaleString()} (${k.changeImpressions > 0 ? '+' : ''}${k.changeImpressions}%)\n`;
+            dataContext += `  Average CTR: ${k.avgCTR}% (${k.changeCTR > 0 ? '+' : ''}${k.changeCTR}%)\n`;
+            dataContext += `  Average Position: ${k.avgPosition} (${k.changePosition > 0 ? '+' : ''}${k.changePosition})\n`;
+            if (k.indexedPages) dataContext += `  Indexed Pages: ${k.indexedPages}\n`;
+            if (k.crawlErrors) dataContext += `  Crawl Errors: ${k.crawlErrors}\n`;
+        }
+        if (seoContext.topQueries?.length) {
+            // Pre-compute patterns for the AI
+            const strikingDistance: string[] = [];
+            const ctrProblems: string[] = [];
+            const ctrStars: string[] = [];
+
+            dataContext += `\n🎯 Search Queries (${seoContext.topQueries.length}) — WITH PRE-COMPUTED INTELLIGENCE:\n`;
+            seoContext.topQueries.forEach((q: any, i: number) => {
+                const pos = parseFloat(q.position) || 50;
+                const ctr = parseFloat(q.ctr) || 0;
+                const impr = parseInt(q.impressions) || 0;
+                const expectedCtr = pos <= 1 ? 30 : pos <= 2 ? 16 : pos <= 3 ? 11 : pos <= 5 ? 7.5 : pos <= 7 ? 4.5 : pos <= 10 ? 2.5 : 1;
+                const ctrGap = (ctr - expectedCtr).toFixed(1);
+                const potentialClicks = pos > 3 ? Math.round(impr * (0.11 - (ctr / 100))) : 0; // Clicks if moved to pos 3
+
+                let flags = '';
+                if (pos >= 8 && pos <= 20 && impr > 50) {
+                    flags += ' ⚡STRIKING_DISTANCE';
+                    strikingDistance.push(`"${q.query}" (pos ${pos}, ${impr} impr, potential +${potentialClicks} clicks)`);
+                }
+                if (Number(ctrGap) < -3) {
+                    flags += ' ⚠️CTR_PROBLEM';
+                    ctrProblems.push(`"${q.query}" (${ctr}% actual vs ${expectedCtr}% expected)`);
+                }
+                if (Number(ctrGap) > 2) {
+                    flags += ' ⭐CTR_STAR';
+                    ctrStars.push(`"${q.query}" (${ctr}% vs ${expectedCtr}% expected — great meta!)`);
+                }
+
+                dataContext += `  ${i + 1}. "${q.query}" — ${q.clicks} clicks, ${impr} impr, ${ctr}% CTR (expected: ~${expectedCtr}%, gap: ${ctrGap}%), pos ${pos}${potentialClicks > 0 ? ` [+${potentialClicks} clicks if pos 3]` : ''}${flags}\n`;
+            });
+
+            // Summary sections for the AI to use
+            if (strikingDistance.length > 0) {
+                dataContext += `\n🎯 STRIKING DISTANCE SUMMARY (${strikingDistance.length} queries):\n`;
+                strikingDistance.forEach(s => { dataContext += `  → ${s}\n`; });
+            }
+            if (ctrProblems.length > 0) {
+                dataContext += `\n⚠️ CTR PROBLEMS (meta titles/descriptions need work, ${ctrProblems.length} queries):\n`;
+                ctrProblems.forEach(s => { dataContext += `  → ${s}\n`; });
+            }
+            if (ctrStars.length > 0) {
+                dataContext += `\n⭐ CTR STARS (great meta, replicate this approach, ${ctrStars.length} queries):\n`;
+                ctrStars.forEach(s => { dataContext += `  → ${s}\n`; });
+            }
+        }
+        if (seoContext.topPages?.length) {
+            dataContext += `\n📊 Top Search Pages (${seoContext.topPages.length}):\n`;
+            seoContext.topPages.forEach((p: any, i: number) => {
+                dataContext += `  ${i + 1}. ${p.page} — ${p.clicks} clicks, ${p.impressions || '?'} impr, ${p.ctr || '?'}% CTR, pos ${p.position}${p.status === 'decay' ? ' 🔴DECAY' : p.status === 'warning' ? ' 🟡WARNING' : ''}\n`;
+            });
+        }
+        if (seoContext.recommendations?.length) {
+            dataContext += `\n💡 Pre-Generated Recommendations (${seoContext.recommendations.length}):\n`;
+            seoContext.recommendations.forEach((r: any, i: number) => {
+                dataContext += `  ${i + 1}. [${r.severity?.toUpperCase()}] ${r.title}\n`;
+                if (r.description) dataContext += `     ${r.description}\n`;
+                if (r.action) dataContext += `     Action: ${r.action}\n`;
+                if (r.impact) dataContext += `     Est. Impact: ${r.impact}\n`;
+            });
+        }
+    }
+
+    return dataContext;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CREDIT SYSTEM HELPERS
+// ═══════════════════════════════════════════════════════════════
+async function getUserCredits(userId: string): Promise<number | null> {
+    if (!ADMIN_API_KEY) return null; // Dev mode
+    try {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits`, {
+            headers: { 'X-API-Key': ADMIN_API_KEY },
+            cache: 'no-store',
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.credits ?? null;
+    } catch { return null; }
+}
+
+async function deductCredits(userId: string): Promise<number | null> {
+    if (!ADMIN_API_KEY) return null;
+    try {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits/deduct`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+            body: JSON.stringify({ amount: 10 }),
+            cache: 'no-store',
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.credits ?? null;
+    } catch { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
@@ -92,118 +305,33 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
         }
 
+        // @ts-expect-error - id added in callbacks
+        const userId = session.user.id;
+
+        // ── Credit check ──
+        if (ADMIN_API_KEY && userId) {
+            const credits = await getUserCredits(String(userId));
+            if (credits !== null && credits < 10) {
+                return NextResponse.json({
+                    error: 'insufficient_credits',
+                    credits: credits,
+                    response: `⚡ You've used all your credits! You have **${credits}** credits remaining, but each AI analysis costs **10 credits**.\n\n🛒 **Get more credits** to continue using TrafficClaw AI:\n- 💰 100 credits for just $1\n- 🔥 500 credits for $5 (save 50%)\n- 🚀 1,200 credits for $10 (best value)\n\nVisit your dashboard settings to purchase more credits.`
+                });
+            }
+        }
+
         if (!GEMINI_API_KEY) {
-            console.warn('[AI Chat] No GEMINI_API_KEY found in environment. Using fallback responses.');
+            console.warn('[AI Chat] No GEMINI_API_KEY found. Using fallback.');
             return NextResponse.json({
                 response: generateFallbackResponse(message, analyticsContext, seoContext, false),
             });
         }
 
-        // Build rich context from analytics data
-        let dataContext = '';
-        if (analyticsContext) {
-            dataContext += '\n\n═══ GOOGLE ANALYTICS 4 DATA ═══\n';
-            if (analyticsContext.kpis) {
-                const k = analyticsContext.kpis;
-                dataContext += `\n📊 KPI Summary:\n`;
-                dataContext += `  Users: ${k.totalUsers?.toLocaleString()} (${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}% vs previous period)\n`;
-                dataContext += `  Sessions: ${k.totalSessions?.toLocaleString()} (${k.changeSessions > 0 ? '+' : ''}${k.changeSessions}%)\n`;
-                dataContext += `  Page Views: ${k.totalPageViews?.toLocaleString()} (${k.changePageViews > 0 ? '+' : ''}${k.changePageViews}%)\n`;
-                dataContext += `  Bounce Rate: ${k.avgBounceRate}% (${k.changeBounceRate > 0 ? '+' : ''}${k.changeBounceRate}%)\n`;
-                dataContext += `  Avg Session Duration: ${Math.floor((k.avgSessionDuration || 0) / 60)}m ${Math.round((k.avgSessionDuration || 0) % 60)}s\n`;
-                dataContext += `  New Users: ${k.newUsers?.toLocaleString()} | Returning: ${k.returningUsers?.toLocaleString()}\n`;
-                dataContext += `  Pages/Session: ${k.pagesPerSession}\n`;
-            }
-            if (analyticsContext.topSources?.length) {
-                dataContext += `\n🔗 Traffic Sources (top ${analyticsContext.topSources.length}):\n`;
-                analyticsContext.topSources.forEach((s: any, i: number) => {
-                    dataContext += `  ${i + 1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)\n`;
-                });
-            }
-            if (analyticsContext.topPages?.length) {
-                dataContext += `\n📄 Top Pages (top ${analyticsContext.topPages.length}):\n`;
-                analyticsContext.topPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i + 1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}\n`;
-                });
-            }
-            if (analyticsContext.topCountries?.length) {
-                dataContext += `\n🌍 Countries (top ${analyticsContext.topCountries.length}):\n`;
-                analyticsContext.topCountries.forEach((c: any, i: number) => {
-                    dataContext += `  ${i + 1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''}\n`;
-                });
-            }
-            if (analyticsContext.devices?.length) {
-                dataContext += `\n📱 Devices: ${analyticsContext.devices.map((d: any) => `${d.device}: ${d.percentage}%`).join(' | ')}\n`;
-            }
-            if (analyticsContext.browsers?.length) {
-                dataContext += `🌐 Browsers: ${analyticsContext.browsers.map((b: any) => `${b.name}: ${b.percentage}%`).join(' | ')}\n`;
-            }
-            if (analyticsContext.channels?.length) {
-                dataContext += `📡 Channels: ${analyticsContext.channels.map((c: any) => `${c.name}: ${c.value || c.percentage}${c.percentage ? '%' : ''}`).join(' | ')}\n`;
-            }
-            if (analyticsContext.referrers?.length) {
-                dataContext += `\n🔀 Referrers (top ${analyticsContext.referrers.length}):\n`;
-                analyticsContext.referrers.forEach((r: any, i: number) => {
-                    dataContext += `  ${i + 1}. ${r.name} — ${r.value} sessions\n`;
-                });
-            }
-            if (analyticsContext.cities?.length) {
-                dataContext += `\n🏙️ Cities: ${analyticsContext.cities.slice(0, 8).map((c: any) => `${c.city}, ${c.country} (${c.users})`).join(' | ')}\n`;
-            }
-            if (analyticsContext.languages?.length) {
-                dataContext += `🗣️ Languages: ${analyticsContext.languages.slice(0, 8).map((l: any) => `${l.name}: ${l.value}`).join(' | ')}\n`;
-            }
-            if (analyticsContext.entryPages?.length) {
-                dataContext += `\n🚪 Entry Pages (${analyticsContext.entryPages.length}) — pages where users START their session:\n`;
-                analyticsContext.entryPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i + 1}. ${p.page} — ${p.sessions} sessions, ${p.users || '?'} users, ${p.bounceRate || '?'}% bounce\n`;
-                });
-            }
-            if (analyticsContext.operatingSystems?.length) {
-                dataContext += `💻 Operating Systems: ${analyticsContext.operatingSystems.map((o: any) => `${o.name}: ${o.percentage || o.value}${o.percentage ? '%' : ''}`).join(' | ')}\n`;
-            }
-        }
-        if (seoContext) {
-            dataContext += '\n\n═══ GOOGLE SEARCH CONSOLE DATA ═══\n';
-            if (seoContext.kpis) {
-                const k = seoContext.kpis;
-                dataContext += `\n🔍 Search Performance Overview:\n`;
-                dataContext += `  Total Clicks: ${k.totalClicks?.toLocaleString()} (${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}% vs previous period)\n`;
-                dataContext += `  Total Impressions: ${k.totalImpressions?.toLocaleString()} (${k.changeImpressions > 0 ? '+' : ''}${k.changeImpressions}%)\n`;
-                dataContext += `  Average CTR: ${k.avgCTR}% (${k.changeCTR > 0 ? '+' : ''}${k.changeCTR}%)\n`;
-                dataContext += `  Average Position: ${k.avgPosition} (${k.changePosition > 0 ? '+' : ''}${k.changePosition} change)\n`;
-                if (k.indexedPages) dataContext += `  Indexed Pages: ${k.indexedPages}\n`;
-                if (k.crawlErrors) dataContext += `  Crawl Errors: ${k.crawlErrors}\n`;
-            }
-            if (seoContext.topQueries?.length) {
-                dataContext += `\n🎯 Search Queries (${seoContext.topQueries.length} queries) — ANALYZE FOR: striking distance (pos 8-20, high impressions), CTR gaps (actual vs expected for position), cannibalization (similar queries going to different pages):\n`;
-                seoContext.topQueries.forEach((q: any, i: number) => {
-                    const expectedCtr = q.position <= 1 ? 28 : q.position <= 2 ? 15 : q.position <= 3 ? 11 : q.position <= 5 ? 7.5 : q.position <= 7 ? 4.5 : q.position <= 10 ? 2.5 : 1;
-                    const ctrGap = ((q.ctr || 0) - expectedCtr).toFixed(1);
-                    dataContext += `  ${i + 1}. "${q.query}" — ${q.clicks} clicks, ${q.impressions} impr, ${q.ctr || 0}% CTR (expected: ~${expectedCtr}%, gap: ${ctrGap}%), pos ${q.position}${q.position >= 8 && q.position <= 20 && q.impressions > 100 ? ' ⚡STRIKING DISTANCE' : ''}${Number(ctrGap) < -3 ? ' ⚠️CTR BELOW EXPECTED' : ''}\n`;
-                });
-            }
-            if (seoContext.topPages?.length) {
-                dataContext += `\n📊 Top Search Pages (${seoContext.topPages.length} pages) — ANALYZE FOR: content decay (high impressions but low clicks), pages that need content refresh:\n`;
-                seoContext.topPages.forEach((p: any, i: number) => {
-                    dataContext += `  ${i + 1}. ${p.page} — ${p.clicks} clicks, ${p.impressions || '?'} impr, ${p.ctr || '?'}% CTR, pos ${p.position}${p.status === 'decay' ? ' 🔴CONTENT DECAY' : p.status === 'warning' ? ' 🟡WARNING' : ''}\n`;
-                });
-            }
-            if (seoContext.recommendations?.length) {
-                dataContext += `\n💡 AI-Generated SEO Recommendations (${seoContext.recommendations.length}):\n`;
-                seoContext.recommendations.forEach((r: any, i: number) => {
-                    dataContext += `  ${i + 1}. [${r.severity?.toUpperCase()}] ${r.title}\n`;
-                    if (r.description) dataContext += `     ${r.description}\n`;
-                    if (r.action) dataContext += `     Action: ${r.action}\n`;
-                    if (r.impact) dataContext += `     Est. Impact: ${r.impact}\n`;
-                });
-            }
-        }
+        // ── Build data context with pre-computed patterns ──
+        const dataContext = buildDataContext(analyticsContext, seoContext);
 
-        // Build messages for Gemini
+        // ── Build conversation history ──
         const contents = [];
-
-        // Add conversation history
         if (history?.length) {
             for (const msg of history) {
                 contents.push({
@@ -213,19 +341,23 @@ export async function POST(req: Request) {
             }
         }
 
-        // Add current message with context
+        // User message with injected data context
         contents.push({
             role: 'user',
-            parts: [{ text: `${SYSTEM_PROMPT}\n\nUser's website data:${dataContext}\n\nUser question: ${message}` }],
+            parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}\n\n---\n\nUser: ${message}` : message }],
         });
 
+        // ── Call Gemini with system_instruction (proper API usage) ──
         const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                system_instruction: {
+                    parts: [{ text: SYSTEM_INSTRUCTION }],
+                },
                 contents,
                 generationConfig: {
-                    temperature: 0.7,
+                    temperature: 0.8,
                     topK: 40,
                     topP: 0.95,
                     maxOutputTokens: 8192,
@@ -244,7 +376,16 @@ export async function POST(req: Request) {
         const data = await res.json();
         const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I could not generate a response. Please try again.';
 
-        return NextResponse.json({ response: responseText });
+        // ── Deduct credits on success ──
+        let remainingCredits: number | null = null;
+        if (ADMIN_API_KEY && userId) {
+            remainingCredits = await deductCredits(String(userId));
+        }
+
+        return NextResponse.json({
+            response: responseText,
+            credits: remainingCredits,
+        });
 
     } catch (err) {
         console.error('AI Chat error:', err);
@@ -259,44 +400,24 @@ function generateFallbackResponse(message: string, analytics: any, seo: any, has
     if (msg.includes('bounce') && analytics?.kpis) {
         const pages = analytics.topPages?.filter((p: any) => p.bounceRate > 40) || [];
         return `Based on your data, your average bounce rate is ${analytics.kpis.avgBounceRate}%.\n\n${pages.length > 0
-                ? `Pages with high bounce rates:\n${pages.map((p: any) => `- ${p.page}: ${p.bounceRate}%`).join('\n')}\n\nRecommendations:\n- Improve page load speed\n- Make content more engaging above the fold\n- Add clear CTAs\n- Ensure mobile responsiveness`
-                : 'Your pages seem to have reasonable bounce rates. Keep monitoring and A/B testing to improve further.'
+            ? `Pages with high bounce rates:\n${pages.map((p: any) => `- ${p.page}: ${p.bounceRate}%`).join('\n')}\n\nRecommendations:\n- Improve page load speed\n- Make content more engaging above the fold\n- Add clear CTAs\n- Ensure mobile responsiveness`
+            : 'Your pages seem to have reasonable bounce rates. Keep monitoring and A/B testing to improve further.'
             }`;
     }
 
     if (msg.includes('traffic') || msg.includes('source')) {
         if (analytics?.topSources?.length) {
-            return `Your top traffic sources:\n${analytics.topSources.map((s: any, i: number) => `${i + 1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)`).join('\n')}\n\nTo grow traffic:\n- Focus on your top-performing channels\n- Diversify traffic sources to reduce dependency\n- Consider investing in underperforming high-potential channels`;
+            return `Your top traffic sources:\n${analytics.topSources.map((s: any, i: number) => `${i + 1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)`).join('\n')}`;
         }
     }
 
     if (msg.includes('seo') || msg.includes('ranking') || msg.includes('improve')) {
-        return `Here are key SEO improvement strategies:\n\n1. **Content Quality** — Create comprehensive, original content targeting user intent\n2. **Technical SEO** — Ensure fast load times, mobile-friendliness, and proper indexing\n3. **Internal Linking** — Build a strong internal link structure\n4. **Backlinks** — Earn quality backlinks through outreach and content marketing\n5. **Keywords** — Target long-tail keywords with lower competition\n6. **User Experience** — Reduce bounce rate and increase time on site\n\nWould you like me to dive deeper into any of these areas?`;
-    }
-
-    if (msg.includes('country') || msg.includes('countries') || msg.includes('geo')) {
-        if (analytics?.topCountries?.length) {
-            return `Your top countries by users:\n${analytics.topCountries.map((c: any, i: number) => `${i + 1}. ${c.country} — ${c.users} users`).join('\n')}\n\nConsider:\n- Localizing content for top markets\n- Adjusting posting times for key timezones\n- Creating region-specific landing pages`;
-        }
-    }
-
-    if (msg.includes('content') || msg.includes('idea') || msg.includes('suggest')) {
-        return `Content strategy recommendations:\n\n1. **Analyze top pages** — Create more content similar to your best-performing pages\n2. **Gap analysis** — Find topics your competitors rank for that you don't\n3. **Update old content** — Refresh outdated articles with new data\n4. **Long-form guides** — Create comprehensive guides for your key topics\n5. **FAQ content** — Answer common questions in your niche\n6. **Video & visual content** — Diversify content formats\n\nWould you like specific suggestions based on your top-performing pages?`;
-    }
-
-    if (msg.includes('mobile') || msg.includes('desktop') || msg.includes('device')) {
-        if (analytics?.devices?.length) {
-            return `Device breakdown:\n${analytics.devices.map((d: any) => `- ${d.device}: ${d.percentage}% of sessions`).join('\n')}\n\nRecommendations:\n- Ensure responsive design across all devices\n- Optimize for the dominant device category\n- Test user flows on mobile devices\n- Consider AMP for mobile pages if mobile traffic is high`;
-        }
+        return `Here are key SEO improvement strategies:\n\n1. **Content Quality** — Create comprehensive, original content\n2. **Technical SEO** — Ensure fast load times, mobile-friendliness\n3. **Internal Linking** — Build strong internal link structure\n4. **Backlinks** — Earn quality backlinks\n5. **Keywords** — Target long-tail keywords`;
     }
 
     const hint = hasKey
-        ? '\n\n*Your GEMINI_API_KEY is configured but the AI service returned an error. Check the server logs for details.*'
-        : '\n\n*Note: Add GEMINI_API_KEY to your environment variables (and ensure the web container has it in docker-compose.yml) for AI-powered responses.*';
+        ? '\n\n*Your GEMINI_API_KEY is configured but the AI service returned an error.*'
+        : '\n\n*Add GEMINI_API_KEY to your environment for AI-powered responses.*';
 
-    return `I can help you analyze your website performance! Try asking about:\n\n- **Bounce rates** — "Which pages have the highest bounce rate?"
-- **Traffic sources** — "What are my top traffic sources?"
-- **SEO tips** — "How can I improve my ranking?"
-- **Geo data** — "Which countries bring the most users?"
-- **Devices** — "How is my mobile vs desktop traffic?"${hint}`;
+    return `I can help you analyze your website! Ask about bounce rates, traffic sources, SEO tips, geo data, or devices.${hint}`;
 }

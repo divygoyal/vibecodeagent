@@ -38,6 +38,12 @@ class User(Base):
     custom_rules = Column(Text)  # JSON string of custom rules
     enabled_plugins = Column(Text)  # JSON string of plugin list
     
+    # Credits (for AI chat usage)
+    credits = Column(Integer, default=100)  # Start with 100 free credits
+    
+    # Bot Settings
+    bot_engine = Column(String(50), default="openclaw")  # openclaw or nanobot
+    
     # Status
     is_active = Column(Boolean, default=True)
     container_status = Column(String(20), default="stopped")  # running, stopped, error

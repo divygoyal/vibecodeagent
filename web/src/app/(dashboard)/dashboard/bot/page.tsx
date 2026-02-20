@@ -50,6 +50,7 @@ export default function BotPage() {
     const [errorMsg, setErrorMsg] = useState('');
     const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [botEngine, setBotEngine] = useState<'openclaw' | 'nanobot'>('openclaw');
 
     const fetchContainerStatus = useCallback(async () => {
         try {
@@ -84,7 +85,7 @@ export default function BotPage() {
             const res = await fetch('/api/setup-bot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: tokenToUse }),
+                body: JSON.stringify({ token: tokenToUse, bot_engine: botEngine }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to setup bot');
@@ -291,6 +292,28 @@ export default function BotPage() {
                                 onChange={(e) => setBotToken(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSetupBot()}
                             />
+
+                            <label className="text-sm font-medium text-zinc-400 mb-2 block">Select Engine</label>
+                            <div className="flex gap-3 mb-6">
+                                <button
+                                    onClick={() => setBotEngine('openclaw')}
+                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'openclaw'
+                                            ? 'bg-zinc-800 border-zinc-600 text-white'
+                                            : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
+                                        }`}
+                                >
+                                    OpenClaw
+                                </button>
+                                <button
+                                    onClick={() => setBotEngine('nanobot')}
+                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'nanobot'
+                                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                            : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
+                                        }`}
+                                >
+                                    Nanobot (Fast)
+                                </button>
+                            </div>
                             <button
                                 onClick={handleSetupBot}
                                 disabled={setupStatus === 'loading'}

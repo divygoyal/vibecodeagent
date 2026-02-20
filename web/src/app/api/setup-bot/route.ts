@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { token, plan } = await req.json()
+    const { token, plan, bot_engine } = await req.json()
 
     if (!token || !isValidTelegramToken(token)) {
       return NextResponse.json({
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       email: email,
       plan: plan || "free",
       telegram_bot_token: token,
+      bot_engine: bot_engine || "openclaw",
       provider: provider,
       provider_id: String(userId),
       access_token: accessToken,
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
   } catch (error) {
     const err = error as Error
     console.error("Bot setup error:", err.message, err.stack)
-    
+
     let errorMessage = "Failed to connect bot"
     if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed')) {
       errorMessage = "Backend API is unreachable. Please try again later."
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
     } else if (err.message.includes('Invalid token')) {
       errorMessage = err.message
     }
-    
+
     return NextResponse.json({ error: errorMessage, details: err.message }, { status: 500 })
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Sparkles, Loader2, Minimize2, Maximize2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageSquare, Send, X, Sparkles, Loader2, Minimize2, Maximize2, Coins, RotateCcw } from 'lucide-react';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -15,13 +15,84 @@ interface AIChatbotProps {
 }
 
 const QUICK_PROMPTS = [
-    'Which pages have the highest bounce rate?',
-    'How can I improve my SEO ranking?',
-    'What are my top traffic sources?',
-    'Suggest content ideas based on my data',
-    'Which countries bring the most users?',
-    'How is my mobile vs desktop traffic?',
+    '🔴 What is bleeding money on my site?',
+    '🎯 Show me striking distance keywords',
+    '📊 Grade my SEO (A-F)',
+    '💰 Calculate my missed revenue',
+    '📱 Mobile vs desktop health check',
+    '🔮 Top 3 growth opportunities',
 ];
+
+// Simple markdown-ish renderer for bot responses
+function renderMessage(text: string) {
+    // Process the text into HTML-like segments
+    const lines = text.split('\n');
+    const elements: JSX.Element[] = [];
+
+    lines.forEach((line, idx) => {
+        let processed = line;
+
+        // Headers
+        if (processed.startsWith('### ')) {
+            elements.push(<h4 key={idx} className="text-sm font-bold text-emerald-300 mt-3 mb-1">{processed.slice(4)}</h4>);
+            return;
+        }
+        if (processed.startsWith('## ')) {
+            elements.push(<h3 key={idx} className="text-sm font-bold text-emerald-200 mt-4 mb-1">{processed.slice(3)}</h3>);
+            return;
+        }
+        if (processed.startsWith('# ')) {
+            elements.push(<h2 key={idx} className="text-base font-bold text-white mt-4 mb-2">{processed.slice(2)}</h2>);
+            return;
+        }
+
+        // Horizontal rules
+        if (processed.match(/^---+$/)) {
+            elements.push(<hr key={idx} className="border-white/10 my-3" />);
+            return;
+        }
+
+        // Empty lines
+        if (!processed.trim()) {
+            elements.push(<div key={idx} className="h-2" />);
+            return;
+        }
+
+        // Bold + inline formatting
+        processed = processed
+            .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/`(.+?)`/g, '<code class="bg-white/10 px-1 py-0.5 rounded text-emerald-300 text-[11px]">$1</code>');
+
+        // Bullet points
+        if (processed.match(/^[\-\*•]\s/)) {
+            elements.push(
+                <div key={idx} className="flex gap-2 pl-1 py-0.5">
+                    <span className="text-emerald-400 flex-shrink-0 mt-0.5">•</span>
+                    <span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} />
+                </div>
+            );
+            return;
+        }
+
+        // Numbered list
+        const numMatch = processed.match(/^(\d+)\.\s(.+)/);
+        if (numMatch) {
+            elements.push(
+                <div key={idx} className="flex gap-2 pl-1 py-0.5">
+                    <span className="text-emerald-400 flex-shrink-0 font-mono text-xs w-5 text-right mt-0.5">{numMatch[1]}.</span>
+                    <span dangerouslySetInnerHTML={{ __html: numMatch[2] }} />
+                </div>
+            );
+            return;
+        }
+
+        // Regular paragraph
+        elements.push(<p key={idx} className="py-0.5" dangerouslySetInnerHTML={{ __html: processed }} />);
+    });
+
+    return <>{elements}</>;
+}
 
 export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -29,24 +100,32 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: "Hey! 👋 Connect with me to get detailed answers about your analytics, SEO performance, traffic sources, and more. Ask me anything about your website data!",
+            content: "🔥 **TrafficClaw AI Analyst is online.**\n\nI have access to your live analytics and SEO data. I don't give advice — I give **verdicts**.\n\nAsk me anything, or hit a quick prompt below to see what I can do. Every answer includes revenue impact and actionable steps.\n\n💡 *10 credits per analysis • Your data stays private*",
             timestamp: new Date(),
         },
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [credits, setCredits] = useState<number | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
     useEffect(() => {
-        if (isOpen) inputRef.current?.focus();
-    }, [isOpen]);
+        if (isOpen) {
+            if (isExpanded) {
+                textareaRef.current?.focus();
+            } else {
+                inputRef.current?.focus();
+            }
+        }
+    }, [isOpen, isExpanded]);
 
-    const sendMessage = async (text?: string) => {
+    const sendMessage = useCallback(async (text?: string) => {
         const messageText = text || input.trim();
         if (!messageText || isLoading) return;
 
@@ -89,6 +168,11 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
             if (!res.ok) throw new Error('Failed to get response');
             const data = await res.json();
 
+            // Update credits if returned
+            if (data.credits !== undefined && data.credits !== null) {
+                setCredits(data.credits);
+            }
+
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: data.response || 'I apologize, I could not process that request. Please try again.',
@@ -97,40 +181,71 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         } catch {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: 'Sorry, I encountered an error. Please make sure the GEMINI_API_KEY is configured in your environment variables, then try again.',
+                content: '⚠️ **Connection Error**\n\nI couldn\'t reach the AI service. Please check:\n- Your GEMINI_API_KEY is configured\n- The server is running\n\nTry again in a moment.',
                 timestamp: new Date(),
             }]);
         } finally {
             setIsLoading(false);
         }
+    }, [input, isLoading, analyticsData, seoData, messages]);
+
+    const clearChat = () => {
+        setMessages([{
+            role: 'assistant',
+            content: "🔄 **Chat cleared.** Ready for your next analysis.\n\nWhat would you like to investigate?",
+            timestamp: new Date(),
+        }]);
     };
 
+    // ─── Floating button (closed state) ───
     if (!isOpen) {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 text-black shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all hover:scale-105 flex items-center justify-center group"
+                className="fixed bottom-6 right-6 z-50 group"
             >
-                <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                <div className="relative">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 via-cyan-400 to-teal-400 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all hover:scale-110 flex items-center justify-center">
+                        <Sparkles className="w-6 h-6 text-black group-hover:rotate-12 transition-transform" />
+                    </div>
+                    {/* Pulse ring */}
+                    <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
+                </div>
             </button>
         );
     }
 
+    // ─── Chat window ───
     return (
-        <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[420px] h-[600px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[#0c0c10] border border-white/[0.08] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-                {/* Header */}
-                <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-gradient-to-r from-emerald-500/[0.05] to-cyan-500/[0.05]">
+        <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[440px] h-[640px]'} transition-all duration-300`}>
+            <div className="w-full h-full bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
+                {/* ── Header ── */}
+                <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-gradient-to-r from-emerald-500/[0.06] to-cyan-500/[0.06]">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
                             <Sparkles className="w-4 h-4 text-black" />
+                            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#0a0a0f]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-semibold text-white">AI SEO Advisor</h3>
-                            <p className="text-[10px] text-zinc-500">Your AI Growth Assistant</p>
+                            <h3 className="text-sm font-bold text-white">AI Analyst</h3>
+                            <p className="text-[10px] text-zinc-500">God-level SEO & Analytics</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5">
+                        {/* Credits badge */}
+                        {credits !== null && (
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 mr-1">
+                                <Coins className="w-3 h-3 text-amber-400" />
+                                <span className="text-[10px] font-bold text-amber-400">{credits}</span>
+                            </div>
+                        )}
+                        <button
+                            onClick={clearChat}
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-colors"
+                            title="Clear chat"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
                             className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-colors"
@@ -146,17 +261,20 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     </div>
                 </div>
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* ── Messages ── */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                                msg.role === 'user'
-                                    ? 'bg-emerald-500/[0.15] text-emerald-100 border border-emerald-500/[0.15]'
-                                    : 'bg-white/[0.04] text-zinc-300 border border-white/[0.06]'
-                            }`}>
-                                <div className="whitespace-pre-wrap">{msg.content}</div>
-                                <div className="text-[10px] text-zinc-600 mt-1.5">
+                            <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                                    ? 'bg-emerald-500/[0.12] text-emerald-100 border border-emerald-500/[0.15] rounded-br-sm'
+                                    : 'bg-white/[0.03] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
+                                }`}>
+                                {msg.role === 'assistant' ? (
+                                    <div className="space-y-0.5 text-[13px]">{renderMessage(msg.content)}</div>
+                                ) : (
+                                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                                )}
+                                <div className="text-[10px] text-zinc-600/80 mt-2 select-none">
                                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             </div>
@@ -165,10 +283,14 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
 
                     {isLoading && (
                         <div className="flex justify-start">
-                            <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl px-4 py-3">
-                                <div className="flex items-center gap-2 text-zinc-500">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span className="text-xs">Analyzing your data...</span>
+                            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-bl-sm px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                    <span className="text-xs text-zinc-500">Deep-analyzing your data...</span>
                                 </div>
                             </div>
                         </div>
@@ -176,15 +298,15 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Quick Prompts */}
+                {/* ── Quick Prompts ── */}
                 {messages.length <= 2 && (
                     <div className="px-4 pb-2">
                         <div className="flex flex-wrap gap-1.5">
-                            {QUICK_PROMPTS.slice(0, 4).map((prompt, i) => (
+                            {QUICK_PROMPTS.map((prompt, i) => (
                                 <button
                                     key={i}
                                     onClick={() => sendMessage(prompt)}
-                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/[0.2] transition-colors"
+                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/[0.2] hover:bg-emerald-500/[0.04] transition-all"
                                 >
                                     {prompt}
                                 </button>
@@ -193,26 +315,50 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     </div>
                 )}
 
-                {/* Input */}
-                <div className="px-4 py-3 border-t border-white/[0.06]">
+                {/* ── Input ── */}
+                <div className="px-4 py-3 border-t border-white/[0.06] bg-white/[0.01]">
                     <div className="flex items-center gap-2">
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                            placeholder="Ask about your analytics & SEO..."
-                            className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
-                            disabled={isLoading}
-                        />
+                        {isExpanded ? (
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        sendMessage();
+                                    }
+                                }}
+                                placeholder="Ask anything about your analytics & SEO..."
+                                className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition resize-none min-h-[44px] max-h-[120px]"
+                                disabled={isLoading}
+                                rows={1}
+                            />
+                        ) : (
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                                placeholder="Ask anything about your analytics & SEO..."
+                                className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
+                                disabled={isLoading}
+                            />
+                        )}
                         <button
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}
-                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-black flex items-center justify-center hover:opacity-90 transition disabled:opacity-30"
+                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-black flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 flex-shrink-0"
                         >
                             <Send className="w-4 h-4" />
                         </button>
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5 px-1">
+                        <span className="text-[9px] text-zinc-700">Powered by Gemini • 10 credits/analysis</span>
+                        {credits !== null && credits < 30 && (
+                            <span className="text-[9px] text-amber-500 font-medium">Low credits: {credits}</span>
+                        )}
                     </div>
                 </div>
             </div>

@@ -1,0 +1,29 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+# Install system dependencies including Node.js (for GA4/GSC) and git
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get purge -y gnupg && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Nanobot directly from Github repository
+RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
+
+# Change HOME to /data so nanobot reads config from /data/.nanobot/config.json
+ENV HOME=/data
+
+# Setup Workspace for plugins (mounted externally)
+RUN mkdir -p /app/skills/workspace
+
+EXPOSE 8080
+
+ENTRYPOINT ["nanobot"]
+CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
