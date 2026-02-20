@@ -20,11 +20,49 @@ class DockerManager:
         self.client = docker.from_env()
         self.base_dir = settings.DATA_DIR  # Host path for user data
         self._shared_plugins_dir = self._ensure_shared_plugins()
+        self._ensure_nanobot_image()
     
     def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
         return f"{settings.CONTAINER_PREFIX}_{user_identifier}"
     
+    def _ensure_nanobot_image(self) -> None:
+        """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
+        tag = "trafficclaw/nanobot:latest"
+        try:
+            self.client.images.get(tag)
+        except docker.errors.ImageNotFound:
+            logger.info(f"Image {tag} not found! Building it now from embedded Dockerfile...")
+            import io
+            dockerfile_content = '''FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+RUN apt-get update && \\
+    apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \\
+    mkdir -p /etc/apt/keyrings && \\
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \\
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \\
+    apt-get update && \\
+    apt-get install -y --no-install-recommends nodejs && \\
+    apt-get purge -y gnupg && \\
+    apt-get autoremove -y && \\
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
+ENV HOME=/data
+RUN mkdir -p /app/skills/workspace
+EXPOSE 8080
+ENTRYPOINT ["nanobot"]
+CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
+'''
+            try:
+                for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), t=tag, rm=True, decode=True):
+                    if 'stream' in line and line['stream'].strip():
+                        print(f"[BUILDER] {line['stream'].strip()}")
+                logger.info(f"Successfully built {tag}!")
+            except Exception as e:
+                logger.error(f"Failed to build nanobot image: {e}")
+
     def _get_user_data_dir(self, user_identifier: str) -> str:
         """Get host path for user's data directory"""
         return f"{self.base_dir}/{user_identifier}"
@@ -238,6 +276,8 @@ _(What do they care about? What projects are they working on? What annoys them? 
         git_dir = f"{workspace}/.git"
         if not os.path.exists(git_dir):
             os.system(f"git init {workspace}")
+            os.system(f"git -C {workspace} config user.email 'bot@trafficclaw.com'")
+            os.system(f"git -C {workspace} config user.name 'TrafficClaw Bot'")
             os.system(f"git -C {workspace} add -A")
             os.system(f'git -C {workspace} commit -m "Initial workspace" --allow-empty')
     
