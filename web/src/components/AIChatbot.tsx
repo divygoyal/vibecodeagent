@@ -27,7 +27,7 @@ const QUICK_PROMPTS = [
 function renderMessage(text: string) {
     // Process the text into HTML-like segments
     const lines = text.split('\n');
-    const elements: JSX.Element[] = [];
+    const elements: React.ReactNode[] = [];
 
     lines.forEach((line, idx) => {
         let processed = line;
@@ -266,8 +266,8 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                    ? 'bg-emerald-500/[0.12] text-emerald-100 border border-emerald-500/[0.15] rounded-br-sm'
-                                    : 'bg-white/[0.03] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
+                                ? 'bg-emerald-500/[0.12] text-emerald-100 border border-emerald-500/[0.15] rounded-br-sm'
+                                : 'bg-white/[0.03] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                                 }`}>
                                 {msg.role === 'assistant' ? (
                                     <div className="space-y-0.5 text-[13px]">{renderMessage(msg.content)}</div>
