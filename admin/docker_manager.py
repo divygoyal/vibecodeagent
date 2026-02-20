@@ -32,9 +32,11 @@ class DockerManager:
         try:
             self.client.images.get(tag)
         except docker.errors.ImageNotFound:
-            logger.info(f"Image {tag} not found! Building it now from embedded Dockerfile...")
-            import io
-            dockerfile_content = '''FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+            logger.info(f"Image {tag} not found! Starting background build thread...")
+            import threading
+            def build_image():
+                import io
+                dockerfile_content = '''FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 RUN apt-get update && \\
     apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \\
@@ -55,13 +57,16 @@ EXPOSE 8080
 ENTRYPOINT ["nanobot"]
 CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
 '''
-            try:
-                for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
-                    if 'stream' in line and line['stream'].strip():
-                        print(f"[BUILDER] {line['stream'].strip()}")
-                logger.info(f"Successfully built {tag}!")
-            except Exception as e:
-                logger.error(f"Failed to build nanobot image: {e}")
+                try:
+                    for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
+                        if 'stream' in line and line['stream'].strip():
+                            print(f"[BUILDER] {line['stream'].strip()}")
+                    logger.info(f"Successfully built {tag} in background!")
+                except Exception as e:
+                    logger.error(f"Failed to build nanobot image in background: {e}")
+                    
+            builder_thread = threading.Thread(target=build_image, daemon=True)
+            builder_thread.start()
 
     def _get_user_data_dir(self, user_identifier: str) -> str:
         """Get host path for user's data directory"""
