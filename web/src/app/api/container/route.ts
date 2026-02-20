@@ -105,6 +105,7 @@ export async function GET() {
         botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username,
         telegramBotToken: data.telegram_bot_token,
         connectedProviders: data.connected_providers || [],
+        error: data.container?.error,
       })
 
     } catch (err: unknown) {

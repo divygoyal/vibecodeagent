@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useRegistration } from '../layout';
 
-/* ─── types ─── */
 type BotStatus = {
     status: string;
     health: string;
@@ -20,6 +19,7 @@ type BotStatus = {
     botUsername?: string;
     telegramBotToken?: string;
     connectedProviders?: Array<{ provider: string; connected: boolean }>;
+    error?: string;
 };
 
 const STATUS_STEPS = [
@@ -232,6 +232,17 @@ export default function BotPage() {
                             <span className="text-xs text-zinc-300 font-mono">@{botStatus.botUsername}</span>
                         </div>
                     )}
+
+                    {botStatus?.status === 'exited' && botStatus.error && (
+                        <div className="mt-4 pt-4 border-t border-red-500/20">
+                            <h3 className="text-xs font-semibold text-red-400 mb-2 flex items-center gap-2">
+                                <AlertCircle className="w-3.5 h-3.5" /> Start Failure Logs
+                            </h3>
+                            <pre className="bg-red-500/10 text-red-300 text-[10px] p-3 rounded-lg overflow-x-auto font-mono whitespace-pre-wrap border border-red-500/20">
+                                {botStatus.error}
+                            </pre>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -298,8 +309,8 @@ export default function BotPage() {
                                 <button
                                     onClick={() => setBotEngine('openclaw')}
                                     className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'openclaw'
-                                            ? 'bg-zinc-800 border-zinc-600 text-white'
-                                            : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
+                                        ? 'bg-zinc-800 border-zinc-600 text-white'
+                                        : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
                                         }`}
                                 >
                                     OpenClaw
@@ -307,8 +318,8 @@ export default function BotPage() {
                                 <button
                                     onClick={() => setBotEngine('nanobot')}
                                     className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'nanobot'
-                                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                                            : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
+                                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                        : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
                                         }`}
                                 >
                                     Nanobot (Fast)
