@@ -1,13 +1,12 @@
 # Admin API Dockerfile
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install system dependencies (including build tools for Python packages)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     gcc \
-    python3-dev \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/*
