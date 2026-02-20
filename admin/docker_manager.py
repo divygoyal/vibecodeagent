@@ -516,14 +516,14 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 "channels": {
                     "telegram": {
                         "enabled": bool(telegram_token),
-                        "bot_token": telegram_token or "",
-                        "allowed_users": []
+                        "botToken": telegram_token or "",
+                        "allowFrom": ["*"]
                     }
                 },
                 "providers": {
                     "gemini": {
                         "enabled": True,
-                        "api_key": gemini_key or settings.GEMINI_API_KEY
+                        "apiKey": gemini_key or settings.GEMINI_API_KEY
                     }
                 },
                 "agents": {
