@@ -56,7 +56,7 @@ ENTRYPOINT ["nanobot"]
 CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
 '''
             try:
-                for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), t=tag, rm=True, decode=True):
+                for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
                     if 'stream' in line and line['stream'].strip():
                         print(f"[BUILDER] {line['stream'].strip()}")
                 logger.info(f"Successfully built {tag}!")
