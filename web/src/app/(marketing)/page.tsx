@@ -4,6 +4,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
+import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
+
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
     ArrowRight, CheckCircle2, Star, Sparkles, Code, GitBranch,
@@ -92,160 +94,282 @@ function Section({ children, className = '', id }: { children: React.ReactNode; 
 
 function Hero() {
     return (
-        <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
-            {/* Background gradient mesh */}
+        <section className="relative min-h-screen flex items-center justify-center pt-24 pb-16 overflow-hidden bg-black"> {/* True black background for maximum contrast */}
+            {/* Background gradient meshes */}
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/[0.07] rounded-full blur-[128px]" />
-                <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-cyan-500/[0.05] rounded-full blur-[128px]" />
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-violet-500/[0.04] rounded-full blur-[128px]" />
+                <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/[0.04] rounded-full blur-[128px]" />
+                <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-cyan-500/[0.03] rounded-full blur-[128px]" />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/[0.02] rounded-full blur-[128px]" />
             </div>
 
-            {/* Grid pattern overlay */}
-            <div
-                className="absolute inset-0 pointer-events-none opacity-[0.03]"
-                style={{
-                    backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-                    backgroundSize: '64px 64px'
-                }}
-            />
-
-            <div className="relative max-w-7xl mx-auto px-6 text-center">
-                {/* Badge */}
+            <div className="relative w-full max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center z-10">
+                {/* Left Side: Marketing Copy */}
                 <motion.div
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.5 }}
-                    className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] mb-8"
+                    initial={{ opacity: 0, x: -40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                    className="flex flex-col gap-8 order-2 lg:order-1 text-center lg:text-left"
                 >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-xs font-medium text-zinc-300">AI-Powered Growth Intelligence</span>
-                </motion.div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-sm font-medium w-fit mx-auto lg:mx-0 border border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.1)]">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Meet TrafficClaw Agent
+                    </div>
 
-                {/* Headline */}
-                <motion.h1
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-                    className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6"
-                >
-                    <span className="text-white">Your website&apos;s growth</span>
-                    <br />
-                    <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-                        on autopilot
-                    </span>
-                </motion.h1>
+                    <h1 className="text-5xl sm:text-6xl lg:text-[5rem] font-bold tracking-tight leading-[1.05]">
+                        <span className="block pb-2 text-white drop-shadow-md font-extrabold" style={{ textShadow: "0px 4px 40px rgba(52,211,153,0.2)" }}>
+                            SEO & Analytics,
+                        </span>
+                        <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent block pb-2">
+                            all from your phone.
+                        </span>
+                    </h1>
 
-                {/* Subtitle */}
-                <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.25 }}
-                    className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed"
-                >
-                    TrafficClaw gives you an AI agent that monitors your analytics, detects SEO issues,
-                    and fixes your code — all through a simple Telegram chat.
-                </motion.p>
+                    <p className="text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0 font-light">
+                        Get real-time insights, traffic drop alerts, and quick SEO wins without ever logging into a clunky dashboard. Just open Telegram and ask your personalized AI.
+                    </p>
 
-                {/* CTA Buttons */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.35 }}
-                    className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
-                >
-                    <button
-                        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                        className="group px-8 py-3.5 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300"
-                    >
-                        Start Free — No Credit Card
-                        <ArrowRight className="inline-block ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                    <a
-                        href="#demo"
-                        className="px-8 py-3.5 text-sm font-medium text-zinc-300 border border-white/[0.1] rounded-xl hover:bg-white/[0.04] hover:border-white/[0.15] transition-all duration-200"
-                    >
-                        See Live Demo
-                    </a>
-                </motion.div>
-
-                {/* Terminal-style bot demo */}
-                <motion.div
-                    initial={{ opacity: 0, y: 40, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.8, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                    className="relative max-w-3xl mx-auto"
-                >
-                    {/* Glow behind card */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-cyan-500/20 to-violet-500/20 rounded-2xl blur-xl opacity-50" />
-
-                    <div className="relative bg-[#0c0c10] border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl">
-                        {/* Terminal header */}
-                        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
-                            <div className="flex gap-1.5">
-                                <div className="w-3 h-3 rounded-full bg-red-500/70" />
-                                <div className="w-3 h-3 rounded-full bg-amber-500/70" />
-                                <div className="w-3 h-3 rounded-full bg-emerald-500/70" />
-                            </div>
-                            <span className="text-xs text-zinc-500 ml-2 font-mono">TrafficClaw Agent · Telegram</span>
-                        </div>
-
-                        {/* Chat messages */}
-                        <div className="p-6 space-y-4 font-mono text-sm">
-                            <ChatMessage sender="You" avatar="👤" delay={0.6}>
-                                Show me my top search queries this week
-                            </ChatMessage>
-                            <ChatMessage sender="TrafficClaw" avatar="🤖" delay={1.2} isBot>
-                                <span className="text-zinc-400">Running:</span>{' '}
-                                <span className="text-cyan-400">gsc query --dimensions query --limit 5</span>
-                            </ChatMessage>
-                            <ChatMessage sender="TrafficClaw" avatar="🤖" delay={1.8} isBot>
-                                <div className="mt-2 text-emerald-400">
-                                    📊 Top 5 Queries (Last 7 Days)
-                                </div>
-                                <div className="mt-2 text-xs text-zinc-400 overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="text-zinc-500">
-                                                <td className="pr-4">Query</td>
-                                                <td className="pr-4 text-right">Clicks</td>
-                                                <td className="pr-4 text-right">Impressions</td>
-                                                <td className="text-right">CTR</td>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="text-zinc-300">
-                                            <tr><td className="pr-4">best crm software</td><td className="pr-4 text-right text-emerald-400">892</td><td className="pr-4 text-right">12.4K</td><td className="text-right">7.2%</td></tr>
-                                            <tr><td className="pr-4">saas analytics tool</td><td className="pr-4 text-right text-emerald-400">654</td><td className="pr-4 text-right">8.9K</td><td className="text-right">7.3%</td></tr>
-                                            <tr><td className="pr-4">website performance</td><td className="pr-4 text-right text-emerald-400">521</td><td className="pr-4 text-right">15.2K</td><td className="text-right">3.4%</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </ChatMessage>
-                            <ChatMessage sender="You" avatar="👤" delay={2.4}>
-                                The CTR on &quot;website performance&quot; is low. Fix the meta title.
-                            </ChatMessage>
-                            <ChatMessage sender="TrafficClaw" avatar="🤖" delay={3.0} isBot>
-                                <span className="text-emerald-400">✓ Updated meta title</span> on /blog/website-performance
-                                <br />
-                                <span className="text-zinc-400">Committed to</span>{' '}
-                                <span className="text-cyan-400">main</span> ·{' '}
-                                <span className="text-zinc-500">a3f8d2c</span>
-                            </ChatMessage>
-                        </div>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-4">
+                        <button
+                            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                            className="group px-8 h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
+                        >
+                            Start Free — No Credit Card
+                            <ArrowRight className="inline-block ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                        <a
+                            href="#features"
+                            className="px-8 h-14 text-[15px] font-medium text-zinc-300 border border-white/10 rounded-xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 w-full sm:w-auto flex items-center justify-center backdrop-blur-sm whitespace-nowrap"
+                        >
+                            Explore Features
+                        </a>
                     </div>
                 </motion.div>
 
-                {/* Trust bar */}
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.6, delay: 1 }}
-                    className="mt-16 flex flex-wrap items-center justify-center gap-8 text-zinc-600 text-sm"
-                >
-                    <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> SOC 2 Ready</span>
-                    <span className="flex items-center gap-2"><Globe className="w-4 h-4" /> Works with any website</span>
-                    <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Setup in 2 minutes</span>
-                </motion.div>
+                {/* Right Side: The Simulation Component with Floating UI */}
+                <div className="order-1 lg:order-2 flex justify-center lg:justify-center relative lg:pl-12 w-full h-[600px] items-center">
+
+                    {/* Floating Element 1 (Traffic Spike) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20, x: -20 }}
+                        animate={{ opacity: 1, y: 0, x: 0 }}
+                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(52,211,153,0.3)" }}
+                        transition={{ duration: 0.5, delay: 0.8 }}
+                        className="absolute hidden lg:flex flex-col gap-2 z-30 lg:-left-20 top-[10%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-emerald-500/30 transition-colors w-[180px]"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
+                                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                                Traffic
+                            </div>
+                            <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">+12%</span>
+                        </div>
+                        <div className="text-2xl font-bold text-white tracking-tight">24.5k</div>
+                        {/* Mini Bar Chart */}
+                        <div className="flex items-end gap-1.5 h-8 mt-1">
+                            {[40, 30, 50, 40, 60, 80, 100].map((height, i) => (
+                                <motion.div
+                                    key={i}
+                                    style={{ originY: 1 }}
+                                    initial={{ scaleY: 0 }}
+                                    animate={{ scaleY: height / 100 }}
+                                    transition={{ duration: 1, delay: 1 + (i * 0.1), ease: "easeOut" }}
+                                    className="w-full h-full bg-emerald-500 rounded-sm origin-bottom"
+                                />
+                            ))}
+                        </div>
+
+                        {/* Connecting Sweep Right */}
+                        <motion.svg
+                            className="absolute pointer-events-none w-[70px] h-[80px] top-1/2 -right-[75px] -translate-y-1/2"
+                            viewBox="0 0 70 80"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1.5, duration: 1 }}
+                        >
+                            <defs>
+                                <linearGradient id="grad-tl" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#34d399" stopOpacity="1" />
+                                    <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <motion.path
+                                d="M 0 10 C 35 10, 35 70, 70 70"
+                                fill="none"
+                                stroke="url(#grad-tl)"
+                                strokeWidth="1.5"
+                                strokeDasharray="4 4"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={{ duration: 1.5, ease: "easeOut", delay: 1 }}
+                            />
+                        </motion.svg>
+                    </motion.div>
+
+                    {/* Floating Element 2 (Keyword Rank) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20, x: -20 }}
+                        animate={{ opacity: 1, y: 0, x: 0 }}
+                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(56,189,248,0.3)" }}
+                        transition={{ duration: 0.5, delay: 1.0 }}
+                        className="absolute hidden lg:flex flex-col gap-3 z-30 lg:-left-28 bottom-[30%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-sky-500/30 transition-colors w-[200px]"
+                    >
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-semibold text-zinc-400">Top Keyword</span>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Rank</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-white font-medium">"AI SEO Tool"</span>
+                            <div className="flex items-center gap-1.5 bg-sky-500/10 px-2 py-1 rounded-md border border-sky-500/20">
+                                <span className="text-sm font-bold text-sky-400">#1</span>
+                                <TrendingUp className="w-3 h-3 text-sky-400" />
+                            </div>
+                        </div>
+
+                        {/* Connecting Sweep Right-Up */}
+                        <motion.svg
+                            className="absolute pointer-events-none w-[90px] h-[60px] top-1/2 -right-[95px] -translate-y-1/2"
+                            viewBox="0 0 90 60"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1.7, duration: 1 }}
+                        >
+                            <defs>
+                                <linearGradient id="grad-bl" x1="0%" y1="100%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="#38bdf8" stopOpacity="1" />
+                                    <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <motion.path
+                                d="M 0 50 C 45 50, 45 10, 90 10"
+                                fill="none"
+                                stroke="url(#grad-bl)"
+                                strokeWidth="1.5"
+                                strokeDasharray="4 4"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={{ duration: 1.5, ease: "easeOut", delay: 1.2 }}
+                            />
+                        </motion.svg>
+                    </motion.div>
+
+                    {/* Main Phone Frame */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                        className="relative z-20 flex justify-center"
+                    >
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-emerald-500/[0.05] rounded-[5rem] blur-3xl pointer-events-none" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-cyan-500/[0.06] rounded-[5rem] blur-2xl pointer-events-none" />
+                        <VideoPhoneFrame />
+                    </motion.div>
+
+                    {/* Floating Element 3 (Site Health) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: -20, x: 20 }}
+                        animate={{ opacity: 1, y: 0, x: 0 }}
+                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(168,85,247,0.3)" }}
+                        transition={{ duration: 0.5, delay: 1.2 }}
+                        className="absolute hidden lg:flex items-center gap-4 z-30 lg:-right-24 top-[25%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-purple-500/30 transition-colors"
+                    >
+                        <div className="relative w-12 h-12 flex items-center justify-center">
+                            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                <path className="text-white/10" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                <motion.path
+                                    className="text-purple-500"
+                                    strokeDasharray="100, 100"
+                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                    fill="none" stroke="currentColor" strokeWidth="3"
+                                    initial={{ strokeDasharray: "0, 100" }}
+                                    animate={{ strokeDasharray: "98, 100" }}
+                                    transition={{ duration: 1.5, delay: 1.5, ease: "easeOut" }}
+                                />
+                            </svg>
+                            <span className="absolute text-xs font-bold text-white">98</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-white">Site Health</span>
+                            <span className="text-xs text-purple-400">Looking great</span>
+                        </div>
+
+                        {/* Connecting Sweep Left */}
+                        <motion.svg
+                            className="absolute pointer-events-none w-[50px] h-[60px] top-1/2 -left-[55px] -translate-y-1/2"
+                            viewBox="0 0 50 60"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1.9, duration: 1 }}
+                        >
+                            <defs>
+                                <linearGradient id="grad-rt" x1="100%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stopColor="#a855f7" stopOpacity="1" />
+                                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <motion.path
+                                d="M 50 10 C 25 10, 25 50, 0 50"
+                                fill="none"
+                                stroke="url(#grad-rt)"
+                                strokeWidth="1.5"
+                                strokeDasharray="4 4"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={{ duration: 1.5, ease: "easeOut", delay: 1.4 }}
+                            />
+                        </motion.svg>
+                    </motion.div>
+
+                    {/* Floating Element 4 (Alert) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: -20, x: 20 }}
+                        animate={{ opacity: 1, y: 0, x: 0 }}
+                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(244,63,94,0.3)" }}
+                        transition={{ duration: 0.5, delay: 1.4 }}
+                        className="absolute hidden lg:flex flex-col gap-2 z-30 lg:-right-24 bottom-[30%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl max-w-[210px] cursor-pointer hover:border-rose-500/30 transition-colors"
+                    >
+                        <div className="flex items-center gap-2">
+                            <div className="relative flex h-6 w-6 items-center justify-center">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-20"></span>
+                                <div className="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center">
+                                    <Zap className="w-3 h-3 text-rose-400" />
+                                </div>
+                            </div>
+                            <span className="text-sm font-semibold text-white">Google Update</span>
+                        </div>
+                        <p className="text-xs text-zinc-400 leading-snug">
+                            Core update detected. Your ranks are stable. See report.
+                        </p>
+
+                        {/* Connecting Sweep Left-Up */}
+                        <motion.svg
+                            className="absolute pointer-events-none w-[30px] h-[40px] top-1/2 -left-[35px] -translate-y-1/2"
+                            viewBox="0 0 30 40"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 2.1, duration: 1 }}
+                        >
+                            <defs>
+                                <linearGradient id="grad-rb" x1="100%" y1="100%" x2="0%" y2="0%">
+                                    <stop offset="0%" stopColor="#f43f5e" stopOpacity="1" />
+                                    <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <motion.path
+                                d="M 30 30 C 15 30, 15 10, 0 10"
+                                fill="none"
+                                stroke="url(#grad-rb)"
+                                strokeWidth="1.5"
+                                strokeDasharray="4 4"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={{ duration: 1.5, ease: "easeOut", delay: 1.6 }}
+                            />
+                        </motion.svg>
+                    </motion.div>
+                </div>
             </div>
         </section>
     );
