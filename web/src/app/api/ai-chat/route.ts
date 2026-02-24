@@ -1,17 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
+
+export const maxDuration = 300; // Allow up to 5 minutes on Vercel Pro/Local for massive reports
+export const dynamic = 'force-dynamic';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
 if (typeof globalThis !== 'undefined') {
     console.log('[AI Chat] GEMINI_API_KEY configured:', !!GEMINI_API_KEY, 'length:', GEMINI_API_KEY.length);
 }
-
-export const dynamic = 'force-dynamic';
 
 // ═══════════════════════════════════════════════════════════════
 // UNIVERSAL ANALYST — GOD-LEVEL SYSTEM INSTRUCTION
@@ -292,17 +294,21 @@ async function deductCredits(userId: string): Promise<number | null> {
 // ═══════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════════
-export async function POST(req: Request) {
+function encodeSSE(data: any): Uint8Array {
+    return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
 
         const { message, analyticsContext, seoContext, history } = await req.json();
 
         if (!message) {
-            return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+            return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 
         // @ts-expect-error - id added in callbacks
@@ -312,26 +318,26 @@ export async function POST(req: Request) {
         if (ADMIN_API_KEY && userId) {
             const credits = await getUserCredits(String(userId));
             if (credits !== null && credits < 10) {
-                return NextResponse.json({
+                return new Response(JSON.stringify({
                     error: 'insufficient_credits',
                     credits: credits,
                     response: `⚡ You've used all your credits! You have **${credits}** credits remaining, but each AI analysis costs **10 credits**.\n\n🛒 **Get more credits** to continue using TrafficClaw AI:\n- 💰 100 credits for just $1\n- 🔥 500 credits for $5 (save 50%)\n- 🚀 1,200 credits for $10 (best value)\n\nVisit your dashboard settings to purchase more credits.`
-                });
+                }), { status: 402, headers: { 'Content-Type': 'application/json' } });
             }
         }
 
         if (!GEMINI_API_KEY) {
             console.warn('[AI Chat] No GEMINI_API_KEY found. Using fallback.');
-            return NextResponse.json({
+            return new Response(JSON.stringify({
                 response: generateFallbackResponse(message, analyticsContext, seoContext, false),
-            });
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
 
         // ── Build data context with pre-computed patterns ──
         const dataContext = buildDataContext(analyticsContext, seoContext);
 
         // ── Build conversation history ──
-        const contents = [];
+        const contents: any[] = [];
         if (history?.length) {
             for (const msg of history) {
                 contents.push({
@@ -347,49 +353,213 @@ export async function POST(req: Request) {
             parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}\n\n---\n\nUser: ${message}` : message }],
         });
 
-        // ── Call Gemini with system_instruction (proper API usage) ──
-        const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: {
-                    parts: [{ text: SYSTEM_INSTRUCTION }],
-                },
-                contents,
-                generationConfig: {
-                    temperature: 0.8,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 8192,
-                },
-            }),
+        // ── Execute Gemini Stream ──
+        const stream = new ReadableStream({
+            async start(controller) {
+                try {
+                    const geminiUrl = `${GEMINI_URL}&key=${GEMINI_API_KEY}`;
+
+                    const response = await fetch(geminiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                            contents,
+                            tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
+                            generationConfig: {
+                                temperature: 0.8, maxOutputTokens: 8192,
+                            },
+                        }),
+                        signal: AbortSignal.timeout(60000), // 60s timeout
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.text();
+                        console.error('Gemini API error:', response.status, errData);
+                        controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service' }));
+                        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+                        controller.close();
+                        return;
+                    }
+
+                    const reader = response.body?.getReader();
+                    if (!reader) {
+                        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+                        controller.close();
+                        return;
+                    }
+
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    let fullText = '';
+                    let pendingFunctionCalls: any[] = [];
+                    let hasDeductedCredit = false;
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+                            const jsonStr = line.slice(6).trim();
+                            if (!jsonStr || jsonStr === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const candidate = parsed.candidates?.[0];
+                                if (!candidate) continue;
+
+                                if (!hasDeductedCredit && ADMIN_API_KEY && userId) {
+                                    hasDeductedCredit = true;
+                                    deductCredits(String(userId)).then(credits => {
+                                        if (credits !== null) {
+                                            controller.enqueue(encodeSSE({ type: 'credits', value: credits }));
+                                        }
+                                    }).catch(console.error);
+                                }
+
+                                const parts = candidate.content?.parts || [];
+                                const hasFunctionCall = parts.some((p: any) => p.functionCall);
+
+                                for (const part of parts) {
+                                    if (part.text) {
+                                        if (!hasFunctionCall) {
+                                            fullText += part.text;
+                                            controller.enqueue(encodeSSE({
+                                                type: 'text',
+                                                content: part.text,
+                                            }));
+                                        } else {
+                                            fullText += part.text;
+                                        }
+                                    }
+
+                                    if (part.functionCall) {
+                                        const isDup = pendingFunctionCalls.some(
+                                            fc => fc.name === part.functionCall.name && JSON.stringify(fc.args) === JSON.stringify(part.functionCall.args)
+                                        );
+                                        if (!isDup) {
+                                            pendingFunctionCalls.push(part.functionCall);
+                                            controller.enqueue(encodeSSE({
+                                                type: 'tool_start',
+                                                name: part.functionCall.name,
+                                                args: part.functionCall.args,
+                                            }));
+                                        }
+                                    }
+                                }
+                            } catch {
+                                // ignore parse errors on partial chunks
+                            }
+                        }
+                    }
+
+                    // Handle tool execution loop
+                    if (pendingFunctionCalls.length > 0) {
+                        for (const fc of pendingFunctionCalls) {
+                            try {
+                                const toolResult = await executeAiChatTool(fc.name, fc.args || {});
+
+                                controller.enqueue(encodeSSE({
+                                    type: 'tool_result',
+                                    name: fc.name,
+                                    result: toolResult.result,
+                                    error: toolResult.error,
+                                }));
+
+                                const followUpContents = [
+                                    ...contents,
+                                    {
+                                        role: 'model',
+                                        parts: [
+                                            ...(fullText ? [{ text: fullText }] : []),
+                                            { functionCall: { name: fc.name, args: fc.args } },
+                                        ],
+                                    },
+                                    {
+                                        role: 'user',
+                                        parts: [{
+                                            functionResponse: { name: fc.name, response: toolResult },
+                                        }],
+                                    },
+                                ];
+
+                                const followResponse = await fetch(geminiUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                                        contents: followUpContents,
+                                        generationConfig: {
+                                            temperature: 0.8, maxOutputTokens: 8192,
+                                        },
+                                    }),
+                                });
+
+                                if (followResponse.ok) {
+                                    const followReader = followResponse.body?.getReader();
+                                    if (followReader) {
+                                        let followBuffer = '';
+                                        while (true) {
+                                            const { done: fDone, value: fValue } = await followReader.read();
+                                            if (fDone) break;
+
+                                            followBuffer += decoder.decode(fValue, { stream: true });
+                                            const fLines = followBuffer.split('\n');
+                                            followBuffer = fLines.pop() || '';
+
+                                            for (const fLine of fLines) {
+                                                if (!fLine.startsWith('data: ')) continue;
+                                                const fJson = fLine.slice(6).trim();
+                                                if (!fJson || fJson === '[DONE]') continue;
+
+                                                try {
+                                                    const fParsed = JSON.parse(fJson);
+                                                    const fParts = fParsed.candidates?.[0]?.content?.parts || [];
+                                                    for (const fp of fParts) {
+                                                        if (fp.text) {
+                                                            controller.enqueue(encodeSSE({ type: 'text', content: fp.text }));
+                                                        }
+                                                    }
+                                                } catch { /* ignore */ }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('Tool execution error:', err);
+                            }
+                        }
+                    }
+
+                    controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+                    controller.close();
+                } catch (error: any) {
+                    console.error('Chat streaming error:', error);
+                    try {
+                        controller.enqueue(encodeSSE({ type: 'error', message: 'Internal server error while streaming' }));
+                        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+                        controller.close();
+                    } catch { /* close errors */ }
+                }
+            },
         });
 
-        if (!res.ok) {
-            const errText = await res.text();
-            console.error('Gemini API error:', res.status, errText);
-            return NextResponse.json({
-                response: `I encountered an error connecting to the AI service (${res.status}). Please verify your GEMINI_API_KEY is valid.\n\nIn the meantime, here's what I can tell you:\n\n${generateFallbackResponse(message, analyticsContext, seoContext, true)}`,
-            });
-        }
-
-        const data = await res.json();
-        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I could not generate a response. Please try again.';
-
-        // ── Deduct credits on success ──
-        let remainingCredits: number | null = null;
-        if (ADMIN_API_KEY && userId) {
-            remainingCredits = await deductCredits(String(userId));
-        }
-
-        return NextResponse.json({
-            response: responseText,
-            credits: remainingCredits,
+        return new Response(stream, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            },
         });
 
     } catch (err) {
         console.error('AI Chat error:', err);
-        return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+        return new Response(JSON.stringify({ error: 'Failed to process request' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 }
 

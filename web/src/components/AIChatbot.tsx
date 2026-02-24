@@ -7,6 +7,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+    tools?: { name: string; args: any; result?: string }[];
 }
 
 interface AIChatbotProps {
@@ -130,7 +131,8 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         if (!messageText || isLoading) return;
 
         const userMessage: Message = { role: 'user', content: messageText, timestamp: new Date() };
-        setMessages(prev => [...prev, userMessage]);
+        // Instantly add user message and an empty assistant message to append text to
+        setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date(), tools: [] }]);
         setInput('');
         setIsLoading(true);
 
@@ -161,23 +163,74 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                         recommendations: seoData.recommendations,
                         trend: seoData.trend?.slice(-14),
                     } : null,
+                    // Filter out tools array before sending history to avoid breaking the backend input expectations
                     history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
                 }),
             });
 
             if (!res.ok) throw new Error('Failed to get response');
-            const data = await res.json();
 
-            // Update credits if returned
-            if (data.credits !== undefined && data.credits !== null) {
-                setCredits(data.credits);
+            const reader = res.body?.getReader();
+            if (!reader) throw new Error('No readable stream available');
+
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (!dataStr || dataStr === '[DONE]') continue;
+
+                        try {
+                            const data = JSON.parse(dataStr);
+
+                            if (data.type === 'text') {
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const last = newMessages[newMessages.length - 1];
+                                    last.content += data.content;
+                                    return newMessages;
+                                });
+                            } else if (data.type === 'tool_start') {
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const last = newMessages[newMessages.length - 1];
+                                    if (!last.tools) last.tools = [];
+                                    last.tools.push({ name: data.name, args: data.args });
+                                    return newMessages;
+                                });
+                            } else if (data.type === 'tool_result') {
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const last = newMessages[newMessages.length - 1];
+                                    const tool = last.tools?.find(t => t.name === data.name && !t.result);
+                                    if (tool) {
+                                        tool.result = data.result || 'Done';
+                                    }
+                                    return newMessages;
+                                });
+                            } else if (data.type === 'credits') {
+                                setCredits(data.value);
+                            } else if (data.type === 'error') {
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const last = newMessages[newMessages.length - 1];
+                                    last.content += `\n\n⚠️ **Error:** ${data.message}`;
+                                    return newMessages;
+                                });
+                            }
+                        } catch (e) {
+                            // skip parse error
+                        }
+                    }
+                }
             }
-
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: data.response || 'I apologize, I could not process that request. Please try again.',
-                timestamp: new Date(),
-            }]);
         } catch {
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -270,7 +323,20 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                 : 'bg-white/[0.03] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                                 }`}>
                                 {msg.role === 'assistant' ? (
-                                    <div className="space-y-0.5 text-[13px]">{renderMessage(msg.content)}</div>
+                                    <div className="space-y-3 text-[13px]">
+                                        {msg.tools && msg.tools.map((tool, idx) => (
+                                            <div key={idx} className="bg-black/40 border border-emerald-500/20 rounded-lg p-3 font-mono text-[11px] text-emerald-400">
+                                                <div className="flex items-center gap-2 mb-1.5 opacity-80">
+                                                    {tool.result ? <Sparkles className="w-3.5 h-3.5 text-emerald-300" /> : <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />}
+                                                    <span className="font-semibold">{tool.result ? 'Diagnostic Complete:' : 'Running Diagnostic:'} {tool.name}</span>
+                                                </div>
+                                                <div className="text-emerald-500/60 pl-5 overflow-hidden whitespace-nowrap text-ellipsis max-w-[300px]" title={JSON.stringify(tool.args)}>
+                                                    {Object.entries(tool.args || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="space-y-0.5">{renderMessage(msg.content)}</div>
+                                    </div>
                                 ) : (
                                     <div className="whitespace-pre-wrap">{msg.content}</div>
                                 )}
