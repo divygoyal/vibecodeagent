@@ -407,8 +407,11 @@ export async function POST(req: NextRequest) {
                     let currentContents = [...contents];
                     let keepGoing = true;
                     let hasDeductedCredit = false;
+                    let loopCount = 0;
+                    const MAX_LOOPS = 4; // Hard cap on recursive tool calling
 
-                    while (keepGoing) {
+                    while (keepGoing && loopCount < MAX_LOOPS) {
+                        loopCount++;
                         keepGoing = false; // Stop looping unless we hit a function call
 
                         // 1. Call Gemini with current state of contents (with retry logic)

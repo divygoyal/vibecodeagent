@@ -208,6 +208,14 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             const csvHeader = `${(dimensions as string[]).join(',')},clicks,impressions,ctr,position`;
             const compressedCsv = [csvHeader, ...csvRows].join('\n');
 
+            // Generate a strict instruction note for the AI
+            let instructionNote = "";
+            if (formattedRows.length === 0) {
+                instructionNote = "STOP: This site has 0 data in Google Search Console for this query. DO NOT retry with different date ranges. Do not guess. The site is either dead, de-indexed, or the user connected the wrong GSC property. State this verdict immediately.";
+            } else if (formattedRows.length > 50) {
+                instructionNote = "DATA TRUNCATED bounds. Only top 50 rows shown. Add filters if you need specific details.";
+            }
+
             return {
                 result: {
                     siteUrl,
@@ -215,7 +223,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                     dimensions,
                     totalRowsAvailable: formattedRows.length,
                     rowsReturned: limitedRows.length,
-                    note: formattedRows.length > 50 ? "DATA TRUNCATED bounds. Only top 50 rows shown. Add filters if you need specific details." : "",
+                    note: instructionNote,
                     csvData: compressedCsv,
                 },
             };
