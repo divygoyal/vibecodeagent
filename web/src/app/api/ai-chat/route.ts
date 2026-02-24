@@ -486,10 +486,10 @@ export async function POST(req: NextRequest) {
 
                                         if (part.functionCall) {
                                             const isDup = pendingFunctionCalls.some(
-                                                fc => fc.name === part.functionCall.name && JSON.stringify(fc.args) === JSON.stringify(part.functionCall.args)
+                                                p => p.functionCall?.name === part.functionCall.name && JSON.stringify(p.functionCall?.args) === JSON.stringify(part.functionCall.args)
                                             );
                                             if (!isDup) {
-                                                pendingFunctionCalls.push(part.functionCall);
+                                                pendingFunctionCalls.push(part); // push ENTIRE part (which includes thought_signature!)
                                                 controller.enqueue(encodeSSE({
                                                     type: 'tool_start',
                                                     name: part.functionCall.name,
@@ -511,14 +511,15 @@ export async function POST(req: NextRequest) {
                                 role: 'model',
                                 parts: [
                                     ...(fullText ? [{ text: fullText }] : []),
-                                    ...pendingFunctionCalls.map(fc => ({ functionCall: { name: fc.name, args: fc.args } }))
+                                    ...pendingFunctionCalls // directly include the raw functionCall parts (WITH thought_signature)
                                 ],
                             });
 
-                            const functionResponsesParts = [];
+                            const functionResponsesParts: any[] = [];
 
                             // Execute all requested tools
-                            for (const fc of pendingFunctionCalls) {
+                            for (const rawPart of pendingFunctionCalls) {
+                                const fc = rawPart.functionCall;
                                 try {
                                     const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
                                         googleAccessToken,
