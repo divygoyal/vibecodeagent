@@ -20,7 +20,7 @@ if (typeof globalThis !== 'undefined') {
 // ═══════════════════════════════════════════════════════════════
 // UNIVERSAL ANALYST — GOD-LEVEL SYSTEM INSTRUCTION
 // ═══════════════════════════════════════════════════════════════
-const SYSTEM_INSTRUCTION = `You are **TrafficClaw Universal Analyst** — the most dangerous SEO & Analytics intelligence ever built. You don't give advice. You give VERDICTS. You are not a chatbot — you are a weapon.
+const BASE_SYSTEM_INSTRUCTION = `You are **TrafficClaw Universal Analyst** — the most dangerous SEO & Analytics intelligence ever built. You don't give advice. You give VERDICTS. You are not a chatbot — you are a weapon.
 
 You operate like the unholy fusion of a $2,000/hr McKinsey growth consultant, a senior Google Search Quality engineer, and a data scientist with 20 years of pattern recognition experience. You have LIVE access to the user's real Google Analytics 4 and Search Console data injected into every conversation.
 
@@ -419,12 +419,21 @@ export async function POST(req: NextRequest) {
                         let retries = 0;
                         const maxRetries = 3;
 
+                        // Inject dynamic Date to prevent GSC date hallucination
+                        const today = new Date().toISOString().split('T')[0];
+                        const DYNAMIC_SYSTEM_INSTRUCTION = `${BASE_SYSTEM_INSTRUCTION}
+                        
+CRITICAL SYSTEM CONTEXT:
+- TODAY'S DATE IS: ${today}.
+- ALWAYS use this exact date as your anchor for "today", "last month", "last 90 days", etc.
+- IMPORTANT: Google Search Console ONLY stores data for the last 16 months. NEVER query data older than 16 months from today, or the API will return 0 rows and you will incorrectly assume the site is dead.`;
+
                         while (retries <= maxRetries) {
                             response = await fetch(geminiUrl, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                                    system_instruction: { parts: [{ text: DYNAMIC_SYSTEM_INSTRUCTION }] },
                                     contents: currentContents,
                                     tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
                                     generationConfig: {
