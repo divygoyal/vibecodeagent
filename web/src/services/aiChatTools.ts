@@ -5,12 +5,12 @@ import { getValidAccessToken } from '@/lib/googleApi';
 export const AI_CHAT_TOOL_DECLARATIONS = [
     {
         name: 'get_search_performance',
-        description: `Flexible "Swiss Army Knife" tool to query Google Search Console data. Use this to analyze Keywords, Pages, Countries, Devices, or Trends. This is your PRIMARY data source — use it WHENEVER the user asks about traffic, clicks, impressions, CTR, positions, trends, opportunities, or audits.
+        description: `Use this to analyze traffic drops, find keyword opportunities, or debug indexing. ALWAYS use this before answering SEO questions. Flexible "Swiss Army Knife" tool to query Google Search Console data. Use this to analyze Keywords, Pages, Countries, Devices, or Trends. This is your PRIMARY data source.
 
 SMART USAGE PATTERNS:
+- "Why did traffic drop?" → dimensions=["date"] for daily breakdown. Combine with filters to find the exact pages or queries that fell.
 - "Top keywords" → dimensions=["query"], sort by clicks
 - "Hidden gems" / "Money pits" → dimensions=["page"], metricFilters=[{metric:"impressions", operator:"greaterThan", value:"5000"}, {metric:"ctr", operator:"lessThan", value:"2"}]
-- "Why did traffic drop?" → dimensions=["date"] for daily breakdown
 - "Mobile vs desktop" → dimensions=["device"]`,
         parameters: {
             type: 'OBJECT' as const,

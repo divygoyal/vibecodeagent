@@ -9,7 +9,7 @@ export const maxDuration = 300; // Allow up to 5 minutes on Vercel Pro/Local for
 export const dynamic = 'force-dynamic';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent?alt=sse';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
@@ -403,192 +403,162 @@ export async function POST(req: NextRequest) {
                 try {
                     const geminiUrl = `${GEMINI_URL}&key=${GEMINI_API_KEY}`;
 
-                    const response = await fetch(geminiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-                            contents,
-                            tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
-                            generationConfig: {
-                                temperature: 0.8, maxOutputTokens: 8192,
-                            },
-                        }),
-                        signal: AbortSignal.timeout(60000), // 60s timeout
-                    });
-
-                    if (!response.ok) {
-                        const errData = await response.text();
-                        console.error('Gemini API error:', response.status, errData);
-                        controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service' }));
-                        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-                        controller.close();
-                        return;
-                    }
-
-                    const reader = response.body?.getReader();
-                    if (!reader) {
-                        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-                        controller.close();
-                        return;
-                    }
-
                     const decoder = new TextDecoder();
-                    let buffer = '';
-                    let fullText = '';
-                    let pendingFunctionCalls: any[] = [];
+                    let currentContents = [...contents];
+                    let keepGoing = true;
                     let hasDeductedCredit = false;
 
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
+                    while (keepGoing) {
+                        keepGoing = false; // Stop looping unless we hit a function call
 
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
+                        // 1. Call Gemini with current state of contents
+                        const response = await fetch(geminiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                                contents: currentContents,
+                                tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
+                                generationConfig: {
+                                    temperature: 0.8, maxOutputTokens: 8192,
+                                },
+                            }),
+                            signal: AbortSignal.timeout(60000), // 60s timeout
+                        });
 
-                        for (const line of lines) {
-                            if (!line.startsWith('data: ')) continue;
-                            const jsonStr = line.slice(6).trim();
-                            if (!jsonStr || jsonStr === '[DONE]') continue;
-
-                            try {
-                                const parsed = JSON.parse(jsonStr);
-                                const candidate = parsed.candidates?.[0];
-                                if (!candidate) continue;
-
-                                if (!hasDeductedCredit && ADMIN_API_KEY && userId) {
-                                    hasDeductedCredit = true;
-                                    deductCredits(String(userId)).then(credits => {
-                                        if (credits !== null) {
-                                            controller.enqueue(encodeSSE({ type: 'credits', value: credits }));
-                                        }
-                                    }).catch(console.error);
-                                }
-
-                                const parts = candidate.content?.parts || [];
-                                const hasFunctionCall = parts.some((p: any) => p.functionCall);
-
-                                for (const part of parts) {
-                                    if (part.text) {
-                                        if (!hasFunctionCall) {
-                                            fullText += part.text;
-                                            controller.enqueue(encodeSSE({
-                                                type: 'text',
-                                                content: part.text,
-                                            }));
-                                        } else {
-                                            fullText += part.text;
-                                        }
-                                    }
-
-                                    if (part.functionCall) {
-                                        const isDup = pendingFunctionCalls.some(
-                                            fc => fc.name === part.functionCall.name && JSON.stringify(fc.args) === JSON.stringify(part.functionCall.args)
-                                        );
-                                        if (!isDup) {
-                                            pendingFunctionCalls.push(part.functionCall);
-                                            controller.enqueue(encodeSSE({
-                                                type: 'tool_start',
-                                                name: part.functionCall.name,
-                                                args: part.functionCall.args,
-                                            }));
-                                        }
-                                    }
-                                }
-                            } catch {
-                                // ignore parse errors on partial chunks
-                            }
+                        if (!response.ok) {
+                            const errData = await response.text();
+                            console.error('Gemini API error:', response.status, errData);
+                            controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service' }));
+                            break;
                         }
-                    }
 
-                    // Handle tool execution loop
-                    if (pendingFunctionCalls.length > 0) {
-                        for (const fc of pendingFunctionCalls) {
-                            try {
-                                const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
-                                    googleAccessToken,
-                                    googleRefreshToken
-                                });
+                        const reader = response.body?.getReader();
+                        if (!reader) break;
 
-                                controller.enqueue(encodeSSE({
-                                    type: 'tool_result',
-                                    name: fc.name,
-                                    result: toolResult.result,
-                                    error: toolResult.error,
-                                }));
+                        let buffer = '';
+                        let fullText = '';
+                        let pendingFunctionCalls: any[] = [];
 
-                                const followUpContents = [
-                                    ...contents,
-                                    {
-                                        role: 'model',
-                                        parts: [
-                                            ...(fullText ? [{ text: fullText }] : []),
-                                            { functionCall: { name: fc.name, args: fc.args } },
-                                        ],
-                                    },
-                                    {
-                                        role: 'function',
-                                        parts: [{
-                                            functionResponse: {
-                                                name: fc.name,
-                                                response: { name: fc.name, content: toolResult }
-                                            },
-                                        }],
-                                    },
-                                ];
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
 
-                                const followResponse = await fetch(geminiUrl, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-                                        contents: followUpContents,
-                                        generationConfig: {
-                                            temperature: 0.8, maxOutputTokens: 8192,
-                                        },
-                                    }),
-                                });
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
 
-                                if (followResponse.ok) {
-                                    const followReader = followResponse.body?.getReader();
-                                    if (followReader) {
-                                        let followBuffer = '';
-                                        while (true) {
-                                            const { done: fDone, value: fValue } = await followReader.read();
-                                            if (fDone) break;
+                            for (const line of lines) {
+                                if (!line.startsWith('data: ')) continue;
+                                const jsonStr = line.slice(6).trim();
+                                if (!jsonStr || jsonStr === '[DONE]') continue;
 
-                                            followBuffer += decoder.decode(fValue, { stream: true });
-                                            const fLines = followBuffer.split('\n');
-                                            followBuffer = fLines.pop() || '';
+                                try {
+                                    const parsed = JSON.parse(jsonStr);
+                                    const candidate = parsed.candidates?.[0];
+                                    if (!candidate) continue;
 
-                                            for (const fLine of fLines) {
-                                                if (!fLine.startsWith('data: ')) continue;
-                                                const fJson = fLine.slice(6).trim();
-                                                if (!fJson || fJson === '[DONE]') continue;
+                                    if (!hasDeductedCredit && ADMIN_API_KEY && userId) {
+                                        hasDeductedCredit = true;
+                                        deductCredits(String(userId)).then(credits => {
+                                            if (credits !== null) {
+                                                controller.enqueue(encodeSSE({ type: 'credits', value: credits }));
+                                            }
+                                        }).catch(console.error);
+                                    }
 
-                                                try {
-                                                    const fParsed = JSON.parse(fJson);
-                                                    const fParts = fParsed.candidates?.[0]?.content?.parts || [];
-                                                    for (const fp of fParts) {
-                                                        if (fp.text) {
-                                                            controller.enqueue(encodeSSE({ type: 'text', content: fp.text }));
-                                                        }
-                                                    }
-                                                } catch { /* ignore */ }
+                                    const parts = candidate.content?.parts || [];
+                                    const hasFunctionCall = parts.some((p: any) => p.functionCall);
+
+                                    // Stream the parsing
+                                    for (const part of parts) {
+                                        if (part.text) {
+                                            if (!hasFunctionCall && pendingFunctionCalls.length === 0) {
+                                                fullText += part.text;
+                                                controller.enqueue(encodeSSE({
+                                                    type: 'text',
+                                                    content: part.text,
+                                                }));
+                                            } else {
+                                                fullText += part.text;
+                                            }
+                                        }
+
+                                        if (part.functionCall) {
+                                            const isDup = pendingFunctionCalls.some(
+                                                fc => fc.name === part.functionCall.name && JSON.stringify(fc.args) === JSON.stringify(part.functionCall.args)
+                                            );
+                                            if (!isDup) {
+                                                pendingFunctionCalls.push(part.functionCall);
+                                                controller.enqueue(encodeSSE({
+                                                    type: 'tool_start',
+                                                    name: part.functionCall.name,
+                                                    args: part.functionCall.args,
+                                                }));
                                             }
                                         }
                                     }
-                                } else {
-                                    const errData = await followResponse.text();
-                                    console.error('Gemini Tool Followup Error:', followResponse.status, errData);
-                                    controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to generate response after tool execution' }));
+                                } catch {
+                                    // ignore parse errors on partial chunks
                                 }
-                            } catch (err) {
-                                console.error('Tool execution error:', err);
                             }
                         }
-                    }
+
+                        // 2. Handle tool execution loop
+                        if (pendingFunctionCalls.length > 0) {
+                            // Append AI's own request to context history
+                            currentContents.push({
+                                role: 'model',
+                                parts: [
+                                    ...(fullText ? [{ text: fullText }] : []),
+                                    ...pendingFunctionCalls.map(fc => ({ functionCall: { name: fc.name, args: fc.args } }))
+                                ],
+                            });
+
+                            const functionResponsesParts = [];
+
+                            // Execute all requested tools
+                            for (const fc of pendingFunctionCalls) {
+                                try {
+                                    const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
+                                        googleAccessToken,
+                                        googleRefreshToken
+                                    });
+
+                                    controller.enqueue(encodeSSE({
+                                        type: 'tool_result',
+                                        name: fc.name,
+                                        result: toolResult.result,
+                                        error: toolResult.error,
+                                    }));
+
+                                    functionResponsesParts.push({
+                                        functionResponse: {
+                                            name: fc.name,
+                                            response: { name: fc.name, content: toolResult }
+                                        }
+                                    });
+                                } catch (err) {
+                                    console.error('Tool execution error:', err);
+                                    functionResponsesParts.push({
+                                        functionResponse: {
+                                            name: fc.name,
+                                            response: { name: fc.name, error: "Execution failed" }
+                                        }
+                                    });
+                                }
+                            }
+
+                            // Append tool results identically as 'function' role
+                            currentContents.push({
+                                role: 'function',
+                                parts: functionResponsesParts
+                            });
+
+                            // Tell the while loop to query Gemini again with the updated history
+                            keepGoing = true;
+                        }
+                    } // END while(keepGoing)
 
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
