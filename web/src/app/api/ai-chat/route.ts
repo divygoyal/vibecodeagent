@@ -97,6 +97,19 @@ Always cross-reference GA4 and GSC data:
 - End with "**Next Steps**" — max 3 bullet points, in priority order
 - Use emoji strategically — not every line, but for visual scanning
 
+## HOW TO USE YOUR TOOLS (CRITICAL)
+
+You have access to a tool called \`get_search_performance\`. **YOU MUST USE THIS TOOL** whenever the user asks about:
+- Their traffic dropping or increasing
+- Their "top pages" or "top keywords"
+- Specific device or country performance
+- Anything requiring historical or deep Search Console data that is NOT already in the LIVE DATA CONTEXT.
+
+**RULES FOR TOOL USAGE:**
+1. If you need to use a tool, **DO NOT** output the standard response format (Verdict, Evidence, etc.) yet. Simply call the tool and wait for the result.
+2. Only output your final analysis *after* you receive the tool's response.
+3. If the user asks a question requiring the tool, check the [AVAILABLE SITES YOU CAN QUERY: ...] list injected by the system. Use the EXACT URL from that list as the \`siteUrl\` argument.
+
 ## CRITICAL RULES — BREAK THESE AND YOU'RE WORTHLESS
 
 1. **NEVER** give generic advice *when analyzing the user's connected site data*. "Improve your meta descriptions" without referencing THEIR actual data is UNACCEPTABLE. However, you MAY give general strategy and explanations if the user asks a general knowledge/coding/marketing question.
@@ -118,42 +131,42 @@ function buildDataContext(analyticsContext: any, seoContext: any): string {
         dataContext += '\n\n═══ LIVE GOOGLE ANALYTICS 4 DATA ═══\n';
         if (analyticsContext.kpis) {
             const k = analyticsContext.kpis;
-            dataContext += `\n📊 KPI DASHBOARD:\n`;
-            dataContext += `  Users: ${k.totalUsers?.toLocaleString()} (${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}% vs prev period)\n`;
-            dataContext += `  Sessions: ${k.totalSessions?.toLocaleString()} (${k.changeSessions > 0 ? '+' : ''}${k.changeSessions}%)\n`;
-            dataContext += `  Page Views: ${k.totalPageViews?.toLocaleString()} (${k.changePageViews > 0 ? '+' : ''}${k.changePageViews}%)\n`;
-            dataContext += `  Bounce Rate: ${k.avgBounceRate}% (${k.changeBounceRate > 0 ? '+' : ''}${k.changeBounceRate}%) ${Number(k.avgBounceRate) > 55 ? '⚠️ HIGH' : Number(k.avgBounceRate) < 35 ? '✅ EXCELLENT' : ''}\n`;
-            dataContext += `  Avg Session Duration: ${Math.floor((k.avgSessionDuration || 0) / 60)}m ${Math.round((k.avgSessionDuration || 0) % 60)}s ${(k.avgSessionDuration || 0) < 60 ? '🔴 CRITICAL' : (k.avgSessionDuration || 0) > 120 ? '✅ GOOD' : ''}\n`;
-            dataContext += `  New Users: ${k.newUsers?.toLocaleString()} | Returning: ${k.returningUsers?.toLocaleString()}\n`;
-            dataContext += `  Pages/Session: ${k.pagesPerSession} ${Number(k.pagesPerSession) < 1.5 ? '⚠️ LOW' : Number(k.pagesPerSession) > 3 ? '✅ EXCELLENT' : ''}\n`;
+            dataContext += `\n📊 KPI DASHBOARD: \n`;
+            dataContext += `  Users: ${k.totalUsers?.toLocaleString()} (${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}% vs prev period) \n`;
+            dataContext += `  Sessions: ${k.totalSessions?.toLocaleString()} (${k.changeSessions > 0 ? '+' : ''}${k.changeSessions}%) \n`;
+            dataContext += `  Page Views: ${k.totalPageViews?.toLocaleString()} (${k.changePageViews > 0 ? '+' : ''}${k.changePageViews}%) \n`;
+            dataContext += `  Bounce Rate: ${k.avgBounceRate}% (${k.changeBounceRate > 0 ? '+' : ''}${k.changeBounceRate}%) ${Number(k.avgBounceRate) > 55 ? '⚠️ HIGH' : Number(k.avgBounceRate) < 35 ? '✅ EXCELLENT' : ''} \n`;
+            dataContext += `  Avg Session Duration: ${Math.floor((k.avgSessionDuration || 0) / 60)}m ${Math.round((k.avgSessionDuration || 0) % 60)}s ${(k.avgSessionDuration || 0) < 60 ? '🔴 CRITICAL' : (k.avgSessionDuration || 0) > 120 ? '✅ GOOD' : ''} \n`;
+            dataContext += `  New Users: ${k.newUsers?.toLocaleString()} | Returning: ${k.returningUsers?.toLocaleString()} \n`;
+            dataContext += `  Pages / Session: ${k.pagesPerSession} ${Number(k.pagesPerSession) < 1.5 ? '⚠️ LOW' : Number(k.pagesPerSession) > 3 ? '✅ EXCELLENT' : ''} \n`;
         }
         if (analyticsContext.topSources?.length) {
-            dataContext += `\n🔗 Traffic Sources (${analyticsContext.topSources.length}):\n`;
+            dataContext += `\n🔗 Traffic Sources(${analyticsContext.topSources.length}): \n`;
             analyticsContext.topSources.forEach((s: any, i: number) => {
-                dataContext += `  ${i + 1}. ${s.source} — ${s.sessions} sessions (${s.percentage}%)\n`;
+                dataContext += `  ${i + 1}. ${s.source} — ${s.sessions} sessions(${s.percentage} %) \n`;
             });
         }
         if (analyticsContext.topPages?.length) {
-            dataContext += `\n📄 Top Pages — ANALYZE FOR HIDDEN GEMS (low traffic + high engagement) AND LEAKY BUCKETS (high traffic + poor engagement):\n`;
+            dataContext += `\n📄 Top Pages — ANALYZE FOR HIDDEN GEMS(low traffic + high engagement) AND LEAKY BUCKETS(high traffic + poor engagement): \n`;
             analyticsContext.topPages.forEach((p: any, i: number) => {
                 const bounceNum = parseFloat(p.bounceRate) || 0;
                 const flag = bounceNum > 70 ? ' 🔴LEAKY' : bounceNum < 30 ? ' 🟢HIDDEN_GEM' : '';
-                dataContext += `  ${i + 1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}${flag}\n`;
+                dataContext += `  ${i + 1}. ${p.page} — ${p.views} views, ${p.bounceRate}% bounce${p.avgTime ? ', avg ' + p.avgTime : ''}${flag} \n`;
             });
         }
         if (analyticsContext.topCountries?.length) {
-            dataContext += `\n🌍 Countries (${analyticsContext.topCountries.length}):\n`;
+            dataContext += `\n🌍 Countries(${analyticsContext.topCountries.length}): \n`;
             analyticsContext.topCountries.forEach((c: any, i: number) => {
-                dataContext += `  ${i + 1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''}\n`;
+                dataContext += `  ${i + 1}. ${c.country} — ${c.users} users${c.percentage ? ' (' + c.percentage + '%)' : ''} \n`;
             });
         }
         if (analyticsContext.devices?.length) {
-            dataContext += `\n📱 Devices: ${analyticsContext.devices.map((d: any) => `${d.device}: ${d.percentage}%`).join(' | ')}\n`;
+            dataContext += `\n📱 Devices: ${analyticsContext.devices.map((d: any) => `${d.device}: ${d.percentage}%`).join(' | ')} \n`;
             // Check for mobile vs desktop disparity
             const mobile = analyticsContext.devices.find((d: any) => d.device?.toLowerCase() === 'mobile');
             const desktop = analyticsContext.devices.find((d: any) => d.device?.toLowerCase() === 'desktop');
             if (mobile && desktop) {
-                dataContext += `  📌 Mobile/Desktop Split: ${mobile.percentage}% / ${desktop.percentage}%\n`;
+                dataContext += `  📌 Mobile / Desktop Split: ${mobile.percentage}% / ${desktop.percentage}%\n`;
             }
         }
         if (analyticsContext.browsers?.length) {
@@ -232,15 +245,15 @@ function buildDataContext(analyticsContext: any, seoContext: any): string {
             // Summary sections for the AI to use
             if (strikingDistance.length > 0) {
                 dataContext += `\n🎯 STRIKING DISTANCE SUMMARY (${strikingDistance.length} queries):\n`;
-                strikingDistance.forEach(s => { dataContext += `  → ${s}\n`; });
+                strikingDistance.forEach((s: string) => { dataContext += `  → ${s}\n`; });
             }
             if (ctrProblems.length > 0) {
                 dataContext += `\n⚠️ CTR PROBLEMS (meta titles/descriptions need work, ${ctrProblems.length} queries):\n`;
-                ctrProblems.forEach(s => { dataContext += `  → ${s}\n`; });
+                ctrProblems.forEach((s: string) => { dataContext += `  → ${s}\n`; });
             }
             if (ctrStars.length > 0) {
                 dataContext += `\n⭐ CTR STARS (great meta, replicate this approach, ${ctrStars.length} queries):\n`;
-                ctrStars.forEach(s => { dataContext += `  → ${s}\n`; });
+                ctrStars.forEach((s: string) => { dataContext += `  → ${s}\n`; });
             }
         }
         if (seoContext.topPages?.length) {
