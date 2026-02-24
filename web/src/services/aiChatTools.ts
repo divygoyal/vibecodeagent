@@ -128,7 +128,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 dataState: 'all',
             };
 
-            const response = await fetch(
+            let response = await fetch(
                 `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
                 {
                     method: 'POST',
@@ -141,12 +141,37 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 }
             );
 
-            if (!response.ok) {
-                return { error: `GSC API failed: ${response.status} ${await response.text()}` };
+            let data = response.ok ? await response.json() : null;
+
+            // Auto-fallback: If sc-domain fails or returns no data, try the explicit https:// prefix
+            if ((!response.ok || !data?.rows || data.rows.length === 0) && siteUrl.startsWith('sc-domain:')) {
+                const altUrl = siteUrl.replace('sc-domain:', 'https://') + '/';
+                console.log(`[AI Chat] GSC returned 0 rows for ${siteUrl}. Auto-retrying with ${altUrl}...`);
+
+                const altResponse = await fetch(
+                    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(altUrl)}/searchAnalytics/query`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(body),
+                        signal: AbortSignal.timeout(10000),
+                    }
+                );
+
+                if (altResponse.ok) {
+                    response = altResponse;
+                    data = await altResponse.json();
+                }
             }
 
-            const data = await response.json();
-            let formattedRows = (data.rows || []).map((row: any) => {
+            if (!response.ok) {
+                return { error: `GSC API failed: ${response.status} ${data ? JSON.stringify(data) : 'Unknown Error'}` };
+            }
+
+            let formattedRows = (data?.rows || []).map((row: any) => {
                 const entry: Record<string, any> = {};
                 (dimensions as string[]).forEach((dim: string, i: number) => {
                     entry[dim] = row.keys[i];
