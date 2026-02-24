@@ -143,13 +143,13 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
 
             let data = response.ok ? await response.json() : null;
 
-            // Auto-fallback: If sc-domain fails or returns no data, try the explicit https:// prefix
+            // Auto-fallback 1: If sc-domain fails or returns no data, try the explicit https:// prefix WITH trailing slash
             if ((!response.ok || !data?.rows || data.rows.length === 0) && siteUrl.startsWith('sc-domain:')) {
-                const altUrl = siteUrl.replace('sc-domain:', 'https://') + '/';
-                console.log(`[AI Chat] GSC returned 0 rows for ${siteUrl}. Auto-retrying with ${altUrl}...`);
+                const altUrl1 = siteUrl.replace('sc-domain:', 'https://') + '/';
+                console.log(`[AI Chat] GSC returned 0 rows for ${siteUrl}. Auto-retrying with ${altUrl1}...`);
 
-                const altResponse = await fetch(
-                    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(altUrl)}/searchAnalytics/query`,
+                let altResponse = await fetch(
+                    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(altUrl1)}/searchAnalytics/query`,
                     {
                         method: 'POST',
                         headers: {
@@ -162,8 +162,36 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 );
 
                 if (altResponse.ok) {
+                    console.log(`[AI Chat] GSC Auto-retry successful for ${altUrl1}. Data populated.`);
                     response = altResponse;
                     data = await altResponse.json();
+                } else {
+                    console.log(`[AI Chat] GSC Auto-retry failed for ${altUrl1} with status: ${altResponse.status}`);
+
+                    // Auto-fallback 2: Try explicit https:// prefix WITHOUT trailing slash
+                    const altUrl2 = siteUrl.replace('sc-domain:', 'https://');
+                    console.log(`[AI Chat] Auto-retrying WITHOUT trailing slash: ${altUrl2}...`);
+
+                    altResponse = await fetch(
+                        `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(altUrl2)}/searchAnalytics/query`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(body),
+                            signal: AbortSignal.timeout(10000),
+                        }
+                    );
+
+                    if (altResponse.ok) {
+                        console.log(`[AI Chat] GSC Auto-retry successful for ${altUrl2}. Data populated.`);
+                        response = altResponse;
+                        data = await altResponse.json();
+                    } else {
+                        console.log(`[AI Chat] Both fallbacks failed.`);
+                    }
                 }
             }
 
