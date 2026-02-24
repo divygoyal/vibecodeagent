@@ -414,6 +414,13 @@ export async function POST(req: NextRequest) {
                         loopCount++;
                         keepGoing = false; // Stop looping unless we hit a function call
 
+                        if (loopCount === MAX_LOOPS) {
+                            controller.enqueue(encodeSSE({
+                                type: 'text',
+                                content: '\n\n*(Note: Analysis was paused here. I reached the maximum allowed deep-dive operations for a single request to protect your data limits. Based on the data gathered so far:)*\n\n'
+                            }));
+                        }
+
                         // 1. Call Gemini with current state of contents (with retry logic)
                         let response: Response | null = null;
                         let retries = 0;
@@ -588,6 +595,13 @@ CRITICAL SYSTEM CONTEXT:
 
                             // Tell the while loop to query Gemini again with the updated history
                             keepGoing = true;
+
+                            // If we hit the max loop cap right here, Gemini won't get a chance to read the final tool results 
+                            // to formulate an answer. So we forcibly break cleanly.
+                            if (loopCount >= MAX_LOOPS) {
+                                keepGoing = false;
+                                console.warn('[AI Chat] MAX_LOOPS hit! Terminating recursive execution early.');
+                            }
                         }
                     } // END while(keepGoing)
 
