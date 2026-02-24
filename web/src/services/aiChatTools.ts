@@ -1,7 +1,59 @@
 // AI Chat Tools Definition & Executor
 // These tools are injected into the Gemini API so the AI can "call" them to perform deep diagnosis.
+import { getValidAccessToken } from '@/lib/googleApi';
 
 export const AI_CHAT_TOOL_DECLARATIONS = [
+    {
+        name: 'get_search_performance',
+        description: `Flexible "Swiss Army Knife" tool to query Google Search Console data. Use this to analyze Keywords, Pages, Countries, Devices, or Trends. This is your PRIMARY data source — use it WHENEVER the user asks about traffic, clicks, impressions, CTR, positions, trends, opportunities, or audits.
+
+SMART USAGE PATTERNS:
+- "Top keywords" → dimensions=["query"], sort by clicks
+- "Hidden gems" / "Money pits" → dimensions=["page"], metricFilters=[{metric:"impressions", operator:"greaterThan", value:"5000"}, {metric:"ctr", operator:"lessThan", value:"2"}]
+- "Why did traffic drop?" → dimensions=["date"] for daily breakdown
+- "Mobile vs desktop" → dimensions=["device"]`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: {
+                    type: 'STRING' as const,
+                    description: 'The exact site URL to query. You must select this from the injected [Available Sites] list in your prompt.',
+                },
+                startDate: {
+                    type: 'STRING' as const,
+                    description: 'Start date in YYYY-MM-DD format (e.g. 28 days ago)',
+                },
+                endDate: {
+                    type: 'STRING' as const,
+                    description: 'End date in YYYY-MM-DD format (e.g. today)',
+                },
+                dimensions: {
+                    type: 'ARRAY' as const,
+                    items: {
+                        type: 'STRING' as const,
+                        enum: ['date', 'query', 'page', 'country', 'device'],
+                    },
+                },
+                rowLimit: {
+                    type: 'INTEGER' as const,
+                    description: 'Max rows to fetch from the API. Default 25. Increase up to 500 when using metricFilters.',
+                },
+                metricFilters: {
+                    type: 'ARRAY' as const,
+                    items: {
+                        type: 'OBJECT' as const,
+                        properties: {
+                            metric: { type: 'STRING' as const, enum: ['clicks', 'impressions', 'ctr', 'position'] },
+                            operator: { type: 'STRING' as const, enum: ['greaterThan', 'lessThan', 'equals'] },
+                            value: { type: 'STRING' as const },
+                        },
+                    },
+                    description: 'Applied AFTER fetching to filter by metrics (e.g. impressions > 5000)',
+                }
+            },
+            required: ['siteUrl', 'startDate', 'endDate', 'dimensions'],
+        },
+    },
     {
         name: 'generate_title_suggestions',
         description: 'Generates optimized title tag and meta description suggestions for a specific page. Use this when the user asks to improve titles or meta descriptions, or when you find a page with low CTR (Money Pit).',
@@ -47,8 +99,92 @@ export const AI_CHAT_TOOL_DECLARATIONS = [
     }
 ];
 
-export async function executeAiChatTool(name: string, args: Record<string, any>) {
+export interface GscContext {
+    googleAccessToken?: string;
+    googleRefreshToken?: string;
+}
+
+export async function executeAiChatTool(name: string, args: Record<string, any>, gscContext?: GscContext) {
     console.log(`[AI Chat] Executing tool: ${name}`, args);
+
+    if (name === 'get_search_performance') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Your Google Account is not connected. Connect it in the Integrations settings.' };
+        }
+
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const { siteUrl, startDate, endDate, rowLimit, metricFilters } = args;
+            let { dimensions } = args;
+
+            if (!dimensions || dimensions.length === 0) dimensions = ['query'];
+
+            const body: any = {
+                startDate,
+                endDate,
+                dimensions,
+                rowLimit: rowLimit || 25,
+                startRow: 0,
+                dataState: 'all',
+            };
+
+            const response = await fetch(
+                `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body),
+                    signal: AbortSignal.timeout(10000),
+                }
+            );
+
+            if (!response.ok) {
+                return { error: `GSC API failed: ${response.status} ${await response.text()}` };
+            }
+
+            const data = await response.json();
+            let formattedRows = (data.rows || []).map((row: any) => {
+                const entry: Record<string, any> = {};
+                (dimensions as string[]).forEach((dim: string, i: number) => {
+                    entry[dim] = row.keys[i];
+                });
+                entry.clicks = row.clicks;
+                entry.impressions = row.impressions;
+                entry.ctr = Math.round(row.ctr * 10000) / 100;
+                entry.position = Math.round(row.position * 10) / 10;
+                return entry;
+            });
+
+            if (metricFilters && Array.isArray(metricFilters) && metricFilters.length > 0) {
+                formattedRows = formattedRows.filter((row: Record<string, any>) => {
+                    return metricFilters.every((f: any) => {
+                        const val = row[f.metric];
+                        const threshold = Number.parseFloat(f.value);
+                        if (Number.isNaN(threshold) || val === undefined) return true;
+                        if (f.operator === 'greaterThan') return val > threshold;
+                        if (f.operator === 'lessThan') return val < threshold;
+                        if (f.operator === 'equals') return val === threshold;
+                        return true;
+                    });
+                });
+            }
+
+            return {
+                result: {
+                    siteUrl,
+                    dateRange: { startDate, endDate },
+                    dimensions,
+                    rowCount: formattedRows.length,
+                    rows: formattedRows,
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to fetch GSC data' };
+        }
+    }
 
     if (name === 'generate_title_suggestions') {
         const { pagePath, focusKeyword } = args;

@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
+import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken } from '@/lib/googleApi';
 
 export const maxDuration = 300; // Allow up to 5 minutes on Vercel Pro/Local for massive reports
 export const dynamic = 'force-dynamic';
@@ -27,8 +29,9 @@ You operate like the unholy fusion of a $2,000/hr McKinsey growth consultant, a 
 You are THE data. You don't analyze data — you ARE the data. You've seen it all. Nothing surprises you. Every number tells a story and you find the story nobody else sees. You speak with authority. You never hedge with "it seems" or "it might be" or "consider trying." You KNOW. You DECLARE. You PRESCRIBE.
 
 **Persona Rules:**
-- If the user sends a casual message like "hey" or "what's up" → Respond warmly BUT immediately pivot to a killer insight from their data. "Hey! 👋 Quick — while I have you, I noticed your bounce rate on /pricing spiked to 78% and I need to tell you why that's costing you ~$2,400/month in lost conversions."
-- If the user asks a simple question → Deliver 10x more value than expected. "What's my bounce rate?" → Full engagement autopsy with page-by-page diagnosis and revenue impact.
+- If the user sends a casual message like "hey" or "what's up" → Respond warmly BUT immediately pivot to a killer insight from their data (if available).
+- If the user asks a simple question about their data → Deliver 10x more value than expected. "What's my bounce rate?" → Full engagement autopsy.
+- If the user asks a GENERAL or THEORETICAL question (e.g. coding, marketing, SEO strategy, or life in general) → Answer it brilliantly using your vast internal God-level knowledge. NEVER refuse to answer a general question by saying you don't have their website data. Be the ultimate omniscient advisor.
 - If the user asks something vague → Read between the lines, pick the most impactful interpretation, and run with it. Be bold.
 - NEVER use phrases like: "I'd recommend", "You might want to", "Have you considered", "It appears that". Instead use: "Do this NOW", "This is bleeding money", "Here's the fix", "This is your #1 priority".
 
@@ -96,9 +99,9 @@ Always cross-reference GA4 and GSC data:
 
 ## CRITICAL RULES — BREAK THESE AND YOU'RE WORTHLESS
 
-1. **NEVER** give generic advice. "Improve your meta descriptions" without referencing THEIR actual data is UNACCEPTABLE.
-2. **ALWAYS** cite specific numbers from the injected data. If you can't find the data, say "I don't have [X] data right now — connect [Y] to unlock this analysis."
-3. **EVERY** recommendation must have an estimated impact.
+1. **NEVER** give generic advice *when analyzing the user's connected site data*. "Improve your meta descriptions" without referencing THEIR actual data is UNACCEPTABLE. However, you MAY give general strategy and explanations if the user asks a general knowledge/coding/marketing question.
+2. **ALWAYS** cite specific numbers from the injected data *WHEN the user asks about their own website*. If the user asks about a different website or something you don't have data for, explicitly state: "I don't see that specific data in your currently connected dashboard" but then **still answer their question** to the best of your omniscient ability using reasoning and industry benchmarks. Do not end the conversation just because data is missing.
+3. **EVERY** data-driven recommendation must have an estimated impact.
 4. When you see a query with high impressions but low clicks, don't just say "optimize for this" — explain WHY it's underperforming (position? CTR gap? intent mismatch?).
 5. Cross-reference GA4 + GSC whenever possible. The magic is in the INTERSECTION.
 6. Think like a CEO, not a junior SEO. Revenue impact > vanity metrics.
@@ -347,10 +350,38 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // ── Get User's Google Tokens ──
+        const jwt = await getToken({ req: req as any }) as any;
+        let googleAccessToken = jwt?.googleAccessToken as string | undefined;
+        let googleRefreshToken = jwt?.googleRefreshToken as string | undefined;
+
+        if (!googleAccessToken && !googleRefreshToken) {
+            const dbTokens = await fetchGoogleTokensFromDb(String(userId));
+            if (dbTokens) {
+                googleAccessToken = dbTokens.accessToken;
+                googleRefreshToken = dbTokens.refreshToken;
+            }
+        }
+
+        // ── Get Available Sites Context ──
+        let availableSitesContext = '';
+        if (googleAccessToken || googleRefreshToken) {
+            try {
+                const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
+                const sites = await listSearchConsoleSites(token);
+                if (sites && sites.length > 0) {
+                    const siteUrls = sites.map((s: any) => s.siteUrl).join(', ');
+                    availableSitesContext = `\n\n[AVAILABLE SITES YOU CAN QUERY: ${siteUrls}]`;
+                }
+            } catch (e) {
+                console.warn('[AI Chat] Failed to fetch site list for prompt injection', e);
+            }
+        }
+
         // User message with injected data context
         contents.push({
             role: 'user',
-            parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}\n\n---\n\nUser: ${message}` : message }],
+            parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}${availableSitesContext}\n\n---\n\nUser: ${message}` : message + availableSitesContext }],
         });
 
         // ── Execute Gemini Stream ──
@@ -462,7 +493,10 @@ export async function POST(req: NextRequest) {
                     if (pendingFunctionCalls.length > 0) {
                         for (const fc of pendingFunctionCalls) {
                             try {
-                                const toolResult = await executeAiChatTool(fc.name, fc.args || {});
+                                const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
+                                    googleAccessToken,
+                                    googleRefreshToken
+                                });
 
                                 controller.enqueue(encodeSSE({
                                     type: 'tool_result',
