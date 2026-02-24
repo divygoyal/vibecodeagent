@@ -411,25 +411,43 @@ export async function POST(req: NextRequest) {
                     while (keepGoing) {
                         keepGoing = false; // Stop looping unless we hit a function call
 
-                        // 1. Call Gemini with current state of contents
-                        const response = await fetch(geminiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-                                contents: currentContents,
-                                tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
-                                generationConfig: {
-                                    temperature: 0.8, maxOutputTokens: 8192,
-                                },
-                            }),
-                            signal: AbortSignal.timeout(60000), // 60s timeout
-                        });
+                        // 1. Call Gemini with current state of contents (with retry logic)
+                        let response: Response | null = null;
+                        let retries = 0;
+                        const maxRetries = 3;
 
-                        if (!response.ok) {
-                            const errData = await response.text();
-                            console.error('Gemini API error:', response.status, errData);
-                            controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service' }));
+                        while (retries <= maxRetries) {
+                            response = await fetch(geminiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                                    contents: currentContents,
+                                    tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
+                                    generationConfig: {
+                                        temperature: 0.8, maxOutputTokens: 8192,
+                                    },
+                                }),
+                                signal: AbortSignal.timeout(60000), // 60s timeout
+                            });
+
+                            if (response.ok) break;
+
+                            if (response.status === 503 && retries < maxRetries) {
+                                retries++;
+                                const delayMs = Math.pow(2, retries) * 1000; // Exponential backoff: 2s, 4s, 8s
+                                console.warn(`Gemini API 503 High Demand. Retrying in ${delayMs / 1000}s (Attempt ${retries}/${maxRetries})...`);
+                                await new Promise(res => setTimeout(res, delayMs));
+                                continue;
+                            }
+
+                            break; // Break on any other error or if max retries exceeded
+                        }
+
+                        if (!response || !response.ok) {
+                            const errData = response ? await response.text() : 'No response';
+                            console.error('Gemini API error:', response?.status, errData);
+                            controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service due to high demand or an internal error.' }));
                             break;
                         }
 
