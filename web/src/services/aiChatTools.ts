@@ -36,7 +36,7 @@ SMART USAGE PATTERNS:
                 },
                 rowLimit: {
                     type: 'INTEGER' as const,
-                    description: 'Max rows to fetch from the API. Default 25. Increase up to 500 when using metricFilters.',
+                    description: 'Max rows to fetch from the API. Default 25. Increase up to 500 when using metricFilters, but final results sent back to you are always truncated to the top 50.',
                 },
                 metricFilters: {
                     type: 'ARRAY' as const,
@@ -172,13 +172,26 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 });
             }
 
+            // Enforce a hard cap of 50 rows to prevent LLM TPM context explosions
+            const limitedRows = formattedRows.slice(0, 50);
+
+            // Compress objects into a tightly packed CSV string to save tokens
+            const csvRows = limitedRows.map((row: any) => {
+                const dims = (dimensions as string[]).map(d => `"${String(row[d]).replace(/"/g, '""')}"`).join(',');
+                return `${dims},${row.clicks},${row.impressions},${row.ctr},${row.position}`;
+            });
+            const csvHeader = `${(dimensions as string[]).join(',')},clicks,impressions,ctr,position`;
+            const compressedCsv = [csvHeader, ...csvRows].join('\n');
+
             return {
                 result: {
                     siteUrl,
                     dateRange: { startDate, endDate },
                     dimensions,
-                    rowCount: formattedRows.length,
-                    rows: formattedRows,
+                    totalRowsAvailable: formattedRows.length,
+                    rowsReturned: limitedRows.length,
+                    note: formattedRows.length > 50 ? "DATA TRUNCATED bounds. Only top 50 rows shown. Add filters if you need specific details." : "",
+                    csvData: compressedCsv,
                 },
             };
         } catch (e: any) {
