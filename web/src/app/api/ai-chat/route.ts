@@ -528,9 +528,12 @@ export async function POST(req: NextRequest) {
                                         ],
                                     },
                                     {
-                                        role: 'user',
+                                        role: 'function',
                                         parts: [{
-                                            functionResponse: { name: fc.name, response: toolResult },
+                                            functionResponse: {
+                                                name: fc.name,
+                                                response: { name: fc.name, content: toolResult }
+                                            },
                                         }],
                                     },
                                 ];
@@ -576,6 +579,10 @@ export async function POST(req: NextRequest) {
                                             }
                                         }
                                     }
+                                } else {
+                                    const errData = await followResponse.text();
+                                    console.error('Gemini Tool Followup Error:', followResponse.status, errData);
+                                    controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to generate response after tool execution' }));
                                 }
                             } catch (err) {
                                 console.error('Tool execution error:', err);
