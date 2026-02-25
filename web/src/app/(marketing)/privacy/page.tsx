@@ -40,9 +40,10 @@ export default function PrivacyPage() {
                         </p>
                         <ul className="list-disc pl-6 space-y-2">
                             <li><strong>Access:</strong> We only access data you explicitly grant permissions for.</li>
-                            <li><strong>Storage:</strong> We cache minimal data for performance; your raw data remains on Google's servers.</li>
-                            <li><strong>Sharing:</strong> We do NOT share your Google user data with third-party AI models for training purposes.</li>
-                            <li><strong>Limited Use:</strong> Our use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.</li>
+                            <li><strong>Data Retention and Deletion:</strong> We securely retain Google user data only for as long as your account is active and necessary to provide our core features. You may request the complete deletion of your data at any time by contacting us at privacy@trafficclaw.com or by revoking the application's access in your Google Account security settings. Upon a deletion request or account closure, all associated Google user data is permanently removed from our databases within 30 days.</li>
+                            <li><strong>Data Sharing and Disclosure:</strong> We do <strong>not</strong> share, transfer, sell, or disclose your Google user data to any third parties, affiliates, advertisers, or external data brokers. Your data is used strictly to provide the requested service directly to you.</li>
+                            <li><strong>AI Models:</strong> We explicitly do not share or use your Google user data with third-party or internal AI models for training purposes.</li>
+                            <li><strong>Limited Use:</strong> Our use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.</li>
                         </ul>
                     </section>
 
