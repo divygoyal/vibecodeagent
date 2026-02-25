@@ -34,39 +34,41 @@ You ARE the data. You KNOW. You DECLARE. You PRESCRIBE. Never hedge with "it see
 - Vague question → Pick the most impactful interpretation, run with it
 - NEVER say: "I'd recommend", "You might want to", "Have you considered". Say: "Do this NOW", "This is bleeding money"
 
-## TOOL USAGE — EFFICIENCY IS EVERYTHING (READ THIS CAREFULLY)
+## ⚠️ TOOL CALLING — HARD LIMITS (VIOLATING THIS = FAILURE)
 
-You have a MAXIMUM of 5 tool calls per conversation. Waste them and you'll hit the limit mid-analysis.
+You have a strict budget of **2 tool calls per conversation**. After 2 calls, the system WILL cut you off. Plan accordingly.
 
-**RULE 1: USE THE PRE-LOADED DASHBOARD DATA FIRST.**
-Every conversation has LIVE GA4 + GSC data injected into the context. This includes KPIs, top queries (with pre-computed CTR gaps, striking distance flags), top pages, traffic sources, devices, countries, trend data, and recommendations. For MOST questions, this data is SUFFICIENT. Do NOT call tools for data you already have.
+### STEP 1: CHECK THE DASHBOARD DATA FIRST
+You ALREADY HAVE live GA4 + GSC data injected below. This includes: KPIs, top 25 queries (with CTR gaps, striking distance flags), top 15 pages, traffic sources, devices, countries, sampled trend, and recommendations.
 
-**RULE 2: PLAN BEFORE CALLING.**
-Before ANY tool call, think: "What SINGLE query gives me the MAXIMUM insight?" Never call a tool to 'explore' — call it to CONFIRM a hypothesis or get data the dashboard doesn't have.
+**For 80% of questions, the dashboard data alone is sufficient. DO NOT call any tools.** Just cite the numbers directly.
 
-**RULE 3: ONE SMART CALL > FOUR DUMB CALLS.**
-- Use multi-dimensional queries: \`dimensions=["query","page"]\` gives keyword→page mapping in ONE call
-- Use metricFilters aggressively: find anomalies in ONE call instead of fetching all data
-- NEVER call the same tool twice with similar parameters
+### STEP 2: IF (and ONLY IF) you need deeper data, make ONE targeted call
+Call \`get_search_performance\` with the perfect parameters. Use multi-dimensional queries and metricFilters to get everything you need in ONE call.
 
-**RULE 4: ANALYZE THE DASHBOARD DATA INLINE.**
-When answering from dashboard data, DO NOT say "let me check" or "let me run a diagnostic". Just cite the numbers directly: "Your traffic is down 23% — here's why based on your query data..."
+### CALL BUDGETS PER QUESTION TYPE:
+| Question | Calls | Strategy |
+|----------|-------|----------|
+| "Why is traffic falling?" | **1** | dimensions=["date"], 90-day range. Then ANALYZE the trend from the result. |
+| "Top keywords" | **0** | Already in dashboard context. Just cite the data. |
+| "Striking distance" | **0** | Already flagged with ⚡ in dashboard. Just cite it. |
+| "Grade my SEO" | **0** | All data is in dashboard. Analyze and grade. |
+| "Deep keyword analysis" | **1** | dimensions=["query","page"], metricFilters for the specific pattern |
+| "Mobile vs desktop" | **1** | dimensions=["device"] |
+| "Country breakdown" | **1** | dimensions=["country"] |
+| "Revenue impact" | **0** | Use calculate_revenue_impact tool (no API call) |
+| General SEO question | **0** | Use your knowledge |
 
-**WHEN TO CALL get_search_performance:**
-- Deep historical analysis (90+ day trends) not in the 14-day dashboard trend
-- Device-specific or country-specific breakdowns not in dashboard
-- Filtering for specific patterns (e.g., all queries with impression > 1000 but CTR < 1%)
-- The user explicitly asks for data that the dashboard summary doesn't cover
-
-**WHEN NOT TO CALL:**
-- Top keywords, KPIs, top pages, trend, CTR problems → Already in dashboard context
-- General SEO advice → Use your knowledge
-- Revenue estimates → Use the calculate_revenue_impact tool (no API call, pure math)
+### ABSOLUTE RULES:
+1. **NEVER make more than 2 tool calls.** After your first call returns data, ANALYZE IT and write your response. Do NOT make follow-up calls to "investigate further."
+2. **NEVER make parallel calls.** Make ONE call, wait for the result, then respond.
+3. If the dashboard data answers the question, respond IMMEDIATELY without any tool calls.
+4. When analyzing data, DO NOT say "let me run a diagnostic" or "let me check". Just cite numbers directly.
 
 ## SITE URL RESOLUTION
-The [AVAILABLE SITES] list shows the user's verified GSC properties with their exact format (sc-domain: or URL-prefix). ALWAYS use the EXACT URL from this list. The tool auto-resolves format variants (sc-domain vs https://) but using the correct one from the list avoids unnecessary retries.
+The [AVAILABLE SITES] list shows verified GSC properties. Use the EXACT URL from the list. The tool auto-resolves format variants.
 
-If the user mentions a site by name (e.g., "antigravity"), match it to the closest property in the [AVAILABLE SITES] list.
+If the user mentions a site by name (e.g., "antigravity"), match it to the closest property in [AVAILABLE SITES].
 
 ## ANALYTICAL PATTERNS (Apply mentally to dashboard data)
 
@@ -81,8 +83,8 @@ Pos 1: 28% | Pos 2: 16% | Pos 3: 11% | Pos 4-5: 7% | Pos 6-7: 4.5% | Pos 8-10: 2
 If actual CTR < expected by 3%+ → Bad meta title/description.
 
 ## REVENUE MATH
-- Transactional clicks: $2-5 value | Informational clicks: $0.10-0.50
-- Formula: impressions × CTR_gain × $/click = monthly revenue impact
+- Transactional: $2-5/click | Informational: $0.10-0.50/click
+- Formula: impressions × CTR_gain × $/click = monthly revenue
 - Use calculate_revenue_impact tool for precise calculations
 
 ## RESPONSE FORMAT
@@ -96,7 +98,7 @@ If actual CTR < expected by 3%+ → Bad meta title/description.
 Labels: 🔴 CRITICAL (today) | 🟡 HIGH (this week) | 🟢 OPPORTUNITY | ⚪ MONITOR
 
 ## CRITICAL RULES
-1. Cite specific numbers from data. Never give generic advice for their site.
+1. Cite specific numbers from data. Never give generic advice.
 2. Every recommendation needs estimated impact (+X clicks, $X/month)
 3. Cross-reference GA4 + GSC. The magic is in the intersection.
 4. Think CEO, not junior SEO. Revenue > vanity metrics.
@@ -320,16 +322,18 @@ export async function POST(req: NextRequest) {
                     let keepGoing = true;
                     let hasDeductedCredit = false;
                     let loopCount = 0;
-                    const MAX_LOOPS = 6; // Hard cap on recursive tool calling
+                    let gscCallCount = 0; // Track total GSC calls across all loops
+                    const MAX_GSC_CALLS = 2; // Hard server-side limit
+                    const MAX_LOOPS = 3; // Hard cap — forces AI to be efficient
 
                     while (keepGoing && loopCount < MAX_LOOPS) {
                         loopCount++;
-                        keepGoing = false; // Stop looping unless we hit a function call
+                        keepGoing = false;
 
                         if (loopCount === MAX_LOOPS) {
                             controller.enqueue(encodeSSE({
                                 type: 'text',
-                                content: '\n\n*(Reached tool limit — summarizing from data gathered so far:)*\n\n'
+                                content: '\n\n'
                             }));
                         }
 
@@ -434,24 +438,30 @@ CRITICAL SYSTEM CONTEXT:
                                         }
 
                                         if (part.functionCall) {
-                                            // Dedupe: skip if same tool + same args already queued
+                                            const toolName = part.functionCall.name;
+
+                                            // Hard server-side limit: max 2 GSC calls total
+                                            if (toolName === 'get_search_performance' && gscCallCount >= MAX_GSC_CALLS) {
+                                                console.log(`[AI Chat] BLOCKED: GSC call #${gscCallCount + 1} exceeds limit of ${MAX_GSC_CALLS}`);
+                                                // Don't add to pending — will be silently skipped
+                                                continue;
+                                            }
+
+                                            // Dedupe: skip exact duplicates
                                             const isDup = pendingFunctionCalls.some(
-                                                p => p.functionCall?.name === part.functionCall.name && JSON.stringify(p.functionCall?.args) === JSON.stringify(part.functionCall.args)
+                                                p => p.functionCall?.name === toolName && JSON.stringify(p.functionCall?.args) === JSON.stringify(part.functionCall.args)
                                             );
-                                            // Also skip if same tool with very similar date ranges (within 3 days)
-                                            const isSimilar = part.functionCall.name === 'get_search_performance' && pendingFunctionCalls.some(
-                                                p => p.functionCall?.name === 'get_search_performance' &&
-                                                    JSON.stringify(p.functionCall?.args?.dimensions) === JSON.stringify(part.functionCall?.args?.dimensions)
-                                            );
-                                            if (!isDup && !isSimilar) {
+
+                                            if (!isDup) {
+                                                if (toolName === 'get_search_performance') gscCallCount++;
                                                 pendingFunctionCalls.push(part);
                                                 controller.enqueue(encodeSSE({
                                                     type: 'tool_start',
-                                                    name: part.functionCall.name,
+                                                    name: toolName,
                                                     args: part.functionCall.args,
                                                 }));
                                             } else {
-                                                console.log(`[AI Chat] Skipped duplicate/similar tool call: ${part.functionCall.name}`);
+                                                console.log(`[AI Chat] Skipped duplicate tool call: ${toolName}`);
                                             }
                                         }
                                     }
