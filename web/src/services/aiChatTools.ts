@@ -5,27 +5,38 @@ import { getValidAccessToken } from '@/lib/googleApi';
 export const AI_CHAT_TOOL_DECLARATIONS = [
     {
         name: 'get_search_performance',
-        description: `Use this to analyze traffic drops, find keyword opportunities, or debug indexing. ALWAYS use this before answering SEO questions. Flexible "Swiss Army Knife" tool to query Google Search Console data. Use this to analyze Keywords, Pages, Countries, Devices, or Trends. This is your PRIMARY data source.
+        description: `Query Google Search Console data for deep analysis. Use ONLY when the pre-loaded dashboard data is insufficient.
 
-SMART USAGE PATTERNS:
-- "Why did traffic drop?" → dimensions=["date"] for daily breakdown. Combine with filters to find the exact pages or queries that fell.
-- "Top keywords" → dimensions=["query"], sort by clicks
-- "Hidden gems" / "Money pits" → dimensions=["page"], metricFilters=[{metric:"impressions", operator:"greaterThan", value:"5000"}, {metric:"ctr", operator:"lessThan", value:"2"}]
-- "Mobile vs desktop" → dimensions=["device"]`,
+WHEN TO USE vs NOT USE:
+- Dashboard context already has KPIs, top 25 queries, top 15 pages, 14-day trend. USE THAT DATA FIRST.
+- Call this tool ONLY for: specific date-range deep dives, device/country breakdowns, filtering high-impression + low-CTR pages, or when the user asks about data NOT in the dashboard.
+
+EFFICIENCY RULES (CRITICAL — you are limited to 5 tool calls per conversation):
+- PLAN your query strategy FIRST. Think: "What single query gives me the most insight?"
+- Use multi-dimensional queries: dimensions=["query","page"] gets you keyword-page mapping in ONE call.
+- Use metricFilters to find anomalies: e.g., impressions > 500 + ctr < 2% finds money pits in ONE call.
+- NEVER call the same tool twice with similar parameters. If you got data, ANALYZE it — don't fetch more.
+
+SMART PATTERNS (ONE call each):
+- "Why did traffic drop?" → dimensions=["date"] with 90-day range
+- "Striking distance" → dimensions=["query"], metricFilters=[{metric:"position", operator:"greaterThan", value:"4"}, {metric:"position", operator:"lessThan", value:"20"}], rowLimit=200
+- "Money pits" → dimensions=["page"], metricFilters=[{metric:"impressions", operator:"greaterThan", value:"500"}, {metric:"ctr", operator:"lessThan", value:"2"}], rowLimit=200
+- "Mobile vs Desktop" → dimensions=["device"]
+- "Country analysis" → dimensions=["country"]`,
         parameters: {
             type: 'OBJECT' as const,
             properties: {
                 siteUrl: {
                     type: 'STRING' as const,
-                    description: 'The exact site URL to query. You must select this from the injected [Available Sites] list in your prompt.',
+                    description: 'The exact site URL from the [AVAILABLE SITES] list. The system will auto-resolve property format variants (sc-domain, https://, with/without trailing slash) so just use the one from the list.',
                 },
                 startDate: {
                     type: 'STRING' as const,
-                    description: 'Start date in YYYY-MM-DD format (e.g. 28 days ago)',
+                    description: 'Start date in YYYY-MM-DD format',
                 },
                 endDate: {
                     type: 'STRING' as const,
-                    description: 'End date in YYYY-MM-DD format (e.g. today)',
+                    description: 'End date in YYYY-MM-DD format',
                 },
                 dimensions: {
                     type: 'ARRAY' as const,
@@ -33,10 +44,11 @@ SMART USAGE PATTERNS:
                         type: 'STRING' as const,
                         enum: ['date', 'query', 'page', 'country', 'device'],
                     },
+                    description: 'Combine multiple dimensions for richer data. E.g. ["query","page"] gives keyword→page mapping.',
                 },
                 rowLimit: {
                     type: 'INTEGER' as const,
-                    description: 'Max rows to fetch from the API. Default 25. Increase up to 500 when using metricFilters, but final results sent back to you are always truncated to the top 50.',
+                    description: 'Max rows to fetch from API. Default 50. Use 200+ when filtering. Results capped at 50 returned to you.',
                 },
                 metricFilters: {
                     type: 'ARRAY' as const,
@@ -48,33 +60,15 @@ SMART USAGE PATTERNS:
                             value: { type: 'STRING' as const },
                         },
                     },
-                    description: 'Applied AFTER fetching to filter by metrics (e.g. impressions > 5000)',
+                    description: 'Post-fetch metric filters. Use aggressively to find anomalies in ONE call.',
                 }
             },
             required: ['siteUrl', 'startDate', 'endDate', 'dimensions'],
         },
     },
     {
-        name: 'generate_title_suggestions',
-        description: 'Generates optimized title tag and meta description suggestions for a specific page. Use this when the user asks to improve titles or meta descriptions, or when you find a page with low CTR (Money Pit).',
-        parameters: {
-            type: 'OBJECT' as const,
-            properties: {
-                pagePath: {
-                    type: 'STRING' as const,
-                    description: 'The URL path of the page to optimize',
-                },
-                focusKeyword: {
-                    type: 'STRING' as const,
-                    description: 'The primary keyword this page should target based on the data',
-                },
-            },
-            required: ['pagePath', 'focusKeyword'],
-        },
-    },
-    {
         name: 'calculate_revenue_impact',
-        description: 'Calculates the detailed estimated monthly revenue impact of improving the position or CTR of a specific keyword.',
+        description: 'Calculates estimated monthly revenue impact of improving position or CTR for a keyword. Use after analyzing GSC data to quantify opportunities. No API call — pure math.',
         parameters: {
             type: 'OBJECT' as const,
             properties: {
@@ -86,17 +80,6 @@ SMART USAGE PATTERNS:
             required: ['keyword', 'currentPosition', 'currentImpressions', 'targetPosition'],
         },
     },
-    {
-        name: 'diagnose_mobile_usability',
-        description: 'Runs a simulated diagnostic on mobile usability for a specific page when the analytics data shows a high mobile bounce rate compared to desktop.',
-        parameters: {
-            type: 'OBJECT' as const,
-            properties: {
-                pagePath: { type: 'STRING' as const },
-            },
-            required: ['pagePath'],
-        },
-    }
 ];
 
 export interface GscContext {
@@ -104,12 +87,80 @@ export interface GscContext {
     googleRefreshToken?: string;
 }
 
+/**
+ * Smart GSC query with automatic property format resolution.
+ * Tries all variants: sc-domain, https:// with slash, https:// without slash.
+ */
+async function queryGSCWithAutoResolve(
+    token: string,
+    siteUrl: string,
+    body: any
+): Promise<{ response: Response; data: any; resolvedUrl: string }> {
+    // Build all possible URL variants
+    const variants: string[] = [siteUrl];
+
+    if (siteUrl.startsWith('sc-domain:')) {
+        const domain = siteUrl.replace('sc-domain:', '');
+        variants.push(`https://${domain}/`, `https://${domain}`, `http://${domain}/`);
+    } else if (siteUrl.startsWith('https://') || siteUrl.startsWith('http://')) {
+        // If user gave URL-prefix, also try sc-domain
+        const domain = siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        variants.push(`sc-domain:${domain}`);
+        // Also try with/without trailing slash
+        if (siteUrl.endsWith('/')) {
+            variants.push(siteUrl.slice(0, -1));
+        } else {
+            variants.push(siteUrl + '/');
+        }
+    }
+
+    // Deduplicate
+    const uniqueVariants = [...new Set(variants)];
+
+    for (const variant of uniqueVariants) {
+        try {
+            const response = await fetch(
+                `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(variant)}/searchAnalytics/query`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body),
+                    signal: AbortSignal.timeout(10000),
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.rows && data.rows.length > 0) {
+                    console.log(`[AI Chat] GSC query succeeded with variant: ${variant} (${data.rows.length} rows)`);
+                    return { response, data, resolvedUrl: variant };
+                }
+                console.log(`[AI Chat] GSC variant ${variant} returned 0 rows, trying next...`);
+            } else {
+                console.log(`[AI Chat] GSC variant ${variant} failed with ${response.status}, trying next...`);
+            }
+        } catch (e: any) {
+            console.log(`[AI Chat] GSC variant ${variant} threw: ${e.message}, trying next...`);
+        }
+    }
+
+    // All variants failed — return structured error
+    return {
+        response: new Response(null, { status: 404 }),
+        data: null,
+        resolvedUrl: siteUrl
+    };
+}
+
 export async function executeAiChatTool(name: string, args: Record<string, any>, gscContext?: GscContext) {
     console.log(`[AI Chat] Executing tool: ${name}`, args);
 
     if (name === 'get_search_performance') {
         if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
-            return { error: 'Your Google Account is not connected. Connect it in the Integrations settings.' };
+            return { error: 'Google Account not connected. Connect it in Integrations settings.' };
         }
 
         try {
@@ -123,83 +174,30 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 startDate,
                 endDate,
                 dimensions,
-                rowLimit: rowLimit || 25,
+                rowLimit: Math.min(rowLimit || 50, 500),
                 startRow: 0,
                 dataState: 'all',
             };
 
-            let response = await fetch(
-                `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
+            // Smart auto-resolve: tries all property format variants
+            const { data, resolvedUrl } = await queryGSCWithAutoResolve(token, siteUrl, body);
+
+            if (!data || !data.rows) {
+                return {
+                    result: {
+                        siteUrl,
+                        triedVariants: true,
+                        dateRange: { startDate, endDate },
+                        dimensions,
+                        totalRowsAvailable: 0,
+                        rowsReturned: 0,
+                        note: `ZERO DATA returned for "${siteUrl}" (tried all property format variants: sc-domain, https://, with and without trailing slash). Possible causes: (1) The GSC property is verified with a different URL format than provided — check [AVAILABLE SITES] list, (2) The site had no search impressions in this date range, (3) The property is not verified. Tell the user which exact properties are available and ask them to verify.`,
+                        csvData: '',
                     },
-                    body: JSON.stringify(body),
-                    signal: AbortSignal.timeout(10000),
-                }
-            );
-
-            let data = response.ok ? await response.json() : null;
-
-            // Auto-fallback 1: If sc-domain fails or returns no data, try the explicit https:// prefix WITH trailing slash
-            if ((!response.ok || !data?.rows || data.rows.length === 0) && siteUrl.startsWith('sc-domain:')) {
-                const altUrl1 = siteUrl.replace('sc-domain:', 'https://') + '/';
-                console.log(`[AI Chat] GSC returned 0 rows for ${siteUrl}. Auto-retrying with ${altUrl1}...`);
-
-                let altResponse = await fetch(
-                    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(altUrl1)}/searchAnalytics/query`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(body),
-                        signal: AbortSignal.timeout(10000),
-                    }
-                );
-
-                if (altResponse.ok) {
-                    console.log(`[AI Chat] GSC Auto-retry successful for ${altUrl1}. Data populated.`);
-                    response = altResponse;
-                    data = await altResponse.json();
-                } else {
-                    console.log(`[AI Chat] GSC Auto-retry failed for ${altUrl1} with status: ${altResponse.status}`);
-
-                    // Auto-fallback 2: Try explicit https:// prefix WITHOUT trailing slash
-                    const altUrl2 = siteUrl.replace('sc-domain:', 'https://');
-                    console.log(`[AI Chat] Auto-retrying WITHOUT trailing slash: ${altUrl2}...`);
-
-                    altResponse = await fetch(
-                        `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(altUrl2)}/searchAnalytics/query`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(body),
-                            signal: AbortSignal.timeout(10000),
-                        }
-                    );
-
-                    if (altResponse.ok) {
-                        console.log(`[AI Chat] GSC Auto-retry successful for ${altUrl2}. Data populated.`);
-                        response = altResponse;
-                        data = await altResponse.json();
-                    } else {
-                        console.log(`[AI Chat] Both fallbacks failed.`);
-                    }
-                }
+                };
             }
 
-            if (!response.ok) {
-                return { error: `GSC API failed: ${response.status} ${data ? JSON.stringify(data) : 'Unknown Error'}` };
-            }
-
-            let formattedRows = (data?.rows || []).map((row: any) => {
+            let formattedRows = (data.rows || []).map((row: any) => {
                 const entry: Record<string, any> = {};
                 (dimensions as string[]).forEach((dim: string, i: number) => {
                     entry[dim] = row.keys[i];
@@ -211,6 +209,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 return entry;
             });
 
+            // Apply metric filters
             if (metricFilters && Array.isArray(metricFilters) && metricFilters.length > 0) {
                 formattedRows = formattedRows.filter((row: Record<string, any>) => {
                     return metricFilters.every((f: any) => {
@@ -225,10 +224,10 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 });
             }
 
-            // Enforce a hard cap of 50 rows to prevent LLM TPM context explosions
+            // Hard cap at 50 rows to save tokens
             const limitedRows = formattedRows.slice(0, 50);
 
-            // Compress objects into a tightly packed CSV string to save tokens
+            // Compress to CSV for token efficiency
             const csvRows = limitedRows.map((row: any) => {
                 const dims = (dimensions as string[]).map(d => `"${String(row[d]).replace(/"/g, '""')}"`).join(',');
                 return `${dims},${row.clicks},${row.impressions},${row.ctr},${row.position}`;
@@ -236,22 +235,25 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             const csvHeader = `${(dimensions as string[]).join(',')},clicks,impressions,ctr,position`;
             const compressedCsv = [csvHeader, ...csvRows].join('\n');
 
-            // Generate a strict instruction note for the AI
-            let instructionNote = "";
-            if (formattedRows.length === 0) {
-                instructionNote = "STOP: This site has 0 data in Google Search Console for this query. DO NOT retry with different date ranges. Do not guess. The site is either dead, de-indexed, or the user connected the wrong GSC property. State this verdict immediately.";
-            } else if (formattedRows.length > 50) {
-                instructionNote = "DATA TRUNCATED bounds. Only top 50 rows shown. Add filters if you need specific details.";
+            // Calculate summary stats for the AI
+            let totalClicks = 0, totalImpressions = 0, totalPos = 0;
+            for (const row of limitedRows) {
+                totalClicks += row.clicks || 0;
+                totalImpressions += row.impressions || 0;
+                totalPos += row.position || 0;
             }
+            const avgPos = limitedRows.length > 0 ? (totalPos / limitedRows.length).toFixed(1) : '0';
+            const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0';
 
             return {
                 result: {
-                    siteUrl,
+                    siteUrl: resolvedUrl,
                     dateRange: { startDate, endDate },
                     dimensions,
                     totalRowsAvailable: formattedRows.length,
                     rowsReturned: limitedRows.length,
-                    note: instructionNote,
+                    summary: `${totalClicks} clicks, ${totalImpressions} impressions, ${avgCtr}% avg CTR, pos ${avgPos} avg`,
+                    note: formattedRows.length > 50 ? 'DATA TRUNCATED to top 50 rows. Use metricFilters to drill down.' : '',
                     csvData: compressedCsv,
                 },
             };
@@ -260,47 +262,46 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
     }
 
-    if (name === 'generate_title_suggestions') {
-        const { pagePath, focusKeyword } = args;
-        // Simulate a brief delay to make it feel real
-        await new Promise(r => setTimeout(r, 1800));
-
-        const titleIdea = focusKeyword.charAt(0).toUpperCase() + focusKeyword.slice(1);
-
-        return {
-            result: `Generated 3 variants for ${pagePath} targeting "${focusKeyword}":\n1. "${titleIdea}: The Ultimate Guide (2026 Update)"\n2. "How to Fix ${titleIdea} Fast [Step-by-Step]"\n3. "${titleIdea} Explained: Everything You Need to Know"\n\nMeta Description: Stop struggling with ${focusKeyword}. Learn the exact framework we use to solve this in under 10 minutes. Read the full guide.`
-        };
-    }
-
     if (name === 'calculate_revenue_impact') {
         const { keyword, currentPosition, currentImpressions, targetPosition } = args;
-        await new Promise(r => setTimeout(r, 1200));
 
-        // Math simulation
-        const currentCtr = currentPosition <= 3 ? 0.15 : currentPosition <= 10 ? 0.03 : 0.01;
-        const targetCtr = targetPosition <= 3 ? 0.18 : 0.05;
+        // Real CTR curve based on industry data
+        const ctrCurve: Record<number, number> = {
+            1: 0.28, 2: 0.16, 3: 0.11, 4: 0.08, 5: 0.065,
+            6: 0.05, 7: 0.04, 8: 0.032, 9: 0.026, 10: 0.022,
+        };
+        const getCtr = (pos: number) => {
+            if (pos <= 0) return 0.28;
+            if (pos <= 10) return ctrCurve[Math.round(pos)] || 0.02;
+            if (pos <= 20) return 0.01;
+            return 0.005;
+        };
 
-        const currentClicks = currentImpressions * currentCtr;
-        const targetClicks = currentImpressions * targetCtr;
-        const extraClicks = Math.max(0, Math.round(targetClicks - currentClicks));
+        const currentCtr = getCtr(currentPosition);
+        const targetCtr = getCtr(targetPosition);
+        const currentClicks = Math.round(currentImpressions * currentCtr);
+        const targetClicks = Math.round(currentImpressions * targetCtr);
+        const extraClicks = Math.max(0, targetClicks - currentClicks);
 
-        const estValuePerClick = 2.50; // $2.50
+        // Value per click varies by intent
+        const estValuePerClick = currentPosition <= 5 ? 3.00 : 2.00;
         const extraRevenue = Math.round(extraClicks * estValuePerClick);
 
         return {
-            result: `Math calculation complete.\nMoving "${keyword}" from pos ${currentPosition} to ${targetPosition} would generate ~${extraClicks} extra clicks/month. At a conservative $2.50/click value, that is +$${extraRevenue}/month in potential added revenue.`
+            result: {
+                keyword,
+                currentPosition,
+                targetPosition,
+                currentCTR: `${(currentCtr * 100).toFixed(1)}%`,
+                targetCTR: `${(targetCtr * 100).toFixed(1)}%`,
+                currentClicks,
+                projectedClicks: targetClicks,
+                extraClicksPerMonth: extraClicks,
+                estimatedRevenueGain: `$${extraRevenue}/month`,
+                valuePerClick: `$${estValuePerClick.toFixed(2)}`,
+            }
         };
     }
 
-    if (name === 'diagnose_mobile_usability') {
-        const { pagePath } = args;
-        await new Promise(r => setTimeout(r, 2000));
-
-        return {
-            result: `Diagnostic complete for ${pagePath}.\nPrimary issues found:\n1. LCP (Largest Contentful Paint) is 4.2s on mobile (fail).\n2. Main hero image is not compressed for mobile viewports.\n3. Tap targets in the navigation are too close together.`
-        };
-    }
-
-    return { error: `Tool ${name} not found` };
+    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact` };
 }
-
