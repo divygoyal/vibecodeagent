@@ -29,7 +29,6 @@ export default function PrivacyPage() {
                         <ul className="list-disc pl-6 space-y-2">
                             <li><strong>Account Information:</strong> Name, email address, and profile picture from your authentication provider (Google/GitHub).</li>
                             <li><strong>Usage Data:</strong> Analytics data from your connected Google Analytics and Search Console accounts (only as authorized by you).</li>
-                            <li><strong>Bot Interactions:</strong> Messages sent to the TrafficClaw bot to process your requests.</li>
                         </ul>
                     </section>
 
