@@ -324,17 +324,46 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                 }`}>
                                 {msg.role === 'assistant' ? (
                                     <div className="space-y-3 text-[13px]">
-                                        {msg.tools && msg.tools.map((tool, idx) => (
-                                            <div key={idx} className="bg-black/40 border border-emerald-500/20 rounded-lg p-3 font-mono text-[11px] text-emerald-400">
-                                                <div className="flex items-center gap-2 mb-1.5 opacity-80">
-                                                    {tool.result ? <Sparkles className="w-3.5 h-3.5 text-emerald-300" /> : <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />}
-                                                    <span className="font-semibold">{tool.result ? 'Diagnostic Complete:' : 'Running Diagnostic:'} {tool.name}</span>
-                                                </div>
-                                                <div className="text-emerald-500/60 pl-5 overflow-hidden whitespace-nowrap text-ellipsis max-w-[300px]" title={JSON.stringify(tool.args)}>
-                                                    {Object.entries(tool.args || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                        {msg.tools && msg.tools.length > 0 && (
+                                            <div className="relative overflow-hidden rounded-xl border border-emerald-500/15 bg-gradient-to-r from-emerald-500/[0.04] via-cyan-500/[0.06] to-emerald-500/[0.04] p-3">
+                                                {/* Animated shimmer overlay */}
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-[shimmer_2s_ease-in-out_infinite]" style={{ backgroundSize: '200% 100%' }} />
+                                                <div className="relative flex items-center gap-3">
+                                                    {/* Pulsing brain icon */}
+                                                    <div className="relative flex-shrink-0">
+                                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
+                                                            <Sparkles className="w-4 h-4 text-emerald-400" />
+                                                        </div>
+                                                        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping opacity-60" />
+                                                        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] font-semibold text-emerald-400">
+                                                                {msg.tools.every((t: any) => t.result) ? 'Analysis Complete' : 'Deep Analyzing'}
+                                                            </span>
+                                                            {!msg.tools.every((t: any) => t.result) && (
+                                                                <span className="flex gap-0.5">
+                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500 mt-0.5">
+                                                            {msg.tools.filter((t: any) => t.result).length}/{msg.tools.length} data sources processed
+                                                        </div>
+                                                        {/* Mini progress bar */}
+                                                        <div className="mt-1.5 h-[3px] bg-white/[0.04] rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-700 ease-out"
+                                                                style={{ width: `${(msg.tools.filter((t: any) => t.result).length / msg.tools.length) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        ))}
+                                        )}
                                         <div className="space-y-0.5">{renderMessage(msg.content)}</div>
                                     </div>
                                 ) : (

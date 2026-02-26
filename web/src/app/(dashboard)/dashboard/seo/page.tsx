@@ -13,6 +13,7 @@ import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import { useRegistration } from '../layout';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -107,7 +108,7 @@ export default function SEOPage() {
 
     // 1. Fetch Sites (only when Google connected)
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-    const [selectedSite, setSelectedSite] = useState('');
+    const { selectedSite, setSelectedSite } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
     // SEO Tools state
