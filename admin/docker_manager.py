@@ -28,7 +28,7 @@ class DockerManager:
     
     def _ensure_nanobot_image(self) -> None:
         """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
-        tag = "trafficclaw/nanobot:v3"
+        tag = "trafficclaw/nanobot:v4"
         try:
             self.client.images.get(tag)
             logger.info(f"Nanobot image {tag} already exists")
@@ -769,7 +769,7 @@ This workspace is your home. You are an analytics & SEO expert.
              env["GITHUB_ID"] = user_identifier
         
         # Create container - select image and memory limit based on engine
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v3"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v4"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 300 * 1024 * 1024
 
         # Set up volumes based on the engine
