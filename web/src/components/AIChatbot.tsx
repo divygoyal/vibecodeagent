@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
-import { useSiteList, usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
+import useSWR from 'swr';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -107,10 +107,12 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Get available sites from hooks
-    const { hasGoogleConnection } = useContainerStatus();
-    const { sites } = useSiteList(hasGoogleConnection);
-    const { properties } = usePropertyList(hasGoogleConnection);
+    // Fetch available sites directly (session-based, no container dependency)
+    const fetcher = (url: string) => fetch(url).then(r => r.ok ? r.json() : []);
+    const { data: sitesData } = useSWR('/api/seo?mode=list', fetcher, { dedupingInterval: 300000 });
+    const { data: propsData } = useSWR('/api/analytics?mode=list', fetcher, { dedupingInterval: 300000 });
+    const sites = Array.isArray(sitesData) ? sitesData : [];
+    const properties = Array.isArray(propsData) ? propsData : [];
 
     // Build combined site list
     const allSites = [
@@ -355,25 +357,29 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
 
                 {/* ── Messages ── */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
-                    {messages.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
-                                : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
-                                }`}>
-                                {msg.role === 'assistant' ? (
-                                    <div className="space-y-1 text-[13px]">
-                                        <div className="space-y-0.5">{renderMessage(msg.content)}</div>
+                    {messages.map((msg, i) => {
+                        // Skip rendering empty assistant placeholder messages
+                        if (msg.role === 'assistant' && !msg.content && (!msg.tools || msg.tools.length === 0)) return null;
+                        return (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                                    ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
+                                    : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
+                                    }`}>
+                                    {msg.role === 'assistant' ? (
+                                        <div className="space-y-1 text-[13px]">
+                                            <div className="space-y-0.5">{renderMessage(msg.content)}</div>
+                                        </div>
+                                    ) : (
+                                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                                    )}
+                                    <div className="text-[10px] text-zinc-700 mt-2 select-none">
+                                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </div>
-                                ) : (
-                                    <div className="whitespace-pre-wrap">{msg.content}</div>
-                                )}
-                                <div className="text-[10px] text-zinc-700 mt-2 select-none">
-                                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {/* ChatGPT/Gemini-style thinking indicator */}
                     {isLoading && (
