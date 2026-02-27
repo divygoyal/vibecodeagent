@@ -461,7 +461,8 @@ export default function DashboardOverview() {
 
             {/* 💰 Money Opportunities — Striking Distance */}
             <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-500/[0.04] to-transparent rounded-full blur-2xl" />
+              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-amber-500/[0.06] to-transparent rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
@@ -474,38 +475,94 @@ export default function DashboardOverview() {
                 </div>
 
                 {(!hasData && isRef) ? (
-                  <div className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+                  <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
                 ) : computedInsights.strikingDistance.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {computedInsights.strikingDistance.slice(0, 4).map((kw, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.03] hover:border-amber-500/10 transition-all group">
-                        <div className="w-6 h-6 rounded-md bg-amber-500/10 flex items-center justify-center text-[10px] font-bold text-amber-400 flex-shrink-0">
-                          {i + 1}
+                  <div className="space-y-2.5">
+                    {computedInsights.strikingDistance.slice(0, 4).map((kw, i) => {
+                      const pos = parseFloat(kw.position);
+                      const progressToPage1 = Math.max(0, Math.min(100, ((20 - pos) / 17) * 100));
+                      const opportunityScore = Math.min(100, Math.round((kw.impressions / 100) * (21 - pos)));
+                      const scoreColor = opportunityScore > 70 ? 'text-emerald-400' : opportunityScore > 40 ? 'text-amber-400' : 'text-zinc-400';
+                      const scoreBg = opportunityScore > 70 ? 'bg-emerald-500/10 border-emerald-500/20' : opportunityScore > 40 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-zinc-500/10 border-zinc-500/20';
+                      return (
+                        <div key={i} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-amber-500/15 transition-all group">
+                          <div className="flex items-start gap-3">
+                            {/* Opportunity Score Circle */}
+                            <div className={`w-10 h-10 rounded-xl ${scoreBg} border flex flex-col items-center justify-center flex-shrink-0`}>
+                              <span className={`text-xs font-bold ${scoreColor}`}>{opportunityScore}</span>
+                              <span className="text-[7px] text-zinc-500 -mt-0.5">score</span>
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              {/* Keyword name */}
+                              <p className="text-[13px] text-zinc-200 font-medium truncate group-hover:text-white transition-colors">{kw.query}</p>
+
+                              {/* Stats row */}
+                              <div className="flex items-center gap-3 mt-1.5 text-[10px] text-zinc-500">
+                                <span className="flex items-center gap-1">
+                                  <Hash className="w-2.5 h-2.5 text-amber-400/60" />
+                                  Pos <span className="text-amber-400 font-semibold">{kw.position}</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Eye className="w-2.5 h-2.5" />
+                                  {fmtNum(kw.impressions)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <MousePointer className="w-2.5 h-2.5" />
+                                  {kw.clicks} → <span className="text-emerald-400 font-semibold">{kw.clicks + kw.potentialClicks}</span>
+                                </span>
+                              </div>
+
+                              {/* Progress bar: distance to page 1 */}
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-amber-500/60 to-amber-400 transition-all duration-700"
+                                    style={{ width: `${progressToPage1}%` }}
+                                  />
+                                </div>
+                                <span className="text-[9px] text-zinc-500 flex-shrink-0">
+                                  {pos <= 10 ? '🔥 Page 1 ready' : `${Math.ceil(pos - 3)} spots to go`}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Revenue badge */}
+                            {kw.potentialClicks > 0 && (
+                              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 px-2 py-1 rounded-lg">
+                                  +{kw.potentialClicks} clicks
+                                </span>
+                                <span className="text-[9px] text-zinc-500">
+                                  ~${kw.estimatedRevenue.toFixed(0)}/mo
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] text-zinc-300 truncate group-hover:text-white transition-colors">{kw.query}</p>
-                          <p className="text-[10px] text-zinc-600">
-                            Pos {kw.position} • {fmtNum(kw.impressions)} impr
-                          </p>
+                      );
+                    })}
+
+                    {/* Revenue Summary Banner */}
+                    <div className="mt-1 p-3 rounded-xl bg-gradient-to-r from-emerald-500/[0.06] to-amber-500/[0.04] border border-emerald-500/10">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <DollarSign className="w-4 h-4 text-emerald-400" />
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-zinc-400">Total estimated monthly value</p>
+                            <p className="text-lg font-bold text-emerald-400 font-mono">
+                              ${computedInsights.strikingDistance.reduce((s, k) => s + k.estimatedRevenue, 0).toFixed(0)}<span className="text-xs text-zinc-500 font-normal">/mo</span>
+                            </p>
+                          </div>
                         </div>
-                        {kw.potentialClicks > 0 && (
-                          <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/8 px-2 py-0.5 rounded-full flex-shrink-0">
-                            +{kw.potentialClicks} clicks
-                          </span>
-                        )}
+                        <div className="text-right">
+                          <p className="text-[10px] text-zinc-500">{computedInsights.strikingDistance.length} keywords</p>
+                          <p className="text-[10px] text-amber-400">+{computedInsights.strikingDistance.reduce((s, k) => s + k.potentialClicks, 0)} potential clicks</p>
+                        </div>
                       </div>
-                    ))}
-                    {computedInsights.strikingDistance.length > 0 && (
-                      <div className="pt-2 border-t border-white/[0.04]">
-                        <p className="text-[10px] text-zinc-500 flex items-center gap-1">
-                          <DollarSign className="w-3 h-3 text-emerald-400" />
-                          Est. monthly value if pushed to top 3:&nbsp;
-                          <span className="text-emerald-400 font-semibold">
-                            ${computedInsights.strikingDistance.reduce((s, k) => s + k.estimatedRevenue, 0).toFixed(0)}/mo
-                          </span>
-                        </p>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 ) : (
                   <div className="py-6 text-center">
@@ -522,88 +579,138 @@ export default function DashboardOverview() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
             {/* 🔧 Quick Wins — CTR Problems */}
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                  <FileWarning className="w-4 h-4 text-red-400" />
-                  Quick Wins
-                </h2>
-                <span className="text-[10px] text-zinc-600">CTR below expected</span>
-              </div>
+            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+              <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-red-500/[0.04] to-transparent rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                    <FileWarning className="w-4 h-4 text-red-400" />
+                    Quick Wins
+                  </h2>
+                  <span className="text-[10px] text-zinc-600 bg-white/[0.02] px-2 py-0.5 rounded-full border border-white/[0.04]">CTR below expected</span>
+                </div>
 
-              {(!hasData && isRef) ? (
-                <div className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-              ) : computedInsights.ctrProblems.length > 0 ? (
-                <div className="space-y-2">
-                  {computedInsights.ctrProblems.map((item, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-red-500/10 transition-all">
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <p className="text-[12px] text-zinc-300 flex-1 truncate font-medium">&quot;{item.query}&quot;</p>
-                        <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">
-                          -{item.gap}% gap
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px] text-zinc-500">
-                        <span>Pos {item.position}</span>
-                        <span>•</span>
-                        <span>CTR {item.actualCTR}% <span className="text-zinc-600">(expected {item.expectedCTR}%)</span></span>
-                        <span>•</span>
-                        <span>{fmtNum(item.impressions)} impr</span>
-                      </div>
-                      <p className="text-[10px] text-amber-400/70 mt-1.5">💡 Fix: Rewrite meta title & description for this query</p>
+                {(!hasData && isRef) ? (
+                  <div className="space-y-2"><Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" /></div>
+                ) : computedInsights.ctrProblems.length > 0 ? (
+                  <div className="space-y-2">
+                    {computedInsights.ctrProblems.map((item, i) => {
+                      const actual = parseFloat(item.actualCTR);
+                      const expected = parseFloat(item.expectedCTR);
+                      const fillPct = Math.min(100, (actual / Math.max(expected, 1)) * 100);
+                      return (
+                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-red-500/10 transition-all">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <p className="text-[12px] text-zinc-300 flex-1 truncate font-medium">&quot;{item.query}&quot;</p>
+                            <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded font-semibold flex-shrink-0 border border-red-500/15">
+                              -{item.gap}% gap
+                            </span>
+                          </div>
+                          {/* CTR visual bar */}
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between text-[9px] mb-1">
+                              <span className="text-red-400">CTR: {item.actualCTR}%</span>
+                              <span className="text-zinc-500">Expected: {item.expectedCTR}%</span>
+                            </div>
+                            <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden relative">
+                              <div className="h-full rounded-full bg-red-400/60 transition-all" style={{ width: `${fillPct}%` }} />
+                              <div className="absolute top-0 h-full w-px bg-emerald-400/40" style={{ left: '100%' }} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+                              <span>Pos {item.position}</span>
+                              <span>•</span>
+                              <span>{fmtNum(item.impressions)} impressions</span>
+                            </div>
+                            <span className="text-[9px] text-amber-400/70">💡 Fix meta title</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center mx-auto mb-3">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-6 text-center">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-400/40 mx-auto mb-2" />
-                  <p className="text-xs text-zinc-500">No CTR issues detected</p>
-                  <p className="text-[10px] text-zinc-600 mt-1">Your click-through rates look healthy!</p>
-                </div>
-              )}
+                    <p className="text-sm text-zinc-400 font-medium">No CTR issues detected</p>
+                    <p className="text-[11px] text-zinc-600 mt-1">Your click-through rates look healthy!</p>
+                    <Link href="/dashboard/seo" className="inline-flex items-center gap-1.5 mt-3 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors bg-emerald-500/8 px-3 py-1.5 rounded-lg border border-emerald-500/10">
+                      View Opportunities <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 📊 Top Performing Pages */}
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-orange-400" />
-                  Top Pages
-                </h2>
-                <Link href="/dashboard/seo" className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1">
-                  Details <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
+            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-violet-500/[0.04] to-transparent rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-orange-400" />
+                    Top Pages
+                  </h2>
+                  <Link href="/dashboard/seo" className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1">
+                    Details <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
 
-              {(!hasData && isRef) ? (
-                <div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-              ) : computedInsights.topPages.length > 0 ? (
-                <div className="space-y-2">
-                  {computedInsights.topPages.map((page, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] transition-all">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-amber-500/10 text-amber-400' :
-                        i === 1 ? 'bg-zinc-500/10 text-zinc-400' :
-                          'bg-orange-500/10 text-orange-400'
-                        }`}>
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] text-zinc-300 truncate font-medium">{page.page}</p>
-                        <div className="flex items-center gap-3 text-[10px] text-zinc-500 mt-0.5">
-                          <span className="flex items-center gap-1"><MousePointer className="w-2.5 h-2.5" /> {fmtNum(page.clicks)}</span>
-                          <span className="flex items-center gap-1"><Eye className="w-2.5 h-2.5" /> {fmtNum(page.impressions)}</span>
-                          <span>Pos {page.position}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-6 text-center">
-                  <Search className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-                  <p className="text-xs text-zinc-500">No page data available yet</p>
-                </div>
-              )}
+                {(!hasData && isRef) ? (
+                  <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
+                ) : computedInsights.topPages.length > 0 ? (
+                  <div className="space-y-2">
+                    {(() => {
+                      const maxClicks = Math.max(...computedInsights.topPages.map(p => p.clicks), 1);
+                      return computedInsights.topPages.map((page, i) => {
+                        const sharePct = Math.round((page.clicks / maxClicks) * 100);
+                        return (
+                          <div key={i} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] transition-all relative overflow-hidden">
+                            {/* Background click share bar */}
+                            <div
+                              className={`absolute inset-y-0 left-0 opacity-[0.03] ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-zinc-400' : 'bg-orange-400'
+                                }`}
+                              style={{ width: `${sharePct}%` }}
+                            />
+                            <div className="relative flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-gradient-to-br from-amber-400/20 to-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                  i === 1 ? 'bg-gradient-to-br from-zinc-400/20 to-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
+                                    'bg-gradient-to-br from-orange-400/20 to-orange-500/10 text-orange-400 border border-orange-500/20'
+                                }`}>
+                                {i + 1}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[12px] text-zinc-200 truncate font-medium">{page.page}</p>
+                                <div className="flex items-center gap-3 text-[10px] text-zinc-500 mt-1">
+                                  <span className="flex items-center gap-1">
+                                    <MousePointer className="w-2.5 h-2.5 text-cyan-400/50" />
+                                    <span className="text-zinc-300 font-semibold">{fmtNum(page.clicks)}</span> clicks
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Eye className="w-2.5 h-2.5" /> {fmtNum(page.impressions)}
+                                  </span>
+                                  <span>Pos <span className="text-amber-400">{page.position}</span></span>
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-[11px] font-bold text-zinc-300">{sharePct}%</div>
+                                <div className="text-[8px] text-zinc-600">of total</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
+                  <div className="py-6 text-center">
+                    <Search className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
+                    <p className="text-xs text-zinc-500">No page data available yet</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
