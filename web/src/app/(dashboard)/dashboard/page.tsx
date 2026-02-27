@@ -15,6 +15,30 @@ import {
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
 
+/* ─── Computed Insight Types ─── */
+interface StrikingKeyword {
+  query: string;
+  position: string;
+  impressions: number;
+  clicks: number;
+  potentialClicks: number;
+  estimatedRevenue: number;
+}
+interface CTRProblem {
+  query: string;
+  position: string;
+  actualCTR: string;
+  expectedCTR: string;
+  impressions: number;
+  gap: string;
+}
+interface TopPage {
+  page: string;
+  clicks: number;
+  impressions: number;
+  position: string;
+}
+
 /* ─── helpers ─── */
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -108,7 +132,7 @@ export default function DashboardOverview() {
     const pages = seoData?.pages || [];
 
     // 1. Striking distance keywords (pos 4-20, high impressions)
-    const strikingDistance = queries
+    const strikingDistance: StrikingKeyword[] = queries
       .filter((q: any) => {
         const pos = parseFloat(q.position);
         const impr = parseInt(q.impressions);
@@ -135,7 +159,7 @@ export default function DashboardOverview() {
       });
 
     // 2. CTR problems (actual CTR << expected for position)
-    const ctrProblems = queries
+    const ctrProblems: CTRProblem[] = queries
       .filter((q: any) => {
         const pos = parseFloat(q.position);
         const ctr = parseFloat(q.ctr);
@@ -168,7 +192,7 @@ export default function DashboardOverview() {
     else if (changeUsers < -10 || changeClicks < -10) { healthVerdict = 'declining'; healthColor = 'red'; healthIcon = 'down'; }
 
     // 4. Top performing pages
-    const topPages = pages
+    const topPages: TopPage[] = pages
       .sort((a: any, b: any) => parseInt(b.clicks || 0) - parseInt(a.clicks || 0))
       .slice(0, 3)
       .map((p: any) => ({
@@ -252,8 +276,8 @@ export default function DashboardOverview() {
                       key={site.siteUrl}
                       onClick={() => { setSelectedSiteUrl(site.siteUrl); setDropdownOpen(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-all ${isSelected
-                          ? 'text-emerald-400 bg-emerald-500/[0.08]'
-                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                        ? 'text-emerald-400 bg-emerald-500/[0.08]'
+                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                         }`}
                     >
                       <Globe className="w-4 h-4 flex-shrink-0" />
@@ -398,8 +422,8 @@ export default function DashboardOverview() {
                   </h2>
                   {hasData && (
                     <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${computedInsights.healthVerdict === 'growing' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        computedInsights.healthVerdict === 'declining' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                          'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      computedInsights.healthVerdict === 'declining' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                       }`}>
                       {computedInsights.healthVerdict === 'growing' ? '📈 Growing' :
                         computedInsights.healthVerdict === 'declining' ? '📉 Declining' : '➡️ Stable'}
@@ -558,8 +582,8 @@ export default function DashboardOverview() {
                   {computedInsights.topPages.map((page, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] transition-all">
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-amber-500/10 text-amber-400' :
-                          i === 1 ? 'bg-zinc-500/10 text-zinc-400' :
-                            'bg-orange-500/10 text-orange-400'
+                        i === 1 ? 'bg-zinc-500/10 text-zinc-400' :
+                          'bg-orange-500/10 text-orange-400'
                         }`}>
                         {i + 1}
                       </div>
