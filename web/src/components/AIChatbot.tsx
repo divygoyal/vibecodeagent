@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
-import useSWR from 'swr';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -14,6 +13,12 @@ interface Message {
 interface AIChatbotProps {
     analyticsData?: any;
     seoData?: any;
+}
+
+interface SiteOption {
+    id: string;
+    label: string;
+    type: string;
 }
 
 const QUICK_PROMPTS = [
@@ -103,30 +108,32 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [credits, setCredits] = useState<number | null>(null);
     const [selectedChatSite, setSelectedChatSite] = useState('');
     const [showSiteDropdown, setShowSiteDropdown] = useState(false);
+    const [allSites, setAllSites] = useState<SiteOption[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Fetch available sites directly (session-based, no container dependency)
-    const fetcher = (url: string) => fetch(url).then(r => r.ok ? r.json() : []);
-    const { data: sitesData } = useSWR('/api/seo?mode=list', fetcher, { dedupingInterval: 300000 });
-    const { data: propsData } = useSWR('/api/analytics?mode=list', fetcher, { dedupingInterval: 300000 });
-    const sites = Array.isArray(sitesData) ? sitesData : [];
-    const properties = Array.isArray(propsData) ? propsData : [];
-
-    // Build combined site list
-    const allSites = [
-        ...sites.map((s: any) => ({ id: s.siteUrl, label: s.siteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\/$/, ''), type: 'GSC' })),
-        ...properties.filter((p: any) => !sites.some((s: any) => s.siteUrl.includes(p.displayName || p.property)))
-            .map((p: any) => ({ id: p.property, label: p.displayName || p.property, type: 'GA4' })),
-    ];
-
-    // Auto-select first site
+    // Fetch available sites on mount (plain fetch, no SWR dependency)
     useEffect(() => {
-        if (allSites.length > 0 && !selectedChatSite) {
-            setSelectedChatSite(allSites[0].id);
+        async function loadSites() {
+            try {
+                const [sitesRes, propsRes] = await Promise.all([
+                    fetch('/api/seo?mode=list').then(r => r.ok ? r.json() : []).catch(() => []),
+                    fetch('/api/analytics?mode=list').then(r => r.ok ? r.json() : []).catch(() => []),
+                ]);
+                const sites = Array.isArray(sitesRes) ? sitesRes : [];
+                const properties = Array.isArray(propsRes) ? propsRes : [];
+                const combined: SiteOption[] = [
+                    ...sites.map((s: any) => ({ id: s.siteUrl, label: s.siteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\/$/, ''), type: 'GSC' })),
+                    ...properties.filter((p: any) => !sites.some((s: any) => s.siteUrl.includes(p.displayName || p.property)))
+                        .map((p: any) => ({ id: p.property, label: p.displayName || p.property, type: 'GA4' })),
+                ];
+                setAllSites(combined);
+                if (combined.length > 0) setSelectedChatSite(prev => prev || combined[0].id);
+            } catch { /* silent */ }
         }
-    }, [allSites.length, selectedChatSite]);
+        loadSites();
+    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
