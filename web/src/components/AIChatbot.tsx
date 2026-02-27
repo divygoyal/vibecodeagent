@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageSquare, Send, X, Sparkles, Loader2, Minimize2, Maximize2, Coins, RotateCcw } from 'lucide-react';
+import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
+import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
+import { useSiteList, usePropertyList } from '@/lib/useDashboardData';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -16,24 +18,22 @@ interface AIChatbotProps {
 }
 
 const QUICK_PROMPTS = [
-    '🔴 What is bleeding money on my site?',
-    '🎯 Show me striking distance keywords',
+    '🔴 What is bleeding money?',
+    '🎯 Striking distance keywords',
     '📊 Grade my SEO (A-F)',
-    '💰 Calculate my missed revenue',
-    '📱 Mobile vs desktop health check',
-    '🔮 Top 3 growth opportunities',
+    '💰 Missed revenue',
+    '📱 Mobile vs desktop',
+    '🔮 Growth opportunities',
 ];
 
 // Simple markdown-ish renderer for bot responses
 function renderMessage(text: string) {
-    // Process the text into HTML-like segments
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
 
     lines.forEach((line, idx) => {
         let processed = line;
 
-        // Headers
         if (processed.startsWith('### ')) {
             elements.push(<h4 key={idx} className="text-sm font-bold text-emerald-300 mt-3 mb-1">{processed.slice(4)}</h4>);
             return;
@@ -47,48 +47,42 @@ function renderMessage(text: string) {
             return;
         }
 
-        // Horizontal rules
         if (processed.match(/^---+$/)) {
-            elements.push(<hr key={idx} className="border-white/10 my-3" />);
+            elements.push(<hr key={idx} className="border-white/5 my-3" />);
             return;
         }
 
-        // Empty lines
         if (!processed.trim()) {
             elements.push(<div key={idx} className="h-2" />);
             return;
         }
 
-        // Bold + inline formatting
         processed = processed
             .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/`(.+?)`/g, '<code class="bg-white/10 px-1 py-0.5 rounded text-emerald-300 text-[11px]">$1</code>');
+            .replace(/`(.+?)`/g, '<code class="bg-white/8 px-1 py-0.5 rounded text-emerald-300 text-[11px]">$1</code>');
 
-        // Bullet points
         if (processed.match(/^[\-\*•]\s/)) {
             elements.push(
                 <div key={idx} className="flex gap-2 pl-1 py-0.5">
-                    <span className="text-emerald-400 flex-shrink-0 mt-0.5">•</span>
+                    <span className="text-emerald-500/70 flex-shrink-0 mt-0.5">•</span>
                     <span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} />
                 </div>
             );
             return;
         }
 
-        // Numbered list
         const numMatch = processed.match(/^(\d+)\.\s(.+)/);
         if (numMatch) {
             elements.push(
                 <div key={idx} className="flex gap-2 pl-1 py-0.5">
-                    <span className="text-emerald-400 flex-shrink-0 font-mono text-xs w-5 text-right mt-0.5">{numMatch[1]}.</span>
+                    <span className="text-emerald-500/70 flex-shrink-0 font-mono text-xs w-5 text-right mt-0.5">{numMatch[1]}.</span>
                     <span dangerouslySetInnerHTML={{ __html: numMatch[2] }} />
                 </div>
             );
             return;
         }
 
-        // Regular paragraph
         elements.push(<p key={idx} className="py-0.5" dangerouslySetInnerHTML={{ __html: processed }} />);
     });
 
@@ -101,16 +95,36 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: "🔥 **TrafficClaw AI Analyst is online.**\n\nI have access to your live analytics and SEO data. I don't give advice — I give **verdicts**.\n\nAsk me anything, or hit a quick prompt below to see what I can do. Every answer includes revenue impact and actionable steps.\n\n💡 *10 credits per analysis • Your data stays private*",
+            content: "👋 **Hey! I'm your AI Analyst.**\n\nI have your live analytics & SEO data loaded. Ask me anything — I give **verdicts**, not advice.\n\n*Select a website above, then ask away.*",
             timestamp: new Date(),
         },
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [credits, setCredits] = useState<number | null>(null);
+    const [selectedChatSite, setSelectedChatSite] = useState('');
+    const [showSiteDropdown, setShowSiteDropdown] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Get available sites from hooks
+    const { sites } = useSiteList(true);
+    const { properties } = usePropertyList(true);
+
+    // Build combined site list
+    const allSites = [
+        ...sites.map((s: any) => ({ id: s.siteUrl, label: s.siteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\/$/, ''), type: 'GSC' })),
+        ...properties.filter((p: any) => !sites.some((s: any) => s.siteUrl.includes(p.displayName || p.property)))
+            .map((p: any) => ({ id: p.property, label: p.displayName || p.property, type: 'GA4' })),
+    ];
+
+    // Auto-select first site
+    useEffect(() => {
+        if (allSites.length > 0 && !selectedChatSite) {
+            setSelectedChatSite(allSites[0].id);
+        }
+    }, [allSites.length, selectedChatSite]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -131,7 +145,6 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         if (!messageText || isLoading) return;
 
         const userMessage: Message = { role: 'user', content: messageText, timestamp: new Date() };
-        // Instantly add user message and an empty assistant message to append text to
         setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date(), tools: [] }]);
         setInput('');
         setIsLoading(true);
@@ -142,6 +155,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: messageText,
+                    selectedSite: selectedChatSite,
                     analyticsContext: analyticsData ? {
                         kpis: analyticsData.kpis,
                         topSources: analyticsData.sources?.slice(0, 15),
@@ -163,7 +177,6 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                         recommendations: seoData.recommendations,
                         trend: seoData.trend?.slice(-14),
                     } : null,
-                    // Filter out tools array before sending history to avoid breaking the backend input expectations
                     history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
                 }),
             });
@@ -234,18 +247,18 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         } catch {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: '⚠️ **Connection Error**\n\nI couldn\'t reach the AI service. Please check:\n- Your GEMINI_API_KEY is configured\n- The server is running\n\nTry again in a moment.',
+                content: '⚠️ **Connection Error**\n\nCouldn\'t reach the AI service. Please try again.',
                 timestamp: new Date(),
             }]);
         } finally {
             setIsLoading(false);
         }
-    }, [input, isLoading, analyticsData, seoData, messages]);
+    }, [input, isLoading, analyticsData, seoData, messages, selectedChatSite]);
 
     const clearChat = () => {
         setMessages([{
             role: 'assistant',
-            content: "🔄 **Chat cleared.** Ready for your next analysis.\n\nWhat would you like to investigate?",
+            content: "🔄 **Chat cleared.** What would you like to investigate?",
             timestamp: new Date(),
         }]);
     };
@@ -261,132 +274,116 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 via-cyan-400 to-teal-400 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all hover:scale-110 flex items-center justify-center">
                         <Sparkles className="w-6 h-6 text-black group-hover:rotate-12 transition-transform" />
                     </div>
-                    {/* Pulse ring */}
                     <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
                 </div>
             </button>
         );
     }
 
+    const currentSiteLabel = allSites.find(s => s.id === selectedChatSite)?.label || 'Select website';
+
     // ─── Chat window ───
     return (
         <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[440px] h-[640px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
+            <div className="w-full h-full bg-[#000000] border border-white/[0.06] rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
                 {/* ── Header ── */}
-                <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-gradient-to-r from-emerald-500/[0.06] to-cyan-500/[0.06]">
+                <div className="px-4 py-3 border-b border-white/[0.04] flex items-center justify-between bg-[#030303]">
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
                             <Sparkles className="w-4 h-4 text-black" />
-                            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#0a0a0f]" />
+                            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#030303]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-white">AI Analyst</h3>
-                            <p className="text-[10px] text-zinc-500">God-level SEO & Analytics</p>
+                            <h3 className="text-sm font-bold text-white leading-none">AI Analyst</h3>
+                            {/* Site selector inline */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowSiteDropdown(!showSiteDropdown)}
+                                    className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors mt-0.5"
+                                >
+                                    <Globe className="w-2.5 h-2.5" />
+                                    <span className="max-w-[120px] truncate">{currentSiteLabel}</span>
+                                    <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showSiteDropdown ? 'rotate-180' : ''}`} />
+                                </button>
+                                {showSiteDropdown && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowSiteDropdown(false)} />
+                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#0a0a0a] border border-white/[0.08] rounded-lg shadow-2xl shadow-black/60 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
+                                            {allSites.length === 0 ? (
+                                                <div className="px-3 py-2 text-[11px] text-zinc-600">No sites connected</div>
+                                            ) : (
+                                                allSites.map(site => (
+                                                    <button
+                                                        key={site.id}
+                                                        onClick={() => { setSelectedChatSite(site.id); setShowSiteDropdown(false); }}
+                                                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 transition ${selectedChatSite === site.id
+                                                                ? 'text-emerald-400 bg-emerald-500/[0.06]'
+                                                                : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                                                            }`}
+                                                    >
+                                                        <Globe className="w-3 h-3 flex-shrink-0" />
+                                                        <span className="truncate">{site.label}</span>
+                                                        <span className="ml-auto text-[9px] text-zinc-600">{site.type}</span>
+                                                        {selectedChatSite === site.id && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-1" />}
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        {/* Credits badge */}
+                    <div className="flex items-center gap-1">
                         {credits !== null && (
-                            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 mr-1">
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/8 border border-amber-500/15 mr-1">
                                 <Coins className="w-3 h-3 text-amber-400" />
                                 <span className="text-[10px] font-bold text-amber-400">{credits}</span>
                             </div>
                         )}
-                        <button
-                            onClick={clearChat}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-colors"
-                            title="Clear chat"
-                        >
+                        <button onClick={clearChat} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" title="Clear chat">
                             <RotateCcw className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                            onClick={() => setIsExpanded(!isExpanded)}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-colors"
-                        >
+                        <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors">
                             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                         </button>
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-colors"
-                        >
+                        <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
 
                 {/* ── Messages ── */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                ? 'bg-emerald-500/[0.12] text-emerald-100 border border-emerald-500/[0.15] rounded-br-sm'
-                                : 'bg-white/[0.03] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
+                                ? 'bg-white/[0.06] text-zinc-200 rounded-br-sm'
+                                : 'text-zinc-400 rounded-bl-sm'
                                 }`}>
                                 {msg.role === 'assistant' ? (
-                                    <div className="space-y-3 text-[13px]">
-                                        {msg.tools && msg.tools.length > 0 && (
-                                            <div className="relative overflow-hidden rounded-xl border border-emerald-500/15 bg-gradient-to-r from-emerald-500/[0.04] via-cyan-500/[0.06] to-emerald-500/[0.04] p-3">
-                                                {/* Animated shimmer overlay */}
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-[shimmer_2s_ease-in-out_infinite]" style={{ backgroundSize: '200% 100%' }} />
-                                                <div className="relative flex items-center gap-3">
-                                                    {/* Pulsing brain icon */}
-                                                    <div className="relative flex-shrink-0">
-                                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
-                                                            <Sparkles className="w-4 h-4 text-emerald-400" />
-                                                        </div>
-                                                        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping opacity-60" />
-                                                        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-semibold text-emerald-400">
-                                                                {msg.tools.every((t: any) => t.result) ? 'Analysis Complete' : 'Deep Analyzing'}
-                                                            </span>
-                                                            {!msg.tools.every((t: any) => t.result) && (
-                                                                <span className="flex gap-0.5">
-                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-[10px] text-zinc-500 mt-0.5">
-                                                            {msg.tools.filter((t: any) => t.result).length}/{msg.tools.length} data sources processed
-                                                        </div>
-                                                        {/* Mini progress bar */}
-                                                        <div className="mt-1.5 h-[3px] bg-white/[0.04] rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-700 ease-out"
-                                                                style={{ width: `${(msg.tools.filter((t: any) => t.result).length / msg.tools.length) * 100}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                    <div className="space-y-1 text-[13px]">
                                         <div className="space-y-0.5">{renderMessage(msg.content)}</div>
                                     </div>
                                 ) : (
                                     <div className="whitespace-pre-wrap">{msg.content}</div>
                                 )}
-                                <div className="text-[10px] text-zinc-600/80 mt-2 select-none">
+                                <div className="text-[10px] text-zinc-700 mt-2 select-none">
                                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             </div>
                         </div>
                     ))}
 
+                    {/* ChatGPT/Gemini-style thinking indicator */}
                     {isLoading && (
                         <div className="flex justify-start">
-                            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-bl-sm px-4 py-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="flex gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                                    </div>
-                                    <span className="text-xs text-zinc-500">Deep-analyzing your data...</span>
+                            <div className="flex items-center gap-2 px-3 py-2">
+                                <div className="relative w-5 h-5">
+                                    <div className="absolute inset-0 rounded-full border-2 border-emerald-500/20" />
+                                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-emerald-400 animate-spin" />
                                 </div>
+                                <span className="text-[12px] text-zinc-500 animate-pulse">Thinking...</span>
                             </div>
                         </div>
                     )}
@@ -401,7 +398,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                 <button
                                     key={i}
                                     onClick={() => sendMessage(prompt)}
-                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/[0.2] hover:bg-emerald-500/[0.04] transition-all"
+                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all"
                                 >
                                     {prompt}
                                 </button>
@@ -411,7 +408,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 )}
 
                 {/* ── Input ── */}
-                <div className="px-4 py-3 border-t border-white/[0.06] bg-white/[0.01]">
+                <div className="px-4 py-3 border-t border-white/[0.04] bg-[#030303]">
                     <div className="flex items-center gap-2">
                         {isExpanded ? (
                             <textarea
@@ -424,8 +421,8 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                         sendMessage();
                                     }
                                 }}
-                                placeholder="Ask anything about your analytics & SEO..."
-                                className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition resize-none min-h-[44px] max-h-[120px]"
+                                placeholder="Ask anything..."
+                                className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-emerald-500/20 transition resize-none min-h-[44px] max-h-[120px]"
                                 disabled={isLoading}
                                 rows={1}
                             />
@@ -436,25 +433,24 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                                placeholder="Ask anything about your analytics & SEO..."
-                                className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
+                                placeholder="Ask anything..."
+                                className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-emerald-500/20 transition"
                                 disabled={isLoading}
                             />
                         )}
                         <button
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}
-                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-black flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 flex-shrink-0"
+                            className="w-10 h-10 rounded-xl bg-white/[0.06] text-zinc-500 hover:text-white hover:bg-white/[0.1] flex items-center justify-center transition disabled:opacity-20 flex-shrink-0"
                         >
                             <Send className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="flex items-center justify-between mt-1.5 px-1">
-                        <span className="text-[9px] text-zinc-700">Powered by Gemini • 10 credits/analysis</span>
-                        {credits !== null && credits < 30 && (
-                            <span className="text-[9px] text-amber-500 font-medium">Low credits: {credits}</span>
-                        )}
-                    </div>
+                    {credits !== null && credits < 30 && (
+                        <div className="mt-1.5 px-1">
+                            <span className="text-[9px] text-amber-500/70 font-medium">Low credits: {credits}</span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
