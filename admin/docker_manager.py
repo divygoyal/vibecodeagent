@@ -770,7 +770,7 @@ This workspace is your home. You are an analytics & SEO expert.
         
         # Create container - select image and memory limit based on engine
         image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v5"
-        mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 250 * 1024 * 1024
+        mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
         # Set up volumes based on the engine
         volumes_config = {
