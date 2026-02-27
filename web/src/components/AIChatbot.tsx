@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
-import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
-import { useSiteList, usePropertyList } from '@/lib/useDashboardData';
+import { useSiteList, usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -109,8 +108,9 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Get available sites from hooks
-    const { sites } = useSiteList(true);
-    const { properties } = usePropertyList(true);
+    const { hasGoogleConnection } = useContainerStatus();
+    const { sites } = useSiteList(hasGoogleConnection);
+    const { properties } = usePropertyList(hasGoogleConnection);
 
     // Build combined site list
     const allSites = [
@@ -285,13 +285,13 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     // ─── Chat window ───
     return (
         <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[440px] h-[640px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[#000000] border border-white/[0.06] rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
+            <div className="w-full h-full bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 flex flex-col overflow-hidden">
                 {/* ── Header ── */}
-                <div className="px-4 py-3 border-b border-white/[0.04] flex items-center justify-between bg-[#030303]">
+                <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-gradient-to-r from-emerald-500/[0.04] to-cyan-500/[0.04]">
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
                             <Sparkles className="w-4 h-4 text-black" />
-                            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#030303]" />
+                            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#0a0a0f]" />
                         </div>
                         <div>
                             <h3 className="text-sm font-bold text-white leading-none">AI Analyst</h3>
@@ -308,7 +308,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                 {showSiteDropdown && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowSiteDropdown(false)} />
-                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#0a0a0a] border border-white/[0.08] rounded-lg shadow-2xl shadow-black/60 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
+                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#111116] border border-white/[0.08] rounded-lg shadow-2xl shadow-black/60 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
                                             {allSites.length === 0 ? (
                                                 <div className="px-3 py-2 text-[11px] text-zinc-600">No sites connected</div>
                                             ) : (
@@ -317,8 +317,8 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                                                         key={site.id}
                                                         onClick={() => { setSelectedChatSite(site.id); setShowSiteDropdown(false); }}
                                                         className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 transition ${selectedChatSite === site.id
-                                                                ? 'text-emerald-400 bg-emerald-500/[0.06]'
-                                                                : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                                                            ? 'text-emerald-400 bg-emerald-500/[0.06]'
+                                                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
                                                             }`}
                                                     >
                                                         <Globe className="w-3 h-3 flex-shrink-0" />
@@ -358,8 +358,8 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                ? 'bg-white/[0.06] text-zinc-200 rounded-br-sm'
-                                : 'text-zinc-400 rounded-bl-sm'
+                                ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
+                                : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                                 }`}>
                                 {msg.role === 'assistant' ? (
                                     <div className="space-y-1 text-[13px]">
@@ -408,7 +408,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 )}
 
                 {/* ── Input ── */}
-                <div className="px-4 py-3 border-t border-white/[0.04] bg-[#030303]">
+                <div className="px-4 py-3 border-t border-white/[0.06] bg-white/[0.01]">
                     <div className="flex items-center gap-2">
                         {isExpanded ? (
                             <textarea
@@ -441,7 +441,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                         <button
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}
-                            className="w-10 h-10 rounded-xl bg-white/[0.06] text-zinc-500 hover:text-white hover:bg-white/[0.1] flex items-center justify-center transition disabled:opacity-20 flex-shrink-0"
+                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-black flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 flex-shrink-0"
                         >
                             <Send className="w-4 h-4" />
                         </button>

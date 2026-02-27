@@ -145,42 +145,6 @@ export default function BotPage() {
                 </p>
             </div>
 
-            {/* ─── What Your Bot Can Do ─── */}
-            <div className="bg-gradient-to-br from-emerald-500/[0.04] to-violet-500/[0.04] border border-emerald-500/[0.12] rounded-2xl p-6">
-                <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                        <Sparkles className="w-5 h-5 text-black" />
-                    </div>
-                    <div>
-                        <h3 className="text-base font-bold text-white">What Your Bot Can Do</h3>
-                        <p className="text-[11px] text-zinc-500">Primary focus: Google Analytics & Search Console deep analysis</p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {BOT_CAPABILITIES.map((cap, i) => (
-                        <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.12] transition-all">
-                            <cap.icon className={`w-5 h-5 ${cap.color} mb-2`} />
-                            <h4 className="text-sm font-semibold text-white mb-1">{cap.label}</h4>
-                            <p className="text-[11px] text-zinc-500 leading-relaxed">{cap.desc}</p>
-                        </div>
-                    ))}
-                </div>
-                <div className="mt-4 p-4 bg-black/20 border border-white/[0.06] rounded-xl">
-                    <div className="flex items-start gap-3">
-                        <MessageSquare className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                            <p className="text-sm text-zinc-300 font-medium mb-1">How it works</p>
-                            <p className="text-xs text-zinc-500 leading-relaxed">
-                                1. Connect your Telegram bot below &nbsp;→&nbsp; 2. Connect Google (Analytics + Search Console) &nbsp;→&nbsp; 3. Chat with your bot naturally.
-                                Say things like <span className="text-emerald-400 font-mono">&quot;how is my traffic this week?&quot;</span>,
-                                <span className="text-emerald-400 font-mono">&quot;which keywords are dropping?&quot;</span>, or
-                                <span className="text-emerald-400 font-mono">&quot;analyze my top pages bounce rate&quot;</span> — your bot gives deep, data-driven insights.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {/* Bot Status Pipeline */}
             {isProvisioned && (
                 <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
@@ -394,6 +358,42 @@ export default function BotPage() {
                         <AlertCircle className="w-3 h-3" /> {errorMsg}
                     </p>
                 )}
+            </div>
+
+            {/* ─── What Your Bot Can Do ─── */}
+            <div className="bg-gradient-to-br from-emerald-500/[0.04] to-violet-500/[0.04] border border-emerald-500/[0.12] rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <Sparkles className="w-5 h-5 text-black" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-bold text-white">What Your Bot Can Do</h3>
+                        <p className="text-[11px] text-zinc-500">Primary focus: Google Analytics & Search Console deep analysis</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {BOT_CAPABILITIES.map((cap, i) => (
+                        <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.12] transition-all">
+                            <cap.icon className={`w-5 h-5 ${cap.color} mb-2`} />
+                            <h4 className="text-sm font-semibold text-white mb-1">{cap.label}</h4>
+                            <p className="text-[11px] text-zinc-500 leading-relaxed">{cap.desc}</p>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-4 p-4 bg-black/20 border border-white/[0.06] rounded-xl">
+                    <div className="flex items-start gap-3">
+                        <MessageSquare className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm text-zinc-300 font-medium mb-1">How it works</p>
+                            <p className="text-xs text-zinc-500 leading-relaxed">
+                                1. Connect your Telegram bot above &nbsp;→&nbsp; 2. Connect Google (Analytics + Search Console) &nbsp;→&nbsp; 3. Chat with your bot naturally.
+                                Say things like <span className="text-emerald-400 font-mono">&quot;how is my traffic this week?&quot;</span>,
+                                <span className="text-emerald-400 font-mono">&quot;which keywords are dropping?&quot;</span>, or
+                                <span className="text-emerald-400 font-mono">&quot;analyze my top pages bounce rate&quot;</span> — your bot gives deep, data-driven insights.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* ─── Integrations ─── */}
