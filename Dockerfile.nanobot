@@ -1,6 +1,6 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-# Install system dependencies including Node.js (for GA4/GSC) and git
+# Install system dependencies including Node.js (for GA4/GSC plugins) and git
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \
     mkdir -p /etc/apt/keyrings && \
@@ -14,14 +14,20 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Install Nanobot directly from Github repository
+# Install Nanobot from Github (latest)
 RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
+
+# Pre-install plugin dependencies (eliminates Node.js cold-start on first analytics query)
+COPY plugins/google-analytics /app/plugins/google-analytics
+COPY plugins/google-search-console /app/plugins/google-search-console
+RUN cd /app/plugins/google-analytics && npm install --production 2>/dev/null || true
+RUN cd /app/plugins/google-search-console && npm install --production 2>/dev/null || true
 
 # Change HOME to /data so nanobot reads config from /data/.nanobot/config.json
 ENV HOME=/data
 
-# Setup Workspace for plugins (mounted externally)
-RUN mkdir -p /app/skills/workspace
+# Pre-create workspace structure
+RUN mkdir -p /data/.nanobot/workspace/skills /data/.nanobot/workspace/memory
 
 EXPOSE 8080
 

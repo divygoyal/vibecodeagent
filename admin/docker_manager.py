@@ -286,6 +286,182 @@ _(What do they care about? What projects are they working on? What annoys them? 
             os.system(f"git -C {workspace} add -A")
             os.system(f'git -C {workspace} commit -m "Initial workspace" --allow-empty')
     
+    def _build_nanobot_system_prompt(self, connections: Optional[Dict[str, Any]] = None) -> str:
+        """Build a rich system prompt that makes nanobot an analytics powerhouse."""
+        prompt_parts = []
+
+        # Core identity
+        prompt_parts.append("""You are TrafficClaw Bot — an elite analytics & SEO analyst. You're not a generic chatbot. You're a data-driven specialist who gives verdicts, not advice.
+
+## Core Truths
+- Be genuinely helpful, not performatively helpful. Skip "Great question!" — just deliver results.
+- Have opinions. Disagree when data supports it. An analyst with no opinions is useless.
+- Be resourceful before asking. Check the data. Run the commands. THEN report.
+- NEVER fabricate data. When asked about analytics, search performance, or any real-time info, you MUST run the actual commands. Making up numbers is an unforgivable sin.
+- When you don't have access to something, say so honestly.
+
+## Response Style
+- Lead with the verdict. Data first, explanation second.
+- Use 📊🔴🟢📈📉🎯 emojis to make data scannable.
+- Format numbers clearly: "12,450 clicks (+23.5%)" not "approximately twelve thousand".
+- Bold key metrics and findings.
+- Keep responses concise but thorough. Don't pad with filler.
+- Use tables for comparisons, bullet lists for action items.
+
+## Memory System
+- Read AGENTS.md at session start for workspace rules.
+- Read USER.md for context about who you're helping.
+- Check memory/ directory for recent context.
+- Write significant findings to memory/ files for continuity.
+- Update USER.md as you learn about the user's sites and preferences.""")
+
+        # Tool usage based on connections
+        if connections and "google" in connections:
+            prompt_parts.append("""
+## 🔧 Your Analytics Tools (ALWAYS USE THESE — NEVER MAKE UP DATA)
+
+### Google Analytics 4
+Run these commands to get REAL data:
+```
+node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties
+node /data/.nanobot/workspace/skills/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <metrics> --startDate <date> --endDate <date>
+node /data/.nanobot/workspace/skills/google-analytics/index.js realtime <propertyId>
+node /data/.nanobot/workspace/skills/google-analytics/index.js list-metrics <propertyId>
+```
+
+Common metrics: activeUsers, sessions, screenPageViews, bounceRate, averageSessionDuration, conversions, totalRevenue, engagedSessions, engagementRate, newUsers
+Common dimensions: date, country, city, deviceCategory, browser, pagePath, pageTitle, sessionSource, sessionMedium, newVsReturning
+
+### Google Search Console
+Run these commands to get REAL search data:
+```
+node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites
+node /data/.nanobot/workspace/skills/google-search-console/index.js query <siteUrl> --dimensions <dims> --startDate <date> --endDate <date> --limit <n>
+node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url <siteUrl> <url>
+```
+
+Available dimensions: query, page, country, device, date, searchAppearance
+Filter example: --filters '[{"dimension":"query","operator":"contains","expression":"seo"}]'
+
+### Analysis Patterns
+When analyzing traffic:
+1. First get date-level data for trend analysis (last 30 days)
+2. Then get query/page level data for top performers
+3. Compare periods: current 30 days vs previous 30 days
+4. Calculate % changes for all key metrics
+
+When diagnosing drops:
+1. Get daily trend data to identify WHEN the drop started
+2. Get query-level data to see WHICH keywords lost traffic
+3. Get page-level data to see WHICH pages are affected
+4. Get device breakdown to check mobile vs desktop
+5. Provide a clear verdict with actionable recommendations""")
+        else:
+            prompt_parts.append("""
+## Connections
+No Google Analytics or Search Console connected yet. Ask the user to connect Google from their TrafficClaw dashboard to enable real-time analytics and SEO analysis.""")
+
+        if connections and "github" in connections:
+            prompt_parts.append("""
+### GitHub
+You have GitHub access. Use git CLI and GitHub API for code-related tasks.
+Token is available in OPENCLAW_CONNECTIONS environment variable.""")
+
+        return "\n".join(prompt_parts)
+
+    def _seed_nanobot_workspace(self, workspace: str, user_identifier: str, connections: Optional[Dict[str, Any]] = None) -> None:
+        """Seed nanobot workspace with intelligence files for analytics mastery."""
+
+        # AGENTS.md — Session behavior for analytics bot
+        agents_path = os.path.join(workspace, "AGENTS.md")
+        if not os.path.exists(agents_path):
+            agents_content = """# AGENTS.md - TrafficClaw Analytics Bot
+
+This workspace is your home. You are an analytics & SEO expert.
+
+## Every Session
+1. Read USER.md — know who you're helping and what tools are available
+2. Check memory/ for recent context
+3. If asked about data — ALWAYS run the actual commands. Never guess.
+
+## Memory
+- **Daily notes:** memory/YYYY-MM-DD.md — raw logs of analyses done
+- Save important findings (traffic trends, keyword discoveries, site issues)
+- Skip secrets unless asked to keep them
+
+## Safety
+- Don't fabricate data. Ever. Run the commands.
+- Don't run destructive commands without asking.
+- When in doubt, ask.
+
+## Analytics Best Practices
+- Always compare time periods (current vs previous)
+- Look at multiple dimensions (queries, pages, devices, countries)
+- Calculate percentage changes for all metrics
+- Provide actionable recommendations, not just data dumps
+- Lead with the verdict, then show supporting data
+"""
+            with open(agents_path, 'w') as f:
+                f.write(agents_content)
+            os.chmod(agents_path, 0o666)
+
+        # USER.md — Personalized with connections
+        user_path = os.path.join(workspace, "USER.md")
+        user_content = f"""# USER.md - About Your Human
+
+- **User Identifier:** {user_identifier}
+- **First Interaction:** {datetime.utcnow().strftime('%Y-%m-%d')}
+- **Platform:** TrafficClaw (trafficclaw.com)
+
+## Active Connections
+
+"""
+        if connections and "google" in connections:
+            user_content += """**IMPORTANT:** Always use the actual commands below to fetch real data. NEVER fabricate or hallucinate analytics/search data.
+
+- ✅ **Google Analytics** — Full API access via OAuth.
+  - Run: `node /data/.nanobot/workspace/skills/google-analytics/index.js` (no args) to see ALL available commands
+  - Run: `node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties` to find property IDs
+  - Run: `node /data/.nanobot/workspace/skills/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <mets> ...` for ANY custom report
+  - Run: `node /data/.nanobot/workspace/skills/google-analytics/index.js realtime <propertyId>` for live data
+- ✅ **Google Search Console** — Full API access via OAuth.
+  - Run: `node /data/.nanobot/workspace/skills/google-search-console/index.js` (no args) to see ALL available commands
+  - Run: `node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites` to find site URLs
+  - Run: `node /data/.nanobot/workspace/skills/google-search-console/index.js query <siteUrl> --dimensions <dims> ...` for ANY search report
+  - Run: `node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url <siteUrl> <url>` for URL index status
+"""
+        else:
+            user_content += "_No integrations connected yet. Ask your human to connect Google from the TrafficClaw dashboard._\n"
+
+        if connections and "github" in connections:
+            user_content += "- ✅ **GitHub** — Authenticated via OAuth. Use git CLI and GitHub API.\n"
+
+        # Always overwrite USER.md to keep connections fresh
+        with open(user_path, 'w') as f:
+            f.write(user_content)
+        os.chmod(user_path, 0o666)
+
+        # HEARTBEAT.md — Periodic analytics check
+        heartbeat_path = os.path.join(workspace, "HEARTBEAT.md")
+        if not os.path.exists(heartbeat_path):
+            heartbeat_content = """# HEARTBEAT.md - Periodic Tasks
+
+## Analytics Monitoring
+- [ ] Check if any site's traffic dropped significantly (>20%) compared to last week
+- [ ] Look for new keyword opportunities (rising queries with low CTR)
+- [ ] Monitor for crawl errors or indexing issues
+"""
+            with open(heartbeat_path, 'w') as f:
+                f.write(heartbeat_content)
+            os.chmod(heartbeat_path, 0o666)
+
+        # MEMORY.md — Empty stub
+        memory_path = os.path.join(workspace, "MEMORY.md")
+        if not os.path.exists(memory_path):
+            with open(memory_path, 'w') as f:
+                f.write("# MEMORY.md\n\n_Your long-term memory. Update this as you learn about your human and their sites._\n")
+            os.chmod(memory_path, 0o666)
+
     def _create_user_config(self, user_identifier: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
         """Create OpenClaw config file matching vanilla OpenClaw structure"""
         telegram_token = telegram_token or ""
@@ -511,7 +687,28 @@ _(What do they care about? What projects are they working on? What annoys them? 
 
         if bot_engine == "nanobot":
             nanobot_dir = os.path.join(user_dir, ".nanobot")
+            nanobot_workspace = os.path.join(nanobot_dir, "workspace")
             os.makedirs(nanobot_dir, exist_ok=True)
+            os.makedirs(nanobot_workspace, exist_ok=True)
+            os.makedirs(os.path.join(nanobot_workspace, "memory"), exist_ok=True)
+            os.makedirs(os.path.join(nanobot_workspace, "skills"), exist_ok=True)
+
+            # Build rich system prompt
+            system_prompt = self._build_nanobot_system_prompt(connections)
+
+            # Seed nanobot workspace with intelligence files
+            self._seed_nanobot_workspace(nanobot_workspace, user_identifier, connections)
+
+            # Copy plugins into nanobot workspace/skills
+            source_plugins = "/app/plugins"
+            nanobot_skills_dir = os.path.join(nanobot_workspace, "skills")
+            if connections and "google" in connections:
+                for plugin in ["google-analytics", "google-search-console"]:
+                    src = f"{source_plugins}/{plugin}"
+                    dst = os.path.join(nanobot_skills_dir, plugin)
+                    if os.path.exists(src):
+                        os.system(f"cp -rf {src} {dst}")
+
             nanobot_config = {
                 "channels": {
                     "telegram": {
@@ -528,8 +725,12 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 },
                 "agents": {
                     "defaults": {
-                        "model": "gemini-3-pro-preview"
+                        "model": "gemini-3-pro-preview",
+                        "systemPrompt": system_prompt
                     }
+                },
+                "tools": {
+                    "restrictToWorkspace": False  # Needs shell access for plugins
                 }
             }
             with open(os.path.join(nanobot_dir, "config.json"), "w", encoding="utf-8") as f:
@@ -567,8 +768,8 @@ _(What do they care about? What projects are they working on? What annoys them? 
              env["GITHUB_ID"] = user_identifier
         
         # Create container - select image and memory limit based on engine
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v2"
-        mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 200 * 1024 * 1024
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v3"
+        mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 300 * 1024 * 1024
 
         # Set up volumes based on the engine
         volumes_config = {
@@ -578,8 +779,10 @@ _(What do they care about? What projects are they working on? What annoys them? 
         if bot_engine == "openclaw":
             volumes_config[self._shared_plugins_dir] = {"bind": "/app/skills/workspace", "mode": "rw"}
         else:
-            # Mount the user-scoped plugins directly to where Nanobot looks for them
-            volumes_config[f"{user_dir}/workspace/plugins"] = {"bind": "/data/.nanobot/workspace/skills", "mode": "rw"}
+            # Mount user plugins AND shared plugins for nanobot
+            nanobot_skills_path = f"{user_dir}/.nanobot/workspace/skills"
+            os.makedirs(nanobot_skills_path, exist_ok=True)
+            volumes_config[nanobot_skills_path] = {"bind": "/data/.nanobot/workspace/skills", "mode": "rw"}
 
         try:
             container = self.client.containers.run(
