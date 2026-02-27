@@ -28,9 +28,10 @@ class DockerManager:
     
     def _ensure_nanobot_image(self) -> None:
         """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
-        tag = "trafficclaw/nanobot:v2"
+        tag = "trafficclaw/nanobot:v3"
         try:
             self.client.images.get(tag)
+            logger.info(f"Nanobot image {tag} already exists")
         except docker.errors.ImageNotFound:
             logger.info(f"Image {tag} not found! Starting background build thread...")
             import threading
@@ -52,10 +53,10 @@ RUN apt-get update && \\
 WORKDIR /app
 RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
 ENV HOME=/data
-RUN mkdir -p /app/skills/workspace
+RUN mkdir -p /data/.nanobot/workspace/skills /data/.nanobot/workspace/memory
 EXPOSE 8080
 ENTRYPOINT ["nanobot"]
-CMD ["gateway", "--port", "8080"]
+CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
 '''
                 try:
                     for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
