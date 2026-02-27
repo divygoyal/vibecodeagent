@@ -29,7 +29,8 @@ ENV HOME=/data
 # Pre-create workspace structure
 RUN mkdir -p /data/.nanobot/workspace/skills /data/.nanobot/workspace/memory
 
-EXPOSE 8080
+# Nanobot gateway listens on 18790 by default
+EXPOSE 18790
 
 ENTRYPOINT ["nanobot"]
-CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
+CMD ["gateway"]

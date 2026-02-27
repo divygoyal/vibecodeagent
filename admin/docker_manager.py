@@ -54,9 +54,9 @@ WORKDIR /app
 RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
 ENV HOME=/data
 RUN mkdir -p /data/.nanobot/workspace/skills /data/.nanobot/workspace/memory
-EXPOSE 8080
+EXPOSE 18790
 ENTRYPOINT ["nanobot"]
-CMD ["gateway", "--port", "8080", "--host", "0.0.0.0"]
+CMD ["gateway"]
 '''
                 try:
                     for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
@@ -791,7 +791,7 @@ This workspace is your home. You are an analytics & SEO expert.
                 name=container_name,
                 detach=True,
                 restart_policy={"Name": "on-failure", "MaximumRetryCount": 3},
-                ports={"8080/tcp": port},
+                ports={"18790/tcp": port} if bot_engine == "nanobot" else {"8080/tcp": port},
                 volumes=volumes_config,
                 environment=env,
                 mem_limit=mem_limit_bytes,
@@ -1095,6 +1095,8 @@ This workspace is your home. You are an analytics & SEO expert.
                 ports = container.attrs.get('NetworkSettings', {}).get('Ports', {})
                 if ports and "8080/tcp" in ports and ports["8080/tcp"]:
                     host_port = int(ports["8080/tcp"][0]["HostPort"])
+                elif ports and "18790/tcp" in ports and ports["18790/tcp"]:
+                    host_port = int(ports["18790/tcp"][0]["HostPort"])
             except Exception:
                 pass
             
