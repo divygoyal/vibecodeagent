@@ -190,7 +190,32 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 }),
             });
 
-            if (!res.ok) throw new Error('Failed to get response');
+            if (!res.ok) {
+                // Handle credit exhaustion (402) specially
+                if (res.status === 402) {
+                    try {
+                        const errorData = await res.json();
+                        const creditMsg = errorData.response || `⚡ You've run out of credits! Each AI analysis costs **10 credits**.\n\n🛒 **Get more credits** to continue using TrafficClaw AI.`;
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            const last = newMessages[newMessages.length - 1];
+                            last.content = creditMsg;
+                            return newMessages;
+                        });
+                        if (errorData.credits !== undefined) setCredits(errorData.credits);
+                    } catch {
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            const last = newMessages[newMessages.length - 1];
+                            last.content = '⚡ **Out of credits!** Please purchase more credits to continue.';
+                            return newMessages;
+                        });
+                    }
+                    setIsLoading(false);
+                    return;
+                }
+                throw new Error('Failed to get response');
+            }
 
             const reader = res.body?.getReader();
             if (!reader) throw new Error('No readable stream available');
