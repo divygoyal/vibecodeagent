@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
+import OverviewInsights from '@/components/OverviewInsights';
 
 /* ─── Computed Insight Types ─── */
 interface StrikingKeyword {
@@ -408,6 +409,18 @@ export default function DashboardOverview() {
       {hasGoogleConnection && (
         <div className="space-y-5">
 
+          {/* ══ NEW 6 INSIGHT SECTIONS ══ */}
+          <OverviewInsights
+            trafficData={analyticsData?.traffic || []}
+            searchTrend={seoData?.trend || []}
+            seoQueries={seoData?.queries || []}
+            seoPages={seoData?.pages || []}
+            analyticsKPIs={analyticsKPIs}
+            seoKPIs={seoKPIs}
+            hasData={hasData}
+            isLoading={!hasData && isRef}
+          />
+
           {/* Row 1: Site Health + Money Opportunities */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
@@ -676,8 +689,8 @@ export default function DashboardOverview() {
                             />
                             <div className="relative flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-gradient-to-br from-amber-400/20 to-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                  i === 1 ? 'bg-gradient-to-br from-zinc-400/20 to-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
-                                    'bg-gradient-to-br from-orange-400/20 to-orange-500/10 text-orange-400 border border-orange-500/20'
+                                i === 1 ? 'bg-gradient-to-br from-zinc-400/20 to-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
+                                  'bg-gradient-to-br from-orange-400/20 to-orange-500/10 text-orange-400 border border-orange-500/20'
                                 }`}>
                                 {i + 1}
                               </div>
