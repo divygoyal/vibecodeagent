@@ -24,7 +24,7 @@ TOKEN_CONFIG = {
     "compaction": "aggressive",
     "heartbeatEnabled": False,
     "heartbeatInterval": "60m",
-    "defaultModel": "gemini-2.0-flash"
+    "defaultModel": "gemini-3-flash-preview"
 }
 
 def get_next_port():

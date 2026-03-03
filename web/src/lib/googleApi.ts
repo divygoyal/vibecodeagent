@@ -37,8 +37,13 @@ export async function fetchGoogleTokensFromDb(
     }
 }
 
+// Bug #8 fix: Deduplication map for concurrent token refresh requests.
+// Keyed by refresh token, holds the in-flight promise so multiple callers share one refresh.
+const pendingRefresh = new Map<string, Promise<string>>();
+
 /**
  * Get a valid Google access token, refreshing if necessary.
+ * Bug #8 fix: Deduplicates concurrent refresh requests using a pending promise map.
  */
 export async function getValidAccessToken(
     accessToken?: string,
@@ -58,30 +63,48 @@ export async function getValidAccessToken(
 
     // Try refreshing with refresh token
     if (refreshToken) {
-        const res = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                client_id: GOOGLE_CLIENT_ID,
-                client_secret: GOOGLE_CLIENT_SECRET,
-                refresh_token: refreshToken,
-            }),
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            const newToken = data.access_token;
-            const expiresIn = data.expires_in || 3600;
-
-            tokenCache.set(refreshToken, {
-                accessToken: newToken,
-                expiresAt: Date.now() + expiresIn * 1000,
-            });
-
-            return newToken;
+        // Bug #8 fix: If a refresh is already in flight for this token, reuse it
+        const existing = pendingRefresh.get(refreshToken);
+        if (existing) {
+            return existing;
         }
-        console.error('Google token refresh failed:', res.status, await res.text());
+
+        const refreshPromise = (async () => {
+            try {
+                const res = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        client_id: GOOGLE_CLIENT_ID,
+                        client_secret: GOOGLE_CLIENT_SECRET,
+                        refresh_token: refreshToken,
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const newToken = data.access_token;
+                    const expiresIn = data.expires_in || 3600;
+
+                    tokenCache.set(refreshToken, {
+                        accessToken: newToken,
+                        expiresAt: Date.now() + expiresIn * 1000,
+                    });
+
+                    return newToken;
+                }
+                console.error('Google token refresh failed:', res.status, await res.text());
+            } finally {
+                pendingRefresh.delete(refreshToken);
+            }
+            // Refresh failed — fall through to access token fallback
+            if (accessToken) return accessToken;
+            throw new Error('Failed to refresh Google token');
+        })();
+
+        pendingRefresh.set(refreshToken, refreshPromise);
+        return refreshPromise;
     }
 
     // Fallback to existing access token (might be expired)

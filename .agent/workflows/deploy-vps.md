@@ -174,7 +174,7 @@ The bot should respond with personality. Then test tools:
 
 | Problem | Fix |
 |---|---|
-| Bot says "I can't do that" | Check model is `gemini-3-pro-preview`, not `gemini-2.0-flash` |
+| Bot says "I can't do that" | Check model is `gemini-3-pro-preview`, not `gemini-3-flash-preview` |
 | Files owned by `root:root` | `chown` runs after file creation in `_seed_intelligence()` — re-provision |
 | Container won't start | Check `docker logs clawbot_<id>` and `GEMINI_API_KEY` |
 | SSL errors | Verify certbot certs exist at `/etc/letsencrypt/live/yourdomain/` |

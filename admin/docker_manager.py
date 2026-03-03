@@ -489,10 +489,10 @@ This workspace is your home. You are an analytics & SEO expert.
                     },
                     "workspace": "/data/workspace",
                     "model": {
-                        "primary": "google/gemini-3-pro-preview"
+                        "primary": "google/gemini-3-flash-preview"
                     },
                     "models": {
-                        "google/gemini-3-pro-preview": {
+                        "google/gemini-3-flash-preview": {
                             "alias": "gemini"
                         }
                     }
@@ -748,7 +748,7 @@ This workspace is your home. You are an analytics & SEO expert.
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
-            "OPENCLAW_MODEL": "google/gemini-3-pro-preview",
+            "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
             # User identification
             "USER_IDENTIFIER": user_identifier,
             "PLAN": plan,

@@ -30,8 +30,12 @@ export async function cachedFetch<T>(
         return existing.data;
     }
 
-    const data = await fetcher();
-    cache.set(key, { data, timestamp: now, ttl: ttlMs });
+    const result = await fetcher();
+    // Bug #10 fix: Don't cache error objects — allow fresh attempts on retry
+    const isError = result && (typeof result === 'object') && ('error' in result || '__isError' in result);
+    if (!isError) {
+        cache.set(key, { data: result, timestamp: now, ttl: ttlMs });
+    }
 
     // Lazy cleanup: remove expired entries when cache gets large
     if (cache.size > 200) {
@@ -42,7 +46,7 @@ export async function cachedFetch<T>(
         }
     }
 
-    return data;
+    return result;
 }
 
 /**

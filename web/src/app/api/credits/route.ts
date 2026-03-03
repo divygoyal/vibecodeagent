@@ -27,13 +27,15 @@ export async function GET() {
 
         if (!res.ok) {
             console.error('[Credits] Failed to fetch credits:', res.status);
-            return NextResponse.json({ credits: 0 });
+            // Bug #12 fix: Return distinct error state instead of masking as 0 credits
+            return NextResponse.json({ credits: null, error: 'unavailable' });
         }
 
         const data = await res.json();
         return NextResponse.json({ credits: data.credits ?? 0 });
     } catch (err) {
         console.error('[Credits] Error:', err);
-        return NextResponse.json({ credits: 0 });
+        // Bug #12 fix: Return distinct error state instead of masking as 0 credits
+        return NextResponse.json({ credits: null, error: 'unavailable' });
     }
 }

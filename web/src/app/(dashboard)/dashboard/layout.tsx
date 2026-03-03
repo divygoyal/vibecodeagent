@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext } from 'react';
-import { signOut, useSession } from 'next-auth/react';
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -20,6 +20,7 @@ interface RegistrationContextType {
     isRegistered: boolean;
     isRegistering: boolean;
     registrationError: string | null;
+    retryRegistration: () => void;
     selectedProperty: string;
     setSelectedProperty: (v: string) => void;
     selectedSite: string;
@@ -30,6 +31,7 @@ const RegistrationContext = createContext<RegistrationContextType>({
     isRegistered: false,
     isRegistering: true,
     registrationError: null,
+    retryRegistration: () => { },
     selectedProperty: '',
     setSelectedProperty: () => { },
     selectedSite: '',
@@ -58,7 +60,7 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const pathname = usePathname();
     const { credits } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
@@ -82,24 +84,52 @@ export default function DashboardLayout({
     };
 
     // Registration state — check sessionStorage first to avoid re-registering on refresh
+    // Bug #3 fix: validate cached registration belongs to current user
     const [registrationState, setRegistrationState] = useState(() => {
         if (typeof window !== 'undefined') {
             const cached = sessionStorage.getItem('tc-registered');
-            if (cached === 'true') {
+            const cachedUser = sessionStorage.getItem('tc-registered-user');
+            // Only trust cache if a user identity was stored with it
+            if (cached === 'true' && cachedUser) {
                 return { isRegistered: true, isRegistering: false, registrationError: null as string | null };
             }
         }
         return { isRegistered: false, isRegistering: true, registrationError: null as string | null };
     });
 
+    // Bug #1 fix: prevent duplicate registration calls with a ref
+    const registrationAttempted = useRef(false);
+
+    // Bug #3 fix: clear registration flag on sign-out so a different account doesn't reuse it
     useEffect(() => {
-        // Skip if already registered (persisted in sessionStorage)
-        if (registrationState.isRegistered) return;
-        if (!session?.user) {
-            // Reset state when no session
-            setRegistrationState({ isRegistered: false, isRegistering: true, registrationError: null });
-            return;
+        if (status === 'unauthenticated') {
+            sessionStorage.removeItem('tc-registered');
+            sessionStorage.removeItem('tc-registered-user');
         }
+    }, [status]);
+
+    // Bug #3 fix: if session user email doesn't match cached user, invalidate cache
+    useEffect(() => {
+        if (session?.user?.email) {
+            const cachedUser = sessionStorage.getItem('tc-registered-user');
+            if (cachedUser && cachedUser !== session.user.email) {
+                // Different user — clear stale cache
+                sessionStorage.removeItem('tc-registered');
+                sessionStorage.removeItem('tc-registered-user');
+                registrationAttempted.current = false;
+                setRegistrationState({ isRegistered: false, isRegistering: true, registrationError: null });
+            }
+        }
+    }, [session?.user?.email]);
+
+    useEffect(() => {
+        // Skip if already registered
+        if (registrationState.isRegistered) return;
+        // Bug #1 fix: don't reset state when session is briefly undefined — just wait
+        if (!session?.user) return;
+        // Bug #1 fix: prevent re-entry if registration is already in-flight
+        if (registrationAttempted.current) return;
+        registrationAttempted.current = true;
 
         const registerProvider = async () => {
             try {
@@ -111,8 +141,9 @@ export default function DashboardLayout({
                 });
 
                 if (res.ok) {
-                    // Persist in sessionStorage so refresh doesn't re-trigger
+                    // Persist in sessionStorage with user identity
                     sessionStorage.setItem('tc-registered', 'true');
+                    sessionStorage.setItem('tc-registered-user', session.user?.email || session.user?.name || '');
                     setRegistrationState({
                         isRegistered: true,
                         isRegistering: false,
@@ -138,7 +169,30 @@ export default function DashboardLayout({
         };
 
         registerProvider();
-    }, [session, registrationState.isRegistered]);
+    }, [session?.user?.email]); // Bug #1 fix: stable dependency — only changes on actual login
+
+    // Bug #6 fix: retry callback so child components can retry without full page reload
+    const retryRegistration = useCallback(() => {
+        registrationAttempted.current = false;
+        setRegistrationState({ isRegistered: false, isRegistering: true, registrationError: null });
+    }, []);
+
+    // Bug #13 fix: redirect to login if session is expired/unauthenticated
+    if (status === 'unauthenticated') {
+        return (
+            <div className="min-h-screen bg-[#09090b] text-white flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-zinc-400 mb-4">Your session has expired</p>
+                    <button
+                        onClick={() => signIn()}
+                        className="px-5 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors border border-emerald-500/20 font-medium text-sm"
+                    >
+                        Sign In Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#09090b] text-white flex">
@@ -312,7 +366,7 @@ export default function DashboardLayout({
                 {/* Page content */}
                 <main className="flex-1 p-6 overflow-y-auto">
                     <div className="max-w-7xl mx-auto">
-                        <RegistrationContext.Provider value={{ ...registrationState, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite }}>
+                        <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite }}>
                             {children}
                         </RegistrationContext.Provider>
                     </div>

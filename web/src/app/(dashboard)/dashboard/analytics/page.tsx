@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -104,10 +105,25 @@ export default function AnalyticsPage() {
 
     if (isLoading && !analyticsData) return <SkeletonDashboard />;
     if (isError && !analyticsData) {
+        const errorMsg = isError?.message || isError?.toString?.() || 'Failed to load analytics data';
+        const isTokenError = errorMsg.toLowerCase().includes('token') || errorMsg.toLowerCase().includes('auth') || errorMsg.toLowerCase().includes('401');
         return (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <p className="text-red-400 text-sm">Failed to load analytics data</p>
-                <button onClick={() => refresh()} className="text-xs text-blue-400 hover:underline">Retry</button>
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
+                    <BarChart3 className="w-6 h-6 text-red-400" />
+                </div>
+                <p className="text-red-400 text-sm font-medium">Analytics data unavailable</p>
+                <p className="text-zinc-500 text-xs max-w-md text-center">{errorMsg}</p>
+                <div className="flex items-center gap-3 mt-2">
+                    <button onClick={() => refresh()} className="px-4 py-2 text-xs text-blue-400 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 transition border border-blue-500/20">
+                        Retry
+                    </button>
+                    {isTokenError && (
+                        <button onClick={() => signIn('google')} className="px-4 py-2 text-xs text-emerald-400 bg-emerald-500/10 rounded-lg hover:bg-emerald-500/20 transition border border-emerald-500/20">
+                            Re-connect Google
+                        </button>
+                    )}
+                </div>
             </div>
         );
     }
@@ -457,19 +473,21 @@ export default function AnalyticsPage() {
                         activeRow={(item: any) => filters.channel.includes(item.name)}
                         columns={[
                             { key: 'name', label: 'Channel', sortable: true, getValue: (item: any) => item.name, render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span> },
-                            { key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => {
-                                const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-                                const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                                return (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-zinc-300 text-xs tabular-nums min-w-[40px] text-right">{item.value?.toLocaleString()}</span>
-                                        <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[50px]">
-                                            <div className="h-full rounded-full bg-emerald-500/40" style={{ width: `${pct}%`, transition: 'width 0.4s' }} />
+                            {
+                                key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => {
+                                    const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+                                    const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                                    return (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-zinc-300 text-xs tabular-nums min-w-[40px] text-right">{item.value?.toLocaleString()}</span>
+                                            <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[50px]">
+                                                <div className="h-full rounded-full bg-emerald-500/40" style={{ width: `${pct}%`, transition: 'width 0.4s' }} />
+                                            </div>
+                                            <span className="text-zinc-500 text-[10px] tabular-nums min-w-[28px] text-right">{pct}%</span>
                                         </div>
-                                        <span className="text-zinc-500 text-[10px] tabular-nums min-w-[28px] text-right">{pct}%</span>
-                                    </div>
-                                );
-                            }},
+                                    );
+                                }
+                            },
                         ]}
                         defaultSort={{ key: 'value', dir: 'desc' }}
                     />
@@ -574,7 +592,7 @@ function TechPanel({ devices, browsers, operatingSystems, allDevices, allBrowser
     const { filters, toggleFilter } = useFilterStore();
     const data = tab === 'device' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, pct: d.percentage }))
         : tab === 'browser' ? browsers.map((b: any) => ({ name: b.name, value: b.value, pct: b.percentage }))
-        : operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }));
+            : operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }));
     const dim = tab === 'device' ? 'device' : tab === 'browser' ? 'browser' : 'os';
     const maxVal = Math.max(...data.map((d: any) => d.value || 0), 1);
 

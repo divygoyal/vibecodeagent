@@ -1,13 +1,12 @@
 {
   "$schema": "https://openclaw.ai/schema/config.json",
   "version": "1.0",
-  
   "agents": {
     "defaults": {
       "heartbeat": {
         "enabled": false,
         "every": "60m",
-        "model": "gemini-2.0-flash-lite"
+        "model": "gemini-3-flash-preview"
       },
       "session": {
         "contextTokens": 32000,
@@ -17,19 +16,18 @@
         "autoSummarizeAfter": 30
       },
       "model": {
-        "default": "gemini-2.0-flash",
+        "default": "gemini-3-flash-preview",
         "thinking": false,
         "temperature": 0.7,
         "maxOutputTokens": 2048
       }
     }
   },
-
   "models": {
     "aliases": {
-      "fast": "gemini-2.0-flash-lite",
-      "balanced": "gemini-2.0-flash",
-      "smart": "gemini-2.0-pro"
+      "fast": "gemini-3-flash-preview",
+      "balanced": "gemini-3-flash-preview",
+      "smart": "gemini-3-flash-preview"
     },
     "routing": {
       "simple_queries": "fast",
@@ -37,37 +35,24 @@
       "complex_reasoning": "smart"
     },
     "params": {
-      "gemini-2.0-flash-lite": {
-        "temperature": 0.5,
-        "maxOutputTokens": 1024,
-        "thinking": false
-      },
-      "gemini-2.0-flash": {
+      "gemini-3-flash-preview": {
         "temperature": 0.7,
         "maxOutputTokens": 2048,
-        "thinking": false
-      },
-      "gemini-2.0-pro": {
-        "temperature": 0.8,
-        "maxOutputTokens": 4096,
         "thinking": false
       }
     }
   },
-
   "rateLimit": {
     "tokensPerMinute": 900000,
     "requestsPerMinute": 50,
     "dailyTokenBudget": 50000000,
     "warningThreshold": 0.8
   },
-
   "caching": {
     "enabled": true,
     "ttlMinutes": 30,
     "maxEntries": 1000
   },
-
   "tools": {
     "outputTruncation": {
       "enabled": true,
@@ -75,12 +60,10 @@
       "truncationMessage": "... [output truncated for token efficiency]"
     }
   },
-
   "telegram": {
     "dmPolicy": "pairing",
     "maxMessageLength": 4000
   },
-
   "logging": {
     "level": "info",
     "tokenUsage": true

@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
+import { useSession } from 'next-auth/react';
 
 const fetcher = async (url: string) => {
     const res = await fetch(url);
@@ -23,23 +25,44 @@ const swrOptions = {
     errorRetryInterval: 3000, // Wait 3s between retries
 };
 
-// Hook that waits for registration before enabling the SWR key
-function useRegisteredSWR(url: string | null, options = {}) {
-    const { isRegistered, isRegistering } = useRegistration();
+// Bug #4/#6 fix: Hook that waits for registration but has a timeout fallback
+// so data fetching isn't permanently blocked if registration is slow or fails.
+const REGISTRATION_TIMEOUT = 5000; // 5 seconds max wait
 
-    // Only fetch if registered and URL is provided
-    const key = isRegistered && !isRegistering ? url : null;
+function useRegisteredSWR(url: string | null, options = {}) {
+    const { isRegistered, isRegistering, registrationError } = useRegistration();
+    const [timedOut, setTimedOut] = useState(false);
+
+    useEffect(() => {
+        if (isRegistered) return; // Already registered, no need for timeout
+        const timer = setTimeout(() => setTimedOut(true), REGISTRATION_TIMEOUT);
+        return () => clearTimeout(timer);
+    }, [isRegistered]);
+
+    // Allow fetching if:
+    // - Registered normally, OR
+    // - Registration timed out (admin DB is slow but JWT tokens are still valid), OR
+    // - Registration failed with error (proceed in degraded mode)
+    const canFetch = isRegistered || timedOut || !!registrationError;
+    const key = canFetch ? url : null;
 
     return useSWR(key, fetcher, { ...swrOptions, ...options });
 }
 
 export function useContainerStatus() {
     const { data, error, isLoading, mutate } = useRegisteredSWR('/api/container');
+    const { data: session } = useSession();
 
-    // Derive Google connection status from connectedProviders
-    const hasGoogleConnection = data?.connectedProviders?.some(
+    // Bug #5 fix: Check from admin DB providers
+    const adminHasGoogle = data?.connectedProviders?.some(
         (c: { provider: string }) => c.provider === 'google'
     ) || false;
+
+    // Bug #5 fix: ALSO check from the current NextAuth session (JWT has the token)
+    // This handles the case where admin DB hasn't synced yet
+    const sessionHasGoogle = !!(session?.user as any)?.googleAccessToken;
+
+    const hasGoogleConnection = adminHasGoogle || sessionHasGoogle;
 
     return {
         botStatus: data,

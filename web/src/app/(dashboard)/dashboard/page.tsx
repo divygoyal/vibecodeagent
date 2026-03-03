@@ -102,11 +102,20 @@ export default function DashboardOverview() {
     }
   }, [sites, selectedSiteUrl]);
 
-  // Derived Property ID
+  // Derived Property ID — Bug #14 fix: improved matching priority
   const domain = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('/', '');
-  const matchedProp = properties.find(p =>
-    p.displayName.toLowerCase().includes(domain.split('.')[0])
-  ) || properties[0]; // Fallback to first
+  const domainRoot = domain.split('.')[0]; // e.g., "example" from "example.com"
+
+  // Try matching in priority order:
+  // 1. Exact domain match in displayName (e.g., "example.com" in "example.com - GA4")
+  // 2. Domain root in property's data stream URL (if available)  
+  // 3. Partial match by domain root in displayName
+  // 4. Fallback to first property
+  const matchedProp =
+    properties.find((p: any) => p.displayName.toLowerCase().includes(domain.toLowerCase())) ||
+    properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
+    properties.find((p: any) => p.displayName.toLowerCase().includes(domainRoot.toLowerCase())) ||
+    properties[0]; // Fallback to first
 
   // 3. Fetch Data — analytics/SEO need Google connection (not container)
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, hasGoogleConnection);

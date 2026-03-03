@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
 
 async function callGemini(prompt: string): Promise<string> {
     if (!GEMINI_API_KEY) return '';

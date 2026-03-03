@@ -81,25 +81,19 @@ export const authOptions: NextAuthOptions = {
                     token.refreshToken = account.refresh_token;
                 }
 
-                // Only keep the CURRENT provider's tokens in JWT.
-                // Clear other provider tokens to prevent stale leakage
-                // (e.g. old GitHub token persisting after user deletion + re-signup).
-                // The admin DB persists ALL provider tokens — API routes fall back
-                // to admin DB when they need tokens from other providers.
+                // Keep BOTH providers' tokens in JWT.
+                // Previously we cleared the other provider's tokens which caused
+                // the "Connect Google" false prompt after switching providers.
                 if (account.provider === "github") {
                     token.username = (profile as any)?.login;
                     token.githubAccessToken = account.access_token;
-                    // Clear Google tokens — admin DB has them if needed
-                    token.googleAccessToken = undefined;
-                    token.googleRefreshToken = undefined;
+                    // Keep existing Google tokens — they're still valid
                 } else if (account.provider === "google") {
                     token.googleAccessToken = account.access_token;
                     if (account.refresh_token) {
                         token.googleRefreshToken = account.refresh_token;
                     }
-                    // Clear GitHub tokens — admin DB has them if needed
-                    token.githubAccessToken = undefined;
-                    token.username = undefined;
+                    // Keep existing GitHub tokens — they're still valid
                 }
             }
             return token;
