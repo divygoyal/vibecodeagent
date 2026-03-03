@@ -469,9 +469,13 @@ CRITICAL SYSTEM CONTEXT:
                                 }
                             }
 
-                            // Collect function calls
-                            if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-                                for (const fc of chunk.functionCalls) {
+                            // Collect function call parts from raw candidates
+                            // (preserves thoughtSignature required by Gemini 3+ models)
+                            const rawParts = chunk.candidates?.[0]?.content?.parts;
+                            if (rawParts) {
+                                for (const part of rawParts) {
+                                    if (!part.functionCall) continue;
+                                    const fc = part.functionCall;
                                     const toolName = fc.name;
 
                                     // Hard limit: max 2 GSC calls
@@ -481,12 +485,12 @@ CRITICAL SYSTEM CONTEXT:
 
                                     // Dedupe
                                     const isDup = pendingFunctionCalls.some(
-                                        p => p.name === toolName && JSON.stringify(p.args) === JSON.stringify(fc.args)
+                                        (p: any) => p.functionCall.name === toolName && JSON.stringify(p.functionCall.args) === JSON.stringify(fc.args)
                                     );
 
                                     if (!isDup) {
                                         if (toolName === 'get_search_performance') gscCallCount++;
-                                        pendingFunctionCalls.push(fc);
+                                        pendingFunctionCalls.push(part);
                                         controller.enqueue(encodeSSE({
                                             type: 'tool_start',
                                             name: toolName,
@@ -500,38 +504,39 @@ CRITICAL SYSTEM CONTEXT:
                         // Handle tool execution
                         if (pendingFunctionCalls.length > 0) {
                             // Add model response to conversation history
+                            // Raw parts preserve thoughtSignature required by Gemini 3+
                             const modelParts: any[] = [];
                             if (fullText) modelParts.push({ text: fullText });
-                            for (const fc of pendingFunctionCalls) {
-                                modelParts.push({ functionCall: { name: fc.name, args: fc.args } });
-                            }
+                            modelParts.push(...pendingFunctionCalls);
                             currentContents.push({ role: 'model', parts: modelParts });
 
                             // Execute tools in parallel
-                            const toolResults = await Promise.all(pendingFunctionCalls.map(async (fc) => {
+                            const toolResults = await Promise.all(pendingFunctionCalls.map(async (part: any) => {
+                                const fcName = part.functionCall.name;
+                                const fcArgs = part.functionCall.args || {};
                                 try {
-                                    const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
+                                    const toolResult = await executeAiChatTool(fcName, fcArgs, {
                                         googleAccessToken,
                                         googleRefreshToken
                                     });
 
                                     controller.enqueue(encodeSSE({
                                         type: 'tool_result',
-                                        name: fc.name,
+                                        name: fcName,
                                         result: toolResult.result,
                                         error: toolResult.error,
                                     }));
 
                                     return {
                                         functionResponse: {
-                                            name: fc.name,
+                                            name: fcName,
                                             response: { result: toolResult },
                                         }
                                     };
                                 } catch {
                                     return {
                                         functionResponse: {
-                                            name: fc.name,
+                                            name: fcName,
                                             response: { result: { error: "Execution failed" } },
                                         }
                                     };
@@ -555,7 +560,18 @@ CRITICAL SYSTEM CONTEXT:
                     controller.close();
                 } catch (error: any) {
                     try {
-                        const errMsg = error?.message || 'Internal server error while streaming';
+                        // Extract a clean error message instead of raw JSON
+                        let errMsg = 'Something went wrong. Please try again.';
+                        const rawMsg = error?.message || '';
+                        if (rawMsg.includes('thought_signature')) {
+                            errMsg = 'AI service configuration error. Please try again or clear the chat.';
+                        } else if (rawMsg.includes('RATE_LIMIT') || rawMsg.includes('429')) {
+                            errMsg = 'AI service is busy. Please wait a moment and try again.';
+                        } else if (rawMsg.includes('timeout') || rawMsg.includes('DEADLINE_EXCEEDED')) {
+                            errMsg = 'Request timed out. Try a simpler question or try again.';
+                        } else if (rawMsg.includes('INVALID_ARGUMENT') || rawMsg.includes('400')) {
+                            errMsg = 'Invalid request. Please clear the chat and try again.';
+                        }
                         controller.enqueue(encodeSSE({ type: 'error', message: errMsg }));
                         controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                         controller.close();
