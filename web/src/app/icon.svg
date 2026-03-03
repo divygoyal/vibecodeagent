@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <defs>
+    <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#fg)"/>
+  <!-- Claw marks -->
+  <g stroke="rgba(0,0,0,0.45)" stroke-width="2.2" stroke-linecap="round">
+    <line x1="8" y1="24" x2="13" y2="9"/>
+    <line x1="13" y1="24" x2="18" y2="9"/>
+    <line x1="18" y1="24" x2="23" y2="9"/>
+  </g>
+  <!-- Trend line -->
+  <path d="M5 25 L11 19 L17 21 L25 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="25" cy="10" r="1.5" fill="white"/>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <defs>
+    <linearGradient id="apple-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="url(#apple-bg)"/>
+  <!-- Claw marks -->
+  <g stroke="rgba(0,0,0,0.45)" stroke-width="12" stroke-linecap="round">
+    <line x1="46" y1="133" x2="74" y2="49"/>
+    <line x1="74" y1="133" x2="102" y2="49"/>
+    <line x1="102" y1="133" x2="130" y2="49"/>
+  </g>
+  <!-- Trend line -->
+  <path d="M28 140 L63 109 L95 119 L140 56" stroke="white" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="140" cy="56" r="7.5" fill="white"/>
+</svg>

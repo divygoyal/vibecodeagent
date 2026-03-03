@@ -16,6 +16,24 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TrafficClaw — AI-Powered Growth Intelligence",
   description: "Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.",
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon.svg',
+  },
+  metadataBase: new URL('https://trafficclaw.com'),
+  openGraph: {
+    title: 'TrafficClaw — AI-Powered Growth Intelligence',
+    description: 'Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.',
+    siteName: 'TrafficClaw',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TrafficClaw — AI-Powered Growth Intelligence',
+    description: 'Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.',
+  },
 };
 
 export default function RootLayout({
