@@ -209,7 +209,7 @@ async function deductCredits(userId: string): Promise<number | null> {
         const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits/deduct`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-            body: JSON.stringify({ amount: 10 }),
+            body: JSON.stringify({ amount: 1 }),
             cache: 'no-store',
         });
         if (!res.ok) return null;
@@ -244,11 +244,11 @@ export async function POST(req: NextRequest) {
         // ── Credit check ──
         if (ADMIN_API_KEY && userId) {
             const credits = await getUserCredits(String(userId));
-            if (credits !== null && credits < 10) {
+            if (credits !== null && credits < 1) {
                 return new Response(JSON.stringify({
                     error: 'insufficient_credits',
                     credits: credits,
-                    response: `⚡ You've used all your credits! You have **${credits}** credits remaining, but each AI analysis costs **10 credits**.\n\n🛒 **Get more credits** to continue using TrafficClaw AI:\n- 💰 100 credits for just $1\n- 🔥 500 credits for $5 (save 50%)\n- 🚀 1,200 credits for $10 (best value)\n\nVisit your dashboard settings to purchase more credits.`
+                    response: `⚡ You've used all your messages! You have **${credits}** credits remaining.\n\n**1 credit = 1 message.** Get more to continue:\n- 💰 [100 messages for $1](https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI)\n- 🔥 [500 messages for $5](https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI)\n- 🚀 [1,200 messages for $10](https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp) (best value — save 20%)`
                 }), { status: 402, headers: { 'Content-Type': 'application/json' } });
             }
         }

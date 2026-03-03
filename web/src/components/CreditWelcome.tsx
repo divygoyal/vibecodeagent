@@ -58,7 +58,7 @@ export default function CreditWelcome({ credits, onDismiss }: CreditWelcomeProps
                         <Coins className="w-8 h-8 text-black" />
                     </div>
                     <h2 className="text-xl font-bold text-white mb-1">Welcome to TrafficClaw!</h2>
-                    <p className="text-zinc-400 text-sm">You&apos;ve been granted free AI credits</p>
+                    <p className="text-zinc-400 text-sm">You&apos;ve been granted free AI messages</p>
                 </div>
 
                 {/* Credit counter */}
@@ -66,8 +66,8 @@ export default function CreditWelcome({ credits, onDismiss }: CreditWelcomeProps
                     <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-2 tabular-nums">
                         {countUp}
                     </div>
-                    <p className="text-zinc-500 text-sm mb-1">AI Analysis Credits</p>
-                    <p className="text-zinc-600 text-xs">Each analysis costs 10 credits • Get instant insights</p>
+                    <p className="text-zinc-500 text-sm mb-1">AI Messages</p>
+                    <p className="text-zinc-600 text-xs">1 credit = 1 message • Start analyzing now</p>
                 </div>
 
                 {/* CTA */}

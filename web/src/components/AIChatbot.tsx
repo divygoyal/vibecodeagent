@@ -195,7 +195,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 if (res.status === 402) {
                     try {
                         const errorData = await res.json();
-                        const creditMsg = errorData.response || `⚡ You've run out of credits! Each AI analysis costs **10 credits**.\n\n🛒 **Get more credits** to continue using TrafficClaw AI.`;
+                        const creditMsg = errorData.response || `⚡ You've run out of messages! **1 credit = 1 message.**\n\nGet more to continue using TrafficClaw AI.`;
                         setMessages(prev => {
                             const newMessages = [...prev];
                             const last = newMessages[newMessages.length - 1];
@@ -207,7 +207,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                         setMessages(prev => {
                             const newMessages = [...prev];
                             const last = newMessages[newMessages.length - 1];
-                            last.content = '⚡ **Out of credits!** Please purchase more credits to continue.';
+                            last.content = '⚡ **Out of messages!** Please purchase more to continue.';
                             return newMessages;
                         });
                     }
@@ -486,7 +486,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                     </div>
                     {credits !== null && credits < 30 && (
                         <div className="mt-1.5 px-1">
-                            <span className="text-[9px] text-amber-500/70 font-medium">Low credits: {credits}</span>
+                            <span className="text-[9px] text-amber-500/70 font-medium">Low messages: {credits}</span>
                         </div>
                     )}
                 </div>

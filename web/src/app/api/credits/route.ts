@@ -17,7 +17,7 @@ export async function GET() {
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
         if (!userId) {
-            return NextResponse.json({ credits: 100 }); // Default for dev
+            return NextResponse.json({ credits: 50 }); // Default for dev
         }
 
         const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits`, {

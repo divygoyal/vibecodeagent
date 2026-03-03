@@ -4,11 +4,11 @@ const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const DODO_WEBHOOK_SECRET = process.env.DODO_PAYMENTS_WEBHOOK_KEY || '';
 
-// DodoPayments product ID → credits mapping
+// DodoPayments product ID → messages (1 credit = 1 message)
 const CREDIT_PRODUCTS: Record<string, number> = {
-    'pdt_0NYn4ZUFJs2YcTSvqivsI': 100,   // 100 credits for $1
-    'pdt_0NYn4ZZQMZXmfjC3aNpkI': 500,   // 500 credits for $5
-    'pdt_0NYn4Zjup0Bo2kI7DIfBp': 1200,  // 1200 credits for $10
+    'pdt_0NYn4ZUFJs2YcTSvqivsI': 100,   // 100 messages for $1
+    'pdt_0NYn4ZZQMZXmfjC3aNpkI': 500,   // 500 messages for $5
+    'pdt_0NYn4Zjup0Bo2kI7DIfBp': 1200,  // 1200 messages for $10 (best value)
 };
 
 export async function POST(req: Request) {

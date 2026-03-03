@@ -346,13 +346,9 @@ export default function DashboardLayout({
                                 <Coins className={`w-3 h-3 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
                                     }`} />
                                 <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
-                                    }`}>{credits} credits</span>
+                                    }`}>{credits} msgs</span>
                             </div>
                         )}
-                        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/[0.15]">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-[10px] font-medium text-emerald-400">Free Plan</span>
-                        </div>
                         {session?.user?.image && (
                             <img
                                 src={session.user.image}
@@ -378,7 +374,7 @@ export default function DashboardLayout({
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
-                <CreditWelcome credits={100} onDismiss={() => setShowWelcome(false)} />
+                <CreditWelcome credits={50} onDismiss={() => setShowWelcome(false)} />
             )}
 
             {/* ─── Mobile sidebar overlay ─── */}

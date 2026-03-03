@@ -820,116 +820,150 @@ function Testimonials() {
 }
 
 /* ═══════════════════════════════════════
-   PRICING SECTION
+   PRICING SECTION — Credit-based (1 credit = 1 message)
    ═══════════════════════════════════════ */
 
 function Pricing() {
-    const plans = [
+    const creditPacks = [
         {
-            name: 'Free',
-            price: '$0',
-            period: 'forever',
-            description: 'Get started with the basics',
+            name: 'Starter',
+            messages: '100',
+            price: '$1',
+            perMessage: '$0.01',
+            description: 'Try it out',
             features: [
-                '1 AI bot instance',
-                'Basic analytics dashboard',
-                '7-day data retention',
-                'Google Analytics integration',
+                '100 AI messages',
+                'Full analytics dashboard',
+                'SEO intelligence tools',
+                'Google Analytics + GSC',
                 'Community support',
             ],
-            cta: 'Start Free',
+            href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI',
+            cta: 'Buy 100 Messages',
             highlighted: false,
+            gradient: 'from-cyan-400 to-blue-500',
+            savings: '',
         },
         {
-            name: 'Pro',
-            price: '$29',
-            period: '/month',
-            description: 'For serious growth',
+            name: 'Growth',
+            messages: '500',
+            price: '$5',
+            perMessage: '$0.01',
+            description: 'Most popular',
             features: [
-                '3 AI bot instances',
+                '500 AI messages',
                 'Full analytics + SEO dashboard',
-                '90-day data retention',
                 'Keyword gap analysis',
                 'Content decay alerts',
                 'Auto-fix (bot commits code)',
                 'Priority support',
             ],
-            cta: 'Start Pro Trial',
+            href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI',
+            cta: 'Buy 500 Messages',
             highlighted: true,
+            gradient: 'from-emerald-400 to-cyan-400',
+            savings: '',
         },
         {
-            name: 'Enterprise',
-            price: '$99',
-            period: '/month',
-            description: 'Unlimited everything',
+            name: 'Pro',
+            messages: '1,200',
+            price: '$10',
+            perMessage: '$0.008',
+            description: 'Best value — save 20%',
             features: [
-                'Unlimited AI bots',
-                'Full dashboard + API access',
-                '1-year data retention',
+                '1,200 AI messages',
+                'Everything in Growth',
                 'All SEO intelligence features',
-                'Custom AI recommendations',
-                'White-label reports',
+                'AI auto-fix & code commits',
+                'Deep keyword analytics',
                 'Dedicated support',
             ],
-            cta: 'Contact Sales',
+            href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp',
+            cta: 'Buy 1,200 Messages',
             highlighted: false,
+            gradient: 'from-violet-400 to-purple-500',
+            savings: 'Save 20%',
         },
     ];
 
     return (
         <Section id="pricing" className="py-32 px-6">
             <div className="max-w-6xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <motion.div variants={fadeUp} className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-xs font-medium text-violet-400 mb-4">
                         PRICING
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                        Simple, transparent{' '}
-                        <span className="bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">
-                            pricing
+                        Pay per{' '}
+                        <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                            message
                         </span>
                     </h2>
-                    <p className="text-zinc-400 text-lg">No hidden fees. Cancel anytime.</p>
+                    <p className="text-zinc-400 text-lg max-w-xl mx-auto">
+                        No subscriptions. No hidden fees. Buy credits, use them anytime.<br />
+                        <span className="text-emerald-400 font-medium">1 credit = 1 AI message.</span>
+                    </p>
+                </motion.div>
+
+                {/* Free tier callout */}
+                <motion.div variants={fadeUp} className="text-center mb-12">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] text-sm">
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-300 font-medium">Every new account gets <strong className="text-emerald-400">50 free messages</strong> to start</span>
+                    </div>
                 </motion.div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {plans.map((plan, i) => (
+                    {creditPacks.map((pack) => (
                         <motion.div
-                            key={plan.name}
+                            key={pack.name}
                             variants={fadeUp}
-                            className={`relative p-6 rounded-2xl border transition-all duration-300 ${plan.highlighted
+                            className={`relative p-6 rounded-2xl border transition-all duration-300 group ${pack.highlighted
                                 ? 'bg-gradient-to-b from-emerald-500/[0.08] to-transparent border-emerald-500/[0.2] hover:border-emerald-500/[0.3]'
                                 : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
                                 }`}
                         >
-                            {plan.highlighted && (
+                            {pack.highlighted && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[10px] font-bold text-black uppercase tracking-wider">
                                     Most Popular
                                 </div>
                             )}
 
-                            <h3 className="text-lg font-semibold text-white mb-1">{plan.name}</h3>
-                            <p className="text-xs text-zinc-500 mb-4">{plan.description}</p>
+                            {pack.savings && (
+                                <div className="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider">
+                                    {pack.savings}
+                                </div>
+                            )}
 
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">{plan.price}</span>
-                                <span className="text-sm text-zinc-500">{plan.period}</span>
+                            <h3 className="text-lg font-semibold text-white mb-1">{pack.name}</h3>
+                            <p className="text-xs text-zinc-500 mb-4">{pack.description}</p>
+
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-4xl font-bold text-white">{pack.price}</span>
+                            </div>
+                            <div className="flex items-center gap-3 mb-6">
+                                <span className="text-sm text-zinc-400">{pack.messages} messages</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 border border-white/[0.06]">
+                                    {pack.perMessage}/msg
+                                </span>
                             </div>
 
-                            <button
-                                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 ${plan.highlighted
+                            <a
+                                href={pack.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 block text-center ${pack.highlighted
                                     ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_24px_rgba(52,211,153,0.3)]'
                                     : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
                                     }`}
                             >
-                                {plan.cta}
-                            </button>
+                                {pack.cta}
+                            </a>
 
                             <ul className="space-y-3">
-                                {plan.features.map((feature, j) => (
+                                {pack.features.map((feature, j) => (
                                     <li key={j} className="flex items-center gap-2 text-sm text-zinc-400">
-                                        <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${plan.highlighted ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                                        <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${pack.highlighted ? 'text-emerald-400' : 'text-zinc-600'}`} />
                                         {feature}
                                     </li>
                                 ))}
@@ -937,6 +971,13 @@ function Pricing() {
                         </motion.div>
                     ))}
                 </div>
+
+                {/* Bottom trust line */}
+                <motion.div variants={fadeUp} className="text-center mt-8">
+                    <p className="text-xs text-zinc-600">
+                        Payments powered by Dodo Payments • Credits never expire • Instant delivery
+                    </p>
+                </motion.div>
             </div>
         </Section>
     );
@@ -1165,13 +1206,13 @@ function FinalCTA() {
                         </h2>
                         <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
                             Join builders who use AI to understand their data and ship faster.
-                            Start free — no credit card required.
+                            Start with 50 free messages — no credit card required.
                         </p>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="group px-10 py-4 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
                         >
-                            Start Growing — It&apos;s Free
+                            Get 50 Free Messages
                             <ArrowRight className="inline-block ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>

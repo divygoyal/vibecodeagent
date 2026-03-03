@@ -4,8 +4,9 @@ import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import {
     User, Mail, LogOut,
-    CheckCircle2, ChevronRight
+    CheckCircle2, ChevronRight, Coins, MessageSquare, Sparkles
 } from 'lucide-react';
+import { useCredits } from '@/lib/useDashboardData';
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
     return (
@@ -18,8 +19,34 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
     );
 }
 
+const CREDIT_PACKS = [
+    {
+        name: 'Starter',
+        messages: 100,
+        price: '$1',
+        href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI',
+        highlight: false,
+    },
+    {
+        name: 'Growth',
+        messages: 500,
+        price: '$5',
+        href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI',
+        highlight: true,
+    },
+    {
+        name: 'Pro',
+        messages: 1200,
+        price: '$10',
+        href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp',
+        highlight: false,
+        badge: 'Best Value',
+    },
+];
+
 export default function SettingsPage() {
     const { data: session } = useSession();
+    const { credits } = useCredits();
     const [notifications, setNotifications] = useState({
         seoAlerts: true,
         weeklyReport: true,
@@ -31,12 +58,16 @@ export default function SettingsPage() {
         setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const displayCredits = credits ?? 0;
+    const isLow = displayCredits < 20;
+    const isMed = displayCredits < 50;
+
     return (
         <div className="space-y-6 max-w-2xl p-6">
             <div>
                 <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
                 <p className="text-sm text-zinc-500">
-                    Manage your account, connections, and preferences.
+                    Manage your account, messages, and preferences.
                 </p>
             </div>
 
@@ -68,29 +99,81 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            {/* Plan */}
+            {/* AI Messages / Credits */}
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Current Plan</h2>
-                <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    AI Messages
+                </h2>
+
+                {/* Current balance */}
+                <div className="flex items-center justify-between mb-4">
                     <div>
-                        <div className="text-white font-semibold flex items-center gap-2">
-                            Free Plan
-                            <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">Current</span>
+                        <div className={`text-3xl font-bold flex items-center gap-2 ${isLow ? 'text-red-400' : isMed ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            <Coins className="w-6 h-6" />
+                            {credits !== null ? displayCredits : '—'}
                         </div>
-                        <div className="text-xs text-zinc-500 mt-1">1 bot · 7-day data · Basic analytics</div>
+                        <div className="text-xs text-zinc-500 mt-1">
+                            {credits !== null
+                                ? `${displayCredits} message${displayCredits !== 1 ? 's' : ''} remaining • 1 credit = 1 message`
+                                : 'Loading balance...'
+                            }
+                        </div>
                     </div>
-                    <button className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-400 to-cyan-400 text-black rounded-xl hover:opacity-90 transition-opacity">
-                        Upgrade to Pro
-                    </button>
+                    {isLow && credits !== null && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/[0.08] border border-red-500/[0.15]">
+                            <Sparkles className="w-3.5 h-3.5 text-red-400" />
+                            <span className="text-[11px] font-medium text-red-400">Running low!</span>
+                        </div>
+                    )}
                 </div>
-                <div className="mt-4 pt-4 border-t border-white/[0.06]">
-                    <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-500">Data usage</span>
-                        <span className="text-zinc-400">2.4 GB / 5 GB</span>
+
+                {/* Progress bar */}
+                {credits !== null && (
+                    <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden mb-6">
+                        <div
+                            className={`h-full rounded-full transition-all duration-500 ${isLow ? 'bg-red-400' : isMed ? 'bg-amber-400' : 'bg-gradient-to-r from-emerald-400 to-cyan-400'}`}
+                            style={{ width: `${Math.min(100, (displayCredits / 500) * 100)}%` }}
+                        />
                     </div>
-                    <div className="w-full h-1.5 bg-white/[0.04] rounded-full mt-2 overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full" style={{ width: '48%' }} />
+                )}
+
+                {/* Buy more packs */}
+                <div className="border-t border-white/[0.06] pt-5">
+                    <h3 className="text-xs font-medium text-zinc-400 mb-3">Buy more messages</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {CREDIT_PACKS.map((pack) => (
+                            <a
+                                key={pack.name}
+                                href={pack.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`relative flex flex-col items-center p-4 rounded-xl border transition-all duration-200 hover:scale-[1.02] ${pack.highlight
+                                    ? 'bg-emerald-500/[0.06] border-emerald-500/[0.2] hover:border-emerald-500/[0.3]'
+                                    : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
+                                    }`}
+                            >
+                                {pack.badge && (
+                                    <span className="absolute -top-2 right-2 text-[9px] px-2 py-0.5 rounded-full bg-violet-500 text-white font-bold uppercase tracking-wider">
+                                        {pack.badge}
+                                    </span>
+                                )}
+                                <span className={`text-xl font-bold ${pack.highlight ? 'text-emerald-400' : 'text-white'}`}>
+                                    {pack.messages.toLocaleString()}
+                                </span>
+                                <span className="text-[10px] text-zinc-500 mb-2">messages</span>
+                                <span className={`text-sm font-semibold px-4 py-1.5 rounded-lg transition ${pack.highlight
+                                    ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                    : 'bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1]'
+                                    }`}>
+                                    {pack.price}
+                                </span>
+                            </a>
+                        ))}
                     </div>
+                    <p className="text-[10px] text-zinc-600 text-center mt-3">
+                        Payments by Dodo Payments • Credits never expire • Instant delivery
+                    </p>
                 </div>
             </div>
 
