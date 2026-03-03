@@ -314,7 +314,7 @@ export async function POST(req: NextRequest) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
 
-        const { message, analyticsContext, seoContext, history } = await req.json();
+        const { message, selectedSite, analyticsContext, seoContext, history } = await req.json();
 
         if (!message) {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -399,9 +399,10 @@ export async function POST(req: NextRequest) {
         }
 
         // User message with injected data context
+        const selectedSiteContext = selectedSite ? `\n[CURRENTLY SELECTED SITE: ${selectedSite}]\nThe user is asking about THIS specific site. Use the data below which belongs to this site.` : '';
         contents.push({
             role: 'user',
-            parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}${availableSitesContext}\n\n---\n\nUser: ${message}` : message + availableSitesContext }],
+            parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${selectedSiteContext}${dataContext}${availableSitesContext}\n\n---\n\nUser: ${message}` : message + selectedSiteContext + availableSitesContext }],
         });
 
         // ── Build system instruction once ──

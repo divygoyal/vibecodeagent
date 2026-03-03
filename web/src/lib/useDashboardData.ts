@@ -27,23 +27,33 @@ const swrOptions = {
 
 // Bug #4/#6 fix: Hook that waits for registration but has a timeout fallback
 // so data fetching isn't permanently blocked if registration is slow or fails.
-const REGISTRATION_TIMEOUT = 5000; // 5 seconds max wait
+const REGISTRATION_TIMEOUT = 3000; // 3 seconds max wait (reduced from 5s)
 
 function useRegisteredSWR(url: string | null, options = {}) {
     const { isRegistered, isRegistering, registrationError } = useRegistration();
     const [timedOut, setTimedOut] = useState(false);
 
+    // Optimistic: if sessionStorage says we're registered from a previous page load,
+    // start fetching immediately without waiting for the registration POST to complete.
+    const [optimistic] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return sessionStorage.getItem('tc-registered') === 'true';
+        }
+        return false;
+    });
+
     useEffect(() => {
-        if (isRegistered) return; // Already registered, no need for timeout
+        if (isRegistered || optimistic) return; // Already registered or optimistic, no need for timeout
         const timer = setTimeout(() => setTimedOut(true), REGISTRATION_TIMEOUT);
         return () => clearTimeout(timer);
-    }, [isRegistered]);
+    }, [isRegistered, optimistic]);
 
     // Allow fetching if:
     // - Registered normally, OR
+    // - Optimistically using cached registration flag (returning user), OR
     // - Registration timed out (admin DB is slow but JWT tokens are still valid), OR
     // - Registration failed with error (proceed in degraded mode)
-    const canFetch = isRegistered || timedOut || !!registrationError;
+    const canFetch = isRegistered || optimistic || timedOut || !!registrationError;
     const key = canFetch ? url : null;
 
     return useSWR(key, fetcher, { ...swrOptions, ...options });

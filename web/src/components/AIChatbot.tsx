@@ -2,17 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
+import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
     tools?: { name: string; args: any; result?: string }[];
-}
-
-interface AIChatbotProps {
-    analyticsData?: any;
-    seoData?: any;
 }
 
 interface SiteOption {
@@ -118,7 +114,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded }: { msg: Me
     );
 });
 
-export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
+export default function AIChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
@@ -133,10 +129,49 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [credits, setCredits] = useState<number | null>(null);
     const [selectedChatSite, setSelectedChatSite] = useState('');
     const [showSiteDropdown, setShowSiteDropdown] = useState(false);
-    const [allSites, setAllSites] = useState<SiteOption[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // ── Self-sufficient data fetching: chatbot loads its own data for selected site ──
+    const { hasGoogleConnection } = useContainerStatus();
+    const { sites: gscSites } = useSiteList(hasGoogleConnection);
+    const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
+
+    // Derive combined site list from SWR hooks
+    const allSites = useMemo<SiteOption[]>(() => {
+        const sites = Array.isArray(gscSites) ? gscSites : [];
+        const properties = Array.isArray(ga4Properties) ? ga4Properties : [];
+        return [
+            ...sites.map((s: any) => ({ id: s.siteUrl, label: s.siteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\/$/, ''), type: 'GSC' })),
+            ...properties.filter((p: any) => !sites.some((s: any) => s.siteUrl.includes(p.displayName || p.property)))
+                .map((p: any) => ({ id: p.property, label: p.displayName || p.property, type: 'GA4' })),
+        ];
+    }, [gscSites, ga4Properties]);
+
+    // Auto-select first site when list loads
+    useEffect(() => {
+        if (allSites.length > 0 && !selectedChatSite) {
+            setSelectedChatSite(allSites[0].id);
+        }
+    }, [allSites, selectedChatSite]);
+
+    // Match selected GSC site to GA4 property (same logic as page.tsx)
+    const matchedProperty = useMemo(() => {
+        if (!selectedChatSite || ga4Properties.length === 0) return ga4Properties[0];
+        const domain = selectedChatSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
+        const domainRoot = domain.split('.')[0];
+        return (
+            ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
+            ga4Properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
+            ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
+            ga4Properties[0]
+        );
+    }, [selectedChatSite, ga4Properties]);
+
+    // Fetch analytics & SEO data for the chatbot's selected site
+    const { data: analyticsData } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedChatSite);
+    const { data: seoData } = useSeoData('all', selectedChatSite, hasGoogleConnection && !!selectedChatSite);
 
     // ── Refs for stable callback access (avoids dependency-loop in useCallback) ──
     const messagesRef = useRef(messages);
@@ -182,28 +217,6 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         return () => {
             if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
         };
-    }, []);
-
-    // Fetch available sites on mount
-    useEffect(() => {
-        async function loadSites() {
-            try {
-                const [sitesRes, propsRes] = await Promise.all([
-                    fetch('/api/seo?mode=list').then(r => r.ok ? r.json() : []).catch(() => []),
-                    fetch('/api/analytics?mode=list').then(r => r.ok ? r.json() : []).catch(() => []),
-                ]);
-                const sites = Array.isArray(sitesRes) ? sitesRes : [];
-                const properties = Array.isArray(propsRes) ? propsRes : [];
-                const combined: SiteOption[] = [
-                    ...sites.map((s: any) => ({ id: s.siteUrl, label: s.siteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\/$/, ''), type: 'GSC' })),
-                    ...properties.filter((p: any) => !sites.some((s: any) => s.siteUrl.includes(p.displayName || p.property)))
-                        .map((p: any) => ({ id: p.property, label: p.displayName || p.property, type: 'GA4' })),
-                ];
-                setAllSites(combined);
-                if (combined.length > 0) setSelectedChatSite(prev => prev || combined[0].id);
-            } catch { /* silent */ }
-        }
-        loadSites();
     }, []);
 
     useEffect(() => {
@@ -486,7 +499,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 {/* ── Messages ── */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
                     {messages.map((msg, i) => {
-                        if (msg.role === 'assistant' && !msg.content && (!msg.tools || msg.tools.length === 0)) return null;
+                        if (msg.role === 'assistant' && !msg.content) return null;
                         return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} />;
                     })}
 

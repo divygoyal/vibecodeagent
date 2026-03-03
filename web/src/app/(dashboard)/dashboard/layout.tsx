@@ -66,8 +66,14 @@ export default function DashboardLayout({
     const { credits } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [selectedProperty, setSelectedProperty] = useState('');
-    const [selectedSite, setSelectedSite] = useState('');
+    const [selectedProperty, setSelectedProperty] = useState(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('tc-last-property') || '';
+        return '';
+    });
+    const [selectedSite, setSelectedSite] = useState(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('tc-last-site') || '';
+        return '';
+    });
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [showWelcome, setShowWelcome] = useState(false);
 
@@ -76,6 +82,14 @@ export default function DashboardLayout({
         const saved = localStorage.getItem('gc-theme') as 'dark' | 'light' | null;
         if (saved) { setTheme(saved); document.documentElement.setAttribute('data-theme', saved); }
     }, []);
+
+    // Persist selected property/site to localStorage for instant load on return
+    useEffect(() => {
+        if (selectedProperty) localStorage.setItem('tc-last-property', selectedProperty);
+    }, [selectedProperty]);
+    useEffect(() => {
+        if (selectedSite) localStorage.setItem('tc-last-site', selectedSite);
+    }, [selectedSite]);
 
     const toggleTheme = () => {
         const next = theme === 'dark' ? 'light' : 'dark';

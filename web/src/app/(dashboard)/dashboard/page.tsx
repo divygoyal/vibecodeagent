@@ -3,6 +3,7 @@
 import { useSession, signIn } from 'next-auth/react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   AreaChart, Area, ResponsiveContainer
 } from 'recharts';
@@ -10,11 +11,21 @@ import {
   Bot, BarChart3, Search, TrendingUp, TrendingDown,
   ArrowUpRight, Zap, Activity, MousePointer, Eye, Users, Hash,
   AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2, ScanSearch,
-  DollarSign, Target, FileWarning, ShieldAlert, ArrowRight, Flame, CheckCircle2
+  DollarSign, Target, FileWarning, ShieldAlert, ArrowRight, Flame, CheckCircle2,
+  Gauge, Rocket, Tag, Shield
 } from 'lucide-react';
-import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights } from '@/lib/useDashboardData';
+import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights, useRealtimeData } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
 import OverviewInsights from '@/components/OverviewInsights';
+
+/* ─── Animation variants ─── */
+const fadeInUp = {
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+};
+const stagger = {
+  animate: { transition: { staggerChildren: 0.08 } },
+};
 
 /* ─── Computed Insight Types ─── */
 interface StrikingKeyword {
@@ -79,8 +90,13 @@ export default function DashboardOverview() {
   const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
   const { properties } = usePropertyList(hasGoogleConnection);
 
-  // State for selection & custom dropdown
-  const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>('');
+  // State for selection & custom dropdown — initialize from localStorage for instant load
+  const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('tc-last-site') || '';
+    }
+    return '';
+  });
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +118,13 @@ export default function DashboardOverview() {
     }
   }, [sites, selectedSiteUrl]);
 
+  // Persist selected site to localStorage for instant load on return visits
+  useEffect(() => {
+    if (selectedSiteUrl) {
+      localStorage.setItem('tc-last-site', selectedSiteUrl);
+    }
+  }, [selectedSiteUrl]);
+
   // Derived Property ID — Bug #14 fix: improved matching priority
   const domain = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('/', '');
   const domainRoot = domain.split('.')[0]; // e.g., "example" from "example.com"
@@ -117,9 +140,18 @@ export default function DashboardOverview() {
     properties.find((p: any) => p.displayName.toLowerCase().includes(domainRoot.toLowerCase())) ||
     properties[0]; // Fallback to first
 
-  // 3. Fetch Data — analytics/SEO need Google connection (not container)
-  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, hasGoogleConnection);
-  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, hasGoogleConnection);
+  // 3. Fetch Data — start fetching if Google is connected OR we have a cached site (optimistic)
+  const hasCachedSite = !!selectedSiteUrl;
+  const canFetchData = hasGoogleConnection || hasCachedSite;
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, canFetchData);
+  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, canFetchData);
+
+  // 4. Real-time active users
+  const { data: realtimeData } = useRealtimeData(matchedProp?.property, canFetchData);
+  const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : null;
+
+  // 5. AI Insights for smart alerts
+  const { insights } = useInsights(canFetchData);
 
   // Extract Data
   const analyticsKPIs = analyticsData?.kpis;
@@ -130,8 +162,8 @@ export default function DashboardOverview() {
 
   const isLive = botRunning && botStatus?.telegramStatus === 'connected';
 
-  // Loading States - include registration state
-  const isInit = isRegistering || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSiteUrl);
+  // Loading States - don't block on registration if we have a cached site (optimistic)
+  const isInit = (!hasCachedSite && isRegistering) || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSiteUrl);
   const isRef = analyticsLoading || seoLoading;
   // True when we have SOME data (even stale) — prevents re-showing skeletons
   const hasData = !!(analyticsKPIs || seoKPIs);
@@ -215,6 +247,68 @@ export default function DashboardOverview() {
     return { strikingDistance, ctrProblems, healthVerdict, healthColor, healthIcon, topPages };
   }, [seoData, analyticsKPIs, seoKPIs]);
 
+  // ═══ PERFORMANCE SCORE (0-100) — Composite metric ═══
+  const performanceScore = useMemo(() => {
+    if (!analyticsKPIs && !seoKPIs) return null;
+    let score = 50;
+    // Traffic trend (+/- 15)
+    const trafficChange = analyticsKPIs?.changeUsers || 0;
+    score += Math.min(15, Math.max(-15, trafficChange));
+    // CTR health (+/- 10)
+    const avgCTR = parseFloat(seoKPIs?.avgCTR) || 0;
+    score += avgCTR > 5 ? 10 : avgCTR > 3 ? 5 : avgCTR > 1 ? 0 : -10;
+    // Bounce rate penalty
+    const bounce = parseFloat(analyticsKPIs?.avgBounceRate) || 50;
+    score -= bounce > 70 ? 15 : bounce > 55 ? 8 : bounce > 40 ? 3 : 0;
+    // Position quality (+/- 10)
+    const avgPos = parseFloat(seoKPIs?.avgPosition) || 30;
+    score += avgPos < 10 ? 10 : avgPos < 20 ? 5 : avgPos < 30 ? 0 : -10;
+    // Impression growth (+/- 10)
+    const imprChange = seoKPIs?.changeImpressions || 0;
+    score += Math.min(10, Math.max(-10, imprChange / 2));
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }, [analyticsKPIs, seoKPIs]);
+
+  // ═══ GROWTH VELOCITY — 7d vs previous 7d ═══
+  const growthVelocity = useMemo(() => {
+    if (searchTrend.length < 14) return null;
+    const recent7 = searchTrend.slice(-7).reduce((s: number, d: any) => s + (d.clicks || 0), 0);
+    const prev7 = searchTrend.slice(-14, -7).reduce((s: number, d: any) => s + (d.clicks || 0), 0);
+    if (prev7 === 0) return null;
+    return ((recent7 - prev7) / prev7 * 100);
+  }, [searchTrend]);
+
+  // ═══ BRANDED vs NON-BRANDED — from SEO queries ═══
+  const brandedSplit = useMemo(() => {
+    const queries = seoData?.queries || [];
+    if (queries.length === 0) return null;
+    const siteName = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\.(com|net|org|io|co|dev|codes|xyz|app).*$/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    if (!siteName || siteName.length < 2) return null;
+    let brandedClicks = 0, nonBrandedClicks = 0;
+    queries.forEach((q: any) => {
+      const qLower = (q.query || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const clicks = parseInt(q.clicks) || 0;
+      if (qLower.includes(siteName)) brandedClicks += clicks;
+      else nonBrandedClicks += clicks;
+    });
+    const total = brandedClicks + nonBrandedClicks;
+    if (total === 0) return null;
+    return {
+      branded: brandedClicks,
+      nonBranded: nonBrandedClicks,
+      brandedPct: Math.round((brandedClicks / total) * 100),
+      nonBrandedPct: Math.round((nonBrandedClicks / total) * 100),
+    };
+  }, [seoData, selectedSiteUrl]);
+
+  // ═══ SMART ALERTS — from insights API ═══
+  const smartAlerts = useMemo(() => {
+    if (!insights || insights.length === 0) return [];
+    return insights
+      .filter((i: any) => i.priority === 'high' || i.severity === 'critical' || i.severity === 'high')
+      .slice(0, 3);
+  }, [insights]);
+
   // Friendly display for selected site
   const selectedSiteLabel = selectedSiteUrl ? selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : '';
 
@@ -237,21 +331,13 @@ export default function DashboardOverview() {
     );
   }
 
-  // Show loading while registering
-  if (isRegistering && !isRegistered) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-        <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
-        <h2 className="text-xl font-semibold text-white mb-2">Setting up your dashboard...</h2>
-        <p className="text-zinc-400">This may take a few seconds</p>
-      </div>
-    );
-  }
+  // No longer block the page during registration — show skeleton UI instead
+  // The useRegisteredSWR hook handles optimistic fetching for returning users
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header & Site Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <motion.div className="space-y-6 p-6" initial="initial" animate="animate" variants={stagger}>
+      {/* Hero Header — Site Selector + Live Metrics */}
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">
             Welcome back{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''} 👋
@@ -262,6 +348,18 @@ export default function DashboardOverview() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Real-time Active Users */}
+          {activeUsers !== null && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-500/[0.06] border border-emerald-500/[0.12] rounded-lg">
+              <div className="relative">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              </div>
+              <span className="text-sm font-bold text-emerald-400 font-mono">{activeUsers}</span>
+              <span className="text-[10px] text-zinc-500">live</span>
+            </div>
+          )}
+
           {/* Custom Site Selector Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
@@ -305,7 +403,123 @@ export default function DashboardOverview() {
             {isLive ? 'Bot Live' : 'Offline'}
           </span>
         </div>
-      </div>
+      </motion.div>
+
+      {/* ═══ COMMAND CENTER — Score + Velocity + Branded Split ═══ */}
+      {hasData && (
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Performance Score Gauge */}
+          {performanceScore !== null && (
+            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-white/[0.1] transition-all">
+              <div className="relative w-16 h-16 flex-shrink-0">
+                <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-white/[0.06]" strokeWidth="2.5" />
+                  <circle cx="18" cy="18" r="15" fill="none"
+                    className={performanceScore >= 70 ? 'text-emerald-400' : performanceScore >= 40 ? 'text-amber-400' : 'text-red-400'}
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                    strokeDasharray={`${performanceScore * 0.94} 100`}
+                    style={{ transition: 'stroke-dasharray 1s ease' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-lg font-bold text-white font-mono">{performanceScore}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">SEO Score</div>
+                <div className={`text-sm font-bold ${performanceScore >= 70 ? 'text-emerald-400' : performanceScore >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {performanceScore >= 80 ? 'Excellent' : performanceScore >= 60 ? 'Good' : performanceScore >= 40 ? 'Needs Work' : 'Critical'}
+                </div>
+                <div className="text-[10px] text-zinc-600 mt-0.5">
+                  Traffic {(analyticsKPIs?.changeUsers || 0) >= 0 ? '+' : ''}{analyticsKPIs?.changeUsers || 0}% | CTR {seoKPIs?.avgCTR || '—'}%
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Growth Velocity */}
+          <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-white/[0.1] transition-all">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              growthVelocity !== null && growthVelocity > 0
+                ? 'bg-emerald-500/10 border border-emerald-500/20'
+                : growthVelocity !== null && growthVelocity < -5
+                  ? 'bg-red-500/10 border border-red-500/20'
+                  : 'bg-white/[0.04] border border-white/[0.06]'
+            }`}>
+              <Rocket className={`w-5 h-5 ${
+                growthVelocity !== null && growthVelocity > 0 ? 'text-emerald-400' :
+                growthVelocity !== null && growthVelocity < -5 ? 'text-red-400' : 'text-zinc-400'
+              }`} />
+            </div>
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Growth Velocity</div>
+              {growthVelocity !== null ? (
+                <>
+                  <div className={`text-lg font-bold font-mono ${growthVelocity > 0 ? 'text-emerald-400' : growthVelocity < -5 ? 'text-red-400' : 'text-amber-400'}`}>
+                    {growthVelocity > 0 ? '+' : ''}{growthVelocity.toFixed(1)}%
+                  </div>
+                  <div className="text-[10px] text-zinc-600">
+                    {growthVelocity > 10 ? 'Accelerating' : growthVelocity > 0 ? 'Growing' : growthVelocity > -5 ? 'Plateauing' : 'Decelerating'} (7d vs prev 7d)
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-zinc-600">Needs 14+ days of data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Branded vs Non-Branded Split */}
+          <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-all">
+            <div className="flex items-center gap-2 mb-3">
+              <Tag className="w-4 h-4 text-cyan-400" />
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic</span>
+            </div>
+            {brandedSplit ? (
+              <>
+                <div className="flex items-end gap-2 mb-2">
+                  <span className="text-lg font-bold text-white font-mono">{brandedSplit.nonBrandedPct}%</span>
+                  <span className="text-[10px] text-zinc-500 mb-0.5">non-branded</span>
+                </div>
+                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden flex">
+                  <div className="bg-cyan-400/80 rounded-full transition-all duration-700" style={{ width: `${brandedSplit.nonBrandedPct}%` }} />
+                  <div className="bg-amber-400/60 rounded-full transition-all duration-700" style={{ width: `${brandedSplit.brandedPct}%` }} />
+                </div>
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-[9px] text-cyan-400/70">{fmtNum(brandedSplit.nonBranded)} organic</span>
+                  <span className="text-[9px] text-amber-400/70">{fmtNum(brandedSplit.branded)} branded</span>
+                </div>
+                {brandedSplit.brandedPct > 60 && (
+                  <div className="mt-2 text-[9px] text-amber-400/80 bg-amber-500/[0.06] border border-amber-500/10 rounded px-2 py-1">
+                    High brand reliance — diversify organic keywords
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-zinc-600">Not enough query data</div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ═══ SMART ALERTS — Critical insights banner ═══ */}
+      {smartAlerts.length > 0 && (
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}
+          className="bg-red-500/[0.03] border border-red-500/[0.1] rounded-xl p-3.5 flex items-start gap-3"
+        >
+          <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Shield className="w-4 h-4 text-red-400" />
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <div className="text-[10px] text-red-400/80 uppercase tracking-wider font-semibold">Priority Alerts</div>
+            {smartAlerts.map((alert: any, i: number) => (
+              <p key={i} className="text-[12px] text-zinc-300 leading-relaxed">
+                <span className="text-red-400 font-semibold">{alert.title || alert.type}:</span>{' '}
+                {alert.description || alert.message || alert.text}
+              </p>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Setup Prompt - shown when Google not connected */}
       {!containerLoading && !hasGoogleConnection && (
@@ -370,7 +584,7 @@ export default function DashboardOverview() {
       )}
 
       {/* Main KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           loading={isRef && !hasData}
           icon={Users}
@@ -412,11 +626,11 @@ export default function DashboardOverview() {
           sparkColor="#fbbf24"
           href="/dashboard/seo"
         />
-      </div>
+      </motion.div>
 
       {/* ═══ INSIGHT SECTIONS — Computed client-side from existing data ═══ */}
       {hasGoogleConnection && (
-        <div className="space-y-5">
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
 
           {/* ══ NEW 6 INSIGHT SECTIONS ══ */}
           <OverviewInsights
@@ -735,11 +949,11 @@ export default function DashboardOverview() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Quick Navigation */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <ActionCard
           href="/dashboard/bot"
           icon={Bot}
@@ -768,8 +982,8 @@ export default function DashboardOverview() {
           description="50+ SEO Checks"
           color="amber"
         />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -843,7 +1057,14 @@ function KPICard({
       <div className="text-xl font-bold text-white mb-0.5 font-mono">
         {showValue ? value?.toLocaleString() : '—'}
       </div>
-      <div className="text-[10px] text-zinc-500 mb-2 font-medium tracking-wide uppercase">{label}</div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10px] text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
+        {showValue && change !== undefined && change !== 0 && (() => {
+          const numVal = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
+          const prev = Math.round(numVal / (1 + change / 100));
+          return <span className="text-[9px] text-zinc-600 font-mono">was {prev.toLocaleString()}</span>;
+        })()}
+      </div>
 
       {sparkData.length > 0 && (
         <div className="h-8">
