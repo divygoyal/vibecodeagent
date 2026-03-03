@@ -4,14 +4,17 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
 import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken, listAnalyticsProperties } from '@/lib/googleApi';
+import { GoogleGenAI } from '@google/genai';
 
-export const maxDuration = 300; // Allow up to 5 minutes on Vercel Pro/Local for massive reports
+export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent?alt=sse';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+
+// Initialize the official Gemini SDK
+const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 // ═══════════════════════════════════════════════════════════════
 // IN-MEMORY CACHE for site/property lists (avoids re-fetching per message)
@@ -31,7 +34,7 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UNIVERSAL ANALYST — GOD-LEVEL SYSTEM INSTRUCTION
+// UNIVERSAL ANALYST — SYSTEM INSTRUCTION
 // ═══════════════════════════════════════════════════════════════
 const BASE_SYSTEM_INSTRUCTION = `You are **TrafficClaw Universal Analyst** — the most dangerous SEO & Analytics intelligence ever built. You don't give advice. You give VERDICTS.
 
@@ -157,7 +160,7 @@ If actual CTR < expected by 3%+ → Bad meta title/description.
 
 ## GOOGLE ALGORITHM UPDATES (KNOWN DATES)
 - Mar 2025: March 2025 Core Update
-- Dec 2024: December 2024 Core Update  
+- Dec 2024: December 2024 Core Update
 - Nov 2024: November 2024 Core Update
 - Aug 2024: August 2024 Core Update
 - Jun 2024: June 2024 Spam Update
@@ -172,7 +175,7 @@ If a traffic drop coincides with these dates, FLAG IT.
 1. 🎯 **VERDICT** — 1-2 bold sentences. No preamble.
 2. 📊 **EVIDENCE** — Exact numbers with comparisons
 3. 💰 **REVENUE IMPACT** — Everything in dollars
-4. ⚡ **ACTION** — Numbered, specific, prioritized steps 
+4. ⚡ **ACTION** — Numbered, specific, prioritized steps
 5. 🔮 **BONUS** — 1-2 things the user didn't ask about
 
 Labels: 🔴 CRITICAL (today) | 🟡 HIGH (this week) | 🟢 OPPORTUNITY | ⚪ MONITOR
@@ -185,7 +188,7 @@ Labels: 🔴 CRITICAL (today) | 🟡 HIGH (this week) | 🟢 OPPORTUNITY | ⚪ M
 5. "How am I doing?" → Letter grade (A-F) per area.`;
 
 // ═══════════════════════════════════════════════════════════════
-// DATA CONTEXT BUILDER — Pre-computes patterns for the AI
+// DATA CONTEXT BUILDER
 // ═══════════════════════════════════════════════════════════════
 function buildDataContext(analyticsContext: any, seoContext: any): string {
     let ctx = '';
@@ -257,7 +260,6 @@ function buildDataContext(analyticsContext: any, seoContext: any): string {
             ctx += `Recommendations: ${seoContext.recommendations.map((r: any) => `[${r.severity}]${r.title}`).join(' | ')}\n`;
         }
         if (seoContext.trend?.length) {
-            // Only send first, middle, and last 3 points of trend for token efficiency
             const t = seoContext.trend;
             const trendSample = t.length <= 7 ? t : [...t.slice(0, 3), ...t.slice(Math.floor(t.length / 2) - 1, Math.floor(t.length / 2) + 1), ...t.slice(-3)];
             ctx += `Trend(sampled): ${trendSample.map((d: any) => `${d.date}:${d.clicks}c/${d.impressions}i`).join(' | ')}\n`;
@@ -271,7 +273,7 @@ function buildDataContext(analyticsContext: any, seoContext: any): string {
 // CREDIT SYSTEM HELPERS
 // ═══════════════════════════════════════════════════════════════
 async function getUserCredits(userId: string): Promise<number | null> {
-    if (!ADMIN_API_KEY) return null; // Dev mode
+    if (!ADMIN_API_KEY) return null;
     try {
         const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
@@ -299,7 +301,7 @@ async function deductCredits(userId: string): Promise<number | null> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN HANDLER
+// MAIN HANDLER — Uses official @google/genai SDK
 // ═══════════════════════════════════════════════════════════════
 function encodeSSE(data: any): Uint8Array {
     return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -333,13 +335,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        if (!GEMINI_API_KEY) {
+        if (!ai) {
             return new Response(JSON.stringify({
                 response: generateFallbackResponse(message, analyticsContext, seoContext, false),
             }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
 
-        // ── Build data context with pre-computed patterns ──
+        // ── Build data context ──
         const dataContext = buildDataContext(analyticsContext, seoContext);
 
         // ── Build conversation history ──
@@ -402,25 +404,19 @@ export async function POST(req: NextRequest) {
             parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}${availableSitesContext}\n\n---\n\nUser: ${message}` : message + availableSitesContext }],
         });
 
-        // ── Build system instruction once (not per loop iteration) ──
+        // ── Build system instruction once ──
         const today = new Date().toISOString().split('T')[0];
-        const DYNAMIC_SYSTEM_INSTRUCTION = `${BASE_SYSTEM_INSTRUCTION}
+        const systemInstruction = `${BASE_SYSTEM_INSTRUCTION}
 
 CRITICAL SYSTEM CONTEXT:
 - TODAY'S DATE IS: ${today}.
 - ALWAYS use this exact date as your anchor for "today", "last month", "last 90 days", etc.
 - IMPORTANT: Google Search Console ONLY stores data for the last 16 months. NEVER query data older than 16 months from today, or the API will return 0 rows and you will incorrectly assume the site is dead.`;
 
-        // Pre-encode the TextEncoder once for the stream
-        const encoder = new TextEncoder();
-
-        // ── Execute Gemini Stream ──
+        // ── Execute Gemini Stream via official SDK ──
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    const geminiUrl = `${GEMINI_URL}&key=${GEMINI_API_KEY}`;
-
-                    const decoder = new TextDecoder();
                     let currentContents = [...contents];
                     let keepGoing = true;
                     let hasDeductedCredit = false;
@@ -433,144 +429,86 @@ CRITICAL SYSTEM CONTEXT:
                         loopCount++;
                         keepGoing = false;
 
-                        if (loopCount === MAX_LOOPS) {
-                            controller.enqueue(encodeSSE({
-                                type: 'text',
-                                content: '\n\n'
-                            }));
-                        }
+                        // Use the official SDK for streaming
+                        const response = await ai.models.generateContentStream({
+                            model: 'gemini-3-flash-preview',
+                            contents: currentContents,
+                            config: {
+                                systemInstruction: systemInstruction,
+                                tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
+                                temperature: 0.8,
+                                maxOutputTokens: 8192,
+                                httpOptions: { timeout: 60000 },
+                            },
+                        });
 
-                        let response: Response | null = null;
-                        let retries = 0;
-                        const maxRetries = 3;
-
-                        while (retries <= maxRetries) {
-                            response = await fetch(geminiUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    system_instruction: { parts: [{ text: DYNAMIC_SYSTEM_INSTRUCTION }] },
-                                    contents: currentContents,
-                                    tools: [{ function_declarations: AI_CHAT_TOOL_DECLARATIONS }],
-                                    generationConfig: {
-                                        temperature: 0.8, maxOutputTokens: 8192,
-                                    },
-                                }),
-                                signal: AbortSignal.timeout(60000), // 60s timeout
-                            });
-
-                            if (response.ok) break;
-
-                            if (response.status === 503 && retries < maxRetries) {
-                                retries++;
-                                const delayMs = Math.pow(2, retries) * 1000;
-                                await new Promise(res => setTimeout(res, delayMs));
-                                continue;
-                            }
-
-                            break; // Break on any other error or if max retries exceeded
-                        }
-
-                        if (!response || !response.ok) {
-                            controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service due to high demand or an internal error.' }));
-                            break;
-                        }
-
-                        const reader = response.body?.getReader();
-                        if (!reader) break;
-
-                        let buffer = '';
                         let fullText = '';
                         let pendingFunctionCalls: any[] = [];
 
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
+                        // Stream chunks from the SDK
+                        for await (const chunk of response) {
+                            // Deduct credit on first chunk
+                            if (!hasDeductedCredit && ADMIN_API_KEY && userId) {
+                                hasDeductedCredit = true;
+                                deductCredits(String(userId)).then(credits => {
+                                    if (credits !== null) {
+                                        try { controller.enqueue(encodeSSE({ type: 'credits', value: credits })); } catch {}
+                                    }
+                                }).catch(() => {});
+                            }
 
-                            buffer += decoder.decode(value, { stream: true });
-                            const lines = buffer.split('\n');
-                            buffer = lines.pop() || '';
+                            // Stream text chunks
+                            if (chunk.text) {
+                                fullText += chunk.text;
+                                // Only stream text if no function calls in this chunk
+                                if (!chunk.functionCalls || chunk.functionCalls.length === 0) {
+                                    controller.enqueue(encodeSSE({
+                                        type: 'text',
+                                        content: chunk.text,
+                                    }));
+                                }
+                            }
 
-                            for (const line of lines) {
-                                if (!line.startsWith('data: ')) continue;
-                                const jsonStr = line.slice(6).trim();
-                                if (!jsonStr || jsonStr === '[DONE]') continue;
+                            // Collect function calls
+                            if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+                                for (const fc of chunk.functionCalls) {
+                                    const toolName = fc.name;
 
-                                try {
-                                    const parsed = JSON.parse(jsonStr);
-                                    const candidate = parsed.candidates?.[0];
-                                    if (!candidate) continue;
-
-                                    if (!hasDeductedCredit && ADMIN_API_KEY && userId) {
-                                        hasDeductedCredit = true;
-                                        deductCredits(String(userId)).then(credits => {
-                                            if (credits !== null) {
-                                                controller.enqueue(encodeSSE({ type: 'credits', value: credits }));
-                                            }
-                                        }).catch(() => {});
+                                    // Hard limit: max 2 GSC calls
+                                    if (toolName === 'get_search_performance' && gscCallCount >= MAX_GSC_CALLS) {
+                                        continue;
                                     }
 
-                                    const parts = candidate.content?.parts || [];
-                                    const hasFunctionCall = parts.some((p: any) => p.functionCall);
+                                    // Dedupe
+                                    const isDup = pendingFunctionCalls.some(
+                                        p => p.name === toolName && JSON.stringify(p.args) === JSON.stringify(fc.args)
+                                    );
 
-                                    // Stream the parsing
-                                    for (const part of parts) {
-                                        if (part.text) {
-                                            if (!hasFunctionCall && pendingFunctionCalls.length === 0) {
-                                                fullText += part.text;
-                                                controller.enqueue(encodeSSE({
-                                                    type: 'text',
-                                                    content: part.text,
-                                                }));
-                                            } else {
-                                                fullText += part.text;
-                                            }
-                                        }
-
-                                        if (part.functionCall) {
-                                            const toolName = part.functionCall.name;
-
-                                            // Hard server-side limit: max 2 GSC calls total
-                                            if (toolName === 'get_search_performance' && gscCallCount >= MAX_GSC_CALLS) {
-                                                continue;
-                                            }
-
-                                            // Dedupe: skip exact duplicates
-                                            const isDup = pendingFunctionCalls.some(
-                                                p => p.functionCall?.name === toolName && JSON.stringify(p.functionCall?.args) === JSON.stringify(part.functionCall.args)
-                                            );
-
-                                            if (!isDup) {
-                                                if (toolName === 'get_search_performance') gscCallCount++;
-                                                pendingFunctionCalls.push(part);
-                                                controller.enqueue(encodeSSE({
-                                                    type: 'tool_start',
-                                                    name: toolName,
-                                                    args: part.functionCall.args,
-                                                }));
-                                            }
-                                        }
+                                    if (!isDup) {
+                                        if (toolName === 'get_search_performance') gscCallCount++;
+                                        pendingFunctionCalls.push(fc);
+                                        controller.enqueue(encodeSSE({
+                                            type: 'tool_start',
+                                            name: toolName,
+                                            args: fc.args,
+                                        }));
                                     }
-                                } catch {
-                                    // ignore parse errors on partial chunks
                                 }
                             }
                         }
 
-                        // 2. Handle tool execution loop
+                        // Handle tool execution
                         if (pendingFunctionCalls.length > 0) {
-                            // Append AI's own request to context history
-                            currentContents.push({
-                                role: 'model',
-                                parts: [
-                                    ...(fullText ? [{ text: fullText }] : []),
-                                    ...pendingFunctionCalls // directly include the raw functionCall parts (WITH thought_signature)
-                                ],
-                            });
+                            // Add model response to conversation history
+                            const modelParts: any[] = [];
+                            if (fullText) modelParts.push({ text: fullText });
+                            for (const fc of pendingFunctionCalls) {
+                                modelParts.push({ functionCall: { name: fc.name, args: fc.args } });
+                            }
+                            currentContents.push({ role: 'model', parts: modelParts });
 
-                            // Execute all requested tools in parallel
-                            const toolPromises = pendingFunctionCalls.map(async (rawPart) => {
-                                const fc = rawPart.functionCall;
+                            // Execute tools in parallel
+                            const toolResults = await Promise.all(pendingFunctionCalls.map(async (fc) => {
                                 try {
                                     const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
                                         googleAccessToken,
@@ -587,43 +525,38 @@ CRITICAL SYSTEM CONTEXT:
                                     return {
                                         functionResponse: {
                                             name: fc.name,
-                                            response: { name: fc.name, content: toolResult }
+                                            response: { result: toolResult },
                                         }
                                     };
-                                } catch (err) {
+                                } catch {
                                     return {
                                         functionResponse: {
                                             name: fc.name,
-                                            response: { name: fc.name, error: "Execution failed" }
+                                            response: { result: { error: "Execution failed" } },
                                         }
                                     };
                                 }
-                            });
+                            }));
 
-                            const functionResponsesParts = await Promise.all(toolPromises);
-
-                            // Append tool results identically as 'function' role
+                            // Add function responses — SDK uses role "user" for function responses
                             currentContents.push({
-                                role: 'function',
-                                parts: functionResponsesParts
+                                role: 'user',
+                                parts: toolResults,
                             });
 
-                            // Tell the while loop to query Gemini again with the updated history
                             keepGoing = true;
-
-                            // If we hit the max loop cap right here, Gemini won't get a chance to read the final tool results 
-                            // to formulate an answer. So we forcibly break cleanly.
                             if (loopCount >= MAX_LOOPS) {
                                 keepGoing = false;
                             }
                         }
-                    } // END while(keepGoing)
+                    }
 
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
-                } catch {
+                } catch (error: any) {
                     try {
-                        controller.enqueue(encodeSSE({ type: 'error', message: 'Internal server error while streaming' }));
+                        const errMsg = error?.message || 'Internal server error while streaming';
+                        controller.enqueue(encodeSSE({ type: 'error', message: errMsg }));
                         controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                         controller.close();
                     } catch { /* close errors */ }
