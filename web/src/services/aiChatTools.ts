@@ -234,15 +234,11 @@ async function queryGSCWithAutoResolve(
             if (response.ok) {
                 const data = await response.json();
                 if (data.rows && data.rows.length > 0) {
-                    console.log(`[AI Chat] GSC query succeeded with variant: ${variant} (${data.rows.length} rows)`);
                     return { response, data, resolvedUrl: variant };
                 }
-                console.log(`[AI Chat] GSC variant ${variant} returned 0 rows, trying next...`);
-            } else {
-                console.log(`[AI Chat] GSC variant ${variant} failed with ${response.status}, trying next...`);
             }
-        } catch (e: any) {
-            console.log(`[AI Chat] GSC variant ${variant} threw: ${e.message}, trying next...`);
+        } catch {
+            // Try next variant
         }
     }
 
@@ -255,7 +251,6 @@ async function queryGSCWithAutoResolve(
 }
 
 export async function executeAiChatTool(name: string, args: Record<string, any>, gscContext?: GscContext) {
-    console.log(`[AI Chat] Executing tool: ${name}`, args);
 
     if (name === 'get_search_performance') {
         if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {

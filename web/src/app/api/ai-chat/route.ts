@@ -13,8 +13,21 @@ const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemi
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-if (typeof globalThis !== 'undefined') {
-    console.log('[AI Chat] GEMINI_API_KEY configured:', !!GEMINI_API_KEY, 'length:', GEMINI_API_KEY.length);
+// ═══════════════════════════════════════════════════════════════
+// IN-MEMORY CACHE for site/property lists (avoids re-fetching per message)
+// ═══════════════════════════════════════════════════════════════
+const SITE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const siteListCache = new Map<string, { data: any; ts: number }>();
+
+function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    const cached = siteListCache.get(key);
+    if (cached && Date.now() - cached.ts < SITE_CACHE_TTL) {
+        return Promise.resolve(cached.data as T);
+    }
+    return fetcher().then(data => {
+        siteListCache.set(key, { data, ts: Date.now() });
+        return data;
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -321,7 +334,6 @@ export async function POST(req: NextRequest) {
         }
 
         if (!GEMINI_API_KEY) {
-            console.warn('[AI Chat] No GEMINI_API_KEY found. Using fallback.');
             return new Response(JSON.stringify({
                 response: generateFallbackResponse(message, analyticsContext, seoContext, false),
             }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -354,14 +366,15 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // ── Get Available Sites Context (with property type for correct format) ──
+        // ── Get Available Sites Context (cached per user for 5min) ──
         let availableSitesContext = '';
         if (googleAccessToken || googleRefreshToken) {
             try {
                 const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
+                const cacheKey = `sites:${userId}`;
                 const [sites, ga4Properties] = await Promise.all([
-                    listSearchConsoleSites(token).catch(() => []),
-                    listAnalyticsProperties(token).catch(() => []),
+                    getCachedOrFetch(`${cacheKey}:gsc`, () => listSearchConsoleSites(token).catch(() => [])),
+                    getCachedOrFetch(`${cacheKey}:ga4`, () => listAnalyticsProperties(token).catch(() => [])),
                 ]);
 
                 if (sites && sites.length > 0) {
@@ -378,8 +391,8 @@ export async function POST(req: NextRequest) {
                     ).join(', ');
                     availableSitesContext += `\n[AVAILABLE GA4 PROPERTIES: ${propList}]\nUse these property IDs with the get_analytics_breakdown tool.`;
                 }
-            } catch (e) {
-                console.warn('[AI Chat] Failed to fetch site/property list for prompt injection', e);
+            } catch {
+                // Site/property list fetch failed — continue without context
             }
         }
 
@@ -388,6 +401,18 @@ export async function POST(req: NextRequest) {
             role: 'user',
             parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${dataContext}${availableSitesContext}\n\n---\n\nUser: ${message}` : message + availableSitesContext }],
         });
+
+        // ── Build system instruction once (not per loop iteration) ──
+        const today = new Date().toISOString().split('T')[0];
+        const DYNAMIC_SYSTEM_INSTRUCTION = `${BASE_SYSTEM_INSTRUCTION}
+
+CRITICAL SYSTEM CONTEXT:
+- TODAY'S DATE IS: ${today}.
+- ALWAYS use this exact date as your anchor for "today", "last month", "last 90 days", etc.
+- IMPORTANT: Google Search Console ONLY stores data for the last 16 months. NEVER query data older than 16 months from today, or the API will return 0 rows and you will incorrectly assume the site is dead.`;
+
+        // Pre-encode the TextEncoder once for the stream
+        const encoder = new TextEncoder();
 
         // ── Execute Gemini Stream ──
         const stream = new ReadableStream({
@@ -400,9 +425,9 @@ export async function POST(req: NextRequest) {
                     let keepGoing = true;
                     let hasDeductedCredit = false;
                     let loopCount = 0;
-                    let gscCallCount = 0; // Track total GSC calls across all loops
-                    const MAX_GSC_CALLS = 2; // Hard server-side limit
-                    const MAX_LOOPS = 3; // Hard cap — forces AI to be efficient
+                    let gscCallCount = 0;
+                    const MAX_GSC_CALLS = 2;
+                    const MAX_LOOPS = 3;
 
                     while (keepGoing && loopCount < MAX_LOOPS) {
                         loopCount++;
@@ -415,19 +440,9 @@ export async function POST(req: NextRequest) {
                             }));
                         }
 
-                        // 1. Call Gemini with current state of contents (with retry logic)
                         let response: Response | null = null;
                         let retries = 0;
                         const maxRetries = 3;
-
-                        // Inject dynamic Date to prevent GSC date hallucination
-                        const today = new Date().toISOString().split('T')[0];
-                        const DYNAMIC_SYSTEM_INSTRUCTION = `${BASE_SYSTEM_INSTRUCTION}
-                        
-CRITICAL SYSTEM CONTEXT:
-- TODAY'S DATE IS: ${today}.
-- ALWAYS use this exact date as your anchor for "today", "last month", "last 90 days", etc.
-- IMPORTANT: Google Search Console ONLY stores data for the last 16 months. NEVER query data older than 16 months from today, or the API will return 0 rows and you will incorrectly assume the site is dead.`;
 
                         while (retries <= maxRetries) {
                             response = await fetch(geminiUrl, {
@@ -448,8 +463,7 @@ CRITICAL SYSTEM CONTEXT:
 
                             if (response.status === 503 && retries < maxRetries) {
                                 retries++;
-                                const delayMs = Math.pow(2, retries) * 1000; // Exponential backoff: 2s, 4s, 8s
-                                console.warn(`Gemini API 503 High Demand. Retrying in ${delayMs / 1000}s (Attempt ${retries}/${maxRetries})...`);
+                                const delayMs = Math.pow(2, retries) * 1000;
                                 await new Promise(res => setTimeout(res, delayMs));
                                 continue;
                             }
@@ -458,8 +472,6 @@ CRITICAL SYSTEM CONTEXT:
                         }
 
                         if (!response || !response.ok) {
-                            const errData = response ? await response.text() : 'No response';
-                            console.error('Gemini API error:', response?.status, errData);
                             controller.enqueue(encodeSSE({ type: 'error', message: 'Failed to connect to AI service due to high demand or an internal error.' }));
                             break;
                         }
@@ -495,7 +507,7 @@ CRITICAL SYSTEM CONTEXT:
                                             if (credits !== null) {
                                                 controller.enqueue(encodeSSE({ type: 'credits', value: credits }));
                                             }
-                                        }).catch(console.error);
+                                        }).catch(() => {});
                                     }
 
                                     const parts = candidate.content?.parts || [];
@@ -520,8 +532,6 @@ CRITICAL SYSTEM CONTEXT:
 
                                             // Hard server-side limit: max 2 GSC calls total
                                             if (toolName === 'get_search_performance' && gscCallCount >= MAX_GSC_CALLS) {
-                                                console.log(`[AI Chat] BLOCKED: GSC call #${gscCallCount + 1} exceeds limit of ${MAX_GSC_CALLS}`);
-                                                // Don't add to pending — will be silently skipped
                                                 continue;
                                             }
 
@@ -538,8 +548,6 @@ CRITICAL SYSTEM CONTEXT:
                                                     name: toolName,
                                                     args: part.functionCall.args,
                                                 }));
-                                            } else {
-                                                console.log(`[AI Chat] Skipped duplicate tool call: ${toolName}`);
                                             }
                                         }
                                     }
@@ -560,10 +568,8 @@ CRITICAL SYSTEM CONTEXT:
                                 ],
                             });
 
-                            const functionResponsesParts: any[] = [];
-
-                            // Execute all requested tools
-                            for (const rawPart of pendingFunctionCalls) {
+                            // Execute all requested tools in parallel
+                            const toolPromises = pendingFunctionCalls.map(async (rawPart) => {
                                 const fc = rawPart.functionCall;
                                 try {
                                     const toolResult = await executeAiChatTool(fc.name, fc.args || {}, {
@@ -578,22 +584,23 @@ CRITICAL SYSTEM CONTEXT:
                                         error: toolResult.error,
                                     }));
 
-                                    functionResponsesParts.push({
+                                    return {
                                         functionResponse: {
                                             name: fc.name,
                                             response: { name: fc.name, content: toolResult }
                                         }
-                                    });
+                                    };
                                 } catch (err) {
-                                    console.error('Tool execution error:', err);
-                                    functionResponsesParts.push({
+                                    return {
                                         functionResponse: {
                                             name: fc.name,
                                             response: { name: fc.name, error: "Execution failed" }
                                         }
-                                    });
+                                    };
                                 }
-                            }
+                            });
+
+                            const functionResponsesParts = await Promise.all(toolPromises);
 
                             // Append tool results identically as 'function' role
                             currentContents.push({
@@ -608,15 +615,13 @@ CRITICAL SYSTEM CONTEXT:
                             // to formulate an answer. So we forcibly break cleanly.
                             if (loopCount >= MAX_LOOPS) {
                                 keepGoing = false;
-                                console.warn('[AI Chat] MAX_LOOPS hit! Terminating recursive execution early.');
                             }
                         }
                     } // END while(keepGoing)
 
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
-                } catch (error: any) {
-                    console.error('Chat streaming error:', error);
+                } catch {
                     try {
                         controller.enqueue(encodeSSE({ type: 'error', message: 'Internal server error while streaming' }));
                         controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
@@ -634,8 +639,7 @@ CRITICAL SYSTEM CONTEXT:
             },
         });
 
-    } catch (err) {
-        console.error('AI Chat error:', err);
+    } catch {
         return new Response(JSON.stringify({ error: 'Failed to process request' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 }

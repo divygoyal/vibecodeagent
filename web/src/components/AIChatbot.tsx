@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
 
 interface Message {
@@ -22,18 +22,12 @@ interface SiteOption {
 }
 
 const QUICK_PROMPTS = [
-    // 🚀 Killer Feature
     '🎯 What is the ONE thing I should do today to grow?',
-    // 🚨 Emergency
     '🚨 Why did my traffic drop?',
-    // 💰 Money
     '💰 Which pages are money pits? (high impressions, low clicks)',
     '📈 Keywords on page 2 I can push to page 1',
-    // 🌍 Content Strategy
     '📝 Give me 5 blog post ideas based on my data',
-    // 🕵️ Deep Dive
     '📊 Grade my SEO (A-F)',
-    // 🤖 Technical SEO
     '⚡ Are my Core Web Vitals hurting my rankings?',
     '🔮 Growth opportunities I am missing',
 ];
@@ -101,6 +95,29 @@ function renderMessage(text: string) {
     return <>{elements}</>;
 }
 
+// Memoized message bubble — prevents re-rendering old messages when new chunks arrive
+const MessageBubble = memo(function MessageBubble({ msg, isExpanded }: { msg: Message; isExpanded: boolean }) {
+    return (
+        <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
+                : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
+                }`}>
+                {msg.role === 'assistant' ? (
+                    <div className="space-y-1 text-[13px]">
+                        <div className="space-y-0.5">{renderMessage(msg.content)}</div>
+                    </div>
+                ) : (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                )}
+                <div className="text-[10px] text-zinc-700 mt-2 select-none">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+            </div>
+        </div>
+    );
+});
+
 export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -121,7 +138,53 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Fetch available sites on mount (plain fetch, no SWR dependency)
+    // ── Refs for stable callback access (avoids dependency-loop in useCallback) ──
+    const messagesRef = useRef(messages);
+    messagesRef.current = messages;
+    const inputRef2 = useRef(input);
+    inputRef2.current = input;
+    const isLoadingRef = useRef(isLoading);
+    isLoadingRef.current = isLoading;
+    const analyticsRef = useRef(analyticsData);
+    analyticsRef.current = analyticsData;
+    const seoRef = useRef(seoData);
+    seoRef.current = seoData;
+    const selectedSiteRef = useRef(selectedChatSite);
+    selectedSiteRef.current = selectedChatSite;
+
+    // ── Streaming batching: accumulate chunks and flush via rAF ──
+    const streamBufferRef = useRef('');
+    const rafIdRef = useRef<number | null>(null);
+
+    const flushStreamBuffer = useCallback(() => {
+        rafIdRef.current = null;
+        const buffered = streamBufferRef.current;
+        if (!buffered) return;
+        streamBufferRef.current = '';
+        setMessages(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            // Create a new last message object so React detects the change
+            updated[updated.length - 1] = { ...last, content: last.content + buffered };
+            return updated;
+        });
+    }, []);
+
+    const appendStreamText = useCallback((text: string) => {
+        streamBufferRef.current += text;
+        if (rafIdRef.current === null) {
+            rafIdRef.current = requestAnimationFrame(flushStreamBuffer);
+        }
+    }, [flushStreamBuffer]);
+
+    // Cleanup rAF on unmount
+    useEffect(() => {
+        return () => {
+            if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+        };
+    }, []);
+
+    // Fetch available sites on mount
     useEffect(() => {
         async function loadSites() {
             try {
@@ -157,10 +220,15 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         }
     }, [isOpen, isExpanded]);
 
-
+    // ── sendMessage: stable callback — reads from refs, no deps on messages/input/etc. ──
     const sendMessage = useCallback(async (text?: string) => {
-        const messageText = text || input.trim();
-        if (!messageText || isLoading) return;
+        const messageText = text || inputRef2.current.trim();
+        if (!messageText || isLoadingRef.current) return;
+
+        const currentAnalytics = analyticsRef.current;
+        const currentSeo = seoRef.current;
+        const currentMessages = messagesRef.current;
+        const currentSite = selectedSiteRef.current;
 
         const userMessage: Message = { role: 'user', content: messageText, timestamp: new Date() };
         setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date(), tools: [] }]);
@@ -173,51 +241,48 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: messageText,
-                    selectedSite: selectedChatSite,
-                    analyticsContext: analyticsData ? {
-                        kpis: analyticsData.kpis,
-                        topSources: analyticsData.sources?.slice(0, 15),
-                        topPages: analyticsData.pages?.slice(0, 20),
-                        topCountries: analyticsData.countries?.slice(0, 15),
-                        devices: analyticsData.devices,
-                        browsers: analyticsData.browsers?.slice(0, 10),
-                        channels: analyticsData.channels?.slice(0, 10),
-                        referrers: analyticsData.referrers?.slice(0, 15),
-                        cities: analyticsData.cities?.slice(0, 12),
-                        languages: analyticsData.languages?.slice(0, 8),
-                        entryPages: analyticsData.entryPages?.slice(0, 10),
-                        operatingSystems: analyticsData.operatingSystems?.slice(0, 5),
+                    selectedSite: currentSite,
+                    analyticsContext: currentAnalytics ? {
+                        kpis: currentAnalytics.kpis,
+                        topSources: currentAnalytics.sources?.slice(0, 15),
+                        topPages: currentAnalytics.pages?.slice(0, 20),
+                        topCountries: currentAnalytics.countries?.slice(0, 15),
+                        devices: currentAnalytics.devices,
+                        browsers: currentAnalytics.browsers?.slice(0, 10),
+                        channels: currentAnalytics.channels?.slice(0, 10),
+                        referrers: currentAnalytics.referrers?.slice(0, 15),
+                        cities: currentAnalytics.cities?.slice(0, 12),
+                        languages: currentAnalytics.languages?.slice(0, 8),
+                        entryPages: currentAnalytics.entryPages?.slice(0, 10),
+                        operatingSystems: currentAnalytics.operatingSystems?.slice(0, 5),
                     } : null,
-                    seoContext: seoData ? {
-                        kpis: seoData.kpis,
-                        topQueries: seoData.queries?.slice(0, 25),
-                        topPages: seoData.pages?.slice(0, 15),
-                        recommendations: seoData.recommendations,
-                        trend: seoData.trend?.slice(-14),
+                    seoContext: currentSeo ? {
+                        kpis: currentSeo.kpis,
+                        topQueries: currentSeo.queries?.slice(0, 25),
+                        topPages: currentSeo.pages?.slice(0, 15),
+                        recommendations: currentSeo.recommendations,
+                        trend: currentSeo.trend?.slice(-14),
                     } : null,
-                    history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+                    history: currentMessages.slice(-8).map(m => ({ role: m.role, content: m.content })),
                 }),
             });
 
             if (!res.ok) {
-                // Handle credit exhaustion (402) specially
                 if (res.status === 402) {
                     try {
                         const errorData = await res.json();
                         const creditMsg = errorData.response || `⚡ You've run out of messages! **1 credit = 1 message.**\n\nGet more to continue using TrafficClaw AI.`;
                         setMessages(prev => {
-                            const newMessages = [...prev];
-                            const last = newMessages[newMessages.length - 1];
-                            last.content = creditMsg;
-                            return newMessages;
+                            const updated = [...prev];
+                            updated[updated.length - 1] = { ...updated[updated.length - 1], content: creditMsg };
+                            return updated;
                         });
                         if (errorData.credits !== undefined) setCredits(errorData.credits);
                     } catch {
                         setMessages(prev => {
-                            const newMessages = [...prev];
-                            const last = newMessages[newMessages.length - 1];
-                            last.content = '⚡ **Out of messages!** Please purchase more to continue.';
-                            return newMessages;
+                            const updated = [...prev];
+                            updated[updated.length - 1] = { ...updated[updated.length - 1], content: '⚡ **Out of messages!** Please purchase more to continue.' };
+                            return updated;
                         });
                     }
                     setIsLoading(false);
@@ -230,62 +295,64 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
             if (!reader) throw new Error('No readable stream available');
 
             const decoder = new TextDecoder();
+            let buffer = '';
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                // Keep the last partial line in the buffer
+                buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const dataStr = line.slice(6).trim();
-                        if (!dataStr || dataStr === '[DONE]') continue;
+                    if (!line.startsWith('data: ')) continue;
+                    const dataStr = line.slice(6).trim();
+                    if (!dataStr || dataStr === '[DONE]') continue;
 
-                        try {
-                            const data = JSON.parse(dataStr);
+                    try {
+                        const data = JSON.parse(dataStr);
 
-                            if (data.type === 'text') {
-                                setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const last = newMessages[newMessages.length - 1];
-                                    last.content += data.content;
-                                    return newMessages;
-                                });
-                            } else if (data.type === 'tool_start') {
-                                setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const last = newMessages[newMessages.length - 1];
-                                    if (!last.tools) last.tools = [];
-                                    last.tools.push({ name: data.name, args: data.args });
-                                    return newMessages;
-                                });
-                            } else if (data.type === 'tool_result') {
-                                setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const last = newMessages[newMessages.length - 1];
-                                    const tool = last.tools?.find(t => t.name === data.name && !t.result);
-                                    if (tool) {
-                                        tool.result = data.result || 'Done';
-                                    }
-                                    return newMessages;
-                                });
-                            } else if (data.type === 'credits') {
-                                setCredits(data.value);
-                            } else if (data.type === 'error') {
-                                setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const last = newMessages[newMessages.length - 1];
-                                    last.content += `\n\n⚠️ **Error:** ${data.message}`;
-                                    return newMessages;
-                                });
-                            }
-                        } catch (e) {
-                            // skip parse error
+                        if (data.type === 'text') {
+                            // Batched via rAF — no setState per chunk
+                            appendStreamText(data.content);
+                        } else if (data.type === 'tool_start') {
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.tools = [...(last.tools || []), { name: data.name, args: data.args }];
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
+                        } else if (data.type === 'tool_result') {
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.tools = (last.tools || []).map(t =>
+                                    t.name === data.name && !t.result ? { ...t, result: data.result || 'Done' } : t
+                                );
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
+                        } else if (data.type === 'credits') {
+                            setCredits(data.value);
+                        } else if (data.type === 'error') {
+                            appendStreamText(`\n\n⚠️ **Error:** ${data.message}`);
                         }
+                    } catch {
+                        // skip parse error
                     }
                 }
+            }
+
+            // Flush any remaining buffered stream text
+            if (streamBufferRef.current) {
+                if (rafIdRef.current !== null) {
+                    cancelAnimationFrame(rafIdRef.current);
+                    rafIdRef.current = null;
+                }
+                flushStreamBuffer();
             }
         } catch {
             setMessages(prev => [...prev, {
@@ -296,7 +363,11 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
         } finally {
             setIsLoading(false);
         }
-    }, [input, isLoading, analyticsData, seoData, messages, selectedChatSite]);
+    }, [appendStreamText, flushStreamBuffer]); // stable deps only
+
+    // ── Stable ref for event listener — never re-adds ──
+    const sendMessageRef = useRef(sendMessage);
+    sendMessageRef.current = sendMessage;
 
     // Listen for external "Ask AI" events (from Intelligence Center)
     useEffect(() => {
@@ -305,23 +376,22 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
             const question = ce.detail?.question;
             if (question) {
                 setIsOpen(true);
-                // Small delay to allow the chat to open, then send
                 setTimeout(() => {
-                    sendMessage(question);
+                    sendMessageRef.current(question);
                 }, 300);
             }
         };
         window.addEventListener('trafficclaw:ask-ai', handler);
         return () => window.removeEventListener('trafficclaw:ask-ai', handler);
-    }, [sendMessage]);
+    }, []); // empty deps — listener is added once, never thrashes
 
-    const clearChat = () => {
+    const clearChat = useCallback(() => {
         setMessages([{
             role: 'assistant',
             content: "🔄 **Chat cleared.** What would you like to investigate?",
             timestamp: new Date(),
         }]);
-    };
+    }, []);
 
     // ─── Floating button (closed state) ───
     if (!isOpen) {
@@ -416,30 +486,11 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
                 {/* ── Messages ── */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
                     {messages.map((msg, i) => {
-                        // Skip rendering empty assistant placeholder messages
                         if (msg.role === 'assistant' && !msg.content && (!msg.tools || msg.tools.length === 0)) return null;
-                        return (
-                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                    ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
-                                    : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
-                                    }`}>
-                                    {msg.role === 'assistant' ? (
-                                        <div className="space-y-1 text-[13px]">
-                                            <div className="space-y-0.5">{renderMessage(msg.content)}</div>
-                                        </div>
-                                    ) : (
-                                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                                    )}
-                                    <div className="text-[10px] text-zinc-700 mt-2 select-none">
-                                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                </div>
-                            </div>
-                        );
+                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} />;
                     })}
 
-                    {/* ChatGPT/Gemini-style thinking indicator */}
+                    {/* Thinking indicator */}
                     {isLoading && (
                         <div className="flex justify-start">
                             <div className="flex items-center gap-2 px-3 py-2">
