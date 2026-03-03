@@ -181,8 +181,58 @@ export default function SEOPage() {
 
     if (isError && !seoData) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <p className="text-red-400 text-sm">Failed to load SEO data</p>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                    <AlertTriangle className="w-8 h-8 text-red-400" />
+                </div>
+                <div className="text-center max-w-md">
+                    <h2 className="text-xl font-semibold text-white mb-2">Couldn&apos;t load SEO data</h2>
+                    <p className="text-sm text-zinc-400 mb-1">
+                        The selected property may not be accessible or doesn&apos;t exist in your Search Console.
+                    </p>
+                    <p className="text-xs text-zinc-600">
+                        Error: {isError?.message || isError?.info?.error || 'Server returned 502 Bad Gateway'}
+                    </p>
+                </div>
+
+                {/* Site selector to pick another property */}
+                <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm">
+                    <h3 className="text-sm font-semibold text-white mb-3">Try a different site</h3>
+                    <div className="relative mb-3">
+                        <select
+                            value={selectedSite}
+                            onChange={(e) => setSelectedSite(e.target.value)}
+                            disabled={sitesLoading || sites.length === 0}
+                            className="w-full appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-2.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition"
+                        >
+                            {sitesLoading ? (
+                                <option>Loading sites...</option>
+                            ) : sites.length === 0 ? (
+                                <option value="">No sites found</option>
+                            ) : (
+                                sites.map(s => (
+                                    <option key={s.siteUrl} value={s.siteUrl}>
+                                        {s.siteUrl.replace('sc-domain:', '')}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                    </div>
+                    <p className="text-[10px] text-zinc-600">
+                        {sites.length > 0
+                            ? `${sites.length} site${sites.length > 1 ? 's' : ''} available in your Search Console`
+                            : 'No sites found. Make sure your Google account has Search Console access.'
+                        }
+                    </p>
+                </div>
+
+                <button
+                    onClick={() => signIn('google')}
+                    className="text-xs text-emerald-400 hover:underline"
+                >
+                    Or re-connect your Google account →
+                </button>
             </div>
         );
     }

@@ -11,7 +11,7 @@ const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr:
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
-    Book, Newspaper, History, Sun, Moon, Coins
+    Book, Newspaper, History, Sun, Moon, Coins, Radar
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
 
@@ -42,6 +42,7 @@ export const useRegistration = () => useContext(RegistrationContext);
 
 const sidebarItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
+    { icon: Radar, label: 'Intelligence', href: '/dashboard/intelligence' },
     { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
     { icon: Search, label: 'SEO', href: '/dashboard/seo' },
