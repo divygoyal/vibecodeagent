@@ -22,12 +22,20 @@ interface SiteOption {
 }
 
 const QUICK_PROMPTS = [
-    '🔴 What is bleeding money?',
-    '🎯 Striking distance keywords',
+    // 🚀 Killer Feature
+    '🎯 What is the ONE thing I should do today to grow?',
+    // 🚨 Emergency
+    '🚨 Why did my traffic drop?',
+    // 💰 Money
+    '💰 Which pages are money pits? (high impressions, low clicks)',
+    '📈 Keywords on page 2 I can push to page 1',
+    // 🌍 Content Strategy
+    '📝 Give me 5 blog post ideas based on my data',
+    // 🕵️ Deep Dive
     '📊 Grade my SEO (A-F)',
-    '💰 Missed revenue',
-    '📱 Mobile vs desktop',
-    '🔮 Growth opportunities',
+    // 🤖 Technical SEO
+    '⚡ Are my Core Web Vitals hurting my rankings?',
+    '🔮 Growth opportunities I am missing',
 ];
 
 // Simple markdown-ish renderer for bot responses
@@ -148,6 +156,7 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
             }
         }
     }, [isOpen, isExpanded]);
+
 
     const sendMessage = useCallback(async (text?: string) => {
         const messageText = text || input.trim();
@@ -288,6 +297,23 @@ export default function AIChatbot({ analyticsData, seoData }: AIChatbotProps) {
             setIsLoading(false);
         }
     }, [input, isLoading, analyticsData, seoData, messages, selectedChatSite]);
+
+    // Listen for external "Ask AI" events (from Intelligence Center)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const ce = e as CustomEvent;
+            const question = ce.detail?.question;
+            if (question) {
+                setIsOpen(true);
+                // Small delay to allow the chat to open, then send
+                setTimeout(() => {
+                    sendMessage(question);
+                }, 300);
+            }
+        };
+        window.addEventListener('trafficclaw:ask-ai', handler);
+        return () => window.removeEventListener('trafficclaw:ask-ai', handler);
+    }, [sendMessage]);
 
     const clearChat = () => {
         setMessages([{

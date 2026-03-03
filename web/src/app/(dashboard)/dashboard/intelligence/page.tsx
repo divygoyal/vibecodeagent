@@ -806,6 +806,162 @@ export default function IntelligencePage() {
                 );
             })()}
 
+            {/* ═══ ASK AI DEEPER — QUESTION PROMPTS ═══ */}
+            <motion.div variants={fadeUp} className="mt-2">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
+                        <Brain className="w-4 h-4 text-violet-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-sm font-semibold text-white">Ask AI Deeper</h2>
+                        <p className="text-[10px] text-zinc-500">Click any question to get an AI-powered deep analysis</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {/* Emergency */}
+                    <div className="bg-white/[0.02] border border-red-500/10 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Shield className="w-3.5 h-3.5 text-red-400" />
+                            <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Emergency</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {[
+                                'Why did my traffic drop?',
+                                'Is my site penalized by Google?',
+                                'Did a Google algorithm update hit me?',
+                                'Which pages are throwing errors?',
+                            ].map(q => (
+                                <button key={q} onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                }}
+                                    className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-red-400 transition flex-shrink-0" />
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Money */}
+                    <div className="bg-white/[0.02] border border-amber-500/10 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Flame className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Revenue & ROI</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {[
+                                'Which pages are money pits? (high impressions, low clicks)',
+                                'Which keywords can I push from page 2 to page 1?',
+                                'Show me pages that drive 80% of my traffic',
+                                'What is my most underrated blog post?',
+                            ].map(q => (
+                                <button key={q} onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                }}
+                                    className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-amber-400 transition flex-shrink-0" />
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Content Strategy */}
+                    <div className="bg-white/[0.02] border border-emerald-500/10 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Content Strategy</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {[
+                                'What keywords should I target that I don\'t have pages for?',
+                                'Give me 5 blog post titles based on my search data',
+                                'Which old blog posts need a content refresh?',
+                                'Should I translate my site? Into which language?',
+                            ].map(q => (
+                                <button key={q} onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                }}
+                                    className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400 transition flex-shrink-0" />
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Deep Dive */}
+                    <div className="bg-white/[0.02] border border-blue-500/10 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Search className="w-3.5 h-3.5 text-blue-400" />
+                            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Deep Dive</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {[
+                                'Compare my traffic this week vs last week',
+                                'Who is linking to me? Show top referrals',
+                                'How does my traffic change on weekends vs weekdays?',
+                                'Is my viral traffic sticking around or bouncing?',
+                            ].map(q => (
+                                <button key={q} onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                }}
+                                    className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-blue-400 transition flex-shrink-0" />
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Technical SEO */}
+                    <div className="bg-white/[0.02] border border-violet-500/10 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Zap className="w-3.5 h-3.5 text-violet-400" />
+                            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Technical SEO</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {[
+                                'Are my Core Web Vitals hurting my ranking?',
+                                'How many of my pages are actually indexed?',
+                                'Which pages are being crawled but not indexed?',
+                                'Do I have any duplicate content issues?',
+                            ].map(q => (
+                                <button key={q} onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                }}
+                                    className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition flex-shrink-0" />
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 🚀 Killer Feature */}
+                    <div className="bg-gradient-to-br from-violet-500/[0.06] to-emerald-500/[0.06] border border-violet-500/20 rounded-2xl p-4 flex flex-col">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-r from-violet-400 to-emerald-400 flex items-center justify-center">
+                                <Target className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-[10px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-emerald-400 uppercase tracking-wider">Killer Feature</span>
+                        </div>
+                        <button onClick={() => {
+                            window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: 'Audit my site and tell me the ONE thing I should do today to grow' } }));
+                        }}
+                            className="flex-1 text-left rounded-xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.08] p-4 hover:border-violet-500/30 transition group cursor-pointer">
+                            <p className="text-sm font-semibold text-white mb-1 group-hover:text-violet-300 transition">
+                                &quot;What&apos;s the ONE thing I should do today to grow?&quot;
+                            </p>
+                            <p className="text-[10px] text-zinc-500">
+                                The AI runs all checks, finds the biggest opportunity, and presents just that one task.
+                            </p>
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+
         </motion.div>
     );
 }

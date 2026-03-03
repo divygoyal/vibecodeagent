@@ -80,6 +80,105 @@ SMART PATTERNS (ONE call each):
             required: ['keyword', 'currentPosition', 'currentImpressions', 'targetPosition'],
         },
     },
+    {
+        name: 'get_analytics_breakdown',
+        description: `Fetch Google Analytics 4 (GA4) data for traffic analysis. Use when the user asks about traffic trends, sources, devices, demographics, or user behavior that ISN'T already in the dashboard context.
+
+WHEN TO USE:
+- "Why did my traffic drop?" → dimension="date", range=90
+- "Where does my traffic come from?" → dimension="sources"
+- "Mobile vs Desktop bounce rate?" → dimension="devices"
+- "Which countries are most valuable?" → dimension="countries"
+- "Who is linking to me?" → dimension="referrers"
+- "What are the entry pages?" → dimension="entryPages"
+- "Weekend vs weekday traffic?" → dimension="date", range=30 (then analyze the pattern)
+- "Is my viral traffic sticking?" → dimension="sources" (check bounce rates)
+
+DO NOT USE IF the dashboard context already has this data. Check first.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                dimension: {
+                    type: 'STRING' as const,
+                    enum: ['date', 'sources', 'devices', 'countries', 'referrers', 'entryPages', 'browsers', 'os', 'languages', 'channels', 'pages'],
+                    description: 'The dimension to break down',
+                },
+                propertyId: {
+                    type: 'STRING' as const,
+                    description: 'GA4 property ID. Use the one from [AVAILABLE PROPERTIES] list.',
+                },
+                range: {
+                    type: 'INTEGER' as const,
+                    description: 'Number of days to look back. Default 28. Use 90 for trend analysis, 7 for recent changes.',
+                },
+            },
+            required: ['dimension', 'propertyId'],
+        },
+    },
+    {
+        name: 'run_page_audit',
+        description: `Run a quick PageSpeed Insights audit on a specific URL. Returns Core Web Vitals (LCP, CLS, FID/INP), performance score, and specific recommendations.
+
+WHEN TO USE:
+- "Are my Core Web Vitals hurting my ranking?"
+- "Why is my site slow on mobile?"
+- "Audit the performance of my homepage"
+- "Check page speed for /blog/my-post"
+
+Returns: performance score, LCP, CLS, TBT, speed index, FCP, and top improvement opportunities.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                url: {
+                    type: 'STRING' as const,
+                    description: 'Full URL to audit (e.g., https://example.com/page)',
+                },
+                strategy: {
+                    type: 'STRING' as const,
+                    enum: ['mobile', 'desktop'],
+                    description: 'Test on mobile or desktop. Default mobile.',
+                },
+            },
+            required: ['url'],
+        },
+    },
+    {
+        name: 'generate_content_strategy',
+        description: `Generate content strategy insights using AI reasoning. No API call needed — uses the existing GSC data context to analyze gaps and opportunities.
+
+WHEN TO USE:
+- "What keywords should I target that I don't have pages for?"
+- "Give me 5 blog post titles based on what users search for"
+- "Which old posts need an update?"
+- "Should I translate my site? Into which language?"
+- "I want to write about [Topic]. Do I have authority?"
+- "What is the ONE thing I should do today to grow?"
+
+This is a computation tool — it processes the injected data and returns strategic insights.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                analysisType: {
+                    type: 'STRING' as const,
+                    enum: ['keyword_gaps', 'content_decay', 'blog_ideas', 'one_thing_today', 'authority_check', 'translation_analysis', 'competitor_analysis'],
+                    description: 'Type of analysis to run',
+                },
+                topic: {
+                    type: 'STRING' as const,
+                    description: 'Optional topic or competitor URL for focused analysis',
+                },
+                existingQueries: {
+                    type: 'STRING' as const,
+                    description: 'Comma-separated list of current top queries (from dashboard context). Pass the top 20.',
+                },
+                existingPages: {
+                    type: 'STRING' as const,
+                    description: 'Comma-separated list of current top pages (from dashboard context). Pass the top 15.',
+                },
+            },
+            required: ['analysisType'],
+        },
+    },
 ];
 
 export interface GscContext {
@@ -303,5 +402,180 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         };
     }
 
-    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact` };
+    if (name === 'get_analytics_breakdown') {
+        // Call our own internal analytics API
+        const { dimension, propertyId, range } = args;
+        try {
+            const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+            // We need to get a valid Google token to pass to our analytics API
+            let token = '';
+            if (gscContext?.googleAccessToken || gscContext?.googleRefreshToken) {
+                token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            }
+
+            if (!token) {
+                return { error: 'Google account not connected. Cannot fetch analytics data.' };
+            }
+
+            const section = dimension || 'overview';
+            const days = range || 28;
+            const url = `${baseUrl}/api/analytics?section=${section}&propertyId=${encodeURIComponent(propertyId || '')}&range=${days}`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'Cookie': '', // Internal call, auth handled differently
+                    'x-google-token': token,
+                },
+                signal: AbortSignal.timeout(15000),
+            });
+
+            if (!response.ok) {
+                return { error: `Analytics API returned ${response.status}. The GA4 property may not be accessible.` };
+            }
+
+            const data = await response.json();
+
+            // Compress the data into CSV format for token efficiency
+            let csvOutput = '';
+            if (Array.isArray(data)) {
+                // It's a list (sources, devices, etc.)
+                const keys = data.length > 0 ? Object.keys(data[0]) : [];
+                csvOutput = keys.join(',') + '\n' + data.slice(0, 30).map((row: any) =>
+                    keys.map(k => `"${String(row[k] || '').replace(/"/g, '""')}"`).join(',')
+                ).join('\n');
+            } else if (data.kpis) {
+                csvOutput = `KPIs: ${JSON.stringify(data.kpis)}\n`;
+                if (data.traffic) csvOutput += `Traffic trend: ${data.traffic.slice(0, 14).map((t: any) => `${t.date}:${t.activeUsers}u/${t.sessions}s`).join(' | ')}\n`;
+            }
+
+            return {
+                result: {
+                    dimension,
+                    range: `${days} days`,
+                    rowsReturned: Array.isArray(data) ? data.length : 1,
+                    csvData: csvOutput || JSON.stringify(data).slice(0, 3000),
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to fetch analytics data' };
+        }
+    }
+
+    if (name === 'run_page_audit') {
+        const { url: pageUrl, strategy } = args;
+        try {
+            const strat = strategy || 'mobile';
+            const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(pageUrl)}&strategy=${strat}&category=performance&category=accessibility&category=best-practices&category=seo`;
+
+            const response = await fetch(apiUrl, {
+                signal: AbortSignal.timeout(30000), // PSI can take a while
+            });
+
+            if (!response.ok) {
+                return { error: `PageSpeed Insights returned ${response.status}. URL may be invalid or unreachable.` };
+            }
+
+            const data = await response.json();
+            const lighthouse = data.lighthouseResult;
+
+            if (!lighthouse) {
+                return { error: 'No Lighthouse data returned. The URL may be blocking automated crawlers.' };
+            }
+
+            // Extract Core Web Vitals
+            const audits = lighthouse.audits || {};
+            const categories = lighthouse.categories || {};
+
+            const result: Record<string, any> = {
+                url: pageUrl,
+                strategy: strat,
+                scores: {
+                    performance: Math.round((categories.performance?.score || 0) * 100),
+                    accessibility: Math.round((categories.accessibility?.score || 0) * 100),
+                    bestPractices: Math.round((categories['best-practices']?.score || 0) * 100),
+                    seo: Math.round((categories.seo?.score || 0) * 100),
+                },
+                coreWebVitals: {
+                    LCP: audits['largest-contentful-paint']?.displayValue || 'N/A',
+                    CLS: audits['cumulative-layout-shift']?.displayValue || 'N/A',
+                    TBT: audits['total-blocking-time']?.displayValue || 'N/A',
+                    FCP: audits['first-contentful-paint']?.displayValue || 'N/A',
+                    SpeedIndex: audits['speed-index']?.displayValue || 'N/A',
+                    TTI: audits['interactive']?.displayValue || 'N/A',
+                },
+                verdicts: {
+                    LCP: audits['largest-contentful-paint']?.score >= 0.9 ? 'GOOD' : audits['largest-contentful-paint']?.score >= 0.5 ? 'NEEDS_IMPROVEMENT' : 'POOR',
+                    CLS: audits['cumulative-layout-shift']?.score >= 0.9 ? 'GOOD' : audits['cumulative-layout-shift']?.score >= 0.5 ? 'NEEDS_IMPROVEMENT' : 'POOR',
+                    TBT: audits['total-blocking-time']?.score >= 0.9 ? 'GOOD' : audits['total-blocking-time']?.score >= 0.5 ? 'NEEDS_IMPROVEMENT' : 'POOR',
+                },
+            };
+
+            // Extract top 5 improvement opportunities
+            const opportunities: string[] = [];
+            const opportunityAudits = ['render-blocking-resources', 'unused-css-rules', 'unused-javascript',
+                'unminified-css', 'unminified-javascript', 'modern-image-formats', 'offscreen-images',
+                'efficiently-encode-images', 'server-response-time', 'redirects', 'dom-size',
+                'critical-rendering-path', 'uses-optimized-images', 'uses-text-compression'];
+
+            for (const auditId of opportunityAudits) {
+                if (audits[auditId] && audits[auditId].score !== null && audits[auditId].score < 0.9) {
+                    const savings = audits[auditId].details?.overallSavingsMs;
+                    opportunities.push(`${audits[auditId].title}${savings ? ` (save ~${Math.round(savings)}ms)` : ''}`);
+                }
+            }
+            result.topOpportunities = opportunities.slice(0, 6);
+
+            return { result };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to run PageSpeed audit' };
+        }
+    }
+
+    if (name === 'generate_content_strategy') {
+        const { analysisType, topic, existingQueries, existingPages } = args;
+
+        // This tool returns structured analysis context — the AI will then use its reasoning to generate insights
+        const queries = existingQueries ? existingQueries.split(',').map((q: string) => q.trim()) : [];
+        const pages = existingPages ? existingPages.split(',').map((p: string) => p.trim()) : [];
+
+        const result: Record<string, any> = { analysisType, topic };
+
+        switch (analysisType) {
+            case 'keyword_gaps':
+                result.instructions = 'Analyze the existing queries list. Identify TOPIC CLUSTERS that are missing. For each existing high-traffic query, suggest related queries the user SHOULD be targeting but likely isn\'t. Focus on long-tail variations and question-based queries.';
+                result.existingQueryCount = queries.length;
+                result.topQueries = queries.slice(0, 20);
+                break;
+            case 'content_decay':
+                result.instructions = 'Analyze the existing pages list. For each page, assess: is the content likely outdated? Are there queries where position > 15 (decaying)? Recommend content refresh priority.';
+                result.existingPages = pages.slice(0, 15);
+                break;
+            case 'blog_ideas':
+                result.instructions = `Generate 5-7 blog post ideas based on: (1) the user's existing top queries (what they already rank for), (2) semantic gaps (related topics they DON'T have), (3) question-based formats ("How to...", "Why does..."). For each idea, include: title, target keyword, estimated difficulty, and content angle.`;
+                result.topQueries = queries.slice(0, 15);
+                break;
+            case 'one_thing_today':
+                result.instructions = 'Based on ALL available data (GSC + GA4), determine the SINGLE highest-impact action the user can take TODAY. Consider: CTR fixes, striking distance keywords, content decay, technical issues, quick wins. Present ONE clear task with estimated impact.';
+                result.topQueries = queries.slice(0, 10);
+                result.existingPages = pages.slice(0, 10);
+                break;
+            case 'authority_check':
+                result.instructions = `Check if the user has existing authority/rankings related to "${topic || 'the topic'}". Look for: related queries they already rank for, relevant pages, keyword clusters, and semantic proximity. Rate authority 1-10.`;
+                result.topQueries = queries.slice(0, 20);
+                result.existingPages = pages.slice(0, 15);
+                break;
+            case 'translation_analysis':
+                result.instructions = 'Analyze traffic by country/language from the dashboard context. Suggest whether translation would be valuable: which languages, estimated traffic gain, and content prioritization.';
+                break;
+            case 'competitor_analysis':
+                result.instructions = `For the competitor "${topic || 'the competitor'}", use your knowledge to: (1) estimate their likely top keywords, (2) identify content types they likely have that the user doesn't, (3) suggest specific pieces of content to create to compete. Note: this uses AI reasoning, not live data.`;
+                result.topQueries = queries.slice(0, 20);
+                break;
+        }
+
+        return { result };
+    }
+
+    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, get_analytics_breakdown, run_page_audit, generate_content_strategy` };
 }

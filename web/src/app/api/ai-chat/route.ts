@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
-import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken } from '@/lib/googleApi';
+import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken, listAnalyticsProperties } from '@/lib/googleApi';
 
 export const maxDuration = 300; // Allow up to 5 minutes on Vercel Pro/Local for massive reports
 export const dynamic = 'force-dynamic';
@@ -44,19 +44,72 @@ You ALREADY HAVE live GA4 + GSC data injected below. This includes: KPIs, top 25
 **For 80% of questions, the dashboard data alone is sufficient. DO NOT call any tools.** Just cite the numbers directly.
 
 ### STEP 2: IF (and ONLY IF) you need deeper data, make ONE targeted call
-Call \`get_search_performance\` with the perfect parameters. Use multi-dimensional queries and metricFilters to get everything you need in ONE call.
+Choose the RIGHT tool for each question type. Use multi-dimensional queries and metricFilters to get everything you need in ONE call.
 
-### CALL BUDGETS PER QUESTION TYPE:
-| Question | Calls | Strategy |
+### 📋 QUESTION-TO-TOOL MAPPING (MEMORIZE THIS):
+
+🚨 EMERGENCY (Diagnostics):
+| Question | Tool | Strategy |
+|----------|------|----------|
+| "Why did my traffic drop?" | get_search_performance | dimensions=["date"], 90-day range |
+| "Is my site down/penalized?" | Dashboard + run_page_audit | Check KPI changes + page speed |
+| "Google algorithm update?" | **0 calls** | Compare drop date vs known update dates (you know them) |
+| "High mobile bounce rate?" | get_analytics_breakdown | dimension="devices" |
+| "Which pages have 404 errors?" | run_page_audit | audit the site's main pages |
+| "Traffic spike — where from?" | get_analytics_breakdown | dimension="sources" |
+
+💰 MONEY (ROI & Conversion):
+| Question | Tool | Strategy |
+|----------|------|----------|
+| "High impressions, low clicks?" | **0 calls** | Already flagged with ⚠️ in dashboard queries |
+| "Keywords on page 2?" | **0 calls** | Already flagged with ⚡ in dashboard |
+| "Top 5 pages = 80% traffic?" | **0 calls** | Analyze dashboard pages data |
+| "Most valuable countries?" | get_analytics_breakdown | dimension="countries" |
+| "Most underrated blog post?" | **0 calls** | Find low-traffic + high-engagement pages from dashboard |
+
+🌍 CONTENT STRATEGY (What to Write):
+| Question | Tool | Strategy |
+|----------|------|----------|
+| "Keywords I don't have pages for?" | generate_content_strategy | analysisType="keyword_gaps" |
+| "Do I have authority on [topic]?" | generate_content_strategy | analysisType="authority_check", topic="..." |
+| "Old posts needing update?" | generate_content_strategy | analysisType="content_decay" |
+| "Blog post ideas?" | generate_content_strategy | analysisType="blog_ideas" |
+| "Should I translate my site?" | generate_content_strategy | analysisType="translation_analysis" |
+
+🕵️ DEEP DIVE (Forensics):
+| Question | Tool | Strategy |
+|----------|------|----------|
+| "This week vs last week?" | get_search_performance | dimensions=["date"], compare periods |
+| "Top referrals/who links to me?" | get_analytics_breakdown | dimension="referrers" |
+| "iPhone vs Android?" | get_analytics_breakdown | dimension="devices" |
+| "Weekend vs weekday?" | **0 calls** | Analyze dashboard trend data by day |
+| "Is viral traffic sticking?" | get_analytics_breakdown | dimension="sources" (check bounce rates) |
+
+🤖 TECHNICAL SEO:
+| Question | Tool | Strategy |
+|----------|------|----------|
+| "Core Web Vitals hurting ranking?" | run_page_audit | Checks LCP, CLS, TBT, FCP |
+| "How many pages indexed?" | **0 calls** | Use indexed pages from dashboard KPIs |
+| "Crawled but not indexed?" | get_search_performance | dimensions=["page"], check low-impression pages |
+| "Duplicate content issues?" | **0 calls** | Analyze dashboard pages for similar URLs |
+| "Sitemap up to date?" | **0 calls** | Check page count vs indexed count |
+
+🚀 KILLER FEATURE:
+| Question | Tool | Strategy |
+|----------|------|----------|
+| "ONE thing to do today to grow" | generate_content_strategy | analysisType="one_thing_today" |
+| "Audit and grade my site A-F" | **0 calls** | Use ALL dashboard data to grade each area |
+
+### CALL BUDGETS (SUMMARY):
+| Question Type | Calls | Strategy |
 |----------|-------|----------|
-| "Why is traffic falling?" | **1** | dimensions=["date"], 90-day range. Then ANALYZE the trend from the result. |
-| "Top keywords" | **0** | Already in dashboard context. Just cite the data. |
-| "Striking distance" | **0** | Already flagged with ⚡ in dashboard. Just cite it. |
-| "Grade my SEO" | **0** | All data is in dashboard. Analyze and grade. |
-| "Deep keyword analysis" | **1** | dimensions=["query","page"], metricFilters for the specific pattern |
-| "Mobile vs desktop" | **1** | dimensions=["device"] |
-| "Country breakdown" | **1** | dimensions=["country"] |
-| "Revenue impact" | **0** | Use calculate_revenue_impact tool (no API call) |
+| "Top keywords / striking distance" | **0** | Already in dashboard context |
+| "Grade my SEO / A-F" | **0** | All data is in dashboard |
+| "Deep keyword analysis" | **1** | get_search_performance with smart filters |
+| "Mobile vs desktop" | **1** | get_analytics_breakdown dimension="devices" |
+| "Core Web Vitals" | **1** | run_page_audit |
+| "Content strategy" | **1** | generate_content_strategy |
+| "Revenue impact" | **0** | calculate_revenue_impact (pure math) |
 | General SEO question | **0** | Use your knowledge |
 
 ### ABSOLUTE RULES:
@@ -77,6 +130,8 @@ If the user mentions a site by name (e.g., "antigravity"), match it to the close
 3. **Content Decay** — Impressions up but clicks down = stale SERP result
 4. **Technical Sabotage** — Mobile bounce > 60% when desktop < 40%
 5. **Cannibalization** — Multiple pages ranking for same query cluster
+6. **Money Pits** — High impressions + low CTR = fix meta title/description NOW
+7. **Quick Wins** — Position 11-15 with >200 impressions = one push to page 1
 
 ## CTR BENCHMARKS
 Pos 1: 28% | Pos 2: 16% | Pos 3: 11% | Pos 4-5: 7% | Pos 6-7: 4.5% | Pos 8-10: 2.5%
@@ -86,6 +141,18 @@ If actual CTR < expected by 3%+ → Bad meta title/description.
 - Transactional: $2-5/click | Informational: $0.10-0.50/click
 - Formula: impressions × CTR_gain × $/click = monthly revenue
 - Use calculate_revenue_impact tool for precise calculations
+
+## GOOGLE ALGORITHM UPDATES (KNOWN DATES)
+- Mar 2025: March 2025 Core Update
+- Dec 2024: December 2024 Core Update  
+- Nov 2024: November 2024 Core Update
+- Aug 2024: August 2024 Core Update
+- Jun 2024: June 2024 Spam Update
+- Mar 2024: March 2024 Core Update + Spam Update
+- Nov 2023: November 2023 Core Update + Reviews Update
+- Oct 2023: October 2023 Core + Spam Update
+- Sep 2023: September 2023 Helpful Content Update
+If a traffic drop coincides with these dates, FLAG IT.
 
 ## RESPONSE FORMAT
 
@@ -292,7 +359,11 @@ export async function POST(req: NextRequest) {
         if (googleAccessToken || googleRefreshToken) {
             try {
                 const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
-                const sites = await listSearchConsoleSites(token);
+                const [sites, ga4Properties] = await Promise.all([
+                    listSearchConsoleSites(token).catch(() => []),
+                    listAnalyticsProperties(token).catch(() => []),
+                ]);
+
                 if (sites && sites.length > 0) {
                     const siteList = sites.map((s: any) => {
                         const type = s.siteUrl.startsWith('sc-domain:') ? 'domain-property' : 'url-prefix';
@@ -300,8 +371,15 @@ export async function POST(req: NextRequest) {
                     }).join(', ');
                     availableSitesContext = `\n\n[AVAILABLE SITES: ${siteList}]\nIMPORTANT: Use the EXACT siteUrl format shown above. The tool auto-resolves variants if needed.`;
                 }
+
+                if (ga4Properties && ga4Properties.length > 0) {
+                    const propList = ga4Properties.map((p: any) =>
+                        `${p.property} (${p.displayName || 'Unnamed'})`
+                    ).join(', ');
+                    availableSitesContext += `\n[AVAILABLE GA4 PROPERTIES: ${propList}]\nUse these property IDs with the get_analytics_breakdown tool.`;
+                }
             } catch (e) {
-                console.warn('[AI Chat] Failed to fetch site list for prompt injection', e);
+                console.warn('[AI Chat] Failed to fetch site/property list for prompt injection', e);
             }
         }
 
