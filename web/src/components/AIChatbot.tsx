@@ -170,8 +170,11 @@ export default function AIChatbot() {
     }, [selectedChatSite, ga4Properties]);
 
     // Fetch analytics & SEO data for the chatbot's selected site
-    const { data: analyticsData } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedChatSite);
-    const { data: seoData } = useSeoData('all', selectedChatSite, hasGoogleConnection && !!selectedChatSite);
+    const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedChatSite);
+    const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedChatSite, hasGoogleConnection && !!selectedChatSite);
+
+    // Track whether data is ready for sending messages
+    const dataReady = !!(analyticsData || seoData) || !hasGoogleConnection;
 
     // ── Refs for stable callback access (avoids dependency-loop in useCallback) ──
     const messagesRef = useRef(messages);
@@ -249,34 +252,31 @@ export default function AIChatbot() {
         setIsLoading(true);
 
         try {
+            // Only inject full data context on the first user message.
+            // Subsequent messages use conversation history — Gemini remembers.
+            const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
+
             const res = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
-                    analyticsContext: currentAnalytics ? {
+                    analyticsContext: isFirstUserMessage && currentAnalytics ? {
                         kpis: currentAnalytics.kpis,
-                        topSources: currentAnalytics.sources?.slice(0, 15),
-                        topPages: currentAnalytics.pages?.slice(0, 20),
-                        topCountries: currentAnalytics.countries?.slice(0, 15),
+                        topSources: currentAnalytics.sources?.slice(0, 8),
+                        topPages: currentAnalytics.pages?.slice(0, 10),
+                        topCountries: currentAnalytics.countries?.slice(0, 8),
                         devices: currentAnalytics.devices,
-                        browsers: currentAnalytics.browsers?.slice(0, 10),
-                        channels: currentAnalytics.channels?.slice(0, 10),
-                        referrers: currentAnalytics.referrers?.slice(0, 15),
-                        cities: currentAnalytics.cities?.slice(0, 12),
-                        languages: currentAnalytics.languages?.slice(0, 8),
-                        entryPages: currentAnalytics.entryPages?.slice(0, 10),
-                        operatingSystems: currentAnalytics.operatingSystems?.slice(0, 5),
+                        channels: currentAnalytics.channels?.slice(0, 6),
                     } : null,
-                    seoContext: currentSeo ? {
+                    seoContext: isFirstUserMessage && currentSeo ? {
                         kpis: currentSeo.kpis,
-                        topQueries: currentSeo.queries?.slice(0, 25),
-                        topPages: currentSeo.pages?.slice(0, 15),
+                        topQueries: currentSeo.queries?.slice(0, 15),
+                        topPages: currentSeo.pages?.slice(0, 8),
                         recommendations: currentSeo.recommendations,
-                        trend: currentSeo.trend?.slice(-14),
                     } : null,
-                    history: currentMessages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+                    history: currentMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
                 }),
             });
 
@@ -521,12 +521,19 @@ export default function AIChatbot() {
                 {/* ── Quick Prompts ── */}
                 {messages.length <= 2 && (
                     <div className="px-4 pb-2">
+                        {!dataReady && (
+                            <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full border border-emerald-500/30 border-t-emerald-400 animate-spin" />
+                                Loading your data...
+                            </div>
+                        )}
                         <div className="flex flex-wrap gap-1.5">
                             {QUICK_PROMPTS.map((prompt, i) => (
                                 <button
                                     key={i}
                                     onClick={() => sendMessage(prompt)}
-                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all"
+                                    disabled={!dataReady || isLoading}
+                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-500 disabled:hover:border-white/[0.04] disabled:hover:bg-white/[0.02]"
                                 >
                                     {prompt}
                                 </button>

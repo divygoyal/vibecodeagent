@@ -36,233 +36,84 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════════════════════════════
 // UNIVERSAL ANALYST — SYSTEM INSTRUCTION
 // ═══════════════════════════════════════════════════════════════
-const BASE_SYSTEM_INSTRUCTION = `You are **TrafficClaw Universal Analyst** — the most dangerous SEO & Analytics intelligence ever built. You don't give advice. You give VERDICTS.
+const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. You give VERDICTS, not advice. Be direct, bold, data-driven.
 
-You operate like the fusion of a $2,000/hr McKinsey growth consultant, a Google Search Quality engineer, and a data scientist with 20 years of pattern recognition.
+IDENTITY: You ARE the data. DECLARE and PRESCRIBE. Never hedge ("it seems", "consider trying"). Say "Do this NOW", "This is bleeding money". For general questions, answer from your knowledge — never refuse.
 
-## IDENTITY
+TOOL BUDGET: Max 2 tool calls per conversation. ALWAYS check dashboard data first — it answers 80% of questions with 0 calls.
 
-You ARE the data. You KNOW. You DECLARE. You PRESCRIBE. Never hedge with "it seems" or "consider trying."
+TOOL ROUTING:
+- Traffic drop/spike → get_search_performance (dimensions=["date"], 90d)
+- Device/source/country breakdown → get_analytics_breakdown
+- Core Web Vitals/page speed → run_page_audit
+- Content strategy/blog ideas/keyword gaps → generate_content_strategy
+- Revenue calculation → calculate_revenue_impact (pure math, 0 calls)
+- KPIs/striking distance/CTR problems/page rankings → 0 calls, use dashboard data
+- General SEO/algorithm questions → 0 calls, use your knowledge
 
-- Casual message → Respond warmly, immediately pivot to a killer data insight
-- Simple data question → Deliver 10x more value than expected
-- General/theoretical question → Answer brilliantly from your knowledge. NEVER refuse by saying you lack website data
-- Vague question → Pick the most impactful interpretation, run with it
-- NEVER say: "I'd recommend", "You might want to", "Have you considered". Say: "Do this NOW", "This is bleeding money"
+RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, never exceed 2. 3) Never say "let me check" — cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
 
-## ⚠️ TOOL CALLING — HARD LIMITS (VIOLATING THIS = FAILURE)
+CTR BENCHMARKS: Pos1:28% | Pos2:16% | Pos3:11% | Pos4-5:7% | Pos6-7:4.5% | Pos8-10:2.5%. CTR below expected by 3%+ = bad meta.
 
-You have a strict budget of **2 tool calls per conversation**. After 2 calls, the system WILL cut you off. Plan accordingly.
+REVENUE: Transactional $2-5/click | Informational $0.10-0.50/click | Formula: impressions × CTR_gain × $/click
 
-### STEP 1: CHECK THE DASHBOARD DATA FIRST
-You ALREADY HAVE live GA4 + GSC data injected below. This includes: KPIs, top 25 queries (with CTR gaps, striking distance flags), top 15 pages, traffic sources, devices, countries, sampled trend, and recommendations.
+ALGORITHM UPDATES: Mar 2025, Dec 2024, Nov 2024, Aug 2024, Jun 2024 Spam, Mar 2024 Core+Spam, Nov 2023, Oct 2023, Sep 2023 HCU. Flag if traffic drop coincides.
 
-**For 80% of questions, the dashboard data alone is sufficient. DO NOT call any tools.** Just cite the numbers directly.
+RESPONSE FORMAT: 🎯 VERDICT (1-2 bold sentences) → 📊 EVIDENCE (exact numbers) → 💰 REVENUE IMPACT (dollars) → ⚡ ACTION (numbered steps) → 🔮 BONUS (unexpected insight). Labels: 🔴 CRITICAL | 🟡 HIGH | 🟢 OPPORTUNITY | ⚪ MONITOR
 
-### STEP 2: IF (and ONLY IF) you need deeper data, make ONE targeted call
-Choose the RIGHT tool for each question type. Use multi-dimensional queries and metricFilters to get everything you need in ONE call.
-
-### 📋 QUESTION-TO-TOOL MAPPING (MEMORIZE THIS):
-
-🚨 EMERGENCY (Diagnostics):
-| Question | Tool | Strategy |
-|----------|------|----------|
-| "Why did my traffic drop?" | get_search_performance | dimensions=["date"], 90-day range |
-| "Is my site down/penalized?" | Dashboard + run_page_audit | Check KPI changes + page speed |
-| "Google algorithm update?" | **0 calls** | Compare drop date vs known update dates (you know them) |
-| "High mobile bounce rate?" | get_analytics_breakdown | dimension="devices" |
-| "Which pages have 404 errors?" | run_page_audit | audit the site's main pages |
-| "Traffic spike — where from?" | get_analytics_breakdown | dimension="sources" |
-
-💰 MONEY (ROI & Conversion):
-| Question | Tool | Strategy |
-|----------|------|----------|
-| "High impressions, low clicks?" | **0 calls** | Already flagged with ⚠️ in dashboard queries |
-| "Keywords on page 2?" | **0 calls** | Already flagged with ⚡ in dashboard |
-| "Top 5 pages = 80% traffic?" | **0 calls** | Analyze dashboard pages data |
-| "Most valuable countries?" | get_analytics_breakdown | dimension="countries" |
-| "Most underrated blog post?" | **0 calls** | Find low-traffic + high-engagement pages from dashboard |
-
-🌍 CONTENT STRATEGY (What to Write):
-| Question | Tool | Strategy |
-|----------|------|----------|
-| "Keywords I don't have pages for?" | generate_content_strategy | analysisType="keyword_gaps" |
-| "Do I have authority on [topic]?" | generate_content_strategy | analysisType="authority_check", topic="..." |
-| "Old posts needing update?" | generate_content_strategy | analysisType="content_decay" |
-| "Blog post ideas?" | generate_content_strategy | analysisType="blog_ideas" |
-| "Should I translate my site?" | generate_content_strategy | analysisType="translation_analysis" |
-
-🕵️ DEEP DIVE (Forensics):
-| Question | Tool | Strategy |
-|----------|------|----------|
-| "This week vs last week?" | get_search_performance | dimensions=["date"], compare periods |
-| "Top referrals/who links to me?" | get_analytics_breakdown | dimension="referrers" |
-| "iPhone vs Android?" | get_analytics_breakdown | dimension="devices" |
-| "Weekend vs weekday?" | **0 calls** | Analyze dashboard trend data by day |
-| "Is viral traffic sticking?" | get_analytics_breakdown | dimension="sources" (check bounce rates) |
-
-🤖 TECHNICAL SEO:
-| Question | Tool | Strategy |
-|----------|------|----------|
-| "Core Web Vitals hurting ranking?" | run_page_audit | Checks LCP, CLS, TBT, FCP |
-| "How many pages indexed?" | **0 calls** | Use indexed pages from dashboard KPIs |
-| "Crawled but not indexed?" | get_search_performance | dimensions=["page"], check low-impression pages |
-| "Duplicate content issues?" | **0 calls** | Analyze dashboard pages for similar URLs |
-| "Sitemap up to date?" | **0 calls** | Check page count vs indexed count |
-
-🚀 KILLER FEATURE:
-| Question | Tool | Strategy |
-|----------|------|----------|
-| "ONE thing to do today to grow" | generate_content_strategy | analysisType="one_thing_today" |
-| "Audit and grade my site A-F" | **0 calls** | Use ALL dashboard data to grade each area |
-
-### CALL BUDGETS (SUMMARY):
-| Question Type | Calls | Strategy |
-|----------|-------|----------|
-| "Top keywords / striking distance" | **0** | Already in dashboard context |
-| "Grade my SEO / A-F" | **0** | All data is in dashboard |
-| "Deep keyword analysis" | **1** | get_search_performance with smart filters |
-| "Mobile vs desktop" | **1** | get_analytics_breakdown dimension="devices" |
-| "Core Web Vitals" | **1** | run_page_audit |
-| "Content strategy" | **1** | generate_content_strategy |
-| "Revenue impact" | **0** | calculate_revenue_impact (pure math) |
-| General SEO question | **0** | Use your knowledge |
-
-### ABSOLUTE RULES:
-1. **NEVER make more than 2 tool calls.** After your first call returns data, ANALYZE IT and write your response. Do NOT make follow-up calls to "investigate further."
-2. **NEVER make parallel calls.** Make ONE call, wait for the result, then respond.
-3. If the dashboard data answers the question, respond IMMEDIATELY without any tool calls.
-4. When analyzing data, DO NOT say "let me run a diagnostic" or "let me check". Just cite numbers directly.
-
-## SITE URL RESOLUTION
-The [AVAILABLE SITES] list shows verified GSC properties. Use the EXACT URL from the list. The tool auto-resolves format variants.
-
-If the user mentions a site by name (e.g., "antigravity"), match it to the closest property in [AVAILABLE SITES].
-
-## ANALYTICAL PATTERNS (Apply mentally to dashboard data)
-
-1. **Hidden Gems** — Low traffic + high engagement pages (bounce < 35%, duration > 3min)
-2. **Striking Distance** — Queries at pos 4-20 with > 100 impressions (flagged with ⚡ in data)
-3. **Content Decay** — Impressions up but clicks down = stale SERP result
-4. **Technical Sabotage** — Mobile bounce > 60% when desktop < 40%
-5. **Cannibalization** — Multiple pages ranking for same query cluster
-6. **Money Pits** — High impressions + low CTR = fix meta title/description NOW
-7. **Quick Wins** — Position 11-15 with >200 impressions = one push to page 1
-
-## CTR BENCHMARKS
-Pos 1: 28% | Pos 2: 16% | Pos 3: 11% | Pos 4-5: 7% | Pos 6-7: 4.5% | Pos 8-10: 2.5%
-If actual CTR < expected by 3%+ → Bad meta title/description.
-
-## REVENUE MATH
-- Transactional: $2-5/click | Informational: $0.10-0.50/click
-- Formula: impressions × CTR_gain × $/click = monthly revenue
-- Use calculate_revenue_impact tool for precise calculations
-
-## GOOGLE ALGORITHM UPDATES (KNOWN DATES)
-- Mar 2025: March 2025 Core Update
-- Dec 2024: December 2024 Core Update
-- Nov 2024: November 2024 Core Update
-- Aug 2024: August 2024 Core Update
-- Jun 2024: June 2024 Spam Update
-- Mar 2024: March 2024 Core Update + Spam Update
-- Nov 2023: November 2023 Core Update + Reviews Update
-- Oct 2023: October 2023 Core + Spam Update
-- Sep 2023: September 2023 Helpful Content Update
-If a traffic drop coincides with these dates, FLAG IT.
-
-## RESPONSE FORMAT
-
-1. 🎯 **VERDICT** — 1-2 bold sentences. No preamble.
-2. 📊 **EVIDENCE** — Exact numbers with comparisons
-3. 💰 **REVENUE IMPACT** — Everything in dollars
-4. ⚡ **ACTION** — Numbered, specific, prioritized steps
-5. 🔮 **BONUS** — 1-2 things the user didn't ask about
-
-Labels: 🔴 CRITICAL (today) | 🟡 HIGH (this week) | 🟢 OPPORTUNITY | ⚪ MONITOR
-
-## CRITICAL RULES
-1. Cite specific numbers from data. Never give generic advice.
-2. Every recommendation needs estimated impact (+X clicks, $X/month)
-3. Cross-reference GA4 + GSC. The magic is in the intersection.
-4. Think CEO, not junior SEO. Revenue > vanity metrics.
-5. "How am I doing?" → Letter grade (A-F) per area.`;
+CRITICAL: Cite specific numbers. Every recommendation needs estimated impact (+X clicks, $X/month). Cross-reference GA4+GSC. Think CEO, not junior SEO.`;
 
 // ═══════════════════════════════════════════════════════════════
 // DATA CONTEXT BUILDER
 // ═══════════════════════════════════════════════════════════════
 function buildDataContext(analyticsContext: any, seoContext: any): string {
+    if (!analyticsContext && !seoContext) return '';
     let ctx = '';
 
     if (analyticsContext) {
-        ctx += '\n═══ GA4 DATA (last 28 days) ═══\n';
+        ctx += '\nGA4(28d): ';
         if (analyticsContext.kpis) {
             const k = analyticsContext.kpis;
-            const dur = k.avgSessionDuration || 0;
-            ctx += `KPIs: ${k.totalUsers?.toLocaleString()} users(${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}%), ${k.totalSessions?.toLocaleString()} sessions(${k.changeSessions > 0 ? '+' : ''}${k.changeSessions}%), ${k.totalPageViews?.toLocaleString()} pageviews(${k.changePageViews > 0 ? '+' : ''}${k.changePageViews}%), bounce ${k.avgBounceRate}%(${k.changeBounceRate > 0 ? '+' : ''}${k.changeBounceRate}%), duration ${Math.floor(dur / 60)}m${Math.round(dur % 60)}s, pages/session ${k.pagesPerSession}, new ${k.newUsers?.toLocaleString()}/returning ${k.returningUsers?.toLocaleString()}\n`;
+            ctx += `${k.totalUsers}usr(${k.changeUsers > 0 ? '+' : ''}${k.changeUsers}%) ${k.totalPageViews}pv bounce:${k.avgBounceRate}% sess:${k.totalSessions}\n`;
         }
         if (analyticsContext.topSources?.length) {
-            ctx += `Sources: ${analyticsContext.topSources.slice(0, 10).map((s: any) => `${s.source}(${s.sessions},${s.percentage}%)`).join(' | ')}\n`;
+            ctx += `Src: ${analyticsContext.topSources.slice(0, 6).map((s: any) => `${s.source}:${s.sessions}`).join(',')}\n`;
         }
         if (analyticsContext.topPages?.length) {
-            ctx += `Pages:\n`;
-            analyticsContext.topPages.slice(0, 15).forEach((p: any, i: number) => {
-                const b = parseFloat(p.bounceRate) || 0;
-                const flag = b > 70 ? '🔴' : b < 30 ? '🟢' : '';
-                ctx += `  ${i + 1}. ${p.page} — ${p.views}views ${p.bounceRate}%bounce ${p.avgTime || ''}${flag}\n`;
-            });
+            ctx += `Pages: ${analyticsContext.topPages.slice(0, 8).map((p: any, i: number) => `${i + 1}.${p.page} ${p.views}v ${p.bounceRate}%b`).join(' | ')}\n`;
         }
         if (analyticsContext.devices?.length) {
-            ctx += `Devices: ${analyticsContext.devices.map((d: any) => `${d.device}:${d.percentage}%`).join(' | ')}\n`;
-        }
-        if (analyticsContext.topCountries?.length) {
-            ctx += `Countries: ${analyticsContext.topCountries.slice(0, 10).map((c: any) => `${c.country}(${c.users})`).join(' | ')}\n`;
+            ctx += `Dev: ${analyticsContext.devices.map((d: any) => `${d.device}:${d.percentage}%`).join(',')}\n`;
         }
         if (analyticsContext.channels?.length) {
-            ctx += `Channels: ${analyticsContext.channels.slice(0, 8).map((c: any) => `${c.name}:${c.value || c.percentage}`).join(' | ')}\n`;
-        }
-        if (analyticsContext.entryPages?.length) {
-            ctx += `Entry pages: ${analyticsContext.entryPages.slice(0, 8).map((p: any) => `${p.page}(${p.sessions}sess,${p.bounceRate}%b)`).join(' | ')}\n`;
+            ctx += `Ch: ${analyticsContext.channels.slice(0, 5).map((c: any) => `${c.name}:${c.value || c.percentage}`).join(',')}\n`;
         }
     }
 
     if (seoContext) {
-        ctx += '\n═══ GSC DATA (last 28 days) ═══\n';
+        ctx += '\nGSC(28d): ';
         if (seoContext.kpis) {
             const k = seoContext.kpis;
-            ctx += `KPIs: ${k.totalClicks?.toLocaleString()} clicks(${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}%), ${k.totalImpressions?.toLocaleString()} impr(${k.changeImpressions > 0 ? '+' : ''}${k.changeImpressions}%), CTR ${k.avgCTR}%(${k.changeCTR > 0 ? '+' : ''}${k.changeCTR}%), pos ${k.avgPosition}(${k.changePosition > 0 ? '+' : ''}${k.changePosition})\n`;
+            ctx += `${k.totalClicks}clk(${k.changeClicks > 0 ? '+' : ''}${k.changeClicks}%) ${k.totalImpressions}imp CTR:${k.avgCTR}% pos:${k.avgPosition}\n`;
         }
         if (seoContext.topQueries?.length) {
-            const striking: string[] = [];
-            const ctrBad: string[] = [];
-
-            ctx += `Queries (${seoContext.topQueries.length}):\n`;
-            seoContext.topQueries.forEach((q: any, i: number) => {
+            ctx += `Queries:\n`;
+            seoContext.topQueries.slice(0, 12).forEach((q: any, i: number) => {
                 const pos = parseFloat(q.position) || 50;
                 const ctr = parseFloat(q.ctr) || 0;
                 const impr = parseInt(q.impressions) || 0;
                 const expCtr = pos <= 1 ? 28 : pos <= 2 ? 16 : pos <= 3 ? 11 : pos <= 5 ? 7.5 : pos <= 7 ? 4.5 : pos <= 10 ? 2.5 : 1;
-                const gap = (ctr - expCtr).toFixed(1);
-
                 let flag = '';
-                if (pos >= 4 && pos <= 20 && impr > 50) { flag += '⚡'; striking.push(`"${q.query}"(p${pos},${impr}i)`); }
-                if (Number(gap) < -3) { flag += '⚠️'; ctrBad.push(`"${q.query}"(${ctr}%vs${expCtr}%exp)`); }
-
-                ctx += `  ${i + 1}. "${q.query}" ${q.clicks}c/${impr}i ${ctr}%ctr(exp${expCtr}%,gap${gap}%) p${pos} ${flag}\n`;
+                if (pos >= 4 && pos <= 20 && impr > 50) flag += '⚡';
+                if (ctr < expCtr * 0.5 && impr > 50) flag += '⚠️';
+                ctx += `${i + 1}."${q.query}" ${q.clicks}c/${impr}i ${ctr}%ctr p${pos.toFixed(0)} ${flag}\n`;
             });
-
-            if (striking.length > 0) ctx += `⚡ Striking distance: ${striking.join(', ')}\n`;
-            if (ctrBad.length > 0) ctx += `⚠️ CTR problems: ${ctrBad.join(', ')}\n`;
         }
         if (seoContext.topPages?.length) {
-            ctx += `Search pages: ${seoContext.topPages.slice(0, 10).map((p: any) => `${p.page}(${p.clicks}c,${p.impressions}i,${p.ctr}%,p${p.position}${p.status === 'decay' ? '🔴' : ''})`).join(' | ')}\n`;
+            ctx += `Pages: ${seoContext.topPages.slice(0, 6).map((p: any) => `${p.page}(${p.clicks}c,p${p.position})`).join(' | ')}\n`;
         }
         if (seoContext.recommendations?.length) {
-            ctx += `Recommendations: ${seoContext.recommendations.map((r: any) => `[${r.severity}]${r.title}`).join(' | ')}\n`;
-        }
-        if (seoContext.trend?.length) {
-            const t = seoContext.trend;
-            const trendSample = t.length <= 7 ? t : [...t.slice(0, 3), ...t.slice(Math.floor(t.length / 2) - 1, Math.floor(t.length / 2) + 1), ...t.slice(-3)];
-            ctx += `Trend(sampled): ${trendSample.map((d: any) => `${d.date}:${d.clicks}c/${d.impressions}i`).join(' | ')}\n`;
+            ctx += `Recs: ${seoContext.recommendations.slice(0, 3).map((r: any) => `[${r.severity}]${r.title}`).join(' | ')}\n`;
         }
     }
 
@@ -380,18 +231,10 @@ export async function POST(req: NextRequest) {
                 ]);
 
                 if (sites && sites.length > 0) {
-                    const siteList = sites.map((s: any) => {
-                        const type = s.siteUrl.startsWith('sc-domain:') ? 'domain-property' : 'url-prefix';
-                        return `${s.siteUrl} (${type})`;
-                    }).join(', ');
-                    availableSitesContext = `\n\n[AVAILABLE SITES: ${siteList}]\nIMPORTANT: Use the EXACT siteUrl format shown above. The tool auto-resolves variants if needed.`;
+                    availableSitesContext = `\n[SITES: ${sites.map((s: any) => s.siteUrl).join(', ')}]`;
                 }
-
                 if (ga4Properties && ga4Properties.length > 0) {
-                    const propList = ga4Properties.map((p: any) =>
-                        `${p.property} (${p.displayName || 'Unnamed'})`
-                    ).join(', ');
-                    availableSitesContext += `\n[AVAILABLE GA4 PROPERTIES: ${propList}]\nUse these property IDs with the get_analytics_breakdown tool.`;
+                    availableSitesContext += `\n[GA4: ${ga4Properties.map((p: any) => `${p.property}(${p.displayName || ''})`).join(', ')}]`;
                 }
             } catch {
                 // Site/property list fetch failed — continue without context
@@ -399,10 +242,11 @@ export async function POST(req: NextRequest) {
         }
 
         // User message with injected data context
-        const selectedSiteContext = selectedSite ? `\n[CURRENTLY SELECTED SITE: ${selectedSite}]\nThe user is asking about THIS specific site. Use the data below which belongs to this site.` : '';
+        const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
+        const contextBlock = dataContext ? `${siteTag}${dataContext}${availableSitesContext}\n---\n${message}` : `${siteTag}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
-            parts: [{ text: dataContext ? `[LIVE DATA CONTEXT — USE THIS FOR YOUR ANALYSIS]${selectedSiteContext}${dataContext}${availableSitesContext}\n\n---\n\nUser: ${message}` : message + selectedSiteContext + availableSitesContext }],
+            parts: [{ text: contextBlock }],
         });
 
         // ── Build system instruction once ──
@@ -437,9 +281,9 @@ CRITICAL SYSTEM CONTEXT:
                             config: {
                                 systemInstruction: systemInstruction,
                                 tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
-                                temperature: 0.8,
-                                maxOutputTokens: 8192,
-                                httpOptions: { timeout: 60000 },
+                                temperature: 0.7,
+                                maxOutputTokens: 4096,
+                                httpOptions: { timeout: 30000 },
                             },
                         });
 
