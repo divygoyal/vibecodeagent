@@ -199,6 +199,7 @@ export async function POST(req: NextRequest) {
         const contents: any[] = [];
         if (history?.length) {
             for (const msg of history) {
+                if (!msg.content) continue;
                 contents.push({
                     role: msg.role === 'assistant' ? 'model' : 'user',
                     parts: [{ text: msg.content }],
@@ -283,7 +284,7 @@ CRITICAL SYSTEM CONTEXT:
                                 tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
                                 temperature: 0.7,
                                 maxOutputTokens: 4096,
-                                httpOptions: { timeout: 30000 },
+                                httpOptions: { timeout: 60000 },
                             },
                         });
 
@@ -405,6 +406,7 @@ CRITICAL SYSTEM CONTEXT:
                     controller.close();
                 } catch (error: any) {
                     try {
+                        console.error('[AI-CHAT] Stream error:', error?.message || error, error?.name);
                         // Extract a clean error message instead of raw JSON
                         let errMsg = 'Something went wrong. Please try again.';
                         const rawMsg = error?.message || '';
@@ -412,7 +414,7 @@ CRITICAL SYSTEM CONTEXT:
                             errMsg = 'AI service configuration error. Please try again or clear the chat.';
                         } else if (rawMsg.includes('RATE_LIMIT') || rawMsg.includes('429')) {
                             errMsg = 'AI service is busy. Please wait a moment and try again.';
-                        } else if (rawMsg.includes('timeout') || rawMsg.includes('DEADLINE_EXCEEDED')) {
+                        } else if (rawMsg.includes('timeout') || rawMsg.includes('DEADLINE_EXCEEDED') || rawMsg.includes('aborted') || error?.name === 'AbortError') {
                             errMsg = 'Request timed out. Try a simpler question or try again.';
                         } else if (rawMsg.includes('INVALID_ARGUMENT') || rawMsg.includes('400')) {
                             errMsg = 'Invalid request. Please clear the chat and try again.';
