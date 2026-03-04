@@ -184,15 +184,37 @@ const markdownComponents: Components = {
     ),
 };
 
+/* ─── Suggestion Chip Parser ─── */
+function parseSuggestions(text: string): { cleanContent: string; suggestions: string[] } {
+    const match = text.match(/<!--\s*suggestions:\s*(\[[\s\S]*?\])\s*-->/);
+
+    if (!match) return { cleanContent: text, suggestions: [] };
+    try {
+        const suggestions = JSON.parse(match[1]);
+        if (!Array.isArray(suggestions)) return { cleanContent: text, suggestions: [] };
+        const cleanContent = text.replace(match[0], '').trimEnd();
+        return { cleanContent, suggestions: suggestions.slice(0, 3) };
+    } catch {
+        return { cleanContent: text, suggestions: [] };
+    }
+}
+
 /* ─── Main Renderer ─── */
 interface ChatMessageRendererProps {
     content: string;
     tools?: ToolCall[];
     isStreaming?: boolean;
     snapshot?: DashboardSnapshot;
+    onSuggestionClick?: (suggestion: string) => void;
 }
 
-export default memo(function ChatMessageRenderer({ content, tools, isStreaming, snapshot }: ChatMessageRendererProps) {
+export default memo(function ChatMessageRenderer({ content, tools, isStreaming, snapshot, onSuggestionClick }: ChatMessageRendererProps) {
+    // Parse follow-up suggestions from content (only when not streaming)
+    const { cleanContent, suggestions } = useMemo(
+        () => isStreaming ? { cleanContent: content, suggestions: [] } : parseSuggestions(content || ''),
+        [content, isStreaming]
+    );
+
     // Check if we have live tool results with structured data (takes priority over snapshot charts)
     const hasLiveToolResult = tools?.some(t =>
         (t.name === 'get_search_performance' || t.name === 'get_analytics_breakdown') && (t.structuredData || t.result)
@@ -211,7 +233,7 @@ export default memo(function ChatMessageRenderer({ content, tools, isStreaming, 
     }, [tools]);
 
     // Split content on chart tags
-    const segments = useMemo(() => splitContentOnChartTags(content || ''), [content]);
+    const segments = useMemo(() => splitContentOnChartTags(cleanContent || ''), [cleanContent]);
 
     return (
         <div className="chat-message-content space-y-0.5">
@@ -249,6 +271,21 @@ export default memo(function ChatMessageRenderer({ content, tools, isStreaming, 
                         </div>
                     ) : null
                 )
+            )}
+
+            {/* Follow-up suggestion chips */}
+            {suggestions.length > 0 && !isStreaming && onSuggestionClick && (
+                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+                    {suggestions.map((s, i) => (
+                        <button
+                            key={i}
+                            onClick={() => onSuggestionClick(s)}
+                            className="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/[0.15] text-emerald-300 hover:bg-emerald-500/[0.12] hover:border-emerald-500/[0.25] transition-all"
+                        >
+                            {s}
+                        </button>
+                    ))}
+                </div>
             )}
 
             {/* Streaming cursor */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import {
     Zap, ArrowRight, TrendingDown, ChevronDown, ChevronUp,
     Eye, MousePointer, Hash, Activity, Shield, Skull,
@@ -291,27 +291,63 @@ export default memo(function OverviewInsights({
         };
     }, [trafficData, searchTrend, seoQueries, seoPages, analyticsKPIs, seoKPIs]);
 
+    const [activeTab, setActiveTab] = useState<'warroom' | 'opportunities' | 'health' | 'intent'>('warroom');
+
     if (!hasData && !isLoading) return null;
 
+    const TABS = [
+        { key: 'warroom' as const, label: 'War Room', icon: Shield },
+        { key: 'opportunities' as const, label: 'Opportunities', icon: Crosshair },
+        { key: 'health' as const, label: 'Content Health', icon: Activity },
+        { key: 'intent' as const, label: 'Intent', icon: BookOpen },
+    ];
+
+    const loadingState = isLoading && !hasData;
+
     return (
-        <div className="space-y-5">
-            {/* ═══ 1. 7-DAY WAR ROOM ═══ */}
-            <WarRoomSection days={insights.warRoom} isLoading={isLoading && !hasData} />
-
-            {/* ═══ Row: Intent Match + Cannibal Alert + Bleeding Positions ═══ */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <IntentMatchSection data={insights.intentData} moneyPct={insights.moneyPct} isLoading={isLoading && !hasData} />
-                <CannibalSection pairs={insights.cannibalPairs} isLoading={isLoading && !hasData} />
-                <BleedingSection keywords={insights.bleedingKWs} isLoading={isLoading && !hasData} />
+        <div className="space-y-4">
+            {/* ═══ Tab Bar ═══ */}
+            <div className="flex items-center gap-0 border-b border-white/[0.06] -mb-px">
+                {TABS.map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`flex items-center gap-2 px-4 py-2.5 text-[11px] font-medium border-b-2 transition-colors ${
+                            activeTab === tab.key
+                                ? 'text-emerald-400 border-emerald-400'
+                                : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-white/[0.1]'
+                        }`}
+                    >
+                        <tab.icon className="w-3.5 h-3.5" />
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
-            {/* ═══ Row: DEFCON Meter + Content Decay ═══ */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <DEFCONSection level={insights.defconLevel} labels={insights.defconLabels} volatility={insights.volatility} isLoading={isLoading && !hasData} />
-                <div className="lg:col-span-2">
-                    <ContentDecaySection pages={insights.decayPages} isLoading={isLoading && !hasData} />
+            {/* ═══ Tab Content ═══ */}
+            {activeTab === 'warroom' && (
+                <WarRoomSection days={insights.warRoom} isLoading={loadingState} />
+            )}
+
+            {activeTab === 'opportunities' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <CannibalSection pairs={insights.cannibalPairs} isLoading={loadingState} />
+                    <BleedingSection keywords={insights.bleedingKWs} isLoading={loadingState} />
                 </div>
-            </div>
+            )}
+
+            {activeTab === 'health' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <DEFCONSection level={insights.defconLevel} labels={insights.defconLabels} volatility={insights.volatility} isLoading={loadingState} />
+                    <div className="lg:col-span-2">
+                        <ContentDecaySection pages={insights.decayPages} isLoading={loadingState} />
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'intent' && (
+                <IntentMatchSection data={insights.intentData} moneyPct={insights.moneyPct} isLoading={loadingState} />
+            )}
         </div>
     );
 });

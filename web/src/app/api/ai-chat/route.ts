@@ -40,7 +40,7 @@ const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an el
 
 IDENTITY: You ARE the data. DECLARE and PRESCRIBE. Never hedge ("it seems", "consider trying"). Say "Do this NOW", "This is bleeding money". For general questions, answer from your knowledge — never refuse.
 
-TOOL BUDGET: Max 2 tool calls per conversation. ALWAYS check dashboard data first — it answers 80% of questions with 0 calls.
+TOOL BUDGET: Max 3 tool calls per conversation. ALWAYS check dashboard data first — it answers 80% of questions with 0 calls.
 
 TOOL ROUTING:
 - Traffic drop/spike → get_search_performance (dimensions=["date"], 90d)
@@ -51,7 +51,7 @@ TOOL ROUTING:
 - KPIs/striking distance/CTR problems/page rankings → 0 calls, use dashboard data
 - General SEO/algorithm questions → 0 calls, use your knowledge
 
-RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, never exceed 2. 3) Never say "let me check" — cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
+RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, never exceed 3. 3) Never say "let me check" — cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
 
 CTR BENCHMARKS: Pos1:28% | Pos2:16% | Pos3:11% | Pos4-5:7% | Pos6-7:4.5% | Pos8-10:2.5%. CTR below expected by 3%+ = bad meta.
 
@@ -99,7 +99,13 @@ CHART TAG RULES:
 9. Multiple data types → include ALL relevant tags
 10. Filtered subsets (e.g. "keywords with 8+ words") → use inline tag with ONLY matching rows
 
-CRITICAL: Cite specific numbers. Every recommendation needs estimated impact (+X clicks, $X/month). Cross-reference GA4+GSC. Think CEO, not junior SEO. Use tables for any data with 3+ rows.`;
+CRITICAL: Cite specific numbers. Every recommendation needs estimated impact (+X clicks, $X/month). Cross-reference GA4+GSC. Think CEO, not junior SEO. Use tables for any data with 3+ rows.
+
+FOLLOW-UP SUGGESTIONS (MANDATORY): End EVERY response with exactly 3 contextual follow-up questions as a suggestions tag. These should be natural next steps based on your analysis. Format on its OWN line at the very end:
+<!-- suggestions: ["Question 1?", "Question 2?", "Question 3?"] -->
+Examples: After traffic analysis → "Which pages lost the most traffic?", "What keywords are declining?", "Should I update my top pages?"
+After keyword analysis → "How do I optimize for these keywords?", "What's the revenue potential?", "Show me content gaps"
+NEVER skip the suggestions tag.`;
 
 // ═══════════════════════════════════════════════════════════════
 // DATA CONTEXT BUILDER
@@ -203,7 +209,7 @@ export async function POST(req: NextRequest) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
 
-        const { message, selectedSite, analyticsContext, seoContext, history } = await req.json();
+        const { message, selectedSite, analyticsContext, seoContext, history, mode } = await req.json();
 
         if (!message) {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -297,6 +303,11 @@ CRITICAL SYSTEM CONTEXT:
 - ALWAYS use this exact date as your anchor for "today", "last month", "last 90 days", etc.
 - IMPORTANT: Google Search Console ONLY stores data for the last 16 months. NEVER query data older than 16 months from today, or the API will return 0 rows and you will incorrectly assume the site is dead.`;
 
+        // ── Briefing mode: enhance system instruction for daily briefings ──
+        const finalSystemInstruction = mode === 'briefing'
+            ? systemInstruction + `\n\nBRIEFING MODE ACTIVE: Generate a concise morning briefing. Structure:\n1. **☀️ Overnight Snapshot** — Key KPI changes (use WoW % changes from dashboard data). Highlight anything unusual.\n2. **🚨 Alerts** — Flag anomalies: traffic drops >10%, CTR problems, ranking losses, striking distance opportunities.\n3. **🎯 #1 Priority Today** — The single most impactful action. Be specific (e.g., "Optimize title tag for [query] — position 8 with 2% CTR, expected 5%+").\nKeep it under 250 words. No filler. Start with "☀️ Good morning! Here's your daily briefing:"`
+            : systemInstruction;
+
         // ── Execute Gemini Stream via official SDK ──
         const stream = new ReadableStream({
             async start(controller) {
@@ -306,8 +317,8 @@ CRITICAL SYSTEM CONTEXT:
                     let hasDeductedCredit = false;
                     let loopCount = 0;
                     let gscCallCount = 0;
-                    const MAX_GSC_CALLS = 2;
-                    const MAX_LOOPS = 3;
+                    const MAX_GSC_CALLS = 3;
+                    const MAX_LOOPS = 4;
 
                     while (keepGoing && loopCount < MAX_LOOPS) {
                         loopCount++;
@@ -318,7 +329,7 @@ CRITICAL SYSTEM CONTEXT:
                             model: 'gemini-3-flash-preview',
                             contents: currentContents,
                             config: {
-                                systemInstruction: systemInstruction,
+                                systemInstruction: finalSystemInstruction,
                                 tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
                                 temperature: 0.7,
                                 maxOutputTokens: 4096,

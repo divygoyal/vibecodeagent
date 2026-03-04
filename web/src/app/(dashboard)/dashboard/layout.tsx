@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
+const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
@@ -77,6 +78,7 @@ export default function DashboardLayout({
     });
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [showWelcome, setShowWelcome] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     // Persist theme to localStorage and apply to <html>
     useEffect(() => {
@@ -165,10 +167,14 @@ export default function DashboardLayout({
                         isRegistering: false,
                         registrationError: null,
                     });
-                    // Show credit welcome animation on FIRST EVER signup
+                    // Show onboarding wizard on FIRST EVER signup (or credit welcome if already onboarded)
                     if (!localStorage.getItem('tc-welcomed')) {
                         localStorage.setItem('tc-welcomed', 'true');
-                        setShowWelcome(true);
+                        if (!localStorage.getItem('tc-onboarded')) {
+                            setShowOnboarding(true);
+                        } else {
+                            setShowWelcome(true);
+                        }
                     }
                 } else {
                     const data = await res.json().catch(() => ({}));
@@ -391,6 +397,15 @@ export default function DashboardLayout({
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
                 <CreditWelcome credits={50} onDismiss={() => setShowWelcome(false)} />
+            )}
+
+            {/* Onboarding wizard for first-time users */}
+            {showOnboarding && (
+                <OnboardingWizard
+                    onComplete={() => { setShowOnboarding(false); setShowWelcome(true); }}
+                    onSelectSite={setSelectedSite}
+                    onSelectProperty={setSelectedProperty}
+                />
             )}
 
             {/* ─── Mobile sidebar overlay ─── */}

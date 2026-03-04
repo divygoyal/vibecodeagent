@@ -12,6 +12,7 @@ import { useRegistration } from '../layout';
 import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
+import { ConnectGoogleState } from '@/components/EmptyState';
 
 const TABS = [
     { key: '', label: 'Overview', icon: BarChart3 },
@@ -115,23 +116,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
     // Not connected state
     if (!containerLoading && !hasGoogleConnection) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
-                    <BarChart3 className="w-8 h-8 text-blue-400" />
-                </div>
-                <h2 className="text-xl font-bold text-white">Connect Google Analytics</h2>
-                <p className="text-sm text-zinc-500 text-center max-w-md">
-                    Sign in with Google to connect your Analytics properties and see real traffic data, visitor insights, and performance metrics.
-                </p>
-                <button
-                    onClick={() => signIn('google')}
-                    className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/20"
-                >
-                    Connect Google
-                </button>
-            </div>
-        );
+        return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="real traffic data, visitor insights, and performance metrics" /></div>;
     }
 
     const isRealtime = pathname?.includes('/realtime');

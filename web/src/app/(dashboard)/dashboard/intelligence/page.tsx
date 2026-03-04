@@ -13,6 +13,8 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { useSeoData, useSiteList, useAnalyticsData, useContainerStatus } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import { signIn } from 'next-auth/react';
+import { ConnectGoogleState } from '@/components/EmptyState';
+import FixWithBotButton from '@/components/FixWithBotButton';
 
 /* ─── Types ─── */
 interface AlertItem {
@@ -251,6 +253,7 @@ export default function IntelligencePage() {
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterSeverity, setFilterSeverity] = useState<string>('all');
     const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
+    const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
     // Auto-select first site
     useEffect(() => {
@@ -270,11 +273,12 @@ export default function IntelligencePage() {
     // Filtered alerts
     const filteredAlerts = useMemo(() => {
         return alerts.filter(a => {
+            if (dismissedAlerts.has(a.id)) return false;
             if (filterCategory !== 'all' && a.category !== filterCategory) return false;
             if (filterSeverity !== 'all' && a.severity !== filterSeverity) return false;
             return true;
         });
-    }, [alerts, filterCategory, filterSeverity]);
+    }, [alerts, filterCategory, filterSeverity, dismissedAlerts]);
 
     // Stats
     const criticalCount = alerts.filter(a => a.severity === 'critical').length;
@@ -301,18 +305,7 @@ export default function IntelligencePage() {
 
     // ── Connect prompt ──
     if (!containerLoading && !hasGoogleConnection) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-emerald-500/20 flex items-center justify-center">
-                    <Radar className="w-8 h-8 text-emerald-400" />
-                </div>
-                <h2 className="text-xl font-semibold text-white">Connect Google to activate Intelligence</h2>
-                <p className="text-sm text-zinc-400 text-center max-w-md">The Intelligence Center analyzes your Search Console and Analytics data to surface proactive insights.</p>
-                <button onClick={() => signIn('google')} className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm">
-                    Connect Google
-                </button>
-            </div>
-        );
+        return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="proactive intelligence alerts and SEO opportunities" /></div>;
     }
 
     // ── Loading ──
@@ -588,7 +581,21 @@ export default function IntelligencePage() {
                                                         className="overflow-hidden"
                                                     >
                                                         <div className="mt-3 pt-3 border-t border-white/[0.04]">
-                                                            <p className="text-xs text-zinc-400 leading-relaxed">{alert.description}</p>
+                                                            <p className="text-xs text-zinc-400 leading-relaxed mb-3">{alert.description}</p>
+                                                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                <FixWithBotButton
+                                                                    label="Fix This"
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    context={`Analyze and fix: ${alert.title}. ${alert.description}${alert.metric ? ` Metric: ${alert.metric}` : ''}${alert.change !== undefined ? ` Change: ${alert.change}%` : ''}`}
+                                                                />
+                                                                <button
+                                                                    onClick={() => setDismissedAlerts(prev => new Set(prev).add(alert.id))}
+                                                                    className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-white/[0.06] transition"
+                                                                >
+                                                                    Dismiss
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </motion.div>
                                                 )}

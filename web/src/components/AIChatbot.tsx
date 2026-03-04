@@ -115,7 +115,7 @@ function renderMessage(text: string) {
 }
 
 // Memoized message bubble — prevents re-rendering old messages when new chunks arrive
-const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming, snapshot }: { msg: Message; isExpanded: boolean; isStreaming?: boolean; snapshot?: any }) {
+const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming, snapshot, onSuggestionClick }: { msg: Message; isExpanded: boolean; isStreaming?: boolean; snapshot?: any; onSuggestionClick?: (s: string) => void }) {
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
@@ -123,7 +123,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
                 : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                 }`}>
                 {msg.role === 'assistant' ? (
-                    <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} snapshot={snapshot} />
+                    <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} snapshot={snapshot} onSuggestionClick={onSuggestionClick} />
                 ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
@@ -321,7 +321,7 @@ export default function AIChatbot() {
     }, [isOpen, isExpanded]);
 
     // ── sendMessage: stable callback — reads from refs, no deps on messages/input/etc. ──
-    const sendMessage = useCallback(async (text?: string) => {
+    const sendMessage = useCallback(async (text?: string, options?: { mode?: string }) => {
         const messageText = text || inputRef2.current.trim();
         if (!messageText || isLoadingRef.current) return;
 
@@ -346,21 +346,23 @@ export default function AIChatbot() {
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
-                    analyticsContext: isFirstUserMessage && currentAnalytics ? {
+                    // Full context on first message, reduced KPI-only context on subsequent messages
+                    analyticsContext: currentAnalytics ? (isFirstUserMessage ? {
                         kpis: currentAnalytics.kpis,
                         topSources: currentAnalytics.sources?.slice(0, 8),
                         topPages: currentAnalytics.pages?.slice(0, 10),
                         topCountries: currentAnalytics.countries?.slice(0, 8),
                         devices: currentAnalytics.devices,
                         channels: currentAnalytics.channels?.slice(0, 6),
-                    } : null,
-                    seoContext: isFirstUserMessage && currentSeo ? {
+                    } : { kpis: currentAnalytics.kpis }) : null,
+                    seoContext: currentSeo ? (isFirstUserMessage ? {
                         kpis: currentSeo.kpis,
                         topQueries: currentSeo.queries?.slice(0, 15),
                         topPages: currentSeo.pages?.slice(0, 8),
                         recommendations: currentSeo.recommendations,
-                    } : null,
-                    history: currentMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+                    } : { kpis: currentSeo.kpis }) : null,
+                    history: currentMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+                    mode: options?.mode,
                 }),
             });
 
@@ -465,6 +467,25 @@ export default function AIChatbot() {
     // ── Stable ref for event listener — never re-adds ──
     const sendMessageRef = useRef(sendMessage);
     sendMessageRef.current = sendMessage;
+
+    // ── Daily briefing: auto-send on first open of the day ──
+    const briefingSentRef = useRef(false);
+
+    useEffect(() => {
+        if (!isOpen || briefingSentRef.current || !dataReady || isLoading) return;
+        if (messages.length > 1) return; // Widget starts with 1 welcome message
+        if (!analyticsData && !seoData) return; // Need actual data for briefing
+
+        const today = new Date().toISOString().split('T')[0];
+        const lastBriefing = localStorage.getItem('tc-last-briefing-date');
+        if (lastBriefing === today) return;
+
+        briefingSentRef.current = true;
+        localStorage.setItem('tc-last-briefing-date', today);
+        setTimeout(() => {
+            sendMessageRef.current('Give me my morning briefing — what changed overnight and what should I focus on today?', { mode: 'briefing' });
+        }, 500); // Small delay to let widget fully animate open
+    }, [isOpen, dataReady, messages.length, isLoading, analyticsData, seoData]);
 
     // Listen for external "Ask AI" events (from Intelligence Center)
     useEffect(() => {
@@ -587,7 +608,7 @@ export default function AIChatbot() {
                     {messages.map((msg, i) => {
                         if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                         const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
-                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} />;
+                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />;
                     })}
 
                     {/* Thinking indicator — cute robot with cycling messages */}

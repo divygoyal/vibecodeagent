@@ -13,6 +13,7 @@ import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
 import { useRegistration } from '../layout';
 
 interface SEOKPIs {
@@ -156,27 +157,11 @@ export default function SEOPage() {
 
     // Show connect prompt if Google not connected
     if (!containerLoading && !hasGoogleConnection) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                    <Search className="w-8 h-8 text-emerald-400" />
-                </div>
-                <h2 className="text-xl font-semibold text-white">Connect Google to view SEO data</h2>
-                <p className="text-sm text-zinc-400 text-center max-w-md">Sign in with your Google account to access Search Console data.</p>
-                <button onClick={() => signIn('google')} className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:opacity-90 transition-all text-sm">
-                    Connect Google
-                </button>
-            </div>
-        );
+        return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="Search Console data and keyword rankings" /></div>;
     }
 
     if ((isLoading || containerLoading) && !seoData) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-                <span className="ml-3 text-zinc-400 text-sm">Loading SEO Data...</span>
-            </div>
-        );
+        return <div className="min-h-[60vh]"><EmptyState variant="loading" title="Loading SEO Data..." description="Fetching your Search Console data" /></div>;
     }
 
     if (isError && !seoData) {

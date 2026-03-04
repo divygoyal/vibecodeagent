@@ -159,7 +159,7 @@ export default function AIChat() {
         return () => document.removeEventListener('mousedown', handler);
     }, [siteDropdownOpen]);
 
-    const sendMessage = useCallback(async (text?: string) => {
+    const sendMessage = useCallback(async (text?: string, options?: { mode?: string }) => {
         const messageText = text || input.trim();
         if (!messageText || isLoading) return;
 
@@ -183,21 +183,23 @@ export default function AIChat() {
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
-                    analyticsContext: isFirstUserMessage && currentAnalytics ? {
+                    // Full context on first message, reduced KPI-only context on subsequent messages
+                    analyticsContext: currentAnalytics ? (isFirstUserMessage ? {
                         kpis: currentAnalytics.kpis,
                         topSources: currentAnalytics.sources?.slice(0, 8),
                         topPages: currentAnalytics.pages?.slice(0, 10),
                         topCountries: currentAnalytics.countries?.slice(0, 8),
                         devices: currentAnalytics.devices,
                         channels: currentAnalytics.channels?.slice(0, 6),
-                    } : null,
-                    seoContext: isFirstUserMessage && currentSeo ? {
+                    } : { kpis: currentAnalytics.kpis }) : null,
+                    seoContext: currentSeo ? (isFirstUserMessage ? {
                         kpis: currentSeo.kpis,
                         topQueries: currentSeo.queries?.slice(0, 15),
                         topPages: currentSeo.pages?.slice(0, 8),
                         recommendations: currentSeo.recommendations,
-                    } : null,
-                    history: currentMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+                    } : { kpis: currentSeo.kpis }) : null,
+                    history: currentMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+                    mode: options?.mode,
                 }),
             });
 
@@ -280,6 +282,24 @@ export default function AIChat() {
             setActiveTool(undefined);
         }
     }, [input, isLoading, appendStreamText, flushStreamBuffer]);
+
+    // ── Daily briefing: auto-send on first visit of the day ──
+    const sendMessageRef = useRef(sendMessage);
+    sendMessageRef.current = sendMessage;
+    const briefingSentRef = useRef(false);
+
+    useEffect(() => {
+        if (briefingSentRef.current || messages.length > 0 || !dataReady || isLoading) return;
+        if (!analyticsData && !seoData) return; // Need actual data for briefing
+
+        const today = new Date().toISOString().split('T')[0];
+        const lastBriefing = localStorage.getItem('tc-last-briefing-date');
+        if (lastBriefing === today) return;
+
+        briefingSentRef.current = true;
+        localStorage.setItem('tc-last-briefing-date', today);
+        sendMessageRef.current('Give me my morning briefing — what changed overnight and what should I focus on today?', { mode: 'briefing' });
+    }, [dataReady, messages.length, isLoading, analyticsData, seoData]);
 
     const clearChat = useCallback(() => {
         setMessages([]);
@@ -409,7 +429,7 @@ export default function AIChat() {
                                         : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                                         }`}>
                                         {msg.role === 'assistant' ? (
-                                            <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} />
+                                            <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />
                                         ) : (
                                             <div className="whitespace-pre-wrap">{msg.content}</div>
                                         )}
