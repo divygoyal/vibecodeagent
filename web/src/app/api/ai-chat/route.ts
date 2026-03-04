@@ -17,7 +17,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 // Fallback model chain: try each in order if previous returns 429/503
-const CHAT_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'] as const;
+const CHAT_MODELS = ['gemini-3-flash-preview', 'gemini-3-pro-preview', 'gemini-2.5-flash', 'gemini-2.0-flash'] as const;
 
 function isRetryableError(error: any): boolean {
     const msg = error?.message || '';
