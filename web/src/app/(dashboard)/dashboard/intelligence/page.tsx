@@ -392,6 +392,7 @@ export default function IntelligencePage() {
                                                                     label="Fix This"
                                                                     size="sm"
                                                                     variant="ghost"
+                                                                    site={selectedSite}
                                                                     context={`Analyze and fix: ${alert.title}. ${alert.description}${alert.metric ? ` Metric: ${alert.metric}` : ''}${alert.change !== undefined ? ` Change: ${alert.change}%` : ''}`}
                                                                 />
                                                                 <button
@@ -645,7 +646,7 @@ export default function IntelligencePage() {
                                 'Which pages are throwing errors?',
                             ].map(q => (
                                 <button key={q} onClick={() => {
-                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
                                 }}
                                     className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
                                     <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-red-400 transition flex-shrink-0" />
@@ -669,7 +670,7 @@ export default function IntelligencePage() {
                                 'What is my most underrated blog post?',
                             ].map(q => (
                                 <button key={q} onClick={() => {
-                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
                                 }}
                                     className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
                                     <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-amber-400 transition flex-shrink-0" />
@@ -693,7 +694,7 @@ export default function IntelligencePage() {
                                 'Should I translate my site? Into which language?',
                             ].map(q => (
                                 <button key={q} onClick={() => {
-                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
                                 }}
                                     className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
                                     <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400 transition flex-shrink-0" />
@@ -717,7 +718,7 @@ export default function IntelligencePage() {
                                 'Is my viral traffic sticking around or bouncing?',
                             ].map(q => (
                                 <button key={q} onClick={() => {
-                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
                                 }}
                                     className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
                                     <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-blue-400 transition flex-shrink-0" />
@@ -741,7 +742,7 @@ export default function IntelligencePage() {
                                 'Do I have any duplicate content issues?',
                             ].map(q => (
                                 <button key={q} onClick={() => {
-                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q } }));
+                                    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
                                 }}
                                     className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
                                     <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition flex-shrink-0" />
@@ -760,7 +761,7 @@ export default function IntelligencePage() {
                             <span className="text-[10px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-emerald-400 uppercase tracking-wider">Killer Feature</span>
                         </div>
                         <button onClick={() => {
-                            window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: 'Audit my site and tell me the ONE thing I should do today to grow' } }));
+                            window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: 'Audit my site and tell me the ONE thing I should do today to grow', site: selectedSite } }));
                         }}
                             className="flex-1 text-left rounded-xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.08] p-4 hover:border-violet-500/30 transition group cursor-pointer">
                             <p className="text-sm font-semibold text-white mb-1 group-hover:text-violet-300 transition">

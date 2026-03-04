@@ -15,7 +15,7 @@ cd web
 npm run dev          # Start Next.js dev server (port 3000)
 npm run build        # Production build
 npm run lint         # ESLint check
-npx tsc --noEmit     # TypeScript type check (no eslint equivalent for types)
+npx tsc --noEmit     # TypeScript type check
 ```
 
 Full stack (from project root):
@@ -24,19 +24,24 @@ docker compose up --build     # All services: admin-api, web, watchdog, nginx
 docker compose up web          # Web only
 ```
 
+There is no test suite. No unit, integration, or E2E tests exist yet.
+
 ## Architecture
 
 ### Multi-Service Layout
 
 ```
 vibecodeagent/
-├── web/           # Next.js 16 dashboard (primary codebase)
-├── admin/         # FastAPI admin API (Python, port 8000) — user CRUD, Docker mgmt, SQLite
-├── clawbot/       # Custom OpenClaw container image
-├── nginx/         # Reverse proxy config
-├── scripts/       # Deployment scripts
+├── web/              # Next.js 16 dashboard (primary codebase)
+├── admin/            # FastAPI admin API (Python, port 8000)
+├── plugins/          # Node.js plugin packages (google-analytics, google-search-console, github-ghost)
+├── clawbot/          # Custom OpenClaw container image
+├── nginx/            # Reverse proxy config
+├── scripts/          # deploy.sh, setup.sh, maintenance.sh, provision_user.py
 └── docker-compose.yml
 ```
+
+**Docker service startup order:** admin-api (must pass healthcheck) → watchdog + web → nginx. All services communicate over the `clawbot-network` bridge. Admin API mounts the Docker socket to manage per-user ClawBot containers.
 
 ### Web App Structure (`web/src/`)
 
@@ -47,17 +52,46 @@ vibecodeagent/
 
 **Key API routes:**
 - `api/ai-chat` — AI chatbot with SSE streaming + Gemini function calling (the most complex route)
-- `api/analytics` — GA4 data fetching
-- `api/seo` — Google Search Console data
+- `api/analytics` — GA4 data fetching; `api/analytics/realtime` and `api/analytics/properties` sub-routes
+- `api/seo` — Google Search Console data; `api/seo/sites` sub-route
 - `api/seo-tools` — AI-powered SEO tool generation (schema, blog, keywords, linking)
+- `api/ai-visibility` — AI visibility tracking
+- `api/alerts` — Anomaly alert system; `api/cron/daily-alerts` for scheduled runs
 - `api/insights` — Auto-generated insights
 - `api/credits` — Message credit system
+- `api/audit` — Site audit
+- `api/container` — User container management
+- `api/auth/register-provider` — Multi-provider OAuth registration
+- `api/github` — GitHub integration
+- `api/webhooks/dodo` — Payment webhook
 
 **Code organization:**
 - `services/` — Business logic: `aiChatTools.ts` (tool declarations + execution for Gemini), `siteAudit.ts`
 - `lib/` — Shared utilities: `auth.ts` (NextAuth), `googleApi.ts` (OAuth tokens, GSC/GA4 APIs), `apiCache.ts` (in-memory TTL cache), `useDashboardData.ts` (SWR hook)
 - `stores/` — Zustand stores: `analyticsFilterStore.ts` (dashboard filters)
 - `components/` — React components: `AIChatbot.tsx` (chat UI with streaming)
+- `types/` — Types are colocated in their respective lib/service files, not centralized here
+
+### Admin API (`admin/`)
+
+FastAPI + Uvicorn with async SQLAlchemy 2.0 + aiosqlite (SQLite):
+- `main.py` — All REST endpoints (user CRUD, OAuth connections, container management, plugin execution)
+- `models.py` — SQLAlchemy models: `User`, `OAuthConnection`, `UsageLog`, `ContainerEvent`, `Alert`
+- `docker_manager.py` — Container lifecycle (create, start, stop, destroy per-user ClawBot instances)
+- `watchdog.py` — Health monitoring service, auto-restarts unhealthy containers, Telegram alerts
+- `alerts.py` — Alert engine
+- `config.py` — Environment config
+
+Database migrations are manual scripts in `admin/migrations/` (not Alembic).
+
+### Plugin System (`plugins/`)
+
+Self-contained Node.js packages that the admin API executes for complex operations:
+- `google-analytics/` — GA4 data fetching
+- `google-search-console/` — GSC data fetching
+- `github-ghost/` — GitHub integration
+
+Plugins follow a SKILL.md documentation format. They are pre-installed in the admin API Docker image.
 
 ### AI Chatbot Data Flow
 
@@ -78,6 +112,8 @@ NextAuth.js with dual OAuth providers:
 - **Google** — Analytics/GSC access (`analytics.readonly webmasters.readonly`)
 - JWT strategy with 30-day max age
 - Google tokens stored in DB via admin API, refreshed via `getValidAccessToken()`
+- Multi-provider OAuth: `OAuthConnection` table supports GitHub, Google, WordPress connections per user
+- No Next.js middleware — auth is checked via `useSession()` client-side and `getServerSession()` in API routes
 
 ### Communication Between Services
 
@@ -85,14 +121,20 @@ NextAuth.js with dual OAuth providers:
 - Web → Google APIs: Direct calls using user's OAuth tokens
 - Web → Gemini: `@google/genai` SDK with `GEMINI_API_KEY`
 - Admin API manages Docker containers for per-user ClawBot instances
+- Admin API → Plugins: Executes Node.js plugin packages for data fetching
 
 ## Tech Stack
 
 - Next.js 16, React 19, TypeScript 5
-- Tailwind CSS 4 (dark theme default, emerald/cyan accent colors)
+- Tailwind CSS 4 (dark theme default, emerald/cyan accent colors, CSS custom properties in `globals.css`)
 - Zustand for client state, SWR for data fetching
 - `@google/genai` SDK for Gemini API
 - Framer Motion for animations, Recharts for charts, Lucide for icons
+- Admin: FastAPI, SQLAlchemy 2.0 (async), aiosqlite
+
+## Styling
+
+Tailwind CSS 4 — no `tailwind.config.js` (uses CSS `@import` and `@theme` in `globals.css`). Dark theme is the default. Light theme is activated via `data-theme='light'` attribute. Color palette uses zinc-950 background with emerald/cyan accents. Font: Geist Sans/Mono.
 
 ## Environment Variables
 
@@ -107,6 +149,18 @@ GITHUB_SECRET=
 ADMIN_API_URL=           # http://localhost:8000
 ADMIN_API_KEY=
 GEMINI_API_KEY=          # from aistudio.google.com
+```
+
+Additional for production/Docker (in `.env`):
+```
+MAX_USERS=50
+DEFAULT_RAM_LIMIT=256m
+DEFAULT_CPU_LIMIT=0.25
+DATA_DIR=/home/ubuntu/clawbot-data
+ADMIN_TELEGRAM_BOT_TOKEN=    # Watchdog Telegram alerts
+ADMIN_TELEGRAM_CHAT_ID=
+HEALTH_CHECK_INTERVAL=60
+MAX_RESTART_ATTEMPTS=3
 ```
 
 ## Path Alias

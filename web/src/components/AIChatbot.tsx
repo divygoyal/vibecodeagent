@@ -11,6 +11,7 @@ interface Message {
     content: string;
     timestamp: Date;
     tools?: { name: string; args: any; result?: string; structuredData?: any }[];
+    hasError?: boolean;
 }
 
 interface SiteOption {
@@ -31,17 +32,21 @@ const QUICK_PROMPTS = [
 ];
 
 const THINKING_PHASES = [
-    'Warming up brain cells...',
-    'Scanning your data...',
-    'Crunching the numbers...',
-    'Connecting the dots...',
-    'Hunting for insights...',
-    'Downloading intelligence...',
-    'Processing at light speed...',
-    'Reading the data tea leaves...',
-    'Asking the data gods...',
-    'Decoding the matrix...',
-];
+    { text: 'Warming up brain cells...', anim: 'typing' },
+    { text: 'Scanning your data...', anim: 'searching' },
+    { text: 'Crunching the numbers...', anim: 'lifting' },
+    { text: 'Connecting the dots...', anim: 'thinking' },
+    { text: 'Hunting for insights...', anim: 'searching' },
+    { text: 'Downloading intelligence...', anim: 'rocket' },
+    { text: 'Processing at light speed...', anim: 'rocket' },
+    { text: 'Reading the data tea leaves...', anim: 'thinking' },
+    { text: 'Asking the data gods...', anim: 'typing' },
+    { text: 'Decoding the matrix...', anim: 'lifting' },
+    { text: 'Robot brain go brrrr...', anim: 'thinking' },
+    { text: 'Consulting the algorithm overlords...', anim: 'searching' },
+    { text: 'Performing digital gymnastics...', anim: 'lifting' },
+    { text: 'Brewing data espresso...', anim: 'typing' },
+] as const;
 
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Digging through search data...',
@@ -140,7 +145,17 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
     );
 });
 
-// Fun animated robot thinking indicator
+// Fun animated robot thinking indicator with full body + phase-specific animations
+const ROBOT_KEYFRAMES = `
+@keyframes robotBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes armWaveL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-35deg); } }
+@keyframes armWaveR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(35deg); } }
+@keyframes robotWalk { 0%,100% { transform: translateX(0); } 25% { transform: translateX(6px); } 75% { transform: translateX(-6px); } }
+@keyframes rocketShake { 0%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-3px) rotate(-3deg); } 75% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes liftUp { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes legKick { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(15deg); } }
+`;
+
 const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { activeTool?: string }) {
     const [phase, setPhase] = useState(0);
     const [eyesClosed, setEyesClosed] = useState(false);
@@ -154,43 +169,61 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
         return () => { clearInterval(msgTimer); clearInterval(blinkTimer); };
     }, []);
 
-    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : THINKING_PHASES[phase];
+    const currentPhase = THINKING_PHASES[phase];
+    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : currentPhase.text;
+    const anim = activeTool ? 'searching' : currentPhase.anim;
+
+    const robotAnim = anim === 'searching' ? 'robotWalk 1s ease-in-out infinite'
+        : anim === 'rocket' ? 'rocketShake 0.3s ease-in-out infinite'
+        : anim === 'lifting' ? 'liftUp 0.8s ease-in-out infinite'
+        : 'robotBounce 1.2s ease-in-out infinite';
+
+    const armSpeed = anim === 'lifting' ? '0.8s' : '2s';
 
     return (
         <div className="flex justify-start">
             <div className="px-4 py-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] rounded-bl-sm">
+                <style dangerouslySetInnerHTML={{ __html: ROBOT_KEYFRAMES }} />
                 <div className="flex items-center gap-3">
-                    {/* Cute robot */}
-                    <div className="relative flex-shrink-0 w-8" style={{ height: 36 }}>
+                    {/* Full-body robot */}
+                    <div className="relative flex-shrink-0" style={{ width: 32, height: 52, animation: robotAnim, willChange: 'transform' }}>
                         {/* Antenna tip */}
-                        <div
-                            className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
-                            style={{ boxShadow: '0 0 6px rgba(52,211,153,0.5)' }}
-                        />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" style={{ boxShadow: '0 0 8px rgba(52,211,153,0.6)' }} />
                         {/* Antenna stem */}
-                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-px h-1 bg-emerald-500/40" />
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-px h-2 bg-emerald-500/40" />
                         {/* Head */}
-                        <div className="absolute top-3 inset-x-0 bottom-0 rounded-lg bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center gap-2">
-                            <div
-                                className="rounded-full bg-emerald-400 transition-all duration-100"
-                                style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(52,211,153,0.6)' }}
-                            />
-                            <div
-                                className="rounded-full bg-cyan-400 transition-all duration-100"
-                                style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(34,211,238,0.6)' }}
-                            />
+                        <div className="absolute top-4 inset-x-0 h-7 rounded-lg bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center gap-2">
+                            <div className="rounded-full bg-emerald-400 transition-all duration-100" style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(52,211,153,0.6)' }} />
+                            <div className="rounded-full bg-cyan-400 transition-all duration-100" style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(34,211,238,0.6)' }} />
                         </div>
+                        {/* Left arm */}
+                        <div className="absolute top-[30px] -left-2 w-1.5 h-5 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: `armWaveL ${armSpeed} ease-in-out infinite` }} />
+                        {/* Right arm */}
+                        <div className="absolute top-[30px] -right-2 w-1.5 h-5 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: `armWaveR ${armSpeed} ease-in-out infinite 0.3s` }} />
+                        {/* Body */}
+                        <div className="absolute top-[30px] inset-x-0.5 h-5 rounded-md bg-zinc-800 border border-white/[0.08]">
+                            {/* Belt buckle */}
+                            <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-2 h-1 rounded-sm bg-emerald-500/30" />
+                        </div>
+                        {/* Left leg */}
+                        <div className="absolute bottom-0 left-1.5 w-1.5 h-3 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: anim === 'searching' ? 'legKick 0.5s ease-in-out infinite' : 'none' }} />
+                        {/* Right leg */}
+                        <div className="absolute bottom-0 right-1.5 w-1.5 h-3 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: anim === 'searching' ? 'legKick 0.5s ease-in-out infinite 0.25s' : 'none' }} />
+                        {/* Rocket flames */}
+                        {anim === 'rocket' && (
+                            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5">
+                                <div className="w-1.5 h-3 rounded-full bg-gradient-to-t from-orange-500 to-yellow-300 animate-pulse" />
+                                <div className="w-1 h-2.5 rounded-full bg-gradient-to-t from-red-500 to-orange-300 animate-pulse" style={{ animationDelay: '0.1s' }} />
+                                <div className="w-1.5 h-3 rounded-full bg-gradient-to-t from-orange-500 to-yellow-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                            </div>
+                        )}
                     </div>
                     {/* Message + dots */}
                     <div className="min-w-0">
                         <span className="text-[12px] text-zinc-400 font-medium">{message}</span>
                         <div className="flex gap-1 mt-1.5">
                             {[0, 1, 2].map(i => (
-                                <div
-                                    key={i}
-                                    className="w-1 h-1 rounded-full bg-emerald-400/60 animate-bounce"
-                                    style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }}
-                                />
+                                <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-bounce" style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }} />
                             ))}
                         </div>
                     </div>
@@ -311,8 +344,13 @@ export default function AIChatbot() {
         };
     }, []);
 
+    // Debounced scroll to prevent jank during rapid streaming updates
+    const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
     }, [messages]);
 
     useEffect(() => {
@@ -345,9 +383,14 @@ export default function AIChatbot() {
             // Subsequent messages use conversation history — Gemini remembers.
             const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
 
+            // TTFB timeout: abort if no response headers within 25s
+            const abortController = new AbortController();
+            const ttfbTimeout = setTimeout(() => abortController.abort(), 25000);
+
             const res = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: abortController.signal,
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
@@ -370,6 +413,7 @@ export default function AIChatbot() {
                     mode: options?.mode,
                 }),
             });
+            clearTimeout(ttfbTimeout); // Response started, cancel TTFB timeout
 
             if (!res.ok) {
                 if (res.status === 402) {
@@ -443,6 +487,11 @@ export default function AIChatbot() {
                             setCredits(data.value);
                         } else if (data.type === 'error') {
                             appendStreamText(`\n\n⚠️ **Error:** ${data.message}`);
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                updated[updated.length - 1] = { ...updated[updated.length - 1], hasError: true };
+                                return updated;
+                            });
                         }
                     } catch {
                         // skip parse error
@@ -458,12 +507,30 @@ export default function AIChatbot() {
                 }
                 flushStreamBuffer();
             }
-        } catch {
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: '⚠️ **Connection Error**\n\nCouldn\'t reach the AI service. Please try again.',
-                timestamp: new Date(),
-            }]);
+        } catch (err: any) {
+            const isTimeout = err?.name === 'AbortError';
+            setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last && last.role === 'assistant') {
+                    updated[updated.length - 1] = {
+                        ...last,
+                        content: (last.content || '') + (isTimeout
+                            ? '\n\n⚠️ **Request timed out.** The AI took too long to respond. Try a simpler question.'
+                            : '\n\n⚠️ **Connection Error.** Couldn\'t reach the AI service.'),
+                        hasError: true,
+                    };
+                    return updated;
+                }
+                return [...prev, {
+                    role: 'assistant',
+                    content: isTimeout
+                        ? '⚠️ **Request timed out.** The AI took too long to respond. Try a simpler question.'
+                        : '⚠️ **Connection Error.** Couldn\'t reach the AI service.',
+                    timestamp: new Date(),
+                    hasError: true,
+                }];
+            });
         } finally {
             setIsLoading(false);
         }
@@ -497,7 +564,9 @@ export default function AIChatbot() {
         const handler = (e: Event) => {
             const ce = e as CustomEvent;
             const question = ce.detail?.question;
+            const site = ce.detail?.site;
             if (question) {
+                if (site) setSelectedChatSite(site);
                 setIsOpen(true);
                 setTimeout(() => {
                     sendMessageRef.current(question);
@@ -613,7 +682,27 @@ export default function AIChatbot() {
                     {messages.map((msg, i) => {
                         if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                         const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
-                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />;
+                        return (
+                            <div key={i}>
+                                <MessageBubble msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />
+                                {msg.hasError && !isLoading && (
+                                    <div className="flex justify-start mt-1">
+                                        <button
+                                            onClick={() => {
+                                                const lastUserMsg = [...messages].slice(0, i).reverse().find(m => m.role === 'user');
+                                                if (lastUserMsg) {
+                                                    setMessages(prev => prev.slice(0, -1));
+                                                    sendMessage(lastUserMsg.content);
+                                                }
+                                            }}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.08] hover:text-white transition"
+                                        >
+                                            <RotateCcw className="w-3 h-3" /> Retry
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
                     })}
 
                     {/* Thinking indicator — cute robot with cycling messages */}
@@ -667,15 +756,21 @@ export default function AIChatbot() {
                                 rows={1}
                             />
                         ) : (
-                            <input
-                                ref={inputRef}
-                                type="text"
+                            <textarea
+                                ref={inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        sendMessage();
+                                    }
+                                }}
                                 placeholder="Ask anything..."
-                                className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-emerald-500/20 transition"
+                                className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-emerald-500/20 transition resize-none"
                                 disabled={isLoading}
+                                rows={1}
+                                style={{ minHeight: '44px', maxHeight: '80px' }}
                             />
                         )}
                         <button

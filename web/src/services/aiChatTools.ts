@@ -373,7 +373,7 @@ async function queryGSCWithAutoResolve(
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(body),
-                    signal: AbortSignal.timeout(10000),
+                    signal: AbortSignal.timeout(8000),
                 }
             );
 
@@ -573,7 +573,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                     'Cookie': '', // Internal call, auth handled differently
                     'x-google-token': token,
                 },
-                signal: AbortSignal.timeout(15000),
+                signal: AbortSignal.timeout(10000),
             });
 
             if (!response.ok) {

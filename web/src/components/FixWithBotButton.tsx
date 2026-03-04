@@ -5,6 +5,7 @@ import { Sparkles } from 'lucide-react';
 interface FixWithBotButtonProps {
     label?: string;
     context?: string;
+    site?: string;
     size?: 'sm' | 'md';
     variant?: 'solid' | 'ghost';
 }
@@ -12,6 +13,7 @@ interface FixWithBotButtonProps {
 export default function FixWithBotButton({
     label = 'Ask AI',
     context,
+    site,
     size = 'sm',
     variant = 'solid',
 }: FixWithBotButtonProps) {
@@ -25,7 +27,7 @@ export default function FixWithBotButton({
 
     const handleClick = () => {
         const question = context || 'Analyze this issue and tell me how to fix it';
-        window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question } }));
+        window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question, site } }));
     };
 
     return (

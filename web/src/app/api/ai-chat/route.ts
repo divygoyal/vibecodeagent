@@ -223,16 +223,19 @@ export async function POST(req: NextRequest) {
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
 
-        // ── Credit check ──
-        if (ADMIN_API_KEY && userId) {
-            const credits = await getUserCredits(String(userId));
-            if (credits !== null && credits < 1) {
-                return new Response(JSON.stringify({
-                    error: 'insufficient_credits',
-                    credits: credits,
-                    response: `⚡ You've used all your messages! You have **${credits}** credits remaining.\n\n**1 credit = 1 message.** Get more to continue:\n- 💰 [100 messages for $1](https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI)\n- 🔥 [500 messages for $5](https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI)\n- 🚀 [1,200 messages for $10](https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp) (best value — save 20%)`
-                }), { status: 402, headers: { 'Content-Type': 'application/json' } });
-            }
+        // ── Parallel pre-flight: credits + JWT token ──
+        const [creditResult, jwt] = await Promise.all([
+            (ADMIN_API_KEY && userId) ? getUserCredits(String(userId)) : Promise.resolve(null),
+            getToken({ req: req as any }),
+        ]);
+
+        // Credit gate
+        if (creditResult !== null && creditResult < 1) {
+            return new Response(JSON.stringify({
+                error: 'insufficient_credits',
+                credits: creditResult,
+                response: `⚡ You've used all your messages! You have **${creditResult}** credits remaining.\n\n**1 credit = 1 message.** Get more to continue:\n- 💰 [100 messages for $1](https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI)\n- 🔥 [500 messages for $5](https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI)\n- 🚀 [1,200 messages for $10](https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp) (best value — save 20%)`
+            }), { status: 402, headers: { 'Content-Type': 'application/json' } });
         }
 
         if (!ai) {
@@ -257,9 +260,8 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Get User's Google Tokens ──
-        const jwt = await getToken({ req: req as any }) as any;
-        let googleAccessToken = jwt?.googleAccessToken as string | undefined;
-        let googleRefreshToken = jwt?.googleRefreshToken as string | undefined;
+        let googleAccessToken = (jwt as any)?.googleAccessToken as string | undefined;
+        let googleRefreshToken = (jwt as any)?.googleRefreshToken as string | undefined;
 
         if (!googleAccessToken && !googleRefreshToken) {
             const dbTokens = await fetchGoogleTokensFromDb(String(userId));
@@ -269,9 +271,10 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // ── Get Available Sites Context (cached per user for 5min) ──
+        // ── Get Available Sites Context (only on first message — subsequent messages have it in history) ──
         let availableSitesContext = '';
-        if (googleAccessToken || googleRefreshToken) {
+        const isFirstMessage = !history?.length;
+        if (isFirstMessage && (googleAccessToken || googleRefreshToken)) {
             try {
                 const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
                 const cacheKey = `sites:${userId}`;
@@ -317,6 +320,9 @@ CRITICAL SYSTEM CONTEXT:
         const stream = new ReadableStream({
             async start(controller) {
                 try {
+                    // Signal client immediately that we're alive
+                    controller.enqueue(encodeSSE({ type: 'status', message: 'Processing...' }));
+
                     let currentContents = [...contents];
                     let keepGoing = true;
                     let hasDeductedCredit = false;
@@ -337,8 +343,8 @@ CRITICAL SYSTEM CONTEXT:
                                 systemInstruction: finalSystemInstruction,
                                 tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
                                 temperature: 0.7,
-                                maxOutputTokens: 4096,
-                                httpOptions: { timeout: 60000 },
+                                maxOutputTokens: 3000,
+                                httpOptions: { timeout: 30000 },
                             },
                         });
 
