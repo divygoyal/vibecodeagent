@@ -132,23 +132,72 @@ function buildTrendData(currentScore: number, topQueries: any[]) {
     };
 }
 
-function buildQueryMonitor(topQueries: any[]) {
+function buildQueryMonitor(topQueries: any[], citationVerdicts?: any[]) {
     const platformList = ['chatgpt', 'perplexity', 'googleAIO'] as const;
-    const citedQueries = topQueries.filter(q => q.position <= 10);
-    const missedQueries = topQueries.filter(q => q.position > 10);
-    const total = topQueries.length || 1;
 
-    return {
-        citationsThisWeek: citedQueries.length,
-        missedOpportunities: missedQueries.length,
-        citationRate: Math.round((citedQueries.length / total) * 100),
-        queries: topQueries.slice(0, 8).map((q, i) => ({
+    // Use Gemini verdicts if available, otherwise fall back to position heuristic
+    let queries: any[];
+    if (citationVerdicts && citationVerdicts.length > 0) {
+        queries = citationVerdicts.slice(0, 8).map((v: any, i: number) => ({
+            query: v.query,
+            platform: v.platform || platformList[i % 3],
+            status: v.status || 'missed',
+            reason: v.reason || '',
+            timeAgo: `${((i + 1) * 3) + (i % 5)}h ago`,
+        }));
+    } else {
+        queries = topQueries.slice(0, 8).map((q, i) => ({
             query: q.query,
             platform: platformList[i % 3],
             status: (q.position <= 10 ? 'cited' : 'missed') as 'cited' | 'missed',
+            reason: q.position <= 10 ? 'Strong ranking position and content signals' : 'Low ranking position reduces AI citation probability',
             timeAgo: `${((i + 1) * 3) + (i % 5)}h ago`,
-        })),
+        }));
+    }
+
+    const cited = queries.filter(q => q.status === 'cited').length;
+    const missed = queries.filter(q => q.status === 'missed').length;
+    const total = queries.length || 1;
+
+    return {
+        citationsThisWeek: cited,
+        missedOpportunities: missed,
+        citationRate: Math.round((cited / total) * 100),
+        queries,
     };
+}
+
+function buildHeuristicEntities(topQueries: any[], pageSignals: PageSignals[], siteUrl: string) {
+    const entities: { name: string; type: string; relevance: number }[] = [];
+    let domain: string;
+    try { domain = new URL(siteUrl).hostname.replace('www.', ''); } catch { domain = siteUrl; }
+
+    // Brand entity from domain
+    entities.push({ name: domain, type: 'brand', relevance: 95 });
+
+    // Extract topic entities from top queries
+    const seen = new Set<string>();
+    for (const q of topQueries.slice(0, 8)) {
+        const words = (q.query as string).split(/\s+/).filter(w => w.length > 3);
+        for (const w of words) {
+            const lower = w.toLowerCase();
+            if (!seen.has(lower) && lower !== domain.split('.')[0]) {
+                seen.add(lower);
+                entities.push({ name: w, type: 'topic', relevance: Math.max(30, 90 - seen.size * 8) });
+            }
+        }
+        if (entities.length >= 12) break;
+    }
+
+    // Technology entities from schema types
+    const allSchemas = [...new Set(pageSignals.flatMap(p => p.schemaTypes))];
+    for (const schema of allSchemas.slice(0, 3)) {
+        if (!seen.has(schema.toLowerCase())) {
+            entities.push({ name: schema, type: 'technology', relevance: 60 });
+        }
+    }
+
+    return entities.slice(0, 15);
 }
 
 function buildPlatformData(
@@ -273,11 +322,15 @@ function enrichResponse(base: any, topQueries: any[], pageSignals: PageSignals[]
     const competitorGapAlert = base.competitorGapAlert ||
         `competitor-a.io was cited ${Math.max(1, trend.citationsChange + 2)} more times than you for "${topQuery}" this week`;
 
-    // Build query monitor
-    const queryMonitor = buildQueryMonitor(topQueries);
+    // Build query monitor — use Gemini citation verdicts if available
+    const citationVerdicts = base.citationVerdicts || [];
+    const queryMonitor = buildQueryMonitor(topQueries, citationVerdicts);
 
     // Build enriched page signals with GEO scores
     const enrichedPages = buildPageGeoScores(pageSignals, base.pageGeoScores);
+
+    // Entities from Gemini or fallback heuristic
+    const entities = base.entities || buildHeuristicEntities(topQueries, pageSignals, siteUrl);
 
     return {
         geoScore,
@@ -290,6 +343,7 @@ function enrichResponse(base: any, topQueries: any[], pageSignals: PageSignals[]
         competitors,
         competitorGapAlert,
         queryMonitor,
+        entities,
         pageSignals: enrichedPages,
         topQueries,
         keywordVisibility: topQueries.map((q: any) => ({
@@ -474,7 +528,13 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
     {"domain": "<competitor domain>", "isYou": false, "geoScore": <0-100>, "citationsPerWeek": <number>, "trend": "up|down|flat"}
   ],
   "competitorGapAlert": "<1 sentence about biggest competitive gap>",
-  "pageGeoScores": {"<page url>": <0-100>}
+  "pageGeoScores": {"<page url>": <0-100>},
+  "entities": [
+    {"name": "<entity name>", "type": "person|product|topic|brand|technology", "relevance": <0-100>}
+  ],
+  "citationVerdicts": [
+    {"query": "<search query>", "platform": "chatgpt|perplexity|googleAIO", "status": "cited|missed", "reason": "<1 sentence why>"}
+  ]
 }`;
 
                     // Try models in fallback order on 429/503
@@ -486,7 +546,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
                                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                                 config: {
                                     temperature: 0.3,
-                                    maxOutputTokens: 3000,
+                                    maxOutputTokens: 4000,
                                     httpOptions: { timeout: 20000 },
                                 },
                             });

@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, X, Lightbulb } from 'lucide-react';
+import { Lightbulb, Code, Zap } from 'lucide-react';
 
 interface PageSignal {
     url: string;
@@ -38,10 +38,15 @@ function GeoScoreBadge({ score }: { score: number }) {
     );
 }
 
-export default function ContentSignals({ pages }: { pages: PageSignal[] }) {
+interface ContentSignalsProps {
+    pages: PageSignal[];
+    onGenerateSchema?: (url: string) => void;
+    onOptimize?: (url: string) => void;
+}
+
+export default function ContentSignals({ pages, onGenerateSchema, onOptimize }: ContentSignalsProps) {
     if (!pages.length) return null;
 
-    // Find the best quick win
     const quickWinPage = pages.find(p => p.quickWin);
 
     return (
@@ -74,6 +79,25 @@ export default function ContentSignals({ pages }: { pages: PageSignal[] }) {
                                 <span className="text-[9px] text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded">
                                     &#10003; {ps.externalLinks} ext links
                                 </span>
+                            </div>
+                            {/* Action buttons */}
+                            <div className="flex gap-2 mt-2.5 pt-2 border-t border-white/[0.04]">
+                                {!ps.hasSchema && onGenerateSchema && (
+                                    <button
+                                        onClick={() => onGenerateSchema(ps.url)}
+                                        className="flex items-center gap-1 px-2 py-1 text-[9px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md hover:bg-emerald-500/20 transition"
+                                    >
+                                        <Code className="w-2.5 h-2.5" /> Generate Schema
+                                    </button>
+                                )}
+                                {onOptimize && (
+                                    <button
+                                        onClick={() => onOptimize(ps.url)}
+                                        className="flex items-center gap-1 px-2 py-1 text-[9px] font-medium text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-md hover:bg-violet-500/20 transition"
+                                    >
+                                        <Zap className="w-2.5 h-2.5" /> Optimize
+                                    </button>
+                                )}
                             </div>
                         </div>
                     );

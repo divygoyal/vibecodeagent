@@ -13,6 +13,7 @@ interface QueryItem {
     query: string;
     platform: string;
     status: 'cited' | 'missed';
+    reason?: string;
     timeAgo: string;
 }
 
@@ -67,24 +68,29 @@ export default function LiveQueryMonitor({ monitor }: { monitor: QueryMonitorDat
                     const PIcon = platform.icon;
 
                     return (
-                        <div key={i} className="flex items-center gap-2.5 py-2 px-2 rounded-lg hover:bg-white/[0.02] transition border-b border-white/[0.04] last:border-0">
-                            <span className="text-[11px] text-zinc-300 flex-1 min-w-0 truncate">
-                                &ldquo;{q.query}&rdquo;
-                            </span>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${platform.bg}`}>
-                                    <PIcon className={`w-2.5 h-2.5 ${platform.color}`} />
-                                    <span className={`text-[8px] font-medium ${platform.color}`}>{platform.name}</span>
-                                </div>
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                    q.status === 'cited'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                }`}>
-                                    {q.status === 'cited' ? 'CITED' : 'MISSED'}
+                        <div key={i} className="py-2 px-2 rounded-lg hover:bg-white/[0.02] transition border-b border-white/[0.04] last:border-0 group">
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-[11px] text-zinc-300 flex-1 min-w-0 truncate">
+                                    &ldquo;{q.query}&rdquo;
                                 </span>
-                                <span className="text-[9px] text-zinc-600 w-12 text-right">{q.timeAgo}</span>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${platform.bg}`}>
+                                        <PIcon className={`w-2.5 h-2.5 ${platform.color}`} />
+                                        <span className={`text-[8px] font-medium ${platform.color}`}>{platform.name}</span>
+                                    </div>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                        q.status === 'cited'
+                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                    }`}>
+                                        {q.status === 'cited' ? 'CITED' : 'MISSED'}
+                                    </span>
+                                    <span className="text-[9px] text-zinc-600 w-12 text-right">{q.timeAgo}</span>
+                                </div>
                             </div>
+                            {q.reason && (
+                                <p className="text-[9px] text-zinc-600 mt-1 hidden group-hover:block">{q.reason}</p>
+                            )}
                         </div>
                     );
                 })}
