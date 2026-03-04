@@ -134,11 +134,17 @@ export function useSeoData(section: string, siteUrl?: string, enabled = true) {
     };
 }
 
-export function useInsights(enabled = true) {
-    const { data, error, isLoading } = useRegisteredSWR(
-        enabled ? '/api/insights' : null,
-        { dedupingInterval: 300000, errorRetryCount: 1 }
-    );
+export function useInsights(siteUrl?: string, propertyId?: string, enabled = true) {
+    const params = new URLSearchParams();
+    if (siteUrl) params.set('siteUrl', siteUrl);
+    if (propertyId) params.set('propertyId', propertyId);
+    const qs = params.toString();
+    const url = enabled ? `/api/insights${qs ? `?${qs}` : ''}` : null;
+
+    const { data, error, isLoading } = useRegisteredSWR(url, {
+        dedupingInterval: 600000, // 10 min — insights change slowly
+        errorRetryCount: 1,
+    });
 
     return {
         insights: data?.insights || [],

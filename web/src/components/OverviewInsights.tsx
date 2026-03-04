@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import {
     Zap, ArrowRight, TrendingDown, ChevronDown, ChevronUp,
     Eye, MousePointer, Hash, Activity, Shield, Skull,
@@ -95,7 +95,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
    MAIN EXPORT — renders all new overview sections
    ════════════════════════════════════════════════════════════════ */
 
-export default function OverviewInsights({
+export default memo(function OverviewInsights({
     trafficData, searchTrend, seoQueries, seoPages,
     analyticsKPIs, seoKPIs, hasData, isLoading,
 }: Props) {
@@ -314,7 +314,7 @@ export default function OverviewInsights({
             </div>
         </div>
     );
-}
+});
 
 /* ════════════════════════════════════════════════════════════════
    Section 1: 7-DAY WAR ROOM

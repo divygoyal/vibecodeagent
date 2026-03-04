@@ -255,12 +255,17 @@ export async function GET(req: Request) {
             return NextResponse.json({ insights: [], message: "Google authentication expired" });
         }
 
+        // Use requested site/property or fall back to first available
+        const { searchParams } = new URL(req.url);
+        const requestedSiteUrl = searchParams.get('siteUrl');
+        const requestedPropertyId = searchParams.get('propertyId');
+
         const insights: Insight[] = [];
 
         // Fetch GSC data for insights
         const sites = await listSearchConsoleSites(token);
-        if (sites.length > 0) {
-            const siteUrl = sites[0].siteUrl;
+        const siteUrl = requestedSiteUrl || (sites.length > 0 ? sites[0].siteUrl : null);
+        if (siteUrl) {
             const [queryData, prevQueryData] = await Promise.all([
                 fetchGSCData(token, siteUrl, daysAgo(28), daysAgo(1), ['query'], 100),
                 fetchGSCData(token, siteUrl, daysAgo(56), daysAgo(29), ['query'], 100),
@@ -270,8 +275,10 @@ export async function GET(req: Request) {
 
         // Fetch GA data for insights
         const properties = await listAnalyticsProperties(token);
-        if (properties.length > 0) {
-            const propId = properties[0].property.replace('properties/', '');
+        const propId = requestedPropertyId
+            ? requestedPropertyId.replace('properties/', '')
+            : (properties.length > 0 ? properties[0].property.replace('properties/', '') : null);
+        if (propId) {
             const gaData = await fetchGAReport(
                 token, propId, daysAgo(28), daysAgo(1),
                 ['pagePath'], ['sessions', 'bounceRate']

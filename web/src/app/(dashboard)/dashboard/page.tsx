@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn } from 'next-auth/react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo, RefObject } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -17,6 +17,7 @@ import {
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights, useRealtimeData } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
 import OverviewInsights from '@/components/OverviewInsights';
+import OverviewDetailDrawer, { DrawerContent } from '@/components/OverviewDetailDrawer';
 
 /* ─── Animation variants ─── */
 const fadeInUp = {
@@ -26,6 +27,22 @@ const fadeInUp = {
 const stagger = {
   animate: { transition: { staggerChildren: 0.08 } },
 };
+
+/* ─── Lazy-load hook for below-fold sections ─── */
+function useLazyVisible(ref: RefObject<HTMLDivElement | null>) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { rootMargin: '200px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [ref]);
+  return visible;
+}
 
 /* ─── Computed Insight Types ─── */
 interface StrikingKeyword {
@@ -80,7 +97,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export default function DashboardOverview() {
   const { data: session } = useSession();
-  const { isRegistering, isRegistered, registrationError } = useRegistration();
+  const { isRegistering, isRegistered, registrationError, selectedSite, setSelectedSite, selectedProperty, setSelectedProperty } = useRegistration();
 
   // 1. Container status + Google connection check
   const { botStatus, hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
@@ -90,13 +107,6 @@ export default function DashboardOverview() {
   const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
   const { properties } = usePropertyList(hasGoogleConnection);
 
-  // State for selection & custom dropdown — initialize from localStorage for instant load
-  const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('tc-last-site') || '';
-    }
-    return '';
-  });
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -111,47 +121,48 @@ export default function DashboardOverview() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
-  // Auto-select first site when loaded
+  // Auto-select first site when loaded (synced via context → layout persists to localStorage)
   useEffect(() => {
-    if (sites.length > 0 && !selectedSiteUrl) {
-      setSelectedSiteUrl(sites[0].siteUrl);
+    if (sites.length > 0 && !selectedSite) {
+      setSelectedSite(sites[0].siteUrl);
     }
-  }, [sites, selectedSiteUrl]);
+  }, [sites, selectedSite, setSelectedSite]);
 
-  // Persist selected site to localStorage for instant load on return visits
-  useEffect(() => {
-    if (selectedSiteUrl) {
-      localStorage.setItem('tc-last-site', selectedSiteUrl);
-    }
-  }, [selectedSiteUrl]);
-
-  // Derived Property ID — Bug #14 fix: improved matching priority
-  const domain = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('/', '');
+  // Derived Property ID — improved matching priority
+  const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
   const domainRoot = domain.split('.')[0]; // e.g., "example" from "example.com"
 
   // Try matching in priority order:
   // 1. Exact domain match in displayName (e.g., "example.com" in "example.com - GA4")
-  // 2. Domain root in property's data stream URL (if available)  
+  // 2. Domain root in property's data stream URL (if available)
   // 3. Partial match by domain root in displayName
   // 4. Fallback to first property
   const matchedProp =
-    properties.find((p: any) => p.displayName.toLowerCase().includes(domain.toLowerCase())) ||
+    properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
     properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-    properties.find((p: any) => p.displayName.toLowerCase().includes(domainRoot.toLowerCase())) ||
+    properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
     properties[0]; // Fallback to first
 
+  // Sync derived property to context so Analytics page picks it up
+  useEffect(() => {
+    if (matchedProp?.property && matchedProp.property !== selectedProperty) {
+      setSelectedProperty(matchedProp.property);
+    }
+  }, [matchedProp, selectedProperty, setSelectedProperty]);
+
   // 3. Fetch Data — start fetching if Google is connected OR we have a cached site (optimistic)
-  const hasCachedSite = !!selectedSiteUrl;
+  const hasCachedSite = !!selectedSite;
   const canFetchData = hasGoogleConnection || hasCachedSite;
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, canFetchData);
-  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSiteUrl, canFetchData);
+  const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSite, canFetchData);
 
-  // 4. Real-time active users
-  const { data: realtimeData } = useRealtimeData(matchedProp?.property, canFetchData);
+  // 4. Real-time active users (deferred until primary data loads)
+  const hasData_early = !!(analyticsData?.kpis || seoData?.kpis);
+  const { data: realtimeData } = useRealtimeData(matchedProp?.property, canFetchData && hasData_early);
   const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : null;
 
-  // 5. AI Insights for smart alerts
-  const { insights } = useInsights(canFetchData);
+  // 5. AI Insights for smart alerts (deferred + per-property)
+  const { insights } = useInsights(selectedSite, matchedProp?.property, canFetchData && hasData_early);
 
   // Extract Data
   const analyticsKPIs = analyticsData?.kpis;
@@ -163,7 +174,7 @@ export default function DashboardOverview() {
   const isLive = botRunning && botStatus?.telegramStatus === 'connected';
 
   // Loading States - don't block on registration if we have a cached site (optimistic)
-  const isInit = (!hasCachedSite && isRegistering) || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSiteUrl);
+  const isInit = (!hasCachedSite && isRegistering) || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSite);
   const isRef = analyticsLoading || seoLoading;
   // True when we have SOME data (even stale) — prevents re-showing skeletons
   const hasData = !!(analyticsKPIs || seoKPIs);
@@ -247,49 +258,60 @@ export default function DashboardOverview() {
     return { strikingDistance, ctrProblems, healthVerdict, healthColor, healthIcon, topPages };
   }, [seoData, analyticsKPIs, seoKPIs]);
 
-  // ═══ PERFORMANCE SCORE (0-100) — Composite metric ═══
-  const performanceScore = useMemo(() => {
+  // ═══ PERFORMANCE SCORE (0-100) — Composite metric with sub-scores ═══
+  const scoreData = useMemo(() => {
     if (!analyticsKPIs && !seoKPIs) return null;
-    let score = 50;
-    // Traffic trend (+/- 15)
     const trafficChange = analyticsKPIs?.changeUsers || 0;
-    score += Math.min(15, Math.max(-15, trafficChange));
-    // CTR health (+/- 10)
+    const trafficScore = Math.min(15, Math.max(-15, trafficChange));
     const avgCTR = parseFloat(seoKPIs?.avgCTR) || 0;
-    score += avgCTR > 5 ? 10 : avgCTR > 3 ? 5 : avgCTR > 1 ? 0 : -10;
-    // Bounce rate penalty
+    const ctrScore = avgCTR > 5 ? 10 : avgCTR > 3 ? 5 : avgCTR > 1 ? 0 : -10;
     const bounce = parseFloat(analyticsKPIs?.avgBounceRate) || 50;
-    score -= bounce > 70 ? 15 : bounce > 55 ? 8 : bounce > 40 ? 3 : 0;
-    // Position quality (+/- 10)
+    const bounceScore = bounce > 70 ? 15 : bounce > 55 ? 8 : bounce > 40 ? 3 : 0;
     const avgPos = parseFloat(seoKPIs?.avgPosition) || 30;
-    score += avgPos < 10 ? 10 : avgPos < 20 ? 5 : avgPos < 30 ? 0 : -10;
-    // Impression growth (+/- 10)
+    const positionScore = avgPos < 10 ? 10 : avgPos < 20 ? 5 : avgPos < 30 ? 0 : -10;
     const imprChange = seoKPIs?.changeImpressions || 0;
-    score += Math.min(10, Math.max(-10, imprChange / 2));
-    return Math.max(0, Math.min(100, Math.round(score)));
+    const impressionScore = Math.min(10, Math.max(-10, imprChange / 2));
+    const score = Math.max(0, Math.min(100, Math.round(50 + trafficScore + ctrScore - bounceScore + positionScore + impressionScore)));
+    return { score, trafficScore, ctrScore, bounceScore, positionScore, impressionScore };
   }, [analyticsKPIs, seoKPIs]);
+  const performanceScore = scoreData?.score ?? null;
 
   // ═══ GROWTH VELOCITY — 7d vs previous 7d ═══
-  const growthVelocity = useMemo(() => {
+  const velocityData = useMemo(() => {
     if (searchTrend.length < 14) return null;
-    const recent7 = searchTrend.slice(-7).reduce((s: number, d: any) => s + (d.clicks || 0), 0);
-    const prev7 = searchTrend.slice(-14, -7).reduce((s: number, d: any) => s + (d.clicks || 0), 0);
-    if (prev7 === 0) return null;
-    return ((recent7 - prev7) / prev7 * 100);
+    const recent7 = searchTrend.slice(-7);
+    const prev7 = searchTrend.slice(-14, -7);
+    const recentClicks = recent7.reduce((s: number, d: any) => s + (d.clicks || 0), 0);
+    const prevClicks = prev7.reduce((s: number, d: any) => s + (d.clicks || 0), 0);
+    if (prevClicks === 0) return null;
+    const velocity = ((recentClicks - prevClicks) / prevClicks * 100);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weekData = recent7.map((d: any, i: number) => ({
+      label: d.date ? days[new Date(d.date).getDay()] : `D${i + 1}`,
+      current: d.clicks || 0,
+      previous: prev7[i]?.clicks || 0,
+    }));
+    return { velocity, recentClicks, prevClicks, weekData };
   }, [searchTrend]);
+  const growthVelocity = velocityData?.velocity ?? null;
 
   // ═══ BRANDED vs NON-BRANDED — from SEO queries ═══
   const brandedSplit = useMemo(() => {
     const queries = seoData?.queries || [];
     if (queries.length === 0) return null;
-    const siteName = selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\.(com|net|org|io|co|dev|codes|xyz|app).*$/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const siteName = selectedSite.replace('sc-domain:', '').replace('https://', '').replace('http://', '').replace(/\.(com|net|org|io|co|dev|codes|xyz|app).*$/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
     if (!siteName || siteName.length < 2) return null;
     let brandedClicks = 0, nonBrandedClicks = 0;
+    const brandedKeywords: { query: string; clicks: number }[] = [];
     queries.forEach((q: any) => {
       const qLower = (q.query || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const clicks = parseInt(q.clicks) || 0;
-      if (qLower.includes(siteName)) brandedClicks += clicks;
-      else nonBrandedClicks += clicks;
+      if (qLower.includes(siteName)) {
+        brandedClicks += clicks;
+        brandedKeywords.push({ query: q.query, clicks });
+      } else {
+        nonBrandedClicks += clicks;
+      }
     });
     const total = brandedClicks + nonBrandedClicks;
     if (total === 0) return null;
@@ -298,8 +320,9 @@ export default function DashboardOverview() {
       nonBranded: nonBrandedClicks,
       brandedPct: Math.round((brandedClicks / total) * 100),
       nonBrandedPct: Math.round((nonBrandedClicks / total) * 100),
+      topBranded: brandedKeywords.sort((a, b) => b.clicks - a.clicks).slice(0, 5),
     };
-  }, [seoData, selectedSiteUrl]);
+  }, [seoData, selectedSite]);
 
   // ═══ SMART ALERTS — from insights API ═══
   const smartAlerts = useMemo(() => {
@@ -310,7 +333,14 @@ export default function DashboardOverview() {
   }, [insights]);
 
   // Friendly display for selected site
-  const selectedSiteLabel = selectedSiteUrl ? selectedSiteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : '';
+  const selectedSiteLabel = selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : '';
+
+  // Lazy-load refs for below-fold sections
+  const insightSectionRef = useRef<HTMLDivElement>(null);
+  const insightVisible = useLazyVisible(insightSectionRef);
+
+  // Detail drawer state
+  const [drawerContent, setDrawerContent] = useState<DrawerContent | null>(null);
 
   // Show registration error if any
   if (registrationError) {
@@ -378,11 +408,11 @@ export default function DashboardOverview() {
               <div className="absolute right-0 top-full mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 py-1 min-w-[250px] max-h-[260px] overflow-y-auto">
                 {sites.map((site: any) => {
                   const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                  const isSelected = site.siteUrl === selectedSiteUrl;
+                  const isSelected = site.siteUrl === selectedSite;
                   return (
                     <button
                       key={site.siteUrl}
-                      onClick={() => { setSelectedSiteUrl(site.siteUrl); setDropdownOpen(false); }}
+                      onClick={() => { setSelectedSite(site.siteUrl); setDropdownOpen(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-all ${isSelected
                         ? 'text-emerald-400 bg-emerald-500/[0.08]'
                         : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -409,8 +439,8 @@ export default function DashboardOverview() {
       {hasData && (
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Performance Score Gauge */}
-          {performanceScore !== null && (
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-white/[0.1] transition-all">
+          {performanceScore !== null && scoreData && (
+            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
               <div className="relative w-16 h-16 flex-shrink-0">
                 <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-white/[0.06]" strokeWidth="2.5" />
@@ -438,7 +468,7 @@ export default function DashboardOverview() {
           )}
 
           {/* Growth Velocity */}
-          <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-white/[0.1] transition-all">
+          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
               growthVelocity !== null && growthVelocity > 0
                 ? 'bg-emerald-500/10 border border-emerald-500/20'
@@ -469,7 +499,7 @@ export default function DashboardOverview() {
           </div>
 
           {/* Branded vs Non-Branded Split */}
-          <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-all">
+          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
             <div className="flex items-center gap-2 mb-3">
               <Tag className="w-4 h-4 text-cyan-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic</span>
@@ -628,12 +658,12 @@ export default function DashboardOverview() {
         />
       </motion.div>
 
-      {/* ═══ INSIGHT SECTIONS — Computed client-side from existing data ═══ */}
+      {/* ═══ INSIGHT SECTIONS — Lazy-loaded when scrolled into view ═══ */}
       {hasGoogleConnection && (
-        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
+        <motion.div ref={insightSectionRef} variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
 
-          {/* ══ NEW 6 INSIGHT SECTIONS ══ */}
-          <OverviewInsights
+          {/* ══ 6 INSIGHT SECTIONS — only rendered when visible ══ */}
+          {insightVisible && <OverviewInsights
             trafficData={analyticsData?.traffic || []}
             searchTrend={seoData?.trend || []}
             seoQueries={seoData?.queries || []}
@@ -642,13 +672,13 @@ export default function DashboardOverview() {
             seoKPIs={seoKPIs}
             hasData={hasData}
             isLoading={!hasData && isRef}
-          />
+          />}
 
           {/* Row 1: Site Health + Money Opportunities */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-            {/* 🚨 Site Health Pulse */}
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            {/* Site Health Pulse */}
+            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -721,7 +751,7 @@ export default function DashboardOverview() {
                       const scoreColor = opportunityScore > 70 ? 'text-emerald-400' : opportunityScore > 40 ? 'text-amber-400' : 'text-zinc-400';
                       const scoreBg = opportunityScore > 70 ? 'bg-emerald-500/10 border-emerald-500/20' : opportunityScore > 40 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-zinc-500/10 border-zinc-500/20';
                       return (
-                        <div key={i} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-amber-500/15 transition-all group">
+                        <div key={i} onClick={() => setDrawerContent({ type: 'keyword', title: kw.query, data: kw })} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-amber-500/15 transition-all group cursor-pointer">
                           <div className="flex items-start gap-3">
                             {/* Opportunity Score Circle */}
                             <div className={`w-10 h-10 rounded-xl ${scoreBg} border flex flex-col items-center justify-center flex-shrink-0`}>
@@ -835,7 +865,7 @@ export default function DashboardOverview() {
                       const expected = parseFloat(item.expectedCTR);
                       const fillPct = Math.min(100, (actual / Math.max(expected, 1)) * 100);
                       return (
-                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-red-500/10 transition-all">
+                        <div key={i} onClick={() => setDrawerContent({ type: 'ctr', title: item.query, data: item })} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-red-500/10 transition-all cursor-pointer">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <p className="text-[12px] text-zinc-300 flex-1 truncate font-medium">&quot;{item.query}&quot;</p>
                             <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded font-semibold flex-shrink-0 border border-red-500/15">
@@ -903,7 +933,7 @@ export default function DashboardOverview() {
                       return computedInsights.topPages.map((page, i) => {
                         const sharePct = Math.round((page.clicks / maxClicks) * 100);
                         return (
-                          <div key={i} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] transition-all relative overflow-hidden">
+                          <div key={i} onClick={() => setDrawerContent({ type: 'page', title: page.page, data: page })} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.1] transition-all relative overflow-hidden cursor-pointer">
                             {/* Background click share bar */}
                             <div
                               className={`absolute inset-y-0 left-0 opacity-[0.03] ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-zinc-400' : 'bg-orange-400'
@@ -983,6 +1013,13 @@ export default function DashboardOverview() {
           color="amber"
         />
       </motion.div>
+
+      {/* Detail Drawer */}
+      <OverviewDetailDrawer
+        open={!!drawerContent}
+        onClose={() => setDrawerContent(null)}
+        content={drawerContent}
+      />
     </motion.div>
   );
 }

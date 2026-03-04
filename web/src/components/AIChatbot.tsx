@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
+import ChatMessageRenderer from './ChatMessageRenderer';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -113,7 +114,7 @@ function renderMessage(text: string) {
 }
 
 // Memoized message bubble — prevents re-rendering old messages when new chunks arrive
-const MessageBubble = memo(function MessageBubble({ msg, isExpanded }: { msg: Message; isExpanded: boolean }) {
+const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming }: { msg: Message; isExpanded: boolean; isStreaming?: boolean }) {
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
@@ -121,9 +122,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded }: { msg: Me
                 : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                 }`}>
                 {msg.role === 'assistant' ? (
-                    <div className="space-y-1 text-[13px]">
-                        <div className="space-y-0.5">{renderMessage(msg.content)}</div>
-                    </div>
+                    <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} />
                 ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
@@ -582,8 +581,9 @@ export default function AIChatbot() {
                 {/* ── Messages ── */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
                     {messages.map((msg, i) => {
-                        if (msg.role === 'assistant' && !msg.content) return null;
-                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} />;
+                        if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
+                        const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
+                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} />;
                     })}
 
                     {/* Thinking indicator — cute robot with cycling messages */}
