@@ -442,15 +442,13 @@ This workspace is your home. You are an analytics & SEO expert.
             f.write(user_content)
         os.chmod(user_path, 0o666)
 
-        # HEARTBEAT.md — Periodic analytics check
+        # HEARTBEAT.md — Keep empty to skip nanobot's 30-min heartbeat API calls
         heartbeat_path = os.path.join(workspace, "HEARTBEAT.md")
         if not os.path.exists(heartbeat_path):
-            heartbeat_content = """# HEARTBEAT.md - Periodic Tasks
+            heartbeat_content = """# HEARTBEAT.md
 
-## Analytics Monitoring
-- [ ] Check if any site's traffic dropped significantly (>20%) compared to last week
-- [ ] Look for new keyword opportunities (rising queries with low CTR)
-- [ ] Monitor for crawl errors or indexing issues
+# Keep this file empty (or with only comments) to skip heartbeat API calls.
+# Add tasks below when you want the agent to check something periodically.
 """
             with open(heartbeat_path, 'w') as f:
                 f.write(heartbeat_content)
