@@ -28,11 +28,20 @@ export const metadata: Metadata = {
     description: 'Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.',
     siteName: 'TrafficClaw',
     type: 'website',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'TrafficClaw AI Visibility Dashboard',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'TrafficClaw — AI-Powered Growth Intelligence',
     description: 'Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.',
+    images: ['/og-image.png'],
   },
 };
 
