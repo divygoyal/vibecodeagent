@@ -13,6 +13,9 @@ export const maxDuration = 60;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
+// Fallback model chain for non-streaming calls
+const VISIBILITY_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'] as const;
+
 function formatDate(d: Date) {
     return d.toISOString().split('T')[0];
 }
@@ -264,17 +267,30 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
   ]
 }`;
 
-                    const response = await ai.models.generateContent({
-                        model: 'gemini-2.0-flash',
-                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                        config: {
-                            temperature: 0.3,
-                            maxOutputTokens: 2000,
-                            httpOptions: { timeout: 20000 },
-                        },
-                    });
-
-                    const text = response.text || '';
+                    // Try models in fallback order on 429/503
+                    let text = '';
+                    for (const model of VISIBILITY_MODELS) {
+                        try {
+                            const response = await ai.models.generateContent({
+                                model,
+                                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                                config: {
+                                    temperature: 0.3,
+                                    maxOutputTokens: 2000,
+                                    httpOptions: { timeout: 20000 },
+                                },
+                            });
+                            text = response.text || '';
+                            break; // success
+                        } catch (modelErr: any) {
+                            const msg = modelErr?.message || '';
+                            if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('UNAVAILABLE')) {
+                                console.warn(`[AI-VISIBILITY] ${model} unavailable, trying next fallback...`);
+                                continue;
+                            }
+                            throw modelErr;
+                        }
+                    }
                     // Extract JSON from response (handle markdown fences)
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {

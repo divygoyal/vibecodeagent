@@ -16,6 +16,14 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 // Initialize the official Gemini SDK
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
+// Fallback model chain: try each in order if previous returns 429/503
+const CHAT_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'] as const;
+
+function isRetryableError(error: any): boolean {
+    const msg = error?.message || '';
+    return msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('UNAVAILABLE') || msg.includes('overloaded');
+}
+
 // ═══════════════════════════════════════════════════════════════
 // IN-MEMORY CACHE for site/property lists (avoids re-fetching per message)
 // ═══════════════════════════════════════════════════════════════
@@ -335,18 +343,33 @@ CRITICAL SYSTEM CONTEXT:
                         loopCount++;
                         keepGoing = false;
 
-                        // Use the official SDK for streaming
-                        const response = await ai.models.generateContentStream({
-                            model: 'gemini-3-flash-preview',
-                            contents: currentContents,
-                            config: {
-                                systemInstruction: finalSystemInstruction,
-                                tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
-                                temperature: 0.7,
-                                maxOutputTokens: 3000,
-                                httpOptions: { timeout: 30000 },
-                            },
-                        });
+                        // Try models in order, fall back on 429/503
+                        let response: any = null;
+                        let lastError: any = null;
+                        for (const model of CHAT_MODELS) {
+                            try {
+                                response = await ai.models.generateContentStream({
+                                    model,
+                                    contents: currentContents,
+                                    config: {
+                                        systemInstruction: finalSystemInstruction,
+                                        tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
+                                        temperature: 0.7,
+                                        maxOutputTokens: 3000,
+                                        httpOptions: { timeout: 30000 },
+                                    },
+                                });
+                                break; // success
+                            } catch (modelErr: any) {
+                                lastError = modelErr;
+                                if (isRetryableError(modelErr)) {
+                                    console.warn(`[AI-CHAT] ${model} unavailable, trying next fallback...`);
+                                    continue;
+                                }
+                                throw modelErr; // non-retryable error, propagate
+                            }
+                        }
+                        if (!response) throw lastError;
 
                         let fullText = '';
                         let pendingFunctionCalls: any[] = [];
