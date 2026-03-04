@@ -450,7 +450,7 @@ function Features() {
         <Section id="features" className="py-32 px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-xs font-medium text-emerald-400 mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         FEATURES
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
@@ -470,7 +470,7 @@ function Features() {
                         <motion.div
                             key={feature.title}
                             variants={fadeUp}
-                            className="group relative p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300"
+                            className="group relative p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300"
                         >
                             {/* Icon */}
                             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
@@ -501,7 +501,7 @@ function InteractiveDemo() {
         <Section id="demo" className="py-32 px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-xs font-medium text-cyan-400 mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         LIVE PREVIEW
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
@@ -522,9 +522,9 @@ function InteractiveDemo() {
                 >
                     <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-violet-500/10 rounded-3xl blur-2xl" />
 
-                    <div className="relative bg-[#0c0c10] border border-white/[0.08] rounded-2xl overflow-hidden">
+                    <div className="relative bg-[#050508] border border-white/[0.08] rounded-2xl overflow-hidden">
                         {/* Dashboard header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
                             <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                                 <span className="text-sm font-medium text-white">Analytics Overview</span>
@@ -546,7 +546,7 @@ function InteractiveDemo() {
                         {/* Charts row */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6 pb-6">
                             {/* Traffic chart - spans 2 cols */}
-                            <div className="lg:col-span-2 bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                            <div className="lg:col-span-2 bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-sm font-medium text-white">Traffic Trend</h3>
                                     <div className="flex gap-3 text-xs">
@@ -576,7 +576,7 @@ function InteractiveDemo() {
                                             <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} />
                                             <YAxis tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
                                             <Tooltip
-                                                contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px' }}
+                                                contentStyle={{ background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px' }}
                                                 labelStyle={{ color: '#a1a1aa' }}
                                             />
                                             <Area type="monotone" dataKey="sessions" stroke="#22d3ee" strokeWidth={2} fill="url(#gradientSessions)" />
@@ -587,7 +587,7 @@ function InteractiveDemo() {
                             </div>
 
                             {/* Traffic sources */}
-                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
                                 <h3 className="text-sm font-medium text-white mb-4">Traffic Sources</h3>
                                 <div className="h-[140px] flex items-center justify-center">
                                     <ResponsiveContainer width="100%" height="100%">
@@ -623,7 +623,7 @@ function InteractiveDemo() {
 
                         {/* Top Queries table */}
                         <div className="px-6 pb-6">
-                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-sm font-medium text-white">Top Search Queries</h3>
                                     <span className="text-xs text-emerald-400 flex items-center gap-1">
@@ -667,7 +667,7 @@ function InteractiveDemo() {
 
 function KPICard({ label, value, change, positive }: { label: string; value: string; change: string; positive: boolean }) {
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
             <div className="text-xs text-zinc-500 mb-1">{label}</div>
             <div className="text-2xl font-bold text-white mb-1">{value}</div>
             <div className={`text-xs font-medium flex items-center gap-1 ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -780,7 +780,7 @@ function Testimonials() {
         <Section className="py-32 px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-xs font-medium text-amber-400 mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-amber-400 mb-4">
                         TESTIMONIALS
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
@@ -796,7 +796,7 @@ function Testimonials() {
                         <motion.div
                             key={i}
                             variants={fadeUp}
-                            className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300"
+                            className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
                         >
                             <div className="flex gap-0.5 mb-4">
                                 {Array.from({ length: review.stars }).map((_, j) => (
@@ -890,7 +890,7 @@ function Pricing() {
         <Section id="pricing" className="py-32 px-6">
             <div className="max-w-6xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-6">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-xs font-medium text-violet-400 mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-violet-400 mb-4">
                         PRICING
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
@@ -920,7 +920,7 @@ function Pricing() {
                             variants={fadeUp}
                             className={`relative p-6 rounded-2xl border transition-all duration-300 group ${pack.highlighted
                                 ? 'bg-gradient-to-b from-emerald-500/[0.08] to-transparent border-emerald-500/[0.2] hover:border-emerald-500/[0.3]'
-                                : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
+                                : 'bg-white/[0.02] border-white/[0.04] hover:border-white/[0.12]'
                                 }`}
                         >
                             {pack.highlighted && (
@@ -943,7 +943,7 @@ function Pricing() {
                             </div>
                             <div className="flex items-center gap-3 mb-6">
                                 <span className="text-sm text-zinc-400">{pack.messages} messages</span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 border border-white/[0.06]">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 border border-white/[0.04]">
                                     {pack.perMessage}/msg
                                 </span>
                             </div>
@@ -1077,7 +1077,7 @@ function HowItWorks() {
         <Section className="py-32 px-6">
             <div className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-20">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-xs font-medium text-cyan-400 mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         HOW IT WORKS
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
@@ -1104,7 +1104,7 @@ function HowItWorks() {
                                     <div className={`w-[72px] h-[72px] rounded-2xl bg-gradient-to-br ${step.gradient} flex items-center justify-center shadow-lg`}>
                                         <step.icon className="w-8 h-8 text-white" />
                                     </div>
-                                    <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-[#09090b] border-2 border-white/[0.1] flex items-center justify-center">
+                                    <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-black border-2 border-white/[0.1] flex items-center justify-center">
                                         <span className="text-[10px] font-bold text-zinc-300">{step.step}</span>
                                     </div>
                                 </div>
@@ -1119,7 +1119,7 @@ function HowItWorks() {
                                     {step.details.map((detail, j) => (
                                         <span
                                             key={j}
-                                            className="text-[10px] px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-zinc-400"
+                                            className="text-[10px] px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.04] text-zinc-400"
                                         >
                                             {detail}
                                         </span>
@@ -1165,14 +1165,14 @@ function IntegrationMarquee() {
             </div>
             <div className="relative">
                 {/* Fade edges */}
-                <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#09090b] to-transparent z-10" />
-                <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#09090b] to-transparent z-10" />
+                <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-black to-transparent z-10" />
+                <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-black to-transparent z-10" />
 
                 <div className="marquee-track">
                     {doubled.map((item, i) => (
                         <div
                             key={i}
-                            className="flex items-center gap-3 px-6 py-3 mx-2 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300 flex-shrink-0"
+                            className="flex items-center gap-3 px-6 py-3 mx-2 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300 flex-shrink-0"
                         >
                             <span className="text-xl">{item.icon}</span>
                             <span className="text-sm font-medium text-zinc-300 whitespace-nowrap">{item.name}</span>
@@ -1228,7 +1228,7 @@ function FinalCTA() {
 
 function Footer() {
     return (
-        <footer className="border-t border-white/[0.06] py-12 px-6">
+        <footer className="border-t border-white/[0.04] py-12 px-6">
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">

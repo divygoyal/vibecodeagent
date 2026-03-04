@@ -54,7 +54,7 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
 
     return (
         <div className="flex justify-start">
-            <div className="px-5 py-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] rounded-bl-sm max-w-lg">
+            <div className="px-5 py-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] rounded-bl-sm max-w-lg">
                 <div className="flex items-center gap-3">
                     <div className="relative flex-shrink-0">
                         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center">
@@ -345,7 +345,7 @@ export default function AIChat() {
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)]">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] bg-[#0a0a12]/80 backdrop-blur-md flex-shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04] bg-[#050508]/80 backdrop-blur-md flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center">
                         <Sparkles className="w-5 h-5 text-emerald-400" />
@@ -367,7 +367,7 @@ export default function AIChat() {
                             <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {siteDropdownOpen && gscSites.length > 0 && (
-                            <div className="absolute right-0 top-full mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto">
+                            <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto">
                                 {gscSites.map((site: any) => {
                                     const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                     const isSelected = site.siteUrl === selectedSite;
@@ -447,7 +447,7 @@ export default function AIChat() {
                                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`${msg.role === 'user' ? 'max-w-[70%]' : 'max-w-[85%] w-full'} rounded-2xl px-5 py-4 text-sm leading-relaxed ${msg.role === 'user'
                                         ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
-                                        : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
+                                        : 'bg-white/[0.02] text-zinc-300 border border-white/[0.04] rounded-bl-sm'
                                         }`}>
                                         {msg.role === 'assistant' ? (
                                             <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />
@@ -469,7 +469,7 @@ export default function AIChat() {
             </div>
 
             {/* Input Area */}
-            <div className="flex-shrink-0 border-t border-white/[0.06] bg-[#0a0a12]/80 backdrop-blur-md px-6 py-4">
+            <div className="flex-shrink-0 border-t border-white/[0.04] bg-[#050508]/80 backdrop-blur-md px-6 py-4">
                 <div className="max-w-3xl mx-auto">
                     <div className="flex items-end gap-3 bg-zinc-900/80 border border-white/[0.08] rounded-2xl px-4 py-3 focus-within:border-emerald-500/30 transition-colors">
                         <textarea

@@ -121,7 +121,7 @@ function VelocityDetail({ data }: { data: any }) {
                                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                                 <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} width={30} />
                                 <Tooltip
-                                    contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
+                                    contentStyle={{ background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
                                     labelStyle={{ color: '#a1a1aa' }}
                                 />
                                 <Bar dataKey="previous" fill="rgba(255,255,255,0.08)" radius={[4, 4, 0, 0]} name="Last Week" />
@@ -132,7 +132,7 @@ function VelocityDetail({ data }: { data: any }) {
                 </div>
             )}
 
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
                 <p className="text-xs text-zinc-300">
                     {data.velocity > 10
                         ? 'Your traffic is accelerating strongly. Keep up the momentum with consistent content publishing.'
@@ -168,7 +168,7 @@ function BrandDetail({ data }: { data: any }) {
                             <Cell fill="#22d3ee" />
                             <Cell fill="#fbbf24" />
                         </Pie>
-                        <Tooltip contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }} />
+                        <Tooltip contentStyle={{ background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }} />
                     </PieChart>
                 </ResponsiveContainer>
             </div>
@@ -287,7 +287,7 @@ function CTRDetail({ data }: { data: any }) {
 function PageDetail({ data }: { data: any }) {
     return (
         <div className="space-y-5">
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Page URL</p>
                 <p className="text-sm text-white font-mono break-all">{data.page}</p>
             </div>
@@ -378,7 +378,7 @@ function MetricCard({ label, value, subtitle, suffix, color }: { label: string; 
         cyan: 'text-cyan-400', violet: 'text-violet-400', zinc: 'text-zinc-400', white: 'text-white',
     };
     return (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3.5">
+        <div className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3.5">
             <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">{label}</p>
             <p className={`text-xl font-bold mt-1 tabular-nums ${colorMap[color] || 'text-white'}`}>
                 {value}{suffix}
@@ -439,9 +439,9 @@ export default function OverviewDetailDrawer({ open, onClose, content }: Props) 
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[#0a0a12] border-l border-white/[0.08] shadow-2xl overflow-y-auto"
+                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[#050508] border-l border-white/[0.08] shadow-2xl overflow-y-auto"
                     >
-                        <div className="sticky top-0 bg-[#0a0a12]/95 backdrop-blur-md border-b border-white/[0.06] px-6 py-4 flex items-center justify-between z-10">
+                        <div className="sticky top-0 bg-[#050508]/95 backdrop-blur-md border-b border-white/[0.04] px-6 py-4 flex items-center justify-between z-10">
                             <div>
                                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Details</p>
                                 <h2 className="text-lg font-bold text-white mt-0.5">{content.title}</h2>

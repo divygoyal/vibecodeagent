@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function AboutPage() {
     return (
-        <div className="min-h-screen bg-[#09090b] text-white pt-24 pb-12 px-6">
+        <div className="min-h-screen bg-black text-white pt-24 pb-12 px-6">
             <div className="max-w-3xl mx-auto">
                 <Link href="/" className="inline-flex items-center text-sm text-zinc-400 hover:text-white mb-8 transition-colors">
                     <ArrowLeft className="w-4 h-4 mr-2" />

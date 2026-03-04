@@ -9,10 +9,11 @@ import dynamic from 'next/dynamic';
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
+import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
-    ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
-    Book, Newspaper, History, Sun, Moon, Coins, Radar, MessageSquare,
+    ChevronLeft, ChevronRight, LogOut, Menu, X,
+    Book, Newspaper, History, Sun, Moon, Coins, MessageSquare,
     CalendarDays, ChevronDown, Bell, Eye
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
@@ -48,8 +49,7 @@ export const useRegistration = () => useContext(RegistrationContext);
 
 const sidebarItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-    { icon: Radar, label: 'Intelligence', href: '/dashboard/intelligence' },
-    { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' },
+    // { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' }, // Hidden — next release
     { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
     { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
@@ -235,9 +235,9 @@ export default function DashboardLayout({
     // Bug #13 fix: redirect to login if session is expired/unauthenticated
     if (status === 'unauthenticated') {
         return (
-            <div className="min-h-screen bg-[#09090b] text-white flex items-center justify-center">
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
                 <div className="text-center">
-                    <p className="text-zinc-400 mb-4">Your session has expired</p>
+                    <p className="text-zinc-500 mb-4">Your session has expired</p>
                     <button
                         onClick={() => signIn()}
                         className="px-5 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors border border-emerald-500/20 font-medium text-sm"
@@ -250,18 +250,16 @@ export default function DashboardLayout({
     }
 
     return (
-        <div className="min-h-screen bg-[#09090b] text-white flex">
+        <div className="min-h-screen bg-black text-white flex">
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
-                className={`hidden lg:flex flex-col border-r border-white/[0.06] bg-[#0c0c10] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
+                className={`hidden lg:flex flex-col border-r border-white/[0.04] bg-[#050508] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
                     }`}
             >
                 {/* Logo */}
-                <div className="h-16 flex items-center px-4 border-b border-white/[0.06]">
+                <div className="h-16 flex items-center px-4 border-b border-white/[0.04]">
                     <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center flex-shrink-0">
-                            <Zap className="w-4 h-4 text-black" strokeWidth={3} />
-                        </div>
+                        <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg flex-shrink-0" />
                         {!collapsed && (
                             <span className="text-base font-bold text-white whitespace-nowrap">
                                 Traffic<span className="text-emerald-400">Claw</span>
@@ -318,7 +316,7 @@ export default function DashboardLayout({
                 </nav>
 
                 {/* User section + collapse toggle */}
-                <div className="border-t border-white/[0.06] p-3 space-y-2">
+                <div className="border-t border-white/[0.04] p-3 space-y-2">
                     {session?.user && !collapsed && (
                         <div className="flex items-center gap-3 px-2 py-2">
                             {session.user.image && (
@@ -362,7 +360,7 @@ export default function DashboardLayout({
             {/* ─── Main content area ─── */}
             <div className="flex-1 flex flex-col min-h-screen">
                 {/* Top bar */}
-                <header className="h-16 flex items-center justify-between px-6 border-b border-white/[0.06] bg-[#09090b]/80 backdrop-blur-lg sticky top-0 z-40">
+                <header className="h-16 flex items-center justify-between px-6 border-b border-white/[0.04] bg-black/85 backdrop-blur-xl sticky top-0 z-40">
                     {/* Mobile menu button */}
                     <button
                         className="lg:hidden text-zinc-400 hover:text-white"
@@ -395,7 +393,7 @@ export default function DashboardLayout({
                             {rangeDropdownOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setRangeDropdownOpen(false)} />
-                                    <div className="absolute right-0 mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[140px]">
+                                    <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[140px]">
                                         {RANGES.map(r => (
                                             <button
                                                 key={r.value}
@@ -420,7 +418,7 @@ export default function DashboardLayout({
                             >
                                 <Bell className="w-4 h-4" />
                                 {criticalAlertCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[#09090b]">
+                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-black">
                                         {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
                                     </span>
                                 )}
@@ -428,8 +426,8 @@ export default function DashboardLayout({
                             {bellOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
-                                    <div className="absolute right-0 mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
-                                        <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+                                    <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
+                                        <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center justify-between">
                                             <span className="text-xs font-semibold text-white">Alerts</span>
                                             {alertCount > 0 && (
                                                 <span className="text-[10px] text-zinc-500">{alertCount} active</span>
@@ -462,13 +460,13 @@ export default function DashboardLayout({
                                             )}
                                         </div>
                                         {alerts.length > 0 && (
-                                            <div className="px-4 py-2 border-t border-white/[0.06]">
+                                            <div className="px-4 py-2 border-t border-white/[0.04]">
                                                 <Link
-                                                    href="/dashboard/intelligence"
+                                                    href="/dashboard"
                                                     onClick={() => setBellOpen(false)}
                                                     className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
                                                 >
-                                                    View all in Intelligence →
+                                                    View all alerts →
                                                 </Link>
                                             </div>
                                         )}
@@ -542,12 +540,10 @@ export default function DashboardLayout({
                         className="fixed inset-0 bg-black/60 z-50 lg:hidden"
                         onClick={() => setMobileOpen(false)}
                     />
-                    <div className="fixed left-0 top-0 bottom-0 w-[260px] bg-[#0c0c10] border-r border-white/[0.06] z-50 lg:hidden flex flex-col">
-                        <div className="h-16 flex items-center justify-between px-4 border-b border-white/[0.06]">
+                    <div className="fixed left-0 top-0 bottom-0 w-[260px] bg-[#050508] border-r border-white/[0.04] z-50 lg:hidden flex flex-col">
+                        <div className="h-16 flex items-center justify-between px-4 border-b border-white/[0.04]">
                             <Link href="/dashboard" className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                                    <Zap className="w-4 h-4 text-black" strokeWidth={3} />
-                                </div>
+                                <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg" />
                                 <span className="text-base font-bold text-white">
                                     Traffic<span className="text-emerald-400">Claw</span>
                                 </span>
@@ -606,7 +602,7 @@ export default function DashboardLayout({
                         </nav>
 
                         {session?.user && (
-                            <div className="border-t border-white/[0.06] p-3">
+                            <div className="border-t border-white/[0.04] p-3">
                                 <div className="flex items-center gap-3 px-2 py-2">
                                     {session.user.image && (
                                         <img src={session.user.image} alt="" className="w-7 h-7 rounded-full" />

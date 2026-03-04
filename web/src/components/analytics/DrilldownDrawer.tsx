@@ -47,10 +47,10 @@ export default function DrilldownDrawer({ open, onClose, data }: DrilldownDrawer
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[#0a0a12] border-l border-white/[0.08] shadow-2xl overflow-y-auto"
+                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[#050508] border-l border-white/[0.08] shadow-2xl overflow-y-auto"
                     >
                         {/* Header */}
-                        <div className="sticky top-0 bg-[#0a0a12]/90 backdrop-blur-md border-b border-white/[0.06] px-6 py-4 flex items-center justify-between z-10">
+                        <div className="sticky top-0 bg-[#050508]/90 backdrop-blur-md border-b border-white/[0.04] px-6 py-4 flex items-center justify-between z-10">
                             <div>
                                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Drilldown</p>
                                 <h2 className="text-lg font-bold text-white mt-0.5">{data.value}</h2>
@@ -65,7 +65,7 @@ export default function DrilldownDrawer({ open, onClose, data }: DrilldownDrawer
                             {data.metrics && data.metrics.length > 0 && (
                                 <div className="grid grid-cols-2 gap-3">
                                     {data.metrics.map((m, i) => (
-                                        <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3.5">
+                                        <div key={i} className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3.5">
                                             <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">{m.label}</p>
                                             <p className="text-xl font-bold text-white mt-1 tabular-nums">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</p>
                                             {m.change != null && m.change !== 0 && (

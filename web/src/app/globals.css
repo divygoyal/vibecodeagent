@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #000000;
+  --foreground: #f0f0f0;
   --emerald: #34d399;
   --cyan: #22d3ee;
-  --card-bg: rgba(255, 255, 255, 0.02);
-  --card-border: rgba(255, 255, 255, 0.06);
-  --card-hover: rgba(255, 255, 255, 0.1);
-  --sidebar-bg: #0c0c10;
-  --header-bg: rgba(9, 9, 11, 0.8);
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --input-bg: rgba(255, 255, 255, 0.03);
-  --input-border: rgba(255, 255, 255, 0.06);
-  --dropdown-bg: #111116;
+  --card-bg: rgba(255, 255, 255, 0.015);
+  --card-border: rgba(255, 255, 255, 0.05);
+  --card-hover: rgba(255, 255, 255, 0.07);
+  --sidebar-bg: #050508;
+  --header-bg: rgba(0, 0, 0, 0.85);
+  --text-primary: #f0f0f0;
+  --text-secondary: #8a8a98;
+  --text-muted: #55556a;
+  --input-bg: rgba(255, 255, 255, 0.025);
+  --input-border: rgba(255, 255, 255, 0.05);
+  --dropdown-bg: #0a0a0f;
   --table-row-hover: rgba(255, 255, 255, 0.02);
-  --divider: rgba(255, 255, 255, 0.06);
+  --divider: rgba(255, 255, 255, 0.05);
+  --accent-glow: rgba(52, 211, 153, 0.08);
 }
 
 [data-theme='light'] {
@@ -98,10 +99,9 @@
   --tw-bg-opacity: 1;
 }
 
-.light-theme [class*="bg-[#09090b]"],
-.light-theme [class*="bg-[#0c0c10]"],
-.light-theme [class*="bg-[#0a0a12]"],
-.light-theme [class*="bg-[#111116]"] {
+.light-theme [class*="bg-black"],
+.light-theme [class*="bg-[#050508]"],
+.light-theme [class*="bg-[#0a0a0f]"] {
   background: var(--background) !important;
 }
 
@@ -158,30 +158,32 @@ body {
 
 /* ========== Glassmorphism cards ========== */
 .glass-card {
-  background: rgba(24, 24, 27, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  background: rgba(10, 10, 15, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 16px;
   transition: all 0.3s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .glass-card:hover {
-  border-color: rgba(52, 211, 153, 0.3);
-  box-shadow: 0 0 30px rgba(52, 211, 153, 0.05);
+  border-color: rgba(52, 211, 153, 0.15);
+  box-shadow: 0 0 40px rgba(52, 211, 153, 0.04), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .glass-card-static {
-  background: rgba(24, 24, 27, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  background: rgba(10, 10, 15, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 /* ========== Gradient text ========== */
 .gradient-text {
-  background: linear-gradient(135deg, #34d399 0%, #22d3ee 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, #6ee7b7 0%, #34d399 30%, #22d3ee 65%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -251,7 +253,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid rgba(63, 63, 70, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.08);
   transition: all 0.3s ease;
 }
 
@@ -262,7 +264,7 @@ body {
 }
 
 .status-step.pending::before {
-  border-color: rgba(63, 63, 70, 0.5);
+  border-color: rgba(255, 255, 255, 0.06);
   background: transparent;
 }
 
@@ -285,7 +287,7 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 2px;
-  background: rgba(39, 39, 42, 0.8);
+  background: rgba(20, 20, 28, 0.9);
   transition: background 0.15s ease;
 }
 
@@ -321,7 +323,7 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(39, 39, 42, 0.5) 25%, rgba(63, 63, 70, 0.5) 50%, rgba(39, 39, 42, 0.5) 75%);
+  background: linear-gradient(90deg, rgba(15, 15, 22, 0.6) 25%, rgba(30, 30, 42, 0.5) 50%, rgba(15, 15, 22, 0.6) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 8px;
@@ -375,12 +377,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(63, 63, 70, 0.5);
+  background: rgba(40, 40, 50, 0.5);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(82, 82, 91, 0.8);
+  background: rgba(60, 60, 75, 0.7);
 }
 
 /* ========== Table styles (admin) ========== */
@@ -398,10 +400,10 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: rgba(161, 161, 170, 1);
-  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   position: sticky;
   top: 0;
-  background: rgba(9, 9, 11, 0.95);
+  background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(8px);
 }
 
@@ -410,12 +412,12 @@ body {
 }
 
 .admin-table tbody tr:hover {
-  background: rgba(39, 39, 42, 0.3);
+  background: rgba(20, 20, 28, 0.4);
 }
 
 .admin-table tbody td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(39, 39, 42, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   font-size: 0.875rem;
 }
 
@@ -432,8 +434,8 @@ body {
 }
 
 .badge-free {
-  background: rgba(63, 63, 70, 0.5);
-  color: #a1a1aa;
+  background: rgba(255, 255, 255, 0.04);
+  color: #8a8a98;
 }
 
 .badge-starter {

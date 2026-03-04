@@ -73,7 +73,7 @@ function SectionHead({ title, filterDim, filterValues }: { title: string; filter
 const ChartTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#0a0a12] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
+        <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
             <p className="text-[11px] font-semibold text-white mb-2">{label}</p>
             <div className="space-y-1.5">
                 {payload.map((e: any, i: number) => (
@@ -90,7 +90,7 @@ const ChartTooltip = ({ active, payload, label }: any) => {
     );
 };
 
-const CARD = 'bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border border-white/[0.06] rounded-2xl hover:border-white/[0.1] transition-all duration-200';
+const CARD = 'bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border border-white/[0.04] rounded-2xl hover:border-white/[0.1] transition-all duration-200';
 
 // ─── Main Overview Page ───
 // Traffic Sources donut colors
@@ -346,7 +346,7 @@ export default function AnalyticsPage() {
                                                 <Cell key={idx} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v: any) => (v ?? 0).toLocaleString()} contentStyle={{ background: '#0a0a12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
+                                        <Tooltip formatter={(v: any) => (v ?? 0).toLocaleString()} contentStyle={{ background: '#050508', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -378,7 +378,7 @@ export default function AnalyticsPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="border-b border-white/[0.06]">
+                                <tr className="border-b border-white/[0.04]">
                                     <th className="text-left text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 pr-4">Query</th>
                                     <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">Clicks</th>
                                     <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">Impressions</th>

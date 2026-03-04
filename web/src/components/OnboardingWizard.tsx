@@ -99,7 +99,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
         : step;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[#09090b] flex items-center justify-center">
+        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/[0.03] rounded-full blur-3xl" />
@@ -123,7 +123,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                                 ? 'bg-emerald-500 text-black'
                                 : i === mappedStep
                                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-white/[0.04] text-zinc-600 border border-white/[0.06]'
+                                    : 'bg-white/[0.04] text-zinc-600 border border-white/[0.04]'
                         }`}>
                             {i < mappedStep ? <Check className="w-3 h-3" /> : i + 1}
                         </div>
@@ -259,7 +259,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
                                                     isSelected
                                                         ? 'bg-emerald-500/[0.08] border-emerald-500/30 text-white'
-                                                        : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:border-white/[0.12] hover:text-white'
+                                                        : 'bg-white/[0.02] border-white/[0.04] text-zinc-400 hover:border-white/[0.12] hover:text-white'
                                                 }`}
                                             >
                                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -318,7 +318,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
                                                     isSelected
                                                         ? 'bg-blue-500/[0.08] border-blue-500/30 text-white'
-                                                        : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:border-white/[0.12] hover:text-white'
+                                                        : 'bg-white/[0.02] border-white/[0.04] text-zinc-400 hover:border-white/[0.12] hover:text-white'
                                                 }`}
                                             >
                                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -366,7 +366,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.08 }}
-                                        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06]"
+                                        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.04]"
                                     >
                                         <div className={`w-9 h-9 rounded-lg bg-gradient-to-br border flex items-center justify-center flex-shrink-0 ${colorMap[f.color]}`}>
                                             <f.icon className="w-4 h-4" />

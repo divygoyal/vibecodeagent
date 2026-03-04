@@ -3,22 +3,25 @@
 import { useSession, signIn } from 'next-auth/react';
 import { useState, useEffect, useRef, useMemo, useCallback, memo, RefObject } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  AreaChart, Area, ResponsiveContainer
+  AreaChart, Area, ResponsiveContainer, Tooltip
 } from 'recharts';
 import {
   Bot, BarChart3, Search, TrendingUp, TrendingDown,
-  ArrowUpRight, Zap, Activity, MousePointer, Eye, Users, Hash,
+  ArrowUpRight, ArrowDownRight, Zap, Activity, MousePointer, Eye, Users, Hash,
   AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2, ScanSearch,
   DollarSign, Target, FileWarning, ShieldAlert, ArrowRight, Flame, CheckCircle2,
-  Gauge, Rocket, Tag, Shield
+  Gauge, Rocket, Tag, Shield,
+  Radar, Crown, XCircle, Sparkles, ChevronRight, Filter, RefreshCw, Brain
 } from 'lucide-react';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights, useRealtimeData } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
 import OverviewInsights from '@/components/OverviewInsights';
 import OverviewDetailDrawer, { DrawerContent } from '@/components/OverviewDetailDrawer';
 import { ConnectGoogleState } from '@/components/EmptyState';
+import { type AlertItem, type OpportunityItem, expectedCTR, computeAlerts, computeOpportunities } from '@/lib/alertEngine';
+import FixWithBotButton from '@/components/FixWithBotButton';
 
 /* ─── Animation variants ─── */
 const fadeInUp = {
@@ -27,6 +30,33 @@ const fadeInUp = {
 };
 const stagger = {
   animate: { transition: { staggerChildren: 0.08 } },
+};
+
+/* ─── Severity Configs (from Intelligence) ─── */
+const severityStyles: Record<string, { bg: string; border: string; text: string; icon: any; pulse: string; badge: string }> = {
+  critical: {
+    bg: 'bg-red-500/[0.06]', border: 'border-red-500/20', text: 'text-red-400',
+    icon: XCircle, pulse: 'bg-red-400', badge: 'bg-red-500/10 text-red-400 border-red-500/20'
+  },
+  warning: {
+    bg: 'bg-amber-500/[0.06]', border: 'border-amber-500/20', text: 'text-amber-400',
+    icon: AlertTriangle, pulse: 'bg-amber-400', badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+  },
+  info: {
+    bg: 'bg-blue-500/[0.06]', border: 'border-blue-500/20', text: 'text-blue-400',
+    icon: Eye, pulse: 'bg-blue-400', badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+  },
+  success: {
+    bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', text: 'text-emerald-400',
+    icon: CheckCircle2, pulse: 'bg-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+  },
+};
+
+const categoryConfig: Record<string, { label: string; icon: any; color: string }> = {
+  traffic: { label: 'Traffic', icon: BarChart3, color: 'text-blue-400' },
+  rankings: { label: 'Rankings', icon: Target, color: 'text-violet-400' },
+  content: { label: 'Content', icon: Activity, color: 'text-amber-400' },
+  opportunities: { label: 'Opportunities', icon: Sparkles, color: 'text-emerald-400' },
 };
 
 /* ─── Lazy-load hook for below-fold sections ─── */
@@ -179,6 +209,37 @@ export default function DashboardOverview() {
   const isRef = analyticsLoading || seoLoading;
   // True when we have SOME data (even stale) — prevents re-showing skeletons
   const hasData = !!(analyticsKPIs || seoKPIs);
+
+  // ═══ INTELLIGENCE STATE ═══
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
+  const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+
+  const intelAlerts = useMemo(() => computeAlerts(seoData, analyticsData), [seoData, analyticsData]);
+  const intelOpportunities = useMemo(() => computeOpportunities(seoData), [seoData]);
+  const filteredAlerts = useMemo(() => {
+    return intelAlerts
+      .filter(a => !dismissedAlerts.has(a.id))
+      .filter(a => filterCategory === 'all' || a.category === filterCategory)
+      .filter(a => !filterSeverity || a.severity === filterSeverity);
+  }, [intelAlerts, dismissedAlerts, filterCategory, filterSeverity]);
+  const intelHealthScore = useMemo(() => {
+    let score = 100;
+    intelAlerts.forEach(a => {
+      if (a.severity === 'critical') score -= 20;
+      else if (a.severity === 'warning') score -= 10;
+      else if (a.severity === 'info') score -= 3;
+    });
+    return Math.max(0, Math.min(100, score));
+  }, [intelAlerts]);
+  const intelHealthColor = intelHealthScore >= 80 ? 'text-emerald-400' : intelHealthScore >= 50 ? 'text-amber-400' : 'text-red-400';
+  const intelHealthBg = intelHealthScore >= 80 ? 'from-emerald-400 to-cyan-400' : intelHealthScore >= 50 ? 'from-amber-400 to-orange-400' : 'from-red-400 to-pink-400';
+  const criticalCount = intelAlerts.filter(a => a.severity === 'critical').length;
+  const warningCount = intelAlerts.filter(a => a.severity === 'warning').length;
+  const opportunityCount = intelAlerts.filter(a => a.category === 'opportunities').length;
+  const successCount = intelAlerts.filter(a => a.severity === 'success').length;
+  const trendData = (seoData?.trend || []).slice(-14).map((d: any) => ({ v: d.clicks }));
 
   // ═══ COMPUTED INSIGHTS (client-side, zero API calls) ═══
   const computedInsights = useMemo(() => {
@@ -406,7 +467,7 @@ export default function DashboardOverview() {
             </button>
 
             {dropdownOpen && sites.length > 0 && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 py-1 min-w-[250px] max-h-[260px] overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 py-1 min-w-[250px] max-h-[260px] overflow-y-auto">
                 {sites.map((site: any) => {
                   const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                   const isSelected = site.siteUrl === selectedSite;
@@ -443,7 +504,7 @@ export default function DashboardOverview() {
 
       {/* Bot setup prompt - shown when Google connected but bot not running */}
       {!containerLoading && hasGoogleConnection && !botRunning && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4">
           <div className="flex items-center gap-3">
             <Bot className="w-5 h-5 text-zinc-500" />
             <p className="text-sm text-zinc-400 flex-1">Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="text-emerald-400 hover:text-emerald-300">Set up your bot →</Link></p>
@@ -496,24 +557,235 @@ export default function DashboardOverview() {
         />
       </motion.div>
 
-      {/* ═══ 2. SMART ALERTS — Critical insights banner ═══ */}
-      {smartAlerts.length > 0 && (
-        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}
-          className="bg-red-500/[0.03] border border-red-500/[0.1] rounded-xl p-3.5 flex items-start gap-3"
-        >
-          <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Shield className="w-4 h-4 text-red-400" />
-          </div>
-          <div className="flex-1 space-y-1.5">
-            <div className="text-[10px] text-red-400/80 uppercase tracking-wider font-semibold">Priority Alerts</div>
-            {smartAlerts.map((alert: any, i: number) => (
-              <p key={i} className="text-[12px] text-zinc-300 leading-relaxed">
-                <span className="text-red-400 font-semibold">{alert.title || alert.type}:</span>{' '}
-                {alert.description || alert.message || alert.text}
-              </p>
-            ))}
-          </div>
-        </motion.div>
+      {/* ═══ 2. INTELLIGENCE — Top Stats + Filter Bar + Active Alerts ═══ */}
+      {hasData && (seoData || analyticsData) && (
+        <>
+          {/* Top Stats Row */}
+          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Health Score */}
+            <div className="col-span-2 lg:col-span-1 bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent" />
+              <div className="relative">
+                <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="6" />
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="url(#healthGradOverview)" strokeWidth="6"
+                    strokeLinecap="round" strokeDasharray={`${(intelHealthScore / 100) * 213.6} 213.6`}
+                    className="transition-all duration-1000" />
+                  <defs>
+                    <linearGradient id="healthGradOverview" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor={intelHealthScore >= 80 ? '#34d399' : intelHealthScore >= 50 ? '#fbbf24' : '#f87171'} />
+                      <stop offset="100%" stopColor={intelHealthScore >= 80 ? '#22d3ee' : intelHealthScore >= 50 ? '#fb923c' : '#ec4899'} />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-2xl font-black ${intelHealthColor}`}>{intelHealthScore}</span>
+                </div>
+              </div>
+              <span className="text-[10px] text-zinc-500 mt-1 font-medium">HEALTH SCORE</span>
+            </div>
+
+            {/* Critical Issues */}
+            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${criticalCount > 0 ? 'border-red-500/20 hover:border-red-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${criticalCount > 0 ? 'bg-red-500/10' : 'bg-white/[0.04]'}`}>
+                  <XCircle className={`w-4 h-4 ${criticalCount > 0 ? 'text-red-400' : 'text-zinc-600'}`} />
+                </div>
+                {criticalCount > 0 && <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
+              </div>
+              <div className={`text-2xl font-bold ${criticalCount > 0 ? 'text-red-400' : 'text-zinc-600'}`}>{criticalCount}</div>
+              <div className="text-[10px] text-zinc-500 mt-0.5">Critical Issues</div>
+            </div>
+
+            {/* Warnings */}
+            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${warningCount > 0 ? 'border-amber-500/20 hover:border-amber-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${warningCount > 0 ? 'bg-amber-500/10' : 'bg-white/[0.04]'}`}>
+                  <AlertTriangle className={`w-4 h-4 ${warningCount > 0 ? 'text-amber-400' : 'text-zinc-600'}`} />
+                </div>
+              </div>
+              <div className={`text-2xl font-bold ${warningCount > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{warningCount}</div>
+              <div className="text-[10px] text-zinc-500 mt-0.5">Warnings</div>
+            </div>
+
+            {/* Opportunities */}
+            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${opportunityCount > 0 ? 'border-emerald-500/20 hover:border-emerald-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${opportunityCount > 0 ? 'bg-emerald-500/10' : 'bg-white/[0.04]'}`}>
+                  <Sparkles className={`w-4 h-4 ${opportunityCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                </div>
+              </div>
+              <div className={`text-2xl font-bold ${opportunityCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{opportunityCount}</div>
+              <div className="text-[10px] text-zinc-500 mt-0.5">Opportunities</div>
+            </div>
+
+            {/* Wins */}
+            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${successCount > 0 ? 'border-emerald-500/20 hover:border-emerald-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${successCount > 0 ? 'bg-emerald-500/10' : 'bg-white/[0.04]'}`}>
+                  <Crown className={`w-4 h-4 ${successCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                </div>
+              </div>
+              <div className={`text-2xl font-bold ${successCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{successCount}</div>
+              <div className="text-[10px] text-zinc-500 mt-0.5">Wins</div>
+            </div>
+          </motion.div>
+
+          {/* Filter Bar */}
+          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 mr-2">
+              <Filter className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="text-xs text-zinc-500 font-medium">Filter:</span>
+            </div>
+            <button onClick={() => setFilterCategory('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterCategory === 'all' ? 'bg-white/[0.08] text-white border border-white/[0.1]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'}`}>
+              All
+            </button>
+            {Object.entries(categoryConfig).map(([key, cfg]) => {
+              const count = intelAlerts.filter(a => a.category === key).length;
+              return (
+                <button key={key} onClick={() => setFilterCategory(key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${filterCategory === key ? 'bg-white/[0.08] text-white border border-white/[0.1]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'}`}>
+                  <cfg.icon className={`w-3 h-3 ${cfg.color}`} />
+                  {cfg.label}
+                  {count > 0 && <span className="text-[9px] bg-white/[0.06] px-1.5 py-0.5 rounded-full">{count}</span>}
+                </button>
+              );
+            })}
+
+            <div className="w-px h-5 bg-white/[0.06] mx-1" />
+
+            {(['critical', 'warning', 'info', 'success'] as const).map(sev => {
+              const count = intelAlerts.filter(a => a.severity === sev).length;
+              if (count === 0) return null;
+              const cfg = severityStyles[sev];
+              return (
+                <button key={sev} onClick={() => setFilterSeverity(filterSeverity === sev ? null : sev)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${filterSeverity === sev ? cfg.badge + ' ' + cfg.border : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${cfg.pulse}`} />
+                  {sev.charAt(0).toUpperCase() + sev.slice(1)} ({count})
+                </button>
+              );
+            })}
+          </motion.div>
+
+          {/* Active Alerts Feed */}
+          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-sm font-semibold text-white">Active Alerts</h2>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 font-medium">
+                {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {filteredAlerts.length === 0 ? (
+              <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-12 text-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-1">All clear!</h3>
+                <p className="text-xs text-zinc-500">
+                  {filterCategory !== 'all' || filterSeverity
+                    ? 'No alerts match your current filters.'
+                    : 'No issues detected. Your site is performing well.'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <AnimatePresence mode="popLayout">
+                  {filteredAlerts.map((alert) => {
+                    const cfg = severityStyles[alert.severity];
+                    const Icon = cfg.icon;
+                    const catCfg = categoryConfig[alert.category];
+                    const isExpanded = expandedAlert === alert.id;
+
+                    return (
+                      <motion.div
+                        key={alert.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className={`${cfg.bg} border ${cfg.border} rounded-xl overflow-hidden transition-all duration-200 hover:bg-opacity-10 cursor-pointer group`}
+                        onClick={() => setExpandedAlert(isExpanded ? null : alert.id)}
+                      >
+                        <div className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.bg} border ${cfg.border}`}>
+                              <Icon className={`w-4 h-4 ${cfg.text}`} />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <h3 className="text-sm font-semibold text-white">{alert.title}</h3>
+                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${cfg.badge}`}>
+                                  {alert.severity}
+                                </span>
+                                {catCfg && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 font-medium flex items-center gap-1">
+                                    <catCfg.icon className="w-2.5 h-2.5" />
+                                    {catCfg.label}
+                                  </span>
+                                )}
+                              </div>
+
+                              {alert.change !== undefined && (
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  {alert.metric && <span className="text-xs text-zinc-400">{alert.metric}</span>}
+                                  <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${alert.change >= 0 ? (alert.type === 'ranking_loss' ? 'text-red-400' : 'text-emerald-400') : 'text-red-400'}`}>
+                                    {alert.change >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                    {alert.change > 0 ? '+' : ''}{alert.change}%
+                                  </span>
+                                </div>
+                              )}
+                              {!alert.change && alert.metric && (
+                                <span className="text-xs text-zinc-500">{alert.metric}</span>
+                              )}
+                            </div>
+
+                            <ChevronRight className={`w-4 h-4 text-zinc-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                          </div>
+
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-3 pt-3 border-t border-white/[0.04]">
+                                  <p className="text-xs text-zinc-400 leading-relaxed mb-3">{alert.description}</p>
+                                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                    <FixWithBotButton
+                                      label="Fix This"
+                                      size="sm"
+                                      variant="ghost"
+                                      site={selectedSite}
+                                      context={`Analyze and fix: ${alert.title}. ${alert.description}${alert.metric ? ` Metric: ${alert.metric}` : ''}${alert.change !== undefined ? ` Change: ${alert.change}%` : ''}`}
+                                    />
+                                    <button
+                                      onClick={() => setDismissedAlerts(prev => new Set(prev).add(alert.id))}
+                                      className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-white/[0.04] transition"
+                                    >
+                                      Dismiss
+                                    </button>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
+          </motion.div>
+        </>
       )}
 
       {/* ═══ 3. COMMAND CENTER — Compact row: Score + Velocity + Branded Split ═══ */}
@@ -521,7 +793,7 @@ export default function DashboardOverview() {
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Performance Score Gauge */}
           {performanceScore !== null && scoreData && (
-            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
               <div className="relative w-16 h-16 flex-shrink-0">
                 <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-white/[0.06]" strokeWidth="2.5" />
@@ -549,13 +821,13 @@ export default function DashboardOverview() {
           )}
 
           {/* Growth Velocity */}
-          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
               growthVelocity !== null && growthVelocity > 0
                 ? 'bg-emerald-500/10 border border-emerald-500/20'
                 : growthVelocity !== null && growthVelocity < -5
                   ? 'bg-red-500/10 border border-red-500/20'
-                  : 'bg-white/[0.04] border border-white/[0.06]'
+                  : 'bg-white/[0.04] border border-white/[0.04]'
             }`}>
               <Rocket className={`w-5 h-5 ${
                 growthVelocity !== null && growthVelocity > 0 ? 'text-emerald-400' :
@@ -580,7 +852,7 @@ export default function DashboardOverview() {
           </div>
 
           {/* Branded vs Non-Branded Split */}
-          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
             <div className="flex items-center gap-2 mb-3">
               <Tag className="w-4 h-4 text-cyan-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic</span>
@@ -628,11 +900,370 @@ export default function DashboardOverview() {
             isLoading={!hasData && isRef}
           />}
 
+          {/* ═══ INTELLIGENCE: Top Opportunities Table ═══ */}
+          {intelOpportunities.length > 0 && (
+            <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Target className="w-4 h-4 text-violet-400" />
+                <h2 className="text-sm font-semibold text-white">Top Opportunities</h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 font-medium">
+                  {intelOpportunities.length} keywords
+                </span>
+              </div>
+
+              <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-zinc-500 border-b border-white/[0.04]">
+                        <th className="text-left py-3 px-4 font-medium">Keyword</th>
+                        <th className="text-right py-3 px-4 font-medium">Position</th>
+                        <th className="text-right py-3 px-4 font-medium hidden sm:table-cell">Impressions</th>
+                        <th className="text-right py-3 px-4 font-medium hidden md:table-cell">Current CTR</th>
+                        <th className="text-right py-3 px-4 font-medium">Potential Clicks</th>
+                        <th className="text-right py-3 px-4 font-medium hidden lg:table-cell">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {intelOpportunities.map((opp, i) => {
+                        const typeLabels: Record<string, { label: string; style: string }> = {
+                          striking_distance: { label: 'Striking Distance', style: 'bg-violet-500/10 text-violet-400' },
+                          ctr_fix: { label: 'CTR Fix', style: 'bg-amber-500/10 text-amber-400' },
+                          quick_win: { label: 'Quick Win', style: 'bg-emerald-500/10 text-emerald-400' },
+                          rising: { label: 'Rising', style: 'bg-blue-500/10 text-blue-400' },
+                        };
+                        const typeInfo = typeLabels[opp.type] || { label: opp.type, style: 'bg-zinc-500/10 text-zinc-400' };
+
+                        return (
+                          <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition group">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <Search className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                                <span className="text-zinc-300 font-medium truncate max-w-[200px]">{opp.query}</span>
+                              </div>
+                            </td>
+                            <td className="text-right py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${opp.position <= 5 ? 'bg-emerald-400/10 text-emerald-400'
+                                : opp.position <= 10 ? 'bg-amber-400/10 text-amber-400'
+                                  : 'bg-red-400/10 text-red-400'
+                                }`}>
+                                #{opp.position.toFixed(1)}
+                              </span>
+                            </td>
+                            <td className="text-right py-3 px-4 text-zinc-400 hidden sm:table-cell">{opp.impressions.toLocaleString()}</td>
+                            <td className="text-right py-3 px-4 text-zinc-400 hidden md:table-cell">{opp.ctr}%</td>
+                            <td className="text-right py-3 px-4">
+                              <span className="text-emerald-400 font-semibold">+{opp.potentialClicks.toLocaleString()}</span>
+                            </td>
+                            <td className="text-right py-3 px-4 hidden lg:table-cell">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${typeInfo.style}`}>
+                                {typeInfo.label}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ═══ INTELLIGENCE: Insight Cards Grid ═══ */}
+          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* CTR Benchmark Card */}
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <MousePointer className="w-4 h-4 text-violet-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">CTR Benchmark</h3>
+              </div>
+              {(() => {
+                const queries = seoData?.queries || [];
+                const top5 = queries.filter((q: any) => q.position <= 5 && q.impressions > 50);
+                const avgCtr = top5.length > 0 ? top5.reduce((s: number, q: any) => s + q.ctr, 0) / top5.length : 0;
+                const benchmark = 18.0;
+                const good = avgCtr >= benchmark;
+                return (
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <span className={`text-2xl font-bold ${good ? 'text-emerald-400' : 'text-amber-400'}`}>{avgCtr.toFixed(1)}%</span>
+                      <span className="text-xs text-zinc-500">vs {benchmark}% avg</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden mb-2">
+                      <div className={`h-full rounded-full transition-all ${good ? 'bg-gradient-to-r from-emerald-400 to-cyan-400' : 'bg-amber-400'}`}
+                        style={{ width: `${Math.min(100, (avgCtr / 30) * 100)}%` }} />
+                    </div>
+                    <p className="text-[10px] text-zinc-600">
+                      {good ? 'Above average! Your titles & descriptions are performing well.' : 'Below average. Consider rewriting meta titles and descriptions.'}
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Keyword Distribution */}
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Hash className="w-4 h-4 text-blue-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">Keyword Distribution</h3>
+              </div>
+              {(() => {
+                const queries = seoData?.queries || [];
+                const buckets = [
+                  { label: 'Top 3', count: queries.filter((q: any) => q.position <= 3).length, color: 'bg-emerald-400' },
+                  { label: 'Pos 4\u201310', count: queries.filter((q: any) => q.position > 3 && q.position <= 10).length, color: 'bg-cyan-400' },
+                  { label: 'Pos 11\u201320', count: queries.filter((q: any) => q.position > 10 && q.position <= 20).length, color: 'bg-amber-400' },
+                  { label: 'Pos 20+', count: queries.filter((q: any) => q.position > 20).length, color: 'bg-zinc-600' },
+                ];
+                const total = Math.max(1, queries.length);
+                return (
+                  <div className="space-y-2.5">
+                    {buckets.map(b => (
+                      <div key={b.label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-zinc-400">{b.label}</span>
+                          <span className="text-xs font-semibold text-zinc-300">{b.count} <span className="text-zinc-600">({Math.round((b.count / total) * 100)}%)</span></span>
+                        </div>
+                        <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${b.color} transition-all duration-500`}
+                            style={{ width: `${(b.count / total) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Quick Trend */}
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">14-Day Trend</h3>
+              </div>
+              {trendData.length > 2 ? (
+                <div className="h-[80px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="trendGradOverview" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Tooltip content={({ active, payload }) =>
+                        active && payload?.[0] ? (
+                          <div className="bg-zinc-900 border border-white/[0.1] rounded px-2 py-1 text-[10px] text-zinc-300">
+                            {payload[0].value?.toLocaleString()} clicks
+                          </div>
+                        ) : null
+                      } />
+                      <Area type="monotone" dataKey="v" stroke="#34d399" fill="url(#trendGradOverview)" strokeWidth={2} dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-600">Not enough data to show trend</p>
+              )}
+            </div>
+          </motion.div>
+
+          {/* ═══ INTELLIGENCE: What's Working ═══ */}
+          {(() => {
+            const queries = seoData?.queries || [];
+            const topPerformers = queries.filter((q: any) => q.position <= 3 && q.clicks > 5).slice(0, 5);
+            if (topPerformers.length === 0) return null;
+            return (
+              <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="bg-gradient-to-r from-emerald-500/[0.04] to-cyan-500/[0.04] border border-emerald-500/[0.12] rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Crown className="w-4 h-4 text-emerald-400" />
+                  <h2 className="text-sm font-semibold text-white">What&apos;s Working</h2>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">Top performers</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {topPerformers.map((q: any, i: number) => (
+                    <div key={i} className="bg-white/[0.03] border border-emerald-500/[0.1] rounded-xl p-3">
+                      <div className="flex items-center gap-1 mb-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-400/10 text-emerald-400 font-bold">#{q.position.toFixed(0)}</span>
+                        <Flame className="w-3 h-3 text-amber-400" />
+                      </div>
+                      <p className="text-xs text-zinc-300 font-medium truncate mb-1">{q.query}</p>
+                      <p className="text-[10px] text-zinc-500">{q.clicks} clicks &middot; {q.impressions.toLocaleString()} imp</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            );
+          })()}
+
+          {/* ═══ INTELLIGENCE: Ask AI Deeper ═══ */}
+          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="mt-2">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
+                <Brain className="w-4 h-4 text-violet-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Ask AI Deeper</h2>
+                <p className="text-[10px] text-zinc-500">Click any question to get an AI-powered deep analysis</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* Emergency */}
+              <div className="bg-white/[0.02] border border-red-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Emergency</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    'Why did my traffic drop?',
+                    'Is my site penalized by Google?',
+                    'Did a Google algorithm update hit me?',
+                    'Which pages are throwing errors?',
+                  ].map(q => (
+                    <button key={q} onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
+                    }}
+                      className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                      <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-red-400 transition flex-shrink-0" />
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Money */}
+              <div className="bg-white/[0.02] border border-amber-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Revenue & ROI</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    'Which pages are money pits? (high impressions, low clicks)',
+                    'Which keywords can I push from page 2 to page 1?',
+                    'Show me pages that drive 80% of my traffic',
+                    'What is my most underrated blog post?',
+                  ].map(q => (
+                    <button key={q} onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
+                    }}
+                      className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                      <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-amber-400 transition flex-shrink-0" />
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Content Strategy */}
+              <div className="bg-white/[0.02] border border-emerald-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Content Strategy</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    'What keywords should I target that I don\'t have pages for?',
+                    'Give me 5 blog post titles based on my search data',
+                    'Which old blog posts need a content refresh?',
+                    'Should I translate my site? Into which language?',
+                  ].map(q => (
+                    <button key={q} onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
+                    }}
+                      className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                      <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400 transition flex-shrink-0" />
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Deep Dive */}
+              <div className="bg-white/[0.02] border border-blue-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Search className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Deep Dive</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    'Compare my traffic this week vs last week',
+                    'Who is linking to me? Show top referrals',
+                    'How does my traffic change on weekends vs weekdays?',
+                    'Is my viral traffic sticking around or bouncing?',
+                  ].map(q => (
+                    <button key={q} onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
+                    }}
+                      className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                      <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-blue-400 transition flex-shrink-0" />
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Technical SEO */}
+              <div className="bg-white/[0.02] border border-violet-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="w-3.5 h-3.5 text-violet-400" />
+                  <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Technical SEO</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    'Are my Core Web Vitals hurting my ranking?',
+                    'How many of my pages are actually indexed?',
+                    'Which pages are being crawled but not indexed?',
+                    'Do I have any duplicate content issues?',
+                  ].map(q => (
+                    <button key={q} onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: q, site: selectedSite } }));
+                    }}
+                      className="w-full text-left text-xs text-zinc-400 hover:text-white py-1.5 px-2.5 rounded-lg hover:bg-white/[0.04] transition flex items-center gap-2 group">
+                      <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition flex-shrink-0" />
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Killer Feature */}
+              <div className="bg-gradient-to-br from-violet-500/[0.06] to-emerald-500/[0.06] border border-violet-500/20 rounded-2xl p-4 flex flex-col">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-violet-400 to-emerald-400 flex items-center justify-center">
+                    <Target className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-[10px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-emerald-400 uppercase tracking-wider">Killer Feature</span>
+                </div>
+                <button onClick={() => {
+                  window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: 'Audit my site and tell me the ONE thing I should do today to grow', site: selectedSite } }));
+                }}
+                  className="flex-1 text-left rounded-xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.08] p-4 hover:border-violet-500/30 transition group cursor-pointer">
+                  <p className="text-sm font-semibold text-white mb-1 group-hover:text-violet-300 transition">
+                    &quot;What&apos;s the ONE thing I should do today to grow?&quot;
+                  </p>
+                  <p className="text-[10px] text-zinc-500">
+                    The AI runs all checks, finds the biggest opportunity, and presents just that one task.
+                  </p>
+                </button>
+              </div>
+            </div>
+          </motion.div>
+
           {/* Row 1: Site Health + Money Opportunities */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
             {/* Site Health Pulse */}
-            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -680,7 +1311,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* 💰 Money Opportunities — Striking Distance */}
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-amber-500/[0.06] to-transparent rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
@@ -799,7 +1430,7 @@ export default function DashboardOverview() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
             {/* 🔧 Quick Wins — CTR Problems */}
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-red-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -865,7 +1496,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* 📊 Top Performing Pages */}
-            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-violet-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1019,7 +1650,7 @@ function KPICard({
   // Show skeleton OR content — never both overlapping
   if (loading && !showValue) {
     return (
-      <Link href={href} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-4">
+      <Link href={href} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4">
         <div className="flex justify-between mb-2">
           <Skeleton className="w-8 h-8 rounded-lg" />
           <Skeleton className="w-12 h-4 rounded-full" />
@@ -1032,7 +1663,7 @@ function KPICard({
   }
 
   return (
-    <Link href={href} className="bg-zinc-900/50 border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.12] transition-all group">
+    <Link href={href} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.12] transition-all group">
       <div className="flex items-center justify-between mb-2">
         <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
           <Icon className="w-4 h-4 text-zinc-400 group-hover:text-white transition-colors" />
@@ -1095,7 +1726,7 @@ function ActionCard({
   return (
     <Link
       href={href}
-      className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-white/[0.06] hover:border-white/[0.1] hover:bg-white/[0.04] transition-all group"
+      className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04] transition-all group"
     >
       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${iconColor[color]} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg shadow-${color}-500/10`}>
         <Icon className="w-5 h-5 text-white" />

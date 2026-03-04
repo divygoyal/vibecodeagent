@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
-import { Menu, X, Zap } from 'lucide-react';
+import Image from 'next/image';
+import { Menu, X } from 'lucide-react';
 
 function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -29,16 +30,14 @@ function Navbar() {
             animate={{ y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
-                ? 'bg-[#09090b]/80 backdrop-blur-xl border-b border-white/[0.06]'
+                ? 'bg-black/80 backdrop-blur-xl border-b border-white/[0.04]'
                 : 'bg-transparent'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-2 group">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                        <Zap className="w-4 h-4 text-black" strokeWidth={3} />
-                    </div>
+                <Link href="/" className="flex items-center gap-2.5 group">
+                    <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg" />
                     <span className="text-lg font-bold text-white tracking-tight">
                         Traffic<span className="text-emerald-400">Claw</span>
                     </span>
@@ -100,7 +99,7 @@ function Navbar() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden bg-[#09090b]/95 backdrop-blur-xl border-b border-white/[0.06]"
+                        className="md:hidden bg-black/95 backdrop-blur-xl border-b border-white/[0.04]"
                     >
                         <div className="px-6 py-4 flex flex-col gap-4">
                             {navLinks.map((link) => (
@@ -133,7 +132,7 @@ export default function MarketingLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen bg-[#09090b] text-white overflow-x-hidden">
+        <div className="min-h-screen bg-black text-white overflow-x-hidden">
             <Navbar />
             {children}
         </div>

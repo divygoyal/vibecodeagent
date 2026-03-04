@@ -147,7 +147,7 @@ export default function BotPage() {
 
             {/* Bot Status Pipeline */}
             {isProvisioned && (
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-5">
                         <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Bot Status</h2>
                         <div className="flex items-center gap-2">
@@ -174,7 +174,7 @@ export default function BotPage() {
                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${isActive
                                             ? 'bg-emerald-400/20 text-emerald-400 border border-emerald-400/40'
                                             : 'bg-zinc-800/50 text-zinc-600 border border-zinc-700/50'
-                                            } ${isCurrent ? 'ring-2 ring-emerald-400/30 ring-offset-2 ring-offset-[#09090b]' : ''}`}>
+                                            } ${isCurrent ? 'ring-2 ring-emerald-400/30 ring-offset-2 ring-offset-black' : ''}`}>
                                             {isActive ? <CheckCircle2 className="w-4 h-4" /> : (i + 1)}
                                         </div>
                                         <span className={`text-[10px] mt-2 font-medium ${isActive ? 'text-emerald-400' : 'text-zinc-600'}`}>
@@ -190,7 +190,7 @@ export default function BotPage() {
                     </div>
 
                     {botStatus?.botUsername && (
-                        <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center gap-2">
+                        <div className="mt-4 pt-4 border-t border-white/[0.04] flex items-center gap-2">
                             <MessageSquare className="w-3.5 h-3.5 text-zinc-500" />
                             <span className="text-xs text-zinc-500">Telegram:</span>
                             <span className="text-xs text-zinc-300 font-mono">@{botStatus.botUsername}</span>
@@ -211,7 +211,7 @@ export default function BotPage() {
             )}
 
             {/* Setup Form / Bot Config */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-2">
                     <h2 className="text-lg font-semibold">
                         {isProvisioned ? 'Bot Configuration' : 'Connect Your Telegram Bot'}
@@ -262,7 +262,7 @@ export default function BotPage() {
                             <input
                                 type="text"
                                 placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-                                className="w-full bg-[#0c0c10] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all placeholder:text-zinc-600 mb-4 font-mono"
+                                className="w-full bg-[#050508] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all placeholder:text-zinc-600 mb-4 font-mono"
                                 value={botToken}
                                 onChange={(e) => setBotToken(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSetupBot()}
@@ -274,7 +274,7 @@ export default function BotPage() {
                                     onClick={() => setBotEngine('openclaw')}
                                     className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'openclaw'
                                         ? 'bg-zinc-800 border-zinc-600 text-white'
-                                        : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
+                                        : 'bg-[#050508] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
                                         }`}
                                 >
                                     OpenClaw
@@ -283,7 +283,7 @@ export default function BotPage() {
                                     onClick={() => setBotEngine('nanobot')}
                                     className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'nanobot'
                                         ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                                        : 'bg-[#0c0c10] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
+                                        : 'bg-[#050508] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
                                         }`}
                                 >
                                     Nanobot (Fast)
@@ -331,7 +331,7 @@ export default function BotPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-[#0c0c10] p-4 rounded-xl border border-white/[0.06] mt-3">
+                    <div className="bg-[#050508] p-4 rounded-xl border border-white/[0.04] mt-3">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-zinc-300 font-medium">Bot is ready and active 🚀</p>
@@ -344,7 +344,7 @@ export default function BotPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="mt-3 flex items-center gap-2 bg-zinc-900/50 px-4 py-2.5 rounded-lg border border-white/[0.06]">
+                        <div className="mt-3 flex items-center gap-2 bg-zinc-900/50 px-4 py-2.5 rounded-lg border border-white/[0.04]">
                             <Lock className="w-3 h-3 text-zinc-600" />
                             <span className="text-xs text-zinc-500">Token:</span>
                             <span className="text-xs text-zinc-400 font-mono tracking-wider">••••••••••••••••••••</span>
@@ -373,14 +373,14 @@ export default function BotPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {BOT_CAPABILITIES.map((cap, i) => (
-                        <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.12] transition-all">
+                        <div key={i} className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-4 hover:border-white/[0.12] transition-all">
                             <cap.icon className={`w-5 h-5 ${cap.color} mb-2`} />
                             <h4 className="text-sm font-semibold text-white mb-1">{cap.label}</h4>
                             <p className="text-[11px] text-zinc-500 leading-relaxed">{cap.desc}</p>
                         </div>
                     ))}
                 </div>
-                <div className="mt-4 p-4 bg-black/20 border border-white/[0.06] rounded-xl">
+                <div className="mt-4 p-4 bg-black/20 border border-white/[0.04] rounded-xl">
                     <div className="flex items-start gap-3">
                         <MessageSquare className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
                         <div>
@@ -397,7 +397,7 @@ export default function BotPage() {
             </div>
 
             {/* ─── Integrations ─── */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
                         Integrations
@@ -444,7 +444,7 @@ export default function BotPage() {
             </div>
 
             {/* ─── Additional Platforms (Secondary) ─── */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-2">
                     <div>
                         <h2 className="text-lg font-semibold text-white">Additional Integrations</h2>
@@ -490,7 +490,7 @@ function IntegrationCard({
     return (
         <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${synced ? 'bg-emerald-500/[0.04] border-emerald-500/[0.15]' :
             stored ? 'bg-amber-500/[0.04] border-amber-500/[0.15]' :
-                'bg-white/[0.01] border-white/[0.06]'
+                'bg-white/[0.01] border-white/[0.04]'
             }`}>
             <div className={`flex-shrink-0 ${synced ? 'text-emerald-400' : stored ? 'text-amber-400' : 'text-zinc-500'}`}>
                 {icon}
