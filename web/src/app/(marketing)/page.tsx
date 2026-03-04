@@ -8,7 +8,7 @@ import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
-    ArrowRight, CheckCircle2, Star, Sparkles, Code, GitBranch,
+    ArrowRight, CheckCircle2, Star, Sparkles, GitBranch,
     MousePointerClick, Eye, ArrowUpRight, ChevronRight, MessageSquare,
     ScanSearch
 } from 'lucide-react';
@@ -680,69 +680,311 @@ function KPICard({ label, value, change, positive }: { label: string; value: str
 }
 
 /* ═══════════════════════════════════════
-   COMPARISON SECTION
+   AI CHAT LIVE DEMO SECTION
    ═══════════════════════════════════════ */
 
-function Comparison() {
-    const items = [
-        {
-            traditional: 'Staring at GA4 raw data tables and confusing navigation menus',
-            growclaw: 'Visual KPI cards, sparkline trends, and AI summaries in plain English',
-            icon: BarChart3
-        },
-        {
-            traditional: 'Search Console with limited filtering and zero actionable insights',
-            growclaw: 'Keyword gaps, decay alerts, AEO optimization, and auto-fix suggestions',
-            icon: Search
-        },
-        {
-            traditional: 'Manual check → fix → commit → deploy cycle for every SEO issue',
-            growclaw: 'Tell AI chat what to fix — it analyzes, suggests, and helps you ship faster',
-            icon: Code
-        },
-    ];
+function AIChatDemo() {
+    const sectionRef = useRef<HTMLDivElement>(null);
+    const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
+    const [phase, setPhase] = useState(0);
+    const [typedQuestion, setTypedQuestion] = useState('');
+    const [showThinking, setShowThinking] = useState(false);
+    const [visibleSections, setVisibleSections] = useState(0);
+
+    const question = 'why is my traffic dropping';
+
+    useEffect(() => {
+        if (!isInView) return;
+        // Phase 1: Type the user question
+        let i = 0;
+        const typeInterval = setInterval(() => {
+            if (i <= question.length) {
+                setTypedQuestion(question.slice(0, i));
+                i++;
+            } else {
+                clearInterval(typeInterval);
+                setPhase(1);
+            }
+        }, 45);
+        return () => clearInterval(typeInterval);
+    }, [isInView]);
+
+    useEffect(() => {
+        if (phase !== 1) return;
+        // Phase 2: Show "thinking" after question sent
+        const t1 = setTimeout(() => { setShowThinking(true); setPhase(2); }, 600);
+        return () => clearTimeout(t1);
+    }, [phase]);
+
+    useEffect(() => {
+        if (phase !== 2) return;
+        // Phase 3: Start revealing bot response sections one by one
+        const t2 = setTimeout(() => { setShowThinking(false); setPhase(3); }, 1200);
+        return () => clearTimeout(t2);
+    }, [phase]);
+
+    useEffect(() => {
+        if (phase !== 3) return;
+        // Reveal sections one by one
+        let s = 0;
+        const revealInterval = setInterval(() => {
+            s++;
+            if (s <= 7) {
+                setVisibleSections(s);
+            } else {
+                clearInterval(revealInterval);
+            }
+        }, 400);
+        return () => clearInterval(revealInterval);
+    }, [phase]);
 
     return (
         <Section className="py-32 px-6">
-            <div className="max-w-5xl mx-auto">
+            <div ref={sectionRef} className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                        <MessageSquare className="w-3 h-3" /> LIVE DEMO
+                    </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                        Stop drowning in{' '}
-                        <span className="line-through text-zinc-600">data</span>.{' '}
+                        Ask anything.{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                            Start growing.
+                            Get verdicts.
                         </span>
                     </h2>
+                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+                        Our AI analyst doesn&apos;t give generic advice — it analyzes your real data and delivers actionable verdicts with evidence.
+                    </p>
                 </motion.div>
 
-                <div className="space-y-4">
-                    {items.map((item, i) => (
-                        <motion.div
-                            key={i}
-                            variants={fadeUp}
-                            className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-center"
-                        >
-                            {/* Old way */}
-                            <div className="p-5 rounded-xl bg-red-500/[0.04] border border-red-500/[0.1] text-sm text-zinc-400">
-                                <span className="text-red-400 text-xs font-semibold uppercase tracking-wider block mb-2">Before</span>
-                                {item.traditional}
+                {/* Chat window mock */}
+                <motion.div variants={fadeUp} className="relative rounded-2xl border border-white/[0.06] bg-[#050508] overflow-hidden shadow-2xl shadow-black/50">
+                    {/* Chat header */}
+                    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-white/[0.04] bg-[#0a0a0f]">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
+                            <Bot className="w-4 h-4 text-black" />
+                        </div>
+                        <div>
+                            <div className="text-sm font-semibold text-white">AI Analyst</div>
+                            <div className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online · antigravity.codes
                             </div>
+                        </div>
+                    </div>
 
-                            {/* Arrow */}
-                            <div className="hidden md:flex items-center justify-center">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center justify-center">
-                                    <ArrowRight className="w-5 h-5 text-black" />
+                    {/* Chat messages area */}
+                    <div className="p-5 space-y-4 min-h-[480px] max-h-[580px] overflow-hidden relative">
+                        {/* Bot greeting */}
+                        <div className="flex gap-3">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                            </div>
+                            <div className="bg-white/[0.03] border border-white/[0.04] rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%]">
+                                <p className="text-sm text-zinc-300">
+                                    <span className="text-amber-400">👋</span> Hey! I&apos;m your AI Analyst. I have your live analytics &amp; SEO data loaded.
+                                    Ask me anything — I give <strong className="text-white">verdicts</strong>, not advice.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* User question - types in */}
+                        {typedQuestion.length > 0 && (
+                            <div className="flex justify-end">
+                                <div className="bg-emerald-500/[0.12] border border-emerald-500/[0.15] rounded-2xl rounded-tr-md px-4 py-3 max-w-[70%]">
+                                    <p className="text-sm text-white">{typedQuestion}{phase === 0 && <span className="inline-block w-0.5 h-4 bg-emerald-400 animate-pulse ml-0.5 align-middle" />}</p>
                                 </div>
                             </div>
+                        )}
 
-                            {/* New way */}
-                            <div className="p-5 rounded-xl bg-emerald-500/[0.04] border border-emerald-500/[0.1] text-sm text-zinc-300">
-                                <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider block mb-2">With TrafficClaw</span>
-                                {item.growclaw}
+                        {/* Thinking indicator */}
+                        {showThinking && (
+                            <div className="flex gap-3">
+                                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                                    <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                                </div>
+                                <div className="bg-white/[0.03] border border-white/[0.04] rounded-2xl rounded-tl-md px-4 py-3">
+                                    <div className="flex items-center gap-2 text-sm text-zinc-500">
+                                        <div className="flex gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </div>
+                                        Analyzing search performance data...
+                                    </div>
+                                </div>
                             </div>
-                        </motion.div>
-                    ))}
-                </div>
+                        )}
+
+                        {/* Bot response - reveals section by section */}
+                        {visibleSections > 0 && (
+                            <div className="flex gap-3">
+                                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                                </div>
+                                <div className="flex-1 space-y-3 max-w-[90%]">
+                                    {/* KPI Cards */}
+                                    {visibleSections >= 1 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="grid grid-cols-4 gap-2">
+                                            {[
+                                                { label: 'CLICKS', value: '8,965', icon: '📈', color: 'text-emerald-400' },
+                                                { label: 'IMPRESSIONS', value: '228,974', icon: '👁', color: 'text-blue-400' },
+                                                { label: 'AVG CTR', value: '3.9%', icon: '📊', color: 'text-violet-400' },
+                                                { label: 'AVG POS', value: '7.1', icon: '🎯', color: 'text-amber-400' },
+                                            ].map(kpi => (
+                                                <div key={kpi.label} className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3 text-center">
+                                                    <div className="text-xs mb-1">{kpi.icon}</div>
+                                                    <div className={`text-base font-bold ${kpi.color}`}>{kpi.value}</div>
+                                                    <div className="text-[8px] text-zinc-600 uppercase tracking-wider mt-0.5">{kpi.label}</div>
+                                                </div>
+                                            ))}
+                                        </motion.div>
+                                    )}
+
+                                    {/* Critical verdict */}
+                                    {visibleSections >= 2 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="bg-red-500/[0.06] border border-red-500/[0.12] rounded-xl p-4">
+                                            <div className="text-sm font-bold text-red-400 mb-2">🚨 CRITICAL: YOUR ORGANIC SEARCH IS COLLAPSING</div>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">
+                                                Your organic traffic is in a death spiral, down <span className="text-red-400 font-semibold">64.9%</span> in 28 days. You are bleeding search visibility on high-intent troubleshooting queries that are your primary acquisition engine.
+                                            </p>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Evidence table */}
+                                    {visibleSections >= 3 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="bg-white/[0.02] border border-white/[0.04] rounded-xl overflow-hidden">
+                                            <div className="px-4 py-2 border-b border-white/[0.04]">
+                                                <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">📋 Evidence</span>
+                                            </div>
+                                            <table className="w-full text-[11px]">
+                                                <thead>
+                                                    <tr className="border-b border-white/[0.03]">
+                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Date</th>
+                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Impressions</th>
+                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Clicks</th>
+                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">CTR</th>
+                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr className="border-b border-white/[0.02]">
+                                                        <td className="px-4 py-2 text-zinc-400">Feb 13</td>
+                                                        <td className="px-4 py-2 text-zinc-300 font-mono">24,692</td>
+                                                        <td className="px-4 py-2 text-zinc-300 font-mono">745</td>
+                                                        <td className="px-4 py-2 text-zinc-300">3.82%</td>
+                                                        <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400">Normal</span></td>
+                                                    </tr>
+                                                    <tr className="border-b border-white/[0.02]">
+                                                        <td className="px-4 py-2 text-zinc-400">Feb 14</td>
+                                                        <td className="px-4 py-2 text-red-400 font-mono font-bold">638</td>
+                                                        <td className="px-4 py-2 text-red-400 font-mono font-bold">59</td>
+                                                        <td className="px-4 py-2 text-zinc-300">9.25%</td>
+                                                        <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-400">🔴 CRASH</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="px-4 py-2 text-zinc-400">Mar 03</td>
+                                                        <td className="px-4 py-2 text-zinc-500 font-mono">1,569</td>
+                                                        <td className="px-4 py-2 text-zinc-500 font-mono">103</td>
+                                                        <td className="px-4 py-2 text-zinc-500">6.06%</td>
+                                                        <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-500/10 text-zinc-500">Flatlined</span></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Verdict */}
+                                    {visibleSections >= 4 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
+                                            <div className="text-sm font-bold text-amber-400 mb-2">⚖️ VERDICT: CATASTROPHIC TECHNICAL EVENT ON FEB 14</div>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">
+                                                Your traffic didn&apos;t just &quot;drop&quot; — it was decapitated. On February 14th, your site lost <span className="text-white font-semibold">90%+</span> of its search visibility overnight, shifting from ~24,000 daily impressions to fewer than 1,000. This is not a slow decline; it is a critical technical failure or a manual penalty.
+                                            </p>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Revenue Impact */}
+                                    {visibleSections >= 5 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="bg-amber-500/[0.04] border border-amber-500/[0.1] rounded-xl p-4">
+                                            <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">💰 Revenue Impact</div>
+                                            <div className="space-y-1.5 text-xs text-zinc-400">
+                                                <div>Daily Loss: <span className="text-red-400 font-semibold">~650 clicks</span></div>
+                                                <div>Monthly Loss: <span className="text-red-400 font-semibold">19,500 clicks</span></div>
+                                                <div>Estimated Revenue Bleed: <span className="text-red-400 font-semibold">$1,900 per month</span> in potential value</div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Action items */}
+                                    {visibleSections >= 6 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="bg-emerald-500/[0.04] border border-emerald-500/[0.1] rounded-xl p-4">
+                                            <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3">🎯 ACTION: EMERGENCY RECOVERY STEPS</div>
+                                            <div className="space-y-2 text-xs text-zinc-400">
+                                                <div className="flex items-start gap-2">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                                                    <span><strong className="text-zinc-200">Check Search Console &quot;Manual Actions&quot;</strong> — Look for a manual penalty in GSC &gt; Security &amp; Manual Actions</span>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                                                    <span><strong className="text-zinc-200">Audit Indexing Status</strong> — Check &quot;Excluded&quot; pages starting Feb 14 for &quot;Blocked by robots.txt&quot;</span>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                                                    <span><strong className="text-zinc-200">Inspect robots.txt</strong> — Ensure you haven&apos;t accidentally added <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">Disallow: /</code></span>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                                                    <span><strong className="text-zinc-200">Sitemap Verification</strong> — Re-submit your XML sitemap in GSC to force Google to recrawl</span>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Follow-up suggestions */}
+                                    {visibleSections >= 7 && (
+                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                            className="flex flex-wrap gap-2">
+                                            {[
+                                                'Check my GSC indexing report for errors starting Feb 14',
+                                                'Which of my top pages are currently cannibalizing each other?',
+                                                'How do I optimize my site for mobile to stop the ranking decline?',
+                                            ].map(q => (
+                                                <button key={q} className="px-3 py-1.5 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/[0.12] text-[10px] text-emerald-400 hover:bg-emerald-500/[0.15] transition-colors">
+                                                    {q}
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Bottom gradient fade */}
+                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#050508] to-transparent pointer-events-none" />
+                    </div>
+
+                    {/* Chat input bar */}
+                    <div className="px-5 py-3 border-t border-white/[0.04] bg-[#0a0a0f]">
+                        <div className="flex items-center gap-3">
+                            <div className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-zinc-600">
+                                Ask anything...
+                            </div>
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
+                                <ArrowUpRight className="w-4 h-4 text-black" />
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Bottom tagline */}
+                <motion.p variants={fadeUp} className="text-center mt-8 text-sm text-zinc-600">
+                    Real response from TrafficClaw AI · Powered by your live Google Search Console data
+                </motion.p>
             </div>
         </Section>
     );
@@ -1264,7 +1506,7 @@ export default function LandingPage() {
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <IntegrationMarquee />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
-            <Comparison />
+            <AIChatDemo />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Testimonials />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
