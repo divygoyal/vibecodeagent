@@ -182,9 +182,14 @@ export default function AIChat() {
         try {
             const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
 
+            // TTFB timeout: abort if no response headers within 25s (matches chatbot sidebar)
+            const abortController = new AbortController();
+            const ttfbTimeout = setTimeout(() => abortController.abort(), 25000);
+
             const res = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: abortController.signal,
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
@@ -207,6 +212,7 @@ export default function AIChat() {
                     mode: options?.mode,
                 }),
             });
+            clearTimeout(ttfbTimeout); // Response started, cancel TTFB timeout
 
             if (!res.ok) {
                 if (res.status === 402) {
@@ -276,11 +282,21 @@ export default function AIChat() {
                 if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
                 flushStreamBuffer();
             }
-        } catch {
+        } catch (err: any) {
+            const isTimeout = err?.name === 'AbortError';
             setMessages(prev => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { ...updated[updated.length - 1], content: "Couldn't reach the AI service. Please try again." };
-                return updated;
+                const last = updated[updated.length - 1];
+                if (last && last.role === 'assistant') {
+                    updated[updated.length - 1] = {
+                        ...last,
+                        content: (last.content || '') + (isTimeout
+                            ? '\n\n⚠️ **Request timed out.** The AI took too long to respond. Try a simpler question or try again.'
+                            : '\n\n⚠️ **Connection Error.** Couldn\'t reach the AI service. Please try again.'),
+                    };
+                    return updated;
+                }
+                return prev;
             });
         } finally {
             setIsLoading(false);

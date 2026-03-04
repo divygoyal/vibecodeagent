@@ -258,7 +258,7 @@ export default function DashboardLayout({
             >
                 {/* Logo */}
                 <div className="h-16 flex items-center px-4 border-b border-white/[0.06]">
-                    <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
+                    <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center flex-shrink-0">
                             <Zap className="w-4 h-4 text-black" strokeWidth={3} />
                         </div>
@@ -544,7 +544,7 @@ export default function DashboardLayout({
                     />
                     <div className="fixed left-0 top-0 bottom-0 w-[260px] bg-[#0c0c10] border-r border-white/[0.06] z-50 lg:hidden flex flex-col">
                         <div className="h-16 flex items-center justify-between px-4 border-b border-white/[0.06]">
-                            <Link href="/" className="flex items-center gap-2.5">
+                            <Link href="/dashboard" className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
                                     <Zap className="w-4 h-4 text-black" strokeWidth={3} />
                                 </div>
