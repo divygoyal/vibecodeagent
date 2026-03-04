@@ -9,7 +9,8 @@ import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
     ArrowRight, CheckCircle2, Star, Sparkles, Code, GitBranch,
-    MousePointerClick, Eye, ArrowUpRight, ChevronRight, MessageSquare
+    MousePointerClick, Eye, ArrowUpRight, ChevronRight, MessageSquare,
+    ScanSearch
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -403,46 +404,46 @@ function ChatMessage({
 function Features() {
     const features = [
         {
-            icon: Bot,
-            title: 'AI Agent on Telegram',
-            description: 'Ask anything in natural language. Your agent fetches analytics, inspects URLs, commits code fixes, and manages your repos.',
-            gradient: 'from-emerald-400 to-emerald-600',
+            icon: MessageSquare,
+            title: 'AI Chat',
+            description: 'Ask questions about your analytics in natural language. Get instant answers, charts, and actionable insights.',
+            gradient: 'from-emerald-400 to-cyan-400',
             tag: 'Core',
-        },
-        {
-            icon: BarChart3,
-            title: 'Analytics Intelligence',
-            description: 'Not just dashboards — smart insights. See traffic trends, bounce rates by device, conversion funnels, and realtime visitors.',
-            gradient: 'from-cyan-400 to-blue-500',
-            tag: 'Insights',
         },
         {
             icon: Search,
             title: 'SEO Intelligence',
-            description: 'Keyword gap analysis, content decay detection, cannibalization alerts. See opportunities Google Search Console hides from you.',
-            gradient: 'from-violet-400 to-purple-600',
+            description: 'Keyword gaps, content decay alerts, cannibalization detection, and AEO engine for AI search optimization.',
+            gradient: 'from-cyan-400 to-blue-400',
             tag: 'Growth',
         },
         {
-            icon: Code,
-            title: 'Auto-Fix Issues',
-            description: 'Low CTR? The bot rewrites your meta tags. Broken link? It fixes the code and pushes to GitHub. Hands-free optimization.',
-            gradient: 'from-amber-400 to-orange-500',
-            tag: 'Automation',
+            icon: BarChart3,
+            title: 'Analytics Dashboard',
+            description: 'Real-time visitors, traffic trends, bounce rates, and conversion funnels — all in one overview.',
+            gradient: 'from-violet-400 to-purple-400',
+            tag: 'Insights',
         },
         {
-            icon: GitBranch,
-            title: 'Full GitHub Integration',
-            description: 'Clone repos, create branches, commit changes, open PRs — all through chat. Your AI pair programmer that never sleeps.',
-            gradient: 'from-pink-400 to-rose-500',
-            tag: 'DevOps',
+            icon: Eye,
+            title: 'AI Visibility',
+            description: 'Track how AI models like ChatGPT and Gemini reference your brand. Coming soon.',
+            gradient: 'from-amber-400 to-orange-400',
+            tag: 'New',
         },
         {
-            icon: Globe,
-            title: 'Multi-Site Support',
-            description: 'Manage all your websites from one dashboard. Compare performance, spot trends across properties, share reports with your team.',
-            gradient: 'from-teal-400 to-emerald-500',
-            tag: 'Scale',
+            icon: ScanSearch,
+            title: 'Site Audit',
+            description: 'Deep page-level audits with performance scores, Core Web Vitals, and auto-fix suggestions.',
+            gradient: 'from-rose-400 to-pink-400',
+            tag: 'Quality',
+        },
+        {
+            icon: Sparkles,
+            title: 'Content Tools',
+            description: 'AI-powered schema generator, blog writer, keyword researcher, and internal linking optimizer.',
+            gradient: 'from-emerald-400 to-teal-400',
+            tag: 'Create',
         },
     ];
 
@@ -470,7 +471,7 @@ function Features() {
                         <motion.div
                             key={feature.title}
                             variants={fadeUp}
-                            className="group relative p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300"
+                            className="group relative p-6 rounded-2xl bg-white/[0.02] backdrop-blur border border-white/[0.04] hover:border-emerald-500/15 transition-all duration-300"
                         >
                             {/* Icon */}
                             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
@@ -505,9 +506,9 @@ function InteractiveDemo() {
                         LIVE PREVIEW
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                        See your data like{' '}
+                        Your AI-powered{' '}
                         <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
-                            never before
+                            command center
                         </span>
                     </h2>
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
@@ -537,10 +538,10 @@ function InteractiveDemo() {
 
                         {/* KPI Cards */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6">
-                            <KPICard label="Active Users" value="3,420" change="+18.2%" positive />
-                            <KPICard label="Sessions" value="5,200" change="+12.4%" positive />
-                            <KPICard label="Bounce Rate" value="34.2%" change="-3.1%" positive />
-                            <KPICard label="Avg Duration" value="2m 48s" change="+0.4%" positive />
+                            <KPICard label="Active Users" value="24,582" change="+22.4%" positive />
+                            <KPICard label="Search Clicks" value="8,965" change="+18.7%" positive />
+                            <KPICard label="Avg Position" value="7.1" change="-0.4%" positive />
+                            <KPICard label="AI Queries" value="1,247" change="+156%" positive />
                         </div>
 
                         {/* Charts row */}
@@ -685,18 +686,18 @@ function KPICard({ label, value, change, positive }: { label: string; value: str
 function Comparison() {
     const items = [
         {
-            traditional: 'Google Analytics → raw data tables, confusing navigation',
-            growclaw: 'Visual KPI cards, trend charts, AI summaries — in plain English',
+            traditional: 'Staring at GA4 raw data tables and confusing navigation menus',
+            growclaw: 'Visual KPI cards, sparkline trends, and AI summaries in plain English',
             icon: BarChart3
         },
         {
-            traditional: 'Search Console → limited filtering, no actionable insights',
-            growclaw: 'Keyword gaps, content decay alerts, auto-fix suggestions',
+            traditional: 'Search Console with limited filtering and zero actionable insights',
+            growclaw: 'Keyword gaps, decay alerts, AEO optimization, and auto-fix suggestions',
             icon: Search
         },
         {
-            traditional: 'Manual SEO → check tools, write fixes, commit, deploy, pray',
-            growclaw: 'Tell the bot what to fix → it commits the code → done',
+            traditional: 'Manual check → fix → commit → deploy cycle for every SEO issue',
+            growclaw: 'Tell AI chat what to fix — it analyzes, suggests, and helps you ship faster',
             icon: Code
         },
     ];
@@ -755,22 +756,22 @@ function Testimonials() {
     const reviews = [
         {
             name: 'Sarah Chen',
-            role: 'Founder, TechStack.io',
-            text: 'TrafficClaw found keyword cannibalization issues we missed for months. Our organic traffic jumped 34% after the bot fixed our meta tags.',
+            role: 'Founder @TechStack.io',
+            text: 'The AI chat is incredible. I asked \'why did my traffic drop?\' and it found a cannibalization issue between two blog posts. Fixed it in minutes.',
             avatar: '👩‍💻',
             stars: 5,
         },
         {
             name: 'Marcus Rodriguez',
-            role: 'CTO, ShipFast',
-            text: 'I just tell it "fix the bounce rate on /pricing" and it actually commits the changes. No more context-switching between analytics and code.',
+            role: 'CTO @ShipFast',
+            text: 'We replaced three SEO tools with TrafficClaw. The overview dashboard gives me everything I need in one glance.',
             avatar: '👨‍💼',
             stars: 5,
         },
         {
             name: 'Priya Patel',
-            role: 'Marketing Lead, CloudBase',
-            text: 'The content decay detection saved us. We caught 12 pages losing rank before they dropped off the first page entirely.',
+            role: 'Marketing Lead @CloudBase',
+            text: 'Content decay detection saved us. We caught 12 pages losing rank before it became a problem. The AI insights are spot-on.',
             avatar: '👩‍🎨',
             stars: 5,
         },
@@ -832,11 +833,10 @@ function Pricing() {
             perMessage: '$0.01',
             description: 'Try it out',
             features: [
-                '100 AI messages',
-                'Full analytics dashboard',
-                'SEO intelligence tools',
-                'Google Analytics + GSC',
-                'Community support',
+                'AI chat with full analytics',
+                'SEO & analytics dashboard',
+                'Site audit reports',
+                'Content tools access',
             ],
             href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI',
             cta: 'Buy 100 Messages',
@@ -851,12 +851,11 @@ function Pricing() {
             perMessage: '$0.01',
             description: 'Most popular',
             features: [
-                '500 AI messages',
-                'Full analytics + SEO dashboard',
-                'Keyword gap analysis',
-                'Content decay alerts',
-                'Auto-fix (bot commits code)',
-                'Priority support',
+                'Everything in Starter',
+                'Priority AI responses',
+                'Advanced SEO intelligence',
+                'AI visibility tracking',
+                'AEO optimization tools',
             ],
             href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI',
             cta: 'Buy 500 Messages',
@@ -871,12 +870,11 @@ function Pricing() {
             perMessage: '$0.008',
             description: 'Best value — save 20%',
             features: [
-                '1,200 AI messages',
                 'Everything in Growth',
-                'All SEO intelligence features',
-                'AI auto-fix & code commits',
-                'Deep keyword analytics',
-                'Dedicated support',
+                'Unlimited site audits',
+                'Custom content strategies',
+                'Priority support',
+                'Early access to new features',
             ],
             href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp',
             cta: 'Buy 1,200 Messages',
@@ -1011,16 +1009,16 @@ function useCountUp(end: number, duration = 2000) {
 }
 
 function StatsBar() {
-    const s1 = useCountUp(3420);
-    const s2 = useCountUp(12, 1500);
+    const s1 = useCountUp(50000);
+    const s2 = useCountUp(15, 1500);
     const s3 = useCountUp(99, 1800);
     const s4 = useCountUp(2, 800);
 
     const stats = [
-        { ref: s1.ref, value: `${s1.count.toLocaleString()}+`, label: 'Bots Deployed', suffix: '' },
+        { ref: s1.ref, value: `${s1.count.toLocaleString()}+`, label: 'Insights Generated', suffix: '' },
         { ref: s2.ref, value: `${s2.count}M+`, label: 'Queries Analyzed', suffix: '' },
         { ref: s3.ref, value: `${s3.count}.9%`, label: 'Uptime', suffix: '' },
-        { ref: s4.ref, value: `${s4.count} min`, label: 'Setup Time', suffix: '' },
+        { ref: s4.ref, value: `<${s4.count} min`, label: 'Setup Time', suffix: '' },
     ];
 
     return (
@@ -1050,26 +1048,26 @@ function HowItWorks() {
         {
             step: '01',
             title: 'Connect Your Stack',
-            description: 'Sign in with Google or GitHub. We auto-detect your analytics properties, search console sites, and repos.',
+            description: 'Sign in with Google. We auto-detect your GA4 properties, Search Console sites, and GitHub repos.',
             icon: Globe,
             gradient: 'from-emerald-400 to-emerald-600',
-            details: ['Google Analytics 4', 'Search Console', 'GitHub Repos'],
+            details: ['Google Analytics 4', 'Search Console', 'GitHub'],
         },
         {
             step: '02',
-            title: 'Deploy Your AI Bot',
-            description: 'Paste your Telegram bot token and TrafficClaw spins up a personal AI agent in under 2 minutes.',
-            icon: Bot,
+            title: 'Explore Your Dashboard',
+            description: 'See your analytics, SEO data, and AI-powered insights instantly. No configuration needed.',
+            icon: BarChart3,
             gradient: 'from-cyan-400 to-blue-500',
-            details: ['Telegram integration', 'Natural language', 'Always online'],
+            details: ['Real-time data', 'AI insights', 'Zero config'],
         },
         {
             step: '03',
-            title: 'Grow on Autopilot',
-            description: 'Ask questions, get insights, and let the bot fix issues. Content decay alerts, keyword gaps, code commits — all automatic.',
+            title: 'Grow with AI',
+            description: 'Ask questions in natural language. Get keyword opportunities, fix SEO issues, and generate content — all through AI chat.',
             icon: TrendingUp,
             gradient: 'from-violet-400 to-purple-600',
-            details: ['Auto-fix code', 'SEO alerts', 'Growth insights'],
+            details: ['Natural language', 'Auto-fix', 'Content generation'],
         },
     ];
 
@@ -1144,14 +1142,10 @@ function IntegrationMarquee() {
         { name: 'Search Console', icon: '🔍' },
         { name: 'GitHub', icon: '🐙' },
         { name: 'Telegram', icon: '💬' },
+        { name: 'WordPress', icon: '📝' },
+        { name: 'Gemini AI', icon: '✨' },
         { name: 'Next.js', icon: '▲' },
         { name: 'Vercel', icon: '▼' },
-        { name: 'React', icon: '⚛️' },
-        { name: 'Node.js', icon: '🟢' },
-        { name: 'Python', icon: '🐍' },
-        { name: 'WordPress', icon: '📝' },
-        { name: 'Shopify', icon: '🛍️' },
-        { name: 'Stripe', icon: '💳' },
     ];
 
     const doubled = [...integrations, ...integrations];
@@ -1202,11 +1196,11 @@ function FinalCTA() {
 
                     <div className="relative">
                         <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                            Ready to grow?
+                            Your AI Growth Engine Awaits
                         </h2>
                         <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
-                            Join builders who use AI to understand their data and ship faster.
-                            Start with 50 free messages — no credit card required.
+                            Join thousands of builders who use AI to understand their data and ship faster.
+                            Start with 50 free messages — no credit card needed.
                         </p>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
@@ -1231,9 +1225,7 @@ function Footer() {
         <footer className="border-t border-white/[0.04] py-12 px-6">
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                        <Zap className="w-3 h-3 text-black" strokeWidth={3} />
-                    </div>
+                    <img src="/icon.svg" alt="TrafficClaw" className="w-6 h-6 rounded-md" />
                     <span className="text-sm font-bold text-white">
                         Traffic<span className="text-emerald-400">Claw</span>
                     </span>
@@ -1263,13 +1255,21 @@ export default function LandingPage() {
         <>
             <Hero />
             <StatsBar />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Features />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <HowItWorks />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <InteractiveDemo />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <IntegrationMarquee />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Comparison />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Testimonials />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Pricing />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <FinalCTA />
             <Footer />
         </>

@@ -560,77 +560,6 @@ export default function DashboardOverview() {
       {/* ═══ 2. INTELLIGENCE — Top Stats + Filter Bar + Active Alerts ═══ */}
       {hasData && (seoData || analyticsData) && (
         <>
-          {/* Top Stats Row */}
-          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Health Score */}
-            <div className="col-span-2 lg:col-span-1 bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent" />
-              <div className="relative">
-                <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="6" />
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="url(#healthGradOverview)" strokeWidth="6"
-                    strokeLinecap="round" strokeDasharray={`${(intelHealthScore / 100) * 213.6} 213.6`}
-                    className="transition-all duration-1000" />
-                  <defs>
-                    <linearGradient id="healthGradOverview" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor={intelHealthScore >= 80 ? '#34d399' : intelHealthScore >= 50 ? '#fbbf24' : '#f87171'} />
-                      <stop offset="100%" stopColor={intelHealthScore >= 80 ? '#22d3ee' : intelHealthScore >= 50 ? '#fb923c' : '#ec4899'} />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={`text-2xl font-black ${intelHealthColor}`}>{intelHealthScore}</span>
-                </div>
-              </div>
-              <span className="text-[10px] text-zinc-500 mt-1 font-medium">HEALTH SCORE</span>
-            </div>
-
-            {/* Critical Issues */}
-            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${criticalCount > 0 ? 'border-red-500/20 hover:border-red-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${criticalCount > 0 ? 'bg-red-500/10' : 'bg-white/[0.04]'}`}>
-                  <XCircle className={`w-4 h-4 ${criticalCount > 0 ? 'text-red-400' : 'text-zinc-600'}`} />
-                </div>
-                {criticalCount > 0 && <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
-              </div>
-              <div className={`text-2xl font-bold ${criticalCount > 0 ? 'text-red-400' : 'text-zinc-600'}`}>{criticalCount}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Critical Issues</div>
-            </div>
-
-            {/* Warnings */}
-            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${warningCount > 0 ? 'border-amber-500/20 hover:border-amber-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${warningCount > 0 ? 'bg-amber-500/10' : 'bg-white/[0.04]'}`}>
-                  <AlertTriangle className={`w-4 h-4 ${warningCount > 0 ? 'text-amber-400' : 'text-zinc-600'}`} />
-                </div>
-              </div>
-              <div className={`text-2xl font-bold ${warningCount > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{warningCount}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Warnings</div>
-            </div>
-
-            {/* Opportunities */}
-            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${opportunityCount > 0 ? 'border-emerald-500/20 hover:border-emerald-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${opportunityCount > 0 ? 'bg-emerald-500/10' : 'bg-white/[0.04]'}`}>
-                  <Sparkles className={`w-4 h-4 ${opportunityCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`} />
-                </div>
-              </div>
-              <div className={`text-2xl font-bold ${opportunityCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{opportunityCount}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Opportunities</div>
-            </div>
-
-            {/* Wins */}
-            <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all ${successCount > 0 ? 'border-emerald-500/20 hover:border-emerald-500/30' : 'border-white/[0.04] hover:border-white/[0.1]'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${successCount > 0 ? 'bg-emerald-500/10' : 'bg-white/[0.04]'}`}>
-                  <Crown className={`w-4 h-4 ${successCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`} />
-                </div>
-              </div>
-              <div className={`text-2xl font-bold ${successCount > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{successCount}</div>
-              <div className="text-[10px] text-zinc-500 mt-0.5">Wins</div>
-            </div>
-          </motion.div>
-
           {/* Filter Bar */}
           <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 mr-2">
@@ -793,7 +722,7 @@ export default function DashboardOverview() {
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Performance Score Gauge */}
           {performanceScore !== null && scoreData && (
-            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer group">
               <div className="relative w-16 h-16 flex-shrink-0">
                 <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-white/[0.06]" strokeWidth="2.5" />
@@ -817,11 +746,15 @@ export default function DashboardOverview() {
                   Traffic {(analyticsKPIs?.changeUsers || 0) >= 0 ? '+' : ''}{analyticsKPIs?.changeUsers || 0}% | CTR {seoKPIs?.avgCTR || '—'}%
                 </div>
               </div>
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                <div className="text-[10px] text-zinc-400">Click for full breakdown</div>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+              </div>
             </div>
           )}
 
           {/* Growth Velocity */}
-          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer group">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
               growthVelocity !== null && growthVelocity > 0
                 ? 'bg-emerald-500/10 border border-emerald-500/20'
@@ -849,10 +782,14 @@ export default function DashboardOverview() {
                 <div className="text-sm text-zinc-600">Needs 14+ days of data</div>
               )}
             </div>
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+              <div className="text-[10px] text-zinc-400">Click for trend breakdown</div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+            </div>
           </div>
 
           {/* Branded vs Non-Branded Split */}
-          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer group">
             <div className="flex items-center gap-2 mb-3">
               <Tag className="w-4 h-4 text-cyan-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic</span>
@@ -880,6 +817,10 @@ export default function DashboardOverview() {
             ) : (
               <div className="text-sm text-zinc-600">Not enough query data</div>
             )}
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+              <div className="text-[10px] text-zinc-400">Click for brand analysis</div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+            </div>
           </div>
         </motion.div>
       )}
@@ -973,7 +914,7 @@ export default function DashboardOverview() {
           {/* ═══ INTELLIGENCE: Insight Cards Grid ═══ */}
           <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* CTR Benchmark Card */}
-            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition">
+            <div className="relative bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition group">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
                   <MousePointer className="w-4 h-4 text-violet-400" />
@@ -1002,10 +943,14 @@ export default function DashboardOverview() {
                   </div>
                 );
               })()}
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                <div className="text-[10px] text-zinc-400">CTR for top-5 positions vs industry avg</div>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+              </div>
             </div>
 
             {/* Keyword Distribution */}
-            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition">
+            <div className="relative bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition group">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                   <Hash className="w-4 h-4 text-blue-400" />
@@ -1038,10 +983,14 @@ export default function DashboardOverview() {
                   </div>
                 );
               })()}
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                <div className="text-[10px] text-zinc-400">Keywords grouped by search ranking position</div>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+              </div>
             </div>
 
             {/* Quick Trend */}
-            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition">
+            <div className="relative bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition group">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -1072,6 +1021,10 @@ export default function DashboardOverview() {
               ) : (
                 <p className="text-xs text-zinc-600">Not enough data to show trend</p>
               )}
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                <div className="text-[10px] text-zinc-400">Daily search clicks over the last 14 days</div>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+              </div>
             </div>
           </motion.div>
 
@@ -1662,8 +1615,13 @@ function KPICard({
     );
   }
 
+  const sparkMin = sparkData.length > 0 ? Math.min(...sparkData.map(d => d.v)) : 0;
+  const sparkMax = sparkData.length > 0 ? Math.max(...sparkData.map(d => d.v)) : 0;
+  const numVal = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
+  const prev = change !== undefined && change !== 0 ? Math.round(numVal / (1 + change / 100)) : null;
+
   return (
-    <Link href={href} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.12] transition-all group">
+    <Link href={href} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.12] transition-all group">
       <div className="flex items-center justify-between mb-2">
         <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
           <Icon className="w-4 h-4 text-zinc-400 group-hover:text-white transition-colors" />
@@ -1681,11 +1639,7 @@ function KPICard({
       </div>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[10px] text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
-        {showValue && change !== undefined && change !== 0 && (() => {
-          const numVal = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
-          const prev = Math.round(numVal / (1 + change / 100));
-          return <span className="text-[9px] text-zinc-600 font-mono">was {prev.toLocaleString()}</span>;
-        })()}
+        {prev !== null && <span className="text-[9px] text-zinc-600 font-mono">was {prev.toLocaleString()}</span>}
       </div>
 
       {sparkData.length > 0 && (
@@ -1701,6 +1655,17 @@ function KPICard({
               <Area type="monotone" dataKey="v" stroke={sparkColor} fill={`url(#spark-${label})`} strokeWidth={1.5} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Hover tooltip */}
+      {showValue && (
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 px-3 py-2 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+          <div className="text-[10px] text-zinc-300 font-medium mb-1">{label} Details</div>
+          {prev !== null && <div className="text-[10px] text-zinc-500">Previous: <span className="text-zinc-300">{prev.toLocaleString()}</span></div>}
+          {sparkData.length > 0 && <div className="text-[10px] text-zinc-500">Range: <span className="text-zinc-300">{sparkMin.toLocaleString()} – {sparkMax.toLocaleString()}</span></div>}
+          {change !== undefined && <div className={`text-[10px] ${positive ? 'text-emerald-400' : 'text-red-400'}`}>{positive ? 'Trending up' : 'Trending down'} {Math.abs(change)}%</div>}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
         </div>
       )}
     </Link>
