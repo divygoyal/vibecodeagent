@@ -28,6 +28,27 @@ const QUICK_PROMPTS = [
     '🔮 Growth opportunities I am missing',
 ];
 
+const THINKING_PHASES = [
+    'Warming up brain cells...',
+    'Scanning your data...',
+    'Crunching the numbers...',
+    'Connecting the dots...',
+    'Hunting for insights...',
+    'Downloading intelligence...',
+    'Processing at light speed...',
+    'Reading the data tea leaves...',
+    'Asking the data gods...',
+    'Decoding the matrix...',
+];
+
+const TOOL_LABELS: Record<string, string> = {
+    get_search_performance: 'Digging through search data...',
+    get_analytics_breakdown: 'Poking around your analytics...',
+    run_page_audit: 'Running a health check on pages...',
+    calculate_revenue_impact: 'Counting potential dollars...',
+    generate_content_strategy: 'Cooking up content ideas...',
+};
+
 // Simple markdown-ish renderer for bot responses
 function renderMessage(text: string) {
     const lines = text.split('\n');
@@ -108,6 +129,66 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded }: { msg: Me
                 )}
                 <div className="text-[10px] text-zinc-700 mt-2 select-none">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+            </div>
+        </div>
+    );
+});
+
+// Fun animated robot thinking indicator
+const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { activeTool?: string }) {
+    const [phase, setPhase] = useState(0);
+    const [eyesClosed, setEyesClosed] = useState(false);
+
+    useEffect(() => {
+        const msgTimer = setInterval(() => setPhase(p => (p + 1) % THINKING_PHASES.length), 2500);
+        const blinkTimer = setInterval(() => {
+            setEyesClosed(true);
+            setTimeout(() => setEyesClosed(false), 150);
+        }, 3000);
+        return () => { clearInterval(msgTimer); clearInterval(blinkTimer); };
+    }, []);
+
+    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : THINKING_PHASES[phase];
+
+    return (
+        <div className="flex justify-start">
+            <div className="px-4 py-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] rounded-bl-sm">
+                <div className="flex items-center gap-3">
+                    {/* Cute robot */}
+                    <div className="relative flex-shrink-0 w-8" style={{ height: 36 }}>
+                        {/* Antenna tip */}
+                        <div
+                            className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
+                            style={{ boxShadow: '0 0 6px rgba(52,211,153,0.5)' }}
+                        />
+                        {/* Antenna stem */}
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-px h-1 bg-emerald-500/40" />
+                        {/* Head */}
+                        <div className="absolute top-3 inset-x-0 bottom-0 rounded-lg bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center gap-2">
+                            <div
+                                className="rounded-full bg-emerald-400 transition-all duration-100"
+                                style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(52,211,153,0.6)' }}
+                            />
+                            <div
+                                className="rounded-full bg-cyan-400 transition-all duration-100"
+                                style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(34,211,238,0.6)' }}
+                            />
+                        </div>
+                    </div>
+                    {/* Message + dots */}
+                    <div className="min-w-0">
+                        <span className="text-[12px] text-zinc-400 font-medium">{message}</span>
+                        <div className="flex gap-1 mt-1.5">
+                            {[0, 1, 2].map(i => (
+                                <div
+                                    key={i}
+                                    className="w-1 h-1 rounded-full bg-emerald-400/60 animate-bounce"
+                                    style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }}
+                                />
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -424,6 +505,8 @@ export default function AIChatbot() {
     }
 
     const currentSiteLabel = allSites.find(s => s.id === selectedChatSite)?.label || 'Select website';
+    const lastMsg = messages[messages.length - 1];
+    const activeTool = isLoading ? lastMsg?.tools?.find(t => !t.result)?.name : undefined;
 
     // ─── Chat window ───
     return (
@@ -503,17 +586,9 @@ export default function AIChatbot() {
                         return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} />;
                     })}
 
-                    {/* Thinking indicator */}
-                    {isLoading && (
-                        <div className="flex justify-start">
-                            <div className="flex items-center gap-2 px-3 py-2">
-                                <div className="relative w-5 h-5">
-                                    <div className="absolute inset-0 rounded-full border-2 border-emerald-500/20" />
-                                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-emerald-400 animate-spin" />
-                                </div>
-                                <span className="text-[12px] text-zinc-500 animate-pulse">Thinking...</span>
-                            </div>
-                        </div>
+                    {/* Thinking indicator — cute robot with cycling messages */}
+                    {isLoading && (!lastMsg?.content || activeTool) && (
+                        <ThinkingIndicator activeTool={activeTool} />
                     )}
                     <div ref={messagesEndRef} />
                 </div>
