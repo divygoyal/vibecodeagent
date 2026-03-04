@@ -63,6 +63,11 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
         run_page_audit: 'Page Audit',
         calculate_revenue_impact: 'Revenue Impact',
         generate_content_strategy: 'Content Strategy',
+        analyze_keyword_clusters: 'Keyword Clusters',
+        compare_time_periods: 'Period Comparison',
+        find_cannibalization: 'Cannibalization Check',
+        suggest_internal_links: 'Internal Links',
+        generate_meta_tags: 'Meta Tags',
     };
 
     return (

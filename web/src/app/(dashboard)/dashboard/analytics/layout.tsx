@@ -6,11 +6,10 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     BarChart3, FileText, Radio, Zap, Users, ChevronDown,
-    CalendarDays, X, Filter, GitCompare, Loader2
+    X, Filter, GitCompare, Loader2
 } from 'lucide-react';
 import { useRegistration } from '../layout';
 import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
-import { signIn } from 'next-auth/react';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
 import { ConnectGoogleState } from '@/components/EmptyState';
 
@@ -20,17 +19,6 @@ const TABS = [
     { key: '/realtime', label: 'Realtime', icon: Radio },
     { key: '/events', label: 'Events', icon: Zap },
     { key: '/sessions', label: 'Sessions', icon: Users },
-];
-
-const RANGES = [
-    { value: 'today', label: 'Today' },
-    { value: 'yesterday', label: 'Yesterday' },
-    { value: '7d', label: 'Last 7 days' },
-    { value: '14d', label: 'Last 14 days' },
-    { value: '30d', label: 'Last 30 days' },
-    { value: '90d', label: 'Last 90 days' },
-    { value: '6m', label: 'Last 6 months' },
-    { value: '12m', label: 'Last 12 months' },
 ];
 
 // Shared analytics context for sub-pages
@@ -103,9 +91,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
-    const { selectedProperty, setSelectedProperty } = useRegistration();
-    const [range, setRange] = useState('30d');
-    const [showRangeDropdown, setShowRangeDropdown] = useState(false);
+    const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
     const { filters, clearFilter, clearAll, compareMode, setCompareMode } = useFilterStore();
 
     useEffect(() => {
@@ -119,7 +105,6 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
         return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="real traffic data, visitor insights, and performance metrics" /></div>;
     }
 
-    const isRealtime = pathname?.includes('/realtime');
     const activeFilterCount = Object.values(filters).filter(arr => arr.length > 0).length;
 
     return (
@@ -156,37 +141,6 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                 Compare
                             </button>
 
-                            {/* Date range */}
-                            {!isRealtime && (
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setShowRangeDropdown(!showRangeDropdown)}
-                                        className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
-                                    >
-                                        <CalendarDays className="w-3.5 h-3.5" />
-                                        {RANGES.find(r => r.value === range)?.label || 'Last 30 days'}
-                                        <ChevronDown className="w-3 h-3" />
-                                    </button>
-                                    {showRangeDropdown && (
-                                        <>
-                                            <div className="fixed inset-0 z-40" onClick={() => setShowRangeDropdown(false)} />
-                                            <div className="absolute right-0 mt-1 z-50 bg-[#0c0c10] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px]">
-                                                {RANGES.map(r => (
-                                                    <button
-                                                        key={r.value}
-                                                        onClick={() => { setRange(r.value); setShowRangeDropdown(false); }}
-                                                        className={`w-full text-left px-4 py-2 text-[11px] transition ${
-                                                            range === r.value ? 'text-blue-400 bg-blue-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                                        }`}
-                                                    >
-                                                        {r.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
 

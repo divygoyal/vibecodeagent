@@ -98,7 +98,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export default function DashboardOverview() {
   const { data: session } = useSession();
-  const { isRegistering, isRegistered, registrationError, selectedSite, setSelectedSite, selectedProperty, setSelectedProperty } = useRegistration();
+  const { isRegistering, isRegistered, registrationError, selectedSite, setSelectedSite, selectedProperty, setSelectedProperty, range } = useRegistration();
 
   // 1. Container status + Google connection check
   const { botStatus, hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
@@ -154,7 +154,7 @@ export default function DashboardOverview() {
   // 3. Fetch Data — start fetching if Google is connected OR we have a cached site (optimistic)
   const hasCachedSite = !!selectedSite;
   const canFetchData = hasGoogleConnection || hasCachedSite;
-  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, canFetchData);
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProp?.property, canFetchData, range);
   const { data: seoData, isLoading: seoLoading } = useSeoData('all', selectedSite, canFetchData);
 
   // 4. Real-time active users (deferred until primary data loads)

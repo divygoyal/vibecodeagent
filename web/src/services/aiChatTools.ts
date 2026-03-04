@@ -179,6 +179,152 @@ This is a computation tool — it processes the injected data and returns strate
             required: ['analysisType'],
         },
     },
+    {
+        name: 'analyze_keyword_clusters',
+        description: `Group the user's existing queries into semantic topic clusters. Pure computation — no API calls.
+
+WHEN TO USE:
+- "Group my keywords" / "Show my keyword clusters"
+- "What topics do I rank for?"
+- "Which keyword groups should I focus on?"
+- "How is my content organized by topic?"
+
+Pass the top queries from dashboard context. Returns clustered topics with aggregate metrics.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                queries: {
+                    type: 'STRING' as const,
+                    description: 'JSON array of query objects from dashboard context. Each: {"query":"...","clicks":N,"impressions":N,"ctr":N,"position":N}',
+                },
+            },
+            required: ['queries'],
+        },
+    },
+    {
+        name: 'compare_time_periods',
+        description: `Compare GSC performance across two time periods side-by-side. Uses 2 GSC API calls.
+
+WHEN TO USE:
+- "Compare this week vs last week"
+- "How did last month compare to the month before?"
+- "Is my performance improving or declining?"
+- "Show me before/after [date]"
+
+Returns a comparison table with delta values and percentage changes.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: {
+                    type: 'STRING' as const,
+                    description: 'Site URL from [AVAILABLE SITES]',
+                },
+                period1Start: { type: 'STRING' as const, description: 'Period 1 start date (YYYY-MM-DD)' },
+                period1End: { type: 'STRING' as const, description: 'Period 1 end date (YYYY-MM-DD)' },
+                period2Start: { type: 'STRING' as const, description: 'Period 2 start date (YYYY-MM-DD)' },
+                period2End: { type: 'STRING' as const, description: 'Period 2 end date (YYYY-MM-DD)' },
+                dimensions: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const, enum: ['query', 'page', 'device', 'country'] },
+                    description: 'Dimensions to compare. Default ["query"].',
+                },
+            },
+            required: ['siteUrl', 'period1Start', 'period1End', 'period2Start', 'period2End'],
+        },
+    },
+    {
+        name: 'find_cannibalization',
+        description: `Detect keyword cannibalization — multiple pages ranking for the same query. Uses 1 GSC call with [query, page] dimensions.
+
+WHEN TO USE:
+- "Check for cannibalization"
+- "Are multiple pages competing for the same keyword?"
+- "Which keywords have duplicate ranking pages?"
+- "Find internal competition"
+
+Returns queries with 2+ pages ranking, sorted by impression volume.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: {
+                    type: 'STRING' as const,
+                    description: 'Site URL from [AVAILABLE SITES]',
+                },
+                startDate: { type: 'STRING' as const, description: 'Start date (YYYY-MM-DD)' },
+                endDate: { type: 'STRING' as const, description: 'End date (YYYY-MM-DD)' },
+                minImpressions: {
+                    type: 'INTEGER' as const,
+                    description: 'Minimum impressions to consider. Default 10.',
+                },
+            },
+            required: ['siteUrl', 'startDate', 'endDate'],
+        },
+    },
+    {
+        name: 'suggest_internal_links',
+        description: `Suggest internal linking opportunities based on the user's existing pages and queries. Pure AI reasoning — no API calls.
+
+WHEN TO USE:
+- "Suggest internal links"
+- "How should I link my pages together?"
+- "Find linking opportunities"
+- "Improve my internal link structure"
+
+Pass existing pages and queries from dashboard context. Returns linking suggestions with anchor text recommendations.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                pages: {
+                    type: 'STRING' as const,
+                    description: 'JSON array of page objects. Each: {"page":"...","clicks":N,"impressions":N,"position":N}',
+                },
+                queries: {
+                    type: 'STRING' as const,
+                    description: 'JSON array of query objects. Each: {"query":"...","clicks":N,"position":N}',
+                },
+            },
+            required: ['pages'],
+        },
+    },
+    {
+        name: 'generate_meta_tags',
+        description: `Generate optimized title tag and meta description for a page based on its URL and target keywords. Pure AI generation — no API calls.
+
+WHEN TO USE:
+- "Generate meta tags for my homepage"
+- "Write a better title tag for /blog/..."
+- "Optimize my meta description"
+- "Help me with my title and description"
+
+Returns optimized title (under 60 chars) and description (under 155 chars) with keyword placement.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                url: {
+                    type: 'STRING' as const,
+                    description: 'The page URL to generate meta tags for',
+                },
+                targetKeywords: {
+                    type: 'STRING' as const,
+                    description: 'Comma-separated target keywords for this page',
+                },
+                currentTitle: {
+                    type: 'STRING' as const,
+                    description: 'Current title tag (if known)',
+                },
+                currentDescription: {
+                    type: 'STRING' as const,
+                    description: 'Current meta description (if known)',
+                },
+                pageType: {
+                    type: 'STRING' as const,
+                    enum: ['homepage', 'blog', 'product', 'service', 'landing', 'category', 'other'],
+                    description: 'Type of page for context',
+                },
+            },
+            required: ['url'],
+        },
+    },
 ];
 
 export interface GscContext {
@@ -597,5 +743,257 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         return { result };
     }
 
-    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, get_analytics_breakdown, run_page_audit, generate_content_strategy` };
+    if (name === 'analyze_keyword_clusters') {
+        try {
+            const queries = JSON.parse(args.queries || '[]');
+            if (!Array.isArray(queries) || queries.length === 0) {
+                return { result: { instructions: 'No queries provided. Pass the top queries from dashboard context as a JSON array.', clusters: [] } };
+            }
+
+            // Simple semantic clustering by shared words
+            const clusters = new Map<string, { queries: any[]; totalClicks: number; totalImpressions: number; avgPosition: number }>();
+            for (const q of queries) {
+                const words = (q.query || '').toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+                // Use the longest meaningful word as the cluster key
+                const clusterKey = words.sort((a: string, b: string) => b.length - a.length)[0] || 'other';
+                if (!clusters.has(clusterKey)) {
+                    clusters.set(clusterKey, { queries: [], totalClicks: 0, totalImpressions: 0, avgPosition: 0 });
+                }
+                const cluster = clusters.get(clusterKey)!;
+                cluster.queries.push(q);
+                cluster.totalClicks += q.clicks || 0;
+                cluster.totalImpressions += q.impressions || 0;
+            }
+
+            // Calculate averages and sort by total clicks
+            const result = Array.from(clusters.entries())
+                .map(([topic, data]) => {
+                    const posSum = data.queries.reduce((sum: number, q: any) => sum + (q.position || 0), 0);
+                    return {
+                        topic,
+                        queryCount: data.queries.length,
+                        totalClicks: data.totalClicks,
+                        totalImpressions: data.totalImpressions,
+                        avgPosition: Math.round((posSum / data.queries.length) * 10) / 10,
+                        topQueries: data.queries.slice(0, 5).map((q: any) => q.query),
+                    };
+                })
+                .sort((a, b) => b.totalClicks - a.totalClicks)
+                .slice(0, 15);
+
+            return {
+                result: {
+                    instructions: 'Analyze these keyword clusters. Identify strong clusters to double down on, weak clusters to improve, and missing topic areas. Recommend content strategy per cluster.',
+                    totalQueries: queries.length,
+                    clusterCount: result.length,
+                    clusters: result,
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to cluster keywords' };
+        }
+    }
+
+    if (name === 'compare_time_periods') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected.' };
+        }
+
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const { siteUrl, period1Start, period1End, period2Start, period2End } = args;
+            const dimensions = args.dimensions || ['query'];
+
+            const body = (start: string, end: string) => ({
+                startDate: start,
+                endDate: end,
+                dimensions,
+                rowLimit: 100,
+                dataState: 'all',
+            });
+
+            // Fetch both periods in parallel
+            const [result1, result2] = await Promise.all([
+                queryGSCWithAutoResolve(token, siteUrl, body(period1Start, period1End)),
+                queryGSCWithAutoResolve(token, siteUrl, body(period2Start, period2End)),
+            ]);
+
+            const rows1 = (result1.data?.rows || []);
+            const rows2 = (result2.data?.rows || []);
+
+            // Build lookup maps
+            const buildMap = (rows: any[]) => {
+                const map = new Map<string, any>();
+                for (const row of rows) {
+                    const key = row.keys.join('|');
+                    map.set(key, { clicks: row.clicks, impressions: row.impressions, ctr: Math.round(row.ctr * 10000) / 100, position: Math.round(row.position * 10) / 10 });
+                }
+                return map;
+            };
+
+            const map1 = buildMap(rows1);
+            const map2 = buildMap(rows2);
+            const allKeys = new Set([...map1.keys(), ...map2.keys()]);
+
+            const comparison = Array.from(allKeys).map(key => {
+                const p1 = map1.get(key) || { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+                const p2 = map2.get(key) || { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+                return {
+                    key,
+                    period1: p1,
+                    period2: p2,
+                    deltaClicks: p2.clicks - p1.clicks,
+                    deltaImpressions: p2.impressions - p1.impressions,
+                    deltaPosition: Math.round((p2.position - p1.position) * 10) / 10,
+                };
+            })
+                .sort((a, b) => Math.abs(b.deltaClicks) - Math.abs(a.deltaClicks))
+                .slice(0, 30);
+
+            // Totals
+            const sum = (rows: any[], metric: string) => rows.reduce((s: number, r: any) => s + (r[metric] || 0), 0);
+            const totals = {
+                period1: { clicks: sum(rows1, 'clicks'), impressions: sum(rows1, 'impressions') },
+                period2: { clicks: sum(rows2, 'clicks'), impressions: sum(rows2, 'impressions') },
+            };
+
+            // CSV output
+            const csvHeader = `${dimensions.join(',')},p1_clicks,p1_impressions,p1_position,p2_clicks,p2_impressions,p2_position,delta_clicks`;
+            const csvRows = comparison.map(c => {
+                return `"${c.key}",${c.period1.clicks},${c.period1.impressions},${c.period1.position},${c.period2.clicks},${c.period2.impressions},${c.period2.position},${c.deltaClicks}`;
+            });
+
+            return {
+                result: {
+                    period1: `${period1Start} to ${period1End}`,
+                    period2: `${period2Start} to ${period2End}`,
+                    totals,
+                    rowsCompared: comparison.length,
+                    csvData: [csvHeader, ...csvRows].join('\n'),
+                },
+                structuredData: {
+                    dimensions,
+                    rows: comparison.map(c => ({
+                        ...Object.fromEntries(c.key.split('|').map((v, i) => [dimensions[i], v])),
+                        clicks: c.period2.clicks,
+                        impressions: c.period2.impressions,
+                        position: c.period2.position,
+                        deltaClicks: c.deltaClicks,
+                    })),
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to compare periods' };
+        }
+    }
+
+    if (name === 'find_cannibalization') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected.' };
+        }
+
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const { siteUrl, startDate, endDate, minImpressions } = args;
+            const minImp = minImpressions || 10;
+
+            const body = {
+                startDate,
+                endDate,
+                dimensions: ['query', 'page'],
+                rowLimit: 500,
+                dataState: 'all',
+            };
+
+            const { data } = await queryGSCWithAutoResolve(token, siteUrl, body);
+            if (!data?.rows) {
+                return { result: { note: 'No data returned. Check site URL and date range.', cannibalized: [] } };
+            }
+
+            // Group by query, find those with 2+ pages
+            const queryMap = new Map<string, { pages: { page: string; clicks: number; impressions: number; ctr: number; position: number }[]; totalImpressions: number }>();
+            for (const row of data.rows) {
+                const query = row.keys[0];
+                const page = row.keys[1];
+                if (row.impressions < minImp) continue;
+
+                if (!queryMap.has(query)) {
+                    queryMap.set(query, { pages: [], totalImpressions: 0 });
+                }
+                const entry = queryMap.get(query)!;
+                entry.pages.push({
+                    page,
+                    clicks: row.clicks,
+                    impressions: row.impressions,
+                    ctr: Math.round(row.ctr * 10000) / 100,
+                    position: Math.round(row.position * 10) / 10,
+                });
+                entry.totalImpressions += row.impressions;
+            }
+
+            // Filter to only cannibalized queries (2+ pages)
+            const cannibalized = Array.from(queryMap.entries())
+                .filter(([, v]) => v.pages.length >= 2)
+                .sort((a, b) => b[1].totalImpressions - a[1].totalImpressions)
+                .slice(0, 20)
+                .map(([query, data]) => ({
+                    query,
+                    pageCount: data.pages.length,
+                    totalImpressions: data.totalImpressions,
+                    pages: data.pages.sort((a, b) => b.impressions - a.impressions).slice(0, 5),
+                }));
+
+            return {
+                result: {
+                    dateRange: `${startDate} to ${endDate}`,
+                    cannibalizedKeywords: cannibalized.length,
+                    instructions: 'For each cannibalized keyword, recommend: which page should be the canonical target, which pages should be redirected or consolidated, and suggested content changes.',
+                    cannibalized,
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to check cannibalization' };
+        }
+    }
+
+    if (name === 'suggest_internal_links') {
+        try {
+            const pages = JSON.parse(args.pages || '[]');
+            const queries = args.queries ? JSON.parse(args.queries) : [];
+
+            return {
+                result: {
+                    instructions: `Analyze these pages and queries to suggest internal linking opportunities. For each suggestion provide: source page → target page, recommended anchor text, and why this link helps SEO. Focus on: (1) pages with related topics that should link to each other, (2) high-authority pages that should link to weaker pages, (3) pages targeting related queries that could benefit from link equity. Be specific with anchor text suggestions.`,
+                    pageCount: pages.length,
+                    queryCount: queries.length,
+                    pages: pages.slice(0, 20),
+                    queries: queries.slice(0, 20),
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to parse page data' };
+        }
+    }
+
+    if (name === 'generate_meta_tags') {
+        const { url, targetKeywords, currentTitle, currentDescription, pageType } = args;
+
+        return {
+            result: {
+                instructions: `Generate optimized meta tags for this page. Rules:
+- Title: Max 60 characters, primary keyword near the front, include brand name at end with | separator
+- Description: Max 155 characters, include primary keyword naturally, include a call-to-action, make it compelling for clicks
+- Provide 3 title variations and 2 description variations
+- If current tags are provided, explain what's wrong with them
+- Consider the page type for tone (${pageType || 'general'})`,
+                url,
+                targetKeywords: targetKeywords || 'Not specified — infer from URL and context',
+                currentTitle: currentTitle || 'Not provided',
+                currentDescription: currentDescription || 'Not provided',
+                pageType: pageType || 'other',
+            },
+        };
+    }
+
+    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, get_analytics_breakdown, run_page_audit, generate_content_strategy, analyze_keyword_clusters, compare_time_periods, find_cannibalization, suggest_internal_links, generate_meta_tags` };
 }

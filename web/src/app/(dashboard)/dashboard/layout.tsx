@@ -12,9 +12,10 @@ const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), 
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, Zap, LogOut, Menu, X,
-    Book, Newspaper, History, Sun, Moon, Coins, Radar, MessageSquare
+    Book, Newspaper, History, Sun, Moon, Coins, Radar, MessageSquare,
+    CalendarDays, ChevronDown, Bell, Eye
 } from 'lucide-react';
-import { useCredits } from '@/lib/useDashboardData';
+import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 
 // Registration context to coordinate registration with data fetching
 interface RegistrationContextType {
@@ -26,6 +27,8 @@ interface RegistrationContextType {
     setSelectedProperty: (v: string) => void;
     selectedSite: string;
     setSelectedSite: (v: string) => void;
+    range: string;
+    setRange: (v: string) => void;
 }
 
 const RegistrationContext = createContext<RegistrationContextType>({
@@ -37,6 +40,8 @@ const RegistrationContext = createContext<RegistrationContextType>({
     setSelectedProperty: () => { },
     selectedSite: '',
     setSelectedSite: () => { },
+    range: '30d',
+    setRange: () => { },
 });
 
 export const useRegistration = () => useContext(RegistrationContext);
@@ -44,12 +49,24 @@ export const useRegistration = () => useContext(RegistrationContext);
 const sidebarItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
     { icon: Radar, label: 'Intelligence', href: '/dashboard/intelligence' },
+    { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' },
     { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
     { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
     { icon: Search, label: 'SEO', href: '/dashboard/seo' },
     { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
+];
+
+const RANGES = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: '7d', label: '7 days' },
+    { value: '14d', label: '14 days' },
+    { value: '30d', label: '30 days' },
+    { value: '90d', label: '90 days' },
+    { value: '6m', label: '6 months' },
+    { value: '12m', label: '12 months' },
 ];
 
 const resourceItems = [
@@ -79,6 +96,19 @@ export default function DashboardLayout({
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [showWelcome, setShowWelcome] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const [range, setRange] = useState(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('tc-last-range') || '30d';
+        return '30d';
+    });
+    const [rangeDropdownOpen, setRangeDropdownOpen] = useState(false);
+    const [bellOpen, setBellOpen] = useState(false);
+
+    // Alerts for notification bell
+    const { hasGoogleConnection } = useContainerStatus();
+    const { sites: gscSites } = useSiteList(hasGoogleConnection);
+    const alertSiteUrl = selectedSite || (gscSites.length > 0 ? gscSites[0].siteUrl : '');
+    const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
+    const criticalAlertCount = alerts.filter((a: any) => a.severity === 'critical' || a.severity === 'warning').length;
 
     // Persist theme to localStorage and apply to <html>
     useEffect(() => {
@@ -93,6 +123,9 @@ export default function DashboardLayout({
     useEffect(() => {
         if (selectedSite) localStorage.setItem('tc-last-site', selectedSite);
     }, [selectedSite]);
+    useEffect(() => {
+        if (range) localStorage.setItem('tc-last-range', range);
+    }, [range]);
 
     const toggleTheme = () => {
         const next = theme === 'dark' ? 'light' : 'dark';
@@ -349,6 +382,100 @@ export default function DashboardLayout({
 
                     {/* Right side */}
                     <div className="flex items-center gap-3">
+                        {/* Global Date Range Picker */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setRangeDropdownOpen(!rangeDropdownOpen)}
+                                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
+                            >
+                                <CalendarDays className="w-3.5 h-3.5" />
+                                {RANGES.find(r => r.value === range)?.label || '30 days'}
+                                <ChevronDown className={`w-3 h-3 transition-transform ${rangeDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {rangeDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setRangeDropdownOpen(false)} />
+                                    <div className="absolute right-0 mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[140px]">
+                                        {RANGES.map(r => (
+                                            <button
+                                                key={r.value}
+                                                onClick={() => { setRange(r.value); setRangeDropdownOpen(false); }}
+                                                className={`w-full text-left px-3 py-2 text-[11px] transition ${
+                                                    range === r.value ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                                }`}
+                                            >
+                                                {r.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        {/* Notification Bell */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setBellOpen(!bellOpen)}
+                                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                                title="Alerts"
+                            >
+                                <Bell className="w-4 h-4" />
+                                {criticalAlertCount > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[#09090b]">
+                                        {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
+                                    </span>
+                                )}
+                            </button>
+                            {bellOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
+                                    <div className="absolute right-0 mt-1 z-50 bg-[#111116] border border-white/[0.1] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
+                                        <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-white">Alerts</span>
+                                            {alertCount > 0 && (
+                                                <span className="text-[10px] text-zinc-500">{alertCount} active</span>
+                                            )}
+                                        </div>
+                                        <div className="overflow-y-auto max-h-[300px]">
+                                            {alerts.length === 0 ? (
+                                                <div className="px-4 py-6 text-center">
+                                                    <Bell className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
+                                                    <p className="text-[11px] text-zinc-600">No alerts right now</p>
+                                                </div>
+                                            ) : (
+                                                alerts.slice(0, 10).map((alert: any) => (
+                                                    <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-white/[0.04] last:border-0">
+                                                        <div className="flex items-start gap-2.5">
+                                                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                                                alert.severity === 'critical' ? 'bg-red-400' :
+                                                                alert.severity === 'warning' ? 'bg-amber-400' :
+                                                                alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
+                                                            }`} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[11px] font-medium text-zinc-200 leading-snug">{alert.title}</p>
+                                                                {alert.metric && (
+                                                                    <p className="text-[10px] text-zinc-500 mt-0.5">{alert.metric}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                        {alerts.length > 0 && (
+                                            <div className="px-4 py-2 border-t border-white/[0.06]">
+                                                <Link
+                                                    href="/dashboard/intelligence"
+                                                    onClick={() => setBellOpen(false)}
+                                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
+                                                >
+                                                    View all in Intelligence →
+                                                </Link>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                         {/* Theme toggle */}
                         <button
                             onClick={toggleTheme}
@@ -384,7 +511,7 @@ export default function DashboardLayout({
                 {/* Page content */}
                 <main className="flex-1 p-6 overflow-y-auto">
                     <div className="max-w-7xl mx-auto">
-                        <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite }}>
+                        <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
                             {children}
                         </RegistrationContext.Provider>
                     </div>

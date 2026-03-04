@@ -49,6 +49,11 @@ const TOOL_LABELS: Record<string, string> = {
     run_page_audit: 'Running a health check on pages...',
     calculate_revenue_impact: 'Counting potential dollars...',
     generate_content_strategy: 'Cooking up content ideas...',
+    analyze_keyword_clusters: 'Clustering your keywords...',
+    compare_time_periods: 'Comparing time periods...',
+    find_cannibalization: 'Checking for cannibalization...',
+    suggest_internal_links: 'Finding linking opportunities...',
+    generate_meta_tags: 'Crafting meta tags...',
 };
 
 // Simple markdown-ish renderer for bot responses

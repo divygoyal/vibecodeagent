@@ -36,6 +36,11 @@ const TOOL_LABELS: Record<string, string> = {
     run_page_audit: 'Running page audit...',
     calculate_revenue_impact: 'Calculating revenue...',
     generate_content_strategy: 'Generating strategy...',
+    analyze_keyword_clusters: 'Clustering keywords...',
+    compare_time_periods: 'Comparing periods...',
+    find_cannibalization: 'Detecting cannibalization...',
+    suggest_internal_links: 'Finding link opportunities...',
+    generate_meta_tags: 'Generating meta tags...',
 };
 
 /* ─── Thinking Indicator ─── */
