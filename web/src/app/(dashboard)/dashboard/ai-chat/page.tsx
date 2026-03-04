@@ -9,12 +9,13 @@ import {
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
+import { buildSnapshot } from '@/lib/chatUtils';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
-    tools?: { name: string; args: any; result?: string }[];
+    tools?: { name: string; args: any; result?: string; structuredData?: any }[];
 }
 
 const STARTER_PROMPTS = [
@@ -102,6 +103,9 @@ export default function AIChat() {
     const { data: analyticsData } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedSite);
     const { data: seoData } = useSeoData('all', selectedSite, hasGoogleConnection && !!selectedSite);
     const dataReady = !!(analyticsData || seoData) || !hasGoogleConnection;
+
+    // Build snapshot for chart rendering in messages
+    const snapshot = useMemo(() => buildSnapshot(analyticsData, seoData), [analyticsData, seoData]);
 
     // Refs for stable callbacks
     const messagesRef = useRef(messages);
@@ -249,7 +253,7 @@ export default function AIChat() {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
                                 last.tools = (last.tools || []).map(t =>
-                                    t.name === data.name && !t.result ? { ...t, result: data.result || 'Done' } : t
+                                    t.name === data.name && !t.result ? { ...t, result: data.result || 'Done', structuredData: data.structuredData } : t
                                 );
                                 updated[updated.length - 1] = last;
                                 return updated;
@@ -405,7 +409,7 @@ export default function AIChat() {
                                         : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                                         }`}>
                                         {msg.role === 'assistant' ? (
-                                            <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} />
+                                            <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} />
                                         ) : (
                                             <div className="whitespace-pre-wrap">{msg.content}</div>
                                         )}

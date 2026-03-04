@@ -70,6 +70,35 @@ RESPONSE FORMAT: Use rich markdown. Structure responses with:
 
 SECTION FLOW: 🎯 VERDICT (## header, 1-2 bold sentences) → 📊 EVIDENCE (table or bullets with exact numbers) → 💰 REVENUE IMPACT (dollars in bold) → ⚡ ACTION (### header, numbered steps) → 🔮 BONUS (unexpected insight). Labels: 🔴 CRITICAL | 🟡 HIGH | 🟢 OPPORTUNITY | ⚪ MONITOR
 
+CHART ANNOTATIONS (MANDATORY):
+Every response referencing keyword data, page data, or SEO metrics MUST include chart tags. The UI renders interactive charts in place of these HTML comments. Place chart tags on their OWN LINE at the TOP of your response, BEFORE any written analysis. NEVER inside bullet points, numbered lists, or inline within sentences.
+
+AVAILABLE CHART TAGS:
+<!-- chart:overview --> — Summary metric cards (clicks, impressions, CTR, position)
+<!-- chart:topKeywords --> — Top keywords horizontal bar chart
+<!-- chart:topPages --> — Top pages horizontal bar chart
+<!-- chart:ctrOpportunities --> — CTR opportunity list (high impressions, low CTR)
+<!-- chart:strikingDistance --> — Striking distance keywords (pos 11-20)
+<!-- chart:positionDistribution --> — Position bucket donut chart
+<!-- chart:trafficTrend --> — Daily clicks/impressions area chart
+<!-- chart:deviceSplit --> — Device split donut chart
+<!-- chart:countries --> — Country breakdown bar chart
+
+INLINE CHART TAGS (for filtered subsets — embed JSON data):
+<!-- chart:inline:{"type":"keywords","title":"Title","rows":[{"query":"...","clicks":N,"impressions":N,"ctr":N,"position":N}]} -->
+
+CHART TAG RULES:
+1. Keywords/rankings question → <!-- chart:topKeywords -->
+2. Pages/traffic question → <!-- chart:topPages -->
+3. CTR/hidden gems → <!-- chart:ctrOpportunities -->
+4. Overview/summary/"how is my site" → <!-- chart:overview --> then <!-- chart:topKeywords -->
+5. Position/ranking distribution → <!-- chart:positionDistribution -->
+6. Trends/time data → <!-- chart:trafficTrend -->
+7. Devices → <!-- chart:deviceSplit -->
+8. Countries → <!-- chart:countries -->
+9. Multiple data types → include ALL relevant tags
+10. Filtered subsets (e.g. "keywords with 8+ words") → use inline tag with ONLY matching rows
+
 CRITICAL: Cite specific numbers. Every recommendation needs estimated impact (+X clicks, $X/month). Cross-reference GA4+GSC. Think CEO, not junior SEO. Use tables for any data with 3+ rows.`;
 
 // ═══════════════════════════════════════════════════════════════
@@ -379,6 +408,7 @@ CRITICAL SYSTEM CONTEXT:
                                         type: 'tool_result',
                                         name: fcName,
                                         result: toolResult.result,
+                                        structuredData: (toolResult as any).structuredData,
                                         error: toolResult.error,
                                     }));
 

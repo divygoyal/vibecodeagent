@@ -350,6 +350,11 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                     note: formattedRows.length > 50 ? 'DATA TRUNCATED to top 50 rows. Use metricFilters to drill down.' : '',
                     csvData: compressedCsv,
                 },
+                structuredData: {
+                    dimensions,
+                    rows: limitedRows,
+                    totals: { clicks: totalClicks, impressions: totalImpressions, ctr: parseFloat(avgCtr), position: parseFloat(avgPos) },
+                },
             };
         } catch (e: any) {
             return { error: e.message || 'Failed to fetch GSC data' };
@@ -444,6 +449,22 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 if (data.traffic) csvOutput += `Traffic trend: ${data.traffic.slice(0, 14).map((t: any) => `${t.date}:${t.activeUsers}u/${t.sessions}s`).join(' | ')}\n`;
             }
 
+            // Build structured data for chart rendering
+            const dimMap: Record<string, string> = {
+                date: 'date', sources: 'source', devices: 'device',
+                countries: 'country', referrers: 'referrer', entryPages: 'page',
+                pages: 'page', channels: 'channel',
+            };
+            const chartDimension = dimMap[dimension] || dimension;
+            let structuredRows: any[] = [];
+            if (Array.isArray(data)) {
+                structuredRows = data.slice(0, 30);
+            } else if (data.traffic) {
+                structuredRows = data.traffic.slice(0, 30).map((t: any) => ({
+                    date: t.date, clicks: t.activeUsers || 0, impressions: t.sessions || 0,
+                }));
+            }
+
             return {
                 result: {
                     dimension,
@@ -451,6 +472,10 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                     rowsReturned: Array.isArray(data) ? data.length : 1,
                     csvData: csvOutput || JSON.stringify(data).slice(0, 3000),
                 },
+                structuredData: structuredRows.length > 0 ? {
+                    dimensions: [chartDimension],
+                    rows: structuredRows,
+                } : undefined,
             };
         } catch (e: any) {
             return { error: e.message || 'Failed to fetch analytics data' };

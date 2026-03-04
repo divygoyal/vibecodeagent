@@ -4,12 +4,13 @@ import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import ChatMessageRenderer from './ChatMessageRenderer';
+import { buildSnapshot } from '@/lib/chatUtils';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
-    tools?: { name: string; args: any; result?: string }[];
+    tools?: { name: string; args: any; result?: string; structuredData?: any }[];
 }
 
 interface SiteOption {
@@ -114,7 +115,7 @@ function renderMessage(text: string) {
 }
 
 // Memoized message bubble — prevents re-rendering old messages when new chunks arrive
-const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming }: { msg: Message; isExpanded: boolean; isStreaming?: boolean }) {
+const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming, snapshot }: { msg: Message; isExpanded: boolean; isStreaming?: boolean; snapshot?: any }) {
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
@@ -122,7 +123,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
                 : 'bg-white/[0.02] text-zinc-300 border border-white/[0.06] rounded-bl-sm'
                 }`}>
                 {msg.role === 'assistant' ? (
-                    <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} />
+                    <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} snapshot={snapshot} />
                 ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
@@ -255,6 +256,9 @@ export default function AIChatbot() {
 
     // Track whether data is ready for sending messages
     const dataReady = !!(analyticsData || seoData) || !hasGoogleConnection;
+
+    // Build snapshot for chart rendering in messages
+    const snapshot = useMemo(() => buildSnapshot(analyticsData, seoData), [analyticsData, seoData]);
 
     // ── Refs for stable callback access (avoids dependency-loop in useCallback) ──
     const messagesRef = useRef(messages);
@@ -423,7 +427,7 @@ export default function AIChatbot() {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
                                 last.tools = (last.tools || []).map(t =>
-                                    t.name === data.name && !t.result ? { ...t, result: data.result || 'Done' } : t
+                                    t.name === data.name && !t.result ? { ...t, result: data.result || 'Done', structuredData: data.structuredData } : t
                                 );
                                 updated[updated.length - 1] = last;
                                 return updated;
@@ -583,7 +587,7 @@ export default function AIChatbot() {
                     {messages.map((msg, i) => {
                         if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                         const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
-                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} />;
+                        return <MessageBubble key={i} msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} />;
                     })}
 
                     {/* Thinking indicator — cute robot with cycling messages */}

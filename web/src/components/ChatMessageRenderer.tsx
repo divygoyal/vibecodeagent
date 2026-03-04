@@ -8,6 +8,10 @@ import {
     Wrench, CheckCircle2, Loader2, AlertCircle
 } from 'lucide-react';
 import type { Components } from 'react-markdown';
+import { SmartChartPanel } from './chat/ChatCharts';
+import { splitContentOnChartTags, renderSnapshotChart } from './chat/SnapshotChartRenderer';
+import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
+import { safeParseToolResult } from '@/lib/chatUtils';
 
 /* ─── Code Block with Copy ─── */
 function CodeBlock({ children, className }: { children: string; className?: string }) {
@@ -43,10 +47,11 @@ function CodeBlock({ children, className }: { children: string; className?: stri
 }
 
 /* ─── Tool Call Card ─── */
-interface ToolCall {
+export interface ToolCall {
     name: string;
     args?: any;
     result?: string;
+    structuredData?: { dimensions: string[]; rows: any[]; totals?: any };
 }
 
 export function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -184,9 +189,30 @@ interface ChatMessageRendererProps {
     content: string;
     tools?: ToolCall[];
     isStreaming?: boolean;
+    snapshot?: DashboardSnapshot;
 }
 
-export default memo(function ChatMessageRenderer({ content, tools, isStreaming }: ChatMessageRendererProps) {
+export default memo(function ChatMessageRenderer({ content, tools, isStreaming, snapshot }: ChatMessageRendererProps) {
+    // Check if we have live tool results with structured data (takes priority over snapshot charts)
+    const hasLiveToolResult = tools?.some(t =>
+        (t.name === 'get_search_performance' || t.name === 'get_analytics_breakdown') && (t.structuredData || t.result)
+    );
+
+    // Parse tool results for SmartChartPanel
+    const liveCharts = useMemo(() => {
+        if (!tools) return [];
+        return tools
+            .filter(t => t.result || t.structuredData)
+            .map(t => {
+                const parsed = t.structuredData || safeParseToolResult(t.result);
+                return parsed?.rows?.length ? { key: t.name, result: parsed } : null;
+            })
+            .filter(Boolean) as { key: string; result: any }[];
+    }, [tools]);
+
+    // Split content on chart tags
+    const segments = useMemo(() => splitContentOnChartTags(content || ''), [content]);
+
     return (
         <div className="chat-message-content space-y-0.5">
             {/* Tool call cards */}
@@ -198,13 +224,31 @@ export default memo(function ChatMessageRenderer({ content, tools, isStreaming }
                 </div>
             )}
 
-            {/* Markdown content */}
-            {content && (
-                <div className="prose-dark">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                        {content}
-                    </ReactMarkdown>
+            {/* Live charts from tool results (SmartChartPanel) */}
+            {liveCharts.length > 0 && (
+                <div className="mb-2">
+                    {liveCharts.map(({ key, result }) => (
+                        <SmartChartPanel key={key} result={result} />
+                    ))}
                 </div>
+            )}
+
+            {/* Interleaved markdown + snapshot charts */}
+            {segments.map((seg, i) =>
+                seg.type === 'chart' ? (
+                    // Render snapshot chart only if no live tool result covers this data
+                    !hasLiveToolResult && snapshot ? (
+                        <div key={`chart-${i}`}>{renderSnapshotChart(seg.tag, snapshot, seg.payload)}</div>
+                    ) : null
+                ) : (
+                    seg.content.trim() ? (
+                        <div key={`text-${i}`} className="prose-dark">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                {seg.content}
+                            </ReactMarkdown>
+                        </div>
+                    ) : null
+                )
             )}
 
             {/* Streaming cursor */}
