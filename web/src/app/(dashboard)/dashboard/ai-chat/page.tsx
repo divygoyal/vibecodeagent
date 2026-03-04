@@ -182,9 +182,9 @@ export default function AIChat() {
         try {
             const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
 
-            // TTFB timeout: abort if no response headers within 25s (matches chatbot sidebar)
+            // Hard timeout: abort if no response headers within 30s
             const abortController = new AbortController();
-            const ttfbTimeout = setTimeout(() => abortController.abort(), 25000);
+            const ttfbTimeout = setTimeout(() => abortController.abort(), 30000);
 
             const res = await fetch('/api/ai-chat', {
                 method: 'POST',

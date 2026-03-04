@@ -16,18 +16,25 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 // Initialize the official Gemini SDK
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
-// Fallback model chain: try each in order if previous returns 429/503
-const CHAT_MODELS = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-2.0-flash'] as const;
+// Fallback model chain: try each in order if previous returns 429/503/timeout
+const CHAT_MODELS = [
+    { model: 'gemini-3-flash-preview', timeout: 12000 },
+    { model: 'gemini-3.1-flash-lite-preview', timeout: 10000 },
+    { model: 'gemini-3.1-pro-preview', timeout: 8000 },
+    { model: 'gemini-2.5-flash', timeout: 8000 },
+] as const;
 
 function isRetryableError(error: any): boolean {
     const msg = error?.message || '';
-    return msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('UNAVAILABLE') || msg.includes('overloaded');
+    const name = error?.name || '';
+    return msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('UNAVAILABLE') || msg.includes('overloaded')
+        || msg.includes('timeout') || msg.includes('DEADLINE_EXCEEDED') || msg.includes('aborted') || name === 'AbortError' || name === 'TimeoutError';
 }
 
 // ═══════════════════════════════════════════════════════════════
 // IN-MEMORY CACHE for site/property lists (avoids re-fetching per message)
 // ═══════════════════════════════════════════════════════════════
-const SITE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SITE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 const siteListCache = new Map<string, { data: any; ts: number }>();
 
 function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
@@ -44,81 +51,24 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════════════════════════════
 // UNIVERSAL ANALYST — SYSTEM INSTRUCTION
 // ═══════════════════════════════════════════════════════════════
-const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. You give VERDICTS, not advice. Be direct, bold, data-driven.
+const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.
 
-IDENTITY: You ARE the data. DECLARE and PRESCRIBE. Never hedge ("it seems", "consider trying"). Say "Do this NOW", "This is bleeding money". For general questions, answer from your knowledge — never refuse.
+RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 4. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
 
-TOOL BUDGET: Max 4 tool calls per conversation. ALWAYS check dashboard data first — it answers 80% of questions with 0 calls.
+CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
+REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
 
-TOOL ROUTING:
-- Traffic drop/spike → get_search_performance (dimensions=["date"], 90d)
-- Device/source/country breakdown → get_analytics_breakdown
-- Core Web Vitals/page speed → run_page_audit
-- Content strategy/blog ideas/keyword gaps → generate_content_strategy
-- Revenue calculation → calculate_revenue_impact (pure math, 0 calls)
-- Group/cluster keywords → analyze_keyword_clusters (0 API calls, pass queries from context)
-- Compare time periods → compare_time_periods (2 GSC calls)
-- Check cannibalization → find_cannibalization (1 GSC call)
-- Internal linking suggestions → suggest_internal_links (0 API calls, pass pages from context)
-- Generate meta tags → generate_meta_tags (0 API calls, pure AI generation)
-- KPIs/striking distance/CTR problems/page rankings → 0 calls, use dashboard data
-- General SEO/algorithm questions → 0 calls, use your knowledge
+FORMAT: Rich markdown. Flow: 🎯 VERDICT (##, 1-2 bold sentences) → 📊 EVIDENCE (table/bullets with numbers) → 💰 REVENUE IMPACT → ⚡ ACTION (numbered steps) → 🔮 BONUS. Labels: 🔴 CRITICAL|🟡 HIGH|🟢 OPPORTUNITY|⚪ MONITOR. Use tables for 3+ rows. Code blocks for technical recs.
 
-RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, never exceed 4. 3) Never say "let me check" — cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
+CHARTS (MANDATORY): Place chart tags on OWN LINE at TOP, BEFORE text. NEVER inline.
+Tags: overview|topKeywords|topPages|ctrOpportunities|strikingDistance|positionDistribution|trafficTrend|deviceSplit|countries
+Format: <!-- chart:TAG_NAME -->
+Inline: <!-- chart:inline:{"type":"keywords","title":"T","rows":[{"query":"...","clicks":N,"impressions":N,"ctr":N,"position":N}]} -->
+Match: keywords→topKeywords, pages→topPages, CTR→ctrOpportunities, overview→overview+topKeywords, trends→trafficTrend, devices→deviceSplit, countries→countries, filtered→inline
 
-CTR BENCHMARKS: Pos1:28% | Pos2:16% | Pos3:11% | Pos4-5:7% | Pos6-7:4.5% | Pos8-10:2.5%. CTR below expected by 3%+ = bad meta.
-
-REVENUE: Transactional $2-5/click | Informational $0.10-0.50/click | Formula: impressions × CTR_gain × $/click
-
-ALGORITHM UPDATES: Mar 2025, Dec 2024, Nov 2024, Aug 2024, Jun 2024 Spam, Mar 2024 Core+Spam, Nov 2023, Oct 2023, Sep 2023 HCU. Flag if traffic drop coincides.
-
-RESPONSE FORMAT: Use rich markdown. Structure responses with:
-- **Headers** (## for sections, ### for subsections) to organize information
-- **Bold** for key metrics and verdicts
-- **Tables** (markdown tables) when comparing data (keywords, pages, metrics)
-- **Numbered lists** for action steps
-- **Bullet lists** for evidence points
-- Code blocks for technical recommendations (meta tags, schema markup, etc.)
-- Blockquotes for critical warnings or key takeaways
-
-SECTION FLOW: 🎯 VERDICT (## header, 1-2 bold sentences) → 📊 EVIDENCE (table or bullets with exact numbers) → 💰 REVENUE IMPACT (dollars in bold) → ⚡ ACTION (### header, numbered steps) → 🔮 BONUS (unexpected insight). Labels: 🔴 CRITICAL | 🟡 HIGH | 🟢 OPPORTUNITY | ⚪ MONITOR
-
-CHART ANNOTATIONS (MANDATORY):
-Every response referencing keyword data, page data, or SEO metrics MUST include chart tags. The UI renders interactive charts in place of these HTML comments. Place chart tags on their OWN LINE at the TOP of your response, BEFORE any written analysis. NEVER inside bullet points, numbered lists, or inline within sentences.
-
-AVAILABLE CHART TAGS:
-<!-- chart:overview --> — Summary metric cards (clicks, impressions, CTR, position)
-<!-- chart:topKeywords --> — Top keywords horizontal bar chart
-<!-- chart:topPages --> — Top pages horizontal bar chart
-<!-- chart:ctrOpportunities --> — CTR opportunity list (high impressions, low CTR)
-<!-- chart:strikingDistance --> — Striking distance keywords (pos 11-20)
-<!-- chart:positionDistribution --> — Position bucket donut chart
-<!-- chart:trafficTrend --> — Daily clicks/impressions area chart
-<!-- chart:deviceSplit --> — Device split donut chart
-<!-- chart:countries --> — Country breakdown bar chart
-
-INLINE CHART TAGS (for filtered subsets — embed JSON data):
-<!-- chart:inline:{"type":"keywords","title":"Title","rows":[{"query":"...","clicks":N,"impressions":N,"ctr":N,"position":N}]} -->
-
-CHART TAG RULES:
-1. Keywords/rankings question → <!-- chart:topKeywords -->
-2. Pages/traffic question → <!-- chart:topPages -->
-3. CTR/hidden gems → <!-- chart:ctrOpportunities -->
-4. Overview/summary/"how is my site" → <!-- chart:overview --> then <!-- chart:topKeywords -->
-5. Position/ranking distribution → <!-- chart:positionDistribution -->
-6. Trends/time data → <!-- chart:trafficTrend -->
-7. Devices → <!-- chart:deviceSplit -->
-8. Countries → <!-- chart:countries -->
-9. Multiple data types → include ALL relevant tags
-10. Filtered subsets (e.g. "keywords with 8+ words") → use inline tag with ONLY matching rows
-
-CRITICAL: Cite specific numbers. Every recommendation needs estimated impact (+X clicks, $X/month). Cross-reference GA4+GSC. Think CEO, not junior SEO. Use tables for any data with 3+ rows.
-
-FOLLOW-UP SUGGESTIONS (MANDATORY): End EVERY response with exactly 3 contextual follow-up questions as a suggestions tag. These should be natural next steps based on your analysis. Format on its OWN line at the very end:
-<!-- suggestions: ["Question 1?", "Question 2?", "Question 3?"] -->
-Examples: After traffic analysis → "Which pages lost the most traffic?", "What keywords are declining?", "Should I update my top pages?"
-After keyword analysis → "How do I optimize for these keywords?", "What's the revenue potential?", "Show me content gaps"
-NEVER skip the suggestions tag.`;
+FOLLOW-UPS (MANDATORY): End EVERY response with exactly 3 follow-up questions:
+<!-- suggestions: ["Q1?", "Q2?", "Q3?"] -->
+NEVER skip suggestions.`;
 
 // ═══════════════════════════════════════════════════════════════
 // DATA CONTEXT BUILDER
@@ -231,10 +181,11 @@ export async function POST(req: NextRequest) {
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
 
-        // ── Parallel pre-flight: credits + JWT token ──
-        const [creditResult, jwt] = await Promise.all([
+        // ── Parallel pre-flight: credits + JWT token + DB tokens (all at once) ──
+        const [creditResult, jwt, dbTokens] = await Promise.all([
             (ADMIN_API_KEY && userId) ? getUserCredits(String(userId)) : Promise.resolve(null),
             getToken({ req: req as any }),
+            fetchGoogleTokensFromDb(String(userId)).catch(() => null),
         ]);
 
         // Credit gate
@@ -267,16 +218,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // ── Get User's Google Tokens ──
+        // ── Get User's Google Tokens (JWT first, DB fallback already fetched in parallel) ──
         let googleAccessToken = (jwt as any)?.googleAccessToken as string | undefined;
         let googleRefreshToken = (jwt as any)?.googleRefreshToken as string | undefined;
 
-        if (!googleAccessToken && !googleRefreshToken) {
-            const dbTokens = await fetchGoogleTokensFromDb(String(userId));
-            if (dbTokens) {
-                googleAccessToken = dbTokens.accessToken;
-                googleRefreshToken = dbTokens.refreshToken;
-            }
+        if (!googleAccessToken && !googleRefreshToken && dbTokens) {
+            googleAccessToken = dbTokens.accessToken;
+            googleRefreshToken = dbTokens.refreshToken;
         }
 
         // ── Get Available Sites Context (only on first message — subsequent messages have it in history) ──
@@ -343,10 +291,10 @@ CRITICAL SYSTEM CONTEXT:
                         loopCount++;
                         keepGoing = false;
 
-                        // Try models in order, fall back on 429/503
+                        // Try models in order, fall back on 429/503/timeout
                         let response: any = null;
                         let lastError: any = null;
-                        for (const model of CHAT_MODELS) {
+                        for (const { model, timeout: modelTimeout } of CHAT_MODELS) {
                             try {
                                 response = await ai.models.generateContentStream({
                                     model,
@@ -355,15 +303,15 @@ CRITICAL SYSTEM CONTEXT:
                                         systemInstruction: finalSystemInstruction,
                                         tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
                                         temperature: 0.7,
-                                        maxOutputTokens: 3000,
-                                        httpOptions: { timeout: 30000 },
+                                        maxOutputTokens: 2048,
+                                        httpOptions: { timeout: modelTimeout },
                                     },
                                 });
                                 break; // success
                             } catch (modelErr: any) {
                                 lastError = modelErr;
                                 if (isRetryableError(modelErr)) {
-                                    console.warn(`[AI-CHAT] ${model} unavailable, trying next fallback...`);
+                                    console.warn(`[AI-CHAT] ${model} unavailable (${modelErr?.message?.slice(0, 80)}), trying next fallback...`);
                                     continue;
                                 }
                                 throw modelErr; // non-retryable error, propagate
