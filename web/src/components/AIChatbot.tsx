@@ -6,14 +6,9 @@ import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown,
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import ChatMessageRenderer from './ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
+import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 
-interface Message {
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-    tools?: { name: string; args: any; result?: string; structuredData?: any }[];
-    hasError?: boolean;
-}
+type Message = ChatMessage;
 
 interface SiteOption {
     id: string;
@@ -76,7 +71,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
                 <div className="text-[10px] text-zinc-700 mt-2 select-none">
-                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
             </div>
         </div>
@@ -174,39 +169,15 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
 const WELCOME_MESSAGE: Message = {
     role: 'assistant',
     content: "👋 **Hey! I'm your AI Analyst.**\n\nI have your live analytics & SEO data loaded. Ask me anything — I give **verdicts**, not advice.\n\n*Select a website above, then ask away.*",
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
 };
-
-const CHAT_STORAGE_KEY = 'tc-chat-history';
-const MAX_STORED_MESSAGES = 20; // last 10 exchanges (user + assistant)
-
-function loadStoredMessages(): Message[] {
-    if (typeof window === 'undefined') return [WELCOME_MESSAGE];
-    try {
-        const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
-        if (stored) {
-            const parsed = JSON.parse(stored) as Message[];
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
-            }
-        }
-    } catch { /* corrupted storage */ }
-    return [WELCOME_MESSAGE];
-}
-
-function saveMessages(messages: Message[]) {
-    if (typeof window === 'undefined') return;
-    try {
-        // Keep only the last MAX_STORED_MESSAGES messages (plus welcome)
-        const toStore = messages.slice(-MAX_STORED_MESSAGES);
-        sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toStore));
-    } catch { /* storage full */ }
-}
 
 export default function AIChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
-    const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
+    const { messages: storeMessages, setMessages, clearChat: storeClearChat } = useChatStore();
+    // Show welcome message when store is empty
+    const messages = storeMessages.length > 0 ? storeMessages : [WELCOME_MESSAGE];
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [credits, setCredits] = useState<number | null>(null);
@@ -239,11 +210,6 @@ export default function AIChatbot() {
             setSelectedChatSite(allSites[0].id);
         }
     }, [allSites, selectedChatSite]);
-
-    // Persist messages to sessionStorage so they survive section navigation
-    useEffect(() => {
-        saveMessages(messages);
-    }, [messages]);
 
     // Match selected GSC site to GA4 property (same logic as page.tsx)
     const matchedProperty = useMemo(() => {
@@ -343,8 +309,8 @@ export default function AIChatbot() {
         const currentMessages = messagesRef.current;
         const currentSite = selectedSiteRef.current;
 
-        const userMessage: Message = { role: 'user', content: messageText, timestamp: new Date() };
-        setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date(), tools: [] }]);
+        const userMessage: Message = { role: 'user', content: messageText, timestamp: new Date().toISOString() };
+        setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date().toISOString(), tools: [] }]);
         setInput('');
         setIsLoading(true);
 
@@ -503,7 +469,7 @@ export default function AIChatbot() {
                     content: isTimeout
                         ? '⚠️ **Request timed out.** The AI took too long to respond. Try a simpler question.'
                         : '⚠️ **Connection Error.** Couldn\'t reach the AI service.',
-                    timestamp: new Date(),
+                    timestamp: new Date().toISOString(),
                     hasError: true,
                 }];
             });
@@ -554,14 +520,8 @@ export default function AIChatbot() {
     }, []); // empty deps — listener is added once, never thrashes
 
     const clearChat = useCallback(() => {
-        const cleared: Message[] = [{
-            role: 'assistant',
-            content: "🔄 **Chat cleared.** What would you like to investigate?",
-            timestamp: new Date(),
-        }];
-        setMessages(cleared);
-        saveMessages(cleared);
-    }, []);
+        storeClearChat();
+    }, [storeClearChat]);
 
     // ─── Floating button (closed state) ───
     if (!isOpen) {

@@ -10,13 +10,7 @@ import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, use
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
-
-interface Message {
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-    tools?: { name: string; args: any; result?: string; structuredData?: any }[];
-}
+import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 
 const STARTER_PROMPTS = [
     { icon: Target, text: 'What is the ONE thing I should do today to grow?', color: 'emerald' },
@@ -82,7 +76,7 @@ export default function AIChat() {
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
-    const [messages, setMessages] = useState<Message[]>([]);
+    const { messages, setMessages, clearChat: storeClearChat } = useChatStore();
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activeTool, setActiveTool] = useState<string | undefined>();
@@ -173,8 +167,8 @@ export default function AIChat() {
         const currentMessages = messagesRef.current;
         const currentSite = selectedSiteRef.current;
 
-        const userMessage: Message = { role: 'user', content: messageText, timestamp: new Date() };
-        setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date(), tools: [] }]);
+        const userMessage: ChatMessage = { role: 'user', content: messageText, timestamp: new Date().toISOString() };
+        setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date().toISOString(), tools: [] }]);
         setInput('');
         setIsLoading(true);
         setActiveTool(undefined);
@@ -323,8 +317,8 @@ export default function AIChat() {
     }, [dataReady, messages.length, isLoading, analyticsData, seoData]);
 
     const clearChat = useCallback(() => {
-        setMessages([]);
-    }, []);
+        storeClearChat();
+    }, [storeClearChat]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
