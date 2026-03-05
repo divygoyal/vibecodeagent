@@ -29,14 +29,14 @@ function KPICardInner({
 
   if (loading && !showValue) {
     return (
-      <Link href={href} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4" aria-label={`Loading ${label}`}>
-        <div className="flex justify-between mb-2">
-          <Skeleton className="w-8 h-8 rounded-lg" />
-          <Skeleton className="w-12 h-4 rounded-full" />
+      <Link href={href} className="kpi-card-skeleton bg-zinc-900/60 border border-white/[0.06] rounded-2xl p-5" aria-label={`Loading ${label}`}>
+        <div className="flex justify-between mb-3">
+          <Skeleton className="w-10 h-10 rounded-xl" />
+          <Skeleton className="w-14 h-5 rounded-full" />
         </div>
-        <Skeleton className="w-24 h-7 rounded-md mb-1" />
-        <Skeleton className="w-16 h-3 rounded-md mb-2" />
-        <Skeleton className="w-full h-8 rounded-md opacity-30" />
+        <Skeleton className="w-28 h-8 rounded-md mb-1.5" />
+        <Skeleton className="w-20 h-3.5 rounded-md mb-3" />
+        <Skeleton className="w-full h-10 rounded-md opacity-30" />
       </Link>
     );
   }
@@ -46,35 +46,73 @@ function KPICardInner({
   const numVal = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
   const prev = change !== undefined && change !== 0 ? Math.round(numVal / (1 + change / 100)) : null;
 
+  // Format value with commas
+  const displayValue = showValue
+    ? typeof value === 'number' ? value.toLocaleString() : value
+    : '—';
+
   return (
-    <Link href={href} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.1] hover:bg-white/[0.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.02)] transition-all duration-300 group" aria-label={`${label}: ${showValue ? value?.toLocaleString() : 'No data'}${change !== undefined ? `, ${change > 0 ? '+' : ''}${change}% change` : ''}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-emerald-500/20 group-hover:to-cyan-500/20 group-hover:shadow-[0_0_12px_rgba(52,211,153,0.15)] transition-all duration-300">
-          <Icon className="w-4 h-4 text-zinc-400 group-hover:text-emerald-400 transition-colors duration-300" />
+    <Link
+      href={href}
+      className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-all duration-500 group overflow-hidden"
+      aria-label={`${label}: ${showValue ? displayValue : 'No data'}${change !== undefined ? `, ${change > 0 ? '+' : ''}${change}% change` : ''}`}
+    >
+      {/* Subtle gradient glow on hover */}
+      <div
+        className="absolute -top-20 -right-20 w-40 h-40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-3xl"
+        style={{ background: `radial-gradient(circle, ${sparkColor}15, transparent)` }}
+      />
+
+      {/* Top row: Icon + Change badge */}
+      <div className="flex items-center justify-between mb-3 relative">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 border"
+          style={{
+            background: `linear-gradient(135deg, ${sparkColor}12, ${sparkColor}06)`,
+            borderColor: `${sparkColor}20`,
+          }}
+        >
+          <span style={{ color: sparkColor }} className="flex items-center justify-center transition-all duration-500">
+            <Icon className="w-[18px] h-[18px]" />
+          </span>
         </div>
         {change !== undefined && (
-          <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${positive ? 'text-emerald-400' : 'text-red-400'}`} aria-label={`${change > 0 ? '+' : ''}${change}% change`}>
-            {positive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+          <span
+            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-sm ${
+              positive
+                ? 'bg-emerald-500/[0.08] border-emerald-500/[0.15] text-emerald-400'
+                : 'bg-red-500/[0.08] border-red-500/[0.15] text-red-400'
+            }`}
+          >
+            {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             {change > 0 ? '+' : ''}{change}%
           </span>
         )}
       </div>
 
-      <div className="text-xl font-bold text-white mb-0.5 font-mono">
-        {showValue ? value?.toLocaleString() : '—'}
-      </div>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
-        {prev !== null && <span className="text-[9px] text-zinc-600 font-mono">was {prev.toLocaleString()}</span>}
+      {/* Value */}
+      <div className="text-[26px] font-extrabold text-white mb-0.5 font-mono tracking-tight relative">
+        {displayValue}
       </div>
 
+      {/* Label + Previous */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[11px] text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
+        {prev !== null && (
+          <span className="text-[10px] text-zinc-600 font-mono">
+            was {prev.toLocaleString()}
+          </span>
+        )}
+      </div>
+
+      {/* Sparkline */}
       {sparkData.length > 0 && (
-        <div className="h-8" aria-hidden="true">
+        <div className="h-10 -mx-1 relative" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+            <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={`spark-${label}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={sparkColor} stopOpacity={0.3} />
+                  <stop offset="5%" stopColor={sparkColor} stopOpacity={0.25} />
                   <stop offset="95%" stopColor={sparkColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -86,10 +124,13 @@ function KPICardInner({
 
       {/* Hover tooltip */}
       {showValue && (
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-52 px-4 py-3 rounded-xl bg-[#0c0c14]/95 backdrop-blur-xl border border-white/[0.1] shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.05)] opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-300 ease-out pointer-events-none z-50" role="tooltip">
-          <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-16 h-[2px] rounded-full ${positive ? 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent' : 'bg-gradient-to-r from-transparent via-red-400 to-transparent'}`} />
-          <div className="text-[11px] text-white font-semibold mb-2 flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${positive ? 'bg-emerald-400' : 'bg-red-400'}`} />
+        <div className="absolute -top-[100px] left-1/2 -translate-x-1/2 w-56 px-4 py-3.5 rounded-xl bg-[#0c0c14]/95 backdrop-blur-xl border border-white/[0.1] shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.05)] opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-300 ease-out pointer-events-none z-50" role="tooltip">
+          <div
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-[2px] rounded-full"
+            style={{ background: `linear-gradient(90deg, transparent, ${sparkColor}, transparent)` }}
+          />
+          <div className="text-[11px] text-white font-semibold mb-2.5 flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sparkColor }} />
             {label}
           </div>
           <div className="space-y-1.5">

@@ -449,33 +449,38 @@ export default function DashboardOverview() {
   // The useRegisteredSWR hook handles optimistic fetching for returning users
 
   return (
-    <motion.div className="space-y-6 p-6" initial="initial" animate="animate" variants={stagger}>
+    <motion.div className="space-y-8 pb-6" initial="initial" animate="animate" variants={stagger}>
       {/* Hero Header — Site Selector + Live Metrics */}
-      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Welcome back{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''} 👋
-          </h1>
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-zinc-500">
-              Growth overview for your projects.
-            </p>
-            <LastUpdated timestamp={lastUpdated} />
-          </div>
-        </div>
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="relative">
+        {/* Header gradient background */}
+        <div className="absolute inset-0 -mx-6 -mt-6 h-[200px] bg-gradient-to-b from-emerald-500/[0.04] via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-cyan-500/[0.03] to-transparent rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex items-center gap-3">
-          {/* Real-time Active Users */}
-          {activeUsers !== null && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-500/[0.06] border border-emerald-500/[0.12] rounded-lg">
-              <div className="relative">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              </div>
-              <span className="text-sm font-bold text-emerald-400 font-mono">{activeUsers}</span>
-              <span className="text-[10px] text-zinc-500">live</span>
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-white mb-1.5 tracking-tight">
+              Welcome back{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''} <span className="inline-block animate-[wave_2s_ease-in-out_infinite]">👋</span>
+            </h1>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-zinc-500">
+                Growth overview for your projects.
+              </p>
+              <LastUpdated timestamp={lastUpdated} />
             </div>
-          )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Real-time Active Users */}
+            {activeUsers !== null && (
+              <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-500/[0.06] border border-emerald-500/[0.12] rounded-xl backdrop-blur-sm">
+                <div className="relative">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                </div>
+                <span className="text-sm font-bold text-emerald-400 font-mono">{activeUsers}</span>
+                <span className="text-[10px] text-zinc-500">live</span>
+              </div>
+            )}
 
           {/* Custom Site Selector Dropdown */}
           <div className="relative" ref={dropdownRef}>
@@ -518,10 +523,11 @@ export default function DashboardOverview() {
             )}
           </div>
 
-          <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${isLive ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+          <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border backdrop-blur-sm ${isLive ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-500'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
             {isLive ? 'Bot Live' : 'Offline'}
           </span>
+          </div>
         </div>
       </motion.div>
 
@@ -532,16 +538,18 @@ export default function DashboardOverview() {
 
       {/* Bot setup prompt - shown when Google connected but bot not running */}
       {!containerLoading && hasGoogleConnection && !botRunning && (
-        <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4">
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="bg-gradient-to-r from-emerald-500/[0.04] to-cyan-500/[0.03] border border-emerald-500/[0.1] rounded-2xl p-4 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <Bot className="w-5 h-5 text-zinc-500" />
-            <p className="text-sm text-zinc-400 flex-1">Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="text-emerald-400 hover:text-emerald-300">Set up your bot →</Link></p>
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-4.5 h-4.5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-zinc-400 flex-1">Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="text-emerald-400 hover:text-emerald-300 font-medium">Set up your bot →</Link></p>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* ═══ 1. KPI GRID — Top of visual hierarchy ═══ */}
-      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="region" aria-label="Key metrics">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Key metrics">
         <KPICard
           loading={isRef && !hasData}
           icon={Users}
@@ -589,7 +597,7 @@ export default function DashboardOverview() {
       {hasData && (seoData || analyticsData) && (
         <>
           {/* Filter Bar */}
-          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="flex items-center gap-2 flex-wrap">
+          <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="flex items-center gap-2 flex-wrap bg-white/[0.02] border border-white/[0.04] rounded-2xl px-4 py-3">
             <div className="flex items-center gap-1.5 mr-2">
               <Filter className="w-3.5 h-3.5 text-zinc-500" />
               <span className="text-xs text-zinc-500 font-medium">Filter:</span>
@@ -631,12 +639,16 @@ export default function DashboardOverview() {
 
           {/* Active Alerts Feed */}
           <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-semibold text-white">Active Alerts</h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 font-medium">
-                {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''}
-              </span>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 flex items-center justify-center border border-emerald-500/15">
+                <Activity className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Active Alerts</h2>
+                <span className="text-[10px] text-zinc-500">
+                  {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''} detected
+                </span>
+              </div>
             </div>
 
             {filteredAlerts.length === 0 ? (
@@ -754,10 +766,17 @@ export default function DashboardOverview() {
 
       {/* ═══ 3. COMMAND CENTER — Compact row: Score + Velocity + Branded Split ═══ */}
       {hasData && (
-        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
+          {/* Section divider */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+            <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Performance</span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Performance Score Gauge */}
           {performanceScore !== null && scoreData && (
-            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer group">
+            <div onClick={() => setDrawerContent({ type: 'score', title: 'SEO Score Breakdown', data: scoreData })} className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer group overflow-hidden">
               <div className="relative w-16 h-16 flex-shrink-0">
                 <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-white/[0.06]" strokeWidth="2.5" />
@@ -789,7 +808,7 @@ export default function DashboardOverview() {
           )}
 
           {/* Growth Velocity */}
-          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer group">
+          <div onClick={() => velocityData && setDrawerContent({ type: 'velocity', title: 'Growth Velocity', data: velocityData })} className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer group overflow-hidden">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
               growthVelocity !== null && growthVelocity > 0
                 ? 'bg-emerald-500/10 border border-emerald-500/20'
@@ -824,7 +843,7 @@ export default function DashboardOverview() {
           </div>
 
           {/* Branded vs Non-Branded Split */}
-          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer group">
+          <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer group overflow-hidden">
             <div className="flex items-center gap-2 mb-3">
               <Tag className="w-4 h-4 text-cyan-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic</span>
@@ -857,6 +876,7 @@ export default function DashboardOverview() {
               <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
             </div>
           </div>
+        </div>
         </motion.div>
       )}
 
@@ -879,15 +899,17 @@ export default function DashboardOverview() {
           {/* ═══ INTELLIGENCE: Top Opportunities Table ═══ */}
           {intelOpportunities.length > 0 && (
             <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Target className="w-4 h-4 text-violet-400" />
-                <h2 className="text-sm font-semibold text-white">Top Opportunities</h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 font-medium">
-                  {intelOpportunities.length} keywords
-                </span>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center border border-violet-500/15">
+                  <Target className="w-4 h-4 text-violet-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">Top Opportunities</h2>
+                  <span className="text-[10px] text-zinc-500">{intelOpportunities.length} keywords to optimize</span>
+                </div>
               </div>
 
-              <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden">
+              <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -949,7 +971,7 @@ export default function DashboardOverview() {
           {/* ═══ INTELLIGENCE: Insight Cards Grid ═══ */}
           <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* CTR Benchmark Card */}
-            <div className="relative bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition group">
+            <div className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-violet-500/20 hover:shadow-[0_0_30px_rgba(167,139,250,0.05)] transition-all duration-500 group overflow-hidden">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
                   <MousePointer className="w-4 h-4 text-violet-400" />
@@ -985,7 +1007,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* Keyword Distribution */}
-            <div className="relative bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition group">
+            <div className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(59,130,246,0.05)] transition-all duration-500 group overflow-hidden">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                   <Hash className="w-4 h-4 text-blue-400" />
@@ -1025,7 +1047,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* Quick Trend */}
-            <div className="relative bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 hover:border-white/[0.1] transition group">
+            <div className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-emerald-500/20 hover:shadow-[0_0_30px_rgba(52,211,153,0.05)] transition-all duration-500 group overflow-hidden">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -1069,11 +1091,16 @@ export default function DashboardOverview() {
             const topPerformers = queries.filter((q: any) => q.position <= 3 && q.clicks > 5).slice(0, 5);
             if (topPerformers.length === 0) return null;
             return (
-              <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="bg-gradient-to-r from-emerald-500/[0.04] to-cyan-500/[0.04] border border-emerald-500/[0.12] rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Crown className="w-4 h-4 text-emerald-400" />
-                  <h2 className="text-sm font-semibold text-white">What&apos;s Working</h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">Top performers</span>
+              <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="bg-gradient-to-r from-emerald-500/[0.04] via-cyan-500/[0.02] to-emerald-500/[0.04] border border-emerald-500/[0.12] rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-emerald-400/[0.05] to-transparent rounded-full blur-3xl pointer-events-none" />
+                <div className="flex items-center gap-3 mb-5 relative">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20">
+                    <Crown className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white">What&apos;s Working</h2>
+                    <span className="text-[10px] text-emerald-400/70">Top performing keywords</span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                   {topPerformers.map((q: any, i: number) => (
@@ -1093,19 +1120,25 @@ export default function DashboardOverview() {
 
           {/* ═══ INTELLIGENCE: Ask AI Deeper ═══ */}
           <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="mt-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
-                <Brain className="w-4 h-4 text-violet-400" />
+            {/* Section divider */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-500/10 to-transparent" />
+              <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">AI Intelligence</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-500/10 to-transparent" />
+            </div>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center border border-violet-500/15">
+                <Brain className="w-4.5 h-4.5 text-violet-400" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-white">Ask AI Deeper</h2>
+                <h2 className="text-sm font-bold text-white">Ask AI Deeper</h2>
                 <p className="text-[10px] text-zinc-500">Click any question to get an AI-powered deep analysis</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* Emergency */}
-              <div className="bg-white/[0.02] border border-red-500/10 rounded-2xl p-4">
+              <div className="bg-[#0a0a12]/80 border border-red-500/[0.12] rounded-2xl p-4 hover:border-red-500/25 transition-all duration-500">
                 <div className="flex items-center gap-2 mb-3">
                   <Shield className="w-3.5 h-3.5 text-red-400" />
                   <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Emergency</span>
@@ -1129,7 +1162,7 @@ export default function DashboardOverview() {
               </div>
 
               {/* Money */}
-              <div className="bg-white/[0.02] border border-amber-500/10 rounded-2xl p-4">
+              <div className="bg-[#0a0a12]/80 border border-amber-500/[0.12] rounded-2xl p-4 hover:border-amber-500/25 transition-all duration-500">
                 <div className="flex items-center gap-2 mb-3">
                   <Flame className="w-3.5 h-3.5 text-amber-400" />
                   <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Revenue & ROI</span>
@@ -1153,7 +1186,7 @@ export default function DashboardOverview() {
               </div>
 
               {/* Content Strategy */}
-              <div className="bg-white/[0.02] border border-emerald-500/10 rounded-2xl p-4">
+              <div className="bg-[#0a0a12]/80 border border-emerald-500/[0.12] rounded-2xl p-4 hover:border-emerald-500/25 transition-all duration-500">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Content Strategy</span>
@@ -1177,7 +1210,7 @@ export default function DashboardOverview() {
               </div>
 
               {/* Deep Dive */}
-              <div className="bg-white/[0.02] border border-blue-500/10 rounded-2xl p-4">
+              <div className="bg-[#0a0a12]/80 border border-blue-500/[0.12] rounded-2xl p-4 hover:border-blue-500/25 transition-all duration-500">
                 <div className="flex items-center gap-2 mb-3">
                   <Search className="w-3.5 h-3.5 text-blue-400" />
                   <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Deep Dive</span>
@@ -1201,7 +1234,7 @@ export default function DashboardOverview() {
               </div>
 
               {/* Technical SEO */}
-              <div className="bg-white/[0.02] border border-violet-500/10 rounded-2xl p-4">
+              <div className="bg-[#0a0a12]/80 border border-violet-500/[0.12] rounded-2xl p-4 hover:border-violet-500/25 transition-all duration-500">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-3.5 h-3.5 text-violet-400" />
                   <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Technical SEO</span>
@@ -1247,11 +1280,18 @@ export default function DashboardOverview() {
             </div>
           </motion.div>
 
+          {/* Section divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+            <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Insights</span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+          </div>
+
           {/* Row 1: Site Health + Money Opportunities */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
             {/* Site Health Pulse */}
-            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all cursor-pointer">
+            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1298,8 +1338,8 @@ export default function DashboardOverview() {
               </div>
             </div>
 
-            {/* 💰 Money Opportunities — Striking Distance */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden">
+            {/* Money Opportunities — Striking Distance */}
+            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-amber-500/[0.06] to-transparent rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
@@ -1417,8 +1457,8 @@ export default function DashboardOverview() {
           {/* Row 2: CTR Problems + Top Pages */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-            {/* 🔧 Quick Wins — CTR Problems */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden">
+            {/* Quick Wins — CTR Problems */}
+            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-red-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1483,8 +1523,8 @@ export default function DashboardOverview() {
               </div>
             </div>
 
-            {/* 📊 Top Performing Pages */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-5 relative overflow-hidden">
+            {/* Top Performing Pages */}
+            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-violet-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1556,7 +1596,15 @@ export default function DashboardOverview() {
       )}
 
       {/* Quick Navigation */}
-      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
+        {/* Section divider */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+          <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Quick Access</span>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+        </div>
+      </motion.div>
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <ActionCard
           href="/dashboard/bot"
           icon={Bot}
