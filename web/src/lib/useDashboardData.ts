@@ -236,6 +236,9 @@ export function useCredits() {
 
     return {
         credits: data?.credits ?? null,
+        plan: (data?.plan as string) ?? 'free',
+        telegramBotEnabled: data?.telegram_bot_enabled ?? false,
+        subscriptionEnd: data?.subscription_end ?? null,
         isLoading,
         isError: error,
         refresh: mutate,

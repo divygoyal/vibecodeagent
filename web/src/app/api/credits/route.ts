@@ -17,7 +17,7 @@ export async function GET() {
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
         if (!userId) {
-            return NextResponse.json({ credits: 50 }); // Default for dev
+            return NextResponse.json({ credits: 50, plan: 'free' });
         }
 
         const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits`, {
@@ -27,15 +27,38 @@ export async function GET() {
 
         if (!res.ok) {
             console.error('[Credits] Failed to fetch credits:', res.status);
-            // Bug #12 fix: Return distinct error state instead of masking as 0 credits
-            return NextResponse.json({ credits: null, error: 'unavailable' });
+            return NextResponse.json({ credits: null, plan: 'free', error: 'unavailable' });
         }
 
         const data = await res.json();
-        return NextResponse.json({ credits: data.credits ?? 0 });
+
+        // Also fetch plan info
+        let plan = 'free';
+        let telegramBotEnabled = false;
+        let subscriptionEnd = null;
+        try {
+            const userRes = await fetch(`${ADMIN_API_URL}/api/users/${userId}`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY },
+                cache: 'no-store',
+            });
+            if (userRes.ok) {
+                const userData = await userRes.json();
+                plan = userData.plan || 'free';
+                telegramBotEnabled = userData.telegram_bot_enabled || false;
+                subscriptionEnd = userData.subscription_end || null;
+            }
+        } catch {
+            // Plan fetch failed, default to free
+        }
+
+        return NextResponse.json({
+            credits: data.credits ?? 0,
+            plan,
+            telegram_bot_enabled: telegramBotEnabled,
+            subscription_end: subscriptionEnd,
+        });
     } catch (err) {
         console.error('[Credits] Error:', err);
-        // Bug #12 fix: Return distinct error state instead of masking as 0 credits
-        return NextResponse.json({ credits: null, error: 'unavailable' });
+        return NextResponse.json({ credits: null, plan: 'free', error: 'unavailable' });
     }
 }

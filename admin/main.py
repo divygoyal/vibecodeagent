@@ -636,10 +636,13 @@ async def get_user(
         "github_username": user.github_username,
         "email": user.email,
         "plan": user.plan,
+        "credits": user.credits or 0,
         "is_active": user.is_active,
         "container": container_status,
+        "subscription_id": user.subscription_id,
         "subscription_start": user.subscription_start,
         "subscription_end": user.subscription_end,
+        "telegram_bot_enabled": user.telegram_bot_enabled or False,
         "created_at": user.created_at,
         "telegram_bot_username": container_status.get("bot_username"), # Use container status
         "telegram_bot_token": user.telegram_bot_token or "", # Expose masked token
