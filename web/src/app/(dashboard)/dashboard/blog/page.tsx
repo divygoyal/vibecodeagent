@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, Clock, ArrowUpRight, Tag, TrendingUp, Search, Bot, BarChart3, Lightbulb } from 'lucide-react';
+import { Calendar, Clock, ArrowUpRight, TrendingUp, Search, Bot, BarChart3, Lightbulb, Shield, Zap, Brain } from 'lucide-react';
 
 interface BlogPost {
     slug: string;
@@ -16,50 +16,80 @@ interface BlogPost {
 
 const POSTS: BlogPost[] = [
     {
-        slug: 'ai-seo-automation',
-        title: 'How AI is Revolutionizing SEO Automation in 2026',
-        excerpt: 'Discover how TrafficClaw uses AI to detect content decay, find keyword gaps, and generate optimization strategies — all from your Telegram bot.',
-        date: 'Feb 14, 2026',
-        readTime: '6 min read',
-        category: 'AI & SEO',
+        slug: 'ai-analyst-verdicts-not-advice',
+        title: 'Why TrafficClaw Gives Verdicts, Not Advice',
+        excerpt: 'Most SEO tools give you generic advice. TrafficClaw\'s AI Analyst analyzes your actual data — GA4 traffic, Search Console rankings, CTR benchmarks — and delivers specific, actionable verdicts with evidence.',
+        date: 'Mar 5, 2026',
+        readTime: '5 min read',
+        category: 'Product',
         categoryColor: 'emerald',
+        icon: Brain,
+    },
+    {
+        slug: 'subscription-plans-launch',
+        title: 'Introducing Monthly Plans: Starter, Growth & Pro',
+        excerpt: 'We\'ve launched three subscription tiers — Starter ($9/mo, 50 credits), Growth ($19/mo, 150 credits), and Pro ($29/mo, 300 credits + Telegram bot). Every new account gets 10 free AI messages to try it out.',
+        date: 'Mar 4, 2026',
+        readTime: '4 min read',
+        category: 'Announcement',
+        categoryColor: 'violet',
+        icon: Zap,
+    },
+    {
+        slug: 'ai-visibility-aeo-optimization',
+        title: 'AI Visibility & AEO: How to Get Cited by AI Search',
+        excerpt: 'AI search engines like ChatGPT and Perplexity are changing how people find information. TrafficClaw now tracks your AI visibility score and helps you optimize for Answer Engine Optimization (AEO).',
+        date: 'Mar 2, 2026',
+        readTime: '7 min read',
+        category: 'AI & SEO',
+        categoryColor: 'cyan',
         icon: Search,
     },
     {
-        slug: 'telegram-bot-devops',
-        title: 'Managing Your Website from Telegram: A DevOps Guide',
-        excerpt: 'Learn how to deploy changes, monitor analytics, and get real-time alerts — all from a single Telegram conversation with your TrafficClaw bot.',
-        date: 'Feb 12, 2026',
-        readTime: '8 min read',
-        category: 'Engineering',
-        categoryColor: 'cyan',
+        slug: 'telegram-bot-pro-plan',
+        title: 'Your Personal SEO Bot on Telegram — Pro Plan Deep Dive',
+        excerpt: 'With the Pro plan, connect your own Telegram bot and get deep analytics insights, search performance analysis, and content strategies — all from a natural chat conversation on your phone.',
+        date: 'Feb 28, 2026',
+        readTime: '6 min read',
+        category: 'Product',
+        categoryColor: 'emerald',
         icon: Bot,
     },
     {
-        slug: 'analytics-dashboard-deep-dive',
-        title: 'Building a Real-Time Analytics Dashboard with GA4',
-        excerpt: 'How we built TrafficClaw\'s analytics dashboard using the GA4 Data API, including traffic trends, source attribution, and the interactive world map.',
-        date: 'Feb 10, 2026',
-        readTime: '10 min read',
-        category: 'Product',
-        categoryColor: 'violet',
-        icon: BarChart3,
-    },
-    {
-        slug: 'content-decay-detection',
-        title: 'Content Decay: Catching Declining Pages Before It\'s Too Late',
-        excerpt: 'TrafficClaw\'s AI monitors your pages for traffic decline and position drops, alerting you via Telegram before you lose significant organic traffic.',
-        date: 'Feb 8, 2026',
-        readTime: '5 min read',
+        slug: 'striking-distance-keywords',
+        title: 'Striking Distance Keywords: The Fastest Way to Page 1',
+        excerpt: 'Keywords ranking on positions 4-20 with high impressions are your biggest opportunity. Learn how TrafficClaw\'s AI identifies these "striking distance" keywords and tells you exactly how to push them up.',
+        date: 'Feb 25, 2026',
+        readTime: '8 min read',
         category: 'SEO Strategy',
         categoryColor: 'amber',
         icon: TrendingUp,
     },
     {
-        slug: 'growth-hacking-with-bots',
-        title: '5 Growth Hacks Using AI-Powered Telegram Bots',
-        excerpt: 'From automated keyword tracking to real-time competitor analysis — five actionable strategies to accelerate your website growth with TrafficClaw.',
-        date: 'Feb 6, 2026',
+        slug: 'daily-briefing-feature',
+        title: 'Start Your Day with an AI Briefing',
+        excerpt: 'TrafficClaw now auto-generates a daily briefing when you open AI Chat — overnight traffic changes, ranking shifts, anomaly alerts, and the #1 action you should take today. All powered by your live data.',
+        date: 'Feb 22, 2026',
+        readTime: '4 min read',
+        category: 'Product',
+        categoryColor: 'emerald',
+        icon: BarChart3,
+    },
+    {
+        slug: 'site-audit-security',
+        title: 'Site Audits: Catch Broken Links, Missing Meta, and Security Issues',
+        excerpt: 'TrafficClaw\'s site audit crawls your pages for broken links, missing meta tags, schema errors, SSL issues, and Core Web Vitals problems. Get a prioritized list of fixes with estimated impact.',
+        date: 'Feb 18, 2026',
+        readTime: '6 min read',
+        category: 'Technical SEO',
+        categoryColor: 'pink',
+        icon: Shield,
+    },
+    {
+        slug: 'growth-hacking-with-ai',
+        title: '5 Growth Hacks Using AI-Powered SEO Analysis',
+        excerpt: 'From automated content decay detection to CTR optimization for high-impression pages — five data-driven strategies to accelerate your organic growth using TrafficClaw\'s AI analyst.',
+        date: 'Feb 14, 2026',
         readTime: '7 min read',
         category: 'Growth',
         categoryColor: 'pink',
@@ -85,7 +115,7 @@ export default function BlogPage() {
         <div className="max-w-4xl mx-auto p-6 space-y-8">
             <div>
                 <h1 className="text-2xl font-bold text-white mb-1">Blog</h1>
-                <p className="text-sm text-zinc-500">Insights on SEO, AI automation, growth strategies, and product updates.</p>
+                <p className="text-sm text-zinc-500">Product updates, SEO strategies, and AI-powered growth insights.</p>
             </div>
 
             {/* Category filters */}

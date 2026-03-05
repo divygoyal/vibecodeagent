@@ -13,7 +13,7 @@ import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
-    Book, Newspaper, History, Sun, Moon, Coins, MessageSquare,
+    Book, Newspaper, Sun, Moon, Coins, MessageSquare,
     CalendarDays, ChevronDown, Bell, Eye
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
@@ -72,7 +72,6 @@ const RANGES = [
 const resourceItems = [
     { icon: Book, label: 'Docs', href: '/dashboard/docs' },
     { icon: Newspaper, label: 'Blog', href: '/dashboard/blog' },
-    { icon: History, label: 'Changelog', href: '/dashboard/changelog' },
 ];
 
 export default function DashboardLayout({
