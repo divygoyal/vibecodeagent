@@ -1,22 +1,29 @@
 """
 Nanobot LLM Fallback Wrapper
 
-Monkey-patches litellm's acompletion with retry + model fallback BEFORE
-nanobot imports it. This ensures that 503/429 errors automatically cascade
-to fallback models instead of surfacing as errors to the user.
+Strategy: Write a sitecustomize.py that patches litellm with retry +
+model fallback, then exec nanobot so the patches load automatically
+in nanobot's Python process via the site-packages mechanism.
 
 Fallback chain (configurable via NANOBOT_FALLBACK_MODELS env var):
-  gemini-3-flash-preview → gemini-2.5-flash → gemini-2.0-flash
+  primary model -> gemini-3.1-flash-lite -> gemini-3.1-pro -> gemini-2.5-flash
 """
 
+import os
+import sys
+import tempfile
+
+# The fallback patch code that will be written to sitecustomize.py
+# and auto-loaded by Python before nanobot starts
+PATCH_CODE = r'''
 import asyncio
 import logging
 import os
 import sys
+import atexit
 
 logger = logging.getLogger("nanobot.fallback")
 
-# --- Configuration from environment ---
 FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
@@ -29,116 +36,128 @@ FALLBACK_MODELS = [
 MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "2"))
 RETRY_DELAY = float(os.environ.get("NANOBOT_RETRY_DELAY", "1.5"))
 
-# --- Patch litellm BEFORE nanobot imports it ---
-import litellm  # noqa: E402
+RETRIABLE_PATTERNS = [
+    "503", "429", "ServiceUnavailable", "RateLimitError",
+    "UNAVAILABLE", "overloaded", "high demand",
+]
 
-_original_acompletion = litellm.acompletion
+_patched = False
 
-# Exceptions that should trigger fallback (503, 429, timeout)
-RETRIABLE_EXCEPTIONS = []
-try:
-    from litellm.exceptions import (
-        ServiceUnavailableError,
-        RateLimitError,
-        Timeout,
-        APIConnectionError,
-    )
-    RETRIABLE_EXCEPTIONS = [ServiceUnavailableError, RateLimitError, Timeout, APIConnectionError]
-except ImportError:
-    pass
+def _apply_patch():
+    global _patched
+    if _patched:
+        return
+    try:
+        import litellm
+    except ImportError:
+        return
 
-# Fallback: also catch by exception message patterns if imports fail
-RETRIABLE_PATTERNS = ["503", "429", "ServiceUnavailable", "RateLimitError", "UNAVAILABLE", "overloaded", "high demand"]
+    _original_acompletion = litellm.acompletion
 
+    RETRIABLE_EXCEPTIONS = []
+    try:
+        from litellm.exceptions import (
+            ServiceUnavailableError,
+            RateLimitError,
+            Timeout,
+            APIConnectionError,
+        )
+        RETRIABLE_EXCEPTIONS.extend([ServiceUnavailableError, RateLimitError, Timeout, APIConnectionError])
+    except ImportError:
+        pass
 
-def _is_retriable(exc: Exception) -> bool:
-    """Check if an exception should trigger retry/fallback."""
-    for exc_type in RETRIABLE_EXCEPTIONS:
-        if isinstance(exc, exc_type):
-            return True
-    exc_str = str(exc)
-    return any(p in exc_str for p in RETRIABLE_PATTERNS)
+    def _is_retriable(exc):
+        for exc_type in RETRIABLE_EXCEPTIONS:
+            if isinstance(exc, exc_type):
+                return True
+        return any(p in str(exc) for p in RETRIABLE_PATTERNS)
 
+    async def acompletion_with_fallback(*args, **kwargs):
+        original_model = kwargs.get("model", args[0] if args else "unknown")
+        last_error = None
 
-async def acompletion_with_fallback(*args, **kwargs):
-    """
-    Wraps litellm.acompletion with:
-    1. Retry the primary model up to MAX_RETRIES times with exponential backoff
-    2. If still failing, try each fallback model in order
-    """
-    original_model = kwargs.get("model", args[0] if args else "unknown")
-    last_error = None
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                return await _original_acompletion(*args, **kwargs)
+            except Exception as e:
+                last_error = e
+                if not _is_retriable(e):
+                    raise
+                if attempt < MAX_RETRIES:
+                    delay = RETRY_DELAY * (2 ** attempt)
+                    logger.warning(
+                        f"[Fallback] {original_model} attempt {attempt + 1} failed: "
+                        f"{type(e).__name__}. Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
 
-    # --- Phase 1: Retry primary model ---
-    for attempt in range(MAX_RETRIES + 1):
-        try:
-            return await _original_acompletion(*args, **kwargs)
-        except Exception as e:
-            last_error = e
-            if not _is_retriable(e):
-                raise  # Non-retriable error (auth, bad request, etc.) — fail fast
-            if attempt < MAX_RETRIES:
-                delay = RETRY_DELAY * (2 ** attempt)  # Exponential backoff
+        for fallback_model in FALLBACK_MODELS:
+            if fallback_model == original_model:
+                continue
+            try:
                 logger.warning(
-                    f"[Fallback] {original_model} attempt {attempt + 1} failed: {type(e).__name__}. "
-                    f"Retrying in {delay:.1f}s..."
+                    f"[Fallback] {original_model} exhausted retries. "
+                    f"Trying fallback: {fallback_model}"
                 )
-                await asyncio.sleep(delay)
+                kwargs["model"] = fallback_model
+                return await _original_acompletion(*args, **kwargs)
+            except Exception as e:
+                logger.warning(f"[Fallback] {fallback_model} also failed: {type(e).__name__}")
+                last_error = e
+                if not _is_retriable(e):
+                    raise
+                continue
 
-    # --- Phase 2: Try fallback models ---
-    for fallback_model in FALLBACK_MODELS:
-        # Skip if fallback is same as primary
-        if fallback_model == original_model:
-            continue
-        try:
-            logger.warning(
-                f"[Fallback] {original_model} exhausted retries. Trying fallback: {fallback_model}"
-            )
-            kwargs["model"] = fallback_model
-            return await _original_acompletion(*args, **kwargs)
-        except Exception as e:
-            logger.warning(f"[Fallback] {fallback_model} also failed: {type(e).__name__}")
-            last_error = e
-            if not _is_retriable(e):
-                raise
-            continue
+        raise last_error
 
-    # All models exhausted — raise the last error
-    raise last_error
+    litellm.acompletion = acompletion_with_fallback
+    litellm.num_retries = MAX_RETRIES
+    litellm.request_timeout = 30
+    _patched = True
 
+    # Re-patch after any future litellm imports bind the old reference
+    _orig_import = __builtins__.__import__ if isinstance(__builtins__, dict) and '__import__' in __builtins__ else __import__
+    def _safe_import(name, *a, **kw):
+        mod = _orig_import(name, *a, **kw)
+        if name == "litellm" and hasattr(mod, "acompletion") and mod.acompletion is not acompletion_with_fallback:
+            mod.acompletion = acompletion_with_fallback
+        return mod
+    try:
+        import builtins
+        builtins.__import__ = _safe_import
+    except Exception:
+        pass
 
-# --- Apply the patch ---
-litellm.acompletion = acompletion_with_fallback
+    logger.info(
+        f"[Fallback] Patched litellm: primary -> {' -> '.join(FALLBACK_MODELS)} "
+        f"(retries={MAX_RETRIES}, delay={RETRY_DELAY}s)"
+    )
 
-# Also patch the module-level import that nanobot uses:
-# `from litellm import acompletion` binds to the old reference,
-# so we need to patch nanobot's provider module after it's imported.
-_original_nanobot_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+# Apply immediately (litellm may already be importable)
+_apply_patch()
 
+# Also hook into future imports in case litellm loads later
+if not _patched:
+    import importlib
+    _orig_import_module = importlib.import_module
+    def _hooked_import_module(name, *a, **kw):
+        mod = _orig_import_module(name, *a, **kw)
+        if name == "litellm":
+            _apply_patch()
+        return mod
+    importlib.import_module = _hooked_import_module
+'''
 
-def _patched_import(name, *args, **kwargs):
-    module = _original_nanobot_import(name, *args, **kwargs)
-    # After nanobot.providers.litellm_provider is imported, patch its acompletion reference
-    if name == "litellm" or (hasattr(module, "acompletion") and name.startswith("litellm")):
-        if hasattr(module, "acompletion") and module.acompletion is not acompletion_with_fallback:
-            module.acompletion = acompletion_with_fallback
-    return module
-
-
-import builtins
-builtins.__import__ = _patched_import
-
-# Set litellm module-level retry settings as belt-and-suspenders
-litellm.num_retries = MAX_RETRIES
-litellm.request_timeout = 30
-
-logger.info(
-    f"[Fallback] Patched litellm with fallback chain: primary → {' → '.join(FALLBACK_MODELS)} "
-    f"(retries={MAX_RETRIES}, delay={RETRY_DELAY}s)"
-)
-
-# --- Start nanobot ---
 if __name__ == "__main__":
-    from nanobot.cli.main import app
-    sys.argv = ["nanobot", "gateway"]
-    app()
+    # Write the patch to a sitecustomize.py in a temp directory
+    patch_dir = tempfile.mkdtemp(prefix="nanobot_patch_")
+    site_file = os.path.join(patch_dir, "sitecustomize.py")
+    with open(site_file, "w") as f:
+        f.write(PATCH_CODE)
+
+    # Prepend to PYTHONPATH so Python loads our sitecustomize.py
+    existing_path = os.environ.get("PYTHONPATH", "")
+    os.environ["PYTHONPATH"] = patch_dir + (":" + existing_path if existing_path else "")
+
+    # exec nanobot — replaces this process, patches load via sitecustomize
+    os.execvp("nanobot", ["nanobot", "gateway"])
