@@ -462,3 +462,105 @@ body {
   background: rgba(251, 191, 36, 0.15);
   color: #fbbf24;
 }
+
+/* ========== Robot animation keyframes (AI Chatbot) ========== */
+@keyframes robotBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes armWaveL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-35deg); } }
+@keyframes armWaveR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(35deg); } }
+@keyframes robotWalk { 0%,100% { transform: translateX(0); } 25% { transform: translateX(6px); } 75% { transform: translateX(-6px); } }
+@keyframes rocketShake { 0%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-3px) rotate(-3deg); } 75% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes liftUp { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes legKick { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(15deg); } }
+
+/* ========== Light theme extended ========== */
+[data-theme='light'] .badge-running {
+  background: rgba(52, 211, 153, 0.12);
+  color: #059669;
+}
+
+[data-theme='light'] .badge-stopped {
+  background: rgba(248, 113, 113, 0.12);
+  color: #dc2626;
+}
+
+[data-theme='light'] .heatmap-cell {
+  background: rgba(228, 228, 231, 0.6);
+}
+
+[data-theme='light'] .heatmap-cell[data-level="1"] { background: rgba(52, 211, 153, 0.2); }
+[data-theme='light'] .heatmap-cell[data-level="2"] { background: rgba(52, 211, 153, 0.35); }
+[data-theme='light'] .heatmap-cell[data-level="3"] { background: rgba(52, 211, 153, 0.55); }
+[data-theme='light'] .heatmap-cell[data-level="4"] { background: rgba(52, 211, 153, 0.85); }
+
+[data-theme='light'] .admin-table thead th {
+  background: rgba(255, 255, 255, 0.95);
+  color: rgba(82, 82, 91, 1);
+}
+
+[data-theme='light'] .admin-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* ========== Focus visible ring (accessibility) ========== */
+:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.5);
+  outline-offset: 2px;
+}
+
+/* ========== Firefox scrollbar fallback ========== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(40, 40, 50, 0.5) transparent;
+}
+
+[data-theme='light'] * {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* ========== Skip to content (accessibility) ========== */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+  padding: 8px 16px;
+  background: var(--emerald);
+  color: black;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.skip-to-content:focus {
+  left: 16px;
+  top: 16px;
+}
+
+/* ========== Keyboard shortcut badge ========== */
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-family: var(--font-mono), monospace;
+  color: rgba(161, 161, 170, 1);
+}
+
+[data-theme='light'] .kbd-hint {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(82, 82, 91, 1);
+}

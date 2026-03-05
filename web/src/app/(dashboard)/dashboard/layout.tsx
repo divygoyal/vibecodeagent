@@ -268,7 +268,7 @@ export default function DashboardLayout({
                 </div>
 
                 {/* Nav items */}
-                <nav className="flex-1 py-3 px-2 space-y-1">
+                <nav className="flex-1 py-3 px-2 space-y-1" aria-label="Main navigation">
                     {sidebarItems.map((item) => {
                         const isActive = pathname === item.href ||
                             (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -336,6 +336,7 @@ export default function DashboardLayout({
                             <button
                                 onClick={() => signOut({ callbackUrl: '/' })}
                                 className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                                aria-label="Sign out"
                                 title="Sign out"
                             >
                                 <LogOut className="w-3.5 h-3.5" />
@@ -364,6 +365,8 @@ export default function DashboardLayout({
                     <button
                         className="lg:hidden text-zinc-400 hover:text-white"
                         onClick={() => setMobileOpen(!mobileOpen)}
+                        aria-label="Open navigation menu"
+                        aria-expanded={mobileOpen}
                     >
                         <Menu className="w-5 h-5" />
                     </button>
@@ -413,6 +416,9 @@ export default function DashboardLayout({
                             <button
                                 onClick={() => setBellOpen(!bellOpen)}
                                 className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                                aria-label={`Alerts${criticalAlertCount > 0 ? ` (${criticalAlertCount} active)` : ''}`}
+                                aria-expanded={bellOpen}
+                                aria-haspopup="true"
                                 title="Alerts"
                             >
                                 <Bell className="w-4 h-4" />
@@ -477,6 +483,7 @@ export default function DashboardLayout({
                         <button
                             onClick={toggleTheme}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                         >
                             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -506,7 +513,7 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Page content */}
-                <main className="flex-1 p-6 overflow-y-auto">
+                <main id="main-content" className="flex-1 p-6 overflow-y-auto" role="main">
                     <div className="max-w-7xl mx-auto">
                         <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
                             {children}
