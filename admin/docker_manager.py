@@ -838,7 +838,7 @@ This workspace is your home. You are an elite SEO & analytics expert.
                 },
                 "agents": {
                     "defaults": {
-                        "model": "gemini-2.5-flash",
+                        "model": "gemini-3-flash-preview",
                         "systemPrompt": system_prompt,
                         "max_tokens": 4096,
                         "temperature": 0.4,
@@ -863,7 +863,7 @@ This workspace is your home. You are an elite SEO & analytics expert.
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
-            "OPENCLAW_MODEL": "google/gemini-2.5-flash",
+            "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
             # LiteLLM retry config — handles 503/429 errors automatically
             "LITELLM_NUM_RETRIES": "4",
             "LITELLM_REQUEST_TIMEOUT": "30",
