@@ -536,6 +536,17 @@ export default function DashboardOverview() {
         <ConnectGoogleState feature="real-time traffic insights, SEO performance tracking, keyword rankings, and AI-powered recommendations" />
       )}
 
+      {/* Bot setup prompt - shown when Google connected but bot not running */}
+      {!containerLoading && hasGoogleConnection && !botRunning && (
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="bg-gradient-to-r from-emerald-500/[0.04] to-cyan-500/[0.03] border border-emerald-500/[0.1] rounded-2xl p-4 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-4.5 h-4.5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-zinc-400 flex-1">Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="text-emerald-400 hover:text-emerald-300 font-medium">Set up your bot →</Link></p>
+          </div>
+        </motion.div>
+      )}
 
       {/* ═══ 1. KPI GRID — Top of visual hierarchy ═══ */}
       <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Key metrics">
