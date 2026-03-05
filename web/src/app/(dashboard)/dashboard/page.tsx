@@ -708,12 +708,18 @@ export default function DashboardOverview() {
                               </div>
 
                               {alert.change !== undefined && (
-                                <div className="flex items-center gap-2 mb-1.5">
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                   {alert.metric && <span className="text-xs text-zinc-400">{alert.metric}</span>}
                                   <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${alert.change >= 0 ? (alert.type === 'ranking_loss' ? 'text-red-400' : 'text-emerald-400') : 'text-red-400'}`}>
                                     {alert.change >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                                     {alert.change > 0 ? '+' : ''}{alert.change}%
                                   </span>
+                                  {/* Estimated revenue impact for traffic/click drops */}
+                                  {alert.change < -10 && (alert.category === 'traffic' || alert.type === 'traffic_drop') && (
+                                    <span className="text-[9px] px-2 py-0.5 rounded bg-red-500/[0.08] text-red-400/80 border border-red-500/10 font-medium">
+                                      ~${Math.abs(Math.round((alert.change / 100) * (parseInt(String(seoKPIs?.totalClicks || 0)) || 0) * 0.5))}/mo impact
+                                    </span>
+                                  )}
                                 </div>
                               )}
                               {!alert.change && alert.metric && (
@@ -793,12 +799,16 @@ export default function DashboardOverview() {
               </div>
               <div>
                 <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">SEO Score</div>
-                <div className={`text-sm font-bold ${performanceScore >= 70 ? 'text-emerald-400' : performanceScore >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {performanceScore >= 80 ? 'Excellent' : performanceScore >= 60 ? 'Good' : performanceScore >= 40 ? 'Needs Work' : 'Critical'}
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-sm font-bold ${performanceScore >= 70 ? 'text-emerald-400' : performanceScore >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {performanceScore >= 80 ? 'Excellent' : performanceScore >= 60 ? 'Good' : performanceScore >= 40 ? 'Needs Work' : 'Critical'}
+                  </span>
+                  <span className="text-[9px] text-zinc-600 font-mono">/100</span>
                 </div>
                 <div className="text-[10px] text-zinc-600 mt-0.5">
-                  Traffic {(analyticsKPIs?.changeUsers || 0) >= 0 ? '+' : ''}{analyticsKPIs?.changeUsers || 0}% | CTR {seoKPIs?.avgCTR || '—'}%
+                  Traffic {(analyticsKPIs?.changeUsers || 0) >= 0 ? '+' : ''}{analyticsKPIs?.changeUsers || 0}% · CTR {seoKPIs?.avgCTR || '—'}% · Pos {seoKPIs?.avgPosition || '—'}
                 </div>
+                <div className="text-[9px] text-zinc-700 mt-0.5">Industry avg: 55 · Your niche: {performanceScore >= 60 ? 'above' : 'below'} par</div>
               </div>
               <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                 <div className="text-[10px] text-zinc-400">Click for full breakdown</div>
@@ -823,13 +833,19 @@ export default function DashboardOverview() {
             </div>
             <div>
               <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Growth Velocity</div>
-              {growthVelocity !== null ? (
+              {growthVelocity !== null && velocityData ? (
                 <>
                   <div className={`text-lg font-bold font-mono ${growthVelocity > 0 ? 'text-emerald-400' : growthVelocity < -5 ? 'text-red-400' : 'text-amber-400'}`}>
                     {growthVelocity > 0 ? '+' : ''}{growthVelocity.toFixed(1)}%
                   </div>
                   <div className="text-[10px] text-zinc-600">
-                    {growthVelocity > 10 ? 'Accelerating' : growthVelocity > 0 ? 'Growing' : growthVelocity > -5 ? 'Plateauing' : 'Decelerating'} (7d vs prev 7d)
+                    Search clicks: {fmtNum(velocityData.recentClicks)} vs {fmtNum(velocityData.prevClicks)} prev week
+                  </div>
+                  <div className="text-[9px] text-zinc-700 mt-0.5">
+                    {growthVelocity > 10 ? 'Strong momentum — sustain with fresh content' :
+                     growthVelocity > 0 ? 'Positive trend — optimize top keywords for faster growth' :
+                     growthVelocity > -5 ? 'Plateauing — try new content angles or target new keywords' :
+                     'Declining clicks — review top pages for ranking drops'}
                   </div>
                 </>
               ) : (
@@ -846,27 +862,35 @@ export default function DashboardOverview() {
           <div onClick={() => brandedSplit && setDrawerContent({ type: 'brand', title: 'Brand vs Organic', data: brandedSplit })} className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer group overflow-hidden">
             <div className="flex items-center gap-2 mb-3">
               <Tag className="w-4 h-4 text-cyan-400" />
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic</span>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Brand vs Organic Traffic</span>
             </div>
             {brandedSplit ? (
               <>
                 <div className="flex items-end gap-2 mb-2">
                   <span className="text-lg font-bold text-white font-mono">{brandedSplit.nonBrandedPct}%</span>
-                  <span className="text-[10px] text-zinc-500 mb-0.5">non-branded</span>
+                  <span className="text-[10px] text-zinc-500 mb-0.5">organic (non-branded) clicks</span>
                 </div>
-                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden flex">
-                  <div className="bg-cyan-400/80 rounded-full transition-all duration-700" style={{ width: `${brandedSplit.nonBrandedPct}%` }} />
-                  <div className="bg-amber-400/60 rounded-full transition-all duration-700" style={{ width: `${brandedSplit.brandedPct}%` }} />
+                <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
+                  <div className="bg-cyan-400/80 rounded-l-full transition-all duration-700" style={{ width: `${brandedSplit.nonBrandedPct}%` }} />
+                  <div className="bg-amber-400/60 rounded-r-full transition-all duration-700" style={{ width: `${brandedSplit.brandedPct}%` }} />
                 </div>
                 <div className="flex justify-between mt-1.5">
-                  <span className="text-[9px] text-cyan-400/70">{fmtNum(brandedSplit.nonBranded)} organic</span>
-                  <span className="text-[9px] text-amber-400/70">{fmtNum(brandedSplit.branded)} branded</span>
+                  <span className="text-[9px] text-cyan-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/80" />
+                    {fmtNum(brandedSplit.nonBranded)} organic clicks ({brandedSplit.nonBrandedPct}%)
+                  </span>
+                  <span className="text-[9px] text-amber-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60" />
+                    {fmtNum(brandedSplit.branded)} branded ({brandedSplit.brandedPct}%)
+                  </span>
                 </div>
-                {brandedSplit.brandedPct > 60 && (
-                  <div className="mt-2 text-[9px] text-amber-400/80 bg-amber-500/[0.06] border border-amber-500/10 rounded px-2 py-1">
-                    High brand reliance — diversify organic keywords
-                  </div>
-                )}
+                <div className="mt-2 text-[9px] text-zinc-600 bg-white/[0.02] border border-white/[0.04] rounded px-2 py-1.5">
+                  {brandedSplit.brandedPct > 60
+                    ? '⚠️ High brand reliance — diversify organic keywords to reduce dependency'
+                    : brandedSplit.brandedPct < 10
+                    ? '✅ Strong organic mix — most traffic comes from non-brand keywords'
+                    : `Healthy mix. ${brandedSplit.nonBrandedPct}% of clicks come from organic discovery.`}
+                </div>
               </>
             ) : (
               <div className="text-sm text-zinc-600">Not enough query data</div>
@@ -986,16 +1010,21 @@ export default function DashboardOverview() {
                 const good = avgCtr >= benchmark;
                 return (
                   <div>
-                    <div className="flex items-baseline gap-2 mb-2">
+                    <div className="flex items-baseline gap-2 mb-1">
                       <span className={`text-2xl font-bold ${good ? 'text-emerald-400' : 'text-amber-400'}`}>{avgCtr.toFixed(1)}%</span>
-                      <span className="text-xs text-zinc-500">vs {benchmark}% avg</span>
+                      <span className="text-xs text-zinc-500">vs {benchmark}% industry avg</span>
                     </div>
-                    <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden mb-2">
+                    <div className="text-[9px] text-zinc-600 mb-2">
+                      Avg CTR for your top-5 ranked keywords ({top5.length} keywords with 50+ impressions)
+                    </div>
+                    <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden mb-2 relative">
                       <div className={`h-full rounded-full transition-all ${good ? 'bg-gradient-to-r from-emerald-400 to-cyan-400' : 'bg-amber-400'}`}
                         style={{ width: `${Math.min(100, (avgCtr / 30) * 100)}%` }} />
+                      {/* Benchmark marker */}
+                      <div className="absolute top-0 h-full w-px bg-zinc-400/40" style={{ left: `${(benchmark / 30) * 100}%` }} />
                     </div>
                     <p className="text-[10px] text-zinc-600">
-                      {good ? 'Above average! Your titles & descriptions are performing well.' : 'Below average. Consider rewriting meta titles and descriptions.'}
+                      {good ? '✅ Above industry average! Your meta titles & descriptions are compelling.' : '⚠️ Below average — rewrite meta titles with action words and numbers to improve CTR.'}
                     </p>
                   </div>
                 );
@@ -1023,20 +1052,29 @@ export default function DashboardOverview() {
                   { label: 'Pos 20+', count: queries.filter((q: any) => q.position > 20).length, color: 'bg-zinc-600' },
                 ];
                 const total = Math.max(1, queries.length);
+                const page1Count = buckets[0].count + buckets[1].count;
                 return (
-                  <div className="space-y-2.5">
-                    {buckets.map(b => (
-                      <div key={b.label}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-zinc-400">{b.label}</span>
-                          <span className="text-xs font-semibold text-zinc-300">{b.count} <span className="text-zinc-600">({Math.round((b.count / total) * 100)}%)</span></span>
+                  <div>
+                    <div className="text-[9px] text-zinc-600 mb-3">
+                      {total} tracked keywords · {page1Count} on page 1 ({Math.round((page1Count / total) * 100)}%)
+                    </div>
+                    <div className="space-y-2.5">
+                      {buckets.map(b => (
+                        <div key={b.label}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-zinc-400">{b.label}</span>
+                            <span className="text-xs font-semibold text-zinc-300">{b.count} of {total} <span className="text-zinc-600">({Math.round((b.count / total) * 100)}%)</span></span>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${b.color} transition-all duration-500`}
+                              style={{ width: `${(b.count / total) * 100}%` }} />
+                          </div>
                         </div>
-                        <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${b.color} transition-all duration-500`}
-                            style={{ width: `${(b.count / total) * 100}%` }} />
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-zinc-600 mt-2.5">
+                      {page1Count >= total * 0.5 ? '✅ Over half your keywords are on page 1' : `⚠️ ${total - page1Count} keywords need optimization to reach page 1`}
+                    </p>
                   </div>
                 );
               })()}
@@ -1079,7 +1117,7 @@ export default function DashboardOverview() {
                 <p className="text-xs text-zinc-600">Not enough data to show trend</p>
               )}
               <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-                <div className="text-[10px] text-zinc-400">Daily search clicks over the last 14 days</div>
+                <div className="text-[10px] text-zinc-400">Daily search clicks from Google Search Console (14 days)</div>
                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
               </div>
             </div>
@@ -1406,17 +1444,28 @@ export default function DashboardOverview() {
                               </div>
                             </div>
 
-                            {/* Revenue badge */}
-                            {kw.potentialClicks > 0 && (
-                              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            {/* Revenue badge + Actions */}
+                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                              {kw.potentialClicks > 0 && (
                                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 px-2 py-1 rounded-lg">
                                   +{kw.potentialClicks} clicks
                                 </span>
-                                <span className="text-[9px] text-zinc-500">
-                                  ~${kw.estimatedRevenue.toFixed(0)}/mo
-                                </span>
+                              )}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `How can I optimize my page to rank higher for "${kw.query}"? Current position: ${kw.position}`, site: selectedSite } }))}
+                                  className="text-[8px] px-2 py-1 rounded bg-violet-500/10 text-violet-400 border border-violet-500/15 hover:bg-violet-500/20 transition"
+                                >
+                                  Optimize
+                                </button>
+                                <button
+                                  onClick={() => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `Analyze the SERP competition for "${kw.query}" and suggest content improvements`, site: selectedSite } }))}
+                                  className="text-[8px] px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/15 hover:bg-cyan-500/20 transition"
+                                >
+                                  Analyze
+                                </button>
                               </div>
-                            )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1502,7 +1551,15 @@ export default function DashboardOverview() {
                               <span>•</span>
                               <span>{fmtNum(item.impressions)} impressions</span>
                             </div>
-                            <span className="text-[9px] text-amber-400/70">💡 Fix meta title</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `Rewrite the meta title and description for my page ranking for "${item.query}" at position ${item.position}. Current CTR is ${item.actualCTR}% but expected is ${item.expectedCTR}%. Suggest 3 compelling alternatives.`, site: selectedSite } }));
+                              }}
+                              className="text-[9px] text-amber-400 bg-amber-500/[0.08] border border-amber-500/10 px-2 py-0.5 rounded hover:bg-amber-500/15 transition"
+                            >
+                              Fix meta title →
+                            </button>
                           </div>
                         </div>
                       );
