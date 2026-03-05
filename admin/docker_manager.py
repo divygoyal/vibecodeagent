@@ -689,11 +689,12 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                 },
                 "agents": {
                     "defaults": {
-                        "model": "gemini-3-flash-preview",
+                        "model": "gemini-2.5-flash",
                         "systemPrompt": system_prompt,
                         "max_tokens": 1500,
                         "temperature": 0.2,
-                        "max_tool_iterations": 5
+                        "max_tool_iterations": 5,
+                        "request_timeout": 30
                     }
                 },
                 "tools": {
@@ -714,11 +715,11 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
-            "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
+            "OPENCLAW_MODEL": "google/gemini-2.5-flash",
             # LLM fallback config — retry primary model, then cascade to fallbacks
-            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-3.1-flash-lite-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
-            "NANOBOT_RETRY_COUNT": "2",
-            "NANOBOT_RETRY_DELAY": "1.5",
+            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
+            "NANOBOT_RETRY_COUNT": "1",
+            "NANOBOT_RETRY_DELAY": "1.0",
             # User identification
             "USER_IDENTIFIER": user_identifier,
             "PLAN": plan,

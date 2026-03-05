@@ -17,12 +17,13 @@ FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
         "NANOBOT_FALLBACK_MODELS",
-        "gemini/gemini-3.1-flash-lite-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
+        "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
     ).split(",")
     if m.strip()
 ]
-MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "2"))
-RETRY_DELAY = float(os.environ.get("NANOBOT_RETRY_DELAY", "1.5"))
+MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "1"))
+RETRY_DELAY = float(os.environ.get("NANOBOT_RETRY_DELAY", "1.0"))
+REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "30"))
 RETRIABLE_PATTERNS = ["503", "429", "ServiceUnavailable", "RateLimitError", "UNAVAILABLE", "overloaded", "high demand"]
 
 _patched = False
@@ -52,6 +53,9 @@ def _apply_patch():
         return any(p in str(exc) for p in RETRIABLE_PATTERNS)
 
     async def _fallback(*args, **kwargs):
+        # Force timeout on every call to prevent 10-minute hangs
+        if "timeout" not in kwargs:
+            kwargs["timeout"] = REQUEST_TIMEOUT
         model = kwargs.get("model", args[0] if args else "unknown")
         last_err = None
         for attempt in range(MAX_RETRIES + 1):
@@ -82,7 +86,7 @@ def _apply_patch():
 
     litellm.acompletion = _fallback
     litellm.num_retries = MAX_RETRIES
-    litellm.request_timeout = 30
+    litellm.request_timeout = REQUEST_TIMEOUT
     _patched = True
     logger.info(f"[Fallback] Patched litellm: primary -> {' -> '.join(FALLBACK_MODELS)} (retries={MAX_RETRIES})")
 
