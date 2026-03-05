@@ -19,8 +19,8 @@ DOCKER_IMAGE = "coollabsio/openclaw:latest"
 
 # Token optimization defaults
 TOKEN_CONFIG = {
-    "contextTokens": 32000,
-    "maxInputTokens": 8000,
+    "contextTokens": 16000,
+    "maxInputTokens": 4000,
     "compaction": "aggressive",
     "heartbeatEnabled": False,
     "heartbeatInterval": "60m",

@@ -9,22 +9,22 @@
         "model": "gemini-3-flash-preview"
       },
       "session": {
-        "contextTokens": 32000,
-        "maxInputTokens": 8000,
-        "pruneAfterMessages": 50,
-        "autoSummarizeAfter": 30
+        "contextTokens": 16000,
+        "maxInputTokens": 4000,
+        "pruneAfterMessages": 20,
+        "autoSummarizeAfter": 12
       },
       "model": {
         "default": "gemini-3-flash-preview",
         "thinking": false,
-        "temperature": 0.7,
-        "maxOutputTokens": 2048
+        "temperature": 0.3,
+        "maxOutputTokens": 1500
       }
     }
   },
   "compaction": {
-    "mode": "safeguard",
-    "threshold": 0.8,
+    "mode": "aggressive",
+    "threshold": 0.6,
     "strategy": "summarize_old"
   },
   "streamMode": "partial",
@@ -44,28 +44,28 @@
     },
     "params": {
       "gemini-3-flash-preview": {
-        "temperature": 0.7,
-        "maxOutputTokens": 2048,
+        "temperature": 0.3,
+        "maxOutputTokens": 1500,
         "thinking": false
       }
     }
   },
   "rateLimit": {
     "tokensPerMinute": 900000,
-    "requestsPerMinute": 50,
+    "requestsPerMinute": 60,
     "dailyTokenBudget": 50000000,
     "warningThreshold": 0.8
   },
   "caching": {
     "enabled": true,
-    "ttlMinutes": 30,
-    "maxEntries": 1000
+    "ttlMinutes": 60,
+    "maxEntries": 500
   },
   "tools": {
     "outputTruncation": {
       "enabled": true,
-      "maxChars": 5000,
-      "truncationMessage": "... [output truncated for token efficiency]"
+      "maxChars": 3000,
+      "truncationMessage": "... [truncated]"
     }
   },
   "telegram": {
