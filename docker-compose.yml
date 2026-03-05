@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.nanobot
-    image: trafficclaw/nanobot:v7
+    image: trafficclaw/nanobot:v8
     command: ["echo", "Nanobot image built successfully"]
     restart: "no"
 
