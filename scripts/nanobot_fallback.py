@@ -21,7 +21,7 @@ FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
         "NANOBOT_FALLBACK_MODELS",
-        "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
+        "gemini/gemini-3.1-flash-lite-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
     ).split(",")
     if m.strip()
 ]

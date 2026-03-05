@@ -865,7 +865,7 @@ This workspace is your home. You are an elite SEO & analytics expert.
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
             # LLM fallback config — retry primary model, then cascade to fallbacks
-            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
+            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-3.1-flash-lite-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
             "NANOBOT_RETRY_COUNT": "2",
             "NANOBOT_RETRY_DELAY": "1.5",
             # User identification
