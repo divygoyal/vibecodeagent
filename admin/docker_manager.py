@@ -709,9 +709,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                         "model": "gemini-3-flash-preview",
                         "systemPrompt": system_prompt,
                         "max_tokens": 4096,
-                        "temperature": 0.3,
+                        "temperature": 1.0,
                         "max_tool_iterations": 10,
-                        "request_timeout": 60
+                        "request_timeout": 30
                     }
                 },
                 "tools": {
@@ -734,10 +734,10 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
             # LLM fallback config — retry primary model, then cascade to fallbacks
-            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-3-flash-preview,gemini/gemini-3-pro-preview,gemini/gemini-2.5-flash",
-            "NANOBOT_RETRY_COUNT": "2",
+            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-3-flash-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
+            "NANOBOT_RETRY_COUNT": "1",
             "NANOBOT_RETRY_DELAY": "1.0",
-            "NANOBOT_REQUEST_TIMEOUT": "60",
+            "NANOBOT_REQUEST_TIMEOUT": "30",
             # User identification
             "USER_IDENTIFIER": user_identifier,
             "PLAN": plan,

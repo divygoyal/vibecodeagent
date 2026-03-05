@@ -23,14 +23,14 @@ FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
         "NANOBOT_FALLBACK_MODELS",
-        "gemini/gemini-3-flash-preview,gemini/gemini-3-pro-preview,gemini/gemini-2.5-flash",
+        "gemini/gemini-3-flash-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
     ).split(",")
     if m.strip()
 ]
 
-MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "2"))
+MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "1"))
 RETRY_DELAY = float(os.environ.get("NANOBOT_RETRY_DELAY", "1.0"))
-REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "60"))
+REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "30"))
 
 RETRIABLE_PATTERNS = [
     "503", "429", "ServiceUnavailable", "RateLimitError",
@@ -111,6 +111,7 @@ def _apply_patch():
         raise last_error
 
     litellm.acompletion = acompletion_with_fallback
+    # IMPORTANT: Do NOT set litellm.num_retries — it causes double-retry with our custom fallback
     litellm.request_timeout = REQUEST_TIMEOUT
     _patched = True
 

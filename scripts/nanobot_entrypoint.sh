@@ -17,13 +17,13 @@ FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
         "NANOBOT_FALLBACK_MODELS",
-        "gemini/gemini-3-flash-preview,gemini/gemini-3-pro-preview,gemini/gemini-2.5-flash",
+        "gemini/gemini-3-flash-preview,gemini/gemini-3.1-pro-preview,gemini/gemini-2.5-flash",
     ).split(",")
     if m.strip()
 ]
-MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "2"))
+MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "1"))
 RETRY_DELAY = float(os.environ.get("NANOBOT_RETRY_DELAY", "1.0"))
-REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "60"))
+REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "30"))
 RETRIABLE_PATTERNS = ["503", "429", "ServiceUnavailable", "RateLimitError", "UNAVAILABLE", "overloaded", "high demand", "capacity"]
 
 _patched = False
@@ -87,6 +87,7 @@ def _apply_patch():
         raise last_err
 
     litellm.acompletion = _fallback
+    # IMPORTANT: Do NOT set litellm.num_retries — it causes double-retry with our custom fallback
     litellm.request_timeout = REQUEST_TIMEOUT
     _patched = True
     logger.info(f"[Fallback] Patched: primary -> {' -> '.join(FALLBACK_MODELS)} (retries={MAX_RETRIES}, timeout={REQUEST_TIMEOUT}s)")
@@ -107,7 +108,7 @@ PYEOF
 # Prepend our patch dir to PYTHONPATH so sitecustomize.py loads automatically
 export PYTHONPATH="$PATCH_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
-echo "[entrypoint] Fallback patch ready (timeout=${NANOBOT_REQUEST_TIMEOUT:-60}s)"
+echo "[entrypoint] Fallback patch ready (timeout=${NANOBOT_REQUEST_TIMEOUT:-30}s)"
 echo "[entrypoint] Starting nanobot gateway..."
 
 exec nanobot gateway
