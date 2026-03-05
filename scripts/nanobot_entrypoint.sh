@@ -9,7 +9,7 @@ PATCH_DIR="/tmp/nanobot_patch"
 mkdir -p "$PATCH_DIR"
 
 cat > "$PATCH_DIR/sitecustomize.py" << 'PYEOF'
-import asyncio, logging, os, sys
+import asyncio, logging, os
 
 logger = logging.getLogger("nanobot.fallback")
 
@@ -17,14 +17,14 @@ FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
         "NANOBOT_FALLBACK_MODELS",
-        "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
+        "gemini/gemini-3-flash-preview,gemini/gemini-3-pro-preview,gemini/gemini-2.5-flash",
     ).split(",")
     if m.strip()
 ]
-MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "1"))
+MAX_RETRIES = int(os.environ.get("NANOBOT_RETRY_COUNT", "2"))
 RETRY_DELAY = float(os.environ.get("NANOBOT_RETRY_DELAY", "1.0"))
-REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "30"))
-RETRIABLE_PATTERNS = ["503", "429", "ServiceUnavailable", "RateLimitError", "UNAVAILABLE", "overloaded", "high demand"]
+REQUEST_TIMEOUT = int(os.environ.get("NANOBOT_REQUEST_TIMEOUT", "60"))
+RETRIABLE_PATTERNS = ["503", "429", "ServiceUnavailable", "RateLimitError", "UNAVAILABLE", "overloaded", "high demand", "capacity"]
 
 _patched = False
 
@@ -53,11 +53,12 @@ def _apply_patch():
         return any(p in str(exc) for p in RETRIABLE_PATTERNS)
 
     async def _fallback(*args, **kwargs):
-        # Force timeout on every call to prevent 10-minute hangs
         if "timeout" not in kwargs:
             kwargs["timeout"] = REQUEST_TIMEOUT
         model = kwargs.get("model", args[0] if args else "unknown")
         last_err = None
+
+        # Retry primary model
         for attempt in range(MAX_RETRIES + 1):
             try:
                 return await _original(*args, **kwargs)
@@ -67,9 +68,10 @@ def _apply_patch():
                     raise
                 if attempt < MAX_RETRIES:
                     delay = RETRY_DELAY * (2 ** attempt)
-                    logger.warning(f"[Fallback] {model} attempt {attempt+1} failed: {type(e).__name__}. Retrying in {delay:.1f}s...")
+                    logger.warning(f"[Fallback] {model} attempt {attempt+1} failed: {type(e).__name__}. Retry in {delay:.1f}s...")
                     await asyncio.sleep(delay)
 
+        # Try fallback models
         for fb in FALLBACK_MODELS:
             if fb == model:
                 continue
@@ -85,10 +87,9 @@ def _apply_patch():
         raise last_err
 
     litellm.acompletion = _fallback
-    litellm.num_retries = MAX_RETRIES
     litellm.request_timeout = REQUEST_TIMEOUT
     _patched = True
-    logger.info(f"[Fallback] Patched litellm: primary -> {' -> '.join(FALLBACK_MODELS)} (retries={MAX_RETRIES})")
+    logger.info(f"[Fallback] Patched: primary -> {' -> '.join(FALLBACK_MODELS)} (retries={MAX_RETRIES}, timeout={REQUEST_TIMEOUT}s)")
 
 _apply_patch()
 
@@ -106,8 +107,7 @@ PYEOF
 # Prepend our patch dir to PYTHONPATH so sitecustomize.py loads automatically
 export PYTHONPATH="$PATCH_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
-echo "[entrypoint] Fallback patch written to $PATCH_DIR/sitecustomize.py"
-echo "[entrypoint] PYTHONPATH=$PYTHONPATH"
+echo "[entrypoint] Fallback patch ready (timeout=${NANOBOT_REQUEST_TIMEOUT:-60}s)"
 echo "[entrypoint] Starting nanobot gateway..."
 
 exec nanobot gateway

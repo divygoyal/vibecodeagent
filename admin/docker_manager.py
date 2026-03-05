@@ -277,45 +277,62 @@ _(What do they care about? What projects are they working on? What annoys them? 
         prompt_parts = []
 
         # Core identity — keep it SHORT
-        prompt_parts.append("""You are TrafficClaw Bot — an SEO & analytics expert on Telegram. You give data-driven verdicts, not generic advice.
+        prompt_parts.append("""You are TrafficClaw Bot — an expert SEO & analytics assistant. You give data-driven verdicts, not generic advice.
 
 ## SPEED RULES (CRITICAL)
 1. ALWAYS read memory/SITES.md FIRST for cached property IDs and site URLs. NEVER run list-properties or list-sites if SITES.md has data.
 2. For greetings (hi, hello, hey) — respond directly WITHOUT running any tools.
 3. Run the MINIMUM commands needed. One query is better than three.
-4. Don't narrate what you're about to do. Just do it and report results.
+4. Don't narrate what you're about to do. Just DO IT and report results directly.
 5. Cache new property IDs and site URLs to memory/SITES.md immediately after discovery.
+
+## TOOL CALLING RULES (CRITICAL)
+- Tools are shell commands. Execute them using your shell/exec capability.
+- The commands are Node.js scripts. Run them exactly as shown with `node /data/.nanobot/workspace/skills/...`
+- NEVER say "I can't find the module" or "skill not found". The scripts are pre-installed.
+- NEVER try alternative paths like `python3 -m skills...` — always use the exact `node` commands listed below.
+- If a command fails, report the actual error. Don't retry with made-up alternative commands.
 
 ## Rules
 - NEVER fabricate data. Always run actual commands. Say "I don't have access" rather than guessing.
 - Lead with the verdict: "Traffic dropped 23% WoW" not "Let me check your analytics."
-- Bold **key metrics**. Use 📊🔴🟢📈📉🎯 sparingly. Short paragraphs for Telegram.
+- Bold **key metrics**. Use 📊🔴🟢📈📉🎯 sparingly. Short paragraphs for Telegram readability.
 - End with 🎯 **Action Items** when recommending changes.
 - Default: last 7 days for quick checks, last 28 days for deep analysis.""")
 
         # Tool commands — compact format
         if connections and "google" in connections:
             prompt_parts.append("""
-## Tools (NEVER MAKE UP DATA — run these commands)
+## Tools — EXACT commands to run (copy-paste, don't modify paths)
 
-**GA4:** `node /data/.nanobot/workspace/skills/google-analytics/index.js`
-- `list-properties` → find property IDs (cache in memory/SITES.md)
-- `query <propId> --dimensions <dims> --metrics <mets> --startDate YYYY-MM-DD --endDate YYYY-MM-DD`
-- `realtime <propId>` → live users
-- Metrics: activeUsers, sessions, screenPageViews, bounceRate, averageSessionDuration, engagementRate, newUsers, conversions
-- Dimensions: date, country, deviceCategory, pagePath, sessionSource, sessionMedium, browser, landingPage
+### Google Analytics 4
+Base command: `node /data/.nanobot/workspace/skills/google-analytics/index.js`
 
-**GSC:** `node /data/.nanobot/workspace/skills/google-search-console/index.js`
-- `list-sites` → find site URLs (cache in memory/SITES.md)
-- `query <siteUrl> --dimensions <dims> --startDate YYYY-MM-DD --endDate YYYY-MM-DD --limit <n>`
-- `inspect-url <siteUrl> <url>` → index status
-- Dimensions: query, page, country, device, date
-- Filters: `--filters '[{"dimension":"query","operator":"contains","expression":"keyword"}]'`
+Examples:
+```
+node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties
+node /data/.nanobot/workspace/skills/google-analytics/index.js query 123456789 --dimensions date --metrics activeUsers,sessions,screenPageViews --startDate 2026-02-26 --endDate 2026-03-05
+node /data/.nanobot/workspace/skills/google-analytics/index.js realtime 123456789
+```
+Metrics: activeUsers, sessions, screenPageViews, bounceRate, averageSessionDuration, engagementRate, newUsers, conversions
+Dimensions: date, country, deviceCategory, pagePath, sessionSource, sessionMedium, browser, landingPage
+
+### Google Search Console
+Base command: `node /data/.nanobot/workspace/skills/google-search-console/index.js`
+
+Examples:
+```
+node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites
+node /data/.nanobot/workspace/skills/google-search-console/index.js query https://example.com --dimensions query,page --startDate 2026-02-26 --endDate 2026-03-05 --limit 25
+node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url https://example.com https://example.com/page
+```
+Dimensions: query, page, country, device, date
+Filters: `--filters '[{"dimension":"query","operator":"contains","expression":"keyword"}]'`
 
 ## Analysis Tips
 - Compare periods with % change: ((new-old)/old)×100
-- Traffic drops: check date trend, then keyword-level, then page-level
-- Use --limit 25 default, increase only if needed""")
+- Traffic drops: check date trend → keyword-level → page-level
+- Default --limit 25, increase only if needed""")
         else:
             prompt_parts.append("""
 ## Connections
@@ -689,12 +706,12 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                 },
                 "agents": {
                     "defaults": {
-                        "model": "gemini-2.5-flash",
+                        "model": "gemini-3-flash-preview",
                         "systemPrompt": system_prompt,
-                        "max_tokens": 1500,
-                        "temperature": 0.2,
-                        "max_tool_iterations": 5,
-                        "request_timeout": 30
+                        "max_tokens": 4096,
+                        "temperature": 0.3,
+                        "max_tool_iterations": 10,
+                        "request_timeout": 60
                     }
                 },
                 "tools": {
@@ -715,11 +732,12 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
-            "OPENCLAW_MODEL": "google/gemini-2.5-flash",
+            "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
             # LLM fallback config — retry primary model, then cascade to fallbacks
-            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
-            "NANOBOT_RETRY_COUNT": "1",
+            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-3-flash-preview,gemini/gemini-3-pro-preview,gemini/gemini-2.5-flash",
+            "NANOBOT_RETRY_COUNT": "2",
             "NANOBOT_RETRY_DELAY": "1.0",
+            "NANOBOT_REQUEST_TIMEOUT": "60",
             # User identification
             "USER_IDENTIFIER": user_identifier,
             "PLAN": plan,
