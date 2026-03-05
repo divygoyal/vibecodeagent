@@ -172,10 +172,19 @@ export async function POST(req: NextRequest) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
 
-        const { message, selectedSite, analyticsContext, seoContext, history, mode } = await req.json();
+        const body = await req.json();
+        const { message, selectedSite, analyticsContext, seoContext, history, mode } = body;
 
-        if (!message) {
+        if (!message || typeof message !== 'string') {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (message.length > 4000) {
+            return new Response(JSON.stringify({ error: 'Message too long (max 4000 chars)' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (history && (!Array.isArray(history) || history.length > 50)) {
+            return new Response(JSON.stringify({ error: 'Invalid history' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 
         // @ts-expect-error - id added in callbacks
@@ -272,6 +281,12 @@ CRITICAL SYSTEM CONTEXT:
             ? systemInstruction + `\n\nBRIEFING MODE ACTIVE: Generate a concise morning briefing. Structure:\n1. **☀️ Overnight Snapshot** — Key KPI changes (use WoW % changes from dashboard data). Highlight anything unusual.\n2. **🚨 Alerts** — Flag anomalies: traffic drops >10%, CTR problems, ranking losses, striking distance opportunities.\n3. **🎯 #1 Priority Today** — The single most impactful action. Be specific (e.g., "Optimize title tag for [query] — position 8 with 2% CTR, expected 5%+").\nKeep it under 250 words. No filler. Start with "☀️ Good morning! Here's your daily briefing:"`
             : systemInstruction;
 
+        // ── Deduct credit BEFORE streaming to prevent race conditions ──
+        let creditBalance: number | null = null;
+        if (ADMIN_API_KEY && userId) {
+            creditBalance = await deductCredits(String(userId));
+        }
+
         // ── Execute Gemini Stream via official SDK ──
         const stream = new ReadableStream({
             async start(controller) {
@@ -279,9 +294,13 @@ CRITICAL SYSTEM CONTEXT:
                     // Signal client immediately that we're alive
                     controller.enqueue(encodeSSE({ type: 'status', message: 'Processing...' }));
 
+                    // Send credit update immediately
+                    if (creditBalance !== null) {
+                        controller.enqueue(encodeSSE({ type: 'credits', value: creditBalance }));
+                    }
+
                     let currentContents = [...contents];
                     let keepGoing = true;
-                    let hasDeductedCredit = false;
                     let loopCount = 0;
                     let gscCallCount = 0;
                     const MAX_GSC_CALLS = 4;
@@ -324,16 +343,6 @@ CRITICAL SYSTEM CONTEXT:
 
                         // Stream chunks from the SDK
                         for await (const chunk of response) {
-                            // Deduct credit on first chunk
-                            if (!hasDeductedCredit && ADMIN_API_KEY && userId) {
-                                hasDeductedCredit = true;
-                                deductCredits(String(userId)).then(credits => {
-                                    if (credits !== null) {
-                                        try { controller.enqueue(encodeSSE({ type: 'credits', value: credits })); } catch {}
-                                    }
-                                }).catch(() => {});
-                            }
-
                             // Stream text chunks
                             if (chunk.text) {
                                 fullText += chunk.text;

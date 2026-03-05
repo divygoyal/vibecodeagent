@@ -34,19 +34,20 @@ export async function POST(req: Request) {
         const rawBody = await req.text();
         let event: any;
 
-        // Verify webhook signature
-        if (DODO_WEBHOOK_SECRET) {
-            try {
-                event = client.webhooks.unwrap(rawBody, {
-                    headers: Object.fromEntries(req.headers.entries()),
-                    key: DODO_WEBHOOK_SECRET,
-                });
-            } catch (err) {
-                console.error('[Webhook] Signature verification failed:', err);
-                return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-            }
-        } else {
-            event = JSON.parse(rawBody);
+        // Verify webhook signature (reject if no secret configured)
+        if (!DODO_WEBHOOK_SECRET) {
+            console.error('[Webhook] DODO_PAYMENTS_WEBHOOK_KEY not configured — rejecting request');
+            return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+        }
+
+        try {
+            event = client.webhooks.unwrap(rawBody, {
+                headers: Object.fromEntries(req.headers.entries()),
+                key: DODO_WEBHOOK_SECRET,
+            });
+        } catch (err) {
+            console.error('[Webhook] Signature verification failed:', err);
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
 
         const eventType = event.event_type || event.type;

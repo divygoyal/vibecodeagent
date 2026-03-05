@@ -62,69 +62,6 @@ const TOOL_LABELS: Record<string, string> = {
     generate_meta_tags: 'Crafting meta tags...',
 };
 
-// Simple markdown-ish renderer for bot responses
-function renderMessage(text: string) {
-    const lines = text.split('\n');
-    const elements: React.ReactNode[] = [];
-
-    lines.forEach((line, idx) => {
-        let processed = line;
-
-        if (processed.startsWith('### ')) {
-            elements.push(<h4 key={idx} className="text-sm font-bold text-emerald-300 mt-3 mb-1">{processed.slice(4)}</h4>);
-            return;
-        }
-        if (processed.startsWith('## ')) {
-            elements.push(<h3 key={idx} className="text-sm font-bold text-emerald-200 mt-4 mb-1">{processed.slice(3)}</h3>);
-            return;
-        }
-        if (processed.startsWith('# ')) {
-            elements.push(<h2 key={idx} className="text-base font-bold text-white mt-4 mb-2">{processed.slice(2)}</h2>);
-            return;
-        }
-
-        if (processed.match(/^---+$/)) {
-            elements.push(<hr key={idx} className="border-white/5 my-3" />);
-            return;
-        }
-
-        if (!processed.trim()) {
-            elements.push(<div key={idx} className="h-2" />);
-            return;
-        }
-
-        processed = processed
-            .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/`(.+?)`/g, '<code class="bg-white/8 px-1 py-0.5 rounded text-emerald-300 text-[11px]">$1</code>');
-
-        if (processed.match(/^[\-\*•]\s/)) {
-            elements.push(
-                <div key={idx} className="flex gap-2 pl-1 py-0.5">
-                    <span className="text-emerald-500/70 flex-shrink-0 mt-0.5">•</span>
-                    <span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} />
-                </div>
-            );
-            return;
-        }
-
-        const numMatch = processed.match(/^(\d+)\.\s(.+)/);
-        if (numMatch) {
-            elements.push(
-                <div key={idx} className="flex gap-2 pl-1 py-0.5">
-                    <span className="text-emerald-500/70 flex-shrink-0 font-mono text-xs w-5 text-right mt-0.5">{numMatch[1]}.</span>
-                    <span dangerouslySetInnerHTML={{ __html: numMatch[2] }} />
-                </div>
-            );
-            return;
-        }
-
-        elements.push(<p key={idx} className="py-0.5" dangerouslySetInnerHTML={{ __html: processed }} />);
-    });
-
-    return <>{elements}</>;
-}
-
 // Memoized message bubble — prevents re-rendering old messages when new chunks arrive
 const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming, snapshot, onSuggestionClick }: { msg: Message; isExpanded: boolean; isStreaming?: boolean; snapshot?: any; onSuggestionClick?: (s: string) => void }) {
     return (
