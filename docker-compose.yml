@@ -11,6 +11,16 @@ services:
     command: ["echo", "Image built successfully"]
     restart: "no"
 
+  # ============= Nanobot Image Builder =============
+  # Builds the nanobot image with LLM fallback wrapper baked in
+  nanobot-image:
+    build:
+      context: .
+      dockerfile: Dockerfile.nanobot
+    image: trafficclaw/nanobot:v7
+    command: ["echo", "Nanobot image built successfully"]
+    restart: "no"
+
   # ============= Admin API =============
   admin-api:
     build: 
