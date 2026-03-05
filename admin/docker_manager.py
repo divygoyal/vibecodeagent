@@ -28,7 +28,7 @@ class DockerManager:
     
     def _ensure_nanobot_image(self) -> None:
         """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
-        tag = "trafficclaw/nanobot:v6"
+        tag = "trafficclaw/nanobot:v7"
         try:
             self.client.images.get(tag)
             logger.info(f"Nanobot image {tag} already exists")
@@ -864,10 +864,10 @@ This workspace is your home. You are an elite SEO & analytics expert.
             # Model config
             "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
             "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
-            # LiteLLM retry config — handles 503/429 errors automatically
-            "LITELLM_NUM_RETRIES": "4",
-            "LITELLM_REQUEST_TIMEOUT": "30",
-            "LITELLM_RETRY_DELAY": "2",
+            # LLM fallback config — retry primary model, then cascade to fallbacks
+            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-2.5-flash,gemini/gemini-2.0-flash",
+            "NANOBOT_RETRY_COUNT": "2",
+            "NANOBOT_RETRY_DELAY": "1.5",
             # User identification
             "USER_IDENTIFIER": user_identifier,
             "PLAN": plan,
@@ -888,7 +888,7 @@ This workspace is your home. You are an elite SEO & analytics expert.
              env["GITHUB_ID"] = user_identifier
         
         # Create container - select image and memory limit based on engine
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v6"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v7"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
         # Set up volumes based on the engine
