@@ -6,9 +6,10 @@ import {
     Bot, CheckCircle2, AlertCircle, Loader2, Lock,
     MessageSquare, Github, Chrome, BarChart3, Search,
     Zap, PenTool, Bug, DollarSign, Globe, Link2,
-    FileText, Shield, Sparkles, ArrowRight, ExternalLink
+    FileText, Shield, Sparkles, ArrowRight, ExternalLink, Crown
 } from 'lucide-react';
 import { useRegistration } from '../layout';
+import { useCredits } from '@/lib/useDashboardData';
 
 type BotStatus = {
     status: string;
@@ -44,6 +45,9 @@ export default function BotPage() {
     const user = session?.user as {
         name?: string | null; email?: string | null; image?: string | null; provider?: string;
     } | undefined;
+
+    const { plan, telegramBotEnabled } = useCredits();
+    const hasProPlan = plan === 'pro' || telegramBotEnabled;
 
     const [botToken, setBotToken] = useState('');
     const [setupStatus, setSetupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -224,7 +228,33 @@ export default function BotPage() {
                 </div>
 
                 {!isProvisioned ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
+                    <div className="relative">
+                        {/* Pro plan gate overlay */}
+                        {!hasProPlan && (
+                            <div className="absolute inset-0 z-20 bg-[#050508]/80 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                                <div className="text-center max-w-sm px-6">
+                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/20">
+                                        <Lock className="w-6 h-6 text-white" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Pro Plan Required</h3>
+                                    <p className="text-sm text-zinc-400 mb-5 leading-relaxed">
+                                        Telegram bot access is exclusive to the <span className="text-violet-400 font-semibold">Pro plan</span>. Upgrade to connect your bot and get 300 AI credits/month.
+                                    </p>
+                                    <a
+                                        href="https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-violet-400 to-purple-500 text-white font-semibold text-sm hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all"
+                                    >
+                                        <Crown className="w-4 h-4" />
+                                        Upgrade to Pro — $29/mo
+                                    </a>
+                                    <p className="text-[10px] text-zinc-600 mt-3">300 AI credits + Telegram bot + Priority support</p>
+                                </div>
+                            </div>
+                        )}
+
+                    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4 ${!hasProPlan ? 'pointer-events-none select-none' : ''}`}>
                         {/* Left column — Instructions + Input */}
                         <div>
                             <div className="flex items-center gap-3 mb-5">
@@ -329,6 +359,7 @@ export default function BotPage() {
                                 </div>
                             </div>
                         </div>
+                    </div>
                     </div>
                 ) : (
                     <div className="bg-[#050508] p-4 rounded-xl border border-white/[0.04] mt-3">

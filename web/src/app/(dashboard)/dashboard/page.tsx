@@ -1621,10 +1621,10 @@ function KPICard({
   const prev = change !== undefined && change !== 0 ? Math.round(numVal / (1 + change / 100)) : null;
 
   return (
-    <Link href={href} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.12] transition-all group">
+    <Link href={href} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.1] hover:bg-white/[0.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.02)] transition-all duration-300 group">
       <div className="flex items-center justify-between mb-2">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
-          <Icon className="w-4 h-4 text-zinc-400 group-hover:text-white transition-colors" />
+        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-emerald-500/20 group-hover:to-cyan-500/20 group-hover:shadow-[0_0_12px_rgba(52,211,153,0.15)] transition-all duration-300">
+          <Icon className="w-4 h-4 text-zinc-400 group-hover:text-emerald-400 transition-colors duration-300" />
         </div>
         {change !== undefined && (
           <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -1658,14 +1658,39 @@ function KPICard({
         </div>
       )}
 
-      {/* Hover tooltip */}
+      {/* Hover tooltip — premium glassmorphism card */}
       {showValue && (
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 px-3 py-2 rounded-lg bg-[#0a0a0f] border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-          <div className="text-[10px] text-zinc-300 font-medium mb-1">{label} Details</div>
-          {prev !== null && <div className="text-[10px] text-zinc-500">Previous: <span className="text-zinc-300">{prev.toLocaleString()}</span></div>}
-          {sparkData.length > 0 && <div className="text-[10px] text-zinc-500">Range: <span className="text-zinc-300">{sparkMin.toLocaleString()} – {sparkMax.toLocaleString()}</span></div>}
-          {change !== undefined && <div className={`text-[10px] ${positive ? 'text-emerald-400' : 'text-red-400'}`}>{positive ? 'Trending up' : 'Trending down'} {Math.abs(change)}%</div>}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a0a0f]" />
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-52 px-4 py-3 rounded-xl bg-[#0c0c14]/95 backdrop-blur-xl border border-white/[0.1] shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.05)] opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-300 ease-out pointer-events-none z-50">
+          {/* Accent glow at top */}
+          <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-16 h-[2px] rounded-full ${positive ? 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent' : 'bg-gradient-to-r from-transparent via-red-400 to-transparent'}`} />
+          <div className="text-[11px] text-white font-semibold mb-2 flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${positive ? 'bg-emerald-400' : 'bg-red-400'}`} />
+            {label}
+          </div>
+          <div className="space-y-1.5">
+            {prev !== null && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500">Previous</span>
+                <span className="text-[10px] text-zinc-300 font-mono font-medium">{prev.toLocaleString()}</span>
+              </div>
+            )}
+            {sparkData.length > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500">Range</span>
+                <span className="text-[10px] text-zinc-300 font-mono font-medium">{sparkMin.toLocaleString()} – {sparkMax.toLocaleString()}</span>
+              </div>
+            )}
+            {change !== undefined && (
+              <div className={`flex items-center justify-between pt-1.5 mt-1.5 border-t border-white/[0.06]`}>
+                <span className="text-[10px] text-zinc-500">Trend</span>
+                <span className={`text-[10px] font-bold flex items-center gap-1 ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {positive ? '↗' : '↘'} {positive ? '+' : ''}{change}%
+                </span>
+              </div>
+            )}
+          </div>
+          {/* Arrow */}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-[#0c0c14]/95" />
         </div>
       )}
     </Link>
