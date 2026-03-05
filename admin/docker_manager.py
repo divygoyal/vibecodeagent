@@ -713,7 +713,7 @@ This workspace is your home. You are an analytics & SEO expert.
                     "telegram": {
                         "enabled": bool(telegram_token),
                         "token": telegram_token or "",
-                        "allowFrom": []
+                        "allowFrom": ["*"]
                     }
                 },
                 "providers": {
