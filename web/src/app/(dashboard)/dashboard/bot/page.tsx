@@ -266,30 +266,19 @@ export default function BotPage() {
                             <div className="relative">
                                 <input
                                     type="text"
-                                    placeholder={hasProPlan ? "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" : "Upgrade to Pro to connect your bot"}
-                                    className={`w-full bg-[#050508] border rounded-xl px-4 py-3.5 text-sm focus:outline-none transition-all placeholder:text-zinc-600 mb-4 font-mono ${
-                                        hasProPlan
-                                            ? 'border-white/[0.08] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30'
-                                            : 'border-white/[0.04] text-zinc-600 cursor-not-allowed opacity-50'
-                                    }`}
+                                    placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+                                    className="w-full bg-[#050508] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm focus:outline-none transition-all placeholder:text-zinc-600 mb-4 font-mono focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
                                     value={botToken}
-                                    onChange={(e) => hasProPlan && setBotToken(e.target.value)}
-                                    onKeyDown={(e) => hasProPlan && e.key === 'Enter' && handleSetupBot()}
-                                    disabled={!hasProPlan}
+                                    onChange={(e) => setBotToken(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSetupBot()}
                                 />
-                                {!hasProPlan && (
-                                    <div className="absolute right-3 top-3.5">
-                                        <Lock className="w-4 h-4 text-zinc-600" />
-                                    </div>
-                                )}
                             </div>
 
                             <label className="text-sm font-medium text-zinc-400 mb-2 block">Select Engine</label>
                             <div className="flex gap-3 mb-6">
                                 <button
-                                    onClick={() => hasProPlan && setBotEngine('openclaw')}
-                                    disabled={!hasProPlan}
-                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${!hasProPlan ? 'opacity-50 cursor-not-allowed bg-[#050508] border-white/[0.04] text-zinc-600' : botEngine === 'openclaw'
+                                    onClick={() => setBotEngine('openclaw')}
+                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'openclaw'
                                         ? 'bg-zinc-800 border-zinc-600 text-white'
                                         : 'bg-[#050508] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
                                         }`}
@@ -297,9 +286,8 @@ export default function BotPage() {
                                     OpenClaw
                                 </button>
                                 <button
-                                    onClick={() => hasProPlan && setBotEngine('nanobot')}
-                                    disabled={!hasProPlan}
-                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${!hasProPlan ? 'opacity-50 cursor-not-allowed bg-[#050508] border-white/[0.04] text-zinc-600' : botEngine === 'nanobot'
+                                    onClick={() => setBotEngine('nanobot')}
+                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'nanobot'
                                         ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
                                         : 'bg-[#050508] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
                                         }`}
@@ -308,41 +296,23 @@ export default function BotPage() {
                                 </button>
                             </div>
 
-                            {hasProPlan ? (
-                                <button
-                                    onClick={handleSetupBot}
-                                    disabled={setupStatus === 'loading'}
-                                    className="w-full py-3.5 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-90 disabled:opacity-50 rounded-xl text-sm font-semibold transition-all text-black flex items-center justify-center gap-2"
-                                >
-                                    {setupStatus === 'loading' ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Connecting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            Save & Connect
-                                            <CheckCircle2 className="w-4 h-4" />
-                                        </>
-                                    )}
-                                </button>
-                            ) : (
-                                <a
-                                    href="https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-full py-3.5 bg-gradient-to-r from-violet-400 to-purple-500 hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] rounded-xl text-sm font-semibold transition-all text-white flex items-center justify-center gap-2"
-                                >
-                                    <Crown className="w-4 h-4" />
-                                    Upgrade to Pro — $29/mo
-                                </a>
-                            )}
-
-                            {!hasProPlan && (
-                                <p className="text-[11px] text-zinc-500 mt-3 text-center">
-                                    Pro plan includes 300 AI credits/mo + Telegram bot access
-                                </p>
-                            )}
+                            <button
+                                onClick={handleSetupBot}
+                                disabled={setupStatus === 'loading'}
+                                className="w-full py-3.5 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-90 disabled:opacity-50 rounded-xl text-sm font-semibold transition-all text-black flex items-center justify-center gap-2"
+                            >
+                                {setupStatus === 'loading' ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Connecting...
+                                    </>
+                                ) : (
+                                    <>
+                                        Save & Connect
+                                        <CheckCircle2 className="w-4 h-4" />
+                                    </>
+                                )}
+                            </button>
                         </div>
 
                         {/* Right column — Phone mockup with video */}
