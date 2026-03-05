@@ -171,16 +171,42 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
     );
 });
 
+const WELCOME_MESSAGE: Message = {
+    role: 'assistant',
+    content: "👋 **Hey! I'm your AI Analyst.**\n\nI have your live analytics & SEO data loaded. Ask me anything — I give **verdicts**, not advice.\n\n*Select a website above, then ask away.*",
+    timestamp: new Date(),
+};
+
+const CHAT_STORAGE_KEY = 'tc-chat-history';
+const MAX_STORED_MESSAGES = 20; // last 10 exchanges (user + assistant)
+
+function loadStoredMessages(): Message[] {
+    if (typeof window === 'undefined') return [WELCOME_MESSAGE];
+    try {
+        const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored) as Message[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+            }
+        }
+    } catch { /* corrupted storage */ }
+    return [WELCOME_MESSAGE];
+}
+
+function saveMessages(messages: Message[]) {
+    if (typeof window === 'undefined') return;
+    try {
+        // Keep only the last MAX_STORED_MESSAGES messages (plus welcome)
+        const toStore = messages.slice(-MAX_STORED_MESSAGES);
+        sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toStore));
+    } catch { /* storage full */ }
+}
+
 export default function AIChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            role: 'assistant',
-            content: "👋 **Hey! I'm your AI Analyst.**\n\nI have your live analytics & SEO data loaded. Ask me anything — I give **verdicts**, not advice.\n\n*Select a website above, then ask away.*",
-            timestamp: new Date(),
-        },
-    ]);
+    const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [credits, setCredits] = useState<number | null>(null);
@@ -213,6 +239,11 @@ export default function AIChatbot() {
             setSelectedChatSite(allSites[0].id);
         }
     }, [allSites, selectedChatSite]);
+
+    // Persist messages to sessionStorage so they survive section navigation
+    useEffect(() => {
+        saveMessages(messages);
+    }, [messages]);
 
     // Match selected GSC site to GA4 property (same logic as page.tsx)
     const matchedProperty = useMemo(() => {
@@ -523,11 +554,13 @@ export default function AIChatbot() {
     }, []); // empty deps — listener is added once, never thrashes
 
     const clearChat = useCallback(() => {
-        setMessages([{
+        const cleared: Message[] = [{
             role: 'assistant',
             content: "🔄 **Chat cleared.** What would you like to investigate?",
             timestamp: new Date(),
-        }]);
+        }];
+        setMessages(cleared);
+        saveMessages(cleared);
     }, []);
 
     // ─── Floating button (closed state) ───
