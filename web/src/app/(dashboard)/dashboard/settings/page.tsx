@@ -149,7 +149,7 @@ export default function SettingsPage() {
                     <h3 className="text-xs font-medium text-zinc-400 mb-3">Subscription Plans</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {SUBSCRIPTION_PLANS.map((plan) => {
-                            const checkoutUrl = `https://test.checkout.dodopayments.com/buy/${plan.productId}?email=${encodeURIComponent(session?.user?.email || '')}`;
+                            const checkoutUrl = `https://checkout.dodopayments.com/buy/${plan.productId}?email=${encodeURIComponent(session?.user?.email || '')}`;
                             return (
                                 <div
                                     key={plan.name}
