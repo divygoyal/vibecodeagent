@@ -36,7 +36,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         
         # Auto-migrate new columns for existing SQLite databases
-        for col, col_def in [("credits", "INTEGER DEFAULT 100"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'")]:
+        for col, col_def in [("credits", "INTEGER DEFAULT 100"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"), ("subscription_id", "VARCHAR(100)"), ("telegram_bot_enabled", "BOOLEAN DEFAULT 0")]:
             try:
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
             except Exception:
@@ -980,6 +980,51 @@ async def add_user_credits(
     
     print(f"[CREDITS] Added {request.amount} credits to user {user.github_id}. New balance: {user.credits}. Reason: {request.reason}")
     return {"credits": user.credits, "added": request.amount, "reason": request.reason}
+
+
+# ============= Subscription Endpoint =============
+class SubscriptionUpdate(BaseModel):
+    plan: str  # free, starter, growth, pro
+    credits: int
+    subscription_id: Optional[str] = None
+    telegram_bot_enabled: bool = False
+    reset_credits: bool = False  # True = set credits to amount, False = add credits
+
+@app.post("/api/users/{identifier}/subscription")
+async def update_user_subscription(
+    identifier: str,
+    request: SubscriptionUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Update user subscription (called by webhook handler)"""
+    user = await get_user_by_identifier(db, identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.plan = request.plan
+    if request.subscription_id is not None:
+        user.subscription_id = request.subscription_id
+    user.telegram_bot_enabled = request.telegram_bot_enabled
+
+    if request.reset_credits:
+        user.credits = request.credits
+    else:
+        user.credits = (user.credits or 0) + request.credits
+
+    now = datetime.utcnow()
+    user.subscription_start = now
+    user.subscription_end = now + timedelta(days=30)
+    user.updated_at = now
+    await db.commit()
+
+    print(f"[SUBSCRIPTION] Updated user {identifier}: plan={request.plan}, credits={user.credits}, telegram={request.telegram_bot_enabled}")
+    return {
+        "plan": user.plan,
+        "credits": user.credits,
+        "subscription_id": user.subscription_id,
+        "telegram_bot_enabled": user.telegram_bot_enabled,
+    }
 
 
 # ============= Container Endpoints =============

@@ -1063,66 +1063,64 @@ function Testimonials() {
 }
 
 /* ═══════════════════════════════════════
-   PRICING SECTION — Credit-based (1 credit = 1 message)
+   PRICING SECTION — Monthly subscription plans
    ═══════════════════════════════════════ */
 
 function Pricing() {
-    const creditPacks = [
+    const plans = [
         {
             name: 'Starter',
-            messages: '100',
-            price: '$1',
-            perMessage: '$0.01',
-            description: 'Try it out',
+            price: '$9',
+            period: '/mo',
+            description: 'For individuals',
+            credits: '50',
             features: [
-                'AI chat with full analytics',
-                'SEO & analytics dashboard',
+                '50 AI credits/month',
+                'Full SEO & analytics dashboard',
                 'Site audit reports',
                 'Content tools access',
             ],
-            href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI',
-            cta: 'Buy 100 Messages',
+            href: 'https://test.checkout.dodopayments.com/buy/pdt_0NZoVGbK4CoQKguLeiFbO',
+            cta: 'Get Starter',
             highlighted: false,
             gradient: 'from-cyan-400 to-blue-500',
-            savings: '',
         },
         {
             name: 'Growth',
-            messages: '500',
-            price: '$5',
-            perMessage: '$0.01',
+            price: '$19',
+            period: '/mo',
             description: 'Most popular',
+            credits: '150',
             features: [
+                '150 AI credits/month',
                 'Everything in Starter',
                 'Priority AI responses',
                 'Advanced SEO intelligence',
                 'AI visibility tracking',
-                'AEO optimization tools',
             ],
-            href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI',
-            cta: 'Buy 500 Messages',
+            href: 'https://test.checkout.dodopayments.com/buy/pdt_0NZoVI3aamuRliw0Ffnuh',
+            cta: 'Get Growth',
             highlighted: true,
             gradient: 'from-emerald-400 to-cyan-400',
-            savings: '',
         },
         {
             name: 'Pro',
-            messages: '1,200',
-            price: '$10',
-            perMessage: '$0.008',
-            description: 'Best value — save 20%',
+            price: '$29',
+            period: '/mo',
+            description: 'For power users',
+            credits: '300',
             features: [
+                '300 AI credits/month',
                 'Everything in Growth',
-                'Unlimited site audits',
-                'Custom content strategies',
+                'Telegram bot included',
                 'Priority support',
                 'Early access to new features',
             ],
-            href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp',
-            cta: 'Buy 1,200 Messages',
+            href: 'https://test.checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop',
+            cta: 'Get Pro',
             highlighted: false,
             gradient: 'from-violet-400 to-purple-500',
-            savings: 'Save 20%',
+            badge: 'Best Value',
         },
     ];
 
@@ -1134,14 +1132,14 @@ function Pricing() {
                         PRICING
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                        Pay per{' '}
+                        Simple{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                            message
+                            monthly plans
                         </span>
                     </h2>
                     <p className="text-zinc-400 text-lg max-w-xl mx-auto">
-                        No subscriptions. No hidden fees. Buy credits, use them anytime.<br />
-                        <span className="text-emerald-400 font-medium">1 credit = 1 AI message.</span>
+                        All website features are free. Pick a plan for AI credits.<br />
+                        <span className="text-emerald-400 font-medium">Credits reset each month — no rollover.</span>
                     </p>
                 </motion.div>
 
@@ -1154,56 +1152,54 @@ function Pricing() {
                 </motion.div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {creditPacks.map((pack) => (
+                    {plans.map((plan) => (
                         <motion.div
-                            key={pack.name}
+                            key={plan.name}
                             variants={fadeUp}
-                            className={`relative p-6 rounded-2xl border transition-all duration-300 group ${pack.highlighted
+                            className={`relative p-6 rounded-2xl border transition-all duration-300 group ${plan.highlighted
                                 ? 'bg-gradient-to-b from-emerald-500/[0.08] to-transparent border-emerald-500/[0.2] hover:border-emerald-500/[0.3]'
                                 : 'bg-white/[0.02] border-white/[0.04] hover:border-white/[0.12]'
                                 }`}
                         >
-                            {pack.highlighted && (
+                            {plan.highlighted && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[10px] font-bold text-black uppercase tracking-wider">
                                     Most Popular
                                 </div>
                             )}
 
-                            {pack.savings && (
+                            {'badge' in plan && plan.badge && (
                                 <div className="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider">
-                                    {pack.savings}
+                                    {plan.badge}
                                 </div>
                             )}
 
-                            <h3 className="text-lg font-semibold text-white mb-1">{pack.name}</h3>
-                            <p className="text-xs text-zinc-500 mb-4">{pack.description}</p>
+                            <h3 className="text-lg font-semibold text-white mb-1">{plan.name}</h3>
+                            <p className="text-xs text-zinc-500 mb-4">{plan.description}</p>
 
                             <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-4xl font-bold text-white">{pack.price}</span>
+                                <span className="text-4xl font-bold text-white">{plan.price}</span>
+                                <span className="text-sm text-zinc-500">{plan.period}</span>
                             </div>
                             <div className="flex items-center gap-3 mb-6">
-                                <span className="text-sm text-zinc-400">{pack.messages} messages</span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-500 border border-white/[0.04]">
-                                    {pack.perMessage}/msg
-                                </span>
+                                <span className="text-sm text-zinc-400">{plan.credits} AI credits/month</span>
                             </div>
 
                             <a
-                                href={pack.href}
+                                href={plan.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 block text-center ${pack.highlighted
+                                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 block text-center ${plan.highlighted
                                     ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_24px_rgba(52,211,153,0.3)]'
                                     : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
                                     }`}
                             >
-                                {pack.cta}
+                                {plan.cta}
                             </a>
 
                             <ul className="space-y-3">
-                                {pack.features.map((feature, j) => (
+                                {plan.features.map((feature, j) => (
                                     <li key={j} className="flex items-center gap-2 text-sm text-zinc-400">
-                                        <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${pack.highlighted ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                                        <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${plan.highlighted ? 'text-emerald-400' : 'text-zinc-600'}`} />
                                         {feature}
                                     </li>
                                 ))}
@@ -1215,7 +1211,7 @@ function Pricing() {
                 {/* Bottom trust line */}
                 <motion.div variants={fadeUp} className="text-center mt-8">
                     <p className="text-xs text-zinc-600">
-                        Payments powered by Dodo Payments • Credits never expire • Instant delivery
+                        Payments powered by Dodo Payments • Credits reset monthly
                     </p>
                 </motion.div>
             </div>

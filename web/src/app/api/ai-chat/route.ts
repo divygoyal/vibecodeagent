@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
             return new Response(JSON.stringify({
                 error: 'insufficient_credits',
                 credits: creditResult,
-                response: `⚡ You've used all your messages! You have **${creditResult}** credits remaining.\n\n**1 credit = 1 message.** Get more to continue:\n- 💰 [100 messages for $1](https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI)\n- 🔥 [500 messages for $5](https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI)\n- 🚀 [1,200 messages for $10](https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp) (best value — save 20%)`
+                response: `⚡ You've used all your AI credits! You have **${creditResult}** credits remaining.\n\n**1 credit = 1 message.** Upgrade your plan to get more:\n- 🚀 [Starter — 50 credits/mo for $9](https://test.checkout.dodopayments.com/buy/pdt_0NZoVGbK4CoQKguLeiFbO)\n- 🔥 [Growth — 150 credits/mo for $19](https://test.checkout.dodopayments.com/buy/pdt_0NZoVI3aamuRliw0Ffnuh)\n- 👑 [Pro — 300 credits/mo for $29](https://test.checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop) (+ Telegram bot)`
             }), { status: 402, headers: { 'Content-Type': 'application/json' } });
         }
 

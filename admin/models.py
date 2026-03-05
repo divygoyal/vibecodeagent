@@ -40,7 +40,11 @@ class User(Base):
     
     # Credits (for AI chat usage)
     credits = Column(Integer, default=100)  # Start with 100 free credits
-    
+
+    # Subscription (Dodo Payments)
+    subscription_id = Column(String(100), nullable=True)  # Dodo subscription ID
+    telegram_bot_enabled = Column(Boolean, default=False)  # Pro plan perk
+
     # Bot Settings
     bot_engine = Column(String(50), default="openclaw")  # openclaw or nanobot
     

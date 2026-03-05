@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import ChatMessageRenderer from './ChatMessageRenderer';
@@ -246,6 +247,7 @@ export default function AIChatbot() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [credits, setCredits] = useState<number | null>(null);
+    const [showCreditAnim, setShowCreditAnim] = useState(false);
     const [selectedChatSite, setSelectedChatSite] = useState('');
     const [showSiteDropdown, setShowSiteDropdown] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -484,7 +486,13 @@ export default function AIChatbot() {
                                 return updated;
                             });
                         } else if (data.type === 'credits') {
-                            setCredits(data.value);
+                            setCredits(prev => {
+                                if (prev !== null && data.value < prev) {
+                                    setShowCreditAnim(true);
+                                    setTimeout(() => setShowCreditAnim(false), 1500);
+                                }
+                                return data.value;
+                            });
                         } else if (data.type === 'error') {
                             appendStreamText(`\n\n⚠️ **Error:** ${data.message}`);
                             setMessages(prev => {
@@ -660,9 +668,22 @@ export default function AIChatbot() {
                     </div>
                     <div className="flex items-center gap-1">
                         {credits !== null && (
-                            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/8 border border-amber-500/15 mr-1">
+                            <div className="relative flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/8 border border-amber-500/15 mr-1">
                                 <Coins className="w-3 h-3 text-amber-400" />
                                 <span className="text-[10px] font-bold text-amber-400">{credits}</span>
+                                <AnimatePresence>
+                                    {showCreditAnim && (
+                                        <motion.span
+                                            initial={{ opacity: 1, y: 0 }}
+                                            animate={{ opacity: 0, y: -20 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 1.5, ease: 'easeOut' }}
+                                            className="absolute -top-1 right-0 text-[10px] font-bold text-red-400 pointer-events-none"
+                                        >
+                                            -1
+                                        </motion.span>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         )}
                         <button onClick={clearChat} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" title="Clear chat">

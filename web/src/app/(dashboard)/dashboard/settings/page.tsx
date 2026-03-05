@@ -4,7 +4,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import {
     User, Mail, LogOut,
-    CheckCircle2, ChevronRight, Coins, MessageSquare, Sparkles
+    CheckCircle2, ChevronRight, Coins, MessageSquare, Sparkles, Bot, Crown
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
 
@@ -19,28 +19,34 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
     );
 }
 
-const CREDIT_PACKS = [
+const SUBSCRIPTION_PLANS = [
     {
         name: 'Starter',
-        messages: 100,
-        price: '$1',
-        href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZUFJs2YcTSvqivsI',
+        price: '$9',
+        credits: 50,
+        telegramBot: false,
+        productId: 'pdt_0NZoVGbK4CoQKguLeiFbO',
         highlight: false,
+        features: ['50 AI credits/month', 'Full dashboard access', 'SEO & analytics tools', 'Site audit reports'],
     },
     {
         name: 'Growth',
-        messages: 500,
-        price: '$5',
-        href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4ZZQMZXmfjC3aNpkI',
+        price: '$19',
+        credits: 150,
+        telegramBot: false,
+        productId: 'pdt_0NZoVI3aamuRliw0Ffnuh',
         highlight: true,
+        features: ['150 AI credits/month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence'],
     },
     {
         name: 'Pro',
-        messages: 1200,
-        price: '$10',
-        href: 'https://checkout.dodopayments.com/buy/pdt_0NYn4Zjup0Bo2kI7DIfBp',
+        price: '$29',
+        credits: 300,
+        telegramBot: true,
+        productId: 'pdt_0NZoVIVgk7pdElblScoop',
         highlight: false,
         badge: 'Best Value',
+        features: ['300 AI credits/month', 'Everything in Growth', 'Telegram bot included', 'Priority support'],
     },
 ];
 
@@ -133,46 +139,66 @@ export default function SettingsPage() {
                     <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden mb-6">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${isLow ? 'bg-red-400' : isMed ? 'bg-amber-400' : 'bg-gradient-to-r from-emerald-400 to-cyan-400'}`}
-                            style={{ width: `${Math.min(100, (displayCredits / 500) * 100)}%` }}
+                            style={{ width: `${Math.min(100, (displayCredits / 300) * 100)}%` }}
                         />
                     </div>
                 )}
 
-                {/* Buy more packs */}
+                {/* Subscription Plans */}
                 <div className="border-t border-white/[0.06] pt-5">
-                    <h3 className="text-xs font-medium text-zinc-400 mb-3">Buy more messages</h3>
+                    <h3 className="text-xs font-medium text-zinc-400 mb-3">Subscription Plans</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {CREDIT_PACKS.map((pack) => (
-                            <a
-                                key={pack.name}
-                                href={pack.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`relative flex flex-col items-center p-4 rounded-xl border transition-all duration-200 hover:scale-[1.02] ${pack.highlight
-                                    ? 'bg-emerald-500/[0.06] border-emerald-500/[0.2] hover:border-emerald-500/[0.3]'
-                                    : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
-                                    }`}
-                            >
-                                {pack.badge && (
-                                    <span className="absolute -top-2 right-2 text-[9px] px-2 py-0.5 rounded-full bg-violet-500 text-white font-bold uppercase tracking-wider">
-                                        {pack.badge}
-                                    </span>
-                                )}
-                                <span className={`text-xl font-bold ${pack.highlight ? 'text-emerald-400' : 'text-white'}`}>
-                                    {pack.messages.toLocaleString()}
-                                </span>
-                                <span className="text-[10px] text-zinc-500 mb-2">messages</span>
-                                <span className={`text-sm font-semibold px-4 py-1.5 rounded-lg transition ${pack.highlight
-                                    ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
-                                    : 'bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1]'
-                                    }`}>
-                                    {pack.price}
-                                </span>
-                            </a>
-                        ))}
+                        {SUBSCRIPTION_PLANS.map((plan) => {
+                            const checkoutUrl = `https://test.checkout.dodopayments.com/buy/${plan.productId}?email=${encodeURIComponent(session?.user?.email || '')}`;
+                            return (
+                                <div
+                                    key={plan.name}
+                                    className={`relative flex flex-col p-4 rounded-xl border transition-all duration-200 ${plan.highlight
+                                        ? 'bg-emerald-500/[0.06] border-emerald-500/[0.2]'
+                                        : 'bg-white/[0.02] border-white/[0.06]'
+                                        }`}
+                                >
+                                    {'badge' in plan && plan.badge && (
+                                        <span className="absolute -top-2 right-2 text-[9px] px-2 py-0.5 rounded-full bg-violet-500 text-white font-bold uppercase tracking-wider">
+                                            {plan.badge}
+                                        </span>
+                                    )}
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`text-sm font-semibold ${plan.highlight ? 'text-emerald-400' : 'text-white'}`}>
+                                            {plan.name}
+                                        </span>
+                                        {plan.telegramBot && <Bot className="w-3.5 h-3.5 text-cyan-400" />}
+                                    </div>
+                                    <div className="flex items-baseline gap-1 mb-1">
+                                        <span className={`text-2xl font-bold ${plan.highlight ? 'text-emerald-400' : 'text-white'}`}>{plan.price}</span>
+                                        <span className="text-[10px] text-zinc-500">/month</span>
+                                    </div>
+                                    <div className="text-[10px] text-zinc-500 mb-3">{plan.credits} AI credits/month</div>
+                                    <ul className="space-y-1.5 mb-4 flex-1">
+                                        {plan.features.map((f, i) => (
+                                            <li key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                                                <CheckCircle2 className={`w-3 h-3 flex-shrink-0 ${plan.highlight ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                                                {f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <a
+                                        href={checkoutUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`text-center text-xs font-semibold px-4 py-2 rounded-lg transition hover:scale-[1.02] ${plan.highlight
+                                            ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                            : 'bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1]'
+                                            }`}
+                                    >
+                                        Subscribe
+                                    </a>
+                                </div>
+                            );
+                        })}
                     </div>
                     <p className="text-[10px] text-zinc-600 text-center mt-3">
-                        Payments by Dodo Payments • Credits never expire • Instant delivery
+                        Payments by Dodo Payments • Credits reset monthly
                     </p>
                 </div>
             </div>
