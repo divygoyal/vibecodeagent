@@ -28,7 +28,7 @@ class DockerManager:
     
     def _ensure_nanobot_image(self) -> None:
         """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
-        tag = "trafficclaw/nanobot:v7"
+        tag = "trafficclaw/nanobot:v8"
         try:
             self.client.images.get(tag)
             logger.info(f"Nanobot image {tag} already exists")
@@ -36,36 +36,21 @@ class DockerManager:
             logger.info(f"Image {tag} not found! Starting background build thread...")
             import threading
             def build_image():
-                import io
-                dockerfile_content = '''FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
-
-RUN apt-get update && \\
-    apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \\
-    mkdir -p /etc/apt/keyrings && \\
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \\
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \\
-    apt-get update && \\
-    apt-get install -y --no-install-recommends nodejs && \\
-    apt-get purge -y gnupg && \\
-    apt-get autoremove -y && \\
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
-ENV HOME=/data
-RUN mkdir -p /data/.nanobot/workspace/skills /data/.nanobot/workspace/memory
-EXPOSE 18790
-ENTRYPOINT ["nanobot"]
-CMD ["gateway"]
-'''
+                build_dir = "/app/nanobot-build"
                 try:
-                    for line in self.client.api.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=tag, rm=True, decode=True):
+                    for line in self.client.api.build(
+                        path=build_dir,
+                        dockerfile="Dockerfile.nanobot",
+                        tag=tag,
+                        rm=True,
+                        decode=True,
+                    ):
                         if 'stream' in line and line['stream'].strip():
                             print(f"[BUILDER] {line['stream'].strip()}")
                     logger.info(f"Successfully built {tag} in background!")
                 except Exception as e:
                     logger.error(f"Failed to build nanobot image in background: {e}")
-                    
+
             builder_thread = threading.Thread(target=build_image, daemon=True)
             builder_thread.start()
 
@@ -888,7 +873,7 @@ This workspace is your home. You are an elite SEO & analytics expert.
              env["GITHUB_ID"] = user_identifier
         
         # Create container - select image and memory limit based on engine
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v7"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v8"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
         # Set up volumes based on the engine
