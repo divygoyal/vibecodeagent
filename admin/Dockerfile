@@ -24,7 +24,7 @@ COPY plugins /app/plugins
 # Copy nanobot build assets (used by docker_manager to build nanobot image at runtime)
 # Layout mirrors project root so Dockerfile.nanobot COPY paths work unchanged
 COPY Dockerfile.nanobot /app/nanobot-build/Dockerfile.nanobot
-COPY scripts/nanobot_fallback.py /app/nanobot-build/scripts/nanobot_fallback.py
+COPY scripts/nanobot_entrypoint.sh /app/nanobot-build/scripts/nanobot_entrypoint.sh
 COPY plugins/google-analytics /app/nanobot-build/plugins/google-analytics
 COPY plugins/google-search-console /app/nanobot-build/plugins/google-search-console
 
