@@ -36,7 +36,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         
         # Auto-migrate new columns for existing SQLite databases
-        for col, col_def in [("credits", "INTEGER DEFAULT 100"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"), ("subscription_id", "VARCHAR(100)"), ("telegram_bot_enabled", "BOOLEAN DEFAULT 0")]:
+        for col, col_def in [("credits", "INTEGER DEFAULT 10"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"), ("subscription_id", "VARCHAR(100)"), ("telegram_bot_enabled", "BOOLEAN DEFAULT 0")]:
             try:
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
             except Exception:

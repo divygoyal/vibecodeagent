@@ -39,7 +39,7 @@ class User(Base):
     enabled_plugins = Column(Text)  # JSON string of plugin list
     
     # Credits (for AI chat usage)
-    credits = Column(Integer, default=100)  # Start with 100 free credits
+    credits = Column(Integer, default=10)  # Start with 10 free credits
 
     # Subscription (Dodo Payments)
     subscription_id = Column(String(100), nullable=True)  # Dodo subscription ID

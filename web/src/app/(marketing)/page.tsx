@@ -1098,7 +1098,7 @@ function Pricing() {
                 <motion.div variants={fadeUp} className="text-center mb-14">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] text-sm">
                         <Sparkles className="w-4 h-4 text-emerald-400" />
-                        <span className="text-emerald-300 font-medium">Every new account gets <strong className="text-emerald-400">50 free messages</strong> to start</span>
+                        <span className="text-emerald-300 font-medium">Every new account gets <strong className="text-emerald-400">10 free messages</strong> to start</span>
                     </div>
                 </motion.div>
 
@@ -1449,13 +1449,13 @@ function FinalCTA() {
                         </h2>
                         <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
                             Join thousands of builders who use AI to understand their data and ship faster.
-                            Start with 50 free messages — no credit card needed.
+                            Start with 10 free messages — no credit card needed.
                         </p>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="group px-10 py-4 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
                         >
-                            Get 50 Free Messages
+                            Get 10 Free Messages
                             <ArrowRight className="inline-block ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>

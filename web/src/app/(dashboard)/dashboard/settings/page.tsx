@@ -199,92 +199,143 @@ export default function SettingsPage() {
             </div>
 
             {/* Subscription Plans */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {plan === 'free' ? 'Choose a Plan' : 'Change Plan'}
-                </h2>
-                <p className="text-[11px] text-zinc-600 mb-5">
-                    {plan === 'free' ? 'Upgrade to unlock AI credits and premium features.' : 'Upgrade or switch your subscription.'}
-                </p>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-emerald-400" />
+                            {plan === 'free' ? 'Choose a Plan' : 'Change Plan'}
+                        </h2>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">
+                            {plan === 'free' ? 'Upgrade to unlock AI credits and premium features.' : 'Upgrade or switch your subscription.'}
+                        </p>
+                    </div>
+                    <span className="text-[10px] text-zinc-600">Credits reset monthly</span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {SUBSCRIPTION_PLANS.map((p) => {
                         const isCurrentPlan = p.key === plan;
                         const isUpgrade = SUBSCRIPTION_PLANS.findIndex(x => x.key === plan) < SUBSCRIPTION_PLANS.findIndex(x => x.key === p.key);
                         const checkoutUrl = `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(session?.user?.email || '')}`;
                         const IconComp = p.icon;
-
-                        const colorMap: Record<string, { border: string; bg: string; text: string; btnBg: string; check: string }> = {
-                            cyan: { border: 'border-cyan-500/[0.2]', bg: 'bg-cyan-500/[0.04]', text: 'text-cyan-400', btnBg: 'bg-gradient-to-r from-cyan-400 to-blue-500', check: 'text-cyan-500' },
-                            emerald: { border: 'border-emerald-500/[0.2]', bg: 'bg-emerald-500/[0.04]', text: 'text-emerald-400', btnBg: 'bg-gradient-to-r from-emerald-400 to-cyan-400', check: 'text-emerald-400' },
-                            violet: { border: 'border-violet-500/[0.2]', bg: 'bg-violet-500/[0.04]', text: 'text-violet-400', btnBg: 'bg-gradient-to-r from-violet-400 to-purple-500', check: 'text-violet-400' },
-                        };
-                        const colors = colorMap[p.color];
+                        const isGrowth = p.key === 'growth';
+                        const isPro = p.key === 'pro';
 
                         return (
                             <div
                                 key={p.key}
-                                className={`relative flex flex-col p-4 rounded-xl border transition-all duration-200 ${
-                                    isCurrentPlan ? `${colors.bg} ${colors.border} ring-1 ring-inset ring-white/[0.06]` : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
+                                className={`relative flex flex-col p-5 rounded-2xl border transition-all duration-300 group overflow-hidden ${
+                                    isCurrentPlan
+                                        ? isPro ? 'bg-gradient-to-b from-violet-500/[0.1] via-purple-500/[0.04] to-transparent border-violet-500/[0.3]'
+                                        : isGrowth ? 'bg-gradient-to-b from-emerald-500/[0.1] via-emerald-500/[0.04] to-transparent border-emerald-500/[0.3]'
+                                        : 'bg-gradient-to-b from-cyan-500/[0.1] via-cyan-500/[0.04] to-transparent border-cyan-500/[0.3]'
+                                    : isPro ? 'bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.02] to-transparent border-violet-500/[0.15] hover:border-violet-500/[0.3]'
+                                    : isGrowth ? 'bg-gradient-to-b from-emerald-500/[0.06] via-emerald-500/[0.02] to-transparent border-2 border-emerald-500/[0.25] hover:border-emerald-500/[0.4]'
+                                    : 'bg-white/[0.02] border-white/[0.06] hover:border-cyan-500/[0.2]'
                                 }`}
                             >
+                                {/* Glow effect for Pro */}
+                                {isPro && <div className="absolute top-0 right-0 w-28 h-28 bg-violet-500/[0.06] rounded-full blur-3xl pointer-events-none" />}
+
+                                {/* Badges */}
                                 {isCurrentPlan && (
-                                    <span className={`absolute -top-2 left-3 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${colors.btnBg} text-white`}>
+                                    <span className={`absolute -top-0 left-0 right-0 text-center text-[9px] py-1 font-bold uppercase tracking-wider ${
+                                        isPro ? 'bg-gradient-to-r from-violet-400 to-purple-500' : isGrowth ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black' : 'bg-gradient-to-r from-cyan-400 to-blue-500'
+                                    } text-white`}>
                                         Current Plan
                                     </span>
                                 )}
-                                {p.key === 'pro' && !isCurrentPlan && (
-                                    <span className="absolute -top-2 right-2 text-[9px] px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-white font-bold uppercase tracking-wider">
+                                {isGrowth && !isCurrentPlan && (
+                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[9px] font-bold text-black uppercase tracking-wider shadow-lg shadow-emerald-500/20">
+                                        Most Popular
+                                    </span>
+                                )}
+                                {isPro && !isCurrentPlan && (
+                                    <span className="absolute -top-3 right-3 px-3 py-0.5 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[9px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20">
                                         Best Value
                                     </span>
                                 )}
-                                <div className="flex items-center gap-2 mb-2 mt-1">
-                                    <div className={`w-6 h-6 rounded-md ${colors.btnBg} flex items-center justify-center`}>
-                                        <IconComp className="w-3.5 h-3.5 text-white" />
+
+                                <div className="relative pt-2">
+                                    {/* Icon */}
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${
+                                        isPro ? 'bg-gradient-to-br from-violet-400/20 to-purple-500/20' : isGrowth ? 'bg-gradient-to-br from-emerald-400/20 to-cyan-400/20' : 'bg-gradient-to-br from-cyan-400/20 to-blue-500/20'
+                                    }`}>
+                                        <IconComp className={`w-4.5 h-4.5 ${isPro ? 'text-violet-400' : isGrowth ? 'text-emerald-400' : 'text-cyan-400'}`} />
                                     </div>
-                                    <span className={`text-sm font-bold ${isCurrentPlan ? colors.text : 'text-white'}`}>
-                                        {p.name}
-                                    </span>
-                                </div>
-                                <div className="flex items-baseline gap-1 mb-1">
-                                    <span className={`text-2xl font-bold ${isCurrentPlan ? colors.text : 'text-white'}`}>{p.price}</span>
-                                    <span className="text-[10px] text-zinc-500">/mo</span>
-                                </div>
-                                <div className="text-[10px] text-zinc-500 mb-3">{p.credits} AI credits/month</div>
-                                <ul className="space-y-1.5 mb-4 flex-1">
-                                    {p.features.map((f, i) => (
-                                        <li key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                                            <CheckCircle2 className={`w-3 h-3 flex-shrink-0 ${isCurrentPlan ? colors.check : 'text-zinc-600'}`} />
-                                            {f}
-                                        </li>
-                                    ))}
-                                </ul>
-                                {isCurrentPlan ? (
-                                    <div className={`text-center text-xs font-semibold px-4 py-2 rounded-lg ${colors.bg} ${colors.text} border ${colors.border}`}>
-                                        Active
+
+                                    {/* Name & description */}
+                                    <h3 className="text-base font-bold text-white mb-0.5">{p.name}</h3>
+                                    <p className="text-[10px] text-zinc-500 mb-4">
+                                        {isPro ? 'Everything unlocked + Telegram bot' : isGrowth ? 'For growing businesses' : 'Perfect for side projects'}
+                                    </p>
+
+                                    {/* Price */}
+                                    <div className="flex items-baseline gap-1 mb-1">
+                                        <span className={`text-3xl font-bold ${
+                                            isPro ? 'bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent'
+                                            : isGrowth ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent'
+                                            : 'text-white'
+                                        }`}>{p.price}</span>
+                                        <span className="text-xs text-zinc-500">/mo</span>
                                     </div>
-                                ) : (
-                                    <a
-                                        href={checkoutUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`text-center text-xs font-semibold px-4 py-2 rounded-lg transition hover:scale-[1.02] flex items-center justify-center gap-1.5 ${
-                                            isUpgrade || plan === 'free'
-                                                ? `${colors.btnBg} text-white hover:shadow-lg`
-                                                : 'bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1]'
-                                        }`}
-                                    >
-                                        {isUpgrade || plan === 'free' ? 'Upgrade' : 'Switch'}
-                                        <ArrowUpRight className="w-3 h-3" />
-                                    </a>
-                                )}
+                                    <div className="flex items-center gap-2 mb-5">
+                                        <span className={`text-xs font-medium ${isPro ? 'text-violet-400' : isGrowth ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                                            {p.credits} AI credits/month
+                                        </span>
+                                        {isGrowth && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15] font-semibold">3x Starter</span>}
+                                        {isPro && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-violet-500/[0.1] text-violet-400 border border-violet-500/[0.15] font-semibold">6x Starter</span>}
+                                    </div>
+
+                                    {/* CTA Button */}
+                                    {isCurrentPlan ? (
+                                        <div className={`text-center text-xs font-semibold px-4 py-2.5 rounded-xl mb-5 ${
+                                            isPro ? 'bg-violet-500/[0.08] text-violet-400 border border-violet-500/[0.2]' : isGrowth ? 'bg-emerald-500/[0.08] text-emerald-400 border border-emerald-500/[0.2]' : 'bg-cyan-500/[0.08] text-cyan-400 border border-cyan-500/[0.2]'
+                                        }`}>
+                                            Active
+                                        </div>
+                                    ) : isGrowth ? (
+                                        <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
+                                            className="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all duration-200 mb-5 block text-center">
+                                            {isUpgrade || plan === 'free' ? 'Get Growth' : 'Switch to Growth'}
+                                        </a>
+                                    ) : isPro ? (
+                                        <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
+                                            className="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all duration-200 mb-5 block text-center">
+                                            {isUpgrade || plan === 'free' ? 'Get Pro' : 'Switch to Pro'}
+                                        </a>
+                                    ) : (
+                                        <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
+                                            className="w-full py-2.5 rounded-xl text-xs font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-5 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2]">
+                                            {isUpgrade || plan === 'free' ? 'Get Starter' : 'Switch to Starter'}
+                                        </a>
+                                    )}
+
+                                    {/* Features */}
+                                    <ul className="space-y-2.5 flex-1">
+                                        {p.features.map((f, i) => (
+                                            <li key={i} className={`flex items-center gap-2 text-[11px] ${
+                                                f.includes('Telegram') ? (isPro ? 'text-violet-300 font-medium' : 'text-zinc-400') : isCurrentPlan ? 'text-zinc-300' : 'text-zinc-400'
+                                            }`}>
+                                                {f.includes('Telegram') ? (
+                                                    <Bot className={`w-3.5 h-3.5 flex-shrink-0 ${isPro ? 'text-violet-400' : 'text-zinc-600'}`} />
+                                                ) : (
+                                                    <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${
+                                                        isPro ? 'text-violet-400' : isGrowth ? 'text-emerald-400' : isCurrentPlan ? 'text-cyan-400' : 'text-zinc-600'
+                                                    }`} />
+                                                )}
+                                                {f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         );
                     })}
                 </div>
-                <p className="text-[10px] text-zinc-600 text-center mt-3">
-                    Payments by Dodo Payments • Credits reset monthly • Cancel anytime
+                <p className="text-[10px] text-zinc-600 text-center">
+                    Secure payments by Dodo Payments • Cancel anytime
                 </p>
             </div>
 

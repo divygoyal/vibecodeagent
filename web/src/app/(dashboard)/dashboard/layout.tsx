@@ -521,7 +521,7 @@ export default function DashboardLayout({
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
-                <CreditWelcome credits={50} onDismiss={() => setShowWelcome(false)} />
+                <CreditWelcome credits={10} onDismiss={() => setShowWelcome(false)} />
             )}
 
             {/* Onboarding wizard for first-time users */}
