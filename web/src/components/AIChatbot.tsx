@@ -7,6 +7,8 @@ import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, use
 import ChatMessageRenderer from './ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
+import { toast } from 'sonner';
+import ConfirmDialog from './ConfirmDialog';
 
 type Message = ChatMessage;
 
@@ -70,7 +72,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
                 ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
-                <div className="text-[10px] text-zinc-700 mt-2 select-none">
+                <div className="text-[10px] text-zinc-500 mt-2 select-none">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
             </div>
@@ -116,7 +118,7 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
     return (
         <div className="flex justify-start">
             <div className="px-4 py-3 rounded-2xl bg-white/[0.02] border border-white/[0.04] rounded-bl-sm">
-                <style dangerouslySetInnerHTML={{ __html: ROBOT_KEYFRAMES }} />
+                {/* Robot keyframes moved to globals.css */}
                 <div className="flex items-center gap-3">
                     {/* Full-body robot */}
                     <div className="relative flex-shrink-0" style={{ width: 32, height: 52, animation: robotAnim, willChange: 'transform' }}>
@@ -519,9 +521,23 @@ export default function AIChatbot() {
         return () => window.removeEventListener('trafficclaw:ask-ai', handler);
     }, []); // empty deps — listener is added once, never thrashes
 
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+
     const clearChat = useCallback(() => {
         storeClearChat();
+        toast.success('Chat cleared');
     }, [storeClearChat]);
+
+    // Escape key to close chat
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                setIsOpen(false);
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [isOpen]);
 
     // ─── Floating button (closed state) ───
     if (!isOpen) {
@@ -529,6 +545,7 @@ export default function AIChatbot() {
             <button
                 onClick={() => setIsOpen(true)}
                 className="fixed bottom-6 right-6 z-50 group"
+                aria-label="Open AI chat"
             >
                 <div className="relative">
                     <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 via-cyan-400 to-teal-400 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all hover:scale-110 flex items-center justify-center">
@@ -616,13 +633,13 @@ export default function AIChatbot() {
                                 </AnimatePresence>
                             </div>
                         )}
-                        <button onClick={clearChat} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" title="Clear chat">
+                        <button onClick={() => setShowClearConfirm(true)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" aria-label="Clear chat history" title="Clear chat">
                             <RotateCcw className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors">
+                        <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" aria-label={isExpanded ? 'Minimize chat' : 'Expand chat'} title={isExpanded ? 'Minimize' : 'Expand'}>
                             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                         </button>
-                        <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors">
+                        <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" aria-label="Close chat" title="Close (Esc)">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
@@ -634,7 +651,7 @@ export default function AIChatbot() {
                         if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                         const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
                         return (
-                            <div key={i}>
+                            <div key={`${msg.timestamp}-${i}`}>
                                 <MessageBubble msg={msg} isExpanded={isExpanded} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />
                                 {msg.hasError && !isLoading && (
                                     <div className="flex justify-start mt-1">
@@ -728,6 +745,7 @@ export default function AIChatbot() {
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}
                             className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-black flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 flex-shrink-0"
+                            aria-label="Send message"
                         >
                             <Send className="w-4 h-4" />
                         </button>
@@ -739,6 +757,17 @@ export default function AIChatbot() {
                     )}
                 </div>
             </div>
+
+            {/* Confirm clear chat dialog */}
+            <ConfirmDialog
+                open={showClearConfirm}
+                onClose={() => setShowClearConfirm(false)}
+                onConfirm={clearChat}
+                title="Clear chat history?"
+                description="This will delete all messages in this conversation. This action cannot be undone."
+                confirmLabel="Clear All"
+                variant="danger"
+            />
         </div>
     );
 }

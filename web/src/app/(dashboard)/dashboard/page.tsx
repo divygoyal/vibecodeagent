@@ -1,27 +1,36 @@
 'use client';
 
-import { useSession, signIn } from 'next-auth/react';
-import { useState, useEffect, useRef, useMemo, useCallback, memo, RefObject } from 'react';
+import { useSession } from 'next-auth/react';
+import { useState, useEffect, useRef, useMemo, useCallback, RefObject } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import {
   AreaChart, Area, ResponsiveContainer, Tooltip
 } from 'recharts';
 import {
   Bot, BarChart3, Search, TrendingUp, TrendingDown,
   ArrowUpRight, ArrowDownRight, Zap, Activity, MousePointer, Eye, Users, Hash,
-  AlertTriangle, Lightbulb, Globe, ChevronDown, Loader2, ScanSearch,
-  DollarSign, Target, FileWarning, ShieldAlert, ArrowRight, Flame, CheckCircle2,
-  Gauge, Rocket, Tag, Shield,
-  Radar, Crown, XCircle, Sparkles, ChevronRight, Filter, RefreshCw, Brain
+  AlertTriangle, Globe, ChevronDown, ScanSearch,
+  DollarSign, Target, FileWarning, ArrowRight, Flame, CheckCircle2,
+  Rocket, Tag, Shield,
+  Crown, XCircle, Sparkles, ChevronRight, Filter, Brain
 } from 'lucide-react';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights, useRealtimeData } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
-import OverviewInsights from '@/components/OverviewInsights';
-import OverviewDetailDrawer, { DrawerContent } from '@/components/OverviewDetailDrawer';
 import { ConnectGoogleState } from '@/components/EmptyState';
-import { type AlertItem, type OpportunityItem, expectedCTR, computeAlerts, computeOpportunities } from '@/lib/alertEngine';
+import { type AlertItem, type OpportunityItem, computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import KPICard from '@/components/dashboard/KPICard';
+import ActionCard from '@/components/dashboard/ActionCard';
+import LastUpdated from '@/components/dashboard/LastUpdated';
+import useKeyboardShortcuts from '@/lib/useKeyboardShortcuts';
+
+import type { DrawerContent } from '@/components/OverviewDetailDrawer';
+
+// Dynamic imports for heavy components (code splitting)
+const OverviewInsights = dynamic(() => import('@/components/OverviewInsights'), { ssr: false });
+const OverviewDetailDrawer = dynamic(() => import('@/components/OverviewDetailDrawer'), { ssr: false });
 
 /* ─── Animation variants ─── */
 const fadeInUp = {
@@ -130,6 +139,12 @@ export default function DashboardOverview() {
   const { data: session } = useSession();
   const { isRegistering, isRegistered, registrationError, selectedSite, setSelectedSite, selectedProperty, setSelectedProperty, range } = useRegistration();
 
+  // Keyboard shortcuts (?, Cmd+K)
+  useKeyboardShortcuts();
+
+  // Track data freshness timestamp
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   // 1. Container status + Google connection check
   const { botStatus, hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
   const botRunning = botStatus?.status === 'running';
@@ -203,6 +218,13 @@ export default function DashboardOverview() {
   const searchTrend = Array.isArray(seoData?.trend) ? seoData.trend : [];
 
   const isLive = botRunning && botStatus?.telegramStatus === 'connected';
+
+  // Track when data was last loaded
+  useEffect(() => {
+    if (analyticsKPIs || seoKPIs) {
+      setLastUpdated(new Date());
+    }
+  }, [analyticsKPIs, seoKPIs]);
 
   // Loading States - don't block on registration if we have a cached site (optimistic)
   const isInit = (!hasCachedSite && isRegistering) || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSite);
@@ -434,9 +456,12 @@ export default function DashboardOverview() {
           <h1 className="text-2xl font-bold text-white mb-1">
             Welcome back{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''} 👋
           </h1>
-          <p className="text-sm text-zinc-500">
-            Growth overview for your projects.
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-zinc-500">
+              Growth overview for your projects.
+            </p>
+            <LastUpdated timestamp={lastUpdated} />
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -458,6 +483,9 @@ export default function DashboardOverview() {
               onClick={() => !isInit && setDropdownOpen(!dropdownOpen)}
               disabled={isInit}
               className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg pl-3 pr-3 py-2 hover:border-zinc-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 outline-none min-w-[220px] transition-all disabled:opacity-50"
+              aria-label="Select website"
+              aria-expanded={dropdownOpen}
+              aria-haspopup="listbox"
             >
               <Globe className="w-4 h-4 text-zinc-500 flex-shrink-0" />
               <span className="flex-1 text-left truncate">
@@ -513,7 +541,7 @@ export default function DashboardOverview() {
       )}
 
       {/* ═══ 1. KPI GRID — Top of visual hierarchy ═══ */}
-      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="region" aria-label="Key metrics">
         <KPICard
           loading={isRef && !hasData}
           icon={Users}
@@ -567,6 +595,7 @@ export default function DashboardOverview() {
               <span className="text-xs text-zinc-500 font-medium">Filter:</span>
             </div>
             <button onClick={() => setFilterCategory('all')}
+              aria-pressed={filterCategory === 'all'}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterCategory === 'all' ? 'bg-white/[0.08] text-white border border-white/[0.1]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'}`}>
               All
             </button>
@@ -574,6 +603,7 @@ export default function DashboardOverview() {
               const count = intelAlerts.filter(a => a.category === key).length;
               return (
                 <button key={key} onClick={() => setFilterCategory(key)}
+                  aria-pressed={filterCategory === key}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${filterCategory === key ? 'bg-white/[0.08] text-white border border-white/[0.1]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'}`}>
                   <cfg.icon className={`w-3 h-3 ${cfg.color}`} />
                   {cfg.label}
@@ -590,8 +620,9 @@ export default function DashboardOverview() {
               const cfg = severityStyles[sev];
               return (
                 <button key={sev} onClick={() => setFilterSeverity(filterSeverity === sev ? null : sev)}
+                  aria-pressed={filterSeverity === sev}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${filterSeverity === sev ? cfg.badge + ' ' + cfg.border : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${cfg.pulse}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${cfg.pulse}`} aria-hidden="true" />
                   {sev.charAt(0).toUpperCase() + sev.slice(1)} ({count})
                 </button>
               );
@@ -638,7 +669,11 @@ export default function DashboardOverview() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         className={`${cfg.bg} border ${cfg.border} rounded-xl overflow-hidden transition-all duration-200 hover:bg-opacity-10 cursor-pointer group`}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
                         onClick={() => setExpandedAlert(isExpanded ? null : alert.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedAlert(isExpanded ? null : alert.id); } }}
                       >
                         <div className="p-4">
                           <div className="flex items-start gap-3">
@@ -1583,149 +1618,4 @@ function MiniStat({ label, value, warn }: { label: string; value: string; warn?:
   );
 }
 
-/* ─── KPI Card ─── */
-function KPICard({
-  icon: Icon, label, value, change, invertChange, sparkData, sparkColor, href, loading
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value?: string | number;
-  change?: number;
-  invertChange?: boolean;
-  sparkData: { v: number }[];
-  sparkColor: string;
-  href: string;
-  loading: boolean;
-}) {
-  const positive = change !== undefined ? (invertChange ? change <= 0 : change >= 0) : true;
-  const showValue = value !== undefined && value !== null;
-
-  // Show skeleton OR content — never both overlapping
-  if (loading && !showValue) {
-    return (
-      <Link href={href} className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4">
-        <div className="flex justify-between mb-2">
-          <Skeleton className="w-8 h-8 rounded-lg" />
-          <Skeleton className="w-12 h-4 rounded-full" />
-        </div>
-        <Skeleton className="w-24 h-7 rounded-md mb-1" />
-        <Skeleton className="w-16 h-3 rounded-md mb-2" />
-        <Skeleton className="w-full h-8 rounded-md opacity-30" />
-      </Link>
-    );
-  }
-
-  const sparkMin = sparkData.length > 0 ? Math.min(...sparkData.map(d => d.v)) : 0;
-  const sparkMax = sparkData.length > 0 ? Math.max(...sparkData.map(d => d.v)) : 0;
-  const numVal = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
-  const prev = change !== undefined && change !== 0 ? Math.round(numVal / (1 + change / 100)) : null;
-
-  return (
-    <Link href={href} className="relative bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-4 hover:border-white/[0.1] hover:bg-white/[0.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.02)] transition-all duration-300 group">
-      <div className="flex items-center justify-between mb-2">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-emerald-500/20 group-hover:to-cyan-500/20 group-hover:shadow-[0_0_12px_rgba(52,211,153,0.15)] transition-all duration-300">
-          <Icon className="w-4 h-4 text-zinc-400 group-hover:text-emerald-400 transition-colors duration-300" />
-        </div>
-        {change !== undefined && (
-          <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-            {positive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-            {change > 0 ? '+' : ''}{change}%
-          </span>
-        )}
-      </div>
-
-      <div className="text-xl font-bold text-white mb-0.5 font-mono">
-        {showValue ? value?.toLocaleString() : '—'}
-      </div>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
-        {prev !== null && <span className="text-[9px] text-zinc-600 font-mono">was {prev.toLocaleString()}</span>}
-      </div>
-
-      {sparkData.length > 0 && (
-        <div className="h-8">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id={`spark-${label}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={sparkColor} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={sparkColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area type="monotone" dataKey="v" stroke={sparkColor} fill={`url(#spark-${label})`} strokeWidth={1.5} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Hover tooltip — premium glassmorphism card */}
-      {showValue && (
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-52 px-4 py-3 rounded-xl bg-[#0c0c14]/95 backdrop-blur-xl border border-white/[0.1] shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.05)] opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-300 ease-out pointer-events-none z-50">
-          {/* Accent glow at top */}
-          <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-16 h-[2px] rounded-full ${positive ? 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent' : 'bg-gradient-to-r from-transparent via-red-400 to-transparent'}`} />
-          <div className="text-[11px] text-white font-semibold mb-2 flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${positive ? 'bg-emerald-400' : 'bg-red-400'}`} />
-            {label}
-          </div>
-          <div className="space-y-1.5">
-            {prev !== null && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-zinc-500">Previous</span>
-                <span className="text-[10px] text-zinc-300 font-mono font-medium">{prev.toLocaleString()}</span>
-              </div>
-            )}
-            {sparkData.length > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-zinc-500">Range</span>
-                <span className="text-[10px] text-zinc-300 font-mono font-medium">{sparkMin.toLocaleString()} – {sparkMax.toLocaleString()}</span>
-              </div>
-            )}
-            {change !== undefined && (
-              <div className={`flex items-center justify-between pt-1.5 mt-1.5 border-t border-white/[0.06]`}>
-                <span className="text-[10px] text-zinc-500">Trend</span>
-                <span className={`text-[10px] font-bold flex items-center gap-1 ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {positive ? '↗' : '↘'} {positive ? '+' : ''}{change}%
-                </span>
-              </div>
-            )}
-          </div>
-          {/* Arrow */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-[#0c0c14]/95" />
-        </div>
-      )}
-    </Link>
-  );
-}
-
-function ActionCard({
-  href, icon: Icon, title, description, color
-}: {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-  color: string;
-}) {
-  const iconColor: Record<string, string> = {
-    emerald: 'from-emerald-400 to-emerald-600',
-    cyan: 'from-cyan-400 to-blue-500',
-    violet: 'from-violet-400 to-purple-600',
-    amber: 'from-amber-400 to-orange-500',
-  };
-
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04] transition-all group"
-    >
-      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${iconColor[color]} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg shadow-${color}-500/10`}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <div className="flex-1">
-        <div className="text-sm font-medium text-white group-hover:text-emerald-400 transition-colors">{title}</div>
-        <div className="text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">{description}</div>
-      </div>
-      <ArrowUpRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 transition-colors opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0" />
-    </Link>
-  );
-}
+/* KPICard and ActionCard extracted to @/components/dashboard/ */
