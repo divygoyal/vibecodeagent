@@ -433,10 +433,15 @@ function WarRoomSection({ days, isLoading }: { days: DayData[]; isLoading: boole
                                         <span className="text-zinc-300 font-medium">{day.position}</span>
                                     </div>
                                 </div>
-                                {/* Event strip */}
+                                {/* Event strip + recommendation */}
                                 <div className="mt-2 pt-2 border-t border-white/[0.04]">
                                     <p className="text-[8px] text-zinc-500 leading-tight line-clamp-2">{day.event}</p>
-                                    <p className="text-[9px] text-emerald-400/70 mt-1">+{day.newKeywords} new kws</p>
+                                    <p className="text-[8px] mt-1 leading-tight line-clamp-2" style={{ color: day.mood === 'surge' ? '#fbbf24' : day.mood === 'dip' ? '#f87171' : '#a1a1aa' }}>
+                                        {day.mood === 'surge' ? '→ Double down: create more content on trending topics' :
+                                         day.mood === 'dip' && day.day === 'SAT' || day.mood === 'dip' && day.day === 'SUN' ? '→ Weekend dip is typical for most niches' :
+                                         day.mood === 'dip' ? '→ Unusual drop — investigate top pages for issues' :
+                                         '→ Consistent performance, focus on growth'}
+                                    </p>
                                 </div>
                                 {/* Expand indicator */}
                                 <div className="absolute bottom-1 right-1">
@@ -477,6 +482,14 @@ function WarRoomSection({ days, isLoading }: { days: DayData[]; isLoading: boole
                             <div className="mt-3 flex items-center gap-2 text-[11px]">
                                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
                                 <span className="text-zinc-400">{days[expanded].event}</span>
+                            </div>
+                            <div className="mt-2 p-2.5 rounded-lg bg-amber-500/[0.05] border border-amber-500/10 text-[10px] text-amber-400/80">
+                                <strong>Recommended action:</strong>{' '}
+                                {days[expanded].mood === 'surge'
+                                    ? 'Capitalize on this momentum — publish related content and share on social media to sustain the traffic spike.'
+                                    : days[expanded].mood === 'dip'
+                                    ? `Check for indexing issues on your top pages. ${days[expanded].changeClicks < -15 ? 'This drop exceeds normal variance — review Google Search Console for manual actions or crawl errors.' : 'A mild dip can be seasonal — compare with the same day last month.'}`
+                                    : 'Steady performance. Focus on optimizing striking distance keywords to push for growth.'}
                             </div>
                         </div>
                     )}
