@@ -9,17 +9,17 @@
         "model": "gemini-3-flash-preview"
       },
       "session": {
-        "contextTokens": 16000,
-        "maxInputTokens": 4000,
+        "contextTokens": 32000,
+        "maxInputTokens": 8000,
         "compaction": "aggressive",
-        "pruneAfterMessages": 20,
-        "autoSummarizeAfter": 12
+        "pruneAfterMessages": 50,
+        "autoSummarizeAfter": 30
       },
       "model": {
         "default": "gemini-3-flash-preview",
         "thinking": false,
-        "temperature": 0.3,
-        "maxOutputTokens": 1500
+        "temperature": 0.7,
+        "maxOutputTokens": 2048
       }
     }
   },
@@ -36,28 +36,28 @@
     },
     "params": {
       "gemini-3-flash-preview": {
-        "temperature": 0.3,
-        "maxOutputTokens": 1500,
+        "temperature": 0.7,
+        "maxOutputTokens": 2048,
         "thinking": false
       }
     }
   },
   "rateLimit": {
     "tokensPerMinute": 900000,
-    "requestsPerMinute": 60,
+    "requestsPerMinute": 50,
     "dailyTokenBudget": 50000000,
     "warningThreshold": 0.8
   },
   "caching": {
     "enabled": true,
-    "ttlMinutes": 60,
-    "maxEntries": 500
+    "ttlMinutes": 30,
+    "maxEntries": 1000
   },
   "tools": {
     "outputTruncation": {
       "enabled": true,
-      "maxChars": 3000,
-      "truncationMessage": "... [truncated]"
+      "maxChars": 5000,
+      "truncationMessage": "... [output truncated for token efficiency]"
     }
   },
   "telegram": {
