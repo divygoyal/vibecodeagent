@@ -21,7 +21,7 @@ import { useRegistration } from './layout';
 import { ConnectGoogleState } from '@/components/EmptyState';
 import { type AlertItem, type OpportunityItem, computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import FixWithBotButton from '@/components/FixWithBotButton';
-import KPICard from '@/components/dashboard/KPICard';
+import KPICard, { type KPIAction } from '@/components/dashboard/KPICard';
 import ActionCard from '@/components/dashboard/ActionCard';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import useKeyboardShortcuts from '@/lib/useKeyboardShortcuts';
@@ -559,6 +559,16 @@ export default function DashboardOverview() {
           sparkData={trafficData.map((d: any) => ({ v: d.activeUsers }))}
           sparkColor="#34d399"
           href="/dashboard/analytics"
+          boostTip={analyticsKPIs?.changeUsers !== undefined && analyticsKPIs.changeUsers < 0
+            ? 'Users are declining — try publishing fresh content or running a social campaign to bring them back.'
+            : 'Users are growing! Double down on your top-performing pages to accelerate growth.'}
+          statusLine={activeUsers !== null ? `${activeUsers} active right now` : undefined}
+          statusSeverity={activeUsers !== null && activeUsers > 0 ? 'good' : undefined}
+          actions={[
+            { label: 'Analyze traffic sources', href: '/dashboard/analytics', icon: BarChart3 },
+            { label: 'AI content strategy', href: '/dashboard/seo', icon: Sparkles },
+            { label: 'Run site audit', href: '/dashboard/audit', icon: ScanSearch },
+          ]}
         />
         <KPICard
           loading={isRef && !hasData}
@@ -569,6 +579,20 @@ export default function DashboardOverview() {
           sparkData={trafficData.map((d: any) => ({ v: d.pageViews }))}
           sparkColor="#22d3ee"
           href="/dashboard/analytics"
+          boostTip={analyticsKPIs?.changePageViews !== undefined && analyticsKPIs.changePageViews < 0
+            ? 'Page views dropped — check for broken pages, improve internal linking, or refresh underperforming content.'
+            : 'Views are up! Add internal links from high-traffic pages to boost engagement further.'}
+          statusLine={analyticsKPIs?.changePageViews !== undefined
+            ? `${Math.abs(analyticsKPIs.changePageViews)}% ${analyticsKPIs.changePageViews >= 0 ? 'increase' : 'decrease'} vs last period`
+            : undefined}
+          statusSeverity={analyticsKPIs?.changePageViews !== undefined
+            ? (analyticsKPIs.changePageViews >= 0 ? 'good' : analyticsKPIs.changePageViews > -20 ? 'warning' : 'critical')
+            : undefined}
+          actions={[
+            { label: 'Find top-performing pages', href: '/dashboard/analytics', icon: Flame },
+            { label: 'Optimize slow pages', href: '/dashboard/audit', icon: Zap },
+            { label: 'Generate blog content', href: '/dashboard/seo', icon: Sparkles },
+          ]}
         />
         <KPICard
           loading={isRef && !hasData}
@@ -579,6 +603,20 @@ export default function DashboardOverview() {
           sparkData={searchTrend.map((d: any) => ({ v: d.clicks }))}
           sparkColor="#a78bfa"
           href="/dashboard/seo"
+          boostTip={seoKPIs?.changeClicks !== undefined && seoKPIs.changeClicks < 0
+            ? 'Clicks are falling — improve meta titles & descriptions on your top pages to boost CTR.'
+            : 'Clicks trending up! Optimize striking-distance keywords (positions 4-15) for even more traffic.'}
+          statusLine={seoKPIs?.totalImpressions
+            ? `${((seoKPIs.totalClicks || 0) / seoKPIs.totalImpressions * 100).toFixed(1)}% avg CTR`
+            : undefined}
+          statusSeverity={seoKPIs?.totalImpressions
+            ? (((seoKPIs.totalClicks || 0) / seoKPIs.totalImpressions * 100) >= 3 ? 'good' : ((seoKPIs.totalClicks || 0) / seoKPIs.totalImpressions * 100) >= 1.5 ? 'warning' : 'critical')
+            : undefined}
+          actions={[
+            { label: 'Find low-CTR opportunities', href: '/dashboard/seo', icon: Target },
+            { label: 'AI keyword research', href: '/dashboard/seo', icon: Search },
+            { label: 'Ask AI for boost plan', href: '/dashboard/intelligence', icon: Brain },
+          ]}
         />
         <KPICard
           loading={isRef && !hasData}
@@ -590,6 +628,22 @@ export default function DashboardOverview() {
           sparkData={searchTrend.map((d: any) => ({ v: d.position }))}
           sparkColor="#fbbf24"
           href="/dashboard/seo"
+          boostTip={seoKPIs?.avgPosition !== undefined && parseFloat(String(seoKPIs.avgPosition)) > 20
+            ? 'Position is high (far from #1) — focus on building backlinks and improving content depth.'
+            : seoKPIs?.changePosition !== undefined && seoKPIs.changePosition > 0
+              ? 'Rankings slipping — update content freshness and check for new competitors.'
+              : 'Rankings are strong! Target featured snippets and People Also Ask to dominate the SERP.'}
+          statusLine={seoKPIs?.avgPosition !== undefined
+            ? (parseFloat(String(seoKPIs.avgPosition)) <= 10 ? 'Page 1 average' : parseFloat(String(seoKPIs.avgPosition)) <= 20 ? 'Page 2 average' : `Page ${Math.ceil(parseFloat(String(seoKPIs.avgPosition)) / 10)} average`)
+            : undefined}
+          statusSeverity={seoKPIs?.avgPosition !== undefined
+            ? (parseFloat(String(seoKPIs.avgPosition)) <= 10 ? 'good' : parseFloat(String(seoKPIs.avgPosition)) <= 20 ? 'warning' : 'critical')
+            : undefined}
+          actions={[
+            { label: 'Find striking-distance keywords', href: '/dashboard/seo', icon: Target },
+            { label: 'Run full SEO audit', href: '/dashboard/audit', icon: ScanSearch },
+            { label: 'AI ranking strategy', href: '/dashboard/intelligence', icon: Rocket },
+          ]}
         />
       </motion.div>
 
