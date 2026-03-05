@@ -685,13 +685,23 @@ function KPICard({ label, value, change, positive }: { label: string; value: str
 
 function AIChatDemo() {
     const sectionRef = useRef<HTMLDivElement>(null);
-    const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
+    const isInView = useInView(sectionRef, { once: false, amount: 0.3 });
     const [phase, setPhase] = useState(0);
     const [typedQuestion, setTypedQuestion] = useState('');
     const [showThinking, setShowThinking] = useState(false);
     const [visibleSections, setVisibleSections] = useState(0);
 
     const question = 'why is my traffic dropping';
+
+    // Reset animation state when section leaves view so it replays on re-entry
+    useEffect(() => {
+        if (!isInView) {
+            setPhase(0);
+            setTypedQuestion('');
+            setShowThinking(false);
+            setVisibleSections(0);
+        }
+    }, [isInView]);
 
     useEffect(() => {
         if (!isInView) return;
