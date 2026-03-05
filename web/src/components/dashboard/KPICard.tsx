@@ -54,14 +54,16 @@ function KPICardInner({
   return (
     <Link
       href={href}
-      className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-all duration-500 group overflow-hidden"
+      className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-all duration-500 group"
       aria-label={`${label}: ${showValue ? displayValue : 'No data'}${change !== undefined ? `, ${change > 0 ? '+' : ''}${change}% change` : ''}`}
     >
-      {/* Subtle gradient glow on hover */}
-      <div
-        className="absolute -top-20 -right-20 w-40 h-40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-3xl"
-        style={{ background: `radial-gradient(circle, ${sparkColor}15, transparent)` }}
-      />
+      {/* Subtle gradient glow on hover — clipped to card bounds */}
+      <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+        <div
+          className="absolute -top-20 -right-20 w-40 h-40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-3xl"
+          style={{ background: `radial-gradient(circle, ${sparkColor}15, transparent)` }}
+        />
+      </div>
 
       {/* Top row: Icon + Change badge */}
       <div className="flex items-center justify-between mb-3 relative">
