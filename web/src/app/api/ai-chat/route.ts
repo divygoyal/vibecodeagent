@@ -53,7 +53,7 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════════════════════════════
 const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.
 
-RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 4. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
+RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 8. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
 
 CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
 REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
@@ -150,6 +150,21 @@ async function deductCredits(userId: string): Promise<number | null> {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
             body: JSON.stringify({ amount: 1 }),
+            cache: 'no-store',
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.credits ?? null;
+    } catch { return null; }
+}
+
+async function refundCredits(userId: string): Promise<number | null> {
+    if (!ADMIN_API_KEY) return null;
+    try {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits/deduct`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+            body: JSON.stringify({ amount: -1 }),
             cache: 'no-store',
         });
         if (!res.ok) return null;
@@ -303,8 +318,8 @@ CRITICAL SYSTEM CONTEXT:
                     let keepGoing = true;
                     let loopCount = 0;
                     let gscCallCount = 0;
-                    const MAX_GSC_CALLS = 4;
-                    const MAX_LOOPS = 4;
+                    const MAX_GSC_CALLS = 8;
+                    const MAX_LOOPS = 8;
 
                     while (keepGoing && loopCount < MAX_LOOPS) {
                         loopCount++;
@@ -448,17 +463,24 @@ CRITICAL SYSTEM CONTEXT:
                 } catch (error: any) {
                     try {
                         console.error('[AI-CHAT] Stream error:', error?.message || error, error?.name);
+                        // Refund the credit since the request failed
+                        if (ADMIN_API_KEY && userId) {
+                            const refunded = await refundCredits(String(userId));
+                            if (refunded !== null) {
+                                controller.enqueue(encodeSSE({ type: 'credits', value: refunded }));
+                            }
+                        }
                         // Extract a clean error message instead of raw JSON
-                        let errMsg = 'Something went wrong. Please try again.';
+                        let errMsg = 'Something went wrong. Your credit has been refunded. Please try again.';
                         const rawMsg = error?.message || '';
                         if (rawMsg.includes('thought_signature')) {
-                            errMsg = 'AI service configuration error. Please try again or clear the chat.';
+                            errMsg = 'AI service configuration error. Your credit has been refunded. Please try again or clear the chat.';
                         } else if (rawMsg.includes('RATE_LIMIT') || rawMsg.includes('429')) {
-                            errMsg = 'AI service is busy. Please wait a moment and try again.';
+                            errMsg = 'AI service is busy. Your credit has been refunded. Please wait a moment and try again.';
                         } else if (rawMsg.includes('timeout') || rawMsg.includes('DEADLINE_EXCEEDED') || rawMsg.includes('aborted') || error?.name === 'AbortError') {
-                            errMsg = 'Request timed out. Try a simpler question or try again.';
+                            errMsg = 'Request timed out. Your credit has been refunded. Try a simpler question or try again.';
                         } else if (rawMsg.includes('INVALID_ARGUMENT') || rawMsg.includes('400')) {
-                            errMsg = 'Invalid request. Please clear the chat and try again.';
+                            errMsg = 'Invalid request. Your credit has been refunded. Please clear the chat and try again.';
                         }
                         controller.enqueue(encodeSSE({ type: 'error', message: errMsg }));
                         controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));

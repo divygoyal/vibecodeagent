@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
     Search, Loader2, AlertTriangle, AlertCircle, Info, CheckCircle2,
     Globe, Clock, FileText, Image, Link2, Code2, Shield, Share2,
-    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink, Zap
+    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink, Zap, Copy, Check
 } from 'lucide-react';
 import type { AuditReport, AuditIssue, Severity } from '@/lib/siteAudit';
 import { useContainerStatus, useSiteList, useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
@@ -158,6 +158,22 @@ export default function AuditPage() {
     const [report, setReport] = useState<AuditReport | null>(null);
     const [error, setError] = useState('');
     const [filter, setFilter] = useState<FilterMode>('all');
+    const [copied, setCopied] = useState(false);
+
+    const shareReport = () => {
+        if (!report) return;
+        const shareData = {
+            url: report.url,
+            score: report.score,
+            summary: report.summary,
+            date: new Date().toISOString(),
+        };
+        const encoded = btoa(JSON.stringify(shareData));
+        const shareUrl = `${window.location.origin}/dashboard/audit?report=${encoded}`;
+        navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     // Fetch user's own sites and pages for quick-audit suggestions
     const { hasGoogleConnection } = useContainerStatus();
@@ -309,6 +325,10 @@ export default function AuditPage() {
             {/* ─── Report ─── */}
             {report && !loading && (
                 <div className="space-y-6">
+                    {/* Audit timestamp */}
+                    <div className="flex justify-end text-[10px] text-zinc-600">
+                        Audited {new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
                     {/* Score + Summary */}
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                         {/* Score ring */}
@@ -389,6 +409,13 @@ export default function AuditPage() {
                             >
                                 <Download className="w-3.5 h-3.5" />
                                 Export CSV
+                            </button>
+                            <button
+                                onClick={shareReport}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors"
+                            >
+                                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                                {copied ? 'Copied!' : 'Share'}
                             </button>
                             <button
                                 onClick={runAudit}

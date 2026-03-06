@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
+import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
@@ -266,6 +267,13 @@ export default function AnalyticsPage() {
 
     return (
         <div className="space-y-5">
+            {/* Data freshness timestamp */}
+            {analyticsData && (
+                <div className="flex justify-end">
+                    <LastUpdated timestamp={new Date()} onRefresh={() => refresh()} isRefreshing={isLoading} />
+                </div>
+            )}
+
             {/* ─── KPI Cards (clean, matching reference) ─── */}
             {kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

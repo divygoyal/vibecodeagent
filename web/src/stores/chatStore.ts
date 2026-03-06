@@ -14,7 +14,7 @@ const MAX_MESSAGES = 30; // ~10 Q&A pairs + some buffer
 function loadFromStorage(): ChatMessage[] {
     if (typeof window === 'undefined') return [];
     try {
-        const stored = sessionStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -26,7 +26,7 @@ function loadFromStorage(): ChatMessage[] {
 function saveToStorage(messages: ChatMessage[]) {
     if (typeof window === 'undefined') return;
     try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)));
     } catch { /* full */ }
 }
 

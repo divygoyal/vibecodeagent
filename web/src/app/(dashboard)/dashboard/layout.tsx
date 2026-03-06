@@ -17,6 +17,7 @@ import {
     CalendarDays, ChevronDown, Bell, Eye, Globe
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
+import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
 
 // Registration context to coordinate registration with data fetching
 interface RegistrationContextType {
@@ -49,7 +50,7 @@ export const useRegistration = () => useContext(RegistrationContext);
 
 const sidebarItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-    // { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' }, // Hidden — next release
+    { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' },
     { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
     { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
@@ -109,6 +110,22 @@ export default function DashboardLayout({
     const alertSiteUrl = selectedSite || (gscSites.length > 0 ? gscSites[0].siteUrl : '');
     const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
     const criticalAlertCount = alerts.filter((a: any) => a.severity === 'critical' || a.severity === 'warning').length;
+
+    // Send browser push notifications for new critical alerts
+    const prevAlertCountRef = useRef(criticalAlertCount);
+    useEffect(() => {
+        if (criticalAlertCount > prevAlertCountRef.current && isPushEnabled()) {
+            const newAlerts = alerts.filter((a: any) => a.severity === 'critical');
+            if (newAlerts.length > 0) {
+                sendBrowserNotification(
+                    'TrafficClaw Alert',
+                    newAlerts[0].title || 'New critical alert detected',
+                    { tag: 'critical-alert', onClick: () => setBellOpen(true) }
+                );
+            }
+        }
+        prevAlertCountRef.current = criticalAlertCount;
+    }, [criticalAlertCount, alerts]);
 
     // Persist theme to localStorage and apply to <html>
     useEffect(() => {
