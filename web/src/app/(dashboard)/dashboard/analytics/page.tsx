@@ -278,7 +278,7 @@ export default function AnalyticsPage() {
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
                             className={`${CARD} p-5`}>
                             <p className="text-xs text-zinc-500 mb-3">{k.label}</p>
-                            <div className="text-[32px] font-bold text-white tabular-nums leading-none mb-2">
+                            <div className="text-2xl sm:text-[32px] font-bold text-white tabular-nums leading-none mb-2">
                                 {k.isDuration ? fmtDur(k.value) : k.formatted ? `${k.value}${k.suffix || ''}` : <AnimatedCounter value={k.value} formatter={fmt} />}
                             </div>
                             <div className="flex items-center gap-1.5">

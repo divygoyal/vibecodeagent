@@ -596,3 +596,93 @@ select:focus-visible {
   background-clip: text;
   animation: shimmer 4s linear infinite;
 }
+
+/* ========== Button press effect ========== */
+.btn-press {
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* ========== Card entrance animation ========== */
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card-enter {
+  animation: cardIn 0.35s ease-out forwards;
+}
+
+/* ========== Number count-up transition ========== */
+.num-transition {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== Smooth tab indicator ========== */
+.tab-active {
+  position: relative;
+}
+
+.tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #34d399, #22d3ee);
+  border-radius: 2px;
+}
+
+/* ========== Toast enter animation ========== */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-enter {
+  animation: toastIn 0.3s ease-out forwards;
+}
+
+/* ========== Mobile-optimized touch targets ========== */
+@media (max-width: 640px) {
+  button, a[role="button"], [role="switch"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .mobile-full {
+    width: 100%;
+  }
+}
+
+/* ========== Responsive table scroll hint ========== */
+.table-scroll-hint {
+  position: relative;
+}
+
+.table-scroll-hint::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--background));
+  pointer-events: none;
+}

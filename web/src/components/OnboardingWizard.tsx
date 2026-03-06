@@ -134,6 +134,13 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                 ))}
             </div>
 
+            {/* Progress text */}
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
+                <span className="text-[10px] text-zinc-600 font-medium">
+                    Step {mappedStep + 1} of {stepIndicators.length}
+                </span>
+            </div>
+
             {/* Content area */}
             <div className="relative w-full max-w-lg px-6">
                 <AnimatePresence mode="wait">
@@ -385,6 +392,9 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                             >
                                 Go to Dashboard <ArrowRight className="w-4 h-4" />
                             </button>
+                            <p className="text-[11px] text-zinc-600 mt-4">
+                                Tip: Press <span className="kbd-hint">?</span> anytime to see keyboard shortcuts
+                            </p>
                         </motion.div>
                     )}
                 </AnimatePresence>

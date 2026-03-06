@@ -233,11 +233,11 @@ export default function SEOPage() {
     const loading = isLoading;
 
     return (
-        <div className="space-y-6 p-6">
+        <div className="space-y-6 p-4 sm:p-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">SEO Intelligence</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-white">SEO Intelligence</h1>
                     <p className="text-sm text-zinc-500 mt-1">Search Console data with AI-powered insights</p>
                 </div>
 
@@ -287,7 +287,7 @@ export default function SEOPage() {
                             </div>
                             <ChangeIndicator value={kpis.changeClicks} />
                         </div>
-                        <div className="text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
+                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
                         <div className="text-xs text-zinc-500 mt-1">Total Clicks</div>
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
@@ -297,7 +297,7 @@ export default function SEOPage() {
                             </div>
                             <ChangeIndicator value={kpis.changeImpressions} />
                         </div>
-                        <div className="text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
+                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
                         <div className="text-xs text-zinc-500 mt-1">Impressions</div>
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
@@ -307,7 +307,7 @@ export default function SEOPage() {
                             </div>
                             <ChangeIndicator value={kpis.changeCTR} />
                         </div>
-                        <div className="text-2xl font-bold text-white">{kpis.avgCTR}%</div>
+                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
                         <div className="text-xs text-zinc-500 mt-1">Avg. CTR</div>
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
@@ -317,7 +317,7 @@ export default function SEOPage() {
                             </div>
                             <ChangeIndicator value={kpis.changePosition} invert />
                         </div>
-                        <div className="text-2xl font-bold text-white">{kpis.avgPosition}</div>
+                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.avgPosition}</div>
                         <div className="text-xs text-zinc-500 mt-1">Avg. Position</div>
                     </div>
                 </div>
@@ -462,9 +462,9 @@ export default function SEOPage() {
                         {activeTool === 'keywords' && (
                             <div className="space-y-3">
                                 <h4 className="text-sm font-semibold text-white flex items-center gap-2"><Brain className="w-4 h-4 text-amber-400" /> Auto Keyword Research</h4>
-                                <div className="flex gap-3">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <input value={kwSiteUrl} onChange={e => setKwSiteUrl(e.target.value)} placeholder="Your site URL (e.g. example.com)" className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/30" />
-                                    <button onClick={() => runTool('keywords', { siteUrl: kwSiteUrl || selectedSite, currentKeywords: queries.slice(0, 5).map((q: any) => q.query).join(', ') })} disabled={toolLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2">
+                                    <button onClick={() => runTool('keywords', { siteUrl: kwSiteUrl || selectedSite, currentKeywords: queries.slice(0, 5).map((q: any) => q.query).join(', ') })} disabled={toolLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2 whitespace-nowrap">
                                         {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Find Keywords
                                     </button>
                                 </div>
@@ -786,7 +786,7 @@ export default function SEOPage() {
                                     <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
                                         <td className="py-3">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-zinc-300 font-medium truncate max-w-[240px]">{p.page}</span>
+                                                <span className="text-zinc-300 font-medium truncate max-w-[160px] sm:max-w-[240px]">{p.page}</span>
                                                 <ArrowUpRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
                                             </div>
                                         </td>

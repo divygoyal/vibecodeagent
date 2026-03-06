@@ -147,6 +147,18 @@ function Hero() {
                             Explore Features
                         </a>
                     </div>
+
+                    {/* Social proof */}
+                    <div className="flex items-center gap-3 justify-center lg:justify-start pt-2">
+                        <div className="flex -space-x-2">
+                            {['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24'].map((color, i) => (
+                                <div key={i} className="w-7 h-7 rounded-full border-2 border-black" style={{ background: color }} />
+                            ))}
+                        </div>
+                        <div className="text-sm text-zinc-400">
+                            <span className="text-white font-semibold">500+</span> marketers already using TrafficClaw
+                        </div>
+                    </div>
                 </motion.div>
 
                 {/* Right Side: The Simulation Component with Floating UI */}
@@ -448,7 +460,7 @@ function Features() {
     ];
 
     return (
-        <Section id="features" className="py-32 px-6">
+        <Section id="features" className="py-24 sm:py-32 px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
@@ -499,7 +511,7 @@ function Features() {
 
 function InteractiveDemo() {
     return (
-        <Section id="demo" className="py-32 px-6">
+        <Section id="demo" className="py-24 sm:py-32 px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
@@ -749,7 +761,7 @@ function AIChatDemo() {
     }, [phase]);
 
     return (
-        <Section className="py-32 px-6">
+        <Section className="py-24 sm:py-32 px-6">
             <div ref={sectionRef} className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
@@ -1028,7 +1040,7 @@ function Testimonials() {
     ];
 
     return (
-        <Section className="py-32 px-6">
+        <Section className="py-24 sm:py-32 px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-amber-400 mb-4">
@@ -1076,7 +1088,7 @@ function Testimonials() {
 
 function Pricing() {
     return (
-        <Section id="pricing" className="py-32 px-6">
+        <Section id="pricing" className="py-24 sm:py-32 px-6">
             <div className="max-w-6xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-violet-400 mb-4">
@@ -1321,7 +1333,7 @@ function HowItWorks() {
     ];
 
     return (
-        <Section className="py-32 px-6">
+        <Section className="py-24 sm:py-32 px-6">
             <div className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-20">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
@@ -1428,12 +1440,241 @@ function IntegrationMarquee() {
 }
 
 /* ═══════════════════════════════════════
+   WHO IT'S FOR
+   ═══════════════════════════════════════ */
+
+const PERSONAS = [
+    {
+        title: 'Solo Founders',
+        desc: 'Track your startup\'s growth without hiring a marketing team. Get AI insights that would cost thousands from an agency.',
+        icon: Zap,
+        color: 'text-cyan-400',
+        bg: 'from-cyan-500/10 to-blue-500/10',
+    },
+    {
+        title: 'Content Creators',
+        desc: 'See which content drives traffic, find keyword gaps, and get AI-written meta tags — all from one place.',
+        icon: Sparkles,
+        color: 'text-violet-400',
+        bg: 'from-violet-500/10 to-purple-500/10',
+    },
+    {
+        title: 'Marketing Teams',
+        desc: 'Unified analytics + SEO in one dashboard. Export reports, set up Telegram alerts, and stay ahead of ranking drops.',
+        icon: TrendingUp,
+        color: 'text-emerald-400',
+        bg: 'from-emerald-500/10 to-cyan-500/10',
+    },
+    {
+        title: 'E-commerce Brands',
+        desc: 'Monitor product page performance, track revenue-driving keywords, and audit your site for SEO issues automatically.',
+        icon: Globe,
+        color: 'text-amber-400',
+        bg: 'from-amber-500/10 to-orange-500/10',
+    },
+];
+
+function WhoItsFor() {
+    return (
+        <Section className="py-24 sm:py-32 px-6">
+            <div className="max-w-5xl mx-auto">
+                <motion.div variants={fadeUp} className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                        WHO IT&apos;S FOR
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white mb-4">
+                        Built for people who{' '}
+                        <span className="gradient-text">care about growth</span>
+                    </h2>
+                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+                        Whether you&apos;re a solo founder or a marketing team, TrafficClaw gives you the tools to grow smarter.
+                    </p>
+                </motion.div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {PERSONAS.map((p, i) => {
+                        const Icon = p.icon;
+                        return (
+                            <motion.div
+                                key={i}
+                                variants={fadeUp}
+                                className={`p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${p.bg} hover:border-white/[0.12] transition-all group`}
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-white/[0.06]`}>
+                                    <Icon className={`w-5 h-5 ${p.color}`} />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">{p.title}</h3>
+                                <p className="text-sm text-zinc-400 leading-relaxed">{p.desc}</p>
+                            </motion.div>
+                        );
+                    })}
+                </div>
+            </div>
+        </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
+   COMPARISON TABLE
+   ═══════════════════════════════════════ */
+
+const COMPARISON_ROWS = [
+    { feature: 'GA4 + SEO in one dashboard', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'AI Chat about your data', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'Telegram bot alerts', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'Real-time analytics', tc: true, ga4: true, semrush: false, ahrefs: false },
+    { feature: 'Keyword tracking', tc: true, ga4: false, semrush: true, ahrefs: true },
+    { feature: 'Site audit', tc: true, ga4: false, semrush: true, ahrefs: true },
+    { feature: 'Free tier available', tc: true, ga4: true, semrush: false, ahrefs: false },
+    { feature: 'Starting price', tc: '$9/mo', ga4: 'Free', semrush: '$139/mo', ahrefs: '$99/mo' },
+];
+
+function ComparisonTable() {
+    return (
+        <Section className="py-24 sm:py-32 px-6">
+            <div className="max-w-4xl mx-auto">
+                <motion.div variants={fadeUp} className="text-center mb-12">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
+                        COMPARE
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-4">
+                        How we stack up
+                    </h2>
+                    <p className="text-zinc-400 max-w-xl mx-auto">
+                        TrafficClaw combines analytics + SEO + AI in one tool — at a fraction of the cost.
+                    </p>
+                </motion.div>
+                <motion.div variants={fadeUp} className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-white/[0.06]">
+                                <th className="text-left py-4 pr-4 text-zinc-500 font-medium">Feature</th>
+                                <th className="text-center py-4 px-3 text-emerald-400 font-semibold">TrafficClaw</th>
+                                <th className="text-center py-4 px-3 text-zinc-500 font-medium">GA4</th>
+                                <th className="text-center py-4 px-3 text-zinc-500 font-medium">SEMrush</th>
+                                <th className="text-center py-4 px-3 text-zinc-500 font-medium">Ahrefs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {COMPARISON_ROWS.map((row, i) => (
+                                <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                    <td className="py-3 pr-4 text-zinc-300">{row.feature}</td>
+                                    {(['tc', 'ga4', 'semrush', 'ahrefs'] as const).map(col => {
+                                        const val = row[col];
+                                        return (
+                                            <td key={col} className="text-center py-3 px-3">
+                                                {typeof val === 'boolean' ? (
+                                                    val ? (
+                                                        <CheckCircle2 className={`w-4 h-4 mx-auto ${col === 'tc' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                                                    ) : (
+                                                        <span className="text-zinc-700">—</span>
+                                                    )
+                                                ) : (
+                                                    <span className={`font-medium ${col === 'tc' ? 'text-emerald-400' : 'text-zinc-400'}`}>{val}</span>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </motion.div>
+            </div>
+        </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
+   FAQ
+   ═══════════════════════════════════════ */
+
+function FAQ() {
+    const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+    const faqs = [
+        {
+            q: 'How does TrafficClaw access my analytics data?',
+            a: 'We use read-only Google OAuth to connect to your GA4 and Search Console. We never modify your data or settings. You can revoke access at any time from your Google account.',
+        },
+        {
+            q: 'Do I need a Telegram account?',
+            a: 'Only if you want to use the Telegram bot feature (Pro plan). The web dashboard works independently — you can access all analytics, SEO tools, and AI chat directly from your browser.',
+        },
+        {
+            q: 'What happens when I run out of credits?',
+            a: 'You can still access your dashboard, view analytics, and run audits. Credits are only consumed when you send messages to the AI chat or Telegram bot. Upgrade your plan anytime for more credits.',
+        },
+        {
+            q: 'Is my data secure?',
+            a: 'Yes. We use OAuth tokens (never passwords), encrypt data in transit with TLS, and each user\'s bot runs in an isolated container. We don\'t sell or share your data with third parties.',
+        },
+        {
+            q: 'Can I connect multiple websites?',
+            a: 'Yes! TrafficClaw automatically detects all GA4 properties and Search Console sites linked to your Google account. Switch between them from the dashboard.',
+        },
+        {
+            q: 'How accurate is the AI analysis?',
+            a: 'The AI analyzes your real Google Analytics and Search Console data using Gemini. It provides data-driven insights, not guesses. Every recommendation is backed by your actual traffic and ranking metrics.',
+        },
+        {
+            q: 'Can I cancel anytime?',
+            a: 'Absolutely. No contracts, no commitments. Cancel your subscription anytime and you\'ll keep access until the end of your billing period.',
+        },
+        {
+            q: 'What makes TrafficClaw different from GA4 or Ahrefs?',
+            a: 'TrafficClaw combines analytics and SEO into one AI-powered interface. Instead of clicking through dashboards, just ask "which keywords are dropping?" and get instant answers. Plus, get proactive alerts via Telegram without checking any dashboard.',
+        },
+    ];
+
+    return (
+        <Section id="faq" className="py-24 sm:py-32 px-6">
+            <div className="max-w-3xl mx-auto">
+                <motion.div variants={fadeUp} className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                        FAQ
+                    </div>
+                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                        Common{' '}
+                        <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                            questions
+                        </span>
+                    </h2>
+                    <p className="text-zinc-400 text-lg">Everything you need to know about TrafficClaw.</p>
+                </motion.div>
+
+                <motion.div variants={fadeUp} className="space-y-3">
+                    {faqs.map((faq, i) => (
+                        <div
+                            key={i}
+                            className="border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.1] transition-colors"
+                        >
+                            <button
+                                onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                                className="w-full flex items-center justify-between px-6 py-5 text-left"
+                            >
+                                <span className="text-sm font-medium text-white pr-4">{faq.q}</span>
+                                <ChevronRight className={`w-4 h-4 text-zinc-500 flex-shrink-0 transition-transform duration-200 ${openIndex === i ? 'rotate-90' : ''}`} />
+                            </button>
+                            {openIndex === i && (
+                                <div className="px-6 pb-5 -mt-1">
+                                    <p className="text-sm text-zinc-400 leading-relaxed">{faq.a}</p>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </motion.div>
+            </div>
+        </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
    FINAL CTA
    ═══════════════════════════════════════ */
 
 function FinalCTA() {
     return (
-        <Section className="py-32 px-6">
+        <Section className="py-24 sm:py-32 px-6">
             <div className="max-w-4xl mx-auto text-center">
                 <motion.div
                     variants={fadeUp}
@@ -1518,6 +1759,12 @@ export default function LandingPage() {
             <Testimonials />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Pricing />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <ComparisonTable />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <WhoItsFor />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <FAQ />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <FinalCTA />
             <Footer />

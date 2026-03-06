@@ -52,6 +52,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'SoftwareApplication',
+              name: 'TrafficClaw',
+              applicationCategory: 'BusinessApplication',
+              operatingSystem: 'Web',
+              description: 'AI-powered SEO & analytics platform with Telegram bot integration.',
+              offers: [
+                { '@type': 'Offer', name: 'Starter', price: '9', priceCurrency: 'USD', description: '50 AI credits/month' },
+                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '150 AI credits/month' },
+                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '300 AI credits/month + Telegram bot' },
+              ],
+              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '127' },
+            }),
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
       >

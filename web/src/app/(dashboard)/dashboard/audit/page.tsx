@@ -60,6 +60,7 @@ function IssueRow({ issue }: { issue: AuditIssue }) {
         <div className={`border ${sev.border} rounded-xl overflow-hidden transition-colors`}>
             <button
                 onClick={() => setExpanded(!expanded)}
+                aria-expanded={expanded}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
             >
                 <SevIcon className={`w-4 h-4 flex-shrink-0 ${sev.color}`} />
@@ -232,6 +233,7 @@ export default function AuditPage() {
                         onChange={(e) => setUrl(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !loading && runAudit()}
                         placeholder="Enter URL to audit (e.g. example.com)"
+                        aria-label="URL to audit"
                         className="w-full pl-10 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                     />
                 </div>
