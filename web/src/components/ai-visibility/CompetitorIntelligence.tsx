@@ -24,7 +24,7 @@ export default function CompetitorIntelligence({ competitors, gapAlert }: Compet
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-sm font-bold text-white">Competitor Intelligence</h2>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">AI citation share comparison</p>
+                    <p className="text-[10px] text-zinc-500 mt-0.5">AI citation share comparison <span className="text-amber-400/60">(estimated)</span></p>
                 </div>
                 <button className="text-[10px] text-cyan-400 hover:text-cyan-300 transition">
                     View all <span className="ml-0.5">&rarr;</span>

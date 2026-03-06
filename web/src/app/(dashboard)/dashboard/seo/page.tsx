@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
+import LastUpdated from '@/components/dashboard/LastUpdated';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
 import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
@@ -238,7 +239,10 @@ export default function SEOPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-white">SEO Intelligence</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Search Console data with AI-powered insights</p>
+                    <div className="flex items-center gap-3 mt-1">
+                        <p className="text-sm text-zinc-500">Search Console data with AI-powered insights</p>
+                        {seoData && <LastUpdated timestamp={new Date()} />}
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3">

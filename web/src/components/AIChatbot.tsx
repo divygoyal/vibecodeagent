@@ -426,6 +426,19 @@ export default function AIChatbot() {
                                 if (prev !== null && data.value < prev) {
                                     setShowCreditAnim(true);
                                     setTimeout(() => setShowCreditAnim(false), 1500);
+                                    // Track credit usage in localStorage for history
+                                    try {
+                                        const history = JSON.parse(localStorage.getItem('tc-credit-usage') || '[]');
+                                        history.push({ date: new Date().toISOString(), action: 'AI Chat message', amount: -1 });
+                                        localStorage.setItem('tc-credit-usage', JSON.stringify(history.slice(-50)));
+                                    } catch { /* skip */ }
+                                } else if (prev !== null && data.value > prev) {
+                                    // Credit was refunded
+                                    try {
+                                        const history = JSON.parse(localStorage.getItem('tc-credit-usage') || '[]');
+                                        history.push({ date: new Date().toISOString(), action: 'Credit refunded (error)', amount: 1 });
+                                        localStorage.setItem('tc-credit-usage', JSON.stringify(history.slice(-50)));
+                                    } catch { /* skip */ }
                                 }
                                 return data.value;
                             });
