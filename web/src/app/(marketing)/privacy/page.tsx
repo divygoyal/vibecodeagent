@@ -1,25 +1,41 @@
-"use client";
-
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+
+export const metadata: Metadata = {
+    title: 'Privacy Policy | TrafficClaw',
+    description:
+        'Learn how TrafficClaw collects, uses, and protects your data. We adhere to Google API Services User Data Policy including Limited Use requirements.',
+    alternates: { canonical: '/privacy' },
+    openGraph: {
+        title: 'Privacy Policy | TrafficClaw',
+        description: 'How TrafficClaw handles your data — Google API compliance, data retention, and security practices.',
+        url: '/privacy',
+    },
+};
 
 export default function PrivacyPage() {
     return (
         <div className="min-h-screen bg-black text-white pt-24 pb-12 px-6">
             <div className="max-w-3xl mx-auto">
-                <Link href="/" className="inline-flex items-center text-sm text-zinc-400 hover:text-white mb-8 transition-colors">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Home
-                </Link>
+                {/* Breadcrumb */}
+                <nav aria-label="Breadcrumb" className="mb-8">
+                    <ol className="flex items-center gap-2 text-sm text-zinc-400">
+                        <li><Link href="/" className="hover:text-white transition-colors">Home</Link></li>
+                        <li aria-hidden="true">/</li>
+                        <li className="text-white font-medium">Privacy Policy</li>
+                    </ol>
+                </nav>
 
                 <h1 className="text-4xl font-bold mb-4">Privacy Policy</h1>
-                <p className="text-zinc-500 mb-8">Last updated: February 25, 2026</p>
+                <p className="text-zinc-500 mb-8">
+                    Last updated: <time dateTime="2026-02-25">February 25, 2026</time>
+                </p>
 
                 <div className="space-y-8 text-zinc-300 leading-relaxed">
                     <section>
                         <h2 className="text-2xl font-semibold text-white mb-4">1. Introduction</h2>
                         <p>
-                            TrafficClaw ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our website and services.
+                            TrafficClaw (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our website and services.
                         </p>
                     </section>
 
@@ -39,7 +55,7 @@ export default function PrivacyPage() {
                         </p>
                         <ul className="list-disc pl-6 space-y-2">
                             <li><strong>Access:</strong> We only access data you explicitly grant permissions for.</li>
-                            <li><strong>Data Retention and Deletion:</strong> We securely retain Google user data only for as long as your account is active and necessary to provide our core features. You may request the complete deletion of your data at any time by contacting us at privacy@trafficclaw.com or by revoking the application's access in your Google Account security settings. Upon a deletion request or account closure, all associated Google user data is permanently removed from our databases within 30 days.</li>
+                            <li><strong>Data Retention and Deletion:</strong> We securely retain Google user data only for as long as your account is active and necessary to provide our core features. You may request the complete deletion of your data at any time by contacting us at privacy@trafficclaw.com or by revoking the application&apos;s access in your Google Account security settings. Upon a deletion request or account closure, all associated Google user data is permanently removed from our databases within 30 days.</li>
                             <li><strong>Data Sharing and Disclosure:</strong> We do <strong>not</strong> share, transfer, sell, or disclose your Google user data to any third parties, affiliates, advertisers, or external data brokers. Your data is used strictly to provide the requested service directly to you.</li>
                             <li><strong>AI Models:</strong> We explicitly do not share or use your Google user data with third-party or internal AI models for training purposes.</li>
                             <li><strong>Limited Use:</strong> Our use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.</li>
@@ -56,9 +72,22 @@ export default function PrivacyPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-white mb-4">5. Contact Us</h2>
                         <p>
-                            If you have any questions about this Privacy Policy, please contact us at privacy@trafficclaw.com.
+                            If you have any questions about this Privacy Policy, please contact us at{' '}
+                            <a href="mailto:privacy@trafficclaw.com" className="text-emerald-400 hover:text-emerald-300 transition-colors">
+                                privacy@trafficclaw.com
+                            </a>.
                         </p>
                     </section>
+                </div>
+
+                {/* Cross-links */}
+                <div className="mt-12 pt-8 border-t border-white/[0.06] flex items-center gap-6 text-sm">
+                    <Link href="/terms" className="text-zinc-400 hover:text-white transition-colors">
+                        Terms of Service &rarr;
+                    </Link>
+                    <Link href="/about" className="text-zinc-400 hover:text-white transition-colors">
+                        About Us &rarr;
+                    </Link>
                 </div>
             </div>
         </div>
