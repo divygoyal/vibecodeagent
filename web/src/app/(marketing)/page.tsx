@@ -1440,6 +1440,151 @@ function IntegrationMarquee() {
 }
 
 /* ═══════════════════════════════════════
+   WHO IT'S FOR
+   ═══════════════════════════════════════ */
+
+const PERSONAS = [
+    {
+        title: 'Solo Founders',
+        desc: 'Track your startup\'s growth without hiring a marketing team. Get AI insights that would cost thousands from an agency.',
+        icon: Zap,
+        color: 'text-cyan-400',
+        bg: 'from-cyan-500/10 to-blue-500/10',
+    },
+    {
+        title: 'Content Creators',
+        desc: 'See which content drives traffic, find keyword gaps, and get AI-written meta tags — all from one place.',
+        icon: Sparkles,
+        color: 'text-violet-400',
+        bg: 'from-violet-500/10 to-purple-500/10',
+    },
+    {
+        title: 'Marketing Teams',
+        desc: 'Unified analytics + SEO in one dashboard. Export reports, set up Telegram alerts, and stay ahead of ranking drops.',
+        icon: TrendingUp,
+        color: 'text-emerald-400',
+        bg: 'from-emerald-500/10 to-cyan-500/10',
+    },
+    {
+        title: 'E-commerce Brands',
+        desc: 'Monitor product page performance, track revenue-driving keywords, and audit your site for SEO issues automatically.',
+        icon: Globe,
+        color: 'text-amber-400',
+        bg: 'from-amber-500/10 to-orange-500/10',
+    },
+];
+
+function WhoItsFor() {
+    return (
+        <Section className="py-24 sm:py-32 px-6">
+            <div className="max-w-5xl mx-auto">
+                <motion.div variants={fadeUp} className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                        WHO IT&apos;S FOR
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white mb-4">
+                        Built for people who{' '}
+                        <span className="gradient-text">care about growth</span>
+                    </h2>
+                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+                        Whether you&apos;re a solo founder or a marketing team, TrafficClaw gives you the tools to grow smarter.
+                    </p>
+                </motion.div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {PERSONAS.map((p, i) => {
+                        const Icon = p.icon;
+                        return (
+                            <motion.div
+                                key={i}
+                                variants={fadeUp}
+                                className={`p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${p.bg} hover:border-white/[0.12] transition-all group`}
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-white/[0.06]`}>
+                                    <Icon className={`w-5 h-5 ${p.color}`} />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">{p.title}</h3>
+                                <p className="text-sm text-zinc-400 leading-relaxed">{p.desc}</p>
+                            </motion.div>
+                        );
+                    })}
+                </div>
+            </div>
+        </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
+   COMPARISON TABLE
+   ═══════════════════════════════════════ */
+
+const COMPARISON_ROWS = [
+    { feature: 'GA4 + SEO in one dashboard', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'AI Chat about your data', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'Telegram bot alerts', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'Real-time analytics', tc: true, ga4: true, semrush: false, ahrefs: false },
+    { feature: 'Keyword tracking', tc: true, ga4: false, semrush: true, ahrefs: true },
+    { feature: 'Site audit', tc: true, ga4: false, semrush: true, ahrefs: true },
+    { feature: 'Free tier available', tc: true, ga4: true, semrush: false, ahrefs: false },
+    { feature: 'Starting price', tc: '$9/mo', ga4: 'Free', semrush: '$139/mo', ahrefs: '$99/mo' },
+];
+
+function ComparisonTable() {
+    return (
+        <Section className="py-24 sm:py-32 px-6">
+            <div className="max-w-4xl mx-auto">
+                <motion.div variants={fadeUp} className="text-center mb-12">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
+                        COMPARE
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-4">
+                        How we stack up
+                    </h2>
+                    <p className="text-zinc-400 max-w-xl mx-auto">
+                        TrafficClaw combines analytics + SEO + AI in one tool — at a fraction of the cost.
+                    </p>
+                </motion.div>
+                <motion.div variants={fadeUp} className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-white/[0.06]">
+                                <th className="text-left py-4 pr-4 text-zinc-500 font-medium">Feature</th>
+                                <th className="text-center py-4 px-3 text-emerald-400 font-semibold">TrafficClaw</th>
+                                <th className="text-center py-4 px-3 text-zinc-500 font-medium">GA4</th>
+                                <th className="text-center py-4 px-3 text-zinc-500 font-medium">SEMrush</th>
+                                <th className="text-center py-4 px-3 text-zinc-500 font-medium">Ahrefs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {COMPARISON_ROWS.map((row, i) => (
+                                <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                    <td className="py-3 pr-4 text-zinc-300">{row.feature}</td>
+                                    {(['tc', 'ga4', 'semrush', 'ahrefs'] as const).map(col => {
+                                        const val = row[col];
+                                        return (
+                                            <td key={col} className="text-center py-3 px-3">
+                                                {typeof val === 'boolean' ? (
+                                                    val ? (
+                                                        <CheckCircle2 className={`w-4 h-4 mx-auto ${col === 'tc' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                                                    ) : (
+                                                        <span className="text-zinc-700">—</span>
+                                                    )
+                                                ) : (
+                                                    <span className={`font-medium ${col === 'tc' ? 'text-emerald-400' : 'text-zinc-400'}`}>{val}</span>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </motion.div>
+            </div>
+        </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
    FAQ
    ═══════════════════════════════════════ */
 
@@ -1614,6 +1759,10 @@ export default function LandingPage() {
             <Testimonials />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Pricing />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <ComparisonTable />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <WhoItsFor />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <FAQ />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />

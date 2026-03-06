@@ -316,6 +316,23 @@ export default function DashboardLayout({
                     })}
                 </nav>
 
+                {/* Keyboard shortcuts hint */}
+                {!collapsed && (
+                    <div className="mx-3 mt-1 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                        <p className="text-[10px] text-zinc-600 mb-1.5">Shortcuts</p>
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-zinc-500">Search</span>
+                                <kbd className="kbd-hint">⌘K</kbd>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-zinc-500">Help</span>
+                                <kbd className="kbd-hint">?</kbd>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* User section + collapse toggle */}
                 <div className="border-t border-white/[0.04] p-3 space-y-2">
                     {session?.user && !collapsed && (
@@ -373,14 +390,34 @@ export default function DashboardLayout({
                         <Menu className="w-5 h-5" />
                     </button>
 
-                    {/* Page title */}
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-sm font-semibold text-zinc-300">
-                            {[...sidebarItems, ...resourceItems].find(i =>
+                    {/* Breadcrumb navigation */}
+                    <nav className="flex items-center gap-1.5 text-sm" aria-label="Breadcrumb">
+                        <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 transition-colors font-medium">
+                            Dashboard
+                        </Link>
+                        {pathname !== '/dashboard' && (() => {
+                            const segments = pathname.replace('/dashboard/', '').split('/');
+                            const currentItem = [...sidebarItems, ...resourceItems].find(i =>
                                 pathname === i.href || (i.href !== '/dashboard' && pathname.startsWith(i.href))
-                            )?.label || 'Dashboard'}
-                        </h1>
-                    </div>
+                            );
+                            return (
+                                <>
+                                    <ChevronRight className="w-3 h-3 text-zinc-600" />
+                                    <span className="text-zinc-300 font-semibold">
+                                        {currentItem?.label || segments[segments.length - 1]?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                    </span>
+                                    {segments.length > 1 && currentItem && (
+                                        <>
+                                            <ChevronRight className="w-3 h-3 text-zinc-600" />
+                                            <span className="text-zinc-300 font-semibold">
+                                                {segments[segments.length - 1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                            </span>
+                                        </>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </nav>
 
                     {/* Right side */}
                     <div className="flex items-center gap-2 sm:gap-3">
