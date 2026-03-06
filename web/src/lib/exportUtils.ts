@@ -1,8 +1,23 @@
 /**
- * CSV Export Utility — Client-side CSV generation and download.
+ * Export Utility — Client-side CSV/JSON generation and download.
  */
 
 type Row = Record<string, string | number | boolean | null | undefined>;
+
+/**
+ * Export data as JSON file.
+ */
+export function exportToJSON(data: unknown, filename: string) {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${filename}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+}
 
 /**
  * Convert an array of objects to CSV string and trigger download.

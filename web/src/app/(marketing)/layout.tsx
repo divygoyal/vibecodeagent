@@ -19,9 +19,9 @@ function Navbar() {
     }, []);
 
     const navLinks = [
-        { label: 'Features', href: '#features' },
-        { label: 'Demo', href: '#demo' },
-        { label: 'Pricing', href: '#pricing' },
+        { label: 'Features', href: '/#features' },
+        { label: 'Demo', href: '/#demo' },
+        { label: 'Pricing', href: '/pricing' },
     ];
 
     return (

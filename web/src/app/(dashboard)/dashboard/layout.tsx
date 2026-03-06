@@ -14,7 +14,7 @@ import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Sun, Moon, Coins, MessageSquare,
-    CalendarDays, ChevronDown, Bell, Eye
+    CalendarDays, ChevronDown, Bell, Eye, Globe
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 
@@ -101,6 +101,7 @@ export default function DashboardLayout({
     });
     const [rangeDropdownOpen, setRangeDropdownOpen] = useState(false);
     const [bellOpen, setBellOpen] = useState(false);
+    const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
 
     // Alerts for notification bell
     const { hasGoogleConnection } = useContainerStatus();
@@ -250,6 +251,7 @@ export default function DashboardLayout({
 
     return (
         <div className="min-h-screen bg-black text-white flex">
+            <a href="#main-content" className="skip-to-content">Skip to content</a>
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
                 className={`hidden lg:flex flex-col border-r border-white/[0.04] bg-[#050508] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
@@ -360,7 +362,7 @@ export default function DashboardLayout({
             {/* ─── Main content area ─── */}
             <div className="flex-1 flex flex-col min-h-screen">
                 {/* Top bar */}
-                <header className="h-16 flex items-center justify-between px-6 border-b border-white/[0.04] bg-black/85 backdrop-blur-xl sticky top-0 z-40">
+                <header className="h-16 flex items-center justify-between px-4 sm:px-6 border-b border-white/[0.04] bg-black/85 backdrop-blur-xl sticky top-0 z-40">
                     {/* Mobile menu button */}
                     <button
                         className="lg:hidden text-zinc-400 hover:text-white"
@@ -381,12 +383,51 @@ export default function DashboardLayout({
                     </div>
 
                     {/* Right side */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Global Site Switcher */}
+                        {gscSites.length > 1 && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
+                                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition max-w-[160px]"
+                                    aria-label="Switch site"
+                                >
+                                    <Globe className="w-3.5 h-3.5 flex-shrink-0" />
+                                    <span className="truncate">{selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Site'}</span>
+                                    <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {siteDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
+                                        <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[200px] max-h-[260px] overflow-y-auto">
+                                            {gscSites.map((site: any) => {
+                                                const url = site.siteUrl || site;
+                                                const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+                                                const isSelected = url === selectedSite;
+                                                return (
+                                                    <button
+                                                        key={url}
+                                                        onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
+                                                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 transition ${
+                                                            isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                                        }`}
+                                                    >
+                                                        <Globe className="w-3 h-3 flex-shrink-0" />
+                                                        <span className="truncate">{label}</span>
+                                                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto flex-shrink-0" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
                         {/* Global Date Range Picker */}
                         <div className="relative">
                             <button
                                 onClick={() => setRangeDropdownOpen(!rangeDropdownOpen)}
-                                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
                             >
                                 <CalendarDays className="w-3.5 h-3.5" />
                                 {RANGES.find(r => r.value === range)?.label || '30 days'}
@@ -490,17 +531,30 @@ export default function DashboardLayout({
                         </button>
                         {/* Credits badge */}
                         {credits !== null && (
-                            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${credits < 20
-                                ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                                : credits < 50
-                                    ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
-                                    : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
-                                }`}>
-                                <Coins className={`w-3 h-3 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
-                                    }`} />
-                                <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
-                                    }`}>{credits} msgs</span>
-                            </div>
+                            <>
+                                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${credits < 20
+                                    ? 'bg-red-500/[0.08] border-red-500/[0.15]'
+                                    : credits < 50
+                                        ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
+                                        : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
+                                    }`}>
+                                    <Coins className={`w-3 h-3 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
+                                        }`} />
+                                    <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
+                                        }`}>{credits} msgs</span>
+                                </div>
+                                <div className={`sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-md border ${credits < 20
+                                    ? 'bg-red-500/[0.08] border-red-500/[0.15]'
+                                    : credits < 50
+                                        ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
+                                        : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
+                                    }`}>
+                                    <Coins className={`w-3 h-3 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
+                                        }`} />
+                                    <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
+                                        }`}>{credits}</span>
+                                </div>
+                            </>
                         )}
                         {session?.user?.image && (
                             <img
@@ -513,7 +567,7 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Page content */}
-                <main id="main-content" className="flex-1 p-6 overflow-y-auto" role="main">
+                <main id="main-content" className="flex-1 p-4 sm:p-6 overflow-y-auto" role="main">
                     <div className="max-w-7xl mx-auto">
                         <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
                             {children}
@@ -557,6 +611,7 @@ export default function DashboardLayout({
                             <button
                                 onClick={() => setMobileOpen(false)}
                                 className="text-zinc-400"
+                                aria-label="Close navigation menu"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -607,6 +662,19 @@ export default function DashboardLayout({
                             })}
                         </nav>
 
+                        {credits !== null && (
+                            <div className="border-t border-white/[0.04] px-4 py-3">
+                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${credits < 20
+                                    ? 'bg-red-500/[0.08] border-red-500/[0.15]'
+                                    : credits < 50
+                                        ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
+                                        : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
+                                    }`}>
+                                    <Coins className={`w-3.5 h-3.5 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`} />
+                                    <span className={`text-xs font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{credits} messages</span>
+                                </div>
+                            </div>
+                        )}
                         {session?.user && (
                             <div className="border-t border-white/[0.04] p-3">
                                 <div className="flex items-center gap-3 px-2 py-2">
