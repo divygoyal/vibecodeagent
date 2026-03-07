@@ -58,13 +58,11 @@ function latLngToScreen(
     const latR = (lat * Math.PI) / 180;
     const lngR = (lng * Math.PI) / 180;
 
-    // Spherical to cartesian
     const x = Math.cos(latR) * Math.sin(lngR + phi);
     const y = Math.sin(latR) * Math.cos(theta) - Math.cos(latR) * Math.sin(theta) * Math.cos(lngR + phi);
     const z = Math.sin(latR) * Math.sin(theta) + Math.cos(latR) * Math.cos(theta) * Math.cos(lngR + phi);
 
-    // Only visible if on the front side
-    const visible = z > 0.1;
+    const visible = z > 0.15;
     const radius = size * 0.42;
 
     return {
@@ -81,7 +79,7 @@ export interface GlobeVisitor {
     country: string;
     avatarColor: string;
     avatarInitial: string;
-    warmth: number; // 0-1, purchase prediction warmth
+    warmth: number;
     users: number;
 }
 
@@ -100,6 +98,7 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
     const markersRef = useRef<{ location: [number, number]; size: number }[]>([]);
     const globeRef = useRef<ReturnType<typeof createGlobe> | null>(null);
     const phiRef = useRef(0);
+    const frameRef = useRef(0);
     const [avatarPositions, setAvatarPositions] = useState<Array<{ x: number; y: number; visible: boolean; visitor: GlobeVisitor }>>([]);
 
     const buildMarkers = useCallback(() => {
@@ -116,7 +115,7 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
                 if (coord) {
                     markers.push({
                         location: coord,
-                        size: Math.max(0.04, (c.users / maxUsers) * 0.3),
+                        size: Math.max(0.02, (c.users / maxUsers) * 0.12),
                     });
                 }
             });
@@ -129,7 +128,7 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
                 if (!hasCity) {
                     markers.push({
                         location: coord,
-                        size: Math.max(0.05, (c.users / maxUsers) * 0.35),
+                        size: Math.max(0.02, (c.users / maxUsers) * 0.15),
                     });
                 }
             }
@@ -146,40 +145,43 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
         if (!canvasRef.current) return;
 
         const onResize = () => {
-            if (canvasRef.current) {
-                widthRef.current = canvasRef.current.offsetWidth;
+            if (containerRef.current) {
+                widthRef.current = containerRef.current.offsetWidth;
             }
         };
         window.addEventListener('resize', onResize);
         onResize();
 
+        const canvasSize = Math.max(widthRef.current, 600);
+
         globeRef.current = createGlobe(canvasRef.current, {
-            devicePixelRatio: 2,
-            width: widthRef.current * 2,
-            height: widthRef.current * 2,
-            phi: 0,
-            theta: 0.15,
+            devicePixelRatio: Math.min(window.devicePixelRatio, 2),
+            width: canvasSize * 2,
+            height: canvasSize * 2,
+            phi: 0.3,
+            theta: 0.2,
             dark: 1,
-            diffuse: 3,
-            mapSamples: 36000,
-            mapBrightness: 4,
-            baseColor: [0.12, 0.12, 0.2],
-            markerColor: [1, 0.3, 0.3],
-            glowColor: [0.05, 0.05, 0.12],
+            diffuse: 1.2,
+            mapSamples: 24000,
+            mapBrightness: 2.5,
+            baseColor: [0.05, 0.08, 0.15],
+            markerColor: [0.1, 0.8, 0.5],
+            glowColor: [0.03, 0.06, 0.12],
             markers,
             onRender: (state) => {
                 if (!pointerInteracting.current) {
-                    currentPhi += 0.002;
+                    currentPhi += 0.003;
                 }
                 const totalPhi = currentPhi + pointerInteractionMovement.current;
                 state.phi = totalPhi;
-                state.width = widthRef.current * 2;
-                state.height = widthRef.current * 2;
+                state.width = canvasSize * 2;
+                state.height = canvasSize * 2;
                 state.markers = markersRef.current;
                 phiRef.current = totalPhi;
 
-                // Update avatar positions relative to globe rotation
-                if (visitors.length > 0 && containerRef.current) {
+                // Throttle avatar position updates to every 3rd frame
+                frameRef.current++;
+                if (visitors.length > 0 && containerRef.current && frameRef.current % 3 === 0) {
                     const w = containerRef.current.offsetWidth;
                     const h = containerRef.current.offsetHeight;
                     const size = Math.min(w, h);
@@ -187,7 +189,7 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
                     const cy = h / 2;
 
                     const positions = visitors.map(v => {
-                        const pos = latLngToScreen(v.lat, v.lng, totalPhi, 0.15, size, cx, cy);
+                        const pos = latLngToScreen(v.lat, v.lng, totalPhi, 0.2, size, cx, cy);
                         return { ...pos, visitor: v };
                     });
                     setAvatarPositions(positions);
@@ -205,27 +207,29 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
         buildMarkers();
     }, [buildMarkers]);
 
-    // Warmth color: cold (blue) → warm (red/orange)
     const getWarmthColor = (warmth: number) => {
-        if (warmth > 0.7) return '#ef4444'; // hot red
-        if (warmth > 0.5) return '#f97316'; // orange
-        if (warmth > 0.3) return '#eab308'; // yellow
-        return '#3b82f6'; // cold blue
-    };
-
-    const getWarmthBorder = (warmth: number) => {
-        if (warmth > 0.7) return 'ring-red-500/50';
-        if (warmth > 0.5) return 'ring-orange-500/50';
-        if (warmth > 0.3) return 'ring-yellow-500/50';
-        return 'ring-blue-500/50';
+        if (warmth > 0.6) return '#10b981';
+        if (warmth > 0.4) return '#06b6d4';
+        if (warmth > 0.25) return '#8b5cf6';
+        return '#3b82f6';
     };
 
     return (
-        <div ref={containerRef} className="relative w-full h-full flex items-center justify-center">
+        <div ref={containerRef} className="relative w-full h-full flex items-center justify-center overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0a1628 0%, #050a14 70%, #000 100%)' }}>
+            {/* Subtle star field background */}
+            <div className="absolute inset-0 opacity-30" style={{
+                backgroundImage: 'radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.3), transparent), radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.2), transparent), radial-gradient(1px 1px at 60% 20%, rgba(255,255,255,0.15), transparent), radial-gradient(1px 1px at 80% 50%, rgba(255,255,255,0.25), transparent), radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.2), transparent), radial-gradient(1px 1px at 70% 90%, rgba(255,255,255,0.15), transparent), radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.18), transparent), radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.22), transparent)',
+            }} />
+
             <canvas
                 ref={canvasRef}
-                className="w-full h-full aspect-square cursor-grab active:cursor-grabbing"
-                style={{ maxWidth: '850px', maxHeight: '850px' }}
+                className="cursor-grab active:cursor-grabbing"
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    maxWidth: '900px',
+                    maxHeight: '900px',
+                }}
                 onPointerDown={(e) => {
                     pointerInteracting.current = e.clientX - pointerInteractionMovement.current;
                     (e.target as HTMLElement).style.cursor = 'grabbing';
@@ -257,41 +261,64 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
                 pos.visible && (
                     <div
                         key={`avatar-${i}`}
-                        className="absolute pointer-events-none transition-all duration-100"
+                        className="absolute pointer-events-none"
                         style={{
                             left: `${pos.x}px`,
                             top: `${pos.y}px`,
                             transform: 'translate(-50%, -50%)',
                             zIndex: 10,
+                            transition: 'left 0.15s ease-out, top 0.15s ease-out',
                         }}
                     >
-                        {/* Pulse ring */}
+                        {/* Pulsing glow ring */}
                         <div
-                            className="absolute inset-0 rounded-full animate-ping"
+                            className="absolute rounded-full"
                             style={{
-                                backgroundColor: getWarmthColor(pos.visitor.warmth),
-                                opacity: 0.3,
-                                width: '40px',
-                                height: '40px',
-                                marginLeft: '-8px',
-                                marginTop: '-8px',
+                                width: '48px',
+                                height: '48px',
+                                left: '-8px',
+                                top: '-8px',
+                                background: getWarmthColor(pos.visitor.warmth),
+                                opacity: 0.15,
+                                animation: 'globe-pulse 2.5s ease-out infinite',
                             }}
                         />
-                        {/* Red dot indicator */}
+                        {/* Avatar container with glow border */}
                         <div
-                            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0c1220] z-10"
-                            style={{ backgroundColor: getWarmthColor(pos.visitor.warmth) }}
-                        />
-                        {/* Avatar image */}
-                        <div
-                            className={`w-6 h-6 rounded-full overflow-hidden ring-2 ${getWarmthBorder(pos.visitor.warmth)} shadow-lg bg-zinc-800`}
+                            className="relative rounded-full overflow-hidden"
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                boxShadow: `0 0 0 2.5px ${getWarmthColor(pos.visitor.warmth)}, 0 0 12px ${getWarmthColor(pos.visitor.warmth)}40, 0 2px 8px rgba(0,0,0,0.6)`,
+                                background: '#0f172a',
+                            }}
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={getAvatarUrl(pos.visitor.name)} alt="" className="w-full h-full" />
                         </div>
+                        {/* Warmth indicator dot */}
+                        <div
+                            className="absolute rounded-full border-2 border-[#0a1628]"
+                            style={{
+                                width: '10px',
+                                height: '10px',
+                                top: '-2px',
+                                right: '-2px',
+                                background: getWarmthColor(pos.visitor.warmth),
+                                zIndex: 11,
+                            }}
+                        />
                     </div>
                 )
             ))}
+
+            <style>{`
+                @keyframes globe-pulse {
+                    0% { transform: scale(0.8); opacity: 0.2; }
+                    50% { opacity: 0.1; }
+                    100% { transform: scale(2.2); opacity: 0; }
+                }
+            `}</style>
         </div>
     );
 });

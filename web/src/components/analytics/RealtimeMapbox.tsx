@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, memo, useState, useCallback, Component, type ReactNode } from 'react';
+import { useEffect, useRef, memo, useState, useCallback } from 'react';
 import type { GlobeVisitor } from './RealtimeGlobe';
 
 // ─── DiceBear avatar URL generator ───
@@ -22,219 +22,224 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-// ─── Error boundary to catch mapbox-gl crashes ───
-class MapboxErrorBoundary extends Component<
-    { children: ReactNode; onError: () => void },
-    { hasError: boolean }
-> {
-    state = { hasError: false };
-    static getDerivedStateFromError() { return { hasError: true }; }
-    componentDidCatch(error: Error) {
-        console.warn('Mapbox GL error:', error.message);
-        this.props.onError();
-    }
-    render() { return this.state.hasError ? null : this.props.children; }
-}
-
-const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapboxToken, onMapFailed }: RealtimeMapboxProps & { onMapFailed: () => void }) {
+const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapboxToken }: RealtimeMapboxProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
+    const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+    const [errorMsg, setErrorMsg] = useState('');
+    const retryCountRef = useRef(0);
 
-    // Initialize map
-    useEffect(() => {
+    const initMap = useCallback(() => {
         if (!containerRef.current || !mapboxToken) {
-            onMapFailed();
+            setStatus('error');
+            setErrorMsg('Missing Mapbox token');
             return;
         }
 
         let map: any;
         let destroyed = false;
-        // Timeout: if map doesn't load within 8s, fallback
-        const timeout = setTimeout(() => {
-            if (!mapRef.current) {
-                console.warn('Mapbox GL: timed out loading');
-                onMapFailed();
-            }
-        }, 8000);
+
+        setStatus('loading');
 
         (async () => {
             try {
                 const mapboxgl = (await import('mapbox-gl')).default;
-                // @ts-expect-error - CSS import for mapbox styles
+                // @ts-expect-error - CSS import
                 await import('mapbox-gl/dist/mapbox-gl.css');
 
                 if (destroyed || !containerRef.current) return;
 
-                // Check WebGL support
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                if (!gl) {
-                    console.warn('WebGL not supported');
-                    onMapFailed();
-                    return;
-                }
-
                 mapboxgl.accessToken = mapboxToken;
+
+                // Clean up any previous map instance in the container
+                while (containerRef.current.firstChild) {
+                    containerRef.current.removeChild(containerRef.current.firstChild);
+                }
 
                 map = new mapboxgl.Map({
                     container: containerRef.current,
                     style: 'mapbox://styles/mapbox/dark-v11',
-                    center: [10, 35],
-                    zoom: 2.2,
+                    center: [30, 25],
+                    zoom: 1.8,
                     projection: 'globe',
                     attributionControl: false,
                     logoPosition: 'bottom-right',
+                    fadeDuration: 0,
                 });
 
                 map.on('error', (e: any) => {
-                    console.warn('Mapbox error event:', e?.error?.message || e);
-                    // If the style fails to load, fallback to COBE
+                    const msg = e?.error?.message || 'Unknown map error';
+                    console.warn('Mapbox error:', msg);
+                    // Only mark as error for auth failures
                     if (e?.error?.status === 401 || e?.error?.status === 403) {
-                        onMapFailed();
+                        setStatus('error');
+                        setErrorMsg('Invalid Mapbox token');
                     }
                 });
 
                 map.on('load', () => {
-                    clearTimeout(timeout);
                     if (destroyed) return;
                     mapRef.current = map;
+                    setStatus('ready');
+                    retryCountRef.current = 0;
+
+                    // Hide branding
                     const logo = containerRef.current?.querySelector('.mapboxgl-ctrl-logo');
                     if (logo) (logo as HTMLElement).style.display = 'none';
+                    const attrib = containerRef.current?.querySelector('.mapboxgl-ctrl-attrib');
+                    if (attrib) (attrib as HTMLElement).style.display = 'none';
                 });
 
                 map.on('style.load', () => {
                     if (destroyed) return;
                     map.setFog({
-                        color: 'rgb(12, 18, 32)',
-                        'high-color': 'rgb(12, 18, 32)',
-                        'horizon-blend': 0.02,
-                        'space-color': 'rgb(10, 10, 20)',
-                        'star-intensity': 0.6,
+                        color: 'rgb(8, 12, 24)',
+                        'high-color': 'rgb(8, 12, 24)',
+                        'horizon-blend': 0.015,
+                        'space-color': 'rgb(6, 6, 14)',
+                        'star-intensity': 0.7,
                     });
                 });
-            } catch (err) {
-                console.warn('Failed to initialize Mapbox GL:', err);
-                clearTimeout(timeout);
-                onMapFailed();
+
+            } catch (err: any) {
+                console.warn('Mapbox init failed:', err?.message || err);
+                if (!destroyed) {
+                    setStatus('error');
+                    setErrorMsg(err?.message || 'Failed to initialize map');
+                }
             }
         })();
 
         return () => {
             destroyed = true;
-            clearTimeout(timeout);
-            markersRef.current.forEach(m => m.remove());
+            markersRef.current.forEach(m => { try { m.remove(); } catch { /**/ } });
             markersRef.current = [];
             if (map) {
-                try { map.remove(); } catch { /* ignore */ }
+                try { map.remove(); } catch { /**/ }
             }
             mapRef.current = null;
         };
-    }, [mapboxToken, onMapFailed]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mapboxToken]);
 
-    // Sync avatar markers when visitors change
+    // Init on mount
+    useEffect(() => {
+        const cleanup = initMap();
+        return cleanup;
+    }, [initMap]);
+
+    // Sync avatar markers
     useEffect(() => {
         const map = mapRef.current;
-        if (!map) return;
+        if (!map || status !== 'ready') return;
 
-        const sync = () => {
-            markersRef.current.forEach(m => m.remove());
-            markersRef.current = [];
+        // Clear old markers
+        markersRef.current.forEach(m => { try { m.remove(); } catch { /**/ } });
+        markersRef.current = [];
 
-            import('mapbox-gl').then(({ default: mapboxgl }) => {
-                visitors.forEach((v) => {
-                    if (v.lat === 0 && v.lng === 0) return;
+        import('mapbox-gl').then(({ default: mapboxgl }) => {
+            visitors.forEach((v) => {
+                if (v.lat === 0 && v.lng === 0) return;
 
-                    const warmthColor = getWarmthColor(v.warmth);
-                    const avatarUrl = getAvatarUrl(v.name);
+                const warmthColor = getWarmthColor(v.warmth);
+                const avatarUrl = getAvatarUrl(v.name);
 
-                    const el = document.createElement('div');
-                    el.style.cssText = 'position:relative;width:44px;height:44px;cursor:pointer;';
+                // Marker container
+                const el = document.createElement('div');
+                el.style.cssText = 'position:relative;width:48px;height:48px;cursor:pointer;';
 
-                    const pulse = document.createElement('div');
-                    pulse.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${warmthColor};opacity:0;animation:mapbox-pulse 2s ease-out infinite;`;
-                    el.appendChild(pulse);
+                // Pulsing ring
+                const pulse = document.createElement('div');
+                pulse.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${warmthColor};opacity:0;animation:mapbox-pulse 2.5s ease-out infinite;`;
+                el.appendChild(pulse);
 
-                    const avatarWrap = document.createElement('div');
-                    avatarWrap.style.cssText = `position:absolute;top:4px;left:4px;width:36px;height:36px;border-radius:50%;background:#1a1a2e;box-shadow:0 0 0 3px ${warmthColor},0 2px 8px rgba(0,0,0,0.5);overflow:hidden;`;
+                // Avatar wrapper with glow ring
+                const avatarWrap = document.createElement('div');
+                avatarWrap.style.cssText = `position:absolute;top:6px;left:6px;width:36px;height:36px;border-radius:50%;background:#0f172a;box-shadow:0 0 0 3px ${warmthColor},0 0 16px ${warmthColor}50,0 2px 8px rgba(0,0,0,0.6);overflow:hidden;`;
 
-                    const img = document.createElement('img');
-                    img.src = avatarUrl;
-                    img.alt = v.name;
-                    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-                    img.onerror = () => {
-                        avatarWrap.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;background:${v.avatarColor};`;
-                        avatarWrap.textContent = v.avatarInitial;
-                    };
-                    avatarWrap.appendChild(img);
-                    el.appendChild(avatarWrap);
+                const img = document.createElement('img');
+                img.src = avatarUrl;
+                img.alt = v.name;
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                img.onerror = () => {
+                    // Fallback to initials
+                    img.remove();
+                    avatarWrap.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:white;background:${v.avatarColor};`;
+                    avatarWrap.textContent = v.avatarInitial;
+                };
+                avatarWrap.appendChild(img);
+                el.appendChild(avatarWrap);
 
-                    const dot = document.createElement('div');
-                    dot.style.cssText = `position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:${warmthColor};border:2px solid #0c1220;z-index:1;`;
-                    el.appendChild(dot);
+                // Warmth indicator dot
+                const dot = document.createElement('div');
+                dot.style.cssText = `position:absolute;top:3px;right:3px;width:11px;height:11px;border-radius:50%;background:${warmthColor};border:2.5px solid #080c18;z-index:1;`;
+                el.appendChild(dot);
 
-                    const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-                        .setLngLat([v.lng, v.lat])
-                        .addTo(map);
+                const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+                    .setLngLat([v.lng, v.lat])
+                    .addTo(map);
 
-                    markersRef.current.push(marker);
-                });
-            }).catch(() => { /* ignore */ });
-        };
+                markersRef.current.push(marker);
+            });
+        }).catch(() => { /* ignore */ });
+    }, [visitors, status]);
 
-        if (map.loaded()) {
-            sync();
-        } else {
-            map.on('load', sync);
+    const handleRetry = useCallback(() => {
+        retryCountRef.current++;
+        // Clean container
+        if (containerRef.current) {
+            while (containerRef.current.firstChild) {
+                containerRef.current.removeChild(containerRef.current.firstChild);
+            }
         }
-    }, [visitors]);
+        mapRef.current = null;
+        markersRef.current = [];
+        initMap();
+    }, [initMap]);
 
     return (
         <>
             <style>{`
                 @keyframes mapbox-pulse {
-                    0% { transform: scale(0.8); opacity: 0.4; }
-                    100% { transform: scale(2); opacity: 0; }
+                    0% { transform: scale(0.8); opacity: 0.35; }
+                    100% { transform: scale(2.2); opacity: 0; }
                 }
                 .mapboxgl-ctrl-logo { display: none !important; }
                 .mapboxgl-ctrl-attrib { display: none !important; }
             `}</style>
-            <div ref={containerRef} className="w-full h-full" />
+
+            {/* Map container - always rendered */}
+            <div ref={containerRef} className="w-full h-full" style={{ background: '#080c18' }} />
+
+            {/* Loading overlay */}
+            {status === 'loading' && (
+                <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#080c18' }}>
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                        <span className="text-zinc-500 text-sm">Loading globe...</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Error overlay with retry */}
+            {status === 'error' && (
+                <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#080c18' }}>
+                    <div className="flex flex-col items-center gap-3 text-center px-4">
+                        <span className="text-zinc-400 text-sm">{errorMsg || 'Globe failed to load'}</span>
+                        <button
+                            onClick={handleRetry}
+                            className="px-4 py-2 text-sm bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition border border-emerald-500/20"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 });
 
-// Main export: tries Mapbox first, falls back to COBE globe
 export default function RealtimeMapbox(props: RealtimeMapboxProps) {
-    const [useCobe, setUseCobe] = useState(false);
-    const [CobeGlobe, setCobeGlobe] = useState<any>(null);
-
-    const handleMapFailed = useCallback(() => {
-        setUseCobe(true);
-        // Dynamically load the COBE globe as fallback
-        import('./RealtimeGlobe').then(mod => {
-            setCobeGlobe(() => mod.default);
-        }).catch(() => { /* both failed */ });
-    }, []);
-
-    if (useCobe && CobeGlobe) {
-        return (
-            <CobeGlobe
-                byCountry={props.byCountry || []}
-                byCity={props.byCity || []}
-                visitors={props.visitors}
-            />
-        );
-    }
-
-    if (useCobe && !CobeGlobe) {
-        // Loading COBE fallback
-        return <div className="w-full h-full bg-[#0c1220]" />;
-    }
-
-    return (
-        <MapboxErrorBoundary onError={handleMapFailed}>
-            <RealtimeMapboxInner {...props} onMapFailed={handleMapFailed} />
-        </MapboxErrorBoundary>
-    );
+    return <RealtimeMapboxInner {...props} />;
 }
