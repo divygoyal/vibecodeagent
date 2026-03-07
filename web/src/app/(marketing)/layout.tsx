@@ -134,7 +134,9 @@ export default function MarketingLayout({
     return (
         <div className="min-h-screen bg-black text-white overflow-x-hidden">
             <Navbar />
-            {children}
+            <main id="main-content">
+                {children}
+            </main>
         </div>
     );
 }

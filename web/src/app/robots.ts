@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
             {
                 userAgent: '*',
                 allow: '/',
-                disallow: ['/dashboard/', '/api/', '/admin/', '/superadmin/'],
+                disallow: ['/dashboard/', '/api/', '/admin/', '/superadmin/', '/auth/'],
             },
         ],
         sitemap: 'https://trafficclaw.com/sitemap.xml',

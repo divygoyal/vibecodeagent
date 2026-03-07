@@ -1,0 +1,17 @@
+{
+  "name": "TrafficClaw",
+  "short_name": "TrafficClaw",
+  "description": "AI-powered SEO & analytics platform",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TrafficClaw — AI-Powered Growth Intelligence",
-  description: "Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.",
+  title: {
+    default: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+    template: '%s | TrafficClaw',
+  },
+  description: "AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes. Start free.",
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
@@ -24,24 +27,40 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL('https://trafficclaw.com'),
   openGraph: {
-    title: 'TrafficClaw — AI-Powered Growth Intelligence',
-    description: 'Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.',
+    title: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+    description: 'Monitor Google Analytics & Search Console, get AI-powered insights, traffic drop alerts, and automated SEO fixes.',
     siteName: 'TrafficClaw',
     type: 'website',
+    locale: 'en_US',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'TrafficClaw AI Visibility Dashboard',
+        alt: 'TrafficClaw — AI-Powered SEO & Analytics Dashboard',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TrafficClaw — AI-Powered Growth Intelligence',
-    description: 'Your AI agent that monitors analytics, detects SEO issues, and fixes your code — all through Telegram.',
+    title: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+    description: 'Monitor Google Analytics & Search Console, get AI-powered insights, traffic drop alerts, and automated SEO fixes.',
     images: ['/og-image.png'],
+  },
+  other: {
+    'theme-color': '#000000',
+  },
+  manifest: '/manifest.json',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 
@@ -62,13 +81,34 @@ export default function RootLayout({
               name: 'TrafficClaw',
               applicationCategory: 'BusinessApplication',
               operatingSystem: 'Web',
-              description: 'AI-powered SEO & analytics platform with Telegram bot integration.',
+              url: 'https://trafficclaw.com',
+              description: 'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes.',
+              featureList: 'Real-time Analytics Dashboard, SEO Intelligence, AI Chat Assistant, Site Audit, Telegram Bot, Smart Alerts, AI SEO Tools',
               offers: [
-                { '@type': 'Offer', name: 'Starter', price: '9', priceCurrency: 'USD', description: '50 AI credits/month' },
-                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '150 AI credits/month' },
-                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '300 AI credits/month + Telegram bot' },
+                { '@type': 'Offer', name: 'Starter', price: '9', priceCurrency: 'USD', description: '50 AI credits/month', url: 'https://trafficclaw.com/pricing' },
+                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '150 AI credits/month', url: 'https://trafficclaw.com/pricing' },
+                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '300 AI credits/month + Telegram bot', url: 'https://trafficclaw.com/pricing' },
               ],
-              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '127' },
+              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '127', bestRating: '5', worstRating: '1' },
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: 'TrafficClaw',
+              url: 'https://trafficclaw.com',
+              logo: 'https://trafficclaw.com/icon.svg',
+              description: 'AI-powered SEO & analytics platform for growth teams.',
+              contactPoint: {
+                '@type': 'ContactPoint',
+                email: 'support@trafficclaw.com',
+                contactType: 'customer support',
+              },
+              sameAs: [],
             }),
           }}
         />
