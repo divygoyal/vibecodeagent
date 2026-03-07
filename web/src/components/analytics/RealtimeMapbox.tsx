@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, memo, useState, Component, type ReactNode } from 'react';
+import { useEffect, useRef, memo, useState, useCallback, Component, type ReactNode } from 'react';
 import type { GlobeVisitor } from './RealtimeGlobe';
 
 // ─── DiceBear avatar URL generator ───
@@ -11,6 +11,8 @@ function getAvatarUrl(seed: string): string {
 interface RealtimeMapboxProps {
     visitors: GlobeVisitor[];
     mapboxToken: string;
+    byCountry?: { country: string; users: number }[];
+    byCity?: { city: string; country: string; users: number }[];
 }
 
 function getWarmthColor(warmth: number): string {
@@ -21,25 +23,40 @@ function getWarmthColor(warmth: number): string {
 }
 
 // ─── Error boundary to catch mapbox-gl crashes ───
-class MapboxErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+class MapboxErrorBoundary extends Component<
+    { children: ReactNode; onError: () => void },
+    { hasError: boolean }
+> {
     state = { hasError: false };
     static getDerivedStateFromError() { return { hasError: true }; }
-    componentDidCatch(error: Error) { console.warn('Mapbox GL error:', error.message); }
-    render() { return this.state.hasError ? this.props.fallback : this.props.children; }
+    componentDidCatch(error: Error) {
+        console.warn('Mapbox GL error:', error.message);
+        this.props.onError();
+    }
+    render() { return this.state.hasError ? null : this.props.children; }
 }
 
-const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapboxToken }: RealtimeMapboxProps) {
+const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapboxToken, onMapFailed }: RealtimeMapboxProps & { onMapFailed: () => void }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
-    const [mapError, setMapError] = useState(false);
 
     // Initialize map
     useEffect(() => {
-        if (!containerRef.current || !mapboxToken) return;
+        if (!containerRef.current || !mapboxToken) {
+            onMapFailed();
+            return;
+        }
 
         let map: any;
         let destroyed = false;
+        // Timeout: if map doesn't load within 8s, fallback
+        const timeout = setTimeout(() => {
+            if (!mapRef.current) {
+                console.warn('Mapbox GL: timed out loading');
+                onMapFailed();
+            }
+        }, 8000);
 
         (async () => {
             try {
@@ -48,6 +65,15 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                 await import('mapbox-gl/dist/mapbox-gl.css');
 
                 if (destroyed || !containerRef.current) return;
+
+                // Check WebGL support
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (!gl) {
+                    console.warn('WebGL not supported');
+                    onMapFailed();
+                    return;
+                }
 
                 mapboxgl.accessToken = mapboxToken;
 
@@ -63,10 +89,16 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
 
                 map.on('error', (e: any) => {
                     console.warn('Mapbox error event:', e?.error?.message || e);
+                    // If the style fails to load, fallback to COBE
+                    if (e?.error?.status === 401 || e?.error?.status === 403) {
+                        onMapFailed();
+                    }
                 });
 
                 map.on('load', () => {
+                    clearTimeout(timeout);
                     if (destroyed) return;
+                    mapRef.current = map;
                     const logo = containerRef.current?.querySelector('.mapboxgl-ctrl-logo');
                     if (logo) (logo as HTMLElement).style.display = 'none';
                 });
@@ -81,16 +113,16 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                         'star-intensity': 0.6,
                     });
                 });
-
-                mapRef.current = map;
             } catch (err) {
                 console.warn('Failed to initialize Mapbox GL:', err);
-                setMapError(true);
+                clearTimeout(timeout);
+                onMapFailed();
             }
         })();
 
         return () => {
             destroyed = true;
+            clearTimeout(timeout);
             markersRef.current.forEach(m => m.remove());
             markersRef.current = [];
             if (map) {
@@ -98,14 +130,13 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
             }
             mapRef.current = null;
         };
-    }, [mapboxToken]);
+    }, [mapboxToken, onMapFailed]);
 
     // Sync avatar markers when visitors change
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
 
-        // Wait for map to be loaded
         const sync = () => {
             markersRef.current.forEach(m => m.remove());
             markersRef.current = [];
@@ -120,12 +151,10 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                     const el = document.createElement('div');
                     el.style.cssText = 'position:relative;width:44px;height:44px;cursor:pointer;';
 
-                    // Pulsing ring
                     const pulse = document.createElement('div');
                     pulse.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${warmthColor};opacity:0;animation:mapbox-pulse 2s ease-out infinite;`;
                     el.appendChild(pulse);
 
-                    // Avatar image with warmth ring
                     const avatarWrap = document.createElement('div');
                     avatarWrap.style.cssText = `position:absolute;top:4px;left:4px;width:36px;height:36px;border-radius:50%;background:#1a1a2e;box-shadow:0 0 0 3px ${warmthColor},0 2px 8px rgba(0,0,0,0.5);overflow:hidden;`;
 
@@ -134,14 +163,12 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                     img.alt = v.name;
                     img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
                     img.onerror = () => {
-                        // Fallback to initials if DiceBear fails
                         avatarWrap.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;background:${v.avatarColor};`;
                         avatarWrap.textContent = v.avatarInitial;
                     };
                     avatarWrap.appendChild(img);
                     el.appendChild(avatarWrap);
 
-                    // Warmth indicator dot (top-right)
                     const dot = document.createElement('div');
                     dot.style.cssText = `position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:${warmthColor};border:2px solid #0c1220;z-index:1;`;
                     el.appendChild(dot);
@@ -162,22 +189,6 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
         }
     }, [visitors]);
 
-    if (mapError) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-[#0c1220]">
-                <p className="text-zinc-500 text-sm">Globe failed to load. Please refresh the page.</p>
-            </div>
-        );
-    }
-
-    if (!mapboxToken) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-[#0c1220]">
-                <p className="text-zinc-500 text-sm">Set NEXT_PUBLIC_MAPBOX_TOKEN to enable the globe</p>
-            </div>
-        );
-    }
-
     return (
         <>
             <style>{`
@@ -193,16 +204,37 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
     );
 });
 
-// Wrap in error boundary
+// Main export: tries Mapbox first, falls back to COBE globe
 export default function RealtimeMapbox(props: RealtimeMapboxProps) {
-    const fallback = (
-        <div className="w-full h-full flex items-center justify-center bg-[#0c1220]">
-            <p className="text-zinc-500 text-sm">Globe failed to load. Please refresh the page.</p>
-        </div>
-    );
+    const [useCobe, setUseCobe] = useState(false);
+    const [CobeGlobe, setCobeGlobe] = useState<any>(null);
+
+    const handleMapFailed = useCallback(() => {
+        setUseCobe(true);
+        // Dynamically load the COBE globe as fallback
+        import('./RealtimeGlobe').then(mod => {
+            setCobeGlobe(() => mod.default);
+        }).catch(() => { /* both failed */ });
+    }, []);
+
+    if (useCobe && CobeGlobe) {
+        return (
+            <CobeGlobe
+                byCountry={props.byCountry || []}
+                byCity={props.byCity || []}
+                visitors={props.visitors}
+            />
+        );
+    }
+
+    if (useCobe && !CobeGlobe) {
+        // Loading COBE fallback
+        return <div className="w-full h-full bg-[#0c1220]" />;
+    }
+
     return (
-        <MapboxErrorBoundary fallback={fallback}>
-            <RealtimeMapboxInner {...props} />
+        <MapboxErrorBoundary onError={handleMapFailed}>
+            <RealtimeMapboxInner {...props} onMapFailed={handleMapFailed} />
         </MapboxErrorBoundary>
     );
 }

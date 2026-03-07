@@ -243,6 +243,8 @@ export default function RealtimePage() {
                 <RealtimeMapbox
                     visitors={globeVisitors}
                     mapboxToken={MAPBOX_TOKEN}
+                    byCountry={byCountry}
+                    byCity={byCity}
                 />
             </div>
 
