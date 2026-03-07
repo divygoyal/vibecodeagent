@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, memo, useState, useCallback } from 'react';
+import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { GlobeVisitor } from './RealtimeGlobe';
 
 // ─── DiceBear avatar URL generator ───
@@ -8,11 +8,17 @@ function getAvatarUrl(seed: string): string {
     return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
 }
 
-interface RealtimeMapboxProps {
+export interface RealtimeMapboxProps {
     visitors: GlobeVisitor[];
     mapboxToken: string;
     byCountry?: { country: string; users: number }[];
     byCity?: { city: string; country: string; users: number }[];
+    autoPan?: boolean;
+}
+
+export interface RealtimeMapboxHandle {
+    toggleAutoPan: () => boolean;
+    isAutoPanning: () => boolean;
 }
 
 function getWarmthColor(warmth: number): string {
@@ -22,13 +28,64 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapboxToken }: RealtimeMapboxProps) {
+const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
     const retryCountRef = useRef(0);
+    const autoPanRef = useRef(autoPanProp);
+    const autoPanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const autoPanIndexRef = useRef(0);
+    const visitorsRef = useRef(visitors);
+    visitorsRef.current = visitors;
+
+    useImperativeHandle(ref, () => ({
+        toggleAutoPan: () => {
+            autoPanRef.current = !autoPanRef.current;
+            if (autoPanRef.current) {
+                startAutoPan();
+            } else {
+                stopAutoPan();
+            }
+            return autoPanRef.current;
+        },
+        isAutoPanning: () => autoPanRef.current,
+    }));
+
+    const stopAutoPan = useCallback(() => {
+        if (autoPanTimerRef.current) {
+            clearInterval(autoPanTimerRef.current);
+            autoPanTimerRef.current = null;
+        }
+    }, []);
+
+    const startAutoPan = useCallback(() => {
+        stopAutoPan();
+        const map = mapRef.current;
+        if (!map) return;
+
+        const fly = () => {
+            const v = visitorsRef.current;
+            if (!autoPanRef.current || v.length === 0 || !mapRef.current) return;
+
+            const idx = autoPanIndexRef.current % v.length;
+            const visitor = v[idx];
+            autoPanIndexRef.current = idx + 1;
+
+            mapRef.current.flyTo({
+                center: [visitor.lng, visitor.lat],
+                zoom: 3.5 + Math.random() * 1.5,
+                duration: 3000,
+                essential: true,
+            });
+        };
+
+        // Initial fly
+        setTimeout(fly, 1500);
+        autoPanTimerRef.current = setInterval(fly, 6000);
+    }, [stopAutoPan]);
 
     const initMap = useCallback(() => {
         if (!containerRef.current || !mapboxToken) {
@@ -39,7 +96,6 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
 
         let map: any;
         let destroyed = false;
-
         setStatus('loading');
 
         (async () => {
@@ -49,10 +105,8 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                 await import('mapbox-gl/dist/mapbox-gl.css');
 
                 if (destroyed || !containerRef.current) return;
-
                 mapboxgl.accessToken = mapboxToken;
 
-                // Clean up any previous map instance in the container
                 while (containerRef.current.firstChild) {
                     containerRef.current.removeChild(containerRef.current.firstChild);
                 }
@@ -71,7 +125,6 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                 map.on('error', (e: any) => {
                     const msg = e?.error?.message || 'Unknown map error';
                     console.warn('Mapbox error:', msg);
-                    // Only mark as error for auth failures
                     if (e?.error?.status === 401 || e?.error?.status === 403) {
                         setStatus('error');
                         setErrorMsg('Invalid Mapbox token');
@@ -89,6 +142,11 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                     if (logo) (logo as HTMLElement).style.display = 'none';
                     const attrib = containerRef.current?.querySelector('.mapboxgl-ctrl-attrib');
                     if (attrib) (attrib as HTMLElement).style.display = 'none';
+
+                    // Start auto-panning if enabled
+                    if (autoPanRef.current) {
+                        startAutoPan();
+                    }
                 });
 
                 map.on('style.load', () => {
@@ -102,6 +160,16 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                     });
                 });
 
+                // Pause auto-pan on user interaction, resume after
+                map.on('dragstart', () => {
+                    if (autoPanRef.current) stopAutoPan();
+                });
+                map.on('dragend', () => {
+                    if (autoPanRef.current) {
+                        setTimeout(() => startAutoPan(), 4000);
+                    }
+                });
+
             } catch (err: any) {
                 console.warn('Mapbox init failed:', err?.message || err);
                 if (!destroyed) {
@@ -113,6 +181,7 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
 
         return () => {
             destroyed = true;
+            stopAutoPan();
             markersRef.current.forEach(m => { try { m.remove(); } catch { /**/ } });
             markersRef.current = [];
             if (map) {
@@ -123,18 +192,16 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mapboxToken]);
 
-    // Init on mount
     useEffect(() => {
         const cleanup = initMap();
         return cleanup;
     }, [initMap]);
 
-    // Sync avatar markers
+    // Sync avatar markers - DataFast style: large 55px avatars with dark bg and colored dot
     useEffect(() => {
         const map = mapRef.current;
         if (!map || status !== 'ready') return;
 
-        // Clear old markers
         markersRef.current.forEach(m => { try { m.remove(); } catch { /**/ } });
         markersRef.current = [];
 
@@ -145,36 +212,50 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                 const warmthColor = getWarmthColor(v.warmth);
                 const avatarUrl = getAvatarUrl(v.name);
 
-                // Marker container
+                // ─── DataFast-style marker: large avatar in dark circle with colored dot ───
                 const el = document.createElement('div');
-                el.style.cssText = 'position:relative;width:48px;height:48px;cursor:pointer;';
+                el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;';
 
-                // Pulsing ring
-                const pulse = document.createElement('div');
-                pulse.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${warmthColor};opacity:0;animation:mapbox-pulse 2.5s ease-out infinite;`;
-                el.appendChild(pulse);
+                // Outer dark circle (the "frame")
+                const frame = document.createElement('div');
+                frame.style.cssText = `
+                    position:absolute;top:2px;left:2px;width:56px;height:56px;
+                    border-radius:50%;
+                    background:rgba(15,20,35,0.9);
+                    border:2.5px solid rgba(255,255,255,0.12);
+                    box-shadow:0 4px 20px rgba(0,0,0,0.5);
+                    overflow:hidden;
+                    transition:transform 0.2s ease;
+                `;
 
-                // Avatar wrapper with glow ring
-                const avatarWrap = document.createElement('div');
-                avatarWrap.style.cssText = `position:absolute;top:6px;left:6px;width:36px;height:36px;border-radius:50%;background:#0f172a;box-shadow:0 0 0 3px ${warmthColor},0 0 16px ${warmthColor}50,0 2px 8px rgba(0,0,0,0.6);overflow:hidden;`;
-
+                // DiceBear avatar image (fills the dark circle)
                 const img = document.createElement('img');
                 img.src = avatarUrl;
                 img.alt = v.name;
-                img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
                 img.onerror = () => {
-                    // Fallback to initials
                     img.remove();
-                    avatarWrap.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:white;background:${v.avatarColor};`;
-                    avatarWrap.textContent = v.avatarInitial;
+                    frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
+                    frame.textContent = v.avatarInitial;
                 };
-                avatarWrap.appendChild(img);
-                el.appendChild(avatarWrap);
+                frame.appendChild(img);
+                el.appendChild(frame);
 
-                // Warmth indicator dot
+                // Warmth indicator dot (top-right, outside the circle)
                 const dot = document.createElement('div');
-                dot.style.cssText = `position:absolute;top:3px;right:3px;width:11px;height:11px;border-radius:50%;background:${warmthColor};border:2.5px solid #080c18;z-index:1;`;
+                dot.style.cssText = `
+                    position:absolute;top:0;right:0;width:14px;height:14px;
+                    border-radius:50%;
+                    background:${warmthColor};
+                    border:3px solid rgba(8,12,24,0.95);
+                    z-index:2;
+                    box-shadow:0 0 6px ${warmthColor}80;
+                `;
                 el.appendChild(dot);
+
+                // Hover: scale up
+                el.onmouseenter = () => { frame.style.transform = 'scale(1.12)'; };
+                el.onmouseleave = () => { frame.style.transform = 'scale(1)'; };
 
                 const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
                     .setLngLat([v.lng, v.lat])
@@ -187,7 +268,6 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
 
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
-        // Clean container
         if (containerRef.current) {
             while (containerRef.current.firstChild) {
                 containerRef.current.removeChild(containerRef.current.firstChild);
@@ -209,10 +289,8 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                 .mapboxgl-ctrl-attrib { display: none !important; }
             `}</style>
 
-            {/* Map container - always rendered */}
             <div ref={containerRef} className="w-full h-full" style={{ background: '#080c18' }} />
 
-            {/* Loading overlay */}
             {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#080c18' }}>
                     <div className="flex flex-col items-center gap-3">
@@ -222,7 +300,6 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
                 </div>
             )}
 
-            {/* Error overlay with retry */}
             {status === 'error' && (
                 <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#080c18' }}>
                     <div className="flex flex-col items-center gap-3 text-center px-4">
@@ -238,8 +315,10 @@ const RealtimeMapboxInner = memo(function RealtimeMapboxInner({ visitors, mapbox
             )}
         </>
     );
+}));
+
+const RealtimeMapbox = forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapbox(props, ref) {
+    return <RealtimeMapboxInner {...props} ref={ref} />;
 });
 
-export default function RealtimeMapbox(props: RealtimeMapboxProps) {
-    return <RealtimeMapboxInner {...props} />;
-}
+export default RealtimeMapbox;

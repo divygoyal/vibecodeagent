@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, Component, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { useRealtimeData } from '@/lib/useDashboardData';
 import { useAnalyticsContext } from '../layout';
 import {
     Loader2, Monitor, Smartphone, Tablet, Eye, X as XIcon,
-    Share2, Music, History, Maximize2, Link2, ExternalLink, AlertTriangle, RotateCcw
+    Share2, Music, History, Maximize2, Link2, ExternalLink, AlertTriangle, RotateCcw, Navigation
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { COUNTRY_COORDS, CITY_COORDS, type GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
+import type { RealtimeMapboxHandle } from '@/components/analytics/RealtimeMapbox';
 
 // ─── DiceBear avatar URL (matching globe markers) ───
 function getAvatarUrl(seed: string): string {
@@ -102,6 +103,15 @@ export default function RealtimePage() {
     const { data: realtimeData, isLoading } = useRealtimeData(selectedProperty, hasGoogleConnection);
     const [mounted, setMounted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isAutoPanning, setIsAutoPanning] = useState(true);
+    const mapRef = useRef<RealtimeMapboxHandle>(null);
+
+    const toggleAutoPan = useCallback(() => {
+        if (mapRef.current) {
+            const newVal = mapRef.current.toggleAutoPan();
+            setIsAutoPanning(newVal);
+        }
+    }, []);
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -241,10 +251,12 @@ export default function RealtimePage() {
             {/* ─── Mapbox GL Globe (replaces cobe globe + SVG map) ─── */}
             <div className="absolute inset-0">
                 <RealtimeMapbox
+                    ref={mapRef}
                     visitors={globeVisitors}
                     mapboxToken={MAPBOX_TOKEN}
                     byCountry={byCountry}
                     byCity={byCity}
+                    autoPan={isAutoPanning}
                 />
             </div>
 
@@ -282,6 +294,17 @@ export default function RealtimePage() {
                             </button>
                             <button className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="History">
                                 <History className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={toggleAutoPan}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition relative group ${isAutoPanning ? 'bg-emerald-500/15 text-emerald-400' : 'hover:bg-white/[0.08] text-zinc-500 hover:text-white'}`}
+                                title={isAutoPanning ? 'Stop auto-panning' : 'Start auto-panning'}
+                            >
+                                <Navigation className="w-3.5 h-3.5" />
+                                {/* Tooltip */}
+                                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                                    {isAutoPanning ? 'Stop auto-panning' : 'Auto-pan'}
+                                </span>
                             </button>
                             <button onClick={toggleFullscreen} className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Fullscreen">
                                 <Maximize2 className="w-3.5 h-3.5" />
