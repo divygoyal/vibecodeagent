@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
+function verifyCronSecret(header: string | null): boolean {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || !header) return false;
+    const expected = `Bearer ${secret}`;
+    if (header.length !== expected.length) return false;
+    return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+}
+
 export async function GET(req: NextRequest) {
-    // Verify cron secret
-    const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!verifyCronSecret(req.headers.get('authorization'))) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

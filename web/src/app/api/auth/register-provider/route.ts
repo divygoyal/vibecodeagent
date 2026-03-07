@@ -89,11 +89,10 @@ export async function POST() {
             })
         }
 
-        const data = await response.json()
+        await response.json()
         return NextResponse.json({
             registered: true,
-            synced: true, // Force sync status to true so frontend refreshes
-            user: data // Return full user object for debugging if needed
+            synced: true,
         })
 
     } catch (error) {
