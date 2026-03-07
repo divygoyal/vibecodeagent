@@ -11,6 +11,8 @@ const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
 // In-memory token cache: refreshToken → { accessToken, expiresAt }
+// Capped at 1000 entries to prevent unbounded memory growth
+const TOKEN_CACHE_MAX = 1000;
 const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
 
 /**
@@ -87,6 +89,14 @@ export async function getValidAccessToken(
                     const newToken = data.access_token;
                     const expiresIn = data.expires_in || 3600;
 
+                    // Evict expired entries if cache is full
+                    if (tokenCache.size >= TOKEN_CACHE_MAX) {
+                        const now = Date.now();
+                        for (const [k, v] of tokenCache) {
+                            if (v.expiresAt < now) tokenCache.delete(k);
+                        }
+                    }
+
                     tokenCache.set(refreshToken, {
                         accessToken: newToken,
                         expiresAt: Date.now() + expiresIn * 1000,
@@ -103,6 +113,7 @@ export async function getValidAccessToken(
             throw new Error('Failed to refresh Google token');
         })();
 
+        // Set BEFORE awaiting so concurrent callers share the same promise
         pendingRefresh.set(refreshToken, refreshPromise);
         return refreshPromise;
     }

@@ -35,6 +35,7 @@ function isRetryableError(error: any): boolean {
 // IN-MEMORY CACHE for site/property lists (avoids re-fetching per message)
 // ═══════════════════════════════════════════════════════════════
 const SITE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const SITE_CACHE_MAX_ENTRIES = 500; // Prevent unbounded memory growth
 const siteListCache = new Map<string, { data: any; ts: number }>();
 
 function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
@@ -43,6 +44,20 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
         return Promise.resolve(cached.data as T);
     }
     return fetcher().then(data => {
+        // Evict stale entries when cache grows too large
+        if (siteListCache.size >= SITE_CACHE_MAX_ENTRIES) {
+            const now = Date.now();
+            for (const [k, v] of siteListCache) {
+                if (now - v.ts > SITE_CACHE_TTL) siteListCache.delete(k);
+            }
+            // If still too large, remove oldest entries
+            if (siteListCache.size >= SITE_CACHE_MAX_ENTRIES) {
+                const entries = [...siteListCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+                for (let i = 0; i < entries.length / 2; i++) {
+                    siteListCache.delete(entries[i][0]);
+                }
+            }
+        }
         siteListCache.set(key, { data, ts: Date.now() });
         return data;
     });

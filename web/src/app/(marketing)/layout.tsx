@@ -14,7 +14,7 @@ function Navbar() {
 
     useEffect(() => {
         const handler = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', handler);
+        window.addEventListener('scroll', handler, { passive: true });
         return () => window.removeEventListener('scroll', handler);
     }, []);
 
@@ -26,6 +26,8 @@ function Navbar() {
 
     return (
         <motion.nav
+            role="navigation"
+            aria-label="Main navigation"
             initial={{ y: -100 }}
             animate={{ y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -85,8 +87,10 @@ function Navbar() {
 
                 {/* Mobile toggle */}
                 <button
-                    className="md:hidden text-zinc-400"
+                    className="md:hidden text-zinc-400 p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors"
                     onClick={() => setMobileOpen(!mobileOpen)}
+                    aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+                    aria-expanded={mobileOpen}
                 >
                     {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </button>

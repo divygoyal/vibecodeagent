@@ -50,8 +50,11 @@ export const authOptions: NextAuthOptions = {
     ],
 
     callbacks: {
-        async signIn({ account, profile }) {
-            console.log(`User signed in via ${account?.provider}`);
+        async signIn({ account }) {
+            // Minimal logging — don't log PII
+            if (account?.provider) {
+                console.log(`[Auth] Sign-in via ${account.provider}`);
+            }
             return true;
         },
 

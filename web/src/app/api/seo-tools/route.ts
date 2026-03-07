@@ -33,10 +33,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { tool, input } = await req.json();
+        const body = await req.json();
+        const { tool, input } = body;
 
-        if (!tool) {
+        if (!tool || typeof tool !== 'string') {
             return NextResponse.json({ error: 'tool parameter required' }, { status: 400 });
+        }
+
+        // Validate input size to prevent abuse
+        const inputStr = JSON.stringify(input || {});
+        if (inputStr.length > 10000) {
+            return NextResponse.json({ error: 'Input too large' }, { status: 400 });
         }
 
         switch (tool) {
@@ -147,10 +154,10 @@ Return ONLY the JSON array.`;
             }
 
             default:
-                return NextResponse.json({ error: `Unknown tool: ${tool}` }, { status: 400 });
+                return NextResponse.json({ error: 'Unknown tool' }, { status: 400 });
         }
-    } catch (err: any) {
-        console.error('SEO Tools error:', err);
-        return NextResponse.json({ error: err.message || 'Tool failed' }, { status: 500 });
+    } catch (err: unknown) {
+        console.error('SEO Tools error:', err instanceof Error ? err.message : err);
+        return NextResponse.json({ error: 'Tool failed. Please try again.' }, { status: 500 });
     }
 }
