@@ -32,8 +32,26 @@ export default function ConfirmDialog({
     }
   }, [open]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
+    // Focus trap: Tab cycles within dialog
+    if (e.key === 'Tab' && dialogRef.current) {
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   }, [onClose]);
 
   if (!open) return null;
@@ -54,7 +72,7 @@ export default function ConfirmDialog({
       aria-describedby="confirm-desc"
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 p-6 max-w-sm w-full mx-4">
+      <div ref={dialogRef} className="relative bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 p-6 max-w-sm w-full mx-4">
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors"

@@ -55,7 +55,7 @@ export default function EmptyState({
     return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
             {Icon && (
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${colors.iconBg} border ${colors.border} flex items-center justify-center mb-5`}>
+                <div aria-hidden="true" className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${colors.iconBg} border ${colors.border} flex items-center justify-center mb-5`}>
                     <Icon className={`w-7 h-7 ${colors.iconText}`} />
                 </div>
             )}
