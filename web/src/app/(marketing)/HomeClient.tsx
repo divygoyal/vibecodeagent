@@ -1194,8 +1194,8 @@ function Pricing() {
                     </motion.div>
 
                     {/* ── PRO (best value) ── */}
-                    <motion.div variants={fadeUp} className="relative p-6 rounded-2xl border border-violet-500/[0.15] bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.03] to-transparent hover:border-violet-500/[0.3] transition-all duration-300 group overflow-hidden">
-                        <div className="absolute -top-3.5 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20">
+                    <motion.div variants={fadeUp} className="relative p-6 pt-8 rounded-2xl border border-violet-500/[0.15] bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.03] to-transparent hover:border-violet-500/[0.3] transition-all duration-300 group">
+                        <div className="absolute -top-3.5 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20 z-10">
                             Best Value
                         </div>
                         {/* Subtle glow */}
@@ -1221,18 +1221,21 @@ function Pricing() {
                                 Get Pro
                             </a>
 
+                            {/* Telegram Bot MVP Highlight */}
+                            <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-sky-500/[0.08] to-violet-500/[0.08] border border-sky-500/[0.15]">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center flex-shrink-0">
+                                        <Bot className="w-4 h-4 text-sky-400" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-white">Telegram Bot Included</div>
+                                        <div className="text-[11px] text-zinc-400">Your AI SEO assistant, right in Telegram. Get alerts, ask questions, monitor traffic — all from your phone.</div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <ul className="space-y-3">
-                                {['300 AI messages per month', 'Everything in Growth'].map((f, i) => (
-                                    <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
-                                        <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-violet-400" />
-                                        {f}
-                                    </li>
-                                ))}
-                                <li className="flex items-center gap-2.5 text-sm text-violet-300 font-medium">
-                                    <Bot className="w-4 h-4 flex-shrink-0 text-violet-400" />
-                                    Telegram bot included
-                                </li>
-                                {['Priority support', 'Custom content strategies', 'Early access to new features'].map((f, i) => (
+                                {['300 AI messages per month', 'Everything in Growth', 'Priority support', 'Custom content strategies', 'Early access to new features'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
                                         <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-violet-400" />
                                         {f}

@@ -5,7 +5,7 @@ import { motion, useInView } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import {
-    Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X
+    Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot
 } from 'lucide-react';
 
 const fadeUp = {
@@ -68,16 +68,17 @@ const PLANS = [
         color: 'violet',
         gradient: 'from-violet-400 to-purple-500',
         description: 'Everything unlocked. Full power.',
+        bestValue: true,
         productId: 'pdt_0NZoVIVgk7pdElblScoop',
         features: [
             { text: '300 AI credits/month', included: true },
             { text: 'Everything in Growth', included: true },
-            { text: 'Telegram bot included', included: true },
             { text: 'Priority support', included: true },
             { text: 'Custom alert rules', included: true },
             { text: 'Unlimited audits', included: true },
             { text: 'Early access to features', included: true },
         ],
+        telegramBot: true,
     },
 ];
 
@@ -90,7 +91,7 @@ const COMPARISON_FEATURES = [
     { name: 'CSV/JSON Export', starter: true, growth: true, pro: true },
     { name: 'Multi-site Support', starter: false, growth: true, pro: true },
     { name: 'Priority AI Responses', starter: false, growth: true, pro: true },
-    { name: 'Telegram Bot', starter: false, growth: false, pro: true },
+    { name: 'Telegram Bot (AI SEO Assistant)', starter: false, growth: false, pro: true },
     { name: 'Custom Alerts', starter: false, growth: false, pro: true },
     { name: 'Priority Support', starter: false, growth: false, pro: true },
     { name: 'Early Feature Access', starter: false, growth: false, pro: true },
@@ -146,17 +147,22 @@ export default function PricingClient() {
                             <motion.div
                                 key={plan.key}
                                 variants={fadeUp}
-                                className={`relative flex flex-col p-6 rounded-2xl border transition-all group overflow-hidden ${
+                                className={`relative flex flex-col p-6 rounded-2xl border transition-all group ${
                                     plan.popular
                                         ? 'bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.02] to-transparent border-2 border-emerald-500/30'
                                         : plan.key === 'pro'
-                                        ? 'bg-gradient-to-b from-violet-500/[0.06] to-transparent border-violet-500/20'
+                                        ? 'bg-gradient-to-b from-violet-500/[0.06] to-transparent border-violet-500/20 pt-8'
                                         : 'bg-white/[0.02] border-white/[0.06]'
                                 }`}
                             >
                                 {plan.popular && (
-                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[9px] font-bold text-black uppercase tracking-wider">
+                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[9px] font-bold text-black uppercase tracking-wider z-10">
                                         Most Popular
+                                    </span>
+                                )}
+                                {'bestValue' in plan && plan.bestValue && (
+                                    <span className="absolute -top-3 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20 z-10">
+                                        Best Value
                                     </span>
                                 )}
 
@@ -195,6 +201,21 @@ export default function PricingClient() {
                                 >
                                     Get {plan.name}
                                 </a>
+
+                                {/* Telegram Bot MVP Highlight for Pro */}
+                                {'telegramBot' in plan && plan.telegramBot && (
+                                    <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-sky-500/[0.08] to-violet-500/[0.08] border border-sky-500/[0.15]">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center flex-shrink-0">
+                                                <Bot className="w-4 h-4 text-sky-400" />
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-bold text-white">Telegram Bot Included</div>
+                                                <div className="text-[11px] text-zinc-400">Your AI SEO assistant in Telegram. Alerts, questions, traffic monitoring — from your phone.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <ul className="space-y-3 flex-1">
                                     {plan.features.map((f, i) => (
