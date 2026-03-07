@@ -5,7 +5,7 @@ export function getGitHubAuthUrl(clientId: string, redirectUri: string) {
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: "repo read:user user:email",
-    state: Math.random().toString(36).substring(7),
+    state: crypto.randomUUID(),
   });
   return `${GITHUB_AUTH_URL}?${params.toString()}`;
 }
@@ -23,5 +23,8 @@ export async function getGitHubAccessToken(clientId: string, clientSecret: strin
       code,
     }),
   });
+  if (!res.ok) {
+    throw new Error(`GitHub token exchange failed: ${res.status}`);
+  }
   return res.json();
 }

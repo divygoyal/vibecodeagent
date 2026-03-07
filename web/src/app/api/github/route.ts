@@ -79,7 +79,7 @@ export async function GET() {
         try {
           // @ts-expect-error - id added in callbacks
           const userId = session.user.id
-          const tokenRes = await fetch(`${ADMIN_API_URL}/api/users/${userId}/oauth/github`, {
+          const tokenRes = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}/oauth/github`, {
             headers: { "X-API-Key": ADMIN_API_KEY }
           })
           if (tokenRes.ok) {
@@ -111,8 +111,6 @@ export async function GET() {
         }
       }
 
-      console.log("GitHub API Debug: Fetching data for user:", user);
-
       // Bug #9 fix: Use resolved `user` (not raw `username`) for the events endpoint.
       // `username` could be undefined if the JWT didn't have it and we had to fetch /user.
       const [eventsRes, reposRes] = await Promise.all([
@@ -123,24 +121,11 @@ export async function GET() {
       let allEvents: any[] = []
       if (eventsRes.ok) {
         allEvents = await eventsRes.json()
-        console.log(`GitHub Debug: Fetched ${allEvents.length} events for user ${username}`);
-        if (allEvents.length > 0) {
-          console.log(`GitHub Debug: Event types: ${allEvents.map((e: any) => e.type).slice(0, 10).join(', ')}`);
-        }
       } else {
-        console.error(`GitHub Debug: Events fetch failed: ${eventsRes.status} ${eventsRes.statusText}`);
-        const errorText = await eventsRes.text();
-        console.error(`GitHub Debug: Error details: ${errorText}`);
+        console.error(`[GitHub] Events fetch failed: ${eventsRes.status}`);
       }
 
       const pushEvents = allEvents.filter((e: any) => e.type === 'PushEvent');
-      if (pushEvents.length > 0) {
-        console.log(`GitHub Debug: First PushEvent payload keys: ${Object.keys(pushEvents[0].payload).join(', ')}`);
-        console.log(`GitHub Debug: First PushEvent commits count: ${pushEvents[0].payload.commits?.length ?? 'undefined'}`);
-        if (pushEvents[0].payload.commits && pushEvents[0].payload.commits.length > 0) {
-          console.log(`GitHub Debug: First commit sample: ${JSON.stringify(pushEvents[0].payload.commits[0])}`);
-        }
-      }
 
       const recentCommits = await Promise.all(pushEvents.slice(0, 5).map(async (e: any) => {
         try {

@@ -20,7 +20,7 @@ export async function GET() {
             return NextResponse.json({ credits: 10, plan: 'free' });
         }
 
-        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}/credits`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
             cache: 'no-store',
         });
@@ -37,7 +37,7 @@ export async function GET() {
         let telegramBotEnabled = false;
         let subscriptionEnd = null;
         try {
-            const userRes = await fetch(`${ADMIN_API_URL}/api/users/${userId}`, {
+            const userRes = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}`, {
                 headers: { 'X-API-Key': ADMIN_API_KEY },
                 cache: 'no-store',
             });

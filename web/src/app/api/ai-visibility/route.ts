@@ -6,6 +6,7 @@ import { getValidAccessToken, fetchGoogleTokensFromDb } from '@/lib/googleApi';
 import { GoogleGenAI } from '@google/genai';
 import * as cheerio from 'cheerio';
 import { cachedFetch } from '@/lib/apiCache';
+import { isBlockedUrl } from '@/lib/urlValidation';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -38,6 +39,7 @@ interface PageSignals {
 }
 
 async function fetchPageSignals(url: string): Promise<PageSignals | null> {
+    if (isBlockedUrl(url)) return null;
     try {
         const res = await fetch(url, {
             headers: { 'User-Agent': 'TrafficClaw-Bot/1.0 (SEO Analysis)' },
@@ -578,6 +580,6 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
         }));
     } catch (error: any) {
         console.error('[AI-VISIBILITY]', error?.message);
-        return NextResponse.json({ error: error?.message, geoScore: 0 }, { status: 500 });
+        return NextResponse.json({ error: 'AI visibility analysis failed', geoScore: 0 }, { status: 500 });
     }
 }

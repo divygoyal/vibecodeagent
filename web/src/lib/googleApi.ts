@@ -25,7 +25,7 @@ export async function fetchGoogleTokensFromDb(
 ): Promise<{ accessToken: string; refreshToken?: string } | null> {
     if (!ADMIN_API_KEY) return null;
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/oauth/google`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(userId)}/oauth/google`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
         });
         if (!res.ok) return null;

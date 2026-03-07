@@ -148,7 +148,7 @@ function buildDataContext(analyticsContext: any, seoContext: any): string {
 async function getUserCredits(userId: string): Promise<number | null> {
     if (!ADMIN_API_KEY) return null;
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(userId)}/credits`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
             cache: 'no-store',
         });
@@ -161,7 +161,7 @@ async function getUserCredits(userId: string): Promise<number | null> {
 async function deductCredits(userId: string): Promise<number | null> {
     if (!ADMIN_API_KEY) return null;
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits/deduct`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(userId)}/credits/deduct`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
             body: JSON.stringify({ amount: 1 }),
@@ -176,7 +176,7 @@ async function deductCredits(userId: string): Promise<number | null> {
 async function refundCredits(userId: string): Promise<number | null> {
     if (!ADMIN_API_KEY) return null;
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/users/${userId}/credits/deduct`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(userId)}/credits/deduct`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
             body: JSON.stringify({ amount: -1 }),
