@@ -1,10 +1,10 @@
 'use client';
 
-import { useRef, useEffect, useCallback, memo } from 'react';
+import { useRef, useEffect, useCallback, memo, useState } from 'react';
 import createGlobe from 'cobe';
 
 // ─── Coordinates for countries (lat, lng) ───
-const COUNTRY_COORDS: Record<string, [number, number]> = {
+export const COUNTRY_COORDS: Record<string, [number, number]> = {
     'India': [20.59, 78.96], 'United States': [37.09, -95.71], 'Brazil': [-14.24, -51.93],
     'United Kingdom': [52.36, -1.17], 'Germany': [51.17, 10.45], 'France': [46.23, 2.21],
     'Canada': [56.13, -106.35], 'Australia': [-25.27, 133.78], 'Japan': [36.20, 138.25],
@@ -26,7 +26,7 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
     'United Arab Emirates': [23.42, 53.85], 'Greece': [39.07, 21.82], 'Hungary': [47.16, 19.50],
 };
 
-const CITY_COORDS: Record<string, [number, number]> = {
+export const CITY_COORDS: Record<string, [number, number]> = {
     'Mumbai': [19.08, 72.88], 'Delhi': [28.70, 77.10], 'Bangalore': [12.97, 77.59],
     'New York': [40.71, -74.01], 'London': [51.51, -0.13], 'Paris': [48.86, 2.35],
     'Tokyo': [35.69, 139.69], 'Berlin': [52.52, 13.41], 'Sydney': [-33.87, 151.21],
@@ -44,18 +44,58 @@ const CITY_COORDS: Record<string, [number, number]> = {
     'Rome': [41.90, 12.50], 'Lisbon': [38.72, -9.14], 'Warsaw': [52.23, 21.01],
 };
 
+// ─── Latitude/Longitude → screen position (for avatar overlay) ───
+function latLngToScreen(
+    lat: number, lng: number,
+    phi: number, theta: number,
+    size: number, centerX: number, centerY: number
+): { x: number; y: number; visible: boolean } {
+    const latR = (lat * Math.PI) / 180;
+    const lngR = (lng * Math.PI) / 180;
+
+    // Spherical to cartesian
+    const x = Math.cos(latR) * Math.sin(lngR + phi);
+    const y = Math.sin(latR) * Math.cos(theta) - Math.cos(latR) * Math.sin(theta) * Math.cos(lngR + phi);
+    const z = Math.sin(latR) * Math.sin(theta) + Math.cos(latR) * Math.cos(theta) * Math.cos(lngR + phi);
+
+    // Only visible if on the front side
+    const visible = z > 0.1;
+    const radius = size * 0.42;
+
+    return {
+        x: centerX + x * radius,
+        y: centerY - y * radius,
+        visible,
+    };
+}
+
+export interface GlobeVisitor {
+    lat: number;
+    lng: number;
+    name: string;
+    country: string;
+    avatarColor: string;
+    avatarInitial: string;
+    warmth: number; // 0-1, purchase prediction warmth
+    users: number;
+}
+
 interface RealtimeGlobeProps {
     byCountry: { country: string; users: number }[];
     byCity?: { city: string; country: string; users: number }[];
+    visitors?: GlobeVisitor[];
 }
 
-const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity }: RealtimeGlobeProps) {
+const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors = [] }: RealtimeGlobeProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const pointerInteracting = useRef<number | null>(null);
     const pointerInteractionMovement = useRef(0);
     const widthRef = useRef(0);
     const markersRef = useRef<{ location: [number, number]; size: number }[]>([]);
     const globeRef = useRef<ReturnType<typeof createGlobe> | null>(null);
+    const phiRef = useRef(0);
+    const [avatarPositions, setAvatarPositions] = useState<Array<{ x: number; y: number; visible: boolean; visitor: GlobeVisitor }>>([]);
 
     const buildMarkers = useCallback(() => {
         const markers: { location: [number, number]; size: number }[] = [];
@@ -95,7 +135,7 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity }: Realtim
     }, [byCountry, byCity]);
 
     useEffect(() => {
-        let phi = 0;
+        let currentPhi = 0;
         const markers = buildMarkers();
 
         if (!canvasRef.current) return;
@@ -108,7 +148,6 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity }: Realtim
         window.addEventListener('resize', onResize);
         onResize();
 
-        // DataFast-style globe: darker, more contrast, visible country outlines
         globeRef.current = createGlobe(canvasRef.current, {
             devicePixelRatio: 2,
             width: widthRef.current * 2,
@@ -120,17 +159,34 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity }: Realtim
             mapSamples: 36000,
             mapBrightness: 4,
             baseColor: [0.12, 0.12, 0.2],
-            markerColor: [1, 0.3, 0.3], // Red markers like DataFast
+            markerColor: [1, 0.3, 0.3],
             glowColor: [0.05, 0.05, 0.12],
             markers,
             onRender: (state) => {
                 if (!pointerInteracting.current) {
-                    phi += 0.002;
+                    currentPhi += 0.002;
                 }
-                state.phi = phi + pointerInteractionMovement.current;
+                const totalPhi = currentPhi + pointerInteractionMovement.current;
+                state.phi = totalPhi;
                 state.width = widthRef.current * 2;
                 state.height = widthRef.current * 2;
                 state.markers = markersRef.current;
+                phiRef.current = totalPhi;
+
+                // Update avatar positions relative to globe rotation
+                if (visitors.length > 0 && containerRef.current) {
+                    const w = containerRef.current.offsetWidth;
+                    const h = containerRef.current.offsetHeight;
+                    const size = Math.min(w, h);
+                    const cx = w / 2;
+                    const cy = h / 2;
+
+                    const positions = visitors.map(v => {
+                        const pos = latLngToScreen(v.lat, v.lng, totalPhi, 0.15, size, cx, cy);
+                        return { ...pos, visitor: v };
+                    });
+                    setAvatarPositions(positions);
+                }
             },
         });
 
@@ -138,14 +194,29 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity }: Realtim
             globeRef.current?.destroy();
             window.removeEventListener('resize', onResize);
         };
-    }, [buildMarkers]);
+    }, [buildMarkers, visitors]);
 
     useEffect(() => {
         buildMarkers();
     }, [buildMarkers]);
 
+    // Warmth color: cold (blue) → warm (red/orange)
+    const getWarmthColor = (warmth: number) => {
+        if (warmth > 0.7) return '#ef4444'; // hot red
+        if (warmth > 0.5) return '#f97316'; // orange
+        if (warmth > 0.3) return '#eab308'; // yellow
+        return '#3b82f6'; // cold blue
+    };
+
+    const getWarmthBorder = (warmth: number) => {
+        if (warmth > 0.7) return 'ring-red-500/50';
+        if (warmth > 0.5) return 'ring-orange-500/50';
+        if (warmth > 0.3) return 'ring-yellow-500/50';
+        return 'ring-blue-500/50';
+    };
+
     return (
-        <div className="w-full h-full flex items-center justify-center">
+        <div ref={containerRef} className="relative w-full h-full flex items-center justify-center">
             <canvas
                 ref={canvasRef}
                 className="w-full h-full aspect-square cursor-grab active:cursor-grabbing"
@@ -175,6 +246,47 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity }: Realtim
                     }
                 }}
             />
+
+            {/* ─── Avatar Pins Overlay ─── */}
+            {avatarPositions.map((pos, i) => (
+                pos.visible && (
+                    <div
+                        key={`avatar-${i}`}
+                        className="absolute pointer-events-none transition-all duration-100"
+                        style={{
+                            left: `${pos.x}px`,
+                            top: `${pos.y}px`,
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 10,
+                        }}
+                    >
+                        {/* Pulse ring */}
+                        <div
+                            className="absolute inset-0 rounded-full animate-ping"
+                            style={{
+                                backgroundColor: getWarmthColor(pos.visitor.warmth),
+                                opacity: 0.3,
+                                width: '40px',
+                                height: '40px',
+                                marginLeft: '-8px',
+                                marginTop: '-8px',
+                            }}
+                        />
+                        {/* Red dot indicator */}
+                        <div
+                            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0c1220] z-10"
+                            style={{ backgroundColor: getWarmthColor(pos.visitor.warmth) }}
+                        />
+                        {/* Avatar circle */}
+                        <div
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2 ${getWarmthBorder(pos.visitor.warmth)} shadow-lg`}
+                            style={{ backgroundColor: pos.visitor.avatarColor }}
+                        >
+                            {pos.visitor.avatarInitial}
+                        </div>
+                    </div>
+                )
+            ))}
         </div>
     );
 });
