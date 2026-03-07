@@ -15,6 +15,7 @@
     "dodopayments": "^2.22.6",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.564.0",
+    "mapbox-gl": "^3.19.1",
     "next": "16.1.6",
     "next-auth": "^4.24.5",
     "react": "19.2.3",

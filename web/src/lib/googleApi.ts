@@ -438,10 +438,10 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
  */
 export async function fetchRealtimeVisitors(token: string, propertyId: string) {
     const pid = cleanPropertyId(propertyId);
-    const result: any = { activeUsers: 0, byCountry: [], byCity: [], byDevice: [], byPage: [] };
+    const result: any = { activeUsers: 0, byCountry: [], byCity: [], byDevice: [], byPage: [], byReferrer: [] };
 
     // Run all real-time queries in parallel
-    const [totalData, countryData, cityData, deviceData, pageData] = await Promise.all([
+    const [totalData, countryData, cityData, deviceData, pageData, referrerData] = await Promise.all([
         gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
             metrics: [{ name: 'activeUsers' }],
         }).catch(() => null),
@@ -464,6 +464,11 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
             dimensions: [{ name: 'unifiedScreenName' }],
             metrics: [{ name: 'activeUsers' }],
             limit: 15,
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 10,
         }).catch(() => null),
     ]);
 
@@ -501,6 +506,14 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
     if (pageData?.rows) {
         result.byPage = pageData.rows.map((row: any) => ({
             page: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    // By referrer channel
+    if (referrerData?.rows) {
+        result.byReferrer = referrerData.rows.map((row: any) => ({
+            source: row.dimensionValues[0].value,
             users: parseInt(row.metricValues[0].value) || 0,
         }));
     }
