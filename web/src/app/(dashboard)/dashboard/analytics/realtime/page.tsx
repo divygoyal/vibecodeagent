@@ -1,21 +1,54 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { useRealtimeData } from '@/lib/useDashboardData';
 import { useAnalyticsContext } from '../layout';
 import {
     Loader2, Monitor, Smartphone, Tablet, Eye, X as XIcon,
-    Share2, Music, History, Maximize2, Link2, ExternalLink
+    Share2, Music, History, Maximize2, Link2, ExternalLink, AlertTriangle, RotateCcw
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { COUNTRY_COORDS, CITY_COORDS, type GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
 
+// ─── DiceBear avatar URL (matching globe markers) ───
+function getAvatarUrl(seed: string): string {
+    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
+}
+
+// ─── Page-level error boundary to prevent dashboard-wide crash ───
+class RealtimeErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+    state = { hasError: false, error: null as Error | null };
+    static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+    componentDidCatch(error: Error) { console.error('Realtime page error:', error); }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
+                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                        <AlertTriangle className="w-8 h-8 text-red-400" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-white mb-2">Realtime view failed to load</h2>
+                    <p className="text-zinc-400 max-w-md mb-4">This may be caused by a WebGL or map rendering issue.</p>
+                    <button
+                        onClick={() => this.setState({ hasError: false, error: null })}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors border border-emerald-500/20 font-medium text-sm"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        Try Again
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
 const RealtimeMapbox = dynamic(() => import('@/components/analytics/RealtimeMapbox'), { ssr: false });
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGl2eWdveWFsIiwiYSI6ImNtbWc3OXY3OTBkeG8yb3NjZXhtdnphMzUifQ.hKvgr-e2sYAMbMq1PvgrAA';
 
 // ─── Anonymous names (DataFast style: adjective + animal) ───
 const ADJECTIVES = ['amaranth', 'bronze', 'blue', 'orange', 'crimson', 'golden', 'silver', 'jade', 'coral', 'violet',
@@ -203,6 +236,7 @@ export default function RealtimePage() {
     }
 
     return (
+        <RealtimeErrorBoundary>
         <div className="relative -mx-6 -mt-6 overflow-hidden select-none" style={{ minHeight: 'calc(100vh - 120px)' }}>
             {/* ─── Mapbox GL Globe (replaces cobe globe + SVG map) ─── */}
             <div className="absolute inset-0">
@@ -370,10 +404,13 @@ export default function RealtimePage() {
                                 className="px-4 py-2.5 border-b border-white/[0.03] last:border-b-0 group"
                             >
                                 <div className="flex items-start gap-2.5">
-                                    {/* Eye icon with warmth color */}
+                                    {/* DiceBear avatar with warmth indicator */}
                                     <div className="relative flex-shrink-0 mt-0.5">
-                                        <Eye className="w-4 h-4 text-zinc-500" />
-                                        <div className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${getWarmthDot(item.warmth)}`} />
+                                        <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800" style={{ boxShadow: `0 0 0 2px ${item.warmth > 0.6 ? '#ef4444' : item.warmth > 0.4 ? '#f97316' : item.warmth > 0.25 ? '#eab308' : '#3b82f6'}` }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={getAvatarUrl(item.name)} alt="" className="w-full h-full" />
+                                        </div>
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#14141e] ${getWarmthDot(item.warmth)}`} />
                                     </div>
 
                                     <div className="flex-1 min-w-0">
@@ -428,5 +465,6 @@ export default function RealtimePage() {
                 </div>
             </motion.div>
         </div>
+        </RealtimeErrorBoundary>
     );
 }

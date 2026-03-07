@@ -3,6 +3,11 @@
 import { useRef, useEffect, useCallback, memo, useState } from 'react';
 import createGlobe from 'cobe';
 
+// ─── DiceBear avatar URL generator ───
+function getAvatarUrl(seed: string): string {
+    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
+}
+
 // ─── Coordinates for countries (lat, lng) ───
 export const COUNTRY_COORDS: Record<string, [number, number]> = {
     'India': [20.59, 78.96], 'United States': [37.09, -95.71], 'Brazil': [-14.24, -51.93],
@@ -277,12 +282,12 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
                             className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0c1220] z-10"
                             style={{ backgroundColor: getWarmthColor(pos.visitor.warmth) }}
                         />
-                        {/* Avatar circle */}
+                        {/* Avatar image */}
                         <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2 ${getWarmthBorder(pos.visitor.warmth)} shadow-lg`}
-                            style={{ backgroundColor: pos.visitor.avatarColor }}
+                            className={`w-6 h-6 rounded-full overflow-hidden ring-2 ${getWarmthBorder(pos.visitor.warmth)} shadow-lg bg-zinc-800`}
                         >
-                            {pos.visitor.avatarInitial}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={getAvatarUrl(pos.visitor.name)} alt="" className="w-full h-full" />
                         </div>
                     </div>
                 )
