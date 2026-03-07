@@ -28,10 +28,21 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
+// Cache the mapboxgl module so subsequent imports resolve synchronously
+let _mapboxgl: any = null;
+async function loadMapboxGL() {
+    if (_mapboxgl) return _mapboxgl;
+    const mod = await import('mapbox-gl');
+    // @ts-expect-error - CSS import
+    await import('mapbox-gl/dist/mapbox-gl.css');
+    _mapboxgl = mod.default;
+    return _mapboxgl;
+}
+
 const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
-    const markersRef = useRef<any[]>([]);
+    const markersRef = useRef<{ marker: any; el: HTMLDivElement; lngLat: [number, number] }[]>([]);
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
     const retryCountRef = useRef(0);
@@ -39,7 +50,48 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     const autoPanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const autoPanIndexRef = useRef(0);
     const visitorsRef = useRef(visitors);
+    const renderListenerRef = useRef<(() => void) | null>(null);
     visitorsRef.current = visitors;
+
+    // ─── Globe back-side occlusion: hide markers behind the globe ───
+    const updateMarkerVisibility = useCallback(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        const cam = map.getFreeCameraOptions?.();
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+
+        // On globe projection at low zoom, we need to hide markers on the far side
+        // Use the camera's forward direction to determine which hemisphere is visible
+        const centerLat = (center.lat * Math.PI) / 180;
+        const centerLng = (center.lng * Math.PI) / 180;
+
+        markersRef.current.forEach(({ el, lngLat }) => {
+            const [lng, lat] = lngLat;
+            const markerLat = (lat * Math.PI) / 180;
+            const markerLng = (lng * Math.PI) / 180;
+
+            // Dot product of center and marker vectors on unit sphere
+            // If > 0, they're on the same hemisphere (visible)
+            const dot = Math.sin(centerLat) * Math.sin(markerLat) +
+                Math.cos(centerLat) * Math.cos(markerLat) * Math.cos(markerLng - centerLng);
+
+            // Threshold: slightly negative to show markers near the edge
+            // At higher zoom levels, show all markers since we're not on globe view
+            const isVisible = zoom > 5 || dot > -0.15;
+
+            el.style.opacity = isVisible ? '1' : '0';
+            el.style.pointerEvents = isVisible ? 'auto' : 'none';
+            // Scale based on depth for subtle 3D perspective
+            if (isVisible && zoom < 5) {
+                const scale = 0.7 + 0.3 * Math.max(0, dot);
+                el.style.transform = `scale(${scale})`;
+            } else {
+                el.style.transform = 'scale(1)';
+            }
+        });
+    }, []);
 
     useImperativeHandle(ref, () => ({
         toggleAutoPan: () => {
@@ -82,7 +134,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             });
         };
 
-        // Initial fly
         setTimeout(fly, 1500);
         autoPanTimerRef.current = setInterval(fly, 6000);
     }, [stopAutoPan]);
@@ -100,9 +151,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
         (async () => {
             try {
-                const mapboxgl = (await import('mapbox-gl')).default;
-                // @ts-expect-error - CSS import
-                await import('mapbox-gl/dist/mapbox-gl.css');
+                const mapboxgl = await loadMapboxGL();
 
                 if (destroyed || !containerRef.current) return;
                 mapboxgl.accessToken = mapboxToken;
@@ -120,6 +169,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     attributionControl: false,
                     logoPosition: 'bottom-right',
                     fadeDuration: 0,
+                    renderWorldCopies: false,
                 });
 
                 map.on('error', (e: any) => {
@@ -143,7 +193,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     const attrib = containerRef.current?.querySelector('.mapboxgl-ctrl-attrib');
                     if (attrib) (attrib as HTMLElement).style.display = 'none';
 
-                    // Start auto-panning if enabled
                     if (autoPanRef.current) {
                         startAutoPan();
                     }
@@ -160,7 +209,12 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     });
                 });
 
-                // Pause auto-pan on user interaction, resume after
+                // Update marker occlusion on every frame
+                const onRender = () => updateMarkerVisibility();
+                map.on('render', onRender);
+                renderListenerRef.current = onRender;
+
+                // Pause auto-pan on user interaction
                 map.on('dragstart', () => {
                     if (autoPanRef.current) stopAutoPan();
                 });
@@ -182,9 +236,12 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return () => {
             destroyed = true;
             stopAutoPan();
-            markersRef.current.forEach(m => { try { m.remove(); } catch { /**/ } });
+            markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
             markersRef.current = [];
             if (map) {
+                if (renderListenerRef.current) {
+                    try { map.off('render', renderListenerRef.current); } catch { /**/ }
+                }
                 try { map.remove(); } catch { /**/ }
             }
             mapRef.current = null;
@@ -197,74 +254,85 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return cleanup;
     }, [initMap]);
 
-    // Sync avatar markers - DataFast style: large 55px avatars with dark bg and colored dot
+    // Sync avatar markers - uses cached mapboxgl for instant resolution
     useEffect(() => {
         const map = mapRef.current;
-        if (!map || status !== 'ready') return;
+        if (!map || status !== 'ready' || !_mapboxgl) return;
 
-        markersRef.current.forEach(m => { try { m.remove(); } catch { /**/ } });
+        const mapboxgl = _mapboxgl;
+
+        // Remove old markers
+        markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
         markersRef.current = [];
 
-        import('mapbox-gl').then(({ default: mapboxgl }) => {
-            visitors.forEach((v) => {
-                if (v.lat === 0 && v.lng === 0) return;
+        visitors.forEach((v) => {
+            if (v.lat === 0 && v.lng === 0) return;
 
-                const warmthColor = getWarmthColor(v.warmth);
-                const avatarUrl = getAvatarUrl(v.name);
+            const warmthColor = getWarmthColor(v.warmth);
+            const avatarUrl = getAvatarUrl(v.name);
 
-                // ─── DataFast-style marker: large avatar in dark circle with colored dot ───
-                const el = document.createElement('div');
-                el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;';
+            // ─── DataFast-style marker: large avatar in dark circle ───
+            const el = document.createElement('div');
+            el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease,transform 0.3s ease;';
 
-                // Outer dark circle (the "frame")
-                const frame = document.createElement('div');
-                frame.style.cssText = `
-                    position:absolute;top:2px;left:2px;width:56px;height:56px;
-                    border-radius:50%;
-                    background:rgba(15,20,35,0.9);
-                    border:2.5px solid rgba(255,255,255,0.12);
-                    box-shadow:0 4px 20px rgba(0,0,0,0.5);
-                    overflow:hidden;
-                    transition:transform 0.2s ease;
-                `;
+            // Outer dark circle frame
+            const frame = document.createElement('div');
+            frame.style.cssText = `
+                position:absolute;top:2px;left:2px;width:56px;height:56px;
+                border-radius:50%;
+                background:rgba(15,20,35,0.92);
+                border:2.5px solid rgba(255,255,255,0.12);
+                box-shadow:0 4px 24px rgba(0,0,0,0.6);
+                overflow:hidden;
+                transition:transform 0.2s ease,box-shadow 0.2s ease;
+            `;
 
-                // DiceBear avatar image (fills the dark circle)
-                const img = document.createElement('img');
-                img.src = avatarUrl;
-                img.alt = v.name;
-                img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-                img.onerror = () => {
-                    img.remove();
-                    frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
-                    frame.textContent = v.avatarInitial;
-                };
-                frame.appendChild(img);
-                el.appendChild(frame);
+            // DiceBear avatar
+            const img = document.createElement('img');
+            img.src = avatarUrl;
+            img.alt = v.name;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+            img.onerror = () => {
+                img.remove();
+                frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
+                frame.textContent = v.avatarInitial;
+            };
+            frame.appendChild(img);
+            el.appendChild(frame);
 
-                // Warmth indicator dot (top-right, outside the circle)
-                const dot = document.createElement('div');
-                dot.style.cssText = `
-                    position:absolute;top:0;right:0;width:14px;height:14px;
-                    border-radius:50%;
-                    background:${warmthColor};
-                    border:3px solid rgba(8,12,24,0.95);
-                    z-index:2;
-                    box-shadow:0 0 6px ${warmthColor}80;
-                `;
-                el.appendChild(dot);
+            // Warmth dot (top-right)
+            const dot = document.createElement('div');
+            dot.style.cssText = `
+                position:absolute;top:0;right:0;width:14px;height:14px;
+                border-radius:50%;
+                background:${warmthColor};
+                border:3px solid rgba(8,12,24,0.95);
+                z-index:2;
+                box-shadow:0 0 8px ${warmthColor}80;
+            `;
+            el.appendChild(dot);
 
-                // Hover: scale up
-                el.onmouseenter = () => { frame.style.transform = 'scale(1.12)'; };
-                el.onmouseleave = () => { frame.style.transform = 'scale(1)'; };
+            // Hover
+            el.onmouseenter = () => {
+                frame.style.transform = 'scale(1.15)';
+                frame.style.boxShadow = `0 4px 24px rgba(0,0,0,0.6),0 0 20px ${warmthColor}30`;
+            };
+            el.onmouseleave = () => {
+                frame.style.transform = 'scale(1)';
+                frame.style.boxShadow = '0 4px 24px rgba(0,0,0,0.6)';
+            };
 
-                const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-                    .setLngLat([v.lng, v.lat])
-                    .addTo(map);
+            const lngLat: [number, number] = [v.lng, v.lat];
+            const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+                .setLngLat(lngLat)
+                .addTo(map);
 
-                markersRef.current.push(marker);
-            });
-        }).catch(() => { /* ignore */ });
-    }, [visitors, status]);
+            markersRef.current.push({ marker, el, lngLat });
+        });
+
+        // Immediately update visibility
+        updateMarkerVisibility();
+    }, [visitors, status, updateMarkerVisibility]);
 
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
@@ -281,10 +349,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     return (
         <>
             <style>{`
-                @keyframes mapbox-pulse {
-                    0% { transform: scale(0.8); opacity: 0.35; }
-                    100% { transform: scale(2.2); opacity: 0; }
-                }
                 .mapboxgl-ctrl-logo { display: none !important; }
                 .mapboxgl-ctrl-attrib { display: none !important; }
             `}</style>
