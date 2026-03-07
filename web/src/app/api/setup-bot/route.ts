@@ -46,9 +46,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
     }
 
-    console.log(`Setup bot for user ${username} (${userId}) via ${provider}`)
-    console.log(`Access token present: ${accessToken ? 'YES' : 'NO'}`)
-    console.log(`Refresh token present: ${refreshToken ? 'YES' : 'NO'}`)
+    console.log(`[Setup-Bot] User ${userId} via ${provider}`)
 
     // Call create_user (upsert) with the telegram token.
     // The backend will:
@@ -106,17 +104,15 @@ export async function POST(req: Request) {
 
   } catch (error) {
     const err = error as Error
-    console.error("Bot setup error:", err.message, err.stack)
+    console.error("Bot setup error:", err.message)
 
     let errorMessage = "Failed to connect bot"
     if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed')) {
       errorMessage = "Backend API is unreachable. Please try again later."
     } else if (err.message.includes('timeout')) {
       errorMessage = "Request timed out. Please try again."
-    } else if (err.message.includes('Invalid token')) {
-      errorMessage = err.message
     }
 
-    return NextResponse.json({ error: errorMessage, details: err.message }, { status: 500 })
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

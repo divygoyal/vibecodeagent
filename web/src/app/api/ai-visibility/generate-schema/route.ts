@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { GoogleGenAI } from '@google/genai';
 import * as cheerio from 'cheerio';
 import { cachedFetch } from '@/lib/apiCache';
+import { isBlockedUrl } from '@/lib/urlValidation';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -21,8 +22,11 @@ export async function POST(req: NextRequest) {
         }
 
         const { url } = await req.json();
-        if (!url) {
+        if (!url || typeof url !== 'string') {
             return NextResponse.json({ error: 'url required' }, { status: 400 });
+        }
+        if (url.length > 2000 || isBlockedUrl(url)) {
+            return NextResponse.json({ error: 'URL not allowed' }, { status: 400 });
         }
 
         // @ts-expect-error - id added in callbacks
@@ -137,6 +141,6 @@ Rules:
         return NextResponse.json(result);
     } catch (error: any) {
         console.error('[SCHEMA-GEN]', error?.message);
-        return NextResponse.json({ error: error?.message, schemas: [] }, { status: 500 });
+        return NextResponse.json({ error: 'Schema generation failed', schemas: [] }, { status: 500 });
     }
 }

@@ -9,11 +9,13 @@ export const dynamic = 'force-dynamic';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-// In-memory alert cache per user (15-minute TTL)
+// In-memory alert cache per user (15-minute TTL), bounded to prevent memory leak
+const ALERT_CACHE_MAX = 500;
 const alertCache = new Map<string, { alerts: any[]; ts: number }>();
 const CACHE_TTL = 15 * 60 * 1000;
 
-// Dismissed alerts per user session
+// Dismissed alerts per user session, bounded
+const DISMISSED_MAX = 500;
 const dismissedSets = new Map<string, Set<string>>();
 
 function formatDate(d: Date) {
@@ -126,7 +128,17 @@ export async function GET(req: NextRequest) {
         const seoData = await fetchSeoDataForAlerts(token, siteUrl);
         const alerts = computeAlerts(seoData, null);
 
-        // Cache the result
+        // Cache the result (evict stale entries if at capacity)
+        if (alertCache.size >= ALERT_CACHE_MAX) {
+            const now = Date.now();
+            for (const [k, v] of alertCache) {
+                if (now - v.ts > CACHE_TTL) alertCache.delete(k);
+            }
+            if (alertCache.size >= ALERT_CACHE_MAX) {
+                const oldest = alertCache.keys().next().value;
+                if (oldest) alertCache.delete(oldest);
+            }
+        }
         alertCache.set(cacheKey, { alerts, ts: Date.now() });
 
         // Filter dismissed
@@ -136,7 +148,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ alerts: filtered, alertCount: filtered.length });
     } catch (error: any) {
         console.error('[ALERTS]', error?.message);
-        return NextResponse.json({ alerts: [], alertCount: 0, error: error?.message });
+        return NextResponse.json({ alerts: [], alertCount: 0, error: 'Failed to compute alerts' });
     }
 }
 
@@ -156,6 +168,10 @@ export async function POST(req: NextRequest) {
         }
 
         if (!dismissedSets.has(userId)) {
+            if (dismissedSets.size >= DISMISSED_MAX) {
+                const oldest = dismissedSets.keys().next().value;
+                if (oldest) dismissedSets.delete(oldest);
+            }
             dismissedSets.set(userId, new Set());
         }
         dismissedSets.get(userId)!.add(alertId);

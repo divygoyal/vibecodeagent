@@ -155,8 +155,8 @@ export function computeAlerts(seoData: any, analyticsData: any): AlertItem[] {
     if (trend.length >= 14) {
         const last7 = trend.slice(-7);
         const prev7 = trend.slice(-14, -7);
-        const avgLast = last7.reduce((sum: number, d: any) => sum + d.clicks, 0) / 7;
-        const avgPrev = prev7.reduce((sum: number, d: any) => sum + d.clicks, 0) / 7;
+        const avgLast = last7.reduce((sum: number, d: any) => sum + (d.clicks || 0), 0) / 7;
+        const avgPrev = prev7.reduce((sum: number, d: any) => sum + (d.clicks || 0), 0) / 7;
         if (avgPrev > 0 && avgLast < avgPrev * 0.7) {
             alerts.push({
                 id: `alert-${id++}`, type: 'traffic_drop', severity: 'critical',
