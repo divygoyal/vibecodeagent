@@ -8,9 +8,9 @@ import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
-    ArrowRight, CheckCircle2, Star, Sparkles, GitBranch,
+    ArrowRight, CheckCircle2, Star, Sparkles,
     MousePointerClick, Eye, ArrowUpRight, ChevronRight, MessageSquare,
-    ScanSearch
+    ScanSearch, Clock
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -111,25 +111,25 @@ function Hero() {
                     transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
                     className="flex flex-col gap-8 order-2 lg:order-1 text-center lg:text-left"
                 >
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-sm font-medium w-fit mx-auto lg:mx-0 border border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.1)]">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium w-fit mx-auto lg:mx-0 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
                         <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                         </span>
-                        Meet TrafficClaw Agent
+                        Early Access — Limited Spots
                     </div>
 
                     <h1 className="text-5xl sm:text-6xl lg:text-[5rem] font-bold tracking-tight leading-[1.05]">
                         <span className="block pb-2 text-white drop-shadow-md font-extrabold" style={{ textShadow: "0px 4px 40px rgba(52,211,153,0.2)" }}>
-                            SEO & Analytics,
+                            Ask AI about
                         </span>
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent block pb-2">
-                            all from your phone.
+                            your traffic data.
                         </span>
                     </h1>
 
                     <p className="text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0 font-light">
-                        Get real-time insights, traffic drop alerts, and quick SEO wins without ever logging into a clunky dashboard. Just open Telegram and ask your personalized AI.
+                        The only SEO tool where you can chat with AI about <span className="text-white font-medium">your own</span> Google Analytics & Search Console data. Get verdicts, not generic advice.
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-4">
@@ -137,26 +137,30 @@ function Hero() {
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="group px-8 h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
                         >
-                            Start Free — No Credit Card
+                            Try Free — 10 AI Messages Included
                             <ArrowRight className="inline-block ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
                         <a
-                            href="#features"
+                            href="#ai-demo"
                             className="px-8 h-14 text-[15px] font-medium text-zinc-300 border border-white/10 rounded-xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 w-full sm:w-auto flex items-center justify-center backdrop-blur-sm whitespace-nowrap"
                         >
-                            Explore Features
+                            See AI in Action
                         </a>
                     </div>
 
                     {/* Social proof */}
-                    <div className="flex items-center gap-3 justify-center lg:justify-start pt-2">
-                        <div className="flex -space-x-2">
-                            {['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24'].map((color, i) => (
-                                <div key={i} className="w-7 h-7 rounded-full border-2 border-black" style={{ background: color }} />
-                            ))}
+                    <div className="flex flex-col gap-3 justify-center lg:justify-start pt-2">
+                        <div className="flex items-center gap-3 justify-center lg:justify-start">
+                            <div className="flex items-center gap-1">
+                                {[1,2,3,4,5].map(i => (
+                                    <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                ))}
+                            </div>
+                            <span className="text-sm text-zinc-400">from early users</span>
                         </div>
-                        <div className="text-sm text-zinc-400">
-                            <span className="text-white font-semibold">500+</span> marketers already using TrafficClaw
+                        <div className="flex items-center gap-2 justify-center lg:justify-start text-xs text-zinc-500">
+                            <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Read-only Google OAuth · Your data stays yours · Cancel anytime</span>
                         </div>
                     </div>
                 </motion.div>
@@ -761,7 +765,7 @@ function AIChatDemo() {
     }, [phase]);
 
     return (
-        <Section className="py-24 sm:py-32 px-6">
+        <Section id="ai-demo" className="py-24 sm:py-32 px-6">
             <div ref={sectionRef} className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
@@ -1001,10 +1005,19 @@ function AIChatDemo() {
                     </div>
                 </motion.div>
 
-                {/* Bottom tagline */}
-                <motion.p variants={fadeUp} className="text-center mt-8 text-sm text-zinc-600">
-                    Real response from TrafficClaw AI · Powered by your live Google Search Console data
-                </motion.p>
+                {/* Bottom tagline + CTA */}
+                <motion.div variants={fadeUp} className="text-center mt-8 space-y-4">
+                    <p className="text-sm text-zinc-600">
+                        Real response from TrafficClaw AI · Powered by your live Google Search Console data
+                    </p>
+                    <button
+                        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                        className="group inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300"
+                    >
+                        Try This With Your Own Data
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                </motion.div>
             </div>
         </Section>
     );
@@ -1018,23 +1031,23 @@ function Testimonials() {
     const reviews = [
         {
             name: 'Sarah Chen',
-            role: 'Founder @TechStack.io',
-            text: 'The AI chat is incredible. I asked \'why did my traffic drop?\' and it found a cannibalization issue between two blog posts. Fixed it in minutes.',
-            avatar: '👩‍💻',
+            role: 'Founder, SaaS startup',
+            text: 'I asked "why did my traffic drop?" and the AI found a cannibalization issue between two blog posts in seconds. Would have taken me hours in GA4 + Search Console separately.',
+            avatar: 'SC',
             stars: 5,
         },
         {
-            name: 'Marcus Rodriguez',
-            role: 'CTO @ShipFast',
-            text: 'We replaced three SEO tools with TrafficClaw. The overview dashboard gives me everything I need in one glance.',
-            avatar: '👨‍💼',
+            name: 'Marcus R.',
+            role: 'Solo founder',
+            text: 'Paying $9/mo instead of $200+ for Semrush. I don\'t need 25 billion keywords — I need to know what\'s happening with MY site. TrafficClaw does exactly that.',
+            avatar: 'MR',
             stars: 5,
         },
         {
             name: 'Priya Patel',
-            role: 'Marketing Lead @CloudBase',
-            text: 'Content decay detection saved us. We caught 12 pages losing rank before it became a problem. The AI insights are spot-on.',
-            avatar: '👩‍🎨',
+            role: 'Content marketer',
+            text: 'The AI told me 4 of my top pages were losing position before I even noticed. It calculated I was losing ~$800/mo in organic value. Fixed it in a day.',
+            avatar: 'PP',
             stars: 5,
         },
     ];
@@ -1068,7 +1081,7 @@ function Testimonials() {
                             </div>
                             <p className="text-sm text-zinc-300 leading-relaxed mb-6">&ldquo;{review.text}&rdquo;</p>
                             <div className="flex items-center gap-3">
-                                <div className="text-2xl">{review.avatar}</div>
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 border border-white/[0.06] flex items-center justify-center text-xs font-bold text-emerald-400">{review.avatar}</div>
                                 <div>
                                     <div className="text-sm font-medium text-white">{review.name}</div>
                                     <div className="text-xs text-zinc-500">{review.role}</div>
@@ -1309,10 +1322,10 @@ function HowItWorks() {
         {
             step: '01',
             title: 'Connect Your Stack',
-            description: 'Sign in with Google. We auto-detect your GA4 properties, Search Console sites, and GitHub repos.',
+            description: 'Sign in with Google. We auto-detect your GA4 properties and Search Console sites instantly.',
             icon: Globe,
             gradient: 'from-emerald-400 to-emerald-600',
-            details: ['Google Analytics 4', 'Search Console', 'GitHub'],
+            details: ['Google Analytics 4', 'Search Console', '30-second setup'],
         },
         {
             step: '02',
@@ -1401,12 +1414,10 @@ function IntegrationMarquee() {
     const integrations = [
         { name: 'Google Analytics', icon: '📊' },
         { name: 'Search Console', icon: '🔍' },
-        { name: 'GitHub', icon: '🐙' },
         { name: 'Telegram', icon: '💬' },
         { name: 'WordPress', icon: '📝' },
         { name: 'Gemini AI', icon: '✨' },
-        { name: 'Next.js', icon: '▲' },
-        { name: 'Vercel', icon: '▼' },
+        { name: 'Google OAuth', icon: '🔐' },
     ];
 
     const doubled = [...integrations, ...integrations];
@@ -1519,13 +1530,14 @@ function WhoItsFor() {
 
 const COMPARISON_ROWS = [
     { feature: 'GA4 + SEO in one dashboard', tc: true, ga4: false, semrush: false, ahrefs: false },
-    { feature: 'AI Chat about your data', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'AI Chat about YOUR data', tc: true, ga4: false, semrush: false, ahrefs: false },
     { feature: 'Telegram bot alerts', tc: true, ga4: false, semrush: false, ahrefs: false },
+    { feature: 'AI schema generation', tc: true, ga4: false, semrush: false, ahrefs: false },
     { feature: 'Real-time analytics', tc: true, ga4: true, semrush: false, ahrefs: false },
     { feature: 'Keyword tracking', tc: true, ga4: false, semrush: true, ahrefs: true },
     { feature: 'Site audit', tc: true, ga4: false, semrush: true, ahrefs: true },
     { feature: 'Free tier available', tc: true, ga4: true, semrush: false, ahrefs: false },
-    { feature: 'Starting price', tc: '$9/mo', ga4: 'Free', semrush: '$139/mo', ahrefs: '$99/mo' },
+    { feature: 'Starting price', tc: '$9/mo', ga4: 'Free', semrush: '$199/mo', ahrefs: '$129/mo' },
 ];
 
 function ComparisonTable() {
@@ -1685,24 +1697,65 @@ function FinalCTA() {
                     <div className="absolute inset-0 border border-white/[0.08] rounded-3xl" />
 
                     <div className="relative">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-xs font-medium mb-6 border border-amber-500/20">
+                            <Clock className="w-3 h-3" />
+                            Limited early access — spots filling up
+                        </div>
                         <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                            Your AI Growth Engine Awaits
+                            Stop guessing.{' '}
+                            <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                                Start asking.
+                            </span>
                         </h2>
-                        <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
-                            Join thousands of builders who use AI to understand their data and ship faster.
-                            Start with 10 free messages — no credit card needed.
+                        <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-4">
+                            Connect Google Analytics + Search Console in 30 seconds.
+                            Then ask AI anything about your traffic.
+                        </p>
+                        <p className="text-sm text-zinc-500 mb-8">
+                            No credit card required · 10 free AI messages · Cancel anytime
                         </p>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="group px-10 py-4 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
                         >
-                            Get 10 Free Messages
+                            Start Free — Connect with Google
                             <ArrowRight className="inline-block ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </motion.div>
             </div>
         </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
+   STICKY MOBILE CTA
+   ═══════════════════════════════════════ */
+
+function StickyMobileCTA() {
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        const handler = () => {
+            // Show after scrolling past hero (600px)
+            setVisible(window.scrollY > 600);
+        };
+        window.addEventListener('scroll', handler, { passive: true });
+        return () => window.removeEventListener('scroll', handler);
+    }, []);
+
+    if (!visible) return null;
+
+    return (
+        <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-black/90 backdrop-blur-xl border-t border-white/[0.06] px-4 py-3 safe-area-bottom">
+            <button
+                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                className="w-full py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl flex items-center justify-center gap-2"
+            >
+                Start Free — No Credit Card
+                <ArrowRight className="w-4 h-4" />
+            </button>
+        </div>
     );
 }
 
@@ -1746,6 +1799,8 @@ export default function LandingPage() {
             <Hero />
             <StatsBar />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <AIChatDemo />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Features />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <HowItWorks />
@@ -1753,8 +1808,6 @@ export default function LandingPage() {
             <InteractiveDemo />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <IntegrationMarquee />
-            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
-            <AIChatDemo />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Testimonials />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
@@ -1767,6 +1820,7 @@ export default function LandingPage() {
             <FAQ />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <FinalCTA />
+            <StickyMobileCTA />
             <Footer />
         </>
     );
