@@ -231,7 +231,7 @@ function Hero() {
                         animate={{ opacity: 1, y: 0, x: 0 }}
                         whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(56,189,248,0.3)" }}
                         transition={{ duration: 0.5, delay: 1.0 }}
-                        className="absolute hidden lg:flex flex-col gap-3 z-30 lg:-left-28 bottom-[30%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-sky-500/30 transition-colors w-[200px]"
+                        className="absolute hidden lg:flex flex-col gap-3 z-30 lg:-left-8 bottom-[18%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-sky-500/30 transition-colors w-[200px]"
                     >
                         <div className="flex justify-between items-center">
                             <span className="text-xs font-semibold text-zinc-400">Top Keyword</span>
