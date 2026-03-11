@@ -177,26 +177,39 @@ export default function RealtimePage() {
         const visitors: GlobeVisitor[] = [];
         const usedCoords = new Set<string>();
 
+        // Helper: check if city coords are geographically close to country coords (within ~15°)
+        const isCityInCountry = (cityCoord: [number, number], countryCoord: [number, number]) => {
+            const dLat = Math.abs(cityCoord[0] - countryCoord[0]);
+            const dLng = Math.abs(cityCoord[1] - countryCoord[1]);
+            return dLat < 20 && dLng < 30; // generous bounds for large countries
+        };
+
         // First: try city-level pins from byCity (most precise)
         byCity.slice(0, 15).forEach((c: any, i: number) => {
             if (visitors.length >= 12) return;
             const cityStr = String(c.city ?? '');
             const countryStr = String(c.country ?? '');
 
-            // Skip "(not set)" / "(other)" / empty cities
-            const cityCoord = cityStr && !cityStr.startsWith('(') ? CITY_COORDS[cityStr] : undefined;
+            // Country coord is required — skip unknown countries
             const countryCoord = COUNTRY_COORDS[countryStr];
-            const coord = cityCoord || countryCoord;
-            if (!coord) return;
+            if (!countryCoord) return;
+
+            // Only use city coord if city is valid AND geographically within the country
+            let coord = countryCoord;
+            if (cityStr && !cityStr.startsWith('(')) {
+                const cityCoord = CITY_COORDS[cityStr];
+                if (cityCoord && isCityInCountry(cityCoord, countryCoord)) {
+                    coord = cityCoord;
+                }
+            }
 
             const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
-            // Add small offset if same location already used (spread overlapping pins)
             let lat = coord[0];
             let lng = coord[1];
             if (usedCoords.has(key)) {
                 // Fixed offset based on city/country hash (stable across re-renders)
-                lat += (hashStr(cityStr + countryStr) % 100 - 50) / 100 * 5;
-                lng += (hashStr(countryStr + cityStr) % 100 - 50) / 100 * 5;
+                lat += (hashStr(cityStr + countryStr) % 100 - 50) / 100 * 3;
+                lng += (hashStr(countryStr + cityStr) % 100 - 50) / 100 * 3;
             }
             usedCoords.add(key);
 
