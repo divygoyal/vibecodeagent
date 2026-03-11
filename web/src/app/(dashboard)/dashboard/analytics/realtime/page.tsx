@@ -172,28 +172,79 @@ export default function RealtimePage() {
     }, [byCity, byPage, byDevice]);
 
     // ─── Globe visitors (for avatar pins) ───
+    // Use byCountry as primary source (reliable country names), spread multiple users per country
     const globeVisitors = useMemo<GlobeVisitor[]>(() => {
-        return byCity.slice(0, 8).map((c: any, i: number) => {
-            const cityStr = String(c.city ?? 'Unknown');
-            const countryStr = String(c.country ?? 'Unknown');
+        const visitors: GlobeVisitor[] = [];
+        const usedCoords = new Set<string>();
+
+        // First: try city-level pins from byCity (most precise)
+        byCity.slice(0, 15).forEach((c: any, i: number) => {
+            if (visitors.length >= 12) return;
+            const cityStr = String(c.city ?? '');
+            const countryStr = String(c.country ?? '');
+
+            // Skip "(not set)" / "(other)" / empty cities
+            const cityCoord = cityStr && !cityStr.startsWith('(') ? CITY_COORDS[cityStr] : undefined;
+            const countryCoord = COUNTRY_COORDS[countryStr];
+            const coord = cityCoord || countryCoord;
+            if (!coord) return;
+
+            const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
+            // Add small offset if same location already used (spread overlapping pins)
+            let lat = coord[0];
+            let lng = coord[1];
+            if (usedCoords.has(key)) {
+                const offset = (visitors.length + 1) * 2.5;
+                lat += (hashStr(cityStr + i) % 100 - 50) / 100 * offset;
+                lng += (hashStr(countryStr + i) % 100 - 50) / 100 * offset;
+            }
+            usedCoords.add(key);
+
             const hash = hashStr(`${cityStr}-${countryStr}-${i}`);
             const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
-            const coord = CITY_COORDS[cityStr] || COUNTRY_COORDS[countryStr];
             const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
             const warmth = predictWarmth(countryStr, device, i);
 
-            return {
-                lat: coord?.[0] ?? 0,
-                lng: coord?.[1] ?? 0,
-                name,
+            visitors.push({
+                lat, lng, name,
                 country: countryStr,
                 avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
                 avatarInitial: name.charAt(0).toUpperCase(),
                 warmth,
                 users: Number(c.users) || 1,
-            };
-        }).filter(v => v.lat !== 0 || v.lng !== 0);
-    }, [byCity, byDevice]);
+            });
+        });
+
+        // Second: fill remaining slots from byCountry (if cities didn't provide enough)
+        if (visitors.length < 8) {
+            byCountry.forEach((c: any, i: number) => {
+                if (visitors.length >= 12) return;
+                const countryStr = String(c.country ?? '');
+                const coord = COUNTRY_COORDS[countryStr];
+                if (!coord) return;
+
+                // Skip if we already have a visitor from this country via city data
+                const alreadyHas = visitors.some(v => v.country === countryStr);
+                if (alreadyHas) return;
+
+                const hash = hashStr(`${countryStr}-country-${i}`);
+                const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
+                const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
+                const warmth = predictWarmth(countryStr, device, i);
+
+                visitors.push({
+                    lat: coord[0], lng: coord[1], name,
+                    country: countryStr,
+                    avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
+                    avatarInitial: name.charAt(0).toUpperCase(),
+                    warmth,
+                    users: Number(c.users) || 1,
+                });
+            });
+        }
+
+        return visitors;
+    }, [byCity, byCountry, byDevice]);
 
     // ─── Estimated total value ───
     const estTotalValue = useMemo(() => {
