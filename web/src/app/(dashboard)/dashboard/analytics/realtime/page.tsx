@@ -194,9 +194,9 @@ export default function RealtimePage() {
             let lat = coord[0];
             let lng = coord[1];
             if (usedCoords.has(key)) {
-                const offset = (visitors.length + 1) * 2.5;
-                lat += (hashStr(cityStr + i) % 100 - 50) / 100 * offset;
-                lng += (hashStr(countryStr + i) % 100 - 50) / 100 * offset;
+                // Fixed offset based on city/country hash (stable across re-renders)
+                lat += (hashStr(cityStr + countryStr) % 100 - 50) / 100 * 5;
+                lng += (hashStr(countryStr + cityStr) % 100 - 50) / 100 * 5;
             }
             usedCoords.add(key);
 
