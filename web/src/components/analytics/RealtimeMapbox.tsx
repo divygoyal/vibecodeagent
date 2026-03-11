@@ -42,7 +42,7 @@ async function loadMapboxGL() {
 const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
-    const markersRef = useRef<{ marker: any; el: HTMLDivElement; lngLat: [number, number] }[]>([]);
+    const markersRef = useRef<{ marker: any; el: HTMLDivElement; frame: HTMLDivElement; lngLat: [number, number] }[]>([]);
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
     const retryCountRef = useRef(0);
@@ -83,13 +83,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
             el.style.opacity = isVisible ? '1' : '0';
             el.style.pointerEvents = isVisible ? 'auto' : 'none';
-            // Scale based on depth for subtle 3D perspective
-            if (isVisible && zoom < 5) {
-                const scale = 0.7 + 0.3 * Math.max(0, dot);
-                el.style.transform = `scale(${scale})`;
-            } else {
-                el.style.transform = 'scale(1)';
-            }
         });
     }, []);
 
@@ -273,7 +266,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
             // ─── DataFast-style marker: large avatar in dark circle ───
             const el = document.createElement('div');
-            el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease,transform 0.3s ease;';
+            el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease;';
 
             // Outer dark circle frame
             const frame = document.createElement('div');
@@ -327,7 +320,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 .setLngLat(lngLat)
                 .addTo(map);
 
-            markersRef.current.push({ marker, el, lngLat });
+            markersRef.current.push({ marker, el, frame, lngLat });
         });
 
         // Immediately update visibility

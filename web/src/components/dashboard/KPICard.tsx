@@ -70,10 +70,10 @@ function KPICardInner({
   const severityDot = statusSeverity === 'critical' ? 'bg-red-400' : statusSeverity === 'warning' ? 'bg-amber-400' : 'bg-emerald-400';
 
   return (
-    <div className="relative group">
+    <div className="relative group h-full">
       <Link
         href={href}
-        className="relative block bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-all duration-500"
+        className="relative block h-full bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-all duration-500"
         aria-label={`${label}: ${showValue ? displayValue : 'No data'}${change !== undefined ? `, ${change > 0 ? '+' : ''}${change}% change` : ''}`}
       >
         {/* Subtle gradient glow on hover — clipped to card bounds */}
