@@ -247,28 +247,72 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return cleanup;
     }, [initMap]);
 
-    // Sync avatar markers - uses cached mapboxgl for instant resolution
+    // Stable key for a visitor (name is deterministic from hash of city+country+index)
+    const visitorKey = useCallback((v: GlobeVisitor) => `${v.name}|${v.lat.toFixed(2)}|${v.lng.toFixed(2)}`, []);
+
+    // Sync avatar markers — diff-based to avoid destroying markers on SWR refresh
     useEffect(() => {
         const map = mapRef.current;
         if (!map || status !== 'ready' || !_mapboxgl) return;
 
         const mapboxgl = _mapboxgl;
 
-        // Remove old markers
-        markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
-        markersRef.current = [];
-
+        // Build set of new visitor keys
+        const newKeys = new Set<string>();
+        const newVisitorsByKey = new Map<string, GlobeVisitor>();
         visitors.forEach((v) => {
             if (v.lat === 0 && v.lng === 0) return;
+            const key = visitorKey(v);
+            newKeys.add(key);
+            newVisitorsByKey.set(key, v);
+        });
 
+        // Build set of existing marker keys
+        const existingKeys = new Set<string>();
+        const existingByKey = new Map<string, typeof markersRef.current[0]>();
+        markersRef.current.forEach((m) => {
+            const key = `${m.lngLat[0].toFixed(2)}|${m.lngLat[1].toFixed(2)}`;
+            // Find matching visitor by lngLat
+            const fullKey = markersRef.current.length > 0
+                ? Array.from(newVisitorsByKey.entries()).find(([k]) => {
+                    const parts = k.split('|');
+                    return parts[1] === m.lngLat[1].toFixed(2) && parts[2] === m.lngLat[0].toFixed(2);
+                })?.[0] || key
+                : key;
+            existingByKey.set(fullKey, m);
+            existingKeys.add(fullKey);
+        });
+
+        // Remove markers that are no longer in the visitor list
+        const toRemove: typeof markersRef.current = [];
+        const toKeep: typeof markersRef.current = [];
+        markersRef.current.forEach((m) => {
+            // Check if this marker's position matches any new visitor
+            const matchKey = Array.from(newKeys).find((k) => {
+                const parts = k.split('|');
+                return parts[1] === m.lngLat[1].toFixed(2) && parts[2] === m.lngLat[0].toFixed(2);
+            });
+            if (matchKey) {
+                toKeep.push(m);
+                newKeys.delete(matchKey);
+                newVisitorsByKey.delete(matchKey);
+            } else {
+                toRemove.push(m);
+            }
+        });
+
+        // Remove stale markers
+        toRemove.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
+        markersRef.current = toKeep;
+
+        // Add new markers only for visitors that don't already have one
+        newVisitorsByKey.forEach((v) => {
             const warmthColor = getWarmthColor(v.warmth);
             const avatarUrl = getAvatarUrl(v.name);
 
-            // ─── DataFast-style marker: large avatar in dark circle ───
             const el = document.createElement('div');
             el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease;';
 
-            // Outer dark circle frame
             const frame = document.createElement('div');
             frame.style.cssText = `
                 position:absolute;top:2px;left:2px;width:56px;height:56px;
@@ -280,7 +324,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 transition:transform 0.2s ease,box-shadow 0.2s ease;
             `;
 
-            // DiceBear avatar
             const img = document.createElement('img');
             img.src = avatarUrl;
             img.alt = v.name;
@@ -293,7 +336,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             frame.appendChild(img);
             el.appendChild(frame);
 
-            // Warmth dot (top-right)
             const dot = document.createElement('div');
             dot.style.cssText = `
                 position:absolute;top:0;right:0;width:14px;height:14px;
@@ -305,7 +347,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             `;
             el.appendChild(dot);
 
-            // Hover
             el.onmouseenter = () => {
                 frame.style.transform = 'scale(1.15)';
                 frame.style.boxShadow = `0 4px 24px rgba(0,0,0,0.6),0 0 20px ${warmthColor}30`;
@@ -323,9 +364,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             markersRef.current.push({ marker, el, frame, lngLat });
         });
 
-        // Immediately update visibility
         updateMarkerVisibility();
-    }, [visitors, status, updateMarkerVisibility]);
+    }, [visitors, status, updateMarkerVisibility, visitorKey]);
 
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
