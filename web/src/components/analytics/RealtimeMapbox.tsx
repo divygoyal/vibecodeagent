@@ -247,116 +247,94 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return cleanup;
     }, [initMap]);
 
-    // Stable key for a visitor (name is deterministic from hash of city+country+index)
-    const visitorKey = useCallback((v: GlobeVisitor) => `${v.name}|${v.lat.toFixed(2)}|${v.lng.toFixed(2)}`, []);
+    // Fingerprint visitors to avoid unnecessary marker recreation
+    const lastFingerprintRef = useRef('');
 
-    // Sync avatar markers — diff-based to avoid destroying markers on SWR refresh
+    // Create a single marker DOM element for a visitor
+    const createMarkerElement = useCallback((v: GlobeVisitor) => {
+        const warmthColor = getWarmthColor(v.warmth);
+        const avatarUrl = getAvatarUrl(v.name);
+
+        const el = document.createElement('div');
+        el.style.cssText = 'width:60px;height:60px;cursor:pointer;';
+        el.title = `${v.name} — ${v.country}`;
+
+        const frame = document.createElement('div');
+        frame.style.cssText = `
+            width:56px;height:56px;margin:2px;
+            border-radius:50%;
+            background:rgba(15,20,35,0.92);
+            border:2.5px solid rgba(255,255,255,0.12);
+            box-shadow:0 4px 24px rgba(0,0,0,0.6);
+            overflow:hidden;
+        `;
+
+        const img = document.createElement('img');
+        img.src = avatarUrl;
+        img.alt = v.name;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        img.onerror = () => {
+            img.remove();
+            frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
+            frame.textContent = v.avatarInitial;
+        };
+        frame.appendChild(img);
+        el.appendChild(frame);
+
+        const dot = document.createElement('div');
+        dot.style.cssText = `
+            position:absolute;top:0;right:0;width:14px;height:14px;
+            border-radius:50%;
+            background:${warmthColor};
+            border:3px solid rgba(8,12,24,0.95);
+            z-index:2;
+            box-shadow:0 0 8px ${warmthColor}80;
+        `;
+        el.style.position = 'relative';
+        el.appendChild(dot);
+
+        el.onmouseenter = () => {
+            frame.style.transform = 'scale(1.15)';
+            frame.style.transition = 'transform 0.2s ease';
+            frame.style.boxShadow = `0 4px 24px rgba(0,0,0,0.6),0 0 20px ${warmthColor}30`;
+        };
+        el.onmouseleave = () => {
+            frame.style.transform = '';
+            frame.style.boxShadow = '0 4px 24px rgba(0,0,0,0.6)';
+        };
+
+        return { el, frame };
+    }, []);
+
+    // Sync markers — only recreate when visitor data actually changes
     useEffect(() => {
         const map = mapRef.current;
         if (!map || status !== 'ready' || !_mapboxgl) return;
 
+        // Build fingerprint from visitor coordinates + names
+        const fingerprint = visitors
+            .filter(v => v.lat !== 0 || v.lng !== 0)
+            .map(v => `${v.name}:${v.lat.toFixed(3)},${v.lng.toFixed(3)}`)
+            .sort()
+            .join('|');
+
+        // Skip if nothing changed
+        if (fingerprint === lastFingerprintRef.current) return;
+        lastFingerprintRef.current = fingerprint;
+
         const mapboxgl = _mapboxgl;
 
-        // Build set of new visitor keys
-        const newKeys = new Set<string>();
-        const newVisitorsByKey = new Map<string, GlobeVisitor>();
+        // Remove all old markers
+        markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
+        markersRef.current = [];
+
+        // Create new markers
         visitors.forEach((v) => {
             if (v.lat === 0 && v.lng === 0) return;
-            const key = visitorKey(v);
-            newKeys.add(key);
-            newVisitorsByKey.set(key, v);
-        });
 
-        // Build set of existing marker keys
-        const existingKeys = new Set<string>();
-        const existingByKey = new Map<string, typeof markersRef.current[0]>();
-        markersRef.current.forEach((m) => {
-            const key = `${m.lngLat[0].toFixed(2)}|${m.lngLat[1].toFixed(2)}`;
-            // Find matching visitor by lngLat
-            const fullKey = markersRef.current.length > 0
-                ? Array.from(newVisitorsByKey.entries()).find(([k]) => {
-                    const parts = k.split('|');
-                    return parts[1] === m.lngLat[1].toFixed(2) && parts[2] === m.lngLat[0].toFixed(2);
-                })?.[0] || key
-                : key;
-            existingByKey.set(fullKey, m);
-            existingKeys.add(fullKey);
-        });
-
-        // Remove markers that are no longer in the visitor list
-        const toRemove: typeof markersRef.current = [];
-        const toKeep: typeof markersRef.current = [];
-        markersRef.current.forEach((m) => {
-            // Check if this marker's position matches any new visitor
-            const matchKey = Array.from(newKeys).find((k) => {
-                const parts = k.split('|');
-                return parts[1] === m.lngLat[1].toFixed(2) && parts[2] === m.lngLat[0].toFixed(2);
-            });
-            if (matchKey) {
-                toKeep.push(m);
-                newKeys.delete(matchKey);
-                newVisitorsByKey.delete(matchKey);
-            } else {
-                toRemove.push(m);
-            }
-        });
-
-        // Remove stale markers
-        toRemove.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
-        markersRef.current = toKeep;
-
-        // Add new markers only for visitors that don't already have one
-        newVisitorsByKey.forEach((v) => {
-            const warmthColor = getWarmthColor(v.warmth);
-            const avatarUrl = getAvatarUrl(v.name);
-
-            const el = document.createElement('div');
-            el.style.cssText = 'position:relative;width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease;';
-
-            const frame = document.createElement('div');
-            frame.style.cssText = `
-                position:absolute;top:2px;left:2px;width:56px;height:56px;
-                border-radius:50%;
-                background:rgba(15,20,35,0.92);
-                border:2.5px solid rgba(255,255,255,0.12);
-                box-shadow:0 4px 24px rgba(0,0,0,0.6);
-                overflow:hidden;
-                transition:transform 0.2s ease,box-shadow 0.2s ease;
-            `;
-
-            const img = document.createElement('img');
-            img.src = avatarUrl;
-            img.alt = v.name;
-            img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-            img.onerror = () => {
-                img.remove();
-                frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
-                frame.textContent = v.avatarInitial;
-            };
-            frame.appendChild(img);
-            el.appendChild(frame);
-
-            const dot = document.createElement('div');
-            dot.style.cssText = `
-                position:absolute;top:0;right:0;width:14px;height:14px;
-                border-radius:50%;
-                background:${warmthColor};
-                border:3px solid rgba(8,12,24,0.95);
-                z-index:2;
-                box-shadow:0 0 8px ${warmthColor}80;
-            `;
-            el.appendChild(dot);
-
-            el.onmouseenter = () => {
-                frame.style.transform = 'scale(1.15)';
-                frame.style.boxShadow = `0 4px 24px rgba(0,0,0,0.6),0 0 20px ${warmthColor}30`;
-            };
-            el.onmouseleave = () => {
-                frame.style.transform = 'scale(1)';
-                frame.style.boxShadow = '0 4px 24px rgba(0,0,0,0.6)';
-            };
-
+            const { el, frame } = createMarkerElement(v);
             const lngLat: [number, number] = [v.lng, v.lat];
+
             const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
                 .setLngLat(lngLat)
                 .addTo(map);
@@ -365,7 +343,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         });
 
         updateMarkerVisibility();
-    }, [visitors, status, updateMarkerVisibility, visitorKey]);
+    }, [visitors, status, updateMarkerVisibility, createMarkerElement]);
 
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
