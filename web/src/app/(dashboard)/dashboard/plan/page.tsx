@@ -201,7 +201,7 @@ function PlanPageContent() {
                         <div className="mt-4 pt-4 border-t border-white/[0.06]">
                             <button
                                 onClick={() => setShowCancelModal(true)}
-                                className="text-[11px] text-zinc-500 hover:text-red-400 transition-colors"
+                                className="text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/[0.1] hover:bg-red-500/[0.12] hover:border-red-500/[0.2]"
                             >
                                 Cancel subscription
                             </button>
