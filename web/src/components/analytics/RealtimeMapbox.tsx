@@ -14,6 +14,7 @@ export interface RealtimeMapboxProps {
     byCountry?: { country: string; users: number }[];
     byCity?: { city: string; country: string; users: number }[];
     autoPan?: boolean;
+    onAutoPanChange?: (enabled: boolean) => void;
 }
 
 export interface RealtimeMapboxHandle {
@@ -39,7 +40,7 @@ async function loadMapboxGL() {
     return _mapboxgl;
 }
 
-const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true }, ref) {
+const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true, onAutoPanChange }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
     const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; frame: HTMLDivElement; lngLat: [number, number] }>>(new Map());
@@ -48,22 +49,24 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     const retryCountRef = useRef(0);
     const autoPanRef = useRef(autoPanProp);
     const autoPanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const autoPanDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const autoPanResumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const autoPanIndexRef = useRef(0);
     const visitorsRef = useRef(visitors);
     const renderListenerRef = useRef<(() => void) | null>(null);
+    const onAutoPanChangeRef = useRef(onAutoPanChange);
     visitorsRef.current = visitors;
+    onAutoPanChangeRef.current = onAutoPanChange;
 
     // ─── Globe back-side occlusion: hide markers behind the globe ───
+    // Uses CSS transition for smooth fade instead of instant toggle
     const updateMarkerVisibility = useCallback(() => {
         const map = mapRef.current;
         if (!map) return;
 
-        const cam = map.getFreeCameraOptions?.();
         const center = map.getCenter();
         const zoom = map.getZoom();
 
-        // On globe projection at low zoom, we need to hide markers on the far side
-        // Use the camera's forward direction to determine which hemisphere is visible
         const centerLat = (center.lat * Math.PI) / 180;
         const centerLng = (center.lng * Math.PI) / 180;
 
@@ -72,37 +75,35 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const markerLat = (lat * Math.PI) / 180;
             const markerLng = (lng * Math.PI) / 180;
 
-            // Dot product of center and marker vectors on unit sphere
-            // If > 0, they're on the same hemisphere (visible)
+            // Dot product on unit sphere — positive = same hemisphere (visible)
             const dot = Math.sin(centerLat) * Math.sin(markerLat) +
                 Math.cos(centerLat) * Math.cos(markerLat) * Math.cos(markerLng - centerLng);
 
-            // Threshold: slightly negative to show markers near the edge
-            // At higher zoom levels, show all markers since we're not on globe view
-            const isVisible = zoom > 5 || dot > -0.15;
+            // At high zoom we're in flat mode, show everything
+            const isVisible = zoom > 5 || dot > -0.1;
 
-            el.style.opacity = isVisible ? '1' : '0';
-            el.style.pointerEvents = isVisible ? 'auto' : 'none';
+            // Smooth transition instead of instant toggle
+            const targetOpacity = isVisible ? '1' : '0';
+            if (el.style.opacity !== targetOpacity) {
+                el.style.opacity = targetOpacity;
+                el.style.pointerEvents = isVisible ? 'auto' : 'none';
+            }
         });
     }, []);
 
-    useImperativeHandle(ref, () => ({
-        toggleAutoPan: () => {
-            autoPanRef.current = !autoPanRef.current;
-            if (autoPanRef.current) {
-                startAutoPan();
-            } else {
-                stopAutoPan();
-            }
-            return autoPanRef.current;
-        },
-        isAutoPanning: () => autoPanRef.current,
-    }));
-
+    // ─── Auto-pan: properly clears ALL timers ───
     const stopAutoPan = useCallback(() => {
         if (autoPanTimerRef.current) {
             clearInterval(autoPanTimerRef.current);
             autoPanTimerRef.current = null;
+        }
+        if (autoPanDelayRef.current) {
+            clearTimeout(autoPanDelayRef.current);
+            autoPanDelayRef.current = null;
+        }
+        if (autoPanResumeRef.current) {
+            clearTimeout(autoPanResumeRef.current);
+            autoPanResumeRef.current = null;
         }
     }, []);
 
@@ -127,9 +128,23 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             });
         };
 
-        setTimeout(fly, 1500);
+        // Track the initial delay so stopAutoPan can cancel it
+        autoPanDelayRef.current = setTimeout(fly, 1500);
         autoPanTimerRef.current = setInterval(fly, 6000);
     }, [stopAutoPan]);
+
+    useImperativeHandle(ref, () => ({
+        toggleAutoPan: () => {
+            autoPanRef.current = !autoPanRef.current;
+            if (autoPanRef.current) {
+                startAutoPan();
+            } else {
+                stopAutoPan();
+            }
+            return autoPanRef.current;
+        },
+        isAutoPanning: () => autoPanRef.current,
+    }));
 
     const initMap = useCallback(() => {
         if (!containerRef.current || !mapboxToken) {
@@ -202,20 +217,24 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     });
                 });
 
-                // Update marker occlusion on every frame
-                const onRender = () => updateMarkerVisibility();
-                map.on('render', onRender);
-                renderListenerRef.current = onRender;
+                // Throttled occlusion check — run on 'move' and 'moveend' only,
+                // NOT on every render frame (which caused performance jank)
+                const onMove = () => updateMarkerVisibility();
+                map.on('move', onMove);
+                map.on('moveend', onMove);
+                renderListenerRef.current = onMove;
 
-                // Pause auto-pan on user interaction
-                map.on('dragstart', () => {
-                    if (autoPanRef.current) stopAutoPan();
-                });
-                map.on('dragend', () => {
+                // On user interaction: stop auto-pan permanently, don't auto-restart
+                // (user must manually re-enable via the toggle button — like DataFast)
+                const disableAutoPan = () => {
                     if (autoPanRef.current) {
-                        setTimeout(() => startAutoPan(), 4000);
+                        stopAutoPan();
+                        autoPanRef.current = false;
+                        onAutoPanChangeRef.current?.(false);
                     }
-                });
+                };
+                map.on('dragstart', disableAutoPan);
+                map.on('zoomstart', disableAutoPan);
 
             } catch (err: any) {
                 console.warn('Mapbox init failed:', err?.message || err);
@@ -233,7 +252,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             markersRef.current = new Map();
             if (map) {
                 if (renderListenerRef.current) {
-                    try { map.off('render', renderListenerRef.current); } catch { /**/ }
+                    try {
+                        map.off('move', renderListenerRef.current);
+                        map.off('moveend', renderListenerRef.current);
+                    } catch { /**/ }
                 }
                 try { map.remove(); } catch { /**/ }
             }
@@ -253,7 +275,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const avatarUrl = getAvatarUrl(v.name);
 
         const el = document.createElement('div');
-        el.style.cssText = 'width:60px;height:60px;cursor:pointer;';
+        el.style.cssText = 'width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease;';
         el.title = `${v.name} — ${v.country}`;
 
         const frame = document.createElement('div');
