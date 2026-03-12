@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
     User, Mail, LogOut,
@@ -70,6 +70,14 @@ const SUBSCRIPTION_PLANS = [
 ];
 
 export default function SettingsPage() {
+    return (
+        <Suspense>
+            <SettingsPageContent />
+        </Suspense>
+    );
+}
+
+function SettingsPageContent() {
     const { data: session } = useSession();
     const { credits, plan, telegramBotEnabled, subscriptionEnd, refresh: refreshCredits } = useCredits();
     const searchParams = useSearchParams();
