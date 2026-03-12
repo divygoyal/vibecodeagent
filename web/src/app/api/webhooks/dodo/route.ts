@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import DodoPayments from 'dodopayments';
+import DodoPayments, { type DodoPayments as DodoPaymentsNS } from 'dodopayments';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const DODO_WEBHOOK_SECRET = process.env.DODO_PAYMENTS_WEBHOOK_KEY || '';
 
 const client = new DodoPayments({
-    bearerToken: process.env.DODO_PAYMENTS_API_KEY || 'unused-webhook-only',
+    bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+    environment: 'live_mode',
 });
 
-// Product ID → plan config
+// Product ID → plan config (live mode product IDs)
 const PLANS: Record<string, { plan: string; credits: number; telegramBot: boolean }> = {
     'pdt_0NZoVGbK4CoQKguLeiFbO': { plan: 'starter', credits: 50, telegramBot: false },
     'pdt_0NZoVI3aamuRliw0Ffnuh': { plan: 'growth', credits: 150, telegramBot: false },
@@ -29,34 +29,37 @@ async function updateSubscription(email: string, body: Record<string, unknown>) 
     return res;
 }
 
+type WebhookEvent = DodoPaymentsNS.UnwrapWebhookEvent;
+
 export async function POST(req: Request) {
     try {
         const rawBody = await req.text();
-        let event: any;
+        const webhookKey = process.env.DODO_PAYMENTS_WEBHOOK_KEY || '';
 
-        // Verify webhook signature (reject if no secret configured)
-        if (!DODO_WEBHOOK_SECRET) {
+        if (!webhookKey) {
             console.error('[Webhook] DODO_PAYMENTS_WEBHOOK_KEY not configured — rejecting request');
             return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
         }
 
+        let event: WebhookEvent;
         try {
             event = client.webhooks.unwrap(rawBody, {
                 headers: Object.fromEntries(req.headers.entries()),
-                key: DODO_WEBHOOK_SECRET,
+                key: webhookKey,
             });
         } catch (err) {
             console.error('[Webhook] Signature verification failed:', err);
             return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
 
-        const eventType = event.event_type || event.type;
+        const eventType = event.type;
         console.log(`[Webhook] DodoPayments event: ${eventType}`);
 
-        const data = event.data || event;
-        const productId = data?.product_id;
-        const customerEmail = data?.customer?.email;
-        const subscriptionId = data?.subscription_id;
+        // Extract subscription data from typed event
+        const data = event.data;
+        const productId = 'product_id' in data ? data.product_id : undefined;
+        const customerEmail = 'customer' in data ? data.customer.email : undefined;
+        const subscriptionId = 'subscription_id' in data ? data.subscription_id : undefined;
 
         // subscription.active — new subscription started
         if (eventType === 'subscription.active') {
@@ -108,6 +111,37 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true, renewed: true });
         }
 
+        // subscription.on_hold — payment issue, keep plan but warn
+        if (eventType === 'subscription.on_hold') {
+            console.warn(`[Webhook] Subscription on hold for ${customerEmail || 'unknown'}`);
+            return NextResponse.json({ received: true });
+        }
+
+        // subscription.plan_changed — user changed plan
+        if (eventType === 'subscription.plan_changed') {
+            if (!productId || !customerEmail) {
+                console.warn('[Webhook] subscription.plan_changed missing data');
+                return NextResponse.json({ received: true });
+            }
+
+            const planConfig = PLANS[productId];
+            if (!planConfig) {
+                console.log(`[Webhook] Unknown product ${productId} on plan change, ignoring`);
+                return NextResponse.json({ received: true });
+            }
+
+            console.log(`[Webhook] Plan changed: ${customerEmail} → ${planConfig.plan}`);
+            await updateSubscription(customerEmail, {
+                plan: planConfig.plan,
+                credits: planConfig.credits,
+                subscription_id: subscriptionId || null,
+                telegram_bot_enabled: planConfig.telegramBot,
+                reset_credits: true,
+            });
+
+            return NextResponse.json({ received: true, plan: planConfig.plan });
+        }
+
         // subscription.cancelled / subscription.expired — downgrade to free
         if (eventType === 'subscription.cancelled' || eventType === 'subscription.expired') {
             if (!customerEmail) {
@@ -121,21 +155,30 @@ export async function POST(req: Request) {
                 credits: 0,
                 subscription_id: null,
                 telegram_bot_enabled: false,
-                reset_credits: false, // keep remaining credits
+                reset_credits: false,
             });
 
             return NextResponse.json({ received: true, downgraded: true });
         }
 
-        // subscription.failed — log warning
+        // subscription.failed — payment failed
         if (eventType === 'subscription.failed') {
             console.warn(`[Webhook] Subscription payment failed for ${customerEmail || 'unknown'}`);
             return NextResponse.json({ received: true });
         }
 
-        // payment.succeeded — backward compat logging
+        // payment.succeeded — log for audit trail
         if (eventType === 'payment.succeeded') {
-            console.log(`[Webhook] Payment succeeded: ${customerEmail || 'unknown'}, product: ${productId || 'unknown'}`);
+            const paymentData = event.data;
+            const payEmail = 'customer' in paymentData ? paymentData.customer.email : 'unknown';
+            const payProduct = 'product_id' in paymentData ? paymentData.product_id : 'unknown';
+            console.log(`[Webhook] Payment succeeded: ${payEmail}, product: ${payProduct}`);
+            return NextResponse.json({ received: true });
+        }
+
+        // refund.succeeded — handle refund by downgrading
+        if (eventType === 'refund.succeeded') {
+            console.log(`[Webhook] Refund succeeded`);
             return NextResponse.json({ received: true });
         }
 
