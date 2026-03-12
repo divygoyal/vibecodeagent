@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { signIn, useSession } from 'next-auth/react';
+import { getSafeRedirectUrl } from '@/lib/checkout';
 import Link from 'next/link';
 import {
     Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot
@@ -121,7 +122,7 @@ export default function PricingClient() {
             signIn('github', { callbackUrl: `/dashboard/plan` });
             return;
         }
-        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(window.location.origin + '/dashboard/plan?upgraded=true')}`;
+        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(getSafeRedirectUrl('/dashboard/plan?upgraded=true'))}`;
         window.open(checkoutUrl, '_blank');
     };
 

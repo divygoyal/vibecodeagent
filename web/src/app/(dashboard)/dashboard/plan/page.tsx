@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
+import { getSafeRedirectUrl } from '@/lib/checkout';
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -259,7 +260,7 @@ function PlanPageContent() {
                         const isCurrentPlan = p.key === plan;
                         const isUpgrade = SUBSCRIPTION_PLANS.findIndex(x => x.key === plan) < SUBSCRIPTION_PLANS.findIndex(x => x.key === p.key);
                         const userEmail = session?.user?.email || '';
-                        const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/plan?upgraded=true` : '';
+                        const returnUrl = getSafeRedirectUrl('/dashboard/plan?upgraded=true');
                         const checkoutUrl = userEmail
                             ? `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(userEmail)}&redirect_url=${encodeURIComponent(returnUrl)}`
                             : '';
