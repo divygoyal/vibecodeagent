@@ -1,0 +1,43 @@
+name: Auto PR & Merge
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  auto-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest commit message
+        id: commit
+        run: echo "message=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+
+      - name: Create PR
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: refactor/multi-provider
+          title: "${{ steps.commit.outputs.message }}"
+          body: |
+            Automated PR from `${{ github.ref_name }}`
+
+            **Latest commit:** ${{ steps.commit.outputs.message }}
+            **Pushed by:** ${{ github.actor }}
+          delete-branch: false
+
+      - name: Auto Merge
+        if: steps.cpr.outputs.pull-request-number
+        run: gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
