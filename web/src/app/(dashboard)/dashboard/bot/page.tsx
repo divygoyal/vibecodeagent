@@ -55,7 +55,7 @@ export default function BotPage() {
     const [errorMsg, setErrorMsg] = useState('');
     const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [botEngine, setBotEngine] = useState<'openclaw' | 'nanobot'>('openclaw');
+    const botEngine = 'nanobot' as const;
     const [copiedUsername, setCopiedUsername] = useState(false);
     const [showAllCapabilities, setShowAllCapabilities] = useState(false);
 
@@ -294,28 +294,6 @@ export default function BotPage() {
                                     onChange={(e) => setBotToken(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSetupBot()}
                                 />
-                            </div>
-
-                            <label className="text-sm font-medium text-zinc-400 mb-2 block">Select Engine</label>
-                            <div className="flex gap-3 mb-6">
-                                <button
-                                    onClick={() => setBotEngine('openclaw')}
-                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'openclaw'
-                                        ? 'bg-zinc-800 border-zinc-600 text-white'
-                                        : 'bg-[#050508] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
-                                        }`}
-                                >
-                                    OpenClaw
-                                </button>
-                                <button
-                                    onClick={() => setBotEngine('nanobot')}
-                                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-medium transition-all ${botEngine === 'nanobot'
-                                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                                        : 'bg-[#050508] border-white/[0.08] text-zinc-500 hover:bg-white/[0.02]'
-                                        }`}
-                                >
-                                    Nanobot (Fast)
-                                </button>
                             </div>
 
                             <button
