@@ -187,7 +187,7 @@ export default function BotPage() {
                         </div>
 
                         <a
-                            href={`https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop?email=${encodeURIComponent(session?.user?.email || '')}`}
+                            href={`https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop?email=${encodeURIComponent(session?.user?.email || '')}&redirect_url=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/dashboard/bot` : '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-violet-400 to-purple-500 text-white font-semibold rounded-xl hover:shadow-[0_0_24px_rgba(139,92,246,0.35)] transition-all text-sm"

@@ -1,7 +1,8 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
     User, Mail, LogOut,
     CheckCircle2, ChevronRight, Coins, MessageSquare, Sparkles, Bot, Crown,
@@ -70,7 +71,19 @@ const SUBSCRIPTION_PLANS = [
 
 export default function SettingsPage() {
     const { data: session } = useSession();
-    const { credits, plan, telegramBotEnabled, subscriptionEnd } = useCredits();
+    const { credits, plan, telegramBotEnabled, subscriptionEnd, refresh: refreshCredits } = useCredits();
+    const searchParams = useSearchParams();
+    const justUpgraded = useMemo(() => searchParams.get('upgraded') === 'true', [searchParams]);
+    const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(justUpgraded);
+
+    useEffect(() => {
+        if (!justUpgraded) return;
+        refreshCredits();
+        window.history.replaceState({}, '', '/dashboard/settings');
+        const timer = setTimeout(() => setShowUpgradeSuccess(false), 8000);
+        return () => clearTimeout(timer);
+    }, [justUpgraded, refreshCredits]);
+
     const [notifications, setNotifications] = useState(() => {
         if (typeof window !== 'undefined') {
             try {
@@ -185,6 +198,17 @@ export default function SettingsPage() {
             </>)}
 
             {activeTab === 'billing' && (<>
+            {/* Upgrade Success Banner */}
+            {showUpgradeSuccess && (
+                <div className="bg-emerald-500/[0.08] border border-emerald-500/[0.2] rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                    <div>
+                        <p className="text-sm font-semibold text-emerald-300">Payment successful!</p>
+                        <p className="text-xs text-zinc-400">Your plan is being activated. It may take a moment to reflect.</p>
+                    </div>
+                </div>
+            )}
+
             {/* Current Plan Card */}
             <div className={`relative overflow-hidden border rounded-2xl p-6 ${
                 plan === 'pro' ? 'bg-gradient-to-br from-violet-500/[0.08] to-purple-500/[0.04] border-violet-500/[0.2]' :
@@ -274,7 +298,8 @@ export default function SettingsPage() {
                     {SUBSCRIPTION_PLANS.map((p) => {
                         const isCurrentPlan = p.key === plan;
                         const isUpgrade = SUBSCRIPTION_PLANS.findIndex(x => x.key === plan) < SUBSCRIPTION_PLANS.findIndex(x => x.key === p.key);
-                        const checkoutUrl = `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(session?.user?.email || '')}`;
+                        const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/settings?upgraded=true` : '';
+                        const checkoutUrl = `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(session?.user?.email || '')}&redirect_url=${encodeURIComponent(returnUrl)}`;
                         const IconComp = p.icon;
                         const isGrowth = p.key === 'growth';
                         const isPro = p.key === 'pro';
