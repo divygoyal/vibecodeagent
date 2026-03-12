@@ -41,6 +41,12 @@ export async function POST() {
             return NextResponse.json({ error: 'You are already on the free plan' }, { status: 400 });
         }
 
+        // Idempotency: if already cancelled, return success without calling Dodo again
+        if (userData.subscription_cancelled) {
+            console.log(`[Cancel] Subscription already cancelled for user ${userId}, returning success`);
+            return NextResponse.json({ success: true, message: 'Subscription is already cancelled. You will retain access until the end of your current billing period.' });
+        }
+
         let subscriptionId = userData.subscription_id;
 
         // If subscription_id not in DB, search Dodo Payments by email
