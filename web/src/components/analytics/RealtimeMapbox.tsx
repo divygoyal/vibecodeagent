@@ -313,7 +313,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 const marker = new mapboxgl.Marker({
                     element: el,
                     anchor: 'center',
-                    occludedOpacity: 0,
                 })
                     .setLngLat(lngLat)
                     .addTo(map);
