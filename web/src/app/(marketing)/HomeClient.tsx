@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { signIn, useSession } from 'next-auth/react';
+import { getSafeRedirectUrl } from '@/lib/checkout';
 import Link from 'next/link';
 import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 
@@ -1417,7 +1418,7 @@ function Pricing() {
             signIn('github', { callbackUrl: `/dashboard/plan` });
             return;
         }
-        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(window.location.origin + '/dashboard/plan?upgraded=true')}`;
+        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(getSafeRedirectUrl('/dashboard/plan?upgraded=true'))}`;
         window.open(checkoutUrl, '_blank');
     };
 
