@@ -103,7 +103,7 @@ export default function RealtimePage() {
     const { data: realtimeData, isLoading } = useRealtimeData(selectedProperty, hasGoogleConnection);
     const [mounted, setMounted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [isAutoPanning, setIsAutoPanning] = useState(true);
+    const [isAutoPanning, setIsAutoPanning] = useState(false);
     const mapRef = useRef<RealtimeMapboxHandle>(null);
 
     const toggleAutoPan = useCallback(() => {
