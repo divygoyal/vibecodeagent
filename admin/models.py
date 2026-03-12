@@ -44,6 +44,7 @@ class User(Base):
     # Subscription (Dodo Payments)
     subscription_id = Column(String(100), nullable=True)  # Dodo subscription ID
     telegram_bot_enabled = Column(Boolean, default=False)  # Pro plan perk
+    subscription_cancelled = Column(Boolean, default=False)  # True when user cancelled but plan still active
 
     # Bot Settings
     bot_engine = Column(String(50), default="openclaw")  # openclaw or nanobot

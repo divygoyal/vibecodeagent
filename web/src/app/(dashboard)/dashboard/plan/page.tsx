@@ -62,7 +62,7 @@ export default function PlanPage() {
 
 function PlanPageContent() {
     const { data: session } = useSession();
-    const { credits, plan, telegramBotEnabled, subscriptionEnd, subscriptionId, refresh: refreshCredits } = useCredits();
+    const { credits, plan, telegramBotEnabled, subscriptionEnd, subscriptionId, subscriptionCancelled, refresh: refreshCredits } = useCredits();
     const searchParams = useSearchParams();
     const justUpgraded = useMemo(() => searchParams.get('upgraded') === 'true', [searchParams]);
     const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(justUpgraded);
@@ -154,8 +154,12 @@ function PlanPageContent() {
                             </div>
                         </div>
                         {renewalDate && plan !== 'free' && (
-                            <div className="text-[10px] text-zinc-500 bg-white/[0.04] px-2.5 py-1 rounded-lg">
-                                Renews {renewalDate}
+                            <div className={`text-[10px] px-2.5 py-1 rounded-lg ${
+                                subscriptionCancelled
+                                    ? 'text-amber-400 bg-amber-500/[0.08] border border-amber-500/[0.15]'
+                                    : 'text-zinc-500 bg-white/[0.04]'
+                            }`}>
+                                {subscriptionCancelled ? `Active until ${renewalDate}` : `Renews ${renewalDate}`}
                             </div>
                         )}
                     </div>
@@ -196,15 +200,24 @@ function PlanPageContent() {
                         </div>
                     )}
 
-                    {/* Cancel subscription button */}
+                    {/* Cancel subscription button or cancelled status */}
                     {plan !== 'free' && (
                         <div className="mt-4 pt-4 border-t border-white/[0.06]">
-                            <button
-                                onClick={() => setShowCancelModal(true)}
-                                className="text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/[0.1] hover:bg-red-500/[0.12] hover:border-red-500/[0.2]"
-                            >
-                                Cancel subscription
-                            </button>
+                            {subscriptionCancelled ? (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/[0.06] border border-amber-500/[0.1]">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                    <span className="text-[11px] text-amber-300">
+                                        Subscription cancelled — active until {renewalDate || 'end of billing period'}
+                                    </span>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowCancelModal(true)}
+                                    className="text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/[0.1] hover:bg-red-500/[0.12] hover:border-red-500/[0.2]"
+                                >
+                                    Cancel subscription
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
