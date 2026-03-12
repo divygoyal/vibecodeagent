@@ -70,6 +70,13 @@ export async function POST() {
             status: 'cancelled',
         });
 
+        // Mark as cancelled in our DB immediately (so UI updates without waiting for webhook)
+        await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}/cancel-flag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+            body: JSON.stringify({ subscription_cancelled: true }),
+        });
+
         console.log(`[Cancel] Subscription ${subscriptionId} cancelled for user ${userId}`);
 
         return NextResponse.json({ success: true, message: 'Subscription cancelled. You will retain access until the end of your current billing period.' });

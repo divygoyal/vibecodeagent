@@ -81,6 +81,7 @@ export async function POST(req: Request) {
                 subscription_id: subscriptionId || null,
                 telegram_bot_enabled: planConfig.telegramBot,
                 reset_credits: true,
+                subscription_cancelled: false,
             });
 
             return NextResponse.json({ received: true, plan: planConfig.plan });
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
                 subscription_id: subscriptionId || null,
                 telegram_bot_enabled: planConfig.telegramBot,
                 reset_credits: true,
+                subscription_cancelled: false,
             });
 
             return NextResponse.json({ received: true, renewed: true });
@@ -149,9 +151,17 @@ export async function POST(req: Request) {
                 return NextResponse.json({ received: true });
             }
 
-            console.log(`[Webhook] subscription.cancelled: ${customerEmail} — plan stays active until billing period ends`);
-            // Do NOT downgrade yet — the user's plan remains active until subscription_end.
-            // The actual downgrade happens when subscription.expired fires at period end.
+            console.log(`[Webhook] subscription.cancelled: ${customerEmail} — marking as cancelled, plan stays active until billing period ends`);
+            // Mark as cancelled but do NOT downgrade — plan remains active until subscription_end.
+            // We need to call the subscription endpoint to set the cancelled flag without changing plan/credits.
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(customerEmail)}/cancel-flag`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+                body: JSON.stringify({ subscription_cancelled: true }),
+            });
+            if (!res.ok) {
+                console.error(`[Webhook] Failed to set cancel flag: ${res.status}`);
+            }
             return NextResponse.json({ received: true, cancelled: true });
         }
 

@@ -36,7 +36,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         
         # Auto-migrate new columns for existing SQLite databases
-        for col, col_def in [("credits", "INTEGER DEFAULT 10"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"), ("subscription_id", "VARCHAR(100)"), ("telegram_bot_enabled", "BOOLEAN DEFAULT 0")]:
+        for col, col_def in [("credits", "INTEGER DEFAULT 10"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"), ("subscription_id", "VARCHAR(100)"), ("telegram_bot_enabled", "BOOLEAN DEFAULT 0"), ("subscription_cancelled", "BOOLEAN DEFAULT 0")]:
             try:
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
             except Exception:
@@ -644,6 +644,7 @@ async def get_user(
         "subscription_id": user.subscription_id,
         "subscription_start": user.subscription_start,
         "subscription_end": user.subscription_end,
+        "subscription_cancelled": user.subscription_cancelled or False,
         "telegram_bot_enabled": user.telegram_bot_enabled or False,
         "created_at": user.created_at,
         "telegram_bot_username": container_status.get("bot_username"), # Use container status
@@ -994,6 +995,7 @@ class SubscriptionUpdate(BaseModel):
     subscription_id: Optional[str] = None
     telegram_bot_enabled: bool = False
     reset_credits: bool = False  # True = set credits to amount, False = add credits
+    subscription_cancelled: Optional[bool] = None  # Set to True when cancelled, False on new/renewed
 
 @app.post("/api/users/{identifier}/subscription")
 async def update_user_subscription(
@@ -1011,6 +1013,8 @@ async def update_user_subscription(
     if request.subscription_id is not None:
         user.subscription_id = request.subscription_id
     user.telegram_bot_enabled = request.telegram_bot_enabled
+    if request.subscription_cancelled is not None:
+        user.subscription_cancelled = request.subscription_cancelled
 
     if request.reset_credits:
         user.credits = request.credits
@@ -1030,6 +1034,29 @@ async def update_user_subscription(
         "subscription_id": user.subscription_id,
         "telegram_bot_enabled": user.telegram_bot_enabled,
     }
+
+
+class CancelFlagUpdate(BaseModel):
+    subscription_cancelled: bool
+
+@app.post("/api/users/{identifier}/cancel-flag")
+async def update_cancel_flag(
+    identifier: str,
+    request: CancelFlagUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Set or clear the subscription_cancelled flag without changing plan/credits"""
+    user = await get_user_by_identifier(db, identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.subscription_cancelled = request.subscription_cancelled
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+
+    print(f"[SUBSCRIPTION] Cancel flag for {identifier}: {request.subscription_cancelled}")
+    return {"subscription_cancelled": user.subscription_cancelled}
 
 
 # ============= Container Endpoints =============

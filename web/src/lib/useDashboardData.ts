@@ -240,6 +240,7 @@ export function useCredits() {
         telegramBotEnabled: data?.telegram_bot_enabled ?? false,
         subscriptionEnd: data?.subscription_end ?? null,
         subscriptionId: data?.subscription_id ?? null,
+        subscriptionCancelled: data?.subscription_cancelled ?? false,
         isLoading,
         isError: error,
         refresh: mutate,
