@@ -14,7 +14,7 @@ import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Sun, Moon, Coins, MessageSquare,
-    CalendarDays, ChevronDown, Bell, Eye, Globe
+    CalendarDays, ChevronDown, Bell, Eye, Globe, CreditCard
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
@@ -56,6 +56,7 @@ const sidebarItems = [
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
     { icon: Search, label: 'SEO', href: '/dashboard/seo' },
     { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
+    { icon: CreditCard, label: 'Plan', href: '/dashboard/plan' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
 
@@ -82,7 +83,7 @@ export default function DashboardLayout({
 }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
-    const { credits } = useCredits();
+    const { credits, plan: userPlan } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState(() => {
@@ -362,8 +363,19 @@ export default function DashboardLayout({
                                 />
                             )}
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium text-zinc-300 truncate">
+                                <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
                                     {session.user.name}
+                                    <Link
+                                        href="/dashboard/plan"
+                                        className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none hover:opacity-80 transition-opacity ${
+                                            userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                            : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                            : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
+                                            : 'bg-zinc-700 text-zinc-400'
+                                        }`}
+                                    >
+                                        {userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                    </Link>
                                 </div>
                                 <div className="text-[10px] text-zinc-600 truncate">
                                     {session.user.email}
@@ -736,7 +748,21 @@ export default function DashboardLayout({
                                         <img src={session.user.image} alt="" className="w-7 h-7 rounded-full" />
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-xs font-medium text-zinc-300 truncate">{session.user.name}</div>
+                                        <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
+                                            {session.user.name}
+                                            <Link
+                                                href="/dashboard/plan"
+                                                onClick={() => setMobileOpen(false)}
+                                                className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
+                                                    userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                                    : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                                    : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
+                                                    : 'bg-zinc-700 text-zinc-400'
+                                                }`}
+                                            >
+                                                {userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                            </Link>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={() => signOut({ callbackUrl: '/' })}

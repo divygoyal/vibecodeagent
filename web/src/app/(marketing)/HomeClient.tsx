@@ -1104,10 +1104,10 @@ function Pricing() {
 
     const handleCheckout = (productId: string) => {
         if (!session?.user?.email) {
-            signIn('github', { callbackUrl: `/dashboard/settings?tab=billing` });
+            signIn('github', { callbackUrl: `/dashboard/plan` });
             return;
         }
-        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(window.location.origin + '/dashboard/settings?upgraded=true')}`;
+        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(window.location.origin + '/dashboard/plan?upgraded=true')}`;
         window.open(checkoutUrl, '_blank');
     };
 
