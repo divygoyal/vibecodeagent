@@ -50,12 +50,12 @@ export const useRegistration = () => useContext(RegistrationContext);
 
 const sidebarItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-    { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' },
     { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
     { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
     { icon: Search, label: 'SEO', href: '/dashboard/seo' },
     { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
+    { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' },
     { icon: CreditCard, label: 'Plan', href: '/dashboard/plan' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
