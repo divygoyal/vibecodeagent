@@ -9,7 +9,7 @@ import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
     ArrowRight, CheckCircle2, Star, Sparkles,
-    MousePointerClick, Eye, ArrowUpRight, ChevronRight, MessageSquare,
+    MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare,
     ScanSearch, Clock
 } from 'lucide-react';
 import {
@@ -439,13 +439,6 @@ function Features() {
             description: 'Real-time visitors, traffic trends, bounce rates, and conversion funnels — all in one overview.',
             gradient: 'from-violet-400 to-purple-400',
             tag: 'Insights',
-        },
-        {
-            icon: Eye,
-            title: 'AI Visibility',
-            description: 'Track how AI models like ChatGPT and Gemini reference your brand. Coming soon.',
-            gradient: 'from-amber-400 to-orange-400',
-            tag: 'New',
         },
         {
             icon: ScanSearch,

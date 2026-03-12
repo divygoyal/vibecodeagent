@@ -14,7 +14,7 @@ import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Sun, Moon, Coins, MessageSquare,
-    CalendarDays, ChevronDown, Bell, Eye, Globe, CreditCard
+    CalendarDays, ChevronDown, Bell, Globe, CreditCard
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
@@ -55,7 +55,6 @@ const sidebarItems = [
     { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
     { icon: Search, label: 'SEO', href: '/dashboard/seo' },
     { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
-    { icon: Eye, label: 'AI Visibility', href: '/dashboard/ai-visibility' },
     { icon: CreditCard, label: 'Plan', href: '/dashboard/plan' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];

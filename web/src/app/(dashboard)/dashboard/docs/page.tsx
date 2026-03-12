@@ -235,7 +235,6 @@ export default function DocsPage() {
                                 <FeatureItem label="Blog post generator" desc="AI-written SEO-optimized blog content based on your keywords" />
                                 <FeatureItem label="Keyword research" desc="Find related keywords and search volume estimates" />
                                 <FeatureItem label="Internal linking suggestions" desc="Discover linking opportunities across your content" />
-                                <FeatureItem label="AI Visibility tracking" desc="Monitor how AI search engines reference your site" />
                             </div>
                         </div>
                     </>
