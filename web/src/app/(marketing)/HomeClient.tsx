@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { motion, useInView } from 'framer-motion';
+import { motion, useInView, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import { signIn, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
@@ -16,6 +17,10 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
+
+import type { GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
+
+const RealtimeGlobe = dynamic(() => import('@/components/analytics/RealtimeGlobe'), { ssr: false });
 
 /* ═══════════════════════════════════════
    FAKE DATA — realistic-looking sample data
@@ -49,6 +54,29 @@ const sourceData = [
     { name: 'Direct', value: 28, color: '#22d3ee' },
     { name: 'Social', value: 18, color: '#a78bfa' },
     { name: 'Referral', value: 12, color: '#f472b6' },
+];
+
+/* Globe demo data — hardcoded, zero API calls */
+const DEMO_VISITORS: GlobeVisitor[] = [
+    { id: '1', lat: 37.77, lng: -122.42, name: 'coral falcon', country: 'United States', avatarColor: '#f87171', avatarInitial: 'CF', warmth: 0.8, users: 3 },
+    { id: '2', lat: 51.51, lng: -0.13, name: 'jade owl', country: 'United Kingdom', avatarColor: '#34d399', avatarInitial: 'JO', warmth: 0.7, users: 2 },
+    { id: '3', lat: 20.59, lng: 78.96, name: 'amber wolf', country: 'India', avatarColor: '#fbbf24', avatarInitial: 'AW', warmth: 0.5, users: 2 },
+    { id: '4', lat: 35.69, lng: 139.69, name: 'silver crane', country: 'Japan', avatarColor: '#a78bfa', avatarInitial: 'SC', warmth: 0.65, users: 1 },
+    { id: '5', lat: -33.87, lng: 151.21, name: 'rose finch', country: 'Australia', avatarColor: '#fb923c', avatarInitial: 'RF', warmth: 0.6, users: 1 },
+    { id: '6', lat: 52.52, lng: 13.41, name: 'teal hawk', country: 'Germany', avatarColor: '#22d3ee', avatarInitial: 'TH', warmth: 0.55, users: 1 },
+    { id: '7', lat: 1.35, lng: 103.82, name: 'bronze panda', country: 'Singapore', avatarColor: '#e879f9', avatarInitial: 'BP', warmth: 0.45, users: 1 },
+    { id: '8', lat: 56.26, lng: 9.50, name: 'topaz crow', country: 'Denmark', avatarColor: '#4ade80', avatarInitial: 'TC', warmth: 0.4, users: 1 },
+];
+
+const DEMO_BY_COUNTRY = DEMO_VISITORS.map(v => ({ country: v.country, users: v.users }));
+
+const DEMO_ACTIVITY = [
+    { name: 'coral falcon', country: 'United States', flag: '\u{1F1FA}\u{1F1F8}', page: '500+ Agent Skills for Claude Code, Cursor & AI Assistants', time: 'a few seconds ago' },
+    { name: 'jade owl', country: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}', page: 'Antigravity Codes | 1,500+ MCP Servers, AI Rules', time: '8 seconds ago' },
+    { name: 'amber wolf', country: 'India', flag: '\u{1F1EE}\u{1F1F3}', page: 'Best MCP Servers for Cursor IDE', time: '15 seconds ago' },
+    { name: 'silver crane', country: 'Japan', flag: '\u{1F1EF}\u{1F1F5}', event: 'exited to' as const, exitUrl: 'apps.apple.com/app/...', time: '24 seconds ago' },
+    { name: 'rose finch', country: 'Australia', flag: '\u{1F1E6}\u{1F1FA}', page: 'AI Coding Assistant Comparison 2026', time: '31 seconds ago' },
+    { name: 'teal hawk', country: 'Germany', flag: '\u{1F1E9}\u{1F1EA}', page: 'How to Build Custom MCP Servers', time: '45 seconds ago' },
 ];
 
 const pagePerformance = [
@@ -507,6 +535,9 @@ function Features() {
    ═══════════════════════════════════════ */
 
 function InteractiveDemo() {
+    const [activeTab, setActiveTab] = useState<'analytics' | 'globe'>('analytics');
+    const [hasClickedGlobe, setHasClickedGlobe] = useState(false);
+
     return (
         <Section id="demo" className="py-24 sm:py-32 px-6">
             <div className="max-w-7xl mx-auto">
@@ -533,141 +564,287 @@ function InteractiveDemo() {
                     <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-violet-500/10 rounded-3xl blur-2xl" />
 
                     <div className="relative bg-[#050508] border border-white/[0.08] rounded-2xl overflow-hidden">
-                        {/* Dashboard header */}
+                        {/* Dashboard header with toggle */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
                             <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <span className="text-sm font-medium text-white">Analytics Overview</span>
+                                <span className="text-sm font-medium text-white">
+                                    {activeTab === 'analytics' ? 'Analytics Overview' : 'Real-Time Globe'}
+                                </span>
                                 <span className="text-xs text-zinc-500">acme-store.com</span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-zinc-500">
-                                <span className="px-2.5 py-1 rounded-md bg-white/[0.05] text-zinc-300">Last 30 days</span>
-                            </div>
-                        </div>
-
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6">
-                            <KPICard label="Active Users" value="24,582" change="+22.4%" positive />
-                            <KPICard label="Search Clicks" value="8,965" change="+18.7%" positive />
-                            <KPICard label="Avg Position" value="7.1" change="-0.4%" positive />
-                            <KPICard label="AI Queries" value="1,247" change="+156%" positive />
-                        </div>
-
-                        {/* Charts row */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6 pb-6">
-                            {/* Traffic chart - spans 2 cols */}
-                            <div className="lg:col-span-2 bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-sm font-medium text-white">Traffic Trend</h3>
-                                    <div className="flex gap-3 text-xs">
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                                            <span className="text-zinc-400">Users</span>
-                                        </span>
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                                            <span className="text-zinc-400">Sessions</span>
-                                        </span>
+                            <div className="flex items-center gap-3">
+                                {/* View toggle */}
+                                <div className="relative flex items-center">
+                                    <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5">
+                                        <button
+                                            onClick={() => setActiveTab('analytics')}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                                                activeTab === 'analytics'
+                                                    ? 'bg-emerald-500/[0.15] text-emerald-400 border border-emerald-500/[0.2] shadow-sm'
+                                                    : 'text-zinc-500 hover:text-zinc-300'
+                                            }`}
+                                        >
+                                            <BarChart3 className="w-3 h-3" />
+                                            <span className="hidden sm:inline">Analytics</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveTab('globe'); setHasClickedGlobe(true); }}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                                                activeTab === 'globe'
+                                                    ? 'bg-emerald-500/[0.15] text-emerald-400 border border-emerald-500/[0.2] shadow-sm'
+                                                    : 'text-zinc-500 hover:text-zinc-300'
+                                            }`}
+                                        >
+                                            <Globe className="w-3 h-3" />
+                                            <span className="hidden sm:inline">Globe</span>
+                                        </button>
                                     </div>
-                                </div>
-                                <div className="h-[200px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={trafficData}>
-                                            <defs>
-                                                <linearGradient id="gradientUsers" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />
-                                                    <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
-                                                </linearGradient>
-                                                <linearGradient id="gradientSessions" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.2} />
-                                                    <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
-                                            <Tooltip
-                                                contentStyle={{ background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px' }}
-                                                labelStyle={{ color: '#a1a1aa' }}
-                                            />
-                                            <Area type="monotone" dataKey="sessions" stroke="#22d3ee" strokeWidth={2} fill="url(#gradientSessions)" />
-                                            <Area type="monotone" dataKey="users" stroke="#34d399" strokeWidth={2} fill="url(#gradientUsers)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
 
-                            {/* Traffic sources */}
-                            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
-                                <h3 className="text-sm font-medium text-white mb-4">Traffic Sources</h3>
-                                <div className="h-[140px] flex items-center justify-center">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={sourceData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={40}
-                                                outerRadius={65}
-                                                paddingAngle={3}
-                                                dataKey="value"
-                                                strokeWidth={0}
+                                    {/* "Try this" tooltip — hidden after first click */}
+                                    {!hasClickedGlobe && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 4 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="absolute -bottom-10 right-0 whitespace-nowrap pointer-events-none"
+                                        >
+                                            <motion.div
+                                                animate={{ y: [0, -3, 0] }}
+                                                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                                                className="relative px-3 py-1.5 rounded-lg bg-white/[0.08] border border-white/[0.06] backdrop-blur-sm"
                                             >
-                                                {sourceData.map((entry, i) => (
-                                                    <Cell key={i} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                                <div className="absolute -top-1 right-6 w-2 h-2 bg-white/[0.08] border-l border-t border-white/[0.06] rotate-45" />
+                                                <span className="text-[11px] text-zinc-300">
+                                                    Try this <span className="text-amber-400">&#10024;</span> <span className="text-zinc-500">(people are addicted)</span>
+                                                </span>
+                                            </motion.div>
+                                        </motion.div>
+                                    )}
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                    {sourceData.map((s) => (
-                                        <div key={s.name} className="flex items-center gap-2 text-xs">
-                                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                                            <span className="text-zinc-400">{s.name}</span>
-                                            <span className="text-zinc-300 ml-auto">{s.value}%</span>
-                                        </div>
-                                    ))}
-                                </div>
+
+                                {/* Context badge */}
+                                <span className="px-2.5 py-1 rounded-md bg-white/[0.05] text-xs text-zinc-300">
+                                    {activeTab === 'analytics' ? 'Last 30 days' : 'REAL-TIME'}
+                                </span>
                             </div>
                         </div>
 
-                        {/* Top Queries table */}
-                        <div className="px-6 pb-6">
-                            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-sm font-medium text-white">Top Search Queries</h3>
-                                    <span className="text-xs text-emerald-400 flex items-center gap-1">
-                                        <Search className="w-3 h-3" /> From Google Search Console
-                                    </span>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="text-xs text-zinc-500 uppercase tracking-wider">
-                                                <th className="text-left pb-3 font-medium">Query</th>
-                                                <th className="text-right pb-3 font-medium">Clicks</th>
-                                                <th className="text-right pb-3 font-medium">Impressions</th>
-                                                <th className="text-right pb-3 font-medium">CTR</th>
-                                                <th className="text-right pb-3 font-medium">Position</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {queryData.map((row, i) => (
-                                                <tr key={i} className="border-t border-white/[0.04]">
-                                                    <td className="py-2.5 text-zinc-300">{row.query}</td>
-                                                    <td className="py-2.5 text-right text-emerald-400 font-medium">{row.clicks.toLocaleString()}</td>
-                                                    <td className="py-2.5 text-right text-zinc-400">{row.impressions.toLocaleString()}</td>
-                                                    <td className="py-2.5 text-right">
-                                                        <span className={row.ctr >= 5 ? 'text-emerald-400' : 'text-amber-400'}>{row.ctr}%</span>
-                                                    </td>
-                                                    <td className="py-2.5 text-right text-zinc-400">{row.position}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+                        {/* Content area */}
+                        <AnimatePresence mode="wait">
+                            {activeTab === 'analytics' ? (
+                                <motion.div
+                                    key="analytics"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    {/* KPI Cards */}
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6">
+                                        <KPICard label="Active Users" value="24,582" change="+22.4%" positive />
+                                        <KPICard label="Search Clicks" value="8,965" change="+18.7%" positive />
+                                        <KPICard label="Avg Position" value="7.1" change="-0.4%" positive />
+                                        <KPICard label="AI Queries" value="1,247" change="+156%" positive />
+                                    </div>
+
+                                    {/* Charts row */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6 pb-6">
+                                        {/* Traffic chart - spans 2 cols */}
+                                        <div className="lg:col-span-2 bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-sm font-medium text-white">Traffic Trend</h3>
+                                                <div className="flex gap-3 text-xs">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                                        <span className="text-zinc-400">Users</span>
+                                                    </span>
+                                                    <span className="flex items-center gap-1.5">
+                                                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                                                        <span className="text-zinc-400">Sessions</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="h-[200px]">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={trafficData}>
+                                                        <defs>
+                                                            <linearGradient id="gradientUsers" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />
+                                                                <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                                                            </linearGradient>
+                                                            <linearGradient id="gradientSessions" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.2} />
+                                                                <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                                        <YAxis tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+                                                        <Tooltip
+                                                            contentStyle={{ background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px' }}
+                                                            labelStyle={{ color: '#a1a1aa' }}
+                                                        />
+                                                        <Area type="monotone" dataKey="sessions" stroke="#22d3ee" strokeWidth={2} fill="url(#gradientSessions)" />
+                                                        <Area type="monotone" dataKey="users" stroke="#34d399" strokeWidth={2} fill="url(#gradientUsers)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+
+                                        {/* Traffic sources */}
+                                        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
+                                            <h3 className="text-sm font-medium text-white mb-4">Traffic Sources</h3>
+                                            <div className="h-[140px] flex items-center justify-center">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={sourceData}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            innerRadius={40}
+                                                            outerRadius={65}
+                                                            paddingAngle={3}
+                                                            dataKey="value"
+                                                            strokeWidth={0}
+                                                        >
+                                                            {sourceData.map((entry, i) => (
+                                                                <Cell key={i} fill={entry.color} />
+                                                            ))}
+                                                        </Pie>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                                {sourceData.map((s) => (
+                                                    <div key={s.name} className="flex items-center gap-2 text-xs">
+                                                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                                                        <span className="text-zinc-400">{s.name}</span>
+                                                        <span className="text-zinc-300 ml-auto">{s.value}%</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Top Queries table */}
+                                    <div className="px-6 pb-6">
+                                        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-sm font-medium text-white">Top Search Queries</h3>
+                                                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                                                    <Search className="w-3 h-3" /> From Google Search Console
+                                                </span>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="text-xs text-zinc-500 uppercase tracking-wider">
+                                                            <th className="text-left pb-3 font-medium">Query</th>
+                                                            <th className="text-right pb-3 font-medium">Clicks</th>
+                                                            <th className="text-right pb-3 font-medium">Impressions</th>
+                                                            <th className="text-right pb-3 font-medium">CTR</th>
+                                                            <th className="text-right pb-3 font-medium">Position</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {queryData.map((row, i) => (
+                                                            <tr key={i} className="border-t border-white/[0.04]">
+                                                                <td className="py-2.5 text-zinc-300">{row.query}</td>
+                                                                <td className="py-2.5 text-right text-emerald-400 font-medium">{row.clicks.toLocaleString()}</td>
+                                                                <td className="py-2.5 text-right text-zinc-400">{row.impressions.toLocaleString()}</td>
+                                                                <td className="py-2.5 text-right">
+                                                                    <span className={row.ctr >= 5 ? 'text-emerald-400' : 'text-amber-400'}>{row.ctr}%</span>
+                                                                </td>
+                                                                <td className="py-2.5 text-right text-zinc-400">{row.position}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="globe"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="relative"
+                                >
+                                    {/* Globe view */}
+                                    <div className="relative h-[600px] overflow-hidden">
+                                        {/* Stats overlay — top left */}
+                                        <div className="absolute top-4 left-4 z-10 bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-xl border border-white/[0.06] p-4 max-w-[340px]">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                                <span className="text-sm font-semibold text-white">8 visitors</span>
+                                                <span className="text-xs text-zinc-500">on</span>
+                                                <span className="text-sm font-medium text-white">your site</span>
+                                                <span className="text-xs text-zinc-500 ml-1">(est. value: <span className="text-emerald-400">$1</span>)</span>
+                                            </div>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex items-start gap-3">
+                                                    <span className="text-zinc-600 w-16 flex-shrink-0">Referrers</span>
+                                                    <span className="text-zinc-300">Direct (8)</span>
+                                                </div>
+                                                <div className="flex items-start gap-3">
+                                                    <span className="text-zinc-600 w-16 flex-shrink-0">Countries</span>
+                                                    <div className="text-zinc-300 flex flex-wrap gap-x-2">
+                                                        <span>US (3)</span> <span>UK (2)</span> <span>IN (2)</span> <span className="text-zinc-500">+5</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-3">
+                                                    <span className="text-zinc-600 w-16 flex-shrink-0">Devices</span>
+                                                    <span className="text-zinc-300">Desktop (8)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* The COBE globe */}
+                                        <RealtimeGlobe
+                                            byCountry={DEMO_BY_COUNTRY}
+                                            visitors={DEMO_VISITORS}
+                                        />
+
+                                        {/* Activity feed — bottom left */}
+                                        <div className="absolute bottom-4 left-4 z-10 w-[320px] sm:w-[400px] max-h-[240px] overflow-y-auto rounded-xl bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl border border-white/[0.06]">
+                                            <div className="divide-y divide-white/[0.03]">
+                                                {DEMO_ACTIVITY.map((item, i) => (
+                                                    <div key={i} className="px-4 py-3 flex items-start gap-3">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(item.name)}&backgroundColor=transparent&radius=50`}
+                                                            alt=""
+                                                            className="w-8 h-8 rounded-full flex-shrink-0 bg-white/[0.05]"
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-xs text-zinc-300 leading-relaxed">
+                                                                <span className="font-semibold text-white">{item.name}</span>
+                                                                {' '}from <span className="text-zinc-400">{item.flag}</span>{' '}
+                                                                <span className="font-semibold text-white">{item.country}</span>
+                                                                {' '}{item.event === 'exited to' ? (
+                                                                    <>exited to <span className="text-zinc-500">{item.exitUrl}</span></>
+                                                                ) : (
+                                                                    <>visited{' '}<span className="font-medium text-zinc-200 break-all">{item.page}</span></>
+                                                                )}
+                                                            </p>
+                                                            <p className="text-[10px] text-zinc-600 mt-0.5">{item.time}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Powered by badge — bottom right */}
+                                        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(20,20,30,0.9)] border border-white/[0.06] text-xs text-zinc-500">
+                                            <BarChart3 className="w-3 h-3 text-emerald-400" />
+                                            Powered by TrafficClaw
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </motion.div>
             </div>
