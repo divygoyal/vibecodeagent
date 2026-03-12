@@ -16,6 +16,21 @@ const PLANS: Record<string, { plan: string; credits: number; telegramBot: boolea
     'pdt_0NaLMM4r23kncRahthuyj': { plan: 'pro', credits: 300, telegramBot: true },
 };
 
+// Simple in-memory dedup to prevent processing the same webhook event twice
+const processedEvents = new Map<string, number>();
+const DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function isDuplicate(eventId: string): boolean {
+    // Clean up old entries
+    const now = Date.now();
+    for (const [id, ts] of processedEvents) {
+        if (now - ts > DEDUP_TTL_MS) processedEvents.delete(id);
+    }
+    if (processedEvents.has(eventId)) return true;
+    processedEvents.set(eventId, now);
+    return false;
+}
+
 async function updateSubscription(email: string, body: Record<string, unknown>) {
     const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(email)}/subscription`, {
         method: 'POST',
@@ -25,6 +40,18 @@ async function updateSubscription(email: string, body: Record<string, unknown>) 
     if (!res.ok) {
         const errText = await res.text();
         console.error(`[Webhook] Admin API error: ${res.status} ${errText}`);
+    }
+    return res;
+}
+
+async function setCancelFlag(identifier: string, cancelled: boolean) {
+    const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(identifier)}/cancel-flag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+        body: JSON.stringify({ subscription_cancelled: cancelled }),
+    });
+    if (!res.ok) {
+        console.error(`[Webhook] Failed to set cancel flag for ${identifier}: ${res.status}`);
     }
     return res;
 }
@@ -55,13 +82,20 @@ export async function POST(req: Request) {
         const eventType = event.type;
         console.log(`[Webhook] DodoPayments event: ${eventType}`);
 
+        // Deduplicate webhook events (Dodo may retry on network errors)
+        const eventId = `${eventType}-${JSON.stringify(event.data).slice(0, 100)}-${Date.now().toString().slice(0, -4)}`;
+        if (isDuplicate(eventId)) {
+            console.log(`[Webhook] Duplicate event detected, skipping: ${eventType}`);
+            return NextResponse.json({ received: true, duplicate: true });
+        }
+
         // Extract subscription data from typed event
         const data = event.data;
         const productId = 'product_id' in data ? data.product_id : undefined;
-        const customerEmail = 'customer' in data ? data.customer.email : undefined;
+        const customerEmail = 'customer' in data && data.customer ? data.customer.email : undefined;
         const subscriptionId = 'subscription_id' in data ? data.subscription_id : undefined;
 
-        // subscription.active — new subscription started
+        // ─── subscription.active — new subscription started ───
         if (eventType === 'subscription.active') {
             if (!productId || !customerEmail) {
                 console.warn('[Webhook] subscription.active missing product_id or email');
@@ -70,7 +104,7 @@ export async function POST(req: Request) {
 
             const planConfig = PLANS[productId];
             if (!planConfig) {
-                console.log(`[Webhook] Unknown product ${productId}, ignoring`);
+                console.warn(`[Webhook] Unknown product ${productId} on subscription.active`);
                 return NextResponse.json({ received: true });
             }
 
@@ -87,7 +121,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true, plan: planConfig.plan });
         }
 
-        // subscription.renewed — monthly renewal, reset credits
+        // ─── subscription.renewed — monthly renewal, reset credits ───
         if (eventType === 'subscription.renewed') {
             if (!productId || !customerEmail) {
                 console.warn('[Webhook] subscription.renewed missing data');
@@ -96,7 +130,7 @@ export async function POST(req: Request) {
 
             const planConfig = PLANS[productId];
             if (!planConfig) {
-                console.log(`[Webhook] Unknown product ${productId} on renewal, ignoring`);
+                console.warn(`[Webhook] Unknown product ${productId} on renewal`);
                 return NextResponse.json({ received: true });
             }
 
@@ -113,13 +147,15 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true, renewed: true });
         }
 
-        // subscription.on_hold — payment issue, keep plan but warn
+        // ─── subscription.on_hold — payment issue, keep plan but flag ───
         if (eventType === 'subscription.on_hold') {
-            console.warn(`[Webhook] Subscription on hold for ${customerEmail || 'unknown'}`);
+            console.warn(`[Webhook] Subscription on hold for ${customerEmail || 'unknown'} — payment issue, plan remains active`);
+            // Plan stays active during hold — Dodo will retry payment.
+            // If all retries fail, subscription.failed or subscription.expired will fire.
             return NextResponse.json({ received: true });
         }
 
-        // subscription.plan_changed — user changed plan
+        // ─── subscription.plan_changed — user changed plan ───
         if (eventType === 'subscription.plan_changed') {
             if (!productId || !customerEmail) {
                 console.warn('[Webhook] subscription.plan_changed missing data');
@@ -128,7 +164,7 @@ export async function POST(req: Request) {
 
             const planConfig = PLANS[productId];
             if (!planConfig) {
-                console.log(`[Webhook] Unknown product ${productId} on plan change, ignoring`);
+                console.warn(`[Webhook] Unknown product ${productId} on plan change`);
                 return NextResponse.json({ received: true });
             }
 
@@ -139,33 +175,25 @@ export async function POST(req: Request) {
                 subscription_id: subscriptionId || null,
                 telegram_bot_enabled: planConfig.telegramBot,
                 reset_credits: true,
+                subscription_cancelled: false,
             });
 
             return NextResponse.json({ received: true, plan: planConfig.plan });
         }
 
-        // subscription.cancelled — user cancelled, keep plan active until period ends
+        // ─── subscription.cancelled — stop renewal, keep plan active until period ends ───
         if (eventType === 'subscription.cancelled') {
             if (!customerEmail) {
                 console.warn('[Webhook] subscription.cancelled missing email');
                 return NextResponse.json({ received: true });
             }
 
-            console.log(`[Webhook] subscription.cancelled: ${customerEmail} — marking as cancelled, plan stays active until billing period ends`);
-            // Mark as cancelled but do NOT downgrade — plan remains active until subscription_end.
-            // We need to call the subscription endpoint to set the cancelled flag without changing plan/credits.
-            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(customerEmail)}/cancel-flag`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-                body: JSON.stringify({ subscription_cancelled: true }),
-            });
-            if (!res.ok) {
-                console.error(`[Webhook] Failed to set cancel flag: ${res.status}`);
-            }
+            console.log(`[Webhook] subscription.cancelled: ${customerEmail} — plan stays active until billing period ends`);
+            await setCancelFlag(customerEmail, true);
             return NextResponse.json({ received: true, cancelled: true });
         }
 
-        // subscription.expired — billing period ended, now downgrade to free
+        // ─── subscription.expired — billing period ended, downgrade to free ───
         if (eventType === 'subscription.expired') {
             if (!customerEmail) {
                 console.warn('[Webhook] subscription.expired missing email');
@@ -179,29 +207,56 @@ export async function POST(req: Request) {
                 subscription_id: null,
                 telegram_bot_enabled: false,
                 reset_credits: false,
+                subscription_cancelled: false,
             });
 
             return NextResponse.json({ received: true, downgraded: true });
         }
 
-        // subscription.failed — payment failed
+        // ─── subscription.failed — payment failed after retries ───
         if (eventType === 'subscription.failed') {
             console.warn(`[Webhook] Subscription payment failed for ${customerEmail || 'unknown'}`);
+            // Dodo has exhausted retries. Downgrade to free.
+            if (customerEmail) {
+                await updateSubscription(customerEmail, {
+                    plan: 'free',
+                    credits: 0,
+                    subscription_id: null,
+                    telegram_bot_enabled: false,
+                    reset_credits: false,
+                    subscription_cancelled: false,
+                });
+                console.log(`[Webhook] Payment failed — downgraded ${customerEmail} to free`);
+            }
             return NextResponse.json({ received: true });
         }
 
-        // payment.succeeded — log for audit trail
+        // ─── payment.succeeded — log for audit trail ───
         if (eventType === 'payment.succeeded') {
             const paymentData = event.data;
-            const payEmail = 'customer' in paymentData ? paymentData.customer.email : 'unknown';
+            const payEmail = 'customer' in paymentData && paymentData.customer ? paymentData.customer.email : 'unknown';
             const payProduct = 'product_id' in paymentData ? paymentData.product_id : 'unknown';
             console.log(`[Webhook] Payment succeeded: ${payEmail}, product: ${payProduct}`);
             return NextResponse.json({ received: true });
         }
 
-        // refund.succeeded — handle refund by downgrading
+        // ─── refund.succeeded — downgrade plan on refund ───
         if (eventType === 'refund.succeeded') {
-            console.log(`[Webhook] Refund succeeded`);
+            const refundData = event.data;
+            const refundEmail = 'customer' in refundData && refundData.customer ? refundData.customer.email : undefined;
+            console.log(`[Webhook] Refund succeeded for ${refundEmail || 'unknown'}`);
+
+            if (refundEmail) {
+                await updateSubscription(refundEmail, {
+                    plan: 'free',
+                    credits: 0,
+                    subscription_id: null,
+                    telegram_bot_enabled: false,
+                    reset_credits: false,
+                    subscription_cancelled: false,
+                });
+                console.log(`[Webhook] Refund processed — downgraded ${refundEmail} to free`);
+            }
             return NextResponse.json({ received: true });
         }
 

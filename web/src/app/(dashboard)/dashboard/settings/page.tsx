@@ -4,8 +4,9 @@ import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import {
     User, Mail, LogOut,
-    CheckCircle2, ChevronRight, Gift, Copy, Check
+    CheckCircle2, ChevronRight, Gift, Copy, Check, CreditCard
 } from 'lucide-react';
+import Link from 'next/link';
 import { BellRing } from 'lucide-react';
 import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } from '@/lib/pushNotifications';
 
@@ -103,6 +104,20 @@ export default function SettingsPage() {
                     </span>
                 </div>
             </div>
+
+            {/* Plan & Billing Link */}
+            <Link href="/dashboard/plan" className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/[0.06] rounded-2xl hover:bg-white/[0.04] transition-colors group">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                        <CreditCard className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                        <div className="text-sm font-medium text-white">Plan & Billing</div>
+                        <div className="text-xs text-zinc-500">Manage your subscription, view credits, and upgrade</div>
+                    </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+            </Link>
 
             {/* Referral Program */}
             <ReferralSection email={session?.user?.email || ''} />

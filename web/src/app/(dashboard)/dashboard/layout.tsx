@@ -83,7 +83,7 @@ export default function DashboardLayout({
 }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
-    const { credits, plan: userPlan } = useCredits();
+    const { credits, plan: userPlan, subscriptionCancelled } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState(() => {
@@ -368,13 +368,14 @@ export default function DashboardLayout({
                                     <Link
                                         href="/dashboard/plan"
                                         className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none hover:opacity-80 transition-opacity ${
-                                            userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                            subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                            : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
                                             : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
                                             : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
                                             : 'bg-zinc-700 text-zinc-400'
                                         }`}
                                     >
-                                        {userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                        {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
                                     </Link>
                                 </div>
                                 <div className="text-[10px] text-zinc-600 truncate">
@@ -754,13 +755,14 @@ export default function DashboardLayout({
                                                 href="/dashboard/plan"
                                                 onClick={() => setMobileOpen(false)}
                                                 className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
-                                                    userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                                    subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                    : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
                                                     : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
                                                     : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
                                                     : 'bg-zinc-700 text-zinc-400'
                                                 }`}
                                             >
-                                                {userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                                {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
                                             </Link>
                                         </div>
                                     </div>
