@@ -142,10 +142,15 @@ export default function RealtimePage() {
 
     // ─── Activity feed with predictions ───
     const activityFeed = useMemo<ActivityItem[]>(() => {
+        // Track duplicate city+country to match globe naming
+        const feedCounts = new Map<string, number>();
         return byCity.slice(0, 20).map((c: any, i: number) => {
             const cityStr = String(c.city ?? 'Unknown');
             const countryStr = String(c.country ?? 'Unknown');
-            const hash = hashStr(`${cityStr}-${countryStr}-${i}`);
+            const feedKey = `${cityStr}-${countryStr}`;
+            const count = feedCounts.get(feedKey) || 0;
+            feedCounts.set(feedKey, count + 1);
+            const hash = hashStr(`${feedKey}-${count}`);
             const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
             const page = String(byPage[i % Math.max(byPage.length, 1)]?.page ?? '/');
             const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
@@ -175,26 +180,39 @@ export default function RealtimePage() {
     // Use byCountry as primary source (reliable country names), spread multiple users per country
     const globeVisitors = useMemo<GlobeVisitor[]>(() => {
         const visitors: GlobeVisitor[] = [];
-        const usedCoords = new Set<string>();
+        const usedKeys = new Map<string, number>(); // key → count of markers at this key
 
-        // Helper: check if city coords are geographically close to country coords (within ~15°)
+        // Helper: check if city coords are geographically close to country coords
         const isCityInCountry = (cityCoord: [number, number], countryCoord: [number, number]) => {
             const dLat = Math.abs(cityCoord[0] - countryCoord[0]);
             const dLng = Math.abs(cityCoord[1] - countryCoord[1]);
-            return dLat < 20 && dLng < 30; // generous bounds for large countries
+            return dLat < 20 && dLng < 30;
         };
 
-        // First: try city-level pins from byCity (most precise)
-        byCity.slice(0, 15).forEach((c: any, i: number) => {
+        // Deterministic name from city+country (NO index dependency)
+        const makeName = (seed: string) => {
+            const h = hashStr(seed);
+            return `${ADJECTIVES[h % ADJECTIVES.length]} ${ANIMALS[(h >> 4) % ANIMALS.length]}`;
+        };
+
+        // Sort byCity for deterministic processing order
+        const sortedCities = [...byCity].sort((a: any, b: any) => {
+            const ka = `${a.country}-${a.city}`;
+            const kb = `${b.country}-${b.city}`;
+            return ka.localeCompare(kb);
+        });
+
+        // First: city-level pins (most precise)
+        sortedCities.slice(0, 15).forEach((c: any) => {
             if (visitors.length >= 12) return;
             const cityStr = String(c.city ?? '');
             const countryStr = String(c.country ?? '');
 
-            // Country coord is required — skip unknown countries
+            // Country coord is required
             const countryCoord = COUNTRY_COORDS[countryStr];
             if (!countryCoord) return;
 
-            // Only use city coord if city is valid AND geographically within the country
+            // Only use city coord if valid AND geographically within the country
             let coord = countryCoord;
             if (cityStr && !cityStr.startsWith('(')) {
                 const cityCoord = CITY_COORDS[cityStr];
@@ -203,20 +221,25 @@ export default function RealtimePage() {
                 }
             }
 
+            // Stable offset for duplicate locations
             const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
+            const count = usedKeys.get(key) || 0;
             let lat = coord[0];
             let lng = coord[1];
-            if (usedCoords.has(key)) {
-                // Fixed offset based on city/country hash (stable across re-renders)
-                lat += (hashStr(cityStr + countryStr) % 100 - 50) / 100 * 3;
-                lng += (hashStr(countryStr + cityStr) % 100 - 50) / 100 * 3;
+            if (count > 0) {
+                // Deterministic spiral offset based on count
+                const angle = count * 2.4; // golden angle
+                const radius = 1.5 + count * 0.8;
+                lat += Math.cos(angle) * radius;
+                lng += Math.sin(angle) * radius;
             }
-            usedCoords.add(key);
+            usedKeys.set(key, count + 1);
 
-            const hash = hashStr(`${cityStr}-${countryStr}-${i}`);
-            const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
-            const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
-            const warmth = predictWarmth(countryStr, device, i);
+            // Name is based on city+country only (stable across re-renders)
+            const seed = `${cityStr}-${countryStr}-${count}`;
+            const name = makeName(seed);
+            const hash = hashStr(seed);
+            const warmth = predictWarmth(countryStr, 'desktop', count);
 
             visitors.push({
                 lat, lng, name,
@@ -228,22 +251,24 @@ export default function RealtimePage() {
             });
         });
 
-        // Second: fill remaining slots from byCountry (if cities didn't provide enough)
+        // Second: fill from byCountry (sorted for stability)
         if (visitors.length < 8) {
-            byCountry.forEach((c: any, i: number) => {
+            const sortedCountries = [...byCountry].sort((a: any, b: any) =>
+                String(a.country ?? '').localeCompare(String(b.country ?? ''))
+            );
+            sortedCountries.forEach((c: any) => {
                 if (visitors.length >= 12) return;
                 const countryStr = String(c.country ?? '');
                 const coord = COUNTRY_COORDS[countryStr];
                 if (!coord) return;
 
-                // Skip if we already have a visitor from this country via city data
                 const alreadyHas = visitors.some(v => v.country === countryStr);
                 if (alreadyHas) return;
 
-                const hash = hashStr(`${countryStr}-country-${i}`);
-                const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
-                const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
-                const warmth = predictWarmth(countryStr, device, i);
+                const seed = `${countryStr}-country`;
+                const name = makeName(seed);
+                const hash = hashStr(seed);
+                const warmth = predictWarmth(countryStr, 'desktop', 0);
 
                 visitors.push({
                     lat: coord[0], lng: coord[1], name,
@@ -257,7 +282,7 @@ export default function RealtimePage() {
         }
 
         return visitors;
-    }, [byCity, byCountry, byDevice]);
+    }, [byCity, byCountry]);
 
     // ─── Estimated total value ───
     const estTotalValue = useMemo(() => {
