@@ -6,17 +6,18 @@ export const dynamic = 'force-dynamic'
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
-// SHA-256 hash of the superadmin password (set SUPERADMIN_PASSWORD env var)
+// HMAC-SHA256 hash of the superadmin password with salt (set SUPERADMIN_PASSWORD env var)
 const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD
-const PASSWORD_HASH = SUPERADMIN_PASSWORD
-    ? crypto.createHash('sha256').update(SUPERADMIN_PASSWORD).digest('hex')
+const PASSWORD_SALT = process.env.NEXTAUTH_SECRET || ''
+const PASSWORD_HASH = SUPERADMIN_PASSWORD && PASSWORD_SALT
+    ? crypto.createHmac('sha256', PASSWORD_SALT).update(SUPERADMIN_PASSWORD).digest('hex')
     : ''
 
 // Token expiry: 24 hours in milliseconds
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000
 
 function createToken(): { token: string; expiresAt: number } {
-    const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret'
+    const secret = process.env.NEXTAUTH_SECRET || ''
     const timestamp = Date.now().toString()
     const hmac = crypto.createHmac('sha256', secret).update(timestamp).digest('hex')
     const token = `${timestamp}.${hmac}`
@@ -26,7 +27,7 @@ function createToken(): { token: string; expiresAt: number } {
 
 function verifyToken(token: string): boolean {
     if (!token) return false
-    const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret'
+    const secret = process.env.NEXTAUTH_SECRET || ''
     const parts = token.split('.')
     if (parts.length !== 2) return false
 
@@ -46,8 +47,8 @@ function verifyToken(token: string): boolean {
 }
 
 function verifyPassword(password: string): boolean {
-    if (!PASSWORD_HASH) return false // No password configured
-    const hash = crypto.createHash('sha256').update(password).digest('hex')
+    if (!PASSWORD_HASH || !PASSWORD_SALT) return false // No password or salt configured
+    const hash = crypto.createHmac('sha256', PASSWORD_SALT).update(password).digest('hex')
     return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(PASSWORD_HASH, 'hex'))
 }
 
