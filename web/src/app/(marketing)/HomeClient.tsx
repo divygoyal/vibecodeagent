@@ -694,11 +694,19 @@ function KPICard({ label, value, change, positive }: { label: string; value: str
 
 function AIChatDemo() {
     const sectionRef = useRef<HTMLDivElement>(null);
+    const chatAreaRef = useRef<HTMLDivElement>(null);
     const isInView = useInView(sectionRef, { once: false, amount: 0.3 });
     const [phase, setPhase] = useState(0);
     const [typedQuestion, setTypedQuestion] = useState('');
     const [showThinking, setShowThinking] = useState(false);
     const [visibleSections, setVisibleSections] = useState(0);
+
+    // Auto-scroll chat area to bottom as new content appears
+    useEffect(() => {
+        if (chatAreaRef.current) {
+            chatAreaRef.current.scrollTo({ top: chatAreaRef.current.scrollHeight, behavior: 'smooth' });
+        }
+    }, [typedQuestion, showThinking, visibleSections]);
 
     const question = 'why is my traffic dropping';
 
@@ -790,8 +798,8 @@ function AIChatDemo() {
                         </div>
                     </div>
 
-                    {/* Chat messages area */}
-                    <div className="p-5 space-y-4 relative">
+                    {/* Chat messages area — fixed height to prevent layout shift */}
+                    <div ref={chatAreaRef} className="p-5 space-y-4 relative h-[520px] sm:h-[480px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         {/* Bot greeting */}
                         <div className="flex gap-3">
                             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
