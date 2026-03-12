@@ -311,10 +311,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const map = mapRef.current;
         if (!map || status !== 'ready' || !_mapboxgl) return;
 
-        // Build fingerprint from visitor coordinates + names
+        // Build fingerprint from coordinates only (not names, which could vary)
         const fingerprint = visitors
             .filter(v => v.lat !== 0 || v.lng !== 0)
-            .map(v => `${v.name}:${v.lat.toFixed(3)},${v.lng.toFixed(3)}`)
+            .map(v => `${v.lat.toFixed(2)},${v.lng.toFixed(2)}`)
             .sort()
             .join('|');
 
