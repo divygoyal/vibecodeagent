@@ -197,7 +197,7 @@ function PlanPageContent() {
                     )}
 
                     {/* Cancel subscription button */}
-                    {plan !== 'free' && subscriptionId && (
+                    {plan !== 'free' && (
                         <div className="mt-4 pt-4 border-t border-white/[0.06]">
                             <button
                                 onClick={() => setShowCancelModal(true)}
