@@ -29,13 +29,22 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-// Cache the mapboxgl module so subsequent imports resolve synchronously
+// Ensure Mapbox CSS is loaded (dynamic import doesn't work reliably in Next.js)
+function ensureMapboxCSS() {
+    if (typeof document === 'undefined') return;
+    if (document.querySelector('link[href*="mapbox-gl"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.css';
+    document.head.appendChild(link);
+}
+
+// Cache the mapboxgl module
 let _mapboxgl: any = null;
 async function loadMapboxGL() {
     if (_mapboxgl) return _mapboxgl;
+    ensureMapboxCSS();
     const mod = await import('mapbox-gl');
-    // @ts-expect-error - CSS import
-    await import('mapbox-gl/dist/mapbox-gl.css');
     _mapboxgl = mod.default;
     return _mapboxgl;
 }
@@ -43,7 +52,7 @@ async function loadMapboxGL() {
 const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true, onAutoPanChange }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
-    const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; frame: HTMLDivElement; lngLat: [number, number] }>>(new Map());
+    const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; lngLat: [number, number] }>>(new Map());
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
     const retryCountRef = useRef(0);
@@ -178,7 +187,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 });
 
                 // On user interaction: stop auto-pan permanently
-                // User must re-enable via the toggle button (like DataFast)
                 const disableAutoPan = () => {
                     if (autoPanRef.current) {
                         stopAutoPan();
@@ -216,14 +224,21 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return cleanup;
     }, [initMap]);
 
-    // Create a single marker DOM element for a visitor
+    // Create marker DOM element — CRITICAL: no `position: relative` on outermost element
+    // Setting position on the Mapbox marker element causes drift during zoom/rotation
+    // See: https://github.com/mapbox/mapbox-gl-js/issues/4048
     const createMarkerElement = useCallback((v: GlobeVisitor) => {
         const warmthColor = getWarmthColor(v.warmth);
         const avatarUrl = getAvatarUrl(v.name);
 
+        // Outermost element — NO position property, let Mapbox fully control it
         const el = document.createElement('div');
         el.style.cssText = 'width:60px;height:60px;cursor:pointer;';
         el.title = `${v.name} — ${v.country}`;
+
+        // Inner wrapper handles relative positioning for the warmth dot
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:relative;width:100%;height:100%;';
 
         const frame = document.createElement('div');
         frame.style.cssText = `
@@ -245,7 +260,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             frame.textContent = v.avatarInitial;
         };
         frame.appendChild(img);
-        el.appendChild(frame);
+        wrapper.appendChild(frame);
 
         const dot = document.createElement('div');
         dot.style.cssText = `
@@ -256,8 +271,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             z-index:2;
             box-shadow:0 0 8px ${warmthColor}80;
         `;
-        el.style.position = 'relative';
-        el.appendChild(dot);
+        wrapper.appendChild(dot);
+        el.appendChild(wrapper);
 
         el.onmouseenter = () => {
             frame.style.transform = 'scale(1.15)';
@@ -269,10 +284,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             frame.style.boxShadow = '0 4px 24px rgba(0,0,0,0.6)';
         };
 
-        return { el, frame };
+        return el;
     }, []);
 
-    // Incremental marker sync — Mapbox handles all positioning & occlusion natively
+    // Incremental marker sync — Mapbox handles positioning & globe occlusion natively
     useEffect(() => {
         const map = mapRef.current;
         if (!map || status !== 'ready' || !_mapboxgl) return;
@@ -287,28 +302,25 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
             const existing = currentMap.get(v.id);
             if (existing) {
-                // Marker exists — update position only if it actually moved
                 const [oldLng, oldLat] = existing.lngLat;
                 if (Math.abs(oldLng - v.lng) > 0.01 || Math.abs(oldLat - v.lat) > 0.01) {
                     existing.marker.setLngLat([v.lng, v.lat]);
                     existing.lngLat = [v.lng, v.lat];
                 }
             } else {
-                // New visitor — create marker with native globe occlusion
-                const { el, frame } = createMarkerElement(v);
+                const el = createMarkerElement(v);
                 const lngLat: [number, number] = [v.lng, v.lat];
                 const marker = new mapboxgl.Marker({
                     element: el,
                     anchor: 'center',
-                    occludedOpacity: 0, // Mapbox v3: auto-hide behind globe
+                    occludedOpacity: 0,
                 })
                     .setLngLat(lngLat)
                     .addTo(map);
-                currentMap.set(v.id, { marker, el, frame, lngLat });
+                currentMap.set(v.id, { marker, el, lngLat });
             }
         });
 
-        // Remove departed visitors
         for (const [id, entry] of currentMap) {
             if (!newIds.has(id)) {
                 try { entry.marker.remove(); } catch { /**/ }
