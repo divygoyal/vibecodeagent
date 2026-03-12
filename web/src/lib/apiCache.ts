@@ -31,8 +31,12 @@ export async function cachedFetch<T>(
     }
 
     const result = await fetcher();
-    // Bug #10 fix: Don't cache error objects — allow fresh attempts on retry
-    const isError = result && (typeof result === 'object') && ('error' in result || '__isError' in result);
+    // Don't cache error objects — allow fresh attempts on retry
+    // Only treat as error if 'error' key has a truthy value (not null/false/undefined)
+    const isError = result && (typeof result === 'object') && (
+        ('__isError' in result && result.__isError) ||
+        ('error' in result && result.error != null && result.error !== false)
+    );
     if (!isError) {
         cache.set(key, { data: result, timestamp: now, ttl: ttlMs });
     }

@@ -258,8 +258,11 @@ function PlanPageContent() {
                     {SUBSCRIPTION_PLANS.map((p) => {
                         const isCurrentPlan = p.key === plan;
                         const isUpgrade = SUBSCRIPTION_PLANS.findIndex(x => x.key === plan) < SUBSCRIPTION_PLANS.findIndex(x => x.key === p.key);
+                        const userEmail = session?.user?.email || '';
                         const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/plan?upgraded=true` : '';
-                        const checkoutUrl = `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(session?.user?.email || '')}&redirect_url=${encodeURIComponent(returnUrl)}`;
+                        const checkoutUrl = userEmail
+                            ? `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(userEmail)}&redirect_url=${encodeURIComponent(returnUrl)}`
+                            : '';
                         const IconComp = p.icon;
                         const isGrowth = p.key === 'growth';
                         const isPro = p.key === 'pro';
@@ -336,6 +339,10 @@ function PlanPageContent() {
                                             isPro ? 'bg-violet-500/[0.08] text-violet-400 border border-violet-500/[0.2]' : isGrowth ? 'bg-emerald-500/[0.08] text-emerald-400 border border-emerald-500/[0.2]' : 'bg-cyan-500/[0.08] text-cyan-400 border border-cyan-500/[0.2]'
                                         }`}>
                                             Active
+                                        </div>
+                                    ) : !checkoutUrl ? (
+                                        <div className="text-center text-[10px] text-zinc-500 px-4 py-2.5 rounded-xl mb-5 bg-white/[0.03] border border-white/[0.06]">
+                                            Email required to subscribe
                                         </div>
                                     ) : isGrowth ? (
                                         <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"

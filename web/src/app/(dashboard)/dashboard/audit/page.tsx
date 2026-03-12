@@ -127,22 +127,32 @@ function CategoryGroup({ category, issues }: { category: string; issues: AuditIs
 }
 
 // ─── Export helper ───
+function csvEscape(val: string): string {
+    if (!val) return '';
+    // Quote any field containing commas, quotes, or newlines
+    if (val.includes(',') || val.includes('"') || val.includes('\n') || val.includes('\r')) {
+        return `"${val.replace(/"/g, '""')}"`;
+    }
+    return val;
+}
+
 function exportAuditCSV(report: AuditReport) {
     const rows = [
         ['Severity', 'Category', 'Issue', 'Description', 'Value', 'Recommendation'],
         ...report.issues.map(i => [
-            i.severity, i.category, i.title,
-            `"${(i.description || '').replace(/"/g, '""')}"`,
-            i.value || '',
-            `"${(i.recommendation || '').replace(/"/g, '""')}"`
+            csvEscape(i.severity), csvEscape(i.category), csvEscape(i.title),
+            csvEscape(i.description || ''),
+            csvEscape(i.value || ''),
+            csvEscape(i.recommendation || '')
         ])
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `site-audit-${new URL(report.url).hostname}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 // ─── Filter bar ───
