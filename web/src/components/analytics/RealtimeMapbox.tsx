@@ -42,7 +42,7 @@ async function loadMapboxGL() {
 const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = true }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
-    const markersRef = useRef<{ marker: any; el: HTMLDivElement; frame: HTMLDivElement; lngLat: [number, number] }[]>([]);
+    const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; frame: HTMLDivElement; lngLat: [number, number] }>>(new Map());
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
     const retryCountRef = useRef(0);
@@ -68,7 +68,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const centerLng = (center.lng * Math.PI) / 180;
 
         markersRef.current.forEach(({ el, lngLat }) => {
-            const [lng, lat] = lngLat;
+            const [lng, lat] = lngLat as [number, number];
             const markerLat = (lat * Math.PI) / 180;
             const markerLng = (lng * Math.PI) / 180;
 
@@ -230,7 +230,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             destroyed = true;
             stopAutoPan();
             markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
-            markersRef.current = [];
+            markersRef.current = new Map();
             if (map) {
                 if (renderListenerRef.current) {
                     try { map.off('render', renderListenerRef.current); } catch { /**/ }
@@ -246,9 +246,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const cleanup = initMap();
         return cleanup;
     }, [initMap]);
-
-    // Fingerprint visitors to avoid unnecessary marker recreation
-    const lastFingerprintRef = useRef('');
 
     // Create a single marker DOM element for a visitor
     const createMarkerElement = useCallback((v: GlobeVisitor) => {
@@ -306,41 +303,46 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return { el, frame };
     }, []);
 
-    // Sync markers — only recreate when visitor data actually changes
+    // Incremental marker sync — only add/remove individual markers, never rebuild all
     useEffect(() => {
         const map = mapRef.current;
         if (!map || status !== 'ready' || !_mapboxgl) return;
 
-        // Build fingerprint from coordinates only (not names, which could vary)
-        const fingerprint = visitors
-            .filter(v => v.lat !== 0 || v.lng !== 0)
-            .map(v => `${v.lat.toFixed(2)},${v.lng.toFixed(2)}`)
-            .sort()
-            .join('|');
-
-        // Skip if nothing changed
-        if (fingerprint === lastFingerprintRef.current) return;
-        lastFingerprintRef.current = fingerprint;
-
         const mapboxgl = _mapboxgl;
+        const currentMap = markersRef.current;
+        const newIds = new Set<string>();
 
-        // Remove all old markers
-        markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
-        markersRef.current = [];
-
-        // Create new markers
+        // Add or update markers for current visitors
         visitors.forEach((v) => {
             if (v.lat === 0 && v.lng === 0) return;
+            newIds.add(v.id);
 
-            const { el, frame } = createMarkerElement(v);
-            const lngLat: [number, number] = [v.lng, v.lat];
-
-            const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-                .setLngLat(lngLat)
-                .addTo(map);
-
-            markersRef.current.push({ marker, el, frame, lngLat });
+            const existing = currentMap.get(v.id);
+            if (existing) {
+                // Marker already exists — just update position if it moved
+                const [oldLng, oldLat] = existing.lngLat;
+                if (Math.abs(oldLng - v.lng) > 0.01 || Math.abs(oldLat - v.lat) > 0.01) {
+                    existing.marker.setLngLat([v.lng, v.lat]);
+                    existing.lngLat = [v.lng, v.lat];
+                }
+            } else {
+                // New visitor — create marker
+                const { el, frame } = createMarkerElement(v);
+                const lngLat: [number, number] = [v.lng, v.lat];
+                const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+                    .setLngLat(lngLat)
+                    .addTo(map);
+                currentMap.set(v.id, { marker, el, frame, lngLat });
+            }
         });
+
+        // Remove markers for visitors that are no longer present
+        for (const [id, entry] of currentMap) {
+            if (!newIds.has(id)) {
+                try { entry.marker.remove(); } catch { /**/ }
+                currentMap.delete(id);
+            }
+        }
 
         updateMarkerVisibility();
     }, [visitors, status, updateMarkerVisibility, createMarkerElement]);
@@ -353,7 +355,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             }
         }
         mapRef.current = null;
-        markersRef.current = [];
+        markersRef.current = new Map();
         initMap();
     }, [initMap]);
 

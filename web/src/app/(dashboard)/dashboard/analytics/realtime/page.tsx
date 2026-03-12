@@ -242,6 +242,7 @@ export default function RealtimePage() {
             const warmth = predictWarmth(countryStr, 'desktop', count);
 
             visitors.push({
+                id: seed,
                 lat, lng, name,
                 country: countryStr,
                 avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
@@ -271,6 +272,7 @@ export default function RealtimePage() {
                 const warmth = predictWarmth(countryStr, 'desktop', 0);
 
                 visitors.push({
+                    id: seed,
                     lat: coord[0], lng: coord[1], name,
                     country: countryStr,
                     avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
