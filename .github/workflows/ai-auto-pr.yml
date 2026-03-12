@@ -20,7 +20,7 @@ jobs:
 
       - name: Create and merge PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_FOR_ACTIONS }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           BRANCH="${{ github.ref_name }}"
