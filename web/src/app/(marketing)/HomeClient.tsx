@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 
@@ -1100,6 +1100,17 @@ function Testimonials() {
    ═══════════════════════════════════════ */
 
 function Pricing() {
+    const { data: session } = useSession();
+
+    const handleCheckout = (productId: string) => {
+        if (!session?.user?.email) {
+            signIn('github', { callbackUrl: `/dashboard/settings?tab=billing` });
+            return;
+        }
+        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(window.location.origin + '/dashboard/settings?upgraded=true')}`;
+        window.open(checkoutUrl, '_blank');
+    };
+
     return (
         <Section id="pricing" className="py-24 sm:py-32 px-6">
             <div className="max-w-6xl mx-auto">
@@ -1143,10 +1154,10 @@ function Pricing() {
                         </div>
                         <div className="text-sm text-cyan-400 font-medium mb-6">50 AI credits/month</div>
 
-                        <a href="https://checkout.dodopayments.com/buy/pdt_0NaLMLyWwiO355QaGlQwq" target="_blank" rel="noopener noreferrer"
-                            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-6 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2]">
+                        <button onClick={() => handleCheckout('pdt_0NaLMLyWwiO355QaGlQwq')}
+                            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-6 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2] cursor-pointer">
                             Get Starter
-                        </a>
+                        </button>
 
                         <ul className="space-y-3">
                             {['50 AI messages per month', 'Full SEO & analytics dashboard', 'Site audit reports', 'AI content tools'].map((f, i) => (
@@ -1178,10 +1189,10 @@ function Pricing() {
                             <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15] font-semibold">3x Starter</span>
                         </div>
 
-                        <a href="https://checkout.dodopayments.com/buy/pdt_0NaLMM1bLW9wAbmxcsebm" target="_blank" rel="noopener noreferrer"
-                            className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all duration-200 mb-6 block text-center">
+                        <button onClick={() => handleCheckout('pdt_0NaLMM1bLW9wAbmxcsebm')}
+                            className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all duration-200 mb-6 block text-center cursor-pointer">
                             Get Growth
-                        </a>
+                        </button>
 
                         <ul className="space-y-3">
                             {['150 AI messages per month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence', 'AI visibility tracking', 'AEO optimization tools'].map((f, i) => (
@@ -1216,10 +1227,10 @@ function Pricing() {
                                 <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/[0.1] text-violet-400 border border-violet-500/[0.15] font-semibold">6x Starter</span>
                             </div>
 
-                            <a href="https://checkout.dodopayments.com/buy/pdt_0NaLMM4r23kncRahthuyj" target="_blank" rel="noopener noreferrer"
-                                className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-200 mb-6 block text-center">
+                            <button onClick={() => handleCheckout('pdt_0NaLMM4r23kncRahthuyj')}
+                                className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-200 mb-6 block text-center cursor-pointer">
                                 Get Pro
-                            </a>
+                            </button>
 
                             {/* Telegram Bot MVP Highlight */}
                             <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-sky-500/[0.08] to-violet-500/[0.08] border border-sky-500/[0.15]">
