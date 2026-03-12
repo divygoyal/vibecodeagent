@@ -318,6 +318,9 @@ CRITICAL SYSTEM CONTEXT:
             creditBalance = await deductCredits(String(userId));
         }
 
+        // ── Track client disconnection via abort signal ──
+        const abortSignal = req.signal;
+
         // ── Execute Gemini Stream via official SDK ──
         const stream = new ReadableStream({
             async start(controller) {
@@ -338,6 +341,11 @@ CRITICAL SYSTEM CONTEXT:
                     const MAX_LOOPS = 8;
 
                     while (keepGoing && loopCount < MAX_LOOPS) {
+                        // Check if client disconnected
+                        if (abortSignal.aborted) {
+                            controller.close();
+                            return;
+                        }
                         loopCount++;
                         keepGoing = false;
 
@@ -374,6 +382,11 @@ CRITICAL SYSTEM CONTEXT:
 
                         // Stream chunks from the SDK
                         for await (const chunk of response) {
+                            // Bail if client disconnected
+                            if (abortSignal.aborted) {
+                                controller.close();
+                                return;
+                            }
                             // Stream text chunks
                             if (chunk.text) {
                                 fullText += chunk.text;

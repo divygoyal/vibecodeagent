@@ -151,7 +151,7 @@ export default function SEOPage() {
         if (sites.length > 0 && !selectedSite) {
             setSelectedSite(sites[0].siteUrl);
         }
-    }, [sites, selectedSite]);
+    }, [sites, selectedSite, setSelectedSite]);
 
     // 2. Fetch SEO Data (only when Google connected)
     const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, hasGoogleConnection);

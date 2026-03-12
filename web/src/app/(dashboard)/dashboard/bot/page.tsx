@@ -2,7 +2,7 @@
 
 import { signIn, useSession } from 'next-auth/react';
 import { getSafeRedirectUrl } from '@/lib/checkout';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Bot, CheckCircle2, AlertCircle, Loader2, Lock,
     MessageSquare, Github, Chrome, BarChart3, Search,
@@ -60,6 +60,12 @@ export default function BotPage() {
     const [copiedUsername, setCopiedUsername] = useState(false);
     const [showAllCapabilities, setShowAllCapabilities] = useState(false);
 
+    // Use refs to avoid re-creating the callback (and thus the interval) on every state change
+    const botTokenRef = useRef(botToken);
+    const setupStatusRef = useRef(setupStatus);
+    botTokenRef.current = botToken;
+    setupStatusRef.current = setupStatus;
+
     const fetchContainerStatus = useCallback(async () => {
         try {
             const res = await fetch('/api/container');
@@ -67,12 +73,12 @@ export default function BotPage() {
                 const data = await res.json();
                 setBotStatus(data);
                 if (data.status === 'running') setSetupStatus('success');
-                if (data.telegramBotToken && !botToken && setupStatus !== 'success') {
+                if (data.telegramBotToken && !botTokenRef.current && setupStatusRef.current !== 'success') {
                     setBotToken(data.telegramBotToken);
                 }
             }
         } catch { /* silent */ }
-    }, [botToken, setupStatus]);
+    }, []);
 
     // Fetch status when registration completes
     useEffect(() => {
