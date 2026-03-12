@@ -557,17 +557,71 @@ function InteractiveDemo() {
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
                         This is what your dashboard looks like. Interactive charts, real insights, zero confusion.
                     </p>
+
+                    {/* View toggle — centered between heading and card */}
+                    <div className="relative flex flex-col items-center mt-8">
+                        <div className="flex items-center bg-[#0a0a10] border border-white/[0.08] rounded-xl p-1 shadow-lg shadow-black/30">
+                            <button
+                                onClick={() => setActiveTab('analytics')}
+                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+                                    activeTab === 'analytics'
+                                        ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.15)]'
+                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+                                }`}
+                            >
+                                {activeTab === 'analytics' && (
+                                    <motion.div layoutId="activeTabBg" className="absolute inset-0 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.08]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                                )}
+                                <BarChart3 className="w-4 h-4 relative z-10" />
+                                <span className="relative z-10">Analytics</span>
+                            </button>
+                            <button
+                                onClick={() => { setActiveTab('globe'); setHasClickedGlobe(true); }}
+                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+                                    activeTab === 'globe'
+                                        ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.15)]'
+                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+                                }`}
+                            >
+                                {activeTab === 'globe' && (
+                                    <motion.div layoutId="activeTabBg" className="absolute inset-0 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.08]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                                )}
+                                <Globe className="w-4 h-4 relative z-10" />
+                                <span className="relative z-10">Globe</span>
+                            </button>
+                        </div>
+
+                        {/* "Try this" tooltip — hidden after first click */}
+                        {!hasClickedGlobe && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-3 pointer-events-none"
+                            >
+                                <motion.div
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                                    className="relative px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.06] backdrop-blur-sm"
+                                >
+                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white/[0.06] border-l border-t border-white/[0.06] rotate-45" />
+                                    <span className="text-xs text-zinc-300">
+                                        Try this <span className="text-amber-400">&#10024;</span> <span className="text-zinc-500">(people are addicted)</span>
+                                    </span>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </div>
                 </motion.div>
 
                 {/* Dashboard preview card */}
                 <motion.div
                     variants={fadeUp}
-                    className="relative"
+                    className="relative mt-8"
                 >
                     <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-violet-500/10 rounded-3xl blur-2xl" />
 
                     <div className="relative bg-[#050508] border border-white/[0.08] rounded-2xl overflow-hidden">
-                        {/* Dashboard header with toggle */}
+                        {/* Dashboard header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
                             <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -576,60 +630,9 @@ function InteractiveDemo() {
                                 </span>
                                 <span className="text-xs text-zinc-500">acme-store.com</span>
                             </div>
-                            <div className="flex items-center gap-3">
-                                {/* View toggle */}
-                                <div className="relative flex items-center">
-                                    <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5">
-                                        <button
-                                            onClick={() => setActiveTab('analytics')}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                                                activeTab === 'analytics'
-                                                    ? 'bg-emerald-500/[0.15] text-emerald-400 border border-emerald-500/[0.2] shadow-sm'
-                                                    : 'text-zinc-500 hover:text-zinc-300'
-                                            }`}
-                                        >
-                                            <BarChart3 className="w-3 h-3" />
-                                            <span className="hidden sm:inline">Analytics</span>
-                                        </button>
-                                        <button
-                                            onClick={() => { setActiveTab('globe'); setHasClickedGlobe(true); }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                                                activeTab === 'globe'
-                                                    ? 'bg-emerald-500/[0.15] text-emerald-400 border border-emerald-500/[0.2] shadow-sm'
-                                                    : 'text-zinc-500 hover:text-zinc-300'
-                                            }`}
-                                        >
-                                            <Globe className="w-3 h-3" />
-                                            <span className="hidden sm:inline">Globe</span>
-                                        </button>
-                                    </div>
-
-                                    {/* "Try this" tooltip — hidden after first click */}
-                                    {!hasClickedGlobe && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 4 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="absolute -bottom-10 right-0 whitespace-nowrap pointer-events-none"
-                                        >
-                                            <motion.div
-                                                animate={{ y: [0, -3, 0] }}
-                                                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                                                className="relative px-3 py-1.5 rounded-lg bg-white/[0.08] border border-white/[0.06] backdrop-blur-sm"
-                                            >
-                                                <div className="absolute -top-1 right-6 w-2 h-2 bg-white/[0.08] border-l border-t border-white/[0.06] rotate-45" />
-                                                <span className="text-[11px] text-zinc-300">
-                                                    Try this <span className="text-amber-400">&#10024;</span> <span className="text-zinc-500">(people are addicted)</span>
-                                                </span>
-                                            </motion.div>
-                                        </motion.div>
-                                    )}
-                                </div>
-
-                                {/* Context badge */}
-                                <span className="px-2.5 py-1 rounded-md bg-white/[0.05] text-xs text-zinc-300">
-                                    {activeTab === 'analytics' ? 'Last 30 days' : 'REAL-TIME'}
-                                </span>
-                            </div>
+                            <span className="px-2.5 py-1 rounded-md bg-white/[0.05] text-xs text-zinc-300">
+                                {activeTab === 'analytics' ? 'Last 30 days' : 'REAL-TIME'}
+                            </span>
                         </div>
 
                         {/* Content area */}
@@ -783,7 +786,7 @@ function InteractiveDemo() {
                                                 visitors={DEMO_VISITORS}
                                                 mapboxToken={MAPBOX_TOKEN}
                                                 byCountry={DEMO_BY_COUNTRY}
-                                                autoPan={true}
+                                                autoPan={false}
                                             />
                                         </div>
 
