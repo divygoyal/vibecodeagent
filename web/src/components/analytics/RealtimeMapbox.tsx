@@ -72,24 +72,15 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const map = mapRef.current;
         if (!map) return;
 
-        const fly = () => {
-            const v = visitorsRef.current;
-            if (!autoPanRef.current || v.length === 0 || !mapRef.current) return;
+        // Slow continuous rotation — keeps globe at the same zoom level
+        const ROTATION_DEG_PER_TICK = 0.3; // degrees per tick
+        const TICK_MS = 50; // ~60fps-ish
 
-            const idx = autoPanIndexRef.current % v.length;
-            const visitor = v[idx];
-            autoPanIndexRef.current = idx + 1;
-
-            mapRef.current.flyTo({
-                center: [visitor.lng, visitor.lat],
-                zoom: 3.5 + Math.random() * 1.5,
-                duration: 3000,
-                essential: true,
-            });
-        };
-
-        autoPanDelayRef.current = setTimeout(fly, 1500);
-        autoPanTimerRef.current = setInterval(fly, 6000);
+        autoPanTimerRef.current = setInterval(() => {
+            if (!autoPanRef.current || !mapRef.current) return;
+            const center = mapRef.current.getCenter();
+            mapRef.current.setCenter([center.lng + ROTATION_DEG_PER_TICK, center.lat]);
+        }, TICK_MS);
     }, [stopAutoPan]);
 
     useImperativeHandle(ref, () => ({
@@ -286,10 +277,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const currentMap = markersRef.current;
         const newIds = new Set<string>();
 
-        if (visitors.length > 0) {
-            console.log('[RealtimeMapbox] Syncing markers:', visitors.length, 'visitors, map ready:', !!map);
-        }
-
         visitors.forEach((v) => {
             if (v.lat === 0 && v.lng === 0) return;
             newIds.add(v.id);
@@ -311,7 +298,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     .setLngLat(lngLat)
                     .addTo(map);
                 currentMap.set(v.id, { marker, el, lngLat });
-                console.log('[RealtimeMapbox] Added marker:', v.name, 'at', lngLat, 'el in DOM:', el.isConnected);
             }
         });
 
