@@ -370,10 +370,10 @@ async def create_user(
     # 3. Upsert Logic
     if existing_user:
         user = existing_user
-        print(f"[DEBUG_TOKEN] Found user={user.id}. Current DB token='{user.telegram_bot_token}'. Incoming token='{user_data.telegram_bot_token}'")
+        print(f"[USER] Found existing user={user.id}, updating fields")
         # Update fields if provided
         if user_data.telegram_bot_token:
-            print(f"[DEBUG_TOKEN] Assigning token! (Old: {user.telegram_bot_token} -> New: {user_data.telegram_bot_token})")
+            print(f"[USER] Updating telegram bot token for user={user.id}")
             user.telegram_bot_token = user_data.telegram_bot_token
         if user_data.gemini_api_key:
             user.gemini_api_key = user_data.gemini_api_key
@@ -531,7 +531,7 @@ async def create_user(
         print(f"[ERROR] create_user: Failed to ensure container: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
-    print(f"[DEBUG_TOKEN] create_user: Success. user_id={user.id}, github_id={user.github_id}, container={user.container_status}, token_exists={bool(user.telegram_bot_token)}")
+    print(f"[USER] create_user: Success. user_id={user.id}, github_id={user.github_id}, container={user.container_status}")
     return UserResponse(
         id=user.id,
         github_id=user.github_id or "",
@@ -579,13 +579,10 @@ async def get_user(
     _: bool = Depends(verify_admin_key)
 ):
     """Get user status including container health"""
-    print(f"[DEBUG_TOKEN] GET /api/users/{github_id} called")
     user = await get_user_by_identifier(db, github_id)
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    print(f"[DEBUG_TOKEN] get_user: DB token for {github_id} is: '{user.telegram_bot_token}'")
     
     display_token = user.telegram_bot_token or ""
 
@@ -785,13 +782,12 @@ async def update_user(
         else:
             # Create new if not exists (upsert)
             if user_update.access_token:
+               # Use appropriate identifier per provider
+               provider_id = user.github_id if user_update.provider == "github" else (user.email or user.github_id or "")
                conn = OAuthConnection(
                    user_id=user.id,
                    provider=user_update.provider,
-                   provider_account_id=user.github_id, # Fallback to github_id if we don't have provider_id in update param?
-                   # Wait, UserUpdate doesn't have provider_id. 
-                   # route.ts passes provider_id though? No, route.ts passes provider_id in payload...
-                   # Let's check UserUpdate model.
+                   provider_account_id=provider_id,
                    access_token=user_update.access_token,
                    refresh_token=user_update.refresh_token,
                    token_type="bearer",
