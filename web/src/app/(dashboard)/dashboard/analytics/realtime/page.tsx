@@ -113,6 +113,10 @@ export default function RealtimePage() {
         }
     }, []);
 
+    const handleAutoPanChange = useCallback((enabled: boolean) => {
+        setIsAutoPanning(enabled);
+    }, []);
+
     useEffect(() => { setMounted(true); }, []);
 
     // ─── Data extraction ───
@@ -180,7 +184,7 @@ export default function RealtimePage() {
     // Use byCountry as primary source (reliable country names), spread multiple users per country
     const globeVisitors = useMemo<GlobeVisitor[]>(() => {
         const visitors: GlobeVisitor[] = [];
-        const usedKeys = new Map<string, number>(); // key → count of markers at this key
+        const usedKeys = new Set<string>(); // track occupied coordinate keys
 
         // Helper: check if city coords are geographically close to country coords
         const isCityInCountry = (cityCoord: [number, number], countryCoord: [number, number]) => {
@@ -221,25 +225,25 @@ export default function RealtimePage() {
                 }
             }
 
-            // Stable offset for duplicate locations
+            // Deterministic offset based on city name hash (stable regardless of other visitors)
             const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
-            const count = usedKeys.get(key) || 0;
+            const cityHash = hashStr(`${cityStr}-${countryStr}`);
             let lat = coord[0];
             let lng = coord[1];
-            if (count > 0) {
-                // Deterministic spiral offset based on count
-                const angle = count * 2.4; // golden angle
-                const radius = 1.5 + count * 0.8;
+            if (usedKeys.has(key)) {
+                // Hash-based offset — always the same for this city, no matter what
+                const angle = (cityHash % 360) * (Math.PI / 180);
+                const radius = 1.2 + (cityHash % 5) * 0.6;
                 lat += Math.cos(angle) * radius;
                 lng += Math.sin(angle) * radius;
             }
-            usedKeys.set(key, count + 1);
+            usedKeys.add(key);
 
             // Name is based on city+country only (stable across re-renders)
-            const seed = `${cityStr}-${countryStr}-${count}`;
+            const seed = `${cityStr}-${countryStr}`;
             const name = makeName(seed);
             const hash = hashStr(seed);
-            const warmth = predictWarmth(countryStr, 'desktop', count);
+            const warmth = predictWarmth(countryStr, 'desktop', 0);
 
             visitors.push({
                 id: seed,
@@ -348,6 +352,7 @@ export default function RealtimePage() {
                     byCountry={byCountry}
                     byCity={byCity}
                     autoPan={isAutoPanning}
+                    onAutoPanChange={handleAutoPanChange}
                 />
             </div>
 
