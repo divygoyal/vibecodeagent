@@ -174,7 +174,13 @@ export async function POST(req: NextRequest) {
             }
             dismissedSets.set(userId, new Set());
         }
-        dismissedSets.get(userId)!.add(alertId);
+        const userSet = dismissedSets.get(userId)!;
+        // Cap per-user dismissed alerts to prevent unbounded growth
+        if (userSet.size >= 200) {
+            const first = userSet.values().next().value;
+            if (first) userSet.delete(first);
+        }
+        userSet.add(alertId);
 
         return NextResponse.json({ success: true });
     } catch {

@@ -20,39 +20,33 @@ export async function GET() {
             return NextResponse.json({ credits: 10, plan: 'free' });
         }
 
-        const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}/credits`, {
-            headers: { 'X-API-Key': ADMIN_API_KEY },
-            cache: 'no-store',
-        });
+        // Fetch credits and user data in parallel for faster response
+        const encodedId = encodeURIComponent(String(userId));
+        const headers = { 'X-API-Key': ADMIN_API_KEY };
+        const [creditsRes, userRes] = await Promise.all([
+            fetch(`${ADMIN_API_URL}/api/users/${encodedId}/credits`, { headers, cache: 'no-store' }),
+            fetch(`${ADMIN_API_URL}/api/users/${encodedId}`, { headers, cache: 'no-store' }).catch(() => null),
+        ]);
 
-        if (!res.ok) {
-            console.error('[Credits] Failed to fetch credits:', res.status);
+        if (!creditsRes.ok) {
+            console.error('[Credits] Failed to fetch credits:', creditsRes.status);
             return NextResponse.json({ credits: null, plan: 'free', error: 'unavailable' });
         }
 
-        const data = await res.json();
+        const data = await creditsRes.json();
 
-        // Also fetch plan info
         let plan = 'free';
         let telegramBotEnabled = false;
         let subscriptionEnd = null;
         let subscriptionId = null;
         let subscriptionCancelled = false;
-        try {
-            const userRes = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}`, {
-                headers: { 'X-API-Key': ADMIN_API_KEY },
-                cache: 'no-store',
-            });
-            if (userRes.ok) {
-                const userData = await userRes.json();
-                plan = userData.plan || 'free';
-                telegramBotEnabled = userData.telegram_bot_enabled || false;
-                subscriptionEnd = userData.subscription_end || null;
-                subscriptionId = userData.subscription_id || null;
-                subscriptionCancelled = userData.subscription_cancelled || false;
-            }
-        } catch {
-            // Plan fetch failed, default to free
+        if (userRes?.ok) {
+            const userData = await userRes.json();
+            plan = userData.plan || 'free';
+            telegramBotEnabled = userData.telegram_bot_enabled || false;
+            subscriptionEnd = userData.subscription_end || null;
+            subscriptionId = userData.subscription_id || null;
+            subscriptionCancelled = userData.subscription_cancelled || false;
         }
 
         return NextResponse.json({

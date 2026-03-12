@@ -82,15 +82,19 @@ export async function POST(req: Request) {
         const eventType = event.type;
         console.log(`[Webhook] DodoPayments event: ${eventType}`);
 
+        // Extract subscription data from typed event
+        const data = event.data;
+
         // Deduplicate webhook events (Dodo may retry on network errors)
-        const eventId = `${eventType}-${JSON.stringify(event.data).slice(0, 100)}-${Date.now().toString().slice(0, -4)}`;
+        // Use stable fields only (no timestamp) so retries of the same event are caught
+        const dedupEmail = 'customer' in data && data.customer ? data.customer.email : '';
+        const dedupProduct = 'product_id' in data ? data.product_id : '';
+        const dedupSubId = 'subscription_id' in data ? data.subscription_id : '';
+        const eventId = `${eventType}-${dedupEmail}-${dedupProduct}-${dedupSubId}`;
         if (isDuplicate(eventId)) {
             console.log(`[Webhook] Duplicate event detected, skipping: ${eventType}`);
             return NextResponse.json({ received: true, duplicate: true });
         }
-
-        // Extract subscription data from typed event
-        const data = event.data;
         const productId = 'product_id' in data ? data.product_id : undefined;
         const customerEmail = 'customer' in data && data.customer ? data.customer.email : undefined;
         const subscriptionId = 'subscription_id' in data ? data.subscription_id : undefined;
