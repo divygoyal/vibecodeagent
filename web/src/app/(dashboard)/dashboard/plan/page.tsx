@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
     CheckCircle2, Coins, Sparkles, Bot, Crown,
-    Zap, TrendingUp, Shield, History
+    Zap, TrendingUp, Shield, History, AlertTriangle, X, Loader2
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
 
@@ -62,10 +62,14 @@ export default function PlanPage() {
 
 function PlanPageContent() {
     const { data: session } = useSession();
-    const { credits, plan, telegramBotEnabled, subscriptionEnd, refresh: refreshCredits } = useCredits();
+    const { credits, plan, telegramBotEnabled, subscriptionEnd, subscriptionId, refresh: refreshCredits } = useCredits();
     const searchParams = useSearchParams();
     const justUpgraded = useMemo(() => searchParams.get('upgraded') === 'true', [searchParams]);
     const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(justUpgraded);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelSuccess, setCancelSuccess] = useState(false);
+    const [cancelError, setCancelError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!justUpgraded) return;
@@ -74,6 +78,26 @@ function PlanPageContent() {
         const timer = setTimeout(() => setShowUpgradeSuccess(false), 8000);
         return () => clearTimeout(timer);
     }, [justUpgraded, refreshCredits]);
+
+    const handleCancelSubscription = async () => {
+        setCancelling(true);
+        setCancelError(null);
+        try {
+            const res = await fetch('/api/subscription/cancel', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                setCancelError(data.error || 'Failed to cancel subscription');
+                return;
+            }
+            setCancelSuccess(true);
+            setShowCancelModal(false);
+            refreshCredits();
+        } catch {
+            setCancelError('Something went wrong. Please try again.');
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     const displayCredits = credits ?? 0;
     const isLow = displayCredits < 20;
@@ -171,8 +195,36 @@ function PlanPageContent() {
                             <CheckCircle2 className="w-3 h-3 text-violet-400 ml-auto" />
                         </div>
                     )}
+
+                    {/* Cancel subscription button */}
+                    {plan !== 'free' && subscriptionId && (
+                        <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                            <button
+                                onClick={() => setShowCancelModal(true)}
+                                className="text-[11px] text-zinc-500 hover:text-red-400 transition-colors"
+                            >
+                                Cancel subscription
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Cancel Success Banner */}
+            {cancelSuccess && (
+                <div className="bg-amber-500/[0.08] border border-amber-500/[0.2] rounded-2xl p-4 flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-300">Subscription cancelled</p>
+                        <p className="text-xs text-zinc-400">
+                            Your plan remains active until {renewalDate || 'the end of your billing period'}. You won&apos;t be charged again.
+                        </p>
+                    </div>
+                    <button onClick={() => setCancelSuccess(false)} className="text-zinc-500 hover:text-zinc-300">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
 
             {/* Subscription Plans */}
             <div className="space-y-4">
@@ -318,6 +370,62 @@ function PlanPageContent() {
 
             {/* Credit Usage History */}
             <CreditUsageHistory />
+
+            {/* Cancel Subscription Modal */}
+            {showCancelModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#0a0a0f] border border-white/[0.08] rounded-2xl p-6 max-w-md w-full space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/[0.1] flex items-center justify-center">
+                                <AlertTriangle className="w-5 h-5 text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-white">Cancel subscription?</h3>
+                                <p className="text-[11px] text-zinc-500">This action will stop future renewals</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                            <p className="text-xs text-zinc-300">
+                                Your <span className={`font-semibold ${currentPlan.color}`}>{currentPlan.label}</span> plan will remain active until <span className="text-white font-medium">{renewalDate || 'the end of your billing period'}</span>.
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                                After that, you&apos;ll be downgraded to the Free plan. Your remaining credits will still be usable until then.
+                            </p>
+                        </div>
+
+                        {cancelError && (
+                            <div className="bg-red-500/[0.08] border border-red-500/[0.15] rounded-lg p-3">
+                                <p className="text-xs text-red-400">{cancelError}</p>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-3 pt-1">
+                            <button
+                                onClick={() => { setShowCancelModal(false); setCancelError(null); }}
+                                disabled={cancelling}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-all border border-white/[0.06]"
+                            >
+                                Keep my plan
+                            </button>
+                            <button
+                                onClick={handleCancelSubscription}
+                                disabled={cancelling}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-red-500/[0.1] text-red-400 hover:bg-red-500/[0.2] transition-all border border-red-500/[0.2] flex items-center justify-center gap-2"
+                            >
+                                {cancelling ? (
+                                    <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        Cancelling...
+                                    </>
+                                ) : (
+                                    'Cancel subscription'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

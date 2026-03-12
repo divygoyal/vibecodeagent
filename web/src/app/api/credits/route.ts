@@ -36,6 +36,7 @@ export async function GET() {
         let plan = 'free';
         let telegramBotEnabled = false;
         let subscriptionEnd = null;
+        let subscriptionId = null;
         try {
             const userRes = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}`, {
                 headers: { 'X-API-Key': ADMIN_API_KEY },
@@ -46,6 +47,7 @@ export async function GET() {
                 plan = userData.plan || 'free';
                 telegramBotEnabled = userData.telegram_bot_enabled || false;
                 subscriptionEnd = userData.subscription_end || null;
+                subscriptionId = userData.subscription_id || null;
             }
         } catch {
             // Plan fetch failed, default to free
@@ -56,6 +58,7 @@ export async function GET() {
             plan,
             telegram_bot_enabled: telegramBotEnabled,
             subscription_end: subscriptionEnd,
+            subscription_id: subscriptionId,
         });
     } catch (err) {
         console.error('[Credits] Error:', err);
