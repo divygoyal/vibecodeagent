@@ -152,6 +152,54 @@ export default function BotPage() {
                 </p>
             </div>
 
+            {/* Pro Plan Gate */}
+            {!hasProPlan ? (
+                <div className="bg-gradient-to-br from-violet-500/[0.06] via-purple-500/[0.03] to-transparent border border-violet-500/[0.15] rounded-2xl p-8">
+                    <div className="max-w-lg mx-auto text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-400/20 to-purple-500/20 flex items-center justify-center mx-auto mb-5">
+                            <Crown className="w-8 h-8 text-violet-400" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-2">Upgrade to Pro</h2>
+                        <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+                            The Telegram bot is a Pro-exclusive feature. Get your personal AI SEO assistant
+                            that monitors your analytics, answers questions, and sends alerts — all from Telegram.
+                        </p>
+
+                        <div className="bg-black/30 border border-violet-500/[0.1] rounded-xl p-5 mb-6 text-left">
+                            <h3 className="text-sm font-semibold text-violet-300 mb-3 flex items-center gap-2">
+                                <Shield className="w-4 h-4" /> What you get with Pro
+                            </h3>
+                            <ul className="space-y-2.5">
+                                {[
+                                    '300 AI credits/month',
+                                    'Personal Telegram bot (AI SEO assistant)',
+                                    'Custom alert rules',
+                                    'Unlimited site audits',
+                                    'Priority support',
+                                    'Early access to new features',
+                                ].map((feature, i) => (
+                                    <li key={i} className="flex items-center gap-2 text-sm text-zinc-300">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+                                        {feature}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <a
+                            href={`https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop?email=${encodeURIComponent(session?.user?.email || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-violet-400 to-purple-500 text-white font-semibold rounded-xl hover:shadow-[0_0_24px_rgba(139,92,246,0.35)] transition-all text-sm"
+                        >
+                            Upgrade to Pro — $29/mo
+                            <ArrowRight className="w-4 h-4" />
+                        </a>
+                        <p className="text-[10px] text-zinc-600 mt-3">Secure payments by Dodo Payments · Cancel anytime</p>
+                    </div>
+                </div>
+            ) : (
+            <>
             {/* Bot Status Pipeline */}
             {isProvisioned && (
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-6">
@@ -483,6 +531,8 @@ export default function BotPage() {
                     <span>Tell your bot <span className="text-zinc-400 font-mono">&quot;connect Slack&quot;</span> or <span className="text-zinc-400 font-mono">&quot;connect Stripe&quot;</span> to set up secondary integrations.</span>
                 </div>
             </div>
+            </>
+            )}
         </div>
     );
 }
