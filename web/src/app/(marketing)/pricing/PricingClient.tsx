@@ -27,7 +27,7 @@ const PLANS = [
         color: 'cyan',
         gradient: 'from-cyan-400 to-blue-500',
         description: 'Perfect for side projects and personal sites.',
-        productId: 'pdt_0NZoVGbK4CoQKguLeiFbO',
+        productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
         features: [
             { text: '50 AI credits/month', included: true },
             { text: 'Full analytics dashboard', included: true },
@@ -48,7 +48,7 @@ const PLANS = [
         gradient: 'from-emerald-400 to-cyan-400',
         description: 'For growing businesses serious about SEO.',
         popular: true,
-        productId: 'pdt_0NZoVI3aamuRliw0Ffnuh',
+        productId: 'pdt_0NaLMM1bLW9wAbmxcsebm',
         features: [
             { text: '150 AI credits/month', included: true },
             { text: 'Everything in Starter', included: true },
@@ -69,7 +69,7 @@ const PLANS = [
         gradient: 'from-violet-400 to-purple-500',
         description: 'Everything unlocked. Full power.',
         bestValue: true,
-        productId: 'pdt_0NZoVIVgk7pdElblScoop',
+        productId: 'pdt_0NaLMM4r23kncRahthuyj',
         features: [
             { text: '300 AI credits/month', included: true },
             { text: 'Everything in Growth', included: true },

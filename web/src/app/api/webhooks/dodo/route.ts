@@ -11,9 +11,9 @@ const client = new DodoPayments({
 
 // Product ID → plan config (live mode product IDs)
 const PLANS: Record<string, { plan: string; credits: number; telegramBot: boolean }> = {
-    'pdt_0NZoVGbK4CoQKguLeiFbO': { plan: 'starter', credits: 50, telegramBot: false },
-    'pdt_0NZoVI3aamuRliw0Ffnuh': { plan: 'growth', credits: 150, telegramBot: false },
-    'pdt_0NZoVIVgk7pdElblScoop': { plan: 'pro', credits: 300, telegramBot: true },
+    'pdt_0NaLMLyWwiO355QaGlQwq': { plan: 'starter', credits: 50, telegramBot: false },
+    'pdt_0NaLMM1bLW9wAbmxcsebm': { plan: 'growth', credits: 150, telegramBot: false },
+    'pdt_0NaLMM4r23kncRahthuyj': { plan: 'pro', credits: 300, telegramBot: true },
 };
 
 async function updateSubscription(email: string, body: Record<string, unknown>) {

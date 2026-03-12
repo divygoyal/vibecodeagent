@@ -1143,7 +1143,7 @@ function Pricing() {
                         </div>
                         <div className="text-sm text-cyan-400 font-medium mb-6">50 AI credits/month</div>
 
-                        <a href="https://checkout.dodopayments.com/buy/pdt_0NZoVGbK4CoQKguLeiFbO" target="_blank" rel="noopener noreferrer"
+                        <a href="https://checkout.dodopayments.com/buy/pdt_0NaLMLyWwiO355QaGlQwq" target="_blank" rel="noopener noreferrer"
                             className="w-full py-2.5 rounded-xl text-sm font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-6 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2]">
                             Get Starter
                         </a>
@@ -1178,7 +1178,7 @@ function Pricing() {
                             <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15] font-semibold">3x Starter</span>
                         </div>
 
-                        <a href="https://checkout.dodopayments.com/buy/pdt_0NZoVI3aamuRliw0Ffnuh" target="_blank" rel="noopener noreferrer"
+                        <a href="https://checkout.dodopayments.com/buy/pdt_0NaLMM1bLW9wAbmxcsebm" target="_blank" rel="noopener noreferrer"
                             className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all duration-200 mb-6 block text-center">
                             Get Growth
                         </a>
@@ -1216,7 +1216,7 @@ function Pricing() {
                                 <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/[0.1] text-violet-400 border border-violet-500/[0.15] font-semibold">6x Starter</span>
                             </div>
 
-                            <a href="https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop" target="_blank" rel="noopener noreferrer"
+                            <a href="https://checkout.dodopayments.com/buy/pdt_0NaLMM4r23kncRahthuyj" target="_blank" rel="noopener noreferrer"
                                 className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-200 mb-6 block text-center">
                                 Get Pro
                             </a>

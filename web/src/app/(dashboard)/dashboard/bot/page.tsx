@@ -320,7 +320,7 @@ export default function BotPage() {
                                 </button>
                             ) : (
                                 <a
-                                    href={`https://checkout.dodopayments.com/buy/pdt_0NZoVIVgk7pdElblScoop?email=${encodeURIComponent(session?.user?.email || '')}&redirect_url=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/dashboard/bot` : '')}`}
+                                    href={`https://checkout.dodopayments.com/buy/pdt_0NaLMM4r23kncRahthuyj?email=${encodeURIComponent(session?.user?.email || '')}&redirect_url=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/dashboard/bot` : '')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="w-full py-3.5 bg-gradient-to-r from-violet-400 to-purple-500 hover:shadow-[0_0_24px_rgba(139,92,246,0.35)] rounded-xl text-sm font-semibold transition-all text-white flex items-center justify-center gap-2"
