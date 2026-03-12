@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { GlobeVisitor } from './RealtimeGlobe';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 // ─── DiceBear avatar URL generator ───
 function getAvatarUrl(seed: string): string {
@@ -29,21 +30,10 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-// Ensure Mapbox CSS is loaded (dynamic import doesn't work reliably in Next.js)
-function ensureMapboxCSS() {
-    if (typeof document === 'undefined') return;
-    if (document.querySelector('link[href*="mapbox-gl"]')) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.css';
-    document.head.appendChild(link);
-}
-
 // Cache the mapboxgl module
 let _mapboxgl: any = null;
 async function loadMapboxGL() {
     if (_mapboxgl) return _mapboxgl;
-    ensureMapboxCSS();
     const mod = await import('mapbox-gl');
     _mapboxgl = mod.default;
     return _mapboxgl;
@@ -233,7 +223,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
         // Outermost element — NO position property, let Mapbox fully control it
         const el = document.createElement('div');
-        el.style.cssText = 'width:60px;height:60px;cursor:pointer;';
+        el.style.cssText = 'width:60px;height:60px;cursor:pointer;z-index:10;';
         el.title = `${v.name} — ${v.country}`;
 
         // Inner wrapper handles relative positioning for the warmth dot
@@ -244,9 +234,9 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         frame.style.cssText = `
             width:56px;height:56px;margin:2px;
             border-radius:50%;
-            background:rgba(15,20,35,0.92);
-            border:2.5px solid rgba(255,255,255,0.12);
-            box-shadow:0 4px 24px rgba(0,0,0,0.6);
+            background:${v.avatarColor};
+            border:2.5px solid rgba(255,255,255,0.25);
+            box-shadow:0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${warmthColor}40;
             overflow:hidden;
         `;
 
@@ -296,6 +286,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const currentMap = markersRef.current;
         const newIds = new Set<string>();
 
+        if (visitors.length > 0) {
+            console.log('[RealtimeMapbox] Syncing markers:', visitors.length, 'visitors, map ready:', !!map);
+        }
+
         visitors.forEach((v) => {
             if (v.lat === 0 && v.lng === 0) return;
             newIds.add(v.id);
@@ -317,6 +311,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     .setLngLat(lngLat)
                     .addTo(map);
                 currentMap.set(v.id, { marker, el, lngLat });
+                console.log('[RealtimeMapbox] Added marker:', v.name, 'at', lngLat, 'el in DOM:', el.isConnected);
             }
         });
 
