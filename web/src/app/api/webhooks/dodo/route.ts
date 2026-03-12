@@ -142,14 +142,27 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true, plan: planConfig.plan });
         }
 
-        // subscription.cancelled / subscription.expired — downgrade to free
-        if (eventType === 'subscription.cancelled' || eventType === 'subscription.expired') {
+        // subscription.cancelled — user cancelled, keep plan active until period ends
+        if (eventType === 'subscription.cancelled') {
             if (!customerEmail) {
-                console.warn(`[Webhook] ${eventType} missing email`);
+                console.warn('[Webhook] subscription.cancelled missing email');
                 return NextResponse.json({ received: true });
             }
 
-            console.log(`[Webhook] ${eventType}: ${customerEmail} → downgrade to free`);
+            console.log(`[Webhook] subscription.cancelled: ${customerEmail} — plan stays active until billing period ends`);
+            // Do NOT downgrade yet — the user's plan remains active until subscription_end.
+            // The actual downgrade happens when subscription.expired fires at period end.
+            return NextResponse.json({ received: true, cancelled: true });
+        }
+
+        // subscription.expired — billing period ended, now downgrade to free
+        if (eventType === 'subscription.expired') {
+            if (!customerEmail) {
+                console.warn('[Webhook] subscription.expired missing email');
+                return NextResponse.json({ received: true });
+            }
+
+            console.log(`[Webhook] subscription.expired: ${customerEmail} → downgrade to free`);
             await updateSubscription(customerEmail, {
                 plan: 'free',
                 credits: 0,
