@@ -559,54 +559,67 @@ function InteractiveDemo() {
                     </p>
 
                     {/* View toggle — centered between heading and card */}
-                    <div className="relative flex flex-col items-center mt-8">
-                        <div className="flex items-center bg-[#0a0a10] border border-white/[0.08] rounded-xl p-1 shadow-lg shadow-black/30">
-                            <button
-                                onClick={() => setActiveTab('analytics')}
-                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
-                                    activeTab === 'analytics'
-                                        ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.15)]'
-                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-                                }`}
-                            >
-                                {activeTab === 'analytics' && (
-                                    <motion.div layoutId="activeTabBg" className="absolute inset-0 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.08]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-                                )}
-                                <BarChart3 className="w-4 h-4 relative z-10" />
-                                <span className="relative z-10">Analytics</span>
-                            </button>
-                            <button
-                                onClick={() => { setActiveTab('globe'); setHasClickedGlobe(true); }}
-                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
-                                    activeTab === 'globe'
-                                        ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.15)]'
-                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-                                }`}
-                            >
-                                {activeTab === 'globe' && (
-                                    <motion.div layoutId="activeTabBg" className="absolute inset-0 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.08]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-                                )}
-                                <Globe className="w-4 h-4 relative z-10" />
-                                <span className="relative z-10">Globe</span>
-                            </button>
+                    <div className="relative flex flex-col items-center mt-10">
+                        <div className="relative">
+                            {/* Glow behind toggle */}
+                            <div className="absolute -inset-3 bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-violet-500/20 rounded-2xl blur-xl opacity-60" />
+
+                            <div className="relative flex items-center bg-zinc-950/80 backdrop-blur-xl border border-white/[0.1] rounded-2xl p-1.5 shadow-2xl shadow-black/50">
+                                <button
+                                    onClick={() => setActiveTab('analytics')}
+                                    className="relative flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200 overflow-hidden"
+                                >
+                                    {activeTab === 'analytics' && (
+                                        <motion.div
+                                            layoutId="demoTabIndicator"
+                                            className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/25 to-cyan-500/20 border border-emerald-400/30 shadow-[0_0_24px_rgba(52,211,153,0.2),inset_0_1px_0_rgba(255,255,255,0.06)]"
+                                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                                        />
+                                    )}
+                                    <BarChart3 className={`w-4 h-4 relative z-10 transition-colors duration-200 ${activeTab === 'analytics' ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                                    <span className={`relative z-10 transition-colors duration-200 ${activeTab === 'analytics' ? 'text-white' : 'text-zinc-500'}`}>Analytics</span>
+                                </button>
+                                <button
+                                    onClick={() => { setActiveTab('globe'); setHasClickedGlobe(true); }}
+                                    className="relative flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200 overflow-hidden"
+                                >
+                                    {activeTab === 'globe' && (
+                                        <motion.div
+                                            layoutId="demoTabIndicator"
+                                            className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/25 to-cyan-500/20 border border-emerald-400/30 shadow-[0_0_24px_rgba(52,211,153,0.2),inset_0_1px_0_rgba(255,255,255,0.06)]"
+                                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                                        />
+                                    )}
+                                    <Globe className={`w-4 h-4 relative z-10 transition-colors duration-200 ${activeTab === 'globe' ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                                    <span className={`relative z-10 transition-colors duration-200 ${activeTab === 'globe' ? 'text-white' : 'text-zinc-500'}`}>Globe</span>
+                                    {/* Pulsing dot to draw attention */}
+                                    {!hasClickedGlobe && (
+                                        <span className="relative z-10 flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
-                        {/* "Try this" tooltip — hidden after first click */}
+                        {/* "Try this" callout — hidden after first click */}
                         {!hasClickedGlobe && (
                             <motion.div
-                                initial={{ opacity: 0, y: -4 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-3 pointer-events-none"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: 0.5, duration: 0.3 }}
+                                className="mt-4 pointer-events-none"
                             >
                                 <motion.div
-                                    animate={{ y: [0, -3, 0] }}
-                                    transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                                    className="relative px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.06] backdrop-blur-sm"
+                                    animate={{ y: [0, -4, 0] }}
+                                    transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20"
                                 >
-                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white/[0.06] border-l border-t border-white/[0.06] rotate-45" />
-                                    <span className="text-xs text-zinc-300">
-                                        Try this <span className="text-amber-400">&#10024;</span> <span className="text-zinc-500">(people are addicted)</span>
+                                    <span className="text-xs font-medium text-zinc-300">
+                                        Try this <span className="text-amber-400">&#10024;</span>
                                     </span>
+                                    <span className="text-xs text-emerald-400/80 font-medium">(people are addicted)</span>
                                 </motion.div>
                             </motion.div>
                         )}
