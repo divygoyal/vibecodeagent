@@ -50,46 +50,11 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     const autoPanRef = useRef(autoPanProp);
     const autoPanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const autoPanDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const autoPanResumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const autoPanIndexRef = useRef(0);
     const visitorsRef = useRef(visitors);
-    const renderListenerRef = useRef<(() => void) | null>(null);
     const onAutoPanChangeRef = useRef(onAutoPanChange);
     visitorsRef.current = visitors;
     onAutoPanChangeRef.current = onAutoPanChange;
-
-    // ─── Globe back-side occlusion: hide markers behind the globe ───
-    // Uses CSS transition for smooth fade instead of instant toggle
-    const updateMarkerVisibility = useCallback(() => {
-        const map = mapRef.current;
-        if (!map) return;
-
-        const center = map.getCenter();
-        const zoom = map.getZoom();
-
-        const centerLat = (center.lat * Math.PI) / 180;
-        const centerLng = (center.lng * Math.PI) / 180;
-
-        markersRef.current.forEach(({ el, lngLat }) => {
-            const [lng, lat] = lngLat as [number, number];
-            const markerLat = (lat * Math.PI) / 180;
-            const markerLng = (lng * Math.PI) / 180;
-
-            // Dot product on unit sphere — positive = same hemisphere (visible)
-            const dot = Math.sin(centerLat) * Math.sin(markerLat) +
-                Math.cos(centerLat) * Math.cos(markerLat) * Math.cos(markerLng - centerLng);
-
-            // At high zoom we're in flat mode, show everything
-            const isVisible = zoom > 5 || dot > -0.1;
-
-            // Smooth transition instead of instant toggle
-            const targetOpacity = isVisible ? '1' : '0';
-            if (el.style.opacity !== targetOpacity) {
-                el.style.opacity = targetOpacity;
-                el.style.pointerEvents = isVisible ? 'auto' : 'none';
-            }
-        });
-    }, []);
 
     // ─── Auto-pan: properly clears ALL timers ───
     const stopAutoPan = useCallback(() => {
@@ -100,10 +65,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         if (autoPanDelayRef.current) {
             clearTimeout(autoPanDelayRef.current);
             autoPanDelayRef.current = null;
-        }
-        if (autoPanResumeRef.current) {
-            clearTimeout(autoPanResumeRef.current);
-            autoPanResumeRef.current = null;
         }
     }, []);
 
@@ -128,7 +89,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             });
         };
 
-        // Track the initial delay so stopAutoPan can cancel it
         autoPanDelayRef.current = setTimeout(fly, 1500);
         autoPanTimerRef.current = setInterval(fly, 6000);
     }, [stopAutoPan]);
@@ -217,15 +177,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     });
                 });
 
-                // Throttled occlusion check — run on 'move' and 'moveend' only,
-                // NOT on every render frame (which caused performance jank)
-                const onMove = () => updateMarkerVisibility();
-                map.on('move', onMove);
-                map.on('moveend', onMove);
-                renderListenerRef.current = onMove;
-
-                // On user interaction: stop auto-pan permanently, don't auto-restart
-                // (user must manually re-enable via the toggle button — like DataFast)
+                // On user interaction: stop auto-pan permanently
+                // User must re-enable via the toggle button (like DataFast)
                 const disableAutoPan = () => {
                     if (autoPanRef.current) {
                         stopAutoPan();
@@ -251,12 +204,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
             markersRef.current = new Map();
             if (map) {
-                if (renderListenerRef.current) {
-                    try {
-                        map.off('move', renderListenerRef.current);
-                        map.off('moveend', renderListenerRef.current);
-                    } catch { /**/ }
-                }
                 try { map.remove(); } catch { /**/ }
             }
             mapRef.current = null;
@@ -275,7 +222,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const avatarUrl = getAvatarUrl(v.name);
 
         const el = document.createElement('div');
-        el.style.cssText = 'width:60px;height:60px;cursor:pointer;transition:opacity 0.3s ease;';
+        el.style.cssText = 'width:60px;height:60px;cursor:pointer;';
         el.title = `${v.name} — ${v.country}`;
 
         const frame = document.createElement('div');
@@ -325,7 +272,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return { el, frame };
     }, []);
 
-    // Incremental marker sync — only add/remove individual markers, never rebuild all
+    // Incremental marker sync — Mapbox handles all positioning & occlusion natively
     useEffect(() => {
         const map = mapRef.current;
         if (!map || status !== 'ready' || !_mapboxgl) return;
@@ -334,40 +281,41 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const currentMap = markersRef.current;
         const newIds = new Set<string>();
 
-        // Add or update markers for current visitors
         visitors.forEach((v) => {
             if (v.lat === 0 && v.lng === 0) return;
             newIds.add(v.id);
 
             const existing = currentMap.get(v.id);
             if (existing) {
-                // Marker already exists — just update position if it moved
+                // Marker exists — update position only if it actually moved
                 const [oldLng, oldLat] = existing.lngLat;
                 if (Math.abs(oldLng - v.lng) > 0.01 || Math.abs(oldLat - v.lat) > 0.01) {
                     existing.marker.setLngLat([v.lng, v.lat]);
                     existing.lngLat = [v.lng, v.lat];
                 }
             } else {
-                // New visitor — create marker
+                // New visitor — create marker with native globe occlusion
                 const { el, frame } = createMarkerElement(v);
                 const lngLat: [number, number] = [v.lng, v.lat];
-                const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+                const marker = new mapboxgl.Marker({
+                    element: el,
+                    anchor: 'center',
+                    occludedOpacity: 0, // Mapbox v3: auto-hide behind globe
+                })
                     .setLngLat(lngLat)
                     .addTo(map);
                 currentMap.set(v.id, { marker, el, frame, lngLat });
             }
         });
 
-        // Remove markers for visitors that are no longer present
+        // Remove departed visitors
         for (const [id, entry] of currentMap) {
             if (!newIds.has(id)) {
                 try { entry.marker.remove(); } catch { /**/ }
                 currentMap.delete(id);
             }
         }
-
-        updateMarkerVisibility();
-    }, [visitors, status, updateMarkerVisibility, createMarkerElement]);
+    }, [visitors, status, createMarkerElement]);
 
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
