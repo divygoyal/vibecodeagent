@@ -196,21 +196,6 @@ export function usePropertyList(enabled = true) {
     };
 }
 
-export function useAIVisibility(siteUrl?: string, enabled = true) {
-    const url = (siteUrl && enabled) ? `/api/ai-visibility?siteUrl=${encodeURIComponent(siteUrl)}` : null;
-    const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
-        dedupingInterval: 1800000, // 30 min
-        errorRetryCount: 1,
-    });
-
-    return {
-        data,
-        geoScore: data?.geoScore ?? null,
-        isLoading,
-        isError: error,
-        refresh: mutate,
-    };
-}
 
 export function useAlerts(siteUrl?: string, enabled = true) {
     const url = (siteUrl && enabled) ? `/api/alerts?siteUrl=${encodeURIComponent(siteUrl)}` : null;

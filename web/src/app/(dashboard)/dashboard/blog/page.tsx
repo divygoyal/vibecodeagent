@@ -36,16 +36,6 @@ const POSTS: BlogPost[] = [
         icon: Zap,
     },
     {
-        slug: 'ai-visibility-aeo-optimization',
-        title: 'AI Visibility & AEO: How to Get Cited by AI Search',
-        excerpt: 'AI search engines like ChatGPT and Perplexity are changing how people find information. TrafficClaw now tracks your AI visibility score and helps you optimize for Answer Engine Optimization (AEO).',
-        date: 'Mar 2, 2026',
-        readTime: '7 min read',
-        category: 'AI & SEO',
-        categoryColor: 'cyan',
-        icon: Search,
-    },
-    {
         slug: 'telegram-bot-pro-plan',
         title: 'Your Personal SEO Bot on Telegram — Pro Plan Deep Dive',
         excerpt: 'With the Pro plan, connect your own Telegram bot and get deep analytics insights, search performance analysis, and content strategies — all from a natural chat conversation on your phone.',
