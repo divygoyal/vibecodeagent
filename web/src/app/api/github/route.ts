@@ -111,8 +111,12 @@ export async function GET() {
         }
       }
 
+      // If user resolution failed entirely, return error instead of fetching with undefined
+      if (!user) {
+        return NextResponse.json({ error: "Could not resolve GitHub username", code: "GITHUB_USER_RESOLUTION_FAILED" }, { status: 500 })
+      }
+
       // Bug #9 fix: Use resolved `user` (not raw `username`) for the events endpoint.
-      // `username` could be undefined if the JWT didn't have it and we had to fetch /user.
       const [eventsRes, reposRes] = await Promise.all([
         fetch(`https://api.github.com/users/${user}/events?per_page=50`, { headers }),
         fetch(`https://api.github.com/user/repos?sort=pushed&per_page=8&type=owner`, { headers })

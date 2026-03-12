@@ -50,10 +50,11 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
             for (const [k, v] of siteListCache) {
                 if (now - v.ts > SITE_CACHE_TTL) siteListCache.delete(k);
             }
-            // If still too large, remove oldest entries
+            // If still too large, remove oldest 75% of entries
             if (siteListCache.size >= SITE_CACHE_MAX_ENTRIES) {
                 const entries = [...siteListCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
-                for (let i = 0; i < entries.length / 2; i++) {
+                const toRemove = Math.ceil(entries.length * 0.75);
+                for (let i = 0; i < toRemove; i++) {
                     siteListCache.delete(entries[i][0]);
                 }
             }

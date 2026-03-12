@@ -955,15 +955,25 @@ async def deduct_user_credits(
     user = await get_user_by_identifier(db, github_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     current = user.credits or 0
     if current < request.amount:
         raise HTTPException(status_code=402, detail="Insufficient credits")
-    
-    user.credits = current - request.amount
-    user.updated_at = datetime.utcnow()
+
+    # Use atomic update to prevent race conditions with concurrent requests
+    from sqlalchemy import update as sql_update
+    from models import User
+    result = await db.execute(
+        sql_update(User)
+        .where(User.id == user.id, User.credits >= request.amount)
+        .values(credits=User.credits - request.amount, updated_at=datetime.utcnow())
+    )
     await db.commit()
-    
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits (concurrent deduction)")
+
+    await db.refresh(user)
     return {"credits": user.credits, "deducted": request.amount}
 
 
@@ -1005,6 +1015,12 @@ async def update_user_subscription(
     _: bool = Depends(verify_admin_key)
 ):
     """Update user subscription (called by webhook handler)"""
+    VALID_PLANS = {"free", "starter", "growth", "pro"}
+    if request.plan not in VALID_PLANS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan: {request.plan}")
+    if request.credits < 0:
+        raise HTTPException(status_code=400, detail="Credits cannot be negative")
+
     user = await get_user_by_identifier(db, identifier)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1179,6 +1195,16 @@ async def exec_plugin(
     if req.plugin not in ALLOWED_PLUGINS:
         raise HTTPException(status_code=400, detail=f"Plugin '{req.plugin}' not allowed")
 
+    # Validate command is alphanumeric with hyphens only (prevent path traversal)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', req.command):
+        raise HTTPException(status_code=400, detail="Invalid command name")
+
+    # Validate args don't contain path traversal
+    for arg in req.args:
+        if '..' in arg or arg.startswith('/'):
+            raise HTTPException(status_code=400, detail="Invalid argument")
+
     user = await get_user_by_identifier(db, github_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1231,7 +1257,7 @@ async def exec_plugin(
         env = os.environ.copy()
         
         print(f"Executing plugin: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60)
         stdout = result.stdout
         stderr = result.stderr
         
@@ -1264,6 +1290,9 @@ async def exec_plugin(
             
             return {"status": "ok", "data": stdout, "stderr": stderr}
 
+    except subprocess.TimeoutExpired:
+        print(f"Plugin exec timeout for {github_id}: {req.plugin} {req.command}")
+        raise HTTPException(status_code=504, detail="Plugin execution timed out")
     except Exception as e:
         print(f"Plugin exec error for {github_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")

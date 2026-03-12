@@ -7,8 +7,13 @@ function verifyCronSecret(header: string | null): boolean {
     const secret = process.env.CRON_SECRET;
     if (!secret || !header) return false;
     const expected = `Bearer ${secret}`;
-    if (header.length !== expected.length) return false;
-    return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+    // Pad both buffers to same length to avoid leaking length info via timing
+    const maxLen = Math.max(header.length, expected.length);
+    const a = Buffer.alloc(maxLen);
+    const b = Buffer.alloc(maxLen);
+    Buffer.from(header).copy(a);
+    Buffer.from(expected).copy(b);
+    return header.length === expected.length && timingSafeEqual(a, b);
 }
 
 export async function GET(req: NextRequest) {

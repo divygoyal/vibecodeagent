@@ -134,6 +134,7 @@ async function gaFetch(url: string, token: string, body?: any) {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(30000),
     };
     if (body) {
         opts.method = 'POST';
