@@ -20,6 +20,7 @@ export async function POST() {
 
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
+        const userEmail = session.user.email;
         if (!userId) {
             return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
         }
@@ -35,14 +36,33 @@ export async function POST() {
         }
 
         const userData = await userRes.json();
-        const subscriptionId = userData.subscription_id;
-
-        if (!subscriptionId) {
-            return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
-        }
 
         if (userData.plan === 'free') {
             return NextResponse.json({ error: 'You are already on the free plan' }, { status: 400 });
+        }
+
+        let subscriptionId = userData.subscription_id;
+
+        // If subscription_id not in DB, search Dodo Payments by email
+        if (!subscriptionId && userEmail) {
+            try {
+                const subs = client.subscriptions.list({ page_size: 10 });
+                for await (const sub of subs) {
+                    if (
+                        sub.customer?.email === userEmail &&
+                        sub.status === 'active'
+                    ) {
+                        subscriptionId = sub.subscription_id;
+                        break;
+                    }
+                }
+            } catch (searchErr) {
+                console.error('[Cancel] Error searching for subscription:', searchErr);
+            }
+        }
+
+        if (!subscriptionId) {
+            return NextResponse.json({ error: 'No active subscription found. Please contact support.' }, { status: 400 });
         }
 
         // Cancel subscription via Dodo Payments API
