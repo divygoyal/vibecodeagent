@@ -144,6 +144,7 @@ function latLngToScreen(
 }
 
 export interface GlobeVisitor {
+    id: string;
     lat: number;
     lng: number;
     name: string;
