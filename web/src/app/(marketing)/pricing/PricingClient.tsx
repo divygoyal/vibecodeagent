@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import {
     Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot
@@ -114,6 +114,17 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
 }
 
 export default function PricingClient() {
+    const { data: session } = useSession();
+
+    const handleCheckout = (productId: string) => {
+        if (!session?.user?.email) {
+            signIn('github', { callbackUrl: `/dashboard/settings?tab=billing` });
+            return;
+        }
+        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(window.location.origin + '/dashboard/settings?upgraded=true')}`;
+        window.open(checkoutUrl, '_blank');
+    };
+
     return (
         <div className="min-h-screen bg-black text-white">
             {/* Hero */}
@@ -142,7 +153,6 @@ export default function PricingClient() {
                 <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
                     {PLANS.map((plan) => {
                         const IconComp = plan.icon;
-                        const checkoutUrl = `https://checkout.dodopayments.com/buy/${plan.productId}`;
                         return (
                             <motion.div
                                 key={plan.key}
@@ -187,11 +197,9 @@ export default function PricingClient() {
                                     {plan.credits} AI credits/month
                                 </p>
 
-                                <a
-                                    href={checkoutUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all ${
+                                <button
+                                    onClick={() => handleCheckout(plan.productId)}
+                                    className={`w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all cursor-pointer ${
                                         plan.popular
                                             ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_20px_rgba(52,211,153,0.3)]'
                                             : plan.key === 'pro'
@@ -200,7 +208,7 @@ export default function PricingClient() {
                                     }`}
                                 >
                                     Get {plan.name}
-                                </a>
+                                </button>
 
                                 {/* Telegram Bot MVP Highlight for Pro */}
                                 {'telegramBot' in plan && plan.telegramBot && (
