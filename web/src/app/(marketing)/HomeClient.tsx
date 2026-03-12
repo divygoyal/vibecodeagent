@@ -11,7 +11,7 @@ import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
     ArrowRight, CheckCircle2, Star, Sparkles,
     MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare,
-    ScanSearch, Clock
+    ScanSearch, Clock, Monitor, ExternalLink, Link2, Share2, Music, History, Navigation, Maximize2
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -19,8 +19,11 @@ import {
 } from 'recharts';
 
 import type { GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
+import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 
-const RealtimeGlobe = dynamic(() => import('@/components/analytics/RealtimeGlobe'), { ssr: false });
+const RealtimeMapbox = dynamic(() => import('@/components/analytics/RealtimeMapbox'), { ssr: false });
+
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGl2eWdveWFsIiwiYSI6ImNtbWc3OXY3OTBkeG8yb3NjZXhtdnphMzUifQ.hKvgr-e2sYAMbMq1PvgrAA';
 
 /* ═══════════════════════════════════════
    FAKE DATA — realistic-looking sample data
@@ -71,12 +74,12 @@ const DEMO_VISITORS: GlobeVisitor[] = [
 const DEMO_BY_COUNTRY = DEMO_VISITORS.map(v => ({ country: v.country, users: v.users }));
 
 const DEMO_ACTIVITY = [
-    { name: 'coral falcon', country: 'United States', flag: '\u{1F1FA}\u{1F1F8}', page: '500+ Agent Skills for Claude Code, Cursor & AI Assistants', time: 'a few seconds ago' },
-    { name: 'jade owl', country: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}', page: 'Antigravity Codes | 1,500+ MCP Servers, AI Rules', time: '8 seconds ago' },
-    { name: 'amber wolf', country: 'India', flag: '\u{1F1EE}\u{1F1F3}', page: 'Best MCP Servers for Cursor IDE', time: '15 seconds ago' },
-    { name: 'silver crane', country: 'Japan', flag: '\u{1F1EF}\u{1F1F5}', event: 'exited to' as const, exitUrl: 'apps.apple.com/app/...', time: '24 seconds ago' },
-    { name: 'rose finch', country: 'Australia', flag: '\u{1F1E6}\u{1F1FA}', page: 'AI Coding Assistant Comparison 2026', time: '31 seconds ago' },
-    { name: 'teal hawk', country: 'Germany', flag: '\u{1F1E9}\u{1F1EA}', page: 'How to Build Custom MCP Servers', time: '45 seconds ago' },
+    { id: 'a1', name: 'coral falcon', country: 'United States', page: '500+ Agent Skills for Claude Code, Cursor & AI Assistants', event: 'visited' as const, warmth: 0.8, time: 'a few seconds ago', confidence: 82, estValue: '$2.40' },
+    { id: 'a2', name: 'jade owl', country: 'United Kingdom', page: 'Antigravity Codes | 1,500+ MCP Servers, AI Rules', event: 'visited' as const, warmth: 0.7, time: '8 seconds ago', confidence: 74, estValue: '$1.80' },
+    { id: 'a3', name: 'amber wolf', country: 'India', page: 'Best MCP Servers for Cursor IDE', event: 'visited' as const, warmth: 0.5, time: '15 seconds ago', confidence: 58, estValue: '$0.90' },
+    { id: 'a4', name: 'silver crane', country: 'Japan', event: 'exited to' as const, exitUrl: 'apps.apple.com/app/...', warmth: 0.65, time: '24 seconds ago', confidence: 68, estValue: '$1.50' },
+    { id: 'a5', name: 'rose finch', country: 'Australia', page: 'AI Coding Assistant Comparison 2026', event: 'visited' as const, warmth: 0.6, time: '31 seconds ago', confidence: 64, estValue: '$1.20' },
+    { id: 'a6', name: 'teal hawk', country: 'Germany', page: 'How to Build Custom MCP Servers', event: 'visited' as const, warmth: 0.55, time: '45 seconds ago', confidence: 60, estValue: '$1.10' },
 ];
 
 const pagePerformance = [
@@ -772,75 +775,188 @@ function InteractiveDemo() {
                                     transition={{ duration: 0.2 }}
                                     className="relative"
                                 >
-                                    {/* Globe view */}
+                                    {/* Globe view — exact clone of realtime page layout */}
                                     <div className="relative h-[600px] overflow-hidden">
-                                        {/* Stats overlay — top left */}
-                                        <div className="absolute top-4 left-4 z-10 bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-xl border border-white/[0.06] p-4 max-w-[340px]">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                                <span className="text-sm font-semibold text-white">8 visitors</span>
-                                                <span className="text-xs text-zinc-500">on</span>
-                                                <span className="text-sm font-medium text-white">your site</span>
-                                                <span className="text-xs text-zinc-500 ml-1">(est. value: <span className="text-emerald-400">$1</span>)</span>
-                                            </div>
-                                            <div className="space-y-2 text-xs">
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-zinc-600 w-16 flex-shrink-0">Referrers</span>
-                                                    <span className="text-zinc-300">Direct (8)</span>
-                                                </div>
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-zinc-600 w-16 flex-shrink-0">Countries</span>
-                                                    <div className="text-zinc-300 flex flex-wrap gap-x-2">
-                                                        <span>US (3)</span> <span>UK (2)</span> <span>IN (2)</span> <span className="text-zinc-500">+5</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-zinc-600 w-16 flex-shrink-0">Devices</span>
-                                                    <span className="text-zinc-300">Desktop (8)</span>
-                                                </div>
-                                            </div>
+                                        {/* Mapbox GL Globe */}
+                                        <div className="absolute inset-0">
+                                            <RealtimeMapbox
+                                                visitors={DEMO_VISITORS}
+                                                mapboxToken={MAPBOX_TOKEN}
+                                                byCountry={DEMO_BY_COUNTRY}
+                                                autoPan={true}
+                                            />
                                         </div>
 
-                                        {/* The COBE globe */}
-                                        <RealtimeGlobe
-                                            byCountry={DEMO_BY_COUNTRY}
-                                            visitors={DEMO_VISITORS}
-                                        />
+                                        {/* ─── TOP-LEFT: Stats Panel (exact realtime page clone) ─── */}
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.1, duration: 0.4 }}
+                                            className="absolute top-4 left-4 z-20"
+                                        >
+                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden" style={{ minWidth: '320px', maxWidth: '400px' }}>
+                                                {/* Header: Logo | REAL-TIME | toolbar */}
+                                                <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                                            <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                                                            <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                                                            <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                                                        </svg>
+                                                        <span className="text-[14px] font-bold text-white tracking-tight">TrafficClaw</span>
+                                                    </div>
+                                                    <div className="w-px h-4 bg-zinc-600/50 mx-0.5" />
+                                                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
+                                                    <div className="flex items-center gap-0 ml-auto">
+                                                        <button className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Share">
+                                                            <Share2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Music">
+                                                            <Music className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="History">
+                                                            <History className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center transition" title="Auto-panning">
+                                                            <Navigation className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Fullscreen">
+                                                            <Maximize2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
 
-                                        {/* Activity feed — bottom left */}
-                                        <div className="absolute bottom-4 left-4 z-10 w-[320px] sm:w-[400px] max-h-[240px] overflow-y-auto rounded-xl bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl border border-white/[0.06]">
-                                            <div className="divide-y divide-white/[0.03]">
-                                                {DEMO_ACTIVITY.map((item, i) => (
-                                                    <div key={i} className="px-4 py-3 flex items-start gap-3">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img
-                                                            src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(item.name)}&backgroundColor=transparent&radius=50`}
-                                                            alt=""
-                                                            className="w-8 h-8 rounded-full flex-shrink-0 bg-white/[0.05]"
-                                                        />
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="text-xs text-zinc-300 leading-relaxed">
-                                                                <span className="font-semibold text-white">{item.name}</span>
-                                                                {' '}from <span className="text-zinc-400">{item.flag}</span>{' '}
-                                                                <span className="font-semibold text-white">{item.country}</span>
-                                                                {' '}{item.event === 'exited to' ? (
-                                                                    <>exited to <span className="text-zinc-500">{item.exitUrl}</span></>
-                                                                ) : (
-                                                                    <>visited{' '}<span className="font-medium text-zinc-200 break-all">{item.page}</span></>
-                                                                )}
-                                                            </p>
-                                                            <p className="text-[10px] text-zinc-600 mt-0.5">{item.time}</p>
+                                                {/* Visitor count */}
+                                                <div className="flex items-center gap-1.5 px-4 pb-2.5 flex-wrap">
+                                                    <span className="relative flex h-2 w-2 flex-shrink-0">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                                                    </span>
+                                                    <span className="text-[13px] text-zinc-300">
+                                                        <span className="font-bold text-white">8</span> visitors on
+                                                    </span>
+                                                    <span className="text-[13px] font-bold text-white">your site</span>
+                                                    <span className="text-[13px] text-zinc-500">(est. value: <span className="text-emerald-400 font-semibold">$1</span>)</span>
+                                                </div>
+
+                                                <div className="h-px bg-white/[0.05]" />
+
+                                                {/* Stats: Referrers / Countries / Devices */}
+                                                <div className="px-4 py-2.5 space-y-2">
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Referrers</span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            <div className="flex items-center gap-1 text-[12px]">
+                                                                <Link2 className="w-3 h-3 text-zinc-400" />
+                                                                <span className="text-zinc-300">Direct</span>
+                                                                <span className="text-zinc-500">(8)</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                ))}
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Countries</span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {[
+                                                                { country: 'United States', users: 3 },
+                                                                { country: 'United Kingdom', users: 2 },
+                                                                { country: 'India', users: 2 },
+                                                            ].map((c, i) => (
+                                                                <div key={i} className="flex items-center gap-1 text-[12px]">
+                                                                    <CountryFlag country={c.country} />
+                                                                    <span className="text-zinc-300">{c.country}</span>
+                                                                    <span className="text-zinc-500">({c.users})</span>
+                                                                </div>
+                                                            ))}
+                                                            <button className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center text-[9px] text-zinc-400 hover:bg-white/[0.1] transition">
+                                                                +5
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Devices</span>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            <div className="flex items-center gap-1 text-[12px]">
+                                                                <Monitor className="w-3 h-3 text-zinc-400" />
+                                                                <span className="text-zinc-300">Desktop</span>
+                                                                <span className="text-zinc-500">(8)</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        </motion.div>
 
-                                        {/* Powered by badge — bottom right */}
-                                        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(20,20,30,0.9)] border border-white/[0.06] text-xs text-zinc-500">
-                                            <BarChart3 className="w-3 h-3 text-emerald-400" />
-                                            Powered by TrafficClaw
-                                        </div>
+                                        {/* ─── BOTTOM-LEFT: Activity Feed (exact realtime page clone) ─── */}
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.3, duration: 0.4 }}
+                                            className="absolute bottom-4 left-4 z-20 w-[360px] md:w-[440px]"
+                                        >
+                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+                                                <div className="max-h-[280px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                                    {DEMO_ACTIVITY.map((item, i) => (
+                                                        <motion.div
+                                                            key={item.id}
+                                                            initial={{ opacity: 0, x: -10 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            transition={{ delay: 0.4 + i * 0.04 }}
+                                                            className="px-4 py-2.5 border-b border-white/[0.03] last:border-b-0 group"
+                                                        >
+                                                            <div className="flex items-start gap-2.5">
+                                                                <div className="relative flex-shrink-0 mt-0.5">
+                                                                    <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800" style={{ boxShadow: `0 0 0 2px ${item.warmth > 0.6 ? '#ef4444' : item.warmth > 0.4 ? '#f97316' : item.warmth > 0.25 ? '#eab308' : '#3b82f6'}` }}>
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(item.name)}&backgroundColor=transparent&radius=50`} alt="" className="w-full h-full" />
+                                                                    </div>
+                                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#14141e] ${item.warmth > 0.6 ? 'bg-red-500' : item.warmth > 0.4 ? 'bg-orange-400' : item.warmth > 0.25 ? 'bg-yellow-400' : 'bg-blue-400'}`} />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center flex-wrap gap-x-1 leading-snug">
+                                                                        <span className="text-[12px] font-bold text-white">{item.name}</span>
+                                                                        <span className="text-[12px] text-zinc-500">from</span>
+                                                                        <CountryFlag country={item.country} />
+                                                                        <span className="text-[12px] font-bold text-white">{item.country}</span>
+                                                                        <span className="text-[12px] text-zinc-500">{item.event}</span>
+                                                                        {item.event === 'visited' ? (
+                                                                            <span className="text-[12px] text-zinc-300 font-mono">{item.page}</span>
+                                                                        ) : (
+                                                                            <>
+                                                                                <ExternalLink className="w-2.5 h-2.5 text-zinc-600" />
+                                                                                <span className="text-[11px] text-zinc-500 truncate">{item.exitUrl}</span>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                                        <span className="text-[10px] text-zinc-600">{item.time}</span>
+                                                                        <span className="text-[9px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            {item.confidence}% conf. &middot; {item.estValue}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+
+                                        {/* ─── BOTTOM-RIGHT: Powered By ─── */}
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: 0.6 }}
+                                            className="absolute bottom-4 right-4 z-20"
+                                        >
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-[rgba(20,20,30,0.9)] backdrop-blur-xl rounded-xl border border-white/[0.06]">
+                                                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                                                    <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                                                    <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                                                    <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                                                </svg>
+                                                <span className="text-[11px] text-zinc-400 font-medium">Powered by TrafficClaw</span>
+                                            </div>
+                                        </motion.div>
                                     </div>
                                 </motion.div>
                             )}
