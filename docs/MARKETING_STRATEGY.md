@@ -20,38 +20,34 @@ The drop IS the story. Show growth, show the fall, show what you're building to 
 **Body**:
 
 ```
-grew antigravity.codes to 84k users.
+grew my site (antigravity.codes) to 84k users this year.
 
-peaked in january — 3,500 daily visitors.
+peaked around january — hitting 3,500 daily visitors. felt great.
 
-then mid-feb, traffic started dying. slowly. every day a little less.
+then sometime mid-feb, traffic started slipping. not a crash, just... slowly bleeding out. a little less every day.
 
-the worst part? i didn't notice for weeks.
+the embarrassing part? i didn't notice for like 3 weeks.
 
-because checking google analytics is boring. so i don't do it. and when i finally do, i spend 20 minutes clicking around trying to figure out what happened.
+because honestly, who actually enjoys opening google analytics? i'll be real — i avoid it. and when i finally do check, i'm spending 20 minutes clicking through tabs trying to piece together what even happened.
 
-so i'm building something. a bot that connects to your GA4 + search console and just tells you what's going on.
+so i started building a thing for myself. basically a bot that hooks into your GA4 + search console and just *tells* you what's going on. plain language. no dashboards. no clicking around.
 
-"your traffic dropped 18% this week. your /blog/x page lost 12 positions. here's why."
+been using it on my own site for a bit now. calling it trafficclaw.
 
-no dashboards. no tabs. just answers.
+still super early. curious if anyone else has this problem — you just... ignore your analytics until something feels off and by then it's already too late?
 
-called it trafficclaw. still building. using it on my own site already.
-
-would've caught that feb drop 2 weeks earlier.
-
-anyone else just... not check their analytics until it's too late?
+also if you've tried other tools for this, what worked for you? would love recommendations or honest feedback on whether this even sounds useful to you.
 ```
 
 **Attach**: Full GA4 screenshot (Aug 2025 - Mar 2026) showing the spike AND the drop.
 
-**Style notes (Marc Lou patterns applied)**:
-- One sentence per line — lots of whitespace
-- Specific numbers: 84k, 3500, 18%, 12 positions, 2 weeks
-- Hook in first line — no buildup
-- ~110 words — scannable in 30 seconds
-- Product mentioned casually at 70% mark, not pitched
-- Ends with relatable question (drives comments → drives visibility)
+**Style notes**:
+- More organic/conversational — filler words, pauses ("just...", "like 3 weeks")
+- Softened language ("the embarrassing part" instead of "the worst part")
+- No `.com` link in body — feels less promotional
+- Product mentioned casually, not pitched
+- Ends with TWO engagement hooks: shared experience + ask for recommendations/feedback
+- ~140 words — still scannable
 - No bullet lists, no headers, no structure
 
 ---
