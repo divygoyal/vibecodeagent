@@ -694,7 +694,7 @@ export default function AIChatbot() {
                 </div>
 
                 {/* ── Quick Prompts ── */}
-                {messages.length <= 2 && (
+                {messages.length === 0 && (
                     <div className="px-4 pb-2">
                         {!dataReady && (
                             <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-1.5">
