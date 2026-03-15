@@ -636,8 +636,8 @@ export default function AIChatbot() {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* ── Quick Prompts ── */}
-                {messages.length === 0 && (
+                {/* ── Quick Prompts — shown until the user sends their first message ── */}
+                {!messages.some(m => m.role === 'user') && !isLoading && (
                     <div className="px-4 pb-2">
                         {!dataReady && (
                             <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-1.5">
@@ -650,7 +650,7 @@ export default function AIChatbot() {
                                 <button
                                     key={i}
                                     onClick={() => sendMessage(prompt)}
-                                    disabled={!dataReady || isLoading}
+                                    disabled={!dataReady}
                                     className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-500 disabled:hover:border-white/[0.04] disabled:hover:bg-white/[0.02]"
                                 >
                                     {prompt}
