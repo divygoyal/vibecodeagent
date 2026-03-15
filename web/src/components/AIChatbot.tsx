@@ -658,7 +658,7 @@ export default function AIChatbot() {
 
                 {/* ── Input ── */}
                 <div className="px-3 py-3 border-t border-white/[0.06] bg-[#0c0c0c]">
-                    <div className="flex items-end gap-2 bg-[#161616] rounded-2xl px-4 py-3">
+                    <div className="flex items-end gap-2 bg-[#161616] rounded-2xl px-4 py-3 border border-transparent focus-within:border-white/[0.08] transition-colors">
                         <textarea
                             ref={isExpanded ? textareaRef : inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
                             value={input}
