@@ -324,7 +324,7 @@ export default function AIChat() {
 
                         {/* ── Centered input (Gemini style) ── */}
                         <div className="w-full max-w-[640px] mb-6">
-                            <div className="relative flex items-end bg-[#1a1a1a] rounded-2xl px-5 py-4 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
+                            <div className="relative flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-4 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
                                 <textarea
                                     ref={textareaRef}
                                     value={input}
@@ -436,7 +436,7 @@ export default function AIChat() {
             {!showEmpty && (
                 <div className="flex-shrink-0 bg-black px-4 sm:px-6 pb-5 pt-2">
                     <div className="max-w-[760px] mx-auto">
-                        <div className="flex items-end bg-[#1a1a1a] rounded-2xl px-5 py-3 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
+                        <div className="flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-3 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
                             <textarea
                                 value={input}
                                 onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
