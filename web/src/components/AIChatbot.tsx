@@ -61,18 +61,19 @@ const TOOL_LABELS: Record<string, string> = {
 
 // Memoized message bubble — prevents re-rendering old messages when new chunks arrive
 const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming, snapshot, onSuggestionClick }: { msg: Message; isExpanded: boolean; isStreaming?: boolean; snapshot?: any; onSuggestionClick?: (s: string) => void }) {
+    const isUser = msg.role === 'user';
     return (
-        <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
-                : 'bg-white/[0.02] text-zinc-300 border border-white/[0.04] rounded-bl-sm'
+        <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+            <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} text-sm leading-relaxed ${isUser
+                ? 'bg-white/[0.07] text-zinc-100 rounded-[20px] rounded-br-md px-4 py-3'
+                : 'text-zinc-300 px-1 py-1'
                 }`}>
                 {msg.role === 'assistant' ? (
                     <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} snapshot={snapshot} onSuggestionClick={onSuggestionClick} />
                 ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
-                <div className="text-[10px] text-zinc-500 mt-2 select-none">
+                <div className={`text-[10px] text-zinc-600 mt-1.5 select-none ${isUser ? '' : 'px-0'}`}>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
             </div>
@@ -81,88 +82,26 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
 });
 
 // Fun animated robot thinking indicator with full body + phase-specific animations
-const ROBOT_KEYFRAMES = `
-@keyframes robotBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-@keyframes armWaveL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-35deg); } }
-@keyframes armWaveR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(35deg); } }
-@keyframes robotWalk { 0%,100% { transform: translateX(0); } 25% { transform: translateX(6px); } 75% { transform: translateX(-6px); } }
-@keyframes rocketShake { 0%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-3px) rotate(-3deg); } 75% { transform: translateY(-3px) rotate(3deg); } }
-@keyframes liftUp { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-@keyframes legKick { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(15deg); } }
-`;
 
 const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { activeTool?: string }) {
     const [phase, setPhase] = useState(0);
-    const [eyesClosed, setEyesClosed] = useState(false);
 
     useEffect(() => {
-        const msgTimer = setInterval(() => setPhase(p => (p + 1) % THINKING_PHASES.length), 2500);
-        const blinkTimer = setInterval(() => {
-            setEyesClosed(true);
-            setTimeout(() => setEyesClosed(false), 150);
-        }, 3000);
-        return () => { clearInterval(msgTimer); clearInterval(blinkTimer); };
+        const timer = setInterval(() => setPhase(p => (p + 1) % THINKING_PHASES.length), 2500);
+        return () => clearInterval(timer);
     }, []);
 
-    const currentPhase = THINKING_PHASES[phase];
-    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : currentPhase.text;
-    const anim = activeTool ? 'searching' : currentPhase.anim;
-
-    const robotAnim = anim === 'searching' ? 'robotWalk 1s ease-in-out infinite'
-        : anim === 'rocket' ? 'rocketShake 0.3s ease-in-out infinite'
-        : anim === 'lifting' ? 'liftUp 0.8s ease-in-out infinite'
-        : 'robotBounce 1.2s ease-in-out infinite';
-
-    const armSpeed = anim === 'lifting' ? '0.8s' : '2s';
+    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : THINKING_PHASES[phase].text;
 
     return (
         <div className="flex justify-start">
-            <div className="px-4 py-3 rounded-2xl bg-white/[0.02] border border-white/[0.04] rounded-bl-sm">
-                {/* Robot keyframes moved to globals.css */}
-                <div className="flex items-center gap-3">
-                    {/* Full-body robot */}
-                    <div className="relative flex-shrink-0" style={{ width: 32, height: 52, animation: robotAnim, willChange: 'transform' }}>
-                        {/* Antenna tip */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" style={{ boxShadow: '0 0 8px rgba(52,211,153,0.6)' }} />
-                        {/* Antenna stem */}
-                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-px h-2 bg-emerald-500/40" />
-                        {/* Head */}
-                        <div className="absolute top-4 inset-x-0 h-7 rounded-lg bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center gap-2">
-                            <div className="rounded-full bg-emerald-400 transition-all duration-100" style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(52,211,153,0.6)' }} />
-                            <div className="rounded-full bg-cyan-400 transition-all duration-100" style={{ width: 5, height: eyesClosed ? 1 : 5, boxShadow: '0 0 4px rgba(34,211,238,0.6)' }} />
-                        </div>
-                        {/* Left arm */}
-                        <div className="absolute top-[30px] -left-2 w-1.5 h-5 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: `armWaveL ${armSpeed} ease-in-out infinite` }} />
-                        {/* Right arm */}
-                        <div className="absolute top-[30px] -right-2 w-1.5 h-5 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: `armWaveR ${armSpeed} ease-in-out infinite 0.3s` }} />
-                        {/* Body */}
-                        <div className="absolute top-[30px] inset-x-0.5 h-5 rounded-md bg-zinc-800 border border-white/[0.08]">
-                            {/* Belt buckle */}
-                            <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-2 h-1 rounded-sm bg-emerald-500/30" />
-                        </div>
-                        {/* Left leg */}
-                        <div className="absolute bottom-0 left-1.5 w-1.5 h-3 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: anim === 'searching' ? 'legKick 0.5s ease-in-out infinite' : 'none' }} />
-                        {/* Right leg */}
-                        <div className="absolute bottom-0 right-1.5 w-1.5 h-3 rounded-full bg-zinc-700" style={{ transformOrigin: 'top center', animation: anim === 'searching' ? 'legKick 0.5s ease-in-out infinite 0.25s' : 'none' }} />
-                        {/* Rocket flames */}
-                        {anim === 'rocket' && (
-                            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5">
-                                <div className="w-1.5 h-3 rounded-full bg-gradient-to-t from-orange-500 to-yellow-300 animate-pulse" />
-                                <div className="w-1 h-2.5 rounded-full bg-gradient-to-t from-red-500 to-orange-300 animate-pulse" style={{ animationDelay: '0.1s' }} />
-                                <div className="w-1.5 h-3 rounded-full bg-gradient-to-t from-orange-500 to-yellow-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
-                            </div>
-                        )}
-                    </div>
-                    {/* Message + dots */}
-                    <div className="min-w-0">
-                        <span className="text-[12px] text-zinc-400 font-medium">{message}</span>
-                        <div className="flex gap-1 mt-1.5">
-                            {[0, 1, 2].map(i => (
-                                <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-bounce" style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }} />
-                            ))}
-                        </div>
-                    </div>
+            <div className="flex items-center gap-3 px-1 py-2">
+                {/* Minimal pulsing orb */}
+                <div className="relative flex-shrink-0 w-6 h-6">
+                    <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" style={{ animationDuration: '2s' }} />
+                    <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 opacity-80" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
                 </div>
+                <span className="text-[13px] text-zinc-400">{message}</span>
             </div>
         </div>
     );
@@ -577,16 +516,16 @@ export default function AIChatbot() {
     // ─── Chat window ───
     return (
         <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[440px] h-[640px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 flex flex-col overflow-hidden">
+            <div className="w-full h-full bg-[#0c0c0c] border border-white/[0.06] rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
                 {/* ── Header ── */}
-                <div className="px-4 py-3 border-b border-white/[0.04] flex items-center justify-between bg-gradient-to-r from-emerald-500/[0.04] to-cyan-500/[0.04]">
+                <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-[#111]">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
                             <Sparkles className="w-4 h-4 text-black" />
-                            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#0a0a0f]" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#111]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-white leading-none">AI Analyst</h3>
+                            <h3 className="text-sm font-semibold text-white leading-none">AI Analyst</h3>
                             {/* Site selector inline */}
                             <div className="relative">
                                 <button
@@ -600,7 +539,7 @@ export default function AIChatbot() {
                                 {showSiteDropdown && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowSiteDropdown(false)} />
-                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.08] rounded-lg shadow-2xl shadow-black/60 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
+                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
                                             {allSites.length === 0 ? (
                                                 <div className="px-3 py-2 text-[11px] text-zinc-600">No sites connected</div>
                                             ) : (
@@ -659,7 +598,7 @@ export default function AIChatbot() {
                 </div>
 
                 {/* ── Messages ── */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                     {messages.map((msg, i) => {
                         if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                         const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
@@ -718,49 +657,31 @@ export default function AIChatbot() {
                 )}
 
                 {/* ── Input ── */}
-                <div className="px-4 py-3 border-t border-white/[0.04] bg-white/[0.01]">
-                    <div className="flex items-center gap-2">
-                        {isExpanded ? (
-                            <textarea
-                                ref={textareaRef}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        sendMessage();
-                                    }
-                                }}
-                                placeholder="Ask anything..."
-                                className="flex-1 bg-white/[0.03] border border-white/[0.04] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-emerald-500/20 transition resize-none min-h-[44px] max-h-[120px]"
-                                disabled={isLoading}
-                                rows={1}
-                            />
-                        ) : (
-                            <textarea
-                                ref={inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        sendMessage();
-                                    }
-                                }}
-                                placeholder="Ask anything..."
-                                className="flex-1 bg-white/[0.03] border border-white/[0.04] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-emerald-500/20 transition resize-none"
-                                disabled={isLoading}
-                                rows={1}
-                                style={{ minHeight: '44px', maxHeight: '80px' }}
-                            />
-                        )}
+                <div className="px-3 py-3 border-t border-white/[0.06] bg-[#0c0c0c]">
+                    <div className="flex items-end gap-2 bg-[#161616] rounded-2xl px-4 py-3">
+                        <textarea
+                            ref={isExpanded ? textareaRef : inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    sendMessage();
+                                }
+                            }}
+                            placeholder="Ask anything..."
+                            className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
+                            disabled={isLoading}
+                            rows={1}
+                            style={{ minHeight: '24px', maxHeight: isExpanded ? '120px' : '80px' }}
+                        />
                         <button
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}
-                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-black flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 flex-shrink-0"
+                            className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200 flex-shrink-0"
                             aria-label="Send message"
                         >
-                            <Send className="w-4 h-4" />
+                            <Send className="w-3.5 h-3.5" />
                         </button>
                     </div>
                     {credits !== null && credits < 30 && (
