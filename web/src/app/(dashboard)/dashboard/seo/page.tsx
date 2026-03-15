@@ -361,7 +361,7 @@ export default function SEOPage() {
                                         <p className="text-xs text-zinc-400 mb-2">{rec.description}</p>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] text-emerald-400 font-medium">→ {rec.action}</span>
-                                            <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get deep analysis: ${rec.action}`} />
+                                            <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get deep analysis: ${rec.action}`} site={selectedSite} />
                                         </div>
                                     </div>
                                 </div>
@@ -451,7 +451,7 @@ export default function SEOPage() {
                                 {toolResult?.content && (
                                     <>
                                         <div className="flex items-center gap-2">
-                                            <FixWithBotButton label="Publish via Bot" size="md" variant="solid" context="Your bot can publish this directly to your CMS" />
+                                            <FixWithBotButton label="Publish via Bot" size="md" variant="solid" context="Your bot can publish this directly to your CMS" site={selectedSite} />
                                             <button onClick={() => navigator.clipboard.writeText(toolResult.content)} className="px-3 py-1.5 text-xs text-zinc-400 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">Copy</button>
                                         </div>
                                         <div className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[400px] overflow-y-auto">
@@ -513,7 +513,7 @@ export default function SEOPage() {
                                     <>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-zinc-500">{toolResult.links.length} link suggestions found</span>
-                                            <FixWithBotButton label="Apply via Bot" size="sm" variant="solid" context="Your bot can add these internal links to your site" />
+                                            <FixWithBotButton label="Apply via Bot" size="sm" variant="solid" context="Your bot can add these internal links to your site" site={selectedSite} />
                                         </div>
                                         <div className="space-y-2">
                                             {toolResult.links.map((link: any, i: number) => (
@@ -522,7 +522,7 @@ export default function SEOPage() {
                                                         <span className="text-zinc-400 truncate">{link.source}</span>
                                                         <ArrowUpRight className="w-3 h-3 text-cyan-400 flex-shrink-0" />
                                                         <span className="text-cyan-400 truncate">{link.target}</span>
-                                                        <span className="ml-auto flex-shrink-0"><FixWithBotButton label="Details" size="sm" variant="ghost" context={`Get analysis for link: ${link.source} → ${link.target}`} /></span>
+                                                        <span className="ml-auto flex-shrink-0"><FixWithBotButton label="Details" size="sm" variant="ghost" context={`Get analysis for link: ${link.source} → ${link.target}`} site={selectedSite} /></span>
                                                     </div>
                                                     <div className="text-[11px] text-zinc-500">Anchor: <span className="text-emerald-400 font-medium">&quot;{link.anchor}&quot;</span></div>
                                                     <div className="text-[10px] text-zinc-600 mt-1">{link.reason}</div>
@@ -550,7 +550,7 @@ export default function SEOPage() {
                                 {toolResult?.schema && (
                                     <>
                                         <div className="flex items-center gap-2">
-                                            <FixWithBotButton label="Add via Bot" size="sm" variant="solid" context="Your bot can inject this schema markup into your page" />
+                                            <FixWithBotButton label="Add via Bot" size="sm" variant="solid" context="Your bot can inject this schema markup into your page" site={selectedSite} />
                                             <button onClick={() => navigator.clipboard.writeText(toolResult.schema)} className="px-3 py-1.5 text-xs text-zinc-400 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">Copy</button>
                                         </div>
                                         <pre className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[300px] overflow-y-auto text-xs text-violet-300 font-mono whitespace-pre-wrap">{toolResult.schema}</pre>
@@ -590,7 +590,7 @@ export default function SEOPage() {
                                 </div>
                             ))}
                             {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length > 0 && (
-                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get deep analysis on decaying content and optimization strategies" /></div>
+                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get deep analysis on decaying content and optimization strategies" site={selectedSite} /></div>
                             )}
                             {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length === 0 && (
                                 <span className="text-[11px] text-emerald-400">No decaying content detected</span>
@@ -619,7 +619,7 @@ export default function SEOPage() {
                                 </div>
                             ))}
                             {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length > 0 && (
-                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get detailed cannibalization analysis and fix recommendations" /></div>
+                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get detailed cannibalization analysis and fix recommendations" site={selectedSite} /></div>
                             )}
                             {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length === 0 && (
                                 <span className="text-[11px] text-emerald-400">No cannibalization issues found</span>

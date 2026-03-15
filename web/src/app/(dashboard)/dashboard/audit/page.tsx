@@ -84,7 +84,7 @@ function IssueRow({ issue }: { issue: AuditIssue }) {
                             <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                             <span className="flex-1">{issue.recommendation}</span>
                             {(issue.severity === 'critical' || issue.severity === 'warning') && (
-                                <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} />
+                                <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} site={url} />
                             )}
                         </div>
                     )}
@@ -411,7 +411,7 @@ export default function AuditPage() {
                         </div>
                         <div className="flex items-center gap-2">
                             {(report.summary.critical > 0 || report.summary.warning > 0) && (
-                                <FixWithBotButton label="Analyze All Issues" size="md" variant="solid" context="Get deep analysis and fix recommendations from your bot" />
+                                <FixWithBotButton label="Analyze All Issues" size="md" variant="solid" context="Get deep analysis and fix recommendations from your bot" site={url} />
                             )}
                             <button
                                 onClick={() => exportAuditCSV(report)}
