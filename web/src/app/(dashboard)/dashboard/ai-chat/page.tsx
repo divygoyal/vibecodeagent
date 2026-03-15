@@ -324,30 +324,31 @@ export default function AIChat() {
 
                         {/* ── Centered input (Gemini style) ── */}
                         <div className="w-full max-w-[640px] mb-6">
-                            <div className="relative flex items-end bg-[#1a1a1a] rounded-2xl px-5 py-4 focus-within:ring-1 focus-within:ring-zinc-700 transition-all">
-                                <textarea
-                                    ref={textareaRef}
-                                    value={input}
-                                    onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder="Ask about your SEO, traffic, keywords..."
-                                    disabled={isLoading || !dataReady}
-                                    rows={1}
-                                    className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 disabled:opacity-40 leading-relaxed"
-                                />
-                                <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                                    {/* Site selector pill */}
+                            <div className="bg-[#1a1a1a] rounded-[28px] overflow-hidden">
+                                <div className="px-6 pt-4 pb-2">
+                                    <textarea
+                                        ref={textareaRef}
+                                        value={input}
+                                        onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Ask about your SEO, traffic, keywords..."
+                                        disabled={isLoading || !dataReady}
+                                        rows={1}
+                                        className="w-full bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 disabled:opacity-40 leading-relaxed"
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between px-4 pb-3">
                                     <div className="relative" ref={dropdownRef}>
                                         <button
                                             onClick={() => setSiteOpen(!siteOpen)}
-                                            className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 rounded-full px-3 py-1.5 transition-colors"
+                                            className="flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-300 rounded-full px-2 py-1 hover:bg-zinc-800 transition-colors"
                                         >
-                                            <Globe className="w-3 h-3" />
-                                            <span className="max-w-[100px] truncate">{siteLabel}</span>
+                                            <Globe className="w-3.5 h-3.5" />
+                                            <span className="max-w-[120px] truncate">{siteLabel}</span>
                                             <ChevronDown className={`w-3 h-3 transition-transform ${siteOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {siteOpen && gscSites.length > 0 && (
-                                            <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+                                            <div className="absolute bottom-full mb-2 left-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
                                                 {gscSites.map((site: any) => {
                                                     const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                                     const active = site.siteUrl === selectedSite;
@@ -366,7 +367,7 @@ export default function AIChat() {
                                     <button
                                         onClick={() => sendMessage()}
                                         disabled={!input.trim() || isLoading || !dataReady}
-                                        className="w-9 h-9 rounded-full bg-white flex items-center justify-center disabled:bg-zinc-700 disabled:text-zinc-500 text-black transition-all hover:bg-zinc-200"
+                                        className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
                                     >
                                         <ArrowUp className="w-4 h-4" />
                                     </button>
@@ -436,52 +437,53 @@ export default function AIChat() {
             {!showEmpty && (
                 <div className="flex-shrink-0 bg-black px-4 sm:px-6 pb-5 pt-2">
                     <div className="max-w-[760px] mx-auto">
-                        <div className="flex items-end bg-[#1a1a1a] rounded-2xl px-5 py-3 focus-within:ring-1 focus-within:ring-zinc-700 transition-all">
-                            <textarea
-                                value={input}
-                                onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Ask anything"
-                                disabled={isLoading}
-                                rows={1}
-                                className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed"
-                            />
-                            <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                                {/* Site pill */}
-                                <div className="relative" ref={!showEmpty ? dropdownRef : undefined}>
-                                    <button
-                                        onClick={() => setSiteOpen(!siteOpen)}
-                                        className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 rounded-full px-3 py-1.5 transition-colors"
-                                    >
-                                        <Globe className="w-3 h-3" />
-                                        <span className="max-w-[80px] truncate">{siteLabel}</span>
-                                    </button>
-                                    {siteOpen && gscSites.length > 0 && (
-                                        <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
-                                            {gscSites.map((site: any) => {
-                                                const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                                const active = site.siteUrl === selectedSite;
-                                                return (
-                                                    <button key={site.siteUrl}
-                                                        onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
-                                                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${active ? 'text-emerald-400 bg-emerald-500/[0.06]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-                                                    >
-                                                        {label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                                {messages.length > 0 && (
-                                    <button onClick={clearChat} className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-zinc-800 transition-colors" title="New chat">
+                        <div className="bg-[#1a1a1a] rounded-[28px] overflow-hidden">
+                            <div className="px-6 pt-4 pb-2">
+                                <textarea
+                                    value={input}
+                                    onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Ask anything"
+                                    disabled={isLoading}
+                                    rows={1}
+                                    className="w-full bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between px-4 pb-3">
+                                <div className="flex items-center gap-1">
+                                    <div className="relative" ref={!showEmpty ? dropdownRef : undefined}>
+                                        <button
+                                            onClick={() => setSiteOpen(!siteOpen)}
+                                            className="flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-300 rounded-full px-2 py-1 hover:bg-zinc-800 transition-colors"
+                                        >
+                                            <Globe className="w-3.5 h-3.5" />
+                                            <span className="max-w-[100px] truncate">{siteLabel}</span>
+                                        </button>
+                                        {siteOpen && gscSites.length > 0 && (
+                                            <div className="absolute bottom-full mb-2 left-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+                                                {gscSites.map((site: any) => {
+                                                    const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+                                                    const active = site.siteUrl === selectedSite;
+                                                    return (
+                                                        <button key={site.siteUrl}
+                                                            onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
+                                                            className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${active ? 'text-emerald-400 bg-emerald-500/[0.06]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
+                                                        >
+                                                            {label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={clearChat} className="flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-300 rounded-full px-2 py-1 hover:bg-zinc-800 transition-colors" title="New chat">
                                         <RotateCcw className="w-3.5 h-3.5" />
                                     </button>
-                                )}
+                                </div>
                                 <button
                                     onClick={() => sendMessage()}
                                     disabled={!input.trim() || isLoading}
-                                    className="w-9 h-9 rounded-full bg-white flex items-center justify-center disabled:bg-zinc-700 disabled:text-zinc-500 text-black transition-all hover:bg-zinc-200"
+                                    className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
                                 >
                                     <ArrowUp className="w-4 h-4" />
                                 </button>
