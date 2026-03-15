@@ -104,6 +104,24 @@ export default function DashboardLayout({
     const [bellOpen, setBellOpen] = useState(false);
     const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
 
+    // Close bell dropdown on route change
+    useEffect(() => {
+        setBellOpen(false);
+    }, [pathname]);
+
+    // Close bell dropdown on any click outside
+    const bellRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!bellOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+                setBellOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [bellOpen]);
+
     // Alerts for notification bell
     const { hasGoogleConnection } = useContainerStatus();
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
@@ -519,7 +537,7 @@ export default function DashboardLayout({
                             )}
                         </div>
                         {/* Notification Bell */}
-                        <div className="relative">
+                        <div className="relative" ref={bellRef}>
                             <button
                                 onClick={() => setBellOpen(!bellOpen)}
                                 className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
@@ -537,7 +555,6 @@ export default function DashboardLayout({
                             </button>
                             {bellOpen && (
                                 <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
                                     <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
                                         <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center justify-between">
                                             <span className="text-xs font-semibold text-white">Alerts</span>
