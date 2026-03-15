@@ -237,6 +237,10 @@ export default function AIChatbot() {
             } else {
                 inputRef.current?.focus();
             }
+            // Scroll to bottom when opening with existing messages
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+            }, 50);
         }
     }, [isOpen, isExpanded]);
 
