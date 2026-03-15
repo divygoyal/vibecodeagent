@@ -84,7 +84,7 @@ function IssueRow({ issue }: { issue: AuditIssue }) {
                             <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                             <span className="flex-1">{issue.recommendation}</span>
                             {(issue.severity === 'critical' || issue.severity === 'warning') && (
-                                <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} site={url} />
+                                <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} />
                             )}
                         </div>
                     )}
