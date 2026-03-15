@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import {
     Send, Sparkles, RotateCcw, Globe, ChevronDown,
     MessageSquare, Zap, Target, TrendingUp, Brain,
-    Loader2, ArrowUp
+    Loader2, ArrowUp, Bot, User, Search, BarChart3, Shield
 } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
@@ -13,28 +13,34 @@ import { buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 
 const STARTER_PROMPTS = [
-    { icon: Target, text: 'What is the ONE thing I should do today to grow?', color: 'emerald' },
-    { icon: TrendingUp, text: 'Which keywords can I push to page 1?', color: 'cyan' },
-    { icon: Zap, text: 'Find me quick wins — low CTR, high impressions', color: 'amber' },
-    { icon: Brain, text: 'Grade my SEO from A to F with a full breakdown', color: 'violet' },
+    { icon: Target, text: 'What is the ONE thing I should do today to grow?', color: 'emerald', tag: 'Growth' },
+    { icon: TrendingUp, text: 'Which keywords can I push to page 1?', color: 'cyan', tag: 'Keywords' },
+    { icon: Zap, text: 'Find me quick wins — low CTR, high impressions', color: 'amber', tag: 'Quick Wins' },
+    { icon: Brain, text: 'Grade my SEO from A to F with a full breakdown', color: 'violet', tag: 'Audit' },
+    { icon: Search, text: 'Why did my traffic drop recently?', color: 'rose', tag: 'Diagnosis' },
+    { icon: BarChart3, text: 'Show me my top performing pages and why they work', color: 'blue', tag: 'Analysis' },
 ];
 
 const THINKING_PHASES = [
-    'Warming up brain cells...', 'Scanning your data...', 'Crunching the numbers...',
-    'Connecting the dots...', 'Hunting for insights...', 'Processing at light speed...',
+    { text: 'Analyzing your data...', icon: '📊' },
+    { text: 'Scanning search performance...', icon: '🔍' },
+    { text: 'Crunching the numbers...', icon: '⚡' },
+    { text: 'Connecting the dots...', icon: '🧠' },
+    { text: 'Hunting for insights...', icon: '🎯' },
+    { text: 'Almost there...', icon: '✨' },
 ];
 
-const TOOL_LABELS: Record<string, string> = {
-    get_search_performance: 'Analyzing search data...',
-    get_analytics_breakdown: 'Checking analytics...',
-    run_page_audit: 'Running page audit...',
-    calculate_revenue_impact: 'Calculating revenue...',
-    generate_content_strategy: 'Generating strategy...',
-    analyze_keyword_clusters: 'Clustering keywords...',
-    compare_time_periods: 'Comparing periods...',
-    find_cannibalization: 'Detecting cannibalization...',
-    suggest_internal_links: 'Finding link opportunities...',
-    generate_meta_tags: 'Generating meta tags...',
+const TOOL_LABELS: Record<string, { text: string; icon: string }> = {
+    get_search_performance: { text: 'Pulling search data...', icon: '🔍' },
+    get_analytics_breakdown: { text: 'Analyzing traffic...', icon: '📈' },
+    run_page_audit: { text: 'Auditing page...', icon: '🛡️' },
+    calculate_revenue_impact: { text: 'Calculating revenue...', icon: '💰' },
+    generate_content_strategy: { text: 'Building strategy...', icon: '📝' },
+    analyze_keyword_clusters: { text: 'Clustering keywords...', icon: '🏷️' },
+    compare_time_periods: { text: 'Comparing periods...', icon: '📅' },
+    find_cannibalization: { text: 'Detecting cannibalization...', icon: '⚠️' },
+    suggest_internal_links: { text: 'Finding link opportunities...', icon: '🔗' },
+    generate_meta_tags: { text: 'Generating meta tags...', icon: '🏷️' },
 };
 
 /* ─── Thinking Indicator ─── */
@@ -44,31 +50,51 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
         const timer = setInterval(() => setPhase(p => (p + 1) % THINKING_PHASES.length), 2500);
         return () => clearInterval(timer);
     }, []);
-    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : THINKING_PHASES[phase];
+
+    const toolInfo = activeTool ? TOOL_LABELS[activeTool] : null;
+    const message = toolInfo?.text || THINKING_PHASES[phase].text;
+    const icon = toolInfo?.icon || THINKING_PHASES[phase].icon;
 
     return (
-        <div className="flex justify-start">
-            <div className="px-5 py-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] rounded-bl-sm max-w-lg">
-                <div className="flex items-center gap-3">
-                    <div className="relative flex-shrink-0">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center">
-                            <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-                        </div>
-                    </div>
-                    <div className="min-w-0">
-                        <span className="text-[13px] text-zinc-400 font-medium">{message}</span>
-                        <div className="flex gap-1 mt-1.5">
-                            {[0, 1, 2].map(i => (
-                                <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-bounce"
-                                    style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }} />
-                            ))}
-                        </div>
-                    </div>
+        <div className="flex gap-3 items-start">
+            <div className="flex-shrink-0 mt-1">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <Bot className="w-4 h-4 text-white" />
                 </div>
             </div>
+            <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-zinc-900/80 border border-zinc-800/80 backdrop-blur-sm">
+                <div className="flex items-center gap-2.5">
+                    <span className="text-sm">{icon}</span>
+                    <span className="text-[13px] text-zinc-400 font-medium">{message}</span>
+                </div>
+                <div className="flex gap-1 mt-2">
+                    {[0, 1, 2].map(i => (
+                        <div key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                            style={{
+                                animation: 'pulse-dot 1.4s ease-in-out infinite',
+                                animationDelay: `${i * 200}ms`,
+                            }}
+                        />
+                    ))}
+                </div>
+            </div>
+            <style jsx>{`
+                @keyframes pulse-dot {
+                    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+                    40% { opacity: 1; transform: scale(1.2); }
+                }
+            `}</style>
         </div>
     );
 });
+
+/* ─── Time formatter ─── */
+function formatTime(ts?: string) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function AIChat() {
     const { selectedSite, setSelectedSite } = useRegistration();
@@ -187,7 +213,6 @@ export default function AIChat() {
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
-                    // Full context on first message, reduced KPI-only context on subsequent messages
                     analyticsContext: currentAnalytics ? (isFirstUserMessage ? {
                         kpis: currentAnalytics.kpis,
                         topSources: currentAnalytics.sources?.slice(0, 8),
@@ -206,7 +231,7 @@ export default function AIChat() {
                     mode: options?.mode,
                 }),
             });
-            clearTimeout(ttfbTimeout); // Response started, cancel TTFB timeout
+            clearTimeout(ttfbTimeout);
 
             if (!res.ok) {
                 if (res.status === 402) {
@@ -285,8 +310,8 @@ export default function AIChat() {
                     updated[updated.length - 1] = {
                         ...last,
                         content: (last.content || '') + (isTimeout
-                            ? '\n\n⚠️ **Request timed out.** The AI took too long to respond. Try a simpler question or try again.'
-                            : '\n\n⚠️ **Connection Error.** Couldn\'t reach the AI service. Please try again.'),
+                            ? '\n\n**Request timed out.** The AI took too long to respond. Try a simpler question or try again.'
+                            : '\n\n**Connection Error.** Couldn\'t reach the AI service. Please try again.'),
                     };
                     return updated;
                 }
@@ -305,7 +330,7 @@ export default function AIChat() {
 
     useEffect(() => {
         if (briefingSentRef.current || messages.length > 0 || !dataReady || isLoading) return;
-        if (!analyticsData && !seoData) return; // Need actual data for briefing
+        if (!analyticsData && !seoData) return;
 
         const today = new Date().toISOString().split('T')[0];
         const lastBriefing = localStorage.getItem('tc-last-briefing-date');
@@ -337,16 +362,22 @@ export default function AIChat() {
     const showEmpty = messages.length === 0;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04] bg-[#050508]/80 backdrop-blur-md flex-shrink-0">
+        <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-[#08080c]">
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/[0.06] bg-[#0a0a10]/90 backdrop-blur-xl flex-shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center">
-                        <Sparkles className="w-5 h-5 text-emerald-400" />
+                    <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Bot className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0a0a10]" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-bold text-white">AI Analyst</h1>
-                        <p className="text-[10px] text-zinc-500">Powered by your live data</p>
+                        <h1 className="text-sm font-bold text-white tracking-tight">AI Analyst</h1>
+                        <p className="text-[10px] text-zinc-500 flex items-center gap-1">
+                            <span className="inline-block w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                            Powered by your live data
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -354,25 +385,25 @@ export default function AIChat() {
                     <div className="relative" ref={dropdownRef}>
                         <button
                             onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                            className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 text-white text-xs rounded-lg px-3 py-2 hover:border-zinc-600 transition min-w-[180px]"
+                            className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] text-white text-xs rounded-xl px-3.5 py-2 hover:border-white/[0.15] hover:bg-white/[0.06] transition-all min-w-[180px]"
                         >
-                            <Globe className="w-3.5 h-3.5 text-zinc-500" />
-                            <span className="truncate flex-1 text-left">{siteLabel}</span>
-                            <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
+                            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="truncate flex-1 text-left text-zinc-300">{siteLabel}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-200 ${siteDropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {siteDropdownOpen && gscSites.length > 0 && (
-                            <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto">
+                            <div className="absolute right-0 top-full mt-2 z-50 bg-[#111118] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 py-1.5 min-w-[240px] max-h-[260px] overflow-y-auto">
                                 {gscSites.map((site: any) => {
                                     const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                     const isSelected = site.siteUrl === selectedSite;
                                     return (
                                         <button key={site.siteUrl}
                                             onClick={() => { setSelectedSite(site.siteUrl); setSiteDropdownOpen(false); }}
-                                            className={`w-full text-left px-4 py-2 text-xs flex items-center gap-2 transition ${isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
+                                            className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-2.5 transition-all ${isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
                                         >
                                             <Globe className="w-3.5 h-3.5 flex-shrink-0" />
                                             <span className="truncate">{label}</span>
-                                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 ml-auto" />}
+                                            {isSelected && <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 ml-auto" />}
                                         </button>
                                     );
                                 })}
@@ -380,74 +411,117 @@ export default function AIChat() {
                         )}
                     </div>
                     {messages.length > 0 && (
-                        <button onClick={clearChat} className="p-2 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-white transition" title="Clear chat">
+                        <button onClick={clearChat} className="p-2 rounded-xl hover:bg-white/[0.06] text-zinc-500 hover:text-white transition-all" title="New chat">
                             <RotateCcw className="w-4 h-4" />
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto">
+            {/* ── Messages Area ── */}
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5 hover:scrollbar-thumb-white/10">
                 {showEmpty ? (
-                    /* Empty state with starter prompts */
+                    /* ── Empty State ── */
                     <div className="flex flex-col items-center justify-center h-full px-6 py-12">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center mb-6">
-                            <Sparkles className="w-8 h-8 text-emerald-400" />
+                        <div className="relative mb-8">
+                            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/10 flex items-center justify-center">
+                                <Bot className="w-10 h-10 text-emerald-400" />
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <Sparkles className="w-3.5 h-3.5 text-white" />
+                            </div>
                         </div>
-                        <h2 className="text-xl font-bold text-white mb-2">AI SEO Analyst</h2>
-                        <p className="text-sm text-zinc-500 text-center max-w-md mb-8">
-                            I have your live analytics and SEO data loaded. Ask me anything — I give <span className="text-emerald-400 font-semibold">verdicts</span>, not just advice.
+                        <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">What can I help with?</h2>
+                        <p className="text-sm text-zinc-500 text-center max-w-md mb-10 leading-relaxed">
+                            Your live analytics data is loaded. I give <span className="text-emerald-400 font-semibold">specific verdicts</span> with revenue impact — not generic advice.
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-2xl">
                             {STARTER_PROMPTS.map((prompt, i) => {
                                 const Icon = prompt.icon;
                                 const colorMap: Record<string, string> = {
-                                    emerald: 'border-emerald-500/15 hover:border-emerald-500/30 hover:bg-emerald-500/[0.04]',
-                                    cyan: 'border-cyan-500/15 hover:border-cyan-500/30 hover:bg-cyan-500/[0.04]',
-                                    amber: 'border-amber-500/15 hover:border-amber-500/30 hover:bg-amber-500/[0.04]',
-                                    violet: 'border-violet-500/15 hover:border-violet-500/30 hover:bg-violet-500/[0.04]',
+                                    emerald: 'group-hover:border-emerald-500/30 group-hover:bg-emerald-500/[0.04] group-hover:shadow-emerald-500/5',
+                                    cyan: 'group-hover:border-cyan-500/30 group-hover:bg-cyan-500/[0.04] group-hover:shadow-cyan-500/5',
+                                    amber: 'group-hover:border-amber-500/30 group-hover:bg-amber-500/[0.04] group-hover:shadow-amber-500/5',
+                                    violet: 'group-hover:border-violet-500/30 group-hover:bg-violet-500/[0.04] group-hover:shadow-violet-500/5',
+                                    rose: 'group-hover:border-rose-500/30 group-hover:bg-rose-500/[0.04] group-hover:shadow-rose-500/5',
+                                    blue: 'group-hover:border-blue-500/30 group-hover:bg-blue-500/[0.04] group-hover:shadow-blue-500/5',
                                 };
                                 const iconColorMap: Record<string, string> = {
-                                    emerald: 'text-emerald-400', cyan: 'text-cyan-400', amber: 'text-amber-400', violet: 'text-violet-400',
+                                    emerald: 'text-emerald-400 bg-emerald-500/10', cyan: 'text-cyan-400 bg-cyan-500/10',
+                                    amber: 'text-amber-400 bg-amber-500/10', violet: 'text-violet-400 bg-violet-500/10',
+                                    rose: 'text-rose-400 bg-rose-500/10', blue: 'text-blue-400 bg-blue-500/10',
+                                };
+                                const tagColorMap: Record<string, string> = {
+                                    emerald: 'text-emerald-500 bg-emerald-500/10', cyan: 'text-cyan-500 bg-cyan-500/10',
+                                    amber: 'text-amber-500 bg-amber-500/10', violet: 'text-violet-500 bg-violet-500/10',
+                                    rose: 'text-rose-500 bg-rose-500/10', blue: 'text-blue-500 bg-blue-500/10',
                                 };
                                 return (
                                     <button
                                         key={i}
                                         onClick={() => sendMessage(prompt.text)}
                                         disabled={isLoading || !dataReady}
-                                        className={`flex items-start gap-3 p-4 rounded-xl border bg-white/[0.01] ${colorMap[prompt.color]} transition-all text-left disabled:opacity-40`}
+                                        className={`group flex flex-col gap-3 p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] ${colorMap[prompt.color]} transition-all duration-200 text-left disabled:opacity-40 shadow-lg shadow-black/20 hover:shadow-xl`}
                                     >
-                                        <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColorMap[prompt.color]}`} />
+                                        <div className="flex items-center justify-between w-full">
+                                            <div className={`w-8 h-8 rounded-lg ${iconColorMap[prompt.color]} flex items-center justify-center`}>
+                                                <Icon className="w-4 h-4" />
+                                            </div>
+                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${tagColorMap[prompt.color]}`}>{prompt.tag}</span>
+                                        </div>
                                         <span className="text-xs text-zinc-300 leading-relaxed">{prompt.text}</span>
                                     </button>
                                 );
                             })}
                         </div>
                         {!dataReady && hasGoogleConnection && (
-                            <div className="flex items-center gap-2 mt-6 text-xs text-zinc-500">
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Loading your data...
+                            <div className="flex items-center gap-2.5 mt-8 text-xs text-zinc-500 bg-zinc-900/50 rounded-full px-4 py-2 border border-zinc-800">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                                Loading your analytics data...
                             </div>
                         )}
                     </div>
                 ) : (
-                    /* Chat messages */
-                    <div className="px-6 py-4 space-y-4 max-w-3xl mx-auto">
+                    /* ── Chat Messages ── */
+                    <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto space-y-6">
                         {messages.map((msg, i) => {
                             if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                             const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
+                            const isUser = msg.role === 'user';
+
                             return (
-                                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`${msg.role === 'user' ? 'max-w-[70%]' : 'max-w-[85%] w-full'} rounded-2xl px-5 py-4 text-sm leading-relaxed ${msg.role === 'user'
-                                        ? 'bg-emerald-500/[0.08] text-emerald-100 border border-emerald-500/[0.12] rounded-br-sm'
-                                        : 'bg-white/[0.02] text-zinc-300 border border-white/[0.04] rounded-bl-sm'
-                                        }`}>
-                                        {msg.role === 'assistant' ? (
-                                            <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />
+                                <div key={i} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+                                    {/* Avatar */}
+                                    <div className="flex-shrink-0 mt-1">
+                                        {isUser ? (
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                                                <User className="w-4 h-4 text-white" />
+                                            </div>
                                         ) : (
-                                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                                <Bot className="w-4 h-4 text-white" />
+                                            </div>
                                         )}
+                                    </div>
+
+                                    {/* Message */}
+                                    <div className={`min-w-0 ${isUser ? 'max-w-[75%]' : 'max-w-[85%] flex-1'}`}>
+                                        {/* Name + time */}
+                                        <div className={`flex items-center gap-2 mb-1.5 ${isUser ? 'justify-end' : ''}`}>
+                                            <span className="text-[11px] font-semibold text-zinc-500">{isUser ? 'You' : 'AI Analyst'}</span>
+                                            <span className="text-[10px] text-zinc-600">{formatTime(msg.timestamp)}</span>
+                                        </div>
+
+                                        <div className={`rounded-2xl px-5 py-4 text-sm leading-relaxed ${isUser
+                                            ? 'bg-gradient-to-br from-emerald-500/[0.12] to-cyan-500/[0.06] text-emerald-50 border border-emerald-500/[0.15] rounded-tr-sm'
+                                            : 'bg-zinc-900/60 text-zinc-300 border border-zinc-800/60 rounded-tl-sm'
+                                        }`}>
+                                            {msg.role === 'assistant' ? (
+                                                <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isLastAssistant && isLoading} snapshot={snapshot} onSuggestionClick={(s) => sendMessage(s)} />
+                                            ) : (
+                                                <div className="whitespace-pre-wrap">{msg.content}</div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -462,10 +536,10 @@ export default function AIChat() {
                 )}
             </div>
 
-            {/* Input Area */}
-            <div className="flex-shrink-0 border-t border-white/[0.04] bg-[#050508]/80 backdrop-blur-md px-6 py-4">
+            {/* ── Input Area ── */}
+            <div className="flex-shrink-0 border-t border-white/[0.06] bg-[#0a0a10]/90 backdrop-blur-xl px-4 sm:px-6 py-4">
                 <div className="max-w-3xl mx-auto">
-                    <div className="flex items-end gap-3 bg-zinc-900/80 border border-white/[0.08] rounded-2xl px-4 py-3 focus-within:border-emerald-500/30 transition-colors">
+                    <div className="relative flex items-end gap-3 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl px-4 py-3 focus-within:border-emerald-500/30 focus-within:shadow-lg focus-within:shadow-emerald-500/5 transition-all duration-200">
                         <textarea
                             ref={textareaRef}
                             value={input}
@@ -479,13 +553,13 @@ export default function AIChat() {
                         <button
                             onClick={() => sendMessage()}
                             disabled={!input.trim() || isLoading || !dataReady}
-                            className="p-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-white transition-all flex-shrink-0"
+                            className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-600 text-white transition-all flex-shrink-0 shadow-lg shadow-emerald-500/20 disabled:shadow-none"
                         >
                             <ArrowUp className="w-4 h-4" />
                         </button>
                     </div>
-                    <p className="text-[10px] text-zinc-600 text-center mt-2">
-                        AI responses are based on your live Google Analytics & Search Console data
+                    <p className="text-[10px] text-zinc-600 text-center mt-2.5">
+                        Analyzing your live Google Analytics & Search Console data
                     </p>
                 </div>
             </div>
