@@ -606,7 +606,7 @@ select:focus-visible {
 }
 
 /* Gradient text shimmer */
-@keyframes shimmer {
+@keyframes shimmer-text {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
@@ -617,7 +617,7 @@ select:focus-visible {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: shimmer 4s linear infinite;
+  animation: shimmer-text 4s linear infinite;
 }
 
 /* ========== Button press effect ========== */

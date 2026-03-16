@@ -8,10 +8,15 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 // HMAC-SHA256 hash of the superadmin password with salt (set SUPERADMIN_PASSWORD env var)
 const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD
-const PASSWORD_SALT = process.env.NEXTAUTH_SECRET || ''
+const PASSWORD_SALT = process.env.SUPERADMIN_PASSWORD_SALT || process.env.NEXTAUTH_SECRET || ''
 const PASSWORD_HASH = SUPERADMIN_PASSWORD && PASSWORD_SALT
     ? crypto.createHmac('sha256', PASSWORD_SALT).update(SUPERADMIN_PASSWORD).digest('hex')
     : ''
+
+// Guard: if superadmin is not configured, all requests are rejected
+if (!SUPERADMIN_PASSWORD || !PASSWORD_SALT) {
+    console.warn('[SUPERADMIN] SUPERADMIN_PASSWORD or salt not configured — route disabled');
+}
 
 // Token expiry: 24 hours in milliseconds
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000
