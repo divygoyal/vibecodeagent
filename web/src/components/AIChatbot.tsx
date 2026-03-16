@@ -265,9 +265,9 @@ export default function AIChatbot() {
             // Subsequent messages use conversation history — Gemini remembers.
             const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
 
-            // Hard timeout: abort if no response headers within 30s
+            // Hard timeout: abort if no response headers within 60s
             const abortController = new AbortController();
-            const ttfbTimeout = setTimeout(() => abortController.abort(), 30000);
+            const ttfbTimeout = setTimeout(() => abortController.abort(), 60000);
 
             const res = await fetch('/api/ai-chat', {
                 method: 'POST',
