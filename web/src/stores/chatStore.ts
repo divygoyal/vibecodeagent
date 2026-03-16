@@ -34,7 +34,18 @@ function saveToStorage(messages: ChatMessage[]) {
     if (typeof window === 'undefined') return;
     try {
         localStorage.setItem(getStorageKey(), JSON.stringify(messages.slice(-MAX_MESSAGES)));
-    } catch { /* full */ }
+    } catch (err) {
+        // localStorage may be full (QuotaExceededError) — try saving fewer messages
+        if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+            try {
+                // Keep only last 10 messages as emergency fallback
+                localStorage.setItem(getStorageKey(), JSON.stringify(messages.slice(-10)));
+            } catch {
+                // Storage completely full — clear old chat data to free space
+                try { localStorage.removeItem(getStorageKey()); } catch { /* truly broken */ }
+            }
+        }
+    }
 }
 
 interface ChatStore {

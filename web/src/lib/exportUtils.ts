@@ -36,7 +36,11 @@ export function exportToCSV(data: Row[], filename: string, columns?: { key: stri
         cols.map(c => {
             const val = row[c.key];
             if (val === null || val === undefined) return '';
-            if (typeof val === 'string') return `"${val.replace(/"/g, '""')}"`;
+            if (typeof val === 'string') {
+                // Strip control characters that can break CSV parsers, keep newlines
+                const clean = val.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F]/g, '');
+                return `"${clean.replace(/"/g, '""')}"`;
+            }
             return String(val);
         }).join(',')
     );

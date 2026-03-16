@@ -11,18 +11,24 @@ export function getGitHubAuthUrl(clientId: string, redirectUri: string) {
 }
 
 export async function getGitHubAccessToken(clientId: string, clientSecret: string, code: string) {
-  const res = await fetch("https://github.com/login/oauth/access_token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    throw new Error(`GitHub token exchange network error: ${err instanceof Error ? err.message : err}`);
+  }
   if (!res.ok) {
     throw new Error(`GitHub token exchange failed: ${res.status}`);
   }
