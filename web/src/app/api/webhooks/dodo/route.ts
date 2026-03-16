@@ -19,12 +19,23 @@ const PLANS: Record<string, { plan: string; credits: number; telegramBot: boolea
 // Simple in-memory dedup to prevent processing the same webhook event twice
 const processedEvents = new Map<string, number>();
 const DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const DEDUP_MAX_SIZE = 10_000; // Hard cap to prevent OOM from rapid unique events
 
 function isDuplicate(eventId: string): boolean {
     // Clean up old entries
     const now = Date.now();
     for (const [id, ts] of processedEvents) {
         if (now - ts > DEDUP_TTL_MS) processedEvents.delete(id);
+    }
+    // Hard cap: if still over limit after TTL cleanup, evict oldest entries
+    if (processedEvents.size >= DEDUP_MAX_SIZE) {
+        const toDelete = processedEvents.size - DEDUP_MAX_SIZE + 100; // evict batch of 100
+        let deleted = 0;
+        for (const key of processedEvents.keys()) {
+            if (deleted >= toDelete) break;
+            processedEvents.delete(key);
+            deleted++;
+        }
     }
     if (processedEvents.has(eventId)) return true;
     processedEvents.set(eventId, now);

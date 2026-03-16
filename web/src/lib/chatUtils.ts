@@ -2,6 +2,22 @@ import type { DashboardSnapshot } from '@/components/chat/SnapshotChartRenderer'
 import type { StructuredToolResult } from '@/components/chat/ChatCharts';
 
 /**
+ * Normalize CTR to a percentage value (0-100).
+ * Handles both raw decimal (0.05 = 5%) from GSC API and pre-formatted percentage (5.0).
+ * Values <= 1 are ambiguous (could be 1% or 100%), so we use > 1 as the threshold
+ * but cap at 100 to avoid nonsensical values.
+ */
+function normalizeCtr(ctr: unknown): number {
+    const val = typeof ctr === 'number' ? ctr : parseFloat(ctr as string);
+    if (!Number.isFinite(val)) return 0;
+    // GSC API returns CTR as decimal (0-1). Pre-formatted values are > 1.
+    // Threshold: values < 1 are definitely decimals. Values >= 1 could be either,
+    // but fetchSeoDashboard already converts to percentage, so treat >= 1 as-is.
+    const result = val < 1 ? val * 100 : val;
+    return Math.min(100, Math.round(result * 10) / 10);
+}
+
+/**
  * Build a DashboardSnapshot from analytics + SEO data for chart rendering.
  */
 export function buildSnapshot(analytics: any, seo: any): DashboardSnapshot | undefined {
@@ -16,14 +32,14 @@ export function buildSnapshot(analytics: any, seo: any): DashboardSnapshot | und
             query: q.query,
             clicks: q.clicks || 0,
             impressions: q.impressions || 0,
-            ctr: typeof q.ctr === 'number' ? (q.ctr > 1 ? q.ctr : q.ctr * 100) : parseFloat(q.ctr) || 0,
+            ctr: normalizeCtr(q.ctr),
             position: parseFloat(q.position) || 0,
         })),
         topPages: (seo?.pages || []).slice(0, 10).map((p: any) => ({
             page: p.page,
             clicks: p.clicks || 0,
             impressions: p.impressions || 0,
-            ctr: typeof p.ctr === 'number' ? (p.ctr > 1 ? p.ctr : p.ctr * 100) : parseFloat(p.ctr) || 0,
+            ctr: normalizeCtr(p.ctr),
             position: parseFloat(p.position) || 0,
         })),
         devices: analytics?.devices || [],

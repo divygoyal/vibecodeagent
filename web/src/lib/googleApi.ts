@@ -71,7 +71,19 @@ export async function getValidAccessToken(
             return existing;
         }
 
-        const refreshPromise = (async () => {
+        // Create the promise first, then store it BEFORE starting execution
+        // so concurrent callers always find it in the map.
+        let resolveRefresh: (token: string) => void;
+        let rejectRefresh: (err: Error) => void;
+        const refreshPromise = new Promise<string>((resolve, reject) => {
+            resolveRefresh = resolve;
+            rejectRefresh = reject;
+        });
+
+        // Store in map BEFORE any async work begins
+        pendingRefresh.set(refreshToken, refreshPromise);
+
+        (async () => {
             try {
                 const res = await fetch('https://oauth2.googleapis.com/token', {
                     method: 'POST',
@@ -102,19 +114,26 @@ export async function getValidAccessToken(
                         expiresAt: Date.now() + expiresIn * 1000,
                     });
 
-                    return newToken;
+                    resolveRefresh!(newToken);
+                    return;
                 }
-                console.error('Google token refresh failed:', res.status, await res.text());
+                const errText = await res.text();
+                console.error('Google token refresh failed:', res.status, errText);
+            } catch (err) {
+                console.error('Google token refresh network error:', err);
             } finally {
+                // Delete from map AFTER promise is settled, so all concurrent
+                // callers who got the promise reference can still await it.
                 pendingRefresh.delete(refreshToken);
             }
             // Refresh failed — fall through to access token fallback
-            if (accessToken) return accessToken;
-            throw new Error('Failed to refresh Google token');
+            if (accessToken) {
+                resolveRefresh!(accessToken);
+            } else {
+                rejectRefresh!(new Error('Failed to refresh Google token'));
+            }
         })();
 
-        // Set BEFORE awaiting so concurrent callers share the same promise
-        pendingRefresh.set(refreshToken, refreshPromise);
         return refreshPromise;
     }
 
@@ -145,7 +164,12 @@ async function gaFetch(url: string, token: string, body?: any) {
         const err = await res.text();
         throw new Error(`Google API error ${res.status}: ${err}`);
     }
-    return res.json();
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error(`Google API returned non-JSON response: ${text.substring(0, 200)}`);
+    }
 }
 
 /**
@@ -296,7 +320,12 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
         }
     }
 
-    const pctChange = (cur: number, prev: number) => prev > 0 ? +((cur - prev) / prev * 100).toFixed(1) : 0;
+    const pctChange = (cur: number, prev: number) => {
+        if (prev <= 0) return 0;
+        const change = ((cur - prev) / prev) * 100;
+        if (!Number.isFinite(change)) return 0;
+        return +change.toFixed(1);
+    };
     const avgBounce = rowCount > 0 ? (totalBounce / rowCount) * 100 : 0;
     const prevAvgBounce = prevRows > 0 ? (prevBounce / prevRows) * 100 : 0;
 
@@ -599,7 +628,12 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
         prevCount++;
     }
 
-    const pctChange = (cur: number, prev: number) => prev > 0 ? +((cur - prev) / prev * 100).toFixed(1) : 0;
+    const pctChange = (cur: number, prev: number) => {
+        if (prev <= 0) return 0;
+        const change = ((cur - prev) / prev) * 100;
+        if (!Number.isFinite(change)) return 0;
+        return +change.toFixed(1);
+    };
     const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const avgPos = curCount > 0 ? totalPos / curCount : 0;
     const prevAvgCtr = prevImpressions > 0 ? (prevClicks / prevImpressions) * 100 : 0;

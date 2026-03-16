@@ -3,6 +3,7 @@
  * Returns a structured audit report with score, issues, and recommendations.
  */
 import * as cheerio from 'cheerio';
+import { isBlockedUrl } from './urlValidation';
 
 // ─── Types ───
 
@@ -66,6 +67,12 @@ function countWords(text: string): number {
 
 export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     const url = normalizeUrl(rawUrl);
+
+    // SSRF protection: block internal/private IPs and metadata endpoints
+    if (isBlockedUrl(url)) {
+        throw new Error('URL is not allowed: internal or private addresses are blocked');
+    }
+
     const issues: AuditIssue[] = [];
     const hostname = getHostname(url);
 
