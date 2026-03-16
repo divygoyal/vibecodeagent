@@ -76,7 +76,7 @@ const DEMO_BY_COUNTRY = DEMO_VISITORS.map(v => ({ country: v.country, users: v.u
 
 const DEMO_ACTIVITY = [
     { id: 'a1', name: 'coral falcon', country: 'United States', page: '500+ Agent Skills for Claude Code, Cursor & AI Assistants', event: 'visited' as const, warmth: 0.8, time: 'a few seconds ago', confidence: 82, estValue: '$2.40' },
-    { id: 'a2', name: 'jade owl', country: 'United Kingdom', page: 'Antigravity Codes | 1,500+ MCP Servers, AI Rules', event: 'visited' as const, warmth: 0.7, time: '8 seconds ago', confidence: 74, estValue: '$1.80' },
+    { id: 'a2', name: 'jade owl', country: 'United Kingdom', page: 'Your Site | 1,500+ MCP Servers, AI Rules', event: 'visited' as const, warmth: 0.7, time: '8 seconds ago', confidence: 74, estValue: '$1.80' },
     { id: 'a3', name: 'amber wolf', country: 'India', page: 'Best MCP Servers for Cursor IDE', event: 'visited' as const, warmth: 0.5, time: '15 seconds ago', confidence: 58, estValue: '$0.90' },
     { id: 'a4', name: 'silver crane', country: 'Japan', event: 'exited to' as const, exitUrl: 'apps.apple.com/app/...', warmth: 0.65, time: '24 seconds ago', confidence: 68, estValue: '$1.50' },
     { id: 'a5', name: 'rose finch', country: 'Australia', page: 'AI Coding Assistant Comparison 2026', event: 'visited' as const, warmth: 0.6, time: '31 seconds ago', confidence: 64, estValue: '$1.20' },
