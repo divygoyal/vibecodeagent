@@ -17,11 +17,12 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 // Fallback model chain: try each in order if previous returns 429/503/timeout
+// Timeouts are ceilings (not delays) — fast responses are unaffected
 const CHAT_MODELS = [
-    { model: 'gemini-3-flash-preview', timeout: 12000 },
-    { model: 'gemini-3.1-flash-lite-preview', timeout: 10000 },
-    { model: 'gemini-3.1-pro-preview', timeout: 8000 },
-    { model: 'gemini-2.5-flash', timeout: 8000 },
+    { model: 'gemini-3-flash-preview', timeout: 25000 },
+    { model: 'gemini-3.1-flash-lite-preview', timeout: 20000 },
+    { model: 'gemini-3.1-pro-preview', timeout: 18000 },
+    { model: 'gemini-2.5-flash', timeout: 18000 },
 ] as const;
 
 function isRetryableError(error: any): boolean {
