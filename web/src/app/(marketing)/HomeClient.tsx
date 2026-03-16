@@ -141,7 +141,7 @@ function Hero() {
                     initial={{ opacity: 0, x: -40 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex flex-col gap-8 order-2 lg:order-1 text-center lg:text-left"
+                    className="flex flex-col gap-8 order-1 text-center lg:text-left"
                 >
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium w-fit mx-auto lg:mx-0 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
                         <span className="relative flex h-2 w-2">
@@ -198,7 +198,7 @@ function Hero() {
                 </motion.div>
 
                 {/* Right Side: The Simulation Component with Floating UI */}
-                <div className="order-1 lg:order-2 flex justify-center lg:justify-center relative lg:pl-12 w-full h-[600px] items-center">
+                <div className="order-2 hidden lg:flex justify-center lg:justify-center relative lg:pl-12 w-full lg:h-[600px] items-center">
 
                     {/* Floating Element 1 (Traffic Spike) */}
                     <motion.div
@@ -793,7 +793,7 @@ function InteractiveDemo() {
                                     className="relative"
                                 >
                                     {/* Globe view — exact clone of realtime page layout */}
-                                    <div className="relative h-[600px] overflow-hidden">
+                                    <div className="relative h-[400px] sm:h-[500px] lg:h-[600px] overflow-hidden">
                                         {/* Mapbox GL Globe */}
                                         <div className="absolute inset-0">
                                             <RealtimeMapbox
@@ -811,7 +811,7 @@ function InteractiveDemo() {
                                             transition={{ delay: 0.1, duration: 0.4 }}
                                             className="absolute top-4 left-4 z-20"
                                         >
-                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden" style={{ minWidth: '320px', maxWidth: '400px' }}>
+                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden w-[calc(100vw-4rem)] sm:w-auto" style={{ minWidth: 0, maxWidth: '400px' }}>
                                                 {/* Header: Logo | REAL-TIME | toolbar */}
                                                 <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
                                                     <div className="flex items-center gap-1.5">
@@ -908,7 +908,7 @@ function InteractiveDemo() {
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.3, duration: 0.4 }}
-                                            className="absolute bottom-4 left-4 z-20 w-[360px] md:w-[440px]"
+                                            className="absolute bottom-4 left-4 right-4 sm:right-auto z-20 sm:w-[360px] md:w-[440px] hidden sm:block"
                                         >
                                             <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
                                                 <div className="max-h-[280px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
