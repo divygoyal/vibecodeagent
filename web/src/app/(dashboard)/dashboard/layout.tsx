@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
+import { useChatStore } from '@/stores/chatStore';
+
+// Extended user type — id is added via JWT callback in auth.ts
+type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
 
 // Registration context to coordinate registration with data fetching
 interface RegistrationContextType {
@@ -85,24 +89,66 @@ export default function DashboardLayout({
     const { credits, plan: userPlan, subscriptionCancelled } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [selectedProperty, setSelectedProperty] = useState(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('tc-last-property') || '';
-        return '';
-    });
-    const [selectedSite, setSelectedSite] = useState(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('tc-last-site') || '';
-        return '';
-    });
+    // User-scoped localStorage helper — prevents cross-user data leaks
+    const user = session?.user as SessionUser | undefined;
+    const getUserKey = useCallback((key: string) => {
+        const uid = user?.id || user?.email || '';
+        return uid ? `${key}:${uid}` : key;
+    }, [user?.id, user?.email]);
+
+    const [selectedProperty, setSelectedProperty] = useState('');
+    const [selectedSite, setSelectedSite] = useState('');
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [showWelcome, setShowWelcome] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
-    const [range, setRange] = useState(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('tc-last-range') || '30d';
-        return '30d';
-    });
+    const [range, setRange] = useState('30d');
+
+    // Load user-scoped selections and chat history once session is available
+    useEffect(() => {
+        if (!user) return;
+        // Scope chat store to current user
+        const uid = user.id || user.email || '';
+        if (uid) useChatStore.getState().setCurrentUser(uid);
+        // Load saved property/site/range
+        const propKey = getUserKey('tc-last-property');
+        const siteKey = getUserKey('tc-last-site');
+        const rangeKey = getUserKey('tc-last-range');
+        const savedProp = localStorage.getItem(propKey) || '';
+        const savedSite = localStorage.getItem(siteKey) || '';
+        const savedRange = localStorage.getItem(rangeKey) || '30d';
+        if (savedProp) setSelectedProperty(savedProp);
+        if (savedSite) setSelectedSite(savedSite);
+        if (savedRange) setRange(savedRange);
+    }, [user, getUserKey]);
     const [rangeDropdownOpen, setRangeDropdownOpen] = useState(false);
     const [bellOpen, setBellOpen] = useState(false);
     const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
+
+    // Logout handler — clears user-scoped data to prevent cross-user leaks
+    const handleSignOut = useCallback(() => {
+        // Clear chat history
+        useChatStore.getState().clearChat();
+        // Clear user-scoped localStorage keys (any key containing user ID)
+        const uid = user?.id || user?.email || '';
+        if (uid) {
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.endsWith(`:${uid}`)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+        }
+        // Clear legacy non-scoped keys (from before this fix)
+        ['tc-last-property', 'tc-last-site', 'tc-last-range', 'tc-chat-history',
+         'tc-credit-usage', 'tc-last-briefing-date', 'tc-onboarded', 'tc-welcomed',
+         'tc-notification-prefs', 'tc-push-enabled'].forEach(k => localStorage.removeItem(k));
+        // Clear session storage
+        sessionStorage.removeItem('tc-registered');
+        sessionStorage.removeItem('tc-registered-user');
+        signOut({ callbackUrl: '/' });
+    }, [user?.id, user?.email]);
 
     // Close bell dropdown on route change
     useEffect(() => {
@@ -151,16 +197,16 @@ export default function DashboardLayout({
         if (saved) { setTheme(saved); document.documentElement.setAttribute('data-theme', saved); }
     }, []);
 
-    // Persist selected property/site to localStorage for instant load on return
+    // Persist selected property/site to user-scoped localStorage
     useEffect(() => {
-        if (selectedProperty) localStorage.setItem('tc-last-property', selectedProperty);
-    }, [selectedProperty]);
+        if (selectedProperty && user) localStorage.setItem(getUserKey('tc-last-property'), selectedProperty);
+    }, [selectedProperty, user, getUserKey]);
     useEffect(() => {
-        if (selectedSite) localStorage.setItem('tc-last-site', selectedSite);
-    }, [selectedSite]);
+        if (selectedSite && user) localStorage.setItem(getUserKey('tc-last-site'), selectedSite);
+    }, [selectedSite, user, getUserKey]);
     useEffect(() => {
-        if (range) localStorage.setItem('tc-last-range', range);
-    }, [range]);
+        if (range && user) localStorage.setItem(getUserKey('tc-last-range'), range);
+    }, [range, user, getUserKey]);
 
     const toggleTheme = () => {
         const next = theme === 'dark' ? 'light' : 'dark';
@@ -236,9 +282,11 @@ export default function DashboardLayout({
                         registrationError: null,
                     });
                     // Show onboarding wizard on FIRST EVER signup (or credit welcome if already onboarded)
-                    if (!localStorage.getItem('tc-welcomed')) {
-                        localStorage.setItem('tc-welcomed', 'true');
-                        if (!localStorage.getItem('tc-onboarded')) {
+                    const welcomeKey = getUserKey('tc-welcomed');
+                    const onboardKey = getUserKey('tc-onboarded');
+                    if (!localStorage.getItem(welcomeKey)) {
+                        localStorage.setItem(welcomeKey, 'true');
+                        if (!localStorage.getItem(onboardKey)) {
                             setShowOnboarding(true);
                         } else {
                             setShowWelcome(true);
@@ -400,7 +448,7 @@ export default function DashboardLayout({
                                 </div>
                             </div>
                             <button
-                                onClick={() => signOut({ callbackUrl: '/' })}
+                                onClick={handleSignOut}
                                 className="text-zinc-600 hover:text-zinc-400 transition-colors"
                                 aria-label="Sign out"
                                 title="Sign out"
@@ -673,6 +721,7 @@ export default function DashboardLayout({
                     onComplete={() => { setShowOnboarding(false); setShowWelcome(true); }}
                     onSelectSite={setSelectedSite}
                     onSelectProperty={setSelectedProperty}
+                    storageKey={getUserKey('tc-onboarded')}
                 />
             )}
 
@@ -783,7 +832,7 @@ export default function DashboardLayout({
                                         </div>
                                     </div>
                                     <button
-                                        onClick={() => signOut({ callbackUrl: '/' })}
+                                        onClick={handleSignOut}
                                         className="text-zinc-600 hover:text-zinc-400"
                                     >
                                         <LogOut className="w-3.5 h-3.5" />

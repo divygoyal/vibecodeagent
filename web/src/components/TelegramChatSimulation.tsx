@@ -29,7 +29,7 @@ const MESSAGES: Message[] = [
     {
         id: "msg-2",
         type: "user",
-        content: "Hi , how is our site antigravity is doing",
+        content: "Hi, how is our site doing?",
         time: "4:02 PM",
     },
     {
@@ -39,7 +39,7 @@ const MESSAGES: Message[] = [
             <div className="flex flex-col gap-4 text-[15px] leading-relaxed">
                 <p>
                     Based on the data from Google Search Console and Google Analytics,
-                    here is the status for <span className="text-blue-400">antigravity.codes</span>:
+                    here is the status for <span className="text-blue-400">yoursite.com</span>:
                 </p>
                 <p className="flex items-center gap-2 font-medium">
                     🚨 Critical Traffic Drop Alert

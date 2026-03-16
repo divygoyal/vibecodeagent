@@ -8,13 +8,20 @@ export interface ChatMessage {
     hasError?: boolean;
 }
 
-const STORAGE_KEY = 'tc-chat-history';
+const BASE_STORAGE_KEY = 'tc-chat-history';
 const MAX_MESSAGES = 30; // ~10 Q&A pairs + some buffer
+
+// Current user ID for scoping — set via setCurrentUser()
+let currentUserId = '';
+
+function getStorageKey(): string {
+    return currentUserId ? `${BASE_STORAGE_KEY}:${currentUserId}` : BASE_STORAGE_KEY;
+}
 
 function loadFromStorage(): ChatMessage[] {
     if (typeof window === 'undefined') return [];
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(getStorageKey());
         if (stored) {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -26,7 +33,7 @@ function loadFromStorage(): ChatMessage[] {
 function saveToStorage(messages: ChatMessage[]) {
     if (typeof window === 'undefined') return;
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)));
+        localStorage.setItem(getStorageKey(), JSON.stringify(messages.slice(-MAX_MESSAGES)));
     } catch { /* full */ }
 }
 
@@ -36,9 +43,10 @@ interface ChatStore {
     addMessage: (msg: ChatMessage) => void;
     updateLastAssistant: (updater: (msg: ChatMessage) => ChatMessage) => void;
     clearChat: () => void;
+    setCurrentUser: (userId: string) => void;
 }
 
-export const useChatStore = create<ChatStore>((set, get) => ({
+export const useChatStore = create<ChatStore>((set) => ({
     messages: loadFromStorage(),
 
     setMessages: (updater) => {
@@ -70,7 +78,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     clearChat: () => {
-        saveToStorage([]);
+        // Clear both current scoped key and legacy unscoped key
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem(getStorageKey());
+            localStorage.removeItem(BASE_STORAGE_KEY);
+        }
         set({ messages: [] });
+    },
+
+    // Call this when user session is available to load the correct chat history
+    setCurrentUser: (userId: string) => {
+        if (currentUserId === userId) return; // No change
+        currentUserId = userId;
+        // Reload messages for the new user
+        const messages = loadFromStorage();
+        set({ messages });
     },
 }));
