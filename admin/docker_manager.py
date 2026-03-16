@@ -20,34 +20,63 @@ class DockerManager:
         self.client = docker.from_env()
         self.base_dir = settings.DATA_DIR  # Host path for user data
         self._shared_plugins_dir = self._ensure_shared_plugins()
-    
+        self._nanobot_build_event = self._start_nanobot_build()
+
     def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
         return f"{settings.CONTAINER_PREFIX}_{user_identifier}"
-    
-    def _ensure_nanobot_image(self) -> None:
-        """Build the trafficclaw/nanobot image natively on the host if it doesn't exist."""
+
+    def _start_nanobot_build(self):
+        """Kick off nanobot image build in background thread. Returns an Event that is set when done."""
+        import threading
         tag = "trafficclaw/nanobot:v9"
+        done_event = threading.Event()
         try:
             self.client.images.get(tag)
             logger.info(f"Nanobot image {tag} already exists")
+            done_event.set()
+            return done_event
         except docker.errors.ImageNotFound:
-            logger.info(f"Image {tag} not found — building now (this may take a moment)...")
-            build_dir = "/app/nanobot-build"
-            try:
-                for line in self.client.api.build(
-                    path=build_dir,
-                    dockerfile="Dockerfile.nanobot",
-                    tag=tag,
-                    rm=True,
-                    decode=True,
-                ):
-                    if 'stream' in line and line['stream'].strip():
-                        print(f"[BUILDER] {line['stream'].strip()}")
-                logger.info(f"Successfully built {tag}!")
-            except Exception as e:
-                logger.error(f"Failed to build nanobot image: {e}")
-                raise
+            logger.info(f"Image {tag} not found — building in background...")
+            self._nanobot_build_error = None
+
+            def build_image():
+                build_dir = "/app/nanobot-build"
+                try:
+                    for line in self.client.api.build(
+                        path=build_dir,
+                        dockerfile="Dockerfile.nanobot",
+                        tag=tag,
+                        rm=True,
+                        decode=True,
+                    ):
+                        if 'stream' in line and line['stream'].strip():
+                            print(f"[BUILDER] {line['stream'].strip()}")
+                    logger.info(f"Successfully built {tag}!")
+                except Exception as e:
+                    logger.error(f"Failed to build nanobot image: {e}")
+                    self._nanobot_build_error = e
+                finally:
+                    done_event.set()
+
+            threading.Thread(target=build_image, daemon=True).start()
+            return done_event
+
+    def _ensure_nanobot_image(self) -> None:
+        """Wait for the background nanobot build to finish. Raises if build failed."""
+        tag = "trafficclaw/nanobot:v9"
+        # Quick check — image may already exist
+        try:
+            self.client.images.get(tag)
+            return
+        except docker.errors.ImageNotFound:
+            pass
+        logger.info("Waiting for nanobot image build to complete...")
+        self._nanobot_build_event.wait(timeout=300)
+        if getattr(self, '_nanobot_build_error', None):
+            raise RuntimeError(f"Nanobot image build failed: {self._nanobot_build_error}")
+        # Final check
+        self.client.images.get(tag)
 
     def _get_user_data_dir(self, user_identifier: str) -> str:
         """Get host path for user's data directory"""
