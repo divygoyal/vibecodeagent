@@ -113,6 +113,10 @@ export default function RootLayout({
             }),
           }}
         />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
+      >
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-8B8RQSMNHP"
           strategy="afterInteractive"
@@ -125,10 +129,6 @@ export default function RootLayout({
             gtag('config', 'G-8B8RQSMNHP');
           `}
         </Script>
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
-      >
         <a href="#main-content" className="skip-to-content">Skip to content</a>
         <Providers>{children}</Providers>
       </body>
