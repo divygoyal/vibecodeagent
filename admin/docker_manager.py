@@ -33,26 +33,22 @@ class DockerManager:
             self.client.images.get(tag)
             logger.info(f"Nanobot image {tag} already exists")
         except docker.errors.ImageNotFound:
-            logger.info(f"Image {tag} not found! Starting background build thread...")
-            import threading
-            def build_image():
-                build_dir = "/app/nanobot-build"
-                try:
-                    for line in self.client.api.build(
-                        path=build_dir,
-                        dockerfile="Dockerfile.nanobot",
-                        tag=tag,
-                        rm=True,
-                        decode=True,
-                    ):
-                        if 'stream' in line and line['stream'].strip():
-                            print(f"[BUILDER] {line['stream'].strip()}")
-                    logger.info(f"Successfully built {tag} in background!")
-                except Exception as e:
-                    logger.error(f"Failed to build nanobot image in background: {e}")
-
-            builder_thread = threading.Thread(target=build_image, daemon=True)
-            builder_thread.start()
+            logger.info(f"Image {tag} not found — building now (this may take a moment)...")
+            build_dir = "/app/nanobot-build"
+            try:
+                for line in self.client.api.build(
+                    path=build_dir,
+                    dockerfile="Dockerfile.nanobot",
+                    tag=tag,
+                    rm=True,
+                    decode=True,
+                ):
+                    if 'stream' in line and line['stream'].strip():
+                        print(f"[BUILDER] {line['stream'].strip()}")
+                logger.info(f"Successfully built {tag}!")
+            except Exception as e:
+                logger.error(f"Failed to build nanobot image: {e}")
+                raise
 
     def _get_user_data_dir(self, user_identifier: str) -> str:
         """Get host path for user's data directory"""
