@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
+import Link from 'next/link';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import ChatMessageRenderer from './ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
@@ -690,7 +691,9 @@ export default function AIChatbot() {
                     </div>
                     {credits !== null && credits < 30 && (
                         <div className="mt-1.5 px-1">
-                            <span className="text-[9px] text-amber-500/70 font-medium">Low messages: {credits}</span>
+                            <Link href="/dashboard/plan" className="text-[9px] text-amber-500/70 font-medium hover:text-amber-400 transition-colors">
+                                Low messages: {credits} — Upgrade for more
+                            </Link>
                         </div>
                     )}
                 </div>

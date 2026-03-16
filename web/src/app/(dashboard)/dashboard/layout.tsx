@@ -14,7 +14,7 @@ import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Sun, Moon, Coins, MessageSquare,
-    CalendarDays, ChevronDown, Bell, Globe, CreditCard
+    CalendarDays, ChevronDown, Bell, Globe, CreditCard, Sparkles
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
@@ -420,33 +420,34 @@ export default function DashboardLayout({
                 <div className="border-t border-white/[0.04] p-3 space-y-2">
                     {session?.user && !collapsed && (
                         <div className="flex items-center gap-3 px-2 py-2">
-                            {session.user.image && (
-                                <img
-                                    src={session.user.image}
-                                    alt=""
-                                    className="w-7 h-7 rounded-full ring-1 ring-white/[0.1]"
-                                />
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
-                                    {session.user.name}
-                                    <Link
-                                        href="/dashboard/plan"
-                                        className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none hover:opacity-80 transition-opacity ${
-                                            subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                            : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
-                                            : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
-                                            : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
-                                            : 'bg-zinc-700 text-zinc-400'
-                                        }`}
-                                    >
-                                        {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
-                                    </Link>
+                            <Link href="/dashboard/plan" className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer">
+                                {session.user.image && (
+                                    <img
+                                        src={session.user.image}
+                                        alt=""
+                                        className="w-7 h-7 rounded-full ring-1 ring-white/[0.1]"
+                                    />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
+                                        {session.user.name}
+                                        <span
+                                            className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
+                                                subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                                : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                                : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
+                                                : 'bg-zinc-700 text-zinc-400'
+                                            }`}
+                                        >
+                                            {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                        </span>
+                                    </div>
+                                    <div className="text-[10px] text-zinc-600 truncate">
+                                        {session.user.email}
+                                    </div>
                                 </div>
-                                <div className="text-[10px] text-zinc-600 truncate">
-                                    {session.user.email}
-                                </div>
-                            </div>
+                            </Link>
                             <button
                                 onClick={handleSignOut}
                                 className="text-zinc-600 hover:text-zinc-400 transition-colors"
@@ -456,6 +457,18 @@ export default function DashboardLayout({
                                 <LogOut className="w-3.5 h-3.5" />
                             </button>
                         </div>
+                    )}
+                    {/* Subtle upgrade hint for non-pro users */}
+                    {session?.user && !collapsed && userPlan !== 'pro' && (
+                        <Link
+                            href="/dashboard/plan"
+                            className="mx-2 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500/[0.06] to-purple-500/[0.06] border border-violet-500/[0.1] hover:border-violet-500/[0.2] transition-all group"
+                        >
+                            <Sparkles className="w-3 h-3 text-violet-400 group-hover:text-violet-300 transition-colors" />
+                            <span className="text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                                {userPlan === 'free' ? 'Upgrade to Pro' : 'Upgrade plan'}
+                            </span>
+                        </Link>
                     )}
 
                     <button
@@ -663,7 +676,7 @@ export default function DashboardLayout({
                         {/* Credits badge */}
                         {credits !== null && (
                             <>
-                                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${credits < 20
+                                <Link href="/dashboard/plan" className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${credits < 20
                                     ? 'bg-red-500/[0.08] border-red-500/[0.15]'
                                     : credits < 50
                                         ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
@@ -673,8 +686,11 @@ export default function DashboardLayout({
                                         }`} />
                                     <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
                                         }`}>{credits} msgs</span>
-                                </div>
-                                <div className={`sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-md border ${credits < 20
+                                    {userPlan === 'free' && (
+                                        <Sparkles className="w-2.5 h-2.5 text-amber-400/70" />
+                                    )}
+                                </Link>
+                                <Link href="/dashboard/plan" className={`sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-md border cursor-pointer hover:opacity-80 transition-opacity ${credits < 20
                                     ? 'bg-red-500/[0.08] border-red-500/[0.15]'
                                     : credits < 50
                                         ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
@@ -684,7 +700,7 @@ export default function DashboardLayout({
                                         }`} />
                                     <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
                                         }`}>{credits}</span>
-                                </div>
+                                </Link>
                             </>
                         )}
                         {session?.user?.image && (
@@ -796,7 +812,10 @@ export default function DashboardLayout({
 
                         {credits !== null && (
                             <div className="border-t border-white/[0.04] px-4 py-3">
-                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${credits < 20
+                                <Link
+                                    href="/dashboard/plan"
+                                    onClick={() => setMobileOpen(false)}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border hover:opacity-80 transition-opacity ${credits < 20
                                     ? 'bg-red-500/[0.08] border-red-500/[0.15]'
                                     : credits < 50
                                         ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
@@ -804,33 +823,36 @@ export default function DashboardLayout({
                                     }`}>
                                     <Coins className={`w-3.5 h-3.5 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`} />
                                     <span className={`text-xs font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{credits} messages</span>
-                                </div>
+                                    {userPlan === 'free' && (
+                                        <Sparkles className="w-3 h-3 text-amber-400/70 ml-auto" />
+                                    )}
+                                </Link>
                             </div>
                         )}
                         {session?.user && (
                             <div className="border-t border-white/[0.04] p-3">
                                 <div className="flex items-center gap-3 px-2 py-2">
-                                    {session.user.image && (
-                                        <img src={session.user.image} alt="" className="w-7 h-7 rounded-full" />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
-                                            {session.user.name}
-                                            <Link
-                                                href="/dashboard/plan"
-                                                onClick={() => setMobileOpen(false)}
-                                                className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
-                                                    subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                                    : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
-                                                    : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
-                                                    : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
-                                                    : 'bg-zinc-700 text-zinc-400'
-                                                }`}
-                                            >
-                                                {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
-                                            </Link>
+                                    <Link href="/dashboard/plan" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                                        {session.user.image && (
+                                            <img src={session.user.image} alt="" className="w-7 h-7 rounded-full" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
+                                                {session.user.name}
+                                                <span
+                                                    className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
+                                                        subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                        : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                                        : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                                        : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
+                                                        : 'bg-zinc-700 text-zinc-400'
+                                                    }`}
+                                                >
+                                                    {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Link>
                                     <button
                                         onClick={handleSignOut}
                                         className="text-zinc-600 hover:text-zinc-400"
@@ -838,6 +860,19 @@ export default function DashboardLayout({
                                         <LogOut className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
+                                {/* Mobile upgrade hint */}
+                                {userPlan !== 'pro' && (
+                                    <Link
+                                        href="/dashboard/plan"
+                                        onClick={() => setMobileOpen(false)}
+                                        className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500/[0.06] to-purple-500/[0.06] border border-violet-500/[0.1] hover:border-violet-500/[0.2] transition-all"
+                                    >
+                                        <Sparkles className="w-3 h-3 text-violet-400" />
+                                        <span className="text-[10px] text-zinc-400">
+                                            {userPlan === 'free' ? 'Upgrade to Pro' : 'Upgrade plan'}
+                                        </span>
+                                    </Link>
+                                )}
                             </div>
                         )}
                     </div>
