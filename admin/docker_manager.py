@@ -20,7 +20,6 @@ class DockerManager:
         self.client = docker.from_env()
         self.base_dir = settings.DATA_DIR  # Host path for user data
         self._shared_plugins_dir = self._ensure_shared_plugins()
-        self._ensure_nanobot_image()
     
     def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
@@ -754,6 +753,8 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
              env["GITHUB_ID"] = user_identifier
         
         # Create container - select image and memory limit based on engine
+        if bot_engine != "openclaw":
+            self._ensure_nanobot_image()
         image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v9"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
