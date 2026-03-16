@@ -13,6 +13,7 @@ interface OnboardingWizardProps {
     onComplete: () => void;
     onSelectSite: (site: string) => void;
     onSelectProperty: (property: string) => void;
+    storageKey?: string;
 }
 
 const FEATURES = [
@@ -31,7 +32,7 @@ const colorMap: Record<string, string> = {
     cyan: 'from-cyan-500/20 to-cyan-600/20 border-cyan-500/20 text-cyan-400',
 };
 
-export default function OnboardingWizard({ onComplete, onSelectSite, onSelectProperty }: OnboardingWizardProps) {
+export default function OnboardingWizard({ onComplete, onSelectSite, onSelectProperty, storageKey }: OnboardingWizardProps) {
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
@@ -86,7 +87,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
     };
 
     const handleFinish = () => {
-        localStorage.setItem('tc-onboarded', 'true');
+        localStorage.setItem(storageKey || 'tc-onboarded', 'true');
         onComplete();
     };
 

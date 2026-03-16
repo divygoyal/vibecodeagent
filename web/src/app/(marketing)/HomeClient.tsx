@@ -1103,7 +1103,7 @@ function AIChatDemo() {
                         <div>
                             <div className="text-sm font-semibold text-white">AI Analyst</div>
                             <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online · antigravity.codes
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online · yoursite.com
                             </div>
                         </div>
                     </div>
