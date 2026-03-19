@@ -32,6 +32,7 @@ import type { DrawerContent } from '@/components/OverviewDetailDrawer';
 // Dynamic imports for heavy components (code splitting)
 const OverviewInsights = dynamic(() => import('@/components/OverviewInsights'), { ssr: false });
 const OverviewDetailDrawer = dynamic(() => import('@/components/OverviewDetailDrawer'), { ssr: false });
+const DomainOverview = dynamic(() => import('@/components/DomainOverview'), { ssr: false });
 
 /* ─── Animation variants ─── */
 const fadeInUp = {
@@ -543,127 +544,37 @@ export default function DashboardOverview() {
 
       {/* Getting Started - shown when Google connected but no properties/sites */}
       {isEmptyShell && (
-        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-6">
-          {/* Welcome */}
-          <div className="text-center py-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
-              <Rocket className="w-8 h-8 text-emerald-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Welcome{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''}!
-            </h2>
-            <p className="text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed">
-              Your Google account is connected, but we didn&apos;t find any GA4 properties or Search Console sites.
-              No worries — there&apos;s plenty you can do right now.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Left: Features that work now */}
-            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-6">
-              <div className="flex items-center gap-2.5 mb-5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/15">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
+        <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
+          {/* Connect Your Data Banner */}
+          <div className="bg-gradient-to-r from-blue-500/[0.04] to-cyan-500/[0.03] border border-blue-500/[0.12] rounded-2xl p-5">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center flex-shrink-0">
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
                 </div>
-                <h3 className="text-sm font-bold text-white">Start Exploring</h3>
-              </div>
-              <div className="space-y-3">
-                <Link href="/dashboard/audit" className="flex items-center gap-3.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-cyan-500/20 hover:bg-cyan-500/[0.03] transition-all group">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                    <ScanSearch className="w-5 h-5 text-cyan-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white group-hover:text-cyan-400 transition-colors">Site Audit</div>
-                    <div className="text-[11px] text-zinc-500">Run 100+ SEO checks on any URL — no setup needed</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
-                </Link>
-
-                <Link href="/dashboard/blog" className="flex items-center gap-3.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-emerald-500/20 hover:bg-emerald-500/[0.03] transition-all group">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">AI SEO Tools</div>
-                    <div className="text-[11px] text-zinc-500">Generate schemas, blog posts, keywords &amp; linking strategies</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
-                </Link>
-
-                <Link href="/dashboard/seo" className="flex items-center gap-3.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-purple-500/20 hover:bg-purple-500/[0.03] transition-all group">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white group-hover:text-purple-400 transition-colors">AI Chat</div>
-                    <div className="text-[11px] text-zinc-500">Ask the AI analyst anything about SEO strategy</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-purple-400 transition-colors flex-shrink-0" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Right: How to connect data */}
-            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-6">
-              <div className="flex items-center gap-2.5 mb-5">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/15">
-                  <BarChart3 className="w-4 h-4 text-blue-400" />
-                </div>
-                <h3 className="text-sm font-bold text-white">Connect Your Data</h3>
-              </div>
-              <p className="text-xs text-zinc-500 mb-5 leading-relaxed">
-                To unlock the full dashboard with traffic analytics, keyword rankings, and AI insights, set up these Google services:
-              </p>
-              <div className="space-y-4 mb-6">
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-[10px] font-bold text-blue-400">1</span>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-white mb-1">Set up Google Analytics (GA4)</div>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed mb-1.5">
-                      Create a GA4 property for your site and add the tracking tag. Properties appear here within minutes.
-                    </p>
-                    <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
-                      Open Google Analytics <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-[10px] font-bold text-emerald-400">2</span>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-white mb-1">Add site to Search Console</div>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed mb-1.5">
-                      Add your website and verify ownership. Sites appear here once verified.
-                    </p>
-                    <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors">
-                      Open Search Console <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-[10px] font-bold text-cyan-400">3</span>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-white">Come back and refresh</div>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">
-                      Once set up, click the button below to detect your properties.
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Connect Google Analytics &amp; Search Console</h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Set up{' '}
+                    <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">GA4</a>
+                    {' '}and{' '}
+                    <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300">Search Console</a>
+                    {' '}to unlock the full dashboard with live traffic data, keyword rankings, and AI insights.
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => window.location.reload()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-all"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-medium text-white hover:bg-white/[0.1] transition-all flex-shrink-0"
               >
-                <RefreshCw className="w-4 h-4" />
-                Refresh &amp; Check for Properties
+                <RefreshCw className="w-3.5 h-3.5" />
+                Check for Properties
               </button>
             </div>
           </div>
+
+          {/* Domain Overview — SEMrush-like analysis */}
+          <DomainOverview session={session} />
         </motion.div>
       )}
 
