@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Target, FileText, Wrench, ChevronRight, Check, Sparkles, ArrowRight, RotateCcw, ArrowUp, ExternalLink } from 'lucide-react';
+import { TrendingUp, Target, FileText, Wrench, ChevronRight, Check, Sparkles, ArrowRight, RotateCcw, X, ExternalLink } from 'lucide-react';
 import FixWithBotButton from '@/components/FixWithBotButton';
 import type { DomainOverviewData, ActionPlanItem } from '@/components/domain-overview/types';
 import { generateActionPlan } from '@/components/domain-overview/types';
@@ -34,7 +34,7 @@ const COLOR_MAP: Record<string, { border: string; bg: string; text: string; ring
 
 export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunnelProps) {
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<2 | 3>(2);
   const [actionPlan, setActionPlan] = useState<ActionPlanItem[]>([]);
   const [completed, setCompleted] = useState(false);
 
@@ -47,13 +47,6 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
       }
     }
   }, []);
-
-  // Advance to step 2 when data arrives
-  useEffect(() => {
-    if (data && step === 1) {
-      setStep(2);
-    }
-  }, [data, step]);
 
   // Generate action plan when moving to step 3
   useEffect(() => {
@@ -83,7 +76,8 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
     onComplete();
   };
 
-  if (completed) return null;
+  // Don't render if completed or no data available yet
+  if (completed || !data) return null;
 
   // Group action items by priority
   const groupedItems = actionPlan.reduce<Record<string, ActionPlanItem[]>>((acc, item) => {
@@ -95,34 +89,33 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
   const priorityOrder: Array<'critical' | 'high' | 'quick-win'> = ['critical', 'high', 'quick-win'];
 
   return (
-    <div className="w-full">
-      <AnimatePresence mode="wait">
-        {/* Step 1: Waiting for domain data */}
-        {step === 1 && (
-          <motion.div
-            key="step-1"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4 }}
-            className="premium-card rounded-2xl p-8 text-center"
-          >
-            <motion.div
-              animate={{ y: [-8, 0, -8] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="flex justify-center mb-4"
-            >
-              <ArrowUp className="w-8 h-8 text-emerald-400" />
-            </motion.div>
-            <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
-              Enter a domain above to get started
-            </h3>
-            <p className="text-sm text-[var(--text-secondary)]">
-              We&apos;ll analyze your site and build a personalized SEO action plan
-            </p>
-          </motion.div>
-        )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onDismiss}
+      />
 
+      {/* Modal content */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ duration: 0.3 }}
+        className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-6 shadow-2xl"
+      >
+        {/* Close button */}
+        <button
+          onClick={onDismiss}
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition-all"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+      <AnimatePresence mode="wait">
         {/* Step 2: Pick Your Goals */}
         {step === 2 && (
           <motion.div
@@ -310,6 +303,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
           </motion.div>
         )}
       </AnimatePresence>
+      </motion.div>
     </div>
   );
 }

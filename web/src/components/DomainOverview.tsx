@@ -23,11 +23,12 @@ import type { DomainOverviewData } from './domain-overview/types'
 interface DomainOverviewProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   session: any
+  onDataReady?: (data: DomainOverviewData) => void
 }
 
 /* ─── Main Component ─── */
 
-export default function DomainOverview({ session }: DomainOverviewProps) {
+export default function DomainOverview({ session, onDataReady }: DomainOverviewProps) {
   const [domain, setDomain] = useState('')
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<DomainOverviewData | null>(null)
@@ -97,7 +98,9 @@ export default function DomainOverview({ session }: DomainOverviewProps) {
         const e = await res.json().catch(() => ({}))
         throw new Error(e.error || 'Analysis failed')
       }
-      setData(await res.json())
+      const result = await res.json()
+      setData(result)
+      onDataReady?.(result)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -140,34 +143,70 @@ export default function DomainOverview({ session }: DomainOverviewProps) {
       {/* Results Dashboard */}
       {data && !loading && (
         <div className="space-y-6 cascade-fade">
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Overview Scores</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <ScoreOverviewRow data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Core Web Vitals</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <CoreWebVitals data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Site Health & Page Analysis</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <IssuesPanel data={data} domain={data.domain} auditUrl={data.url} />
             <PageAnalysis data={data} domain={data.domain} />
           </div>
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Keyword Opportunities</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <KeywordTable data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Technical Infrastructure</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <TechStackPanel data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Performance Optimization</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <PageSpeedOpportunities data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Content Quality</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <ReadabilityPanel data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">AI Search Readiness</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <GeoReadiness data={data} domain={data.domain} />
 
-          <div className="section-divider" />
+          <div className="flex items-center gap-3 mt-8 mb-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Next Steps</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+          </div>
           <ActionButtonsRow domain={data.domain} auditUrl={data.url} />
         </div>
       )}

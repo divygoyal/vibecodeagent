@@ -648,7 +648,17 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          {/* Onboarding Funnel (if not completed) */}
+          {/* Workspace Tabs */}
+          <WorkspaceTabs activeTab={activeWorkspaceTab} onTabChange={setActiveWorkspaceTab} />
+
+          {/* Active Workspace Content */}
+          {activeWorkspaceTab === 'analysis' && <DomainOverview session={session} onDataReady={(d: any) => setDomainData(d)} />}
+          {activeWorkspaceTab === 'content' && <ContentEditor />}
+          {activeWorkspaceTab === 'keywords' && <KeywordResearch />}
+          {activeWorkspaceTab === 'competitor' && <CompetitorSpy />}
+          {activeWorkspaceTab === 'crawler' && <SiteCrawler />}
+
+          {/* Onboarding Funnel overlay (appears after first analysis completes) */}
           {!funnelCompleted && (
             <OnboardingFunnel
               data={domainData}
@@ -662,16 +672,6 @@ export default function DashboardOverview() {
               }}
             />
           )}
-
-          {/* Workspace Tabs */}
-          <WorkspaceTabs activeTab={activeWorkspaceTab} onTabChange={setActiveWorkspaceTab} />
-
-          {/* Active Workspace Content */}
-          {activeWorkspaceTab === 'analysis' && <DomainOverview session={session} />}
-          {activeWorkspaceTab === 'content' && <ContentEditor />}
-          {activeWorkspaceTab === 'keywords' && <KeywordResearch />}
-          {activeWorkspaceTab === 'competitor' && <CompetitorSpy />}
-          {activeWorkspaceTab === 'crawler' && <SiteCrawler />}
         </motion.div>
       )}
 
