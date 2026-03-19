@@ -105,6 +105,14 @@ export async function GET(req: Request) {
             return NextResponse.json(await res.json())
         }
 
+        if (endpoint === 'queries') {
+            const res = await fetch(`${ADMIN_API_URL}/contact`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) throw new Error('Failed to get contact queries')
+            return NextResponse.json(await res.json())
+        }
+
         if (endpoint === 'user-detail') {
             const githubId = searchParams.get('id')
             if (!githubId) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
@@ -208,6 +216,26 @@ export async function POST(req: Request) {
         if (action === 'get-credits') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
             const res = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/credits`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            return NextResponse.json(await res.json())
+        }
+
+        if (action === 'update-query-status') {
+            const { queryId, status } = body
+            if (!queryId || !status) return NextResponse.json({ error: 'Missing queryId or status' }, { status: 400 })
+            const res = await fetch(`${ADMIN_API_URL}/contact/${queryId}?status=${encodeURIComponent(status)}`, {
+                method: 'PATCH',
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            return NextResponse.json(await res.json())
+        }
+
+        if (action === 'delete-query') {
+            const { queryId } = body
+            if (!queryId) return NextResponse.json({ error: 'Missing queryId' }, { status: 400 })
+            const res = await fetch(`${ADMIN_API_URL}/contact/${queryId}`, {
+                method: 'DELETE',
                 headers: { 'X-API-Key': ADMIN_API_KEY }
             })
             return NextResponse.json(await res.json())

@@ -1478,6 +1478,18 @@ async def update_contact_status(query_id: int, status: str, db: AsyncSession = D
     return {"success": True}
 
 
+@app.delete("/contact/{query_id}")
+async def delete_contact_query(query_id: int, db: AsyncSession = Depends(get_db), _=Depends(verify_admin_key)):
+    """Delete a contact query"""
+    result = await db.execute(select(ContactQuery).where(ContactQuery.id == query_id))
+    query = result.scalar_one_or_none()
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+    await db.delete(query)
+    await db.commit()
+    return {"success": True}
+
+
 # ============= Health Check =============
 @app.get("/health")
 async def health_check():

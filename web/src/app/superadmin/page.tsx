@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
     Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
-    Terminal, Clock, AlertTriangle
+    Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -36,6 +36,16 @@ interface EventData {
     details: string
     timestamp: string
     github_id?: string
+}
+
+interface QueryData {
+    id: number
+    name: string
+    email: string
+    message: string
+    status: string
+    ip_address: string | null
+    created_at: string | null
 }
 
 interface UserDetail {
@@ -188,10 +198,11 @@ export default function SuperAdminPage() {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({ onSignOut }: { onSignOut: () => void }) {
-    const [tab, setTab] = useState<'users' | 'events' | 'system'>('users')
+    const [tab, setTab] = useState<'users' | 'events' | 'system' | 'queries'>('users')
     const [status, setStatus] = useState<StatusData | null>(null)
     const [users, setUsers] = useState<UserData[]>([])
     const [events, setEvents] = useState<EventData[]>([])
+    const [queries, setQueries] = useState<QueryData[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
@@ -200,14 +211,16 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     const fetchData = useCallback(async () => {
         try {
             setError('')
-            const [statusData, usersData, eventsData] = await Promise.all([
+            const [statusData, usersData, eventsData, queriesData] = await Promise.all([
                 apiGet('status'),
                 apiGet('users'),
-                apiGet('events')
+                apiGet('events'),
+                apiGet('queries').catch(() => [])
             ])
             setStatus(statusData)
             setUsers(Array.isArray(usersData) ? usersData : [])
             setEvents(Array.isArray(eventsData) ? eventsData : [])
+            setQueries(Array.isArray(queriesData) ? queriesData : [])
         } catch (err) {
             const e = err as Error
             if (e.message === 'Unauthorized') {
@@ -241,10 +254,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 
     const capacity = status ? Math.round((status.total_users / (status.max_users || 50)) * 100) : 0
 
+    const newQueryCount = queries.filter(q => q.status === 'new').length
+
     const tabs = [
-        { key: 'users' as const, label: 'Users', icon: Users },
-        { key: 'events' as const, label: 'Events', icon: Clock },
-        { key: 'system' as const, label: 'System', icon: Server },
+        { key: 'users' as const, label: 'Users', icon: Users, badge: 0 },
+        { key: 'queries' as const, label: 'Queries', icon: MessageSquare, badge: newQueryCount },
+        { key: 'events' as const, label: 'Events', icon: Clock, badge: 0 },
+        { key: 'system' as const, label: 'System', icon: Server, badge: 0 },
     ]
 
     return (
@@ -284,7 +300,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                 )}
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                     <StatCard
                         icon={Users}
                         label="Total Users"
@@ -301,6 +317,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                         icon={Coins}
                         label="Plan Breakdown"
                         value={status ? `${status.plans?.free ?? 0}F / ${status.plans?.starter ?? 0}S / ${status.plans?.pro ?? 0}P` : '-'}
+                        color="amber"
+                    />
+                    <StatCard
+                        icon={MessageSquare}
+                        label="New Queries"
+                        value={queries.filter(q => q.status === 'new').length}
+                        sub={`${queries.length} total`}
                         color="amber"
                     />
                     <StatCard
@@ -326,6 +349,11 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                         >
                             <t.icon className="w-4 h-4" />
                             {t.label}
+                            {t.badge > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-bold leading-none">
+                                    {t.badge}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -347,6 +375,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                                 onRefresh={fetchData}
                             />
                         )}
+                        {tab === 'queries' && <QueriesTab queries={queries} onRefresh={fetchData} />}
                         {tab === 'events' && <EventsTab events={events} />}
                         {tab === 'system' && <SystemTab status={status} capacity={capacity} />}
                     </motion.div>
@@ -750,6 +779,239 @@ function UserRow({ user, actionLoading, expanded, userLogs, credits, showCreditI
                 </tr>
             )}
         </>
+    )
+}
+
+// ─── Queries Tab ─────────────────────────────────────────────────────────────
+
+function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: () => void }) {
+    const [filter, setFilter] = useState<'all' | 'new' | 'read' | 'replied'>('all')
+    const [expandedId, setExpandedId] = useState<number | null>(null)
+    const [actionLoading, setActionLoading] = useState('')
+    const [deleteTarget, setDeleteTarget] = useState<QueryData | null>(null)
+
+    const filtered = queries.filter(q => filter === 'all' || q.status === filter)
+
+    const handleStatusUpdate = async (queryId: number, status: string) => {
+        setActionLoading(`status-${queryId}`)
+        try {
+            await apiPost('update-query-status', { queryId, status })
+            onRefresh()
+        } catch (err) {
+            alert((err as Error).message)
+        } finally {
+            setActionLoading('')
+        }
+    }
+
+    const handleDelete = async (query: QueryData) => {
+        setActionLoading(`delete-${query.id}`)
+        try {
+            await apiPost('delete-query', { queryId: query.id })
+            setDeleteTarget(null)
+            onRefresh()
+        } catch (err) {
+            alert((err as Error).message)
+        } finally {
+            setActionLoading('')
+        }
+    }
+
+    const statusColor = (s: string) => {
+        if (s === 'new') return 'bg-emerald-500/20 text-emerald-400'
+        if (s === 'read') return 'bg-amber-500/20 text-amber-400'
+        if (s === 'replied') return 'bg-cyan-500/20 text-cyan-400'
+        return 'bg-zinc-700 text-zinc-400'
+    }
+
+    const counts = {
+        all: queries.length,
+        new: queries.filter(q => q.status === 'new').length,
+        read: queries.filter(q => q.status === 'read').length,
+        replied: queries.filter(q => q.status === 'replied').length,
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Filter pills */}
+            <div className="flex gap-2 flex-wrap">
+                {(['all', 'new', 'read', 'replied'] as const).map(f => (
+                    <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                            filter === f
+                                ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-zinc-900/50 text-zinc-500 border border-white/[0.04] hover:text-zinc-300'
+                        }`}
+                    >
+                        {f} ({counts[f]})
+                    </button>
+                ))}
+            </div>
+
+            {/* Queries list */}
+            <div className="space-y-3">
+                {filtered.length === 0 && (
+                    <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-12 text-center">
+                        <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+                        <p className="text-zinc-600">No {filter === 'all' ? '' : filter} queries yet</p>
+                    </div>
+                )}
+
+                {filtered.map(query => (
+                    <div
+                        key={query.id}
+                        className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden"
+                    >
+                        {/* Header row */}
+                        <div
+                            className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                            onClick={() => {
+                                setExpandedId(expandedId === query.id ? null : query.id)
+                                if (query.status === 'new') handleStatusUpdate(query.id, 'read')
+                            }}
+                        >
+                            {/* Avatar */}
+                            <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-bold text-emerald-400">
+                                    {query.name[0]?.toUpperCase() || '?'}
+                                </span>
+                            </div>
+
+                            {/* Name + email */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-white truncate">{query.name}</span>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor(query.status)}`}>
+                                        {query.status}
+                                    </span>
+                                </div>
+                                <span className="text-xs text-zinc-500 truncate block">{query.email}</span>
+                            </div>
+
+                            {/* Time */}
+                            <span className="text-xs text-zinc-600 whitespace-nowrap flex-shrink-0">
+                                {query.created_at ? timeAgo(query.created_at) : '-'}
+                            </span>
+
+                            {/* Expand chevron */}
+                            <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform flex-shrink-0 ${expandedId === query.id ? 'rotate-180' : ''}`} />
+                        </div>
+
+                        {/* Expanded content */}
+                        {expandedId === query.id && (
+                            <div className="border-t border-white/[0.04] px-5 py-4 bg-black/20">
+                                {/* Message */}
+                                <div className="mb-4">
+                                    <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Message</div>
+                                    <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed bg-black/30 rounded-lg p-4">
+                                        {query.message}
+                                    </p>
+                                </div>
+
+                                {/* Meta */}
+                                <div className="flex items-center gap-4 text-xs text-zinc-600 mb-4">
+                                    <span>ID: #{query.id}</span>
+                                    {query.ip_address && <span>IP: {query.ip_address}</span>}
+                                    {query.created_at && <span>{new Date(query.created_at).toLocaleString()}</span>}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <a
+                                        href={`mailto:${query.email}?subject=${encodeURIComponent(`Re: Your TrafficClaw query`)}&body=${encodeURIComponent(`Hi ${query.name},\n\nThank you for reaching out to TrafficClaw.\n\n---\nYour original message:\n${query.message}\n`)}`}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 text-xs font-medium hover:bg-emerald-600/30 transition-colors"
+                                    >
+                                        <Mail className="w-3.5 h-3.5" />
+                                        Reply via Email
+                                        <ExternalLink className="w-3 h-3" />
+                                    </a>
+
+                                    {query.status !== 'replied' && (
+                                        <button
+                                            onClick={() => handleStatusUpdate(query.id, 'replied')}
+                                            disabled={actionLoading === `status-${query.id}`}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600/20 text-cyan-400 text-xs font-medium hover:bg-cyan-600/30 transition-colors disabled:opacity-50"
+                                        >
+                                            <Check className="w-3.5 h-3.5" />
+                                            Mark as Replied
+                                        </button>
+                                    )}
+
+                                    {query.status === 'replied' && (
+                                        <button
+                                            onClick={() => handleStatusUpdate(query.id, 'new')}
+                                            disabled={actionLoading === `status-${query.id}`}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                                        >
+                                            Mark as New
+                                        </button>
+                                    )}
+
+                                    <button
+                                        onClick={() => setDeleteTarget(query)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/10 text-red-400 text-xs font-medium hover:bg-red-600/20 transition-colors ml-auto"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deleteTarget && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                        onClick={() => setDeleteTarget(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-zinc-900 border border-white/[0.08] rounded-2xl p-6 max-w-md w-full"
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">Delete Query</h3>
+                                    <p className="text-sm text-zinc-500">From {deleteTarget.name} ({deleteTarget.email})</p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-zinc-400 mb-6">
+                                This will permanently delete this contact query. This action cannot be undone.
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setDeleteTarget(null)}
+                                    className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(deleteTarget)}
+                                    disabled={actionLoading === `delete-${deleteTarget.id}`}
+                                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                                >
+                                    {actionLoading === `delete-${deleteTarget.id}` ? 'Deleting...' : 'Delete Forever'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     )
 }
 
