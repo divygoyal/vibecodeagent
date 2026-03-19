@@ -493,7 +493,7 @@ export default function DashboardOverview() {
             <button
               onClick={() => !isInit && setDropdownOpen(!dropdownOpen)}
               disabled={isInit}
-              className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg pl-3 pr-3 py-2 hover:border-zinc-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 outline-none min-w-[220px] transition-all disabled:opacity-50"
+              className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm rounded-lg pl-3 pr-3 py-2 hover:border-[var(--card-hover)] focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 outline-none min-w-[220px] transition-all disabled:opacity-50"
               aria-label="Select website"
               aria-expanded={dropdownOpen}
               aria-haspopup="listbox"
@@ -506,7 +506,7 @@ export default function DashboardOverview() {
             </button>
 
             {dropdownOpen && sites.length > 0 && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 py-1 min-w-[250px] max-h-[260px] overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl shadow-black/60 py-1 min-w-[250px] max-h-[260px] overflow-y-auto">
                 {sites.map((site: any) => {
                   const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                   const isSelected = site.siteUrl === selectedSite;

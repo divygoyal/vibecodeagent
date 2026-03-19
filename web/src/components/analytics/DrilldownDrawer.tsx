@@ -47,13 +47,13 @@ export default function DrilldownDrawer({ open, onClose, data }: DrilldownDrawer
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[#050508] border-l border-white/[0.08] shadow-2xl overflow-y-auto"
+                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[var(--sidebar-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
                     >
                         {/* Header */}
-                        <div className="sticky top-0 bg-[#050508]/90 backdrop-blur-md border-b border-white/[0.04] px-6 py-4 flex items-center justify-between z-10">
+                        <div className="sticky top-0 bg-[var(--sidebar-bg)] backdrop-blur-md border-b border-[var(--divider)] px-6 py-4 flex items-center justify-between z-10">
                             <div>
                                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Drilldown</p>
-                                <h2 className="text-lg font-bold text-white mt-0.5">{data.value}</h2>
+                                <h2 className="text-lg font-bold text-[var(--text-primary)] mt-0.5">{data.value}</h2>
                             </div>
                             <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-white transition">
                                 <X className="w-5 h-5" />

@@ -521,6 +521,147 @@ body {
   background: rgba(0, 0, 0, 0.02);
 }
 
+/* ========== Comprehensive light mode overrides ========== */
+/* --- Layout shells --- */
+[data-theme='light'] .min-h-screen.bg-black {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+/* --- Sidebar & mobile sidebar --- */
+[data-theme='light'] aside,
+[data-theme='light'] .bg-\[\#050508\] {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* --- Header --- */
+[data-theme='light'] header.bg-black\/85,
+[data-theme='light'] header {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(20px);
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* --- Cards with hardcoded dark backgrounds --- */
+[data-theme='light'] [class*="bg-[#0a0a12]"],
+[data-theme='light'] [class*="bg-[#0c0c14]"],
+[data-theme='light'] [class*="bg-[#0c0c0c]"],
+[data-theme='light'] [class*="bg-[#0a0a0f]"],
+[data-theme='light'] [class*="bg-[#050508]"],
+[data-theme='light'] [class*="bg-[#04060e]"],
+[data-theme='light'] [class*="bg-[#111]"],
+[data-theme='light'] [class*="bg-[#161616]"],
+[data-theme='light'] [class*="bg-[#1a1a1a]"],
+[data-theme='light'] [class*="bg-[#1c1c1e]"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* --- Zinc-900 cards (OverviewInsights, etc.) --- */
+[data-theme='light'] [class*="bg-zinc-900"] {
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* --- Borders: white-alpha → black-alpha --- */
+[data-theme='light'] [class*="border-white\/"] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme='light'] [class*="border-white/[0."] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* --- Text color overrides --- */
+[data-theme='light'] .text-white {
+  color: #18181b !important;
+}
+
+[data-theme='light'] .text-zinc-200 {
+  color: #27272a !important;
+}
+
+[data-theme='light'] .text-zinc-300 {
+  color: #3f3f46 !important;
+}
+
+[data-theme='light'] .text-zinc-400 {
+  color: #52525b !important;
+}
+
+[data-theme='light'] .text-zinc-500 {
+  color: #71717a !important;
+}
+
+[data-theme='light'] .text-zinc-600 {
+  color: #a1a1aa !important;
+}
+
+/* --- Dropdown menus --- */
+[data-theme='light'] [class*="bg-[#0a0a0f]"],
+[data-theme='light'] .bg-\[\#0a0a0f\] {
+  background: #ffffff !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* --- Hover states: white-alpha → black-alpha --- */
+[data-theme='light'] [class*="hover:bg-white/"] :is(:hover) {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* --- Subtle white-alpha backgrounds → black-alpha --- */
+[data-theme='light'] [class*="bg-white/[0.02]"],
+[data-theme='light'] [class*="bg-white/[0.03]"],
+[data-theme='light'] [class*="bg-white/[0.04]"] {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* --- Glass card light shadows --- */
+[data-theme='light'] .glass-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme='light'] .glass-card:hover {
+  border-color: rgba(5, 150, 105, 0.2) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(5, 150, 105, 0.1) !important;
+}
+
+[data-theme='light'] .glass-card-static {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* --- Focus ring light mode --- */
+[data-theme='light'] :focus-visible {
+  outline-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme='light'] button:focus-visible,
+[data-theme='light'] a:focus-visible {
+  outline-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* --- Notification bell ring --- */
+[data-theme='light'] .ring-black {
+  --tw-ring-color: #ffffff !important;
+}
+
+/* --- Badge: bg-zinc-700 --- */
+[data-theme='light'] .bg-zinc-700 {
+  background: #e4e4e7 !important;
+}
+
+[data-theme='light'] .bg-zinc-700.text-zinc-400 {
+  color: #71717a !important;
+}
+
+/* --- Kbd hint already handled --- */
+
+/* --- Recharts tooltip containers --- */
+[data-theme='light'] .recharts-default-tooltip {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #18181b !important;
+}
+
 /* ========== Focus visible ring (accessibility) ========== */
 :focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.15);

@@ -72,7 +72,7 @@ export default function ConfirmDialog({
       aria-describedby="confirm-desc"
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div ref={dialogRef} className="relative bg-[#0a0a0f] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 p-6 max-w-sm w-full mx-4">
+      <div ref={dialogRef} className="relative bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-2xl shadow-2xl shadow-black/60 p-6 max-w-sm w-full mx-4">
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors"

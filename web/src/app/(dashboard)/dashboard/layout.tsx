@@ -318,7 +318,7 @@ export default function DashboardLayout({
     // Bug #13 fix: redirect to login if session is expired/unauthenticated
     if (status === 'unauthenticated') {
         return (
-            <div className="min-h-screen bg-black text-white flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex items-center justify-center">
                 <div className="text-center">
                     <p className="text-zinc-500 mb-4">Your session has expired</p>
                     <button
@@ -333,19 +333,19 @@ export default function DashboardLayout({
     }
 
     return (
-        <div className="min-h-screen bg-black text-white flex">
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex">
             <a href="#main-content" className="skip-to-content">Skip to content</a>
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
-                className={`hidden lg:flex flex-col border-r border-white/[0.04] bg-[#050508] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
+                className={`hidden lg:flex flex-col border-r border-[var(--card-border)] bg-[var(--sidebar-bg)] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
                     }`}
             >
                 {/* Logo */}
-                <div className="h-16 flex items-center px-4 border-b border-white/[0.04]">
+                <div className="h-16 flex items-center px-4 border-b border-[var(--divider)]">
                     <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
                         <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg flex-shrink-0" />
                         {!collapsed && (
-                            <span className="text-base font-bold text-white whitespace-nowrap">
+                            <span className="text-base font-bold text-[var(--text-primary)] whitespace-nowrap">
                                 Traffic<span className="text-emerald-400">Claw</span>
                             </span>
                         )}
@@ -376,11 +376,11 @@ export default function DashboardLayout({
 
                     {/* Resources divider */}
                     {!collapsed && (
-                        <div className="pt-3 mt-2 border-t border-white/[0.04]">
+                        <div className="pt-3 mt-2 border-t border-[var(--divider)]">
                             <span className="px-3 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Resources</span>
                         </div>
                     )}
-                    {collapsed && <div className="mt-2 border-t border-white/[0.04]" />}
+                    {collapsed && <div className="mt-2 border-t border-[var(--divider)]" />}
                     {resourceItems.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                         return (
@@ -401,7 +401,7 @@ export default function DashboardLayout({
 
                 {/* Keyboard shortcuts hint */}
                 {!collapsed && (
-                    <div className="mx-3 mt-1 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <div className="mx-3 mt-1 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-[var(--divider)]">
                         <p className="text-[10px] text-zinc-600 mb-1.5">Shortcuts</p>
                         <div className="space-y-1">
                             <div className="flex items-center justify-between">
@@ -417,7 +417,7 @@ export default function DashboardLayout({
                 )}
 
                 {/* User section + collapse toggle */}
-                <div className="border-t border-white/[0.04] p-3 space-y-2">
+                <div className="border-t border-[var(--divider)] p-3 space-y-2">
                     {session?.user && !collapsed && (
                         <div className="flex items-center gap-3 px-2 py-2">
                             <Link href="/dashboard/plan" className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer">
@@ -487,7 +487,7 @@ export default function DashboardLayout({
             {/* ─── Main content area ─── */}
             <div className="flex-1 flex flex-col min-h-screen">
                 {/* Top bar */}
-                <header className="h-16 flex items-center justify-between px-4 sm:px-6 border-b border-white/[0.04] bg-black/85 backdrop-blur-xl sticky top-0 z-40">
+                <header className="h-16 flex items-center justify-between px-4 sm:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
                     {/* Mobile menu button */}
                     <button
                         className="lg:hidden text-zinc-400 hover:text-white"
@@ -544,7 +544,7 @@ export default function DashboardLayout({
                                 {siteDropdownOpen && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
-                                        <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[200px] max-h-[260px] overflow-y-auto">
+                                        <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[200px] max-h-[260px] overflow-y-auto">
                                             {gscSites.map((site: any) => {
                                                 const url = site.siteUrl || site;
                                                 const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
@@ -581,7 +581,7 @@ export default function DashboardLayout({
                             {rangeDropdownOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setRangeDropdownOpen(false)} />
-                                    <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[140px]">
+                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[140px]">
                                         {RANGES.map(r => (
                                             <button
                                                 key={r.value}
@@ -609,15 +609,15 @@ export default function DashboardLayout({
                             >
                                 <Bell className="w-4 h-4" />
                                 {criticalAlertCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-black">
+                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[var(--background)]">
                                         {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
                                     </span>
                                 )}
                             </button>
                             {bellOpen && (
                                 <>
-                                    <div className="absolute right-0 mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
-                                        <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center justify-between">
+                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
+                                        <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
                                             <span className="text-xs font-semibold text-white">Alerts</span>
                                             {alertCount > 0 && (
                                                 <span className="text-[10px] text-zinc-500">{alertCount} active</span>
@@ -631,7 +631,7 @@ export default function DashboardLayout({
                                                 </div>
                                             ) : (
                                                 alerts.slice(0, 10).map((alert: any) => (
-                                                    <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-white/[0.04] last:border-0">
+                                                    <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
                                                         <div className="flex items-start gap-2.5">
                                                             <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
                                                                 alert.severity === 'critical' ? 'bg-red-400' :
@@ -650,7 +650,7 @@ export default function DashboardLayout({
                                             )}
                                         </div>
                                         {alerts.length > 0 && (
-                                            <div className="px-4 py-2 border-t border-white/[0.04]">
+                                            <div className="px-4 py-2 border-t border-[var(--divider)]">
                                                 <Link
                                                     href="/dashboard"
                                                     onClick={() => setBellOpen(false)}
@@ -748,8 +748,8 @@ export default function DashboardLayout({
                         className="fixed inset-0 bg-black/60 z-50 lg:hidden"
                         onClick={() => setMobileOpen(false)}
                     />
-                    <div className="fixed left-0 top-0 bottom-0 w-[260px] bg-[#050508] border-r border-white/[0.04] z-50 lg:hidden flex flex-col">
-                        <div className="h-16 flex items-center justify-between px-4 border-b border-white/[0.04]">
+                    <div className="fixed left-0 top-0 bottom-0 w-[260px] bg-[var(--sidebar-bg)] border-r border-[var(--card-border)] z-50 lg:hidden flex flex-col">
+                        <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--divider)]">
                             <Link href="/dashboard" className="flex items-center gap-2.5">
                                 <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg" />
                                 <span className="text-base font-bold text-white">
@@ -788,7 +788,7 @@ export default function DashboardLayout({
                             })}
 
                             {/* Resources divider */}
-                            <div className="pt-3 mt-2 border-t border-white/[0.04]">
+                            <div className="pt-3 mt-2 border-t border-[var(--divider)]">
                                 <span className="px-3 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Resources</span>
                             </div>
                             {resourceItems.map((item) => {
@@ -811,7 +811,7 @@ export default function DashboardLayout({
                         </nav>
 
                         {credits !== null && (
-                            <div className="border-t border-white/[0.04] px-4 py-3">
+                            <div className="border-t border-[var(--divider)] px-4 py-3">
                                 <Link
                                     href="/dashboard/plan"
                                     onClick={() => setMobileOpen(false)}
@@ -830,7 +830,7 @@ export default function DashboardLayout({
                             </div>
                         )}
                         {session?.user && (
-                            <div className="border-t border-white/[0.04] p-3">
+                            <div className="border-t border-[var(--divider)] p-3">
                                 <div className="flex items-center gap-3 px-2 py-2">
                                     <Link href="/dashboard/plan" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
                                         {session.user.image && (

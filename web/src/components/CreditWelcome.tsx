@@ -62,7 +62,7 @@ export default function CreditWelcome({ credits, onDismiss }: CreditWelcomeProps
                 </div>
 
                 {/* Credit counter */}
-                <div className="bg-[#0a0a0f] px-6 py-6 text-center">
+                <div className="bg-[var(--dropdown-bg)] px-6 py-6 text-center">
                     <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-2 tabular-nums">
                         {countUp}
                     </div>
@@ -71,7 +71,7 @@ export default function CreditWelcome({ credits, onDismiss }: CreditWelcomeProps
                 </div>
 
                 {/* CTA */}
-                <div className="bg-[#0a0a0f] px-6 pb-6">
+                <div className="bg-[var(--dropdown-bg)] px-6 pb-6">
                     <button
                         onClick={dismiss}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-opacity"

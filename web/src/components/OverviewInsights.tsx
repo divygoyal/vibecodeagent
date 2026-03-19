@@ -413,7 +413,7 @@ function WarRoomSection({ days, isLoading }: { days: DayData[]; isLoading: boole
                                 </div>
                                 {/* Main metric */}
                                 <div className={`text-xl font-bold font-mono mb-1.5 ${day.mood === 'surge' ? 'text-amber-400' :
-                                        day.mood === 'dip' ? 'text-red-400' : 'text-white'
+                                        day.mood === 'dip' ? 'text-red-400' : 'text-[var(--text-primary)]'
                                     }`}>
                                     {fmtNum(day.clicks)}
                                 </div>
