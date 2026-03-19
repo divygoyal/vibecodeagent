@@ -36,7 +36,7 @@ export default function DomainOverview({ session, onDataReady }: DomainOverviewP
   const [recentDomains, setRecentDomains] = useState<string[]>([])
   const [analysisSteps, setAnalysisSteps] = useState<{ label: string; done: boolean }[]>([])
 
-  // Restore last analyzed domain and recent domains from localStorage on mount
+  // Restore last analyzed domain, cached data, and recent domains from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem('tc-analyzed-domain')
@@ -44,6 +44,14 @@ export default function DomainOverview({ session, onDataReady }: DomainOverviewP
 
       const recent = localStorage.getItem('tc-recent-domains')
       if (recent) setRecentDomains(JSON.parse(recent))
+
+      // Restore cached analysis data so tab switching doesn't lose results
+      const cachedData = localStorage.getItem('tc-analysis-data')
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData)
+        setData(parsed)
+        onDataReady?.(parsed)
+      }
     } catch {
       // localStorage unavailable
     }
@@ -101,6 +109,8 @@ export default function DomainOverview({ session, onDataReady }: DomainOverviewP
       const result = await res.json()
       setData(result)
       onDataReady?.(result)
+      // Cache analysis data to survive tab switching
+      try { localStorage.setItem('tc-analysis-data', JSON.stringify(result)) } catch { /* ignore */ }
     } catch (err) {
       setError((err as Error).message)
     } finally {

@@ -28,8 +28,8 @@
   --card-bg: rgba(255, 255, 255, 0.015);
   --card-border: rgba(255, 255, 255, 0.05);
   --card-hover: rgba(255, 255, 255, 0.07);
-  --sidebar-bg: #050508;
-  --header-bg: rgba(0, 0, 0, 0.85);
+  --sidebar-bg: #000000;
+  --header-bg: rgba(0, 0, 0, 0.92);
   --text-primary: #f0f0f0;
   --text-secondary: #8a8a98;
   --text-muted: #55556a;
@@ -178,10 +178,10 @@ body {
 
 /* ========== Glassmorphism cards ========== */
 .glass-card {
-  background: rgba(10, 10, 15, 0.8);
+  background: rgba(0, 0, 0, 0.9);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   transition: all 0.3s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.02);
@@ -867,7 +867,7 @@ select:focus-visible {
 
 .premium-card {
   position: relative;
-  background: rgba(10, 10, 15, 0.9);
+  background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-radius: 20px;
