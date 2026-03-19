@@ -133,7 +133,7 @@ export default function CommandPalette() {
     <div className="fixed inset-0 z-[150] flex items-start justify-center pt-[20vh]">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
       <div
-        className="relative w-full max-w-lg bg-[#0a0a0f] border border-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 overflow-hidden"
+        className="relative w-full max-w-lg bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-2xl shadow-2xl shadow-black/60 overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"

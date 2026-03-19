@@ -53,7 +53,7 @@ function ActionCardInner({ href, icon: Icon, title, description, color }: Action
         <Icon className="w-5 h-5 text-white" />
       </div>
       <div className="flex-1 relative">
-        <div className={`text-sm font-semibold text-white ${styles.text} transition-colors duration-300`}>{title}</div>
+        <div className={`text-sm font-semibold text-[var(--text-primary)] ${styles.text} transition-colors duration-300`}>{title}</div>
         <div className="text-[11px] text-zinc-500 group-hover:text-zinc-400 transition-colors duration-300">{description}</div>
       </div>
       <ArrowUpRight className={`w-4 h-4 text-zinc-600 ${styles.text} transition-all duration-300 opacity-0 group-hover:opacity-100 transform translate-x-[-8px] group-hover:translate-x-0`} />

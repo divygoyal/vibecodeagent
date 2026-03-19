@@ -112,7 +112,7 @@ function KPICardInner({
         </div>
 
         {/* Value */}
-        <div className="text-[26px] font-extrabold text-white mb-0.5 font-mono tracking-tight relative">
+        <div className="text-[26px] font-extrabold text-[var(--text-primary)] mb-0.5 font-mono tracking-tight relative">
           {displayValue}
         </div>
 
@@ -168,7 +168,7 @@ function KPICardInner({
           />
 
           {/* Header */}
-          <div className="text-[11px] text-white font-semibold mb-3 flex items-center gap-1.5">
+          <div className="text-[11px] text-[var(--text-primary)] font-semibold mb-3 flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sparkColor }} />
             {label} Overview
           </div>

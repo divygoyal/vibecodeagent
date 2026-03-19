@@ -521,13 +521,13 @@ export default function AIChatbot() {
     // ─── Chat window ───
     return (
         <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[440px] h-[640px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[#0c0c0c] border border-white/[0.06] rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
+            <div className="w-full h-full bg-[var(--sidebar-bg)] border border-[var(--card-border)] rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
                 {/* ── Header ── */}
-                <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-[#111]">
+                <div className="px-4 py-3 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--header-bg)]">
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
                             <Sparkles className="w-4 h-4 text-black" />
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#111]" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[var(--header-bg)]" />
                         </div>
                         <div>
                             <h3 className="text-sm font-semibold text-white leading-none">AI Analyst</h3>
@@ -544,7 +544,7 @@ export default function AIChatbot() {
                                 {showSiteDropdown && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowSiteDropdown(false)} />
-                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
+                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
                                             {allSites.length === 0 ? (
                                                 <div className="px-3 py-2 text-[11px] text-zinc-600">No sites connected</div>
                                             ) : (
@@ -662,8 +662,8 @@ export default function AIChatbot() {
                 )}
 
                 {/* ── Input ── */}
-                <div className="px-3 py-3 border-t border-white/[0.06] bg-[#0c0c0c]">
-                    <div className="flex items-end gap-2 bg-[#161616] rounded-2xl px-4 py-3 border border-transparent focus-within:border-white/[0.08] transition-colors">
+                <div className="px-3 py-3 border-t border-[var(--card-border)] bg-[var(--sidebar-bg)]">
+                    <div className="flex items-end gap-2 bg-[var(--input-bg)] rounded-2xl px-4 py-3 border border-transparent focus-within:border-[var(--input-border)] transition-colors">
                         <textarea
                             ref={isExpanded ? textareaRef : inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
                             value={input}

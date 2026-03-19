@@ -28,9 +28,9 @@ export default function GlassCard({ children, className = '', hover = true, glow
             onClick={onClick}
             className={`
                 relative rounded-2xl
-                bg-[rgba(255,255,255,0.025)] backdrop-blur-sm
-                border border-white/[0.06]
-                ${hover ? `hover:border-white/[0.12] hover:bg-[rgba(255,255,255,0.04)] ${GLOW_COLORS[glow]} hover:shadow-lg` : ''}
+                bg-[var(--card-bg)] backdrop-blur-sm
+                border border-[var(--card-border)]
+                ${hover ? `hover:border-[var(--card-hover)] hover:bg-[var(--card-hover)] ${GLOW_COLORS[glow]} hover:shadow-lg` : ''}
                 ${active ? 'border-emerald-500/30 bg-emerald-500/[0.04] shadow-emerald-500/[0.08] shadow-lg' : ''}
                 ${onClick ? 'cursor-pointer' : ''}
                 transition-colors duration-200

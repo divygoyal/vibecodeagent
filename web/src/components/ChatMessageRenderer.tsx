@@ -25,7 +25,7 @@ function CodeBlock({ children, className }: { children: string; className?: stri
     };
 
     return (
-        <div className="relative group my-4 rounded-xl overflow-hidden bg-[#111] border border-zinc-800/60">
+        <div className="relative group my-4 rounded-xl overflow-hidden bg-[var(--input-bg)] border border-zinc-800/60">
             <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/60">
                 <span className="text-[11px] text-zinc-500 font-mono">{language || 'code'}</span>
                 <button onClick={handleCopy} className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-white transition-colors">
@@ -81,7 +81,7 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
             )}
             {expanded && tool.result && (
                 <div className="w-full mt-1">
-                    <pre className="text-[11px] text-zinc-500 font-mono max-h-32 overflow-y-auto whitespace-pre-wrap bg-[#111] rounded-lg p-3">
+                    <pre className="text-[11px] text-zinc-500 font-mono max-h-32 overflow-y-auto whitespace-pre-wrap bg-[var(--input-bg)] rounded-lg p-3">
                         {typeof tool.result === 'string' && tool.result.length > 500 ? tool.result.slice(0, 500) + '...' : tool.result}
                     </pre>
                 </div>
@@ -157,7 +157,7 @@ const markdownComponents: Components = {
     },
     pre: ({ children }) => <>{children}</>,
     table: ({ children }) => (
-        <div className="my-5 rounded-xl overflow-hidden border border-zinc-800/60 bg-[#111]">
+        <div className="my-5 rounded-xl overflow-hidden border border-zinc-800/60 bg-[var(--input-bg)]">
             <div className="overflow-x-auto">
                 <table className="w-full text-[13px]">{children}</table>
             </div>
@@ -266,7 +266,7 @@ export default memo(function ChatMessageRenderer({ content, tools, isStreaming, 
                         <button
                             key={i}
                             onClick={() => onSuggestionClick(s)}
-                            className="group text-[13px] text-zinc-400 px-4 py-2.5 rounded-full bg-[#1a1a1a] hover:bg-[#252525] hover:text-white transition-all flex items-center gap-1.5"
+                            className="group text-[13px] text-zinc-400 px-4 py-2.5 rounded-full bg-[var(--input-bg)] hover:bg-[#252525] hover:text-white transition-all flex items-center gap-1.5"
                         >
                             {s}
                             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
