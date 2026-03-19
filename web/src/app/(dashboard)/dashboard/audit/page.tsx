@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
     Search, Loader2, AlertTriangle, AlertCircle, Info, CheckCircle2,
@@ -172,6 +172,14 @@ type FilterMode = 'all' | 'critical' | 'warning' | 'info' | 'passed';
 // ═══════════════════════════════════════
 
 export default function AuditPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-emerald-400" /></div>}>
+            <AuditPageInner />
+        </Suspense>
+    );
+}
+
+function AuditPageInner() {
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [report, setReport] = useState<AuditReport | null>(null);

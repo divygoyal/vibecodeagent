@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Target, Zap, AlertTriangle, Loader2, Search } from 'lucide-react';
 import { useContainerStatus, useSiteList } from '@/lib/useDashboardData';
@@ -63,6 +63,14 @@ function SkeletonCard() {
 }
 
 export default function OpportunitiesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-emerald-400" /></div>}>
+      <OpportunitiesPageInner />
+    </Suspense>
+  );
+}
+
+function OpportunitiesPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
