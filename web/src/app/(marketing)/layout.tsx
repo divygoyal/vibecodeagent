@@ -62,6 +62,7 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
         { label: 'AI Demo', href: '/#ai-demo' },
         { label: 'Features', href: '/features' },
         { label: 'Pricing', href: '/pricing' },
+        { label: 'Contact', href: '/contact' },
     ];
 
     return (
