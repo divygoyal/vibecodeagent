@@ -305,7 +305,7 @@ export default function AIChat() {
     const showEmpty = messages.length === 0;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-black">
+        <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-[var(--background)]">
 
             {/* ── Messages / Empty State ── */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
@@ -324,7 +324,7 @@ export default function AIChat() {
 
                         {/* ── Centered input (Gemini style) ── */}
                         <div className="w-full max-w-[640px] mb-6">
-                            <div className="relative flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-4 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
+                            <div className="relative flex items-center bg-[var(--input-bg)] rounded-2xl px-5 py-4 border border-[var(--input-border)] focus-within:border-[var(--card-hover)] transition-all">
                                 <textarea
                                     ref={textareaRef}
                                     value={input}
@@ -340,14 +340,14 @@ export default function AIChat() {
                                     <div className="relative" ref={dropdownRef}>
                                         <button
                                             onClick={() => setSiteOpen(!siteOpen)}
-                                            className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 rounded-full px-3 py-1.5 transition-colors"
+                                            className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-full px-3 py-1.5 transition-colors"
                                         >
                                             <Globe className="w-3 h-3" />
                                             <span className="max-w-[100px] truncate">{siteLabel}</span>
                                             <ChevronDown className={`w-3 h-3 transition-transform ${siteOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {siteOpen && gscSites.length > 0 && (
-                                            <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+                                            <div className="absolute bottom-full mb-2 right-0 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
                                                 {gscSites.map((site: any) => {
                                                     const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                                     const active = site.siteUrl === selectedSite;
@@ -381,7 +381,7 @@ export default function AIChat() {
                                     key={i}
                                     onClick={() => sendMessage(chip)}
                                     disabled={isLoading || !dataReady}
-                                    className="text-[13px] text-zinc-400 px-4 py-2.5 rounded-full bg-[#1a1a1a] hover:bg-[#252525] hover:text-white transition-all disabled:opacity-30"
+                                    className="text-[13px] text-zinc-400 px-4 py-2.5 rounded-full bg-[var(--input-bg)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)] transition-all disabled:opacity-30"
                                 >
                                     {chip}
                                 </button>
@@ -405,7 +405,7 @@ export default function AIChat() {
                             return msg.role === 'user' ? (
                                 /* ── User message: right-aligned pill ── */
                                 <div key={i} className="flex justify-end mb-8">
-                                    <div className="max-w-[80%] bg-[#1a1a1a] text-white text-[15px] rounded-3xl px-5 py-3 leading-relaxed">
+                                    <div className="max-w-[80%] bg-[var(--input-bg)] text-[var(--text-primary)] text-[15px] rounded-3xl px-5 py-3 leading-relaxed">
                                         {msg.content}
                                     </div>
                                 </div>
@@ -434,9 +434,9 @@ export default function AIChat() {
 
             {/* ── Bottom input (only when chatting) ── */}
             {!showEmpty && (
-                <div className="flex-shrink-0 bg-black px-4 sm:px-6 pb-5 pt-2">
+                <div className="flex-shrink-0 bg-[var(--background)] px-4 sm:px-6 pb-5 pt-2">
                     <div className="max-w-[760px] mx-auto">
-                        <div className="flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-3 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
+                        <div className="flex items-center bg-[var(--input-bg)] rounded-2xl px-5 py-3 border border-[var(--input-border)] focus-within:border-[var(--card-hover)] transition-all">
                             <textarea
                                 value={input}
                                 onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
@@ -451,13 +451,13 @@ export default function AIChat() {
                                 <div className="relative" ref={!showEmpty ? dropdownRef : undefined}>
                                     <button
                                         onClick={() => setSiteOpen(!siteOpen)}
-                                        className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 rounded-full px-3 py-1.5 transition-colors"
+                                        className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-full px-3 py-1.5 transition-colors"
                                     >
                                         <Globe className="w-3 h-3" />
                                         <span className="max-w-[80px] truncate">{siteLabel}</span>
                                     </button>
                                     {siteOpen && gscSites.length > 0 && (
-                                        <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+                                        <div className="absolute bottom-full mb-2 right-0 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
                                             {gscSites.map((site: any) => {
                                                 const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                                 const active = site.siteUrl === selectedSite;
@@ -474,7 +474,7 @@ export default function AIChat() {
                                     )}
                                 </div>
                                 {messages.length > 0 && (
-                                    <button onClick={clearChat} className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-zinc-800 transition-colors" title="New chat">
+                                    <button onClick={clearChat} className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-[var(--card-hover)] transition-colors" title="New chat">
                                         <RotateCcw className="w-3.5 h-3.5" />
                                     </button>
                                 )}

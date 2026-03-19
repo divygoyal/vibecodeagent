@@ -55,7 +55,7 @@ function PropertyDropdown({ properties, value, onChange }: { properties: any[]; 
             {open && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-                    <div className="absolute left-0 mt-1.5 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/40 py-1.5 min-w-[220px] overflow-hidden">
+                    <div className="absolute left-0 mt-1.5 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl shadow-black/40 py-1.5 min-w-[220px] overflow-hidden">
                         <div className="px-3 pb-1.5 pt-0.5">
                             <span className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">Properties</span>
                         </div>
@@ -111,7 +111,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
         <AnalyticsContext.Provider value={{ selectedProperty, range, setRange, hasGoogleConnection }}>
             <div className="space-y-0">
                 {/* ─── Sticky Top Bar ─── */}
-                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
+                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0" style={{ background: 'linear-gradient(180deg, var(--background) 0%, var(--background) 92%, transparent 100%)' }}>
                     {/* Row 1: Property & Date Range & Controls */}
                     <div className="flex items-center justify-between py-3">
                         <div className="flex items-center gap-3">
@@ -145,7 +145,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                     </div>
 
                     {/* Row 2: Tabs */}
-                    <div className="flex items-center gap-0 -mb-px border-b border-white/[0.04]">
+                    <div className="flex items-center gap-0 -mb-px border-b border-[var(--divider)]">
                         {TABS.map(tab => {
                             const href = `/dashboard/analytics${tab.key}`;
                             const isActive = tab.key === ''

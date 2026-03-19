@@ -74,7 +74,7 @@ function SectionHead({ title, filterDim, filterValues }: { title: string; filter
 const ChartTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
+        <div className="bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
             <p className="text-[11px] font-semibold text-white mb-2">{label}</p>
             <div className="space-y-1.5">
                 {payload.map((e: any, i: number) => (
@@ -91,7 +91,7 @@ const ChartTooltip = ({ active, payload, label }: any) => {
     );
 };
 
-const CARD = 'bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border border-white/[0.04] rounded-2xl hover:border-white/[0.1] transition-all duration-200';
+const CARD = 'bg-[var(--card-bg)] backdrop-blur-sm border border-[var(--card-border)] rounded-2xl hover:border-[var(--card-hover)] transition-all duration-200';
 
 // ─── Main Overview Page ───
 // Traffic Sources donut colors
