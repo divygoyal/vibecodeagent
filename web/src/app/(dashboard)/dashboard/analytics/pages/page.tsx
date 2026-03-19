@@ -19,7 +19,7 @@ export default function PagesPage() {
     return (
         <div className="space-y-6">
             {/* All Pages */}
-            <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+            <div className="bg-[var(--card-bg)] border border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-white">Pages</h2>
                     <span className="text-[10px] text-zinc-600">{pages.length} pages tracked</span>
@@ -73,7 +73,7 @@ export default function PagesPage() {
             </div>
 
             {/* Entry Pages */}
-            <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl p-5">
+            <div className="bg-[var(--card-bg)] border border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-white">Entry Pages</h2>
                     <span className="text-[10px] text-zinc-600">Landing pages where visitors arrive</span>

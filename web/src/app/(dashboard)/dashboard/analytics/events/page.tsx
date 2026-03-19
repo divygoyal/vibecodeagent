@@ -86,7 +86,7 @@ export default function EventsPage() {
             </div>
 
             {/* Events Table */}
-            <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl overflow-hidden">
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden">
                 <AnalyticsTable
                     data={events}
                     searchKey={(e: any) => `${e.name} ${e.event} ${e.country}`}

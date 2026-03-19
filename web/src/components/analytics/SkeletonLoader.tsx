@@ -2,7 +2,7 @@
 
 export function SkeletonPulse({ className = '' }: { className?: string }) {
     return (
-        <div className={`animate-pulse bg-white/[0.04] rounded-lg ${className}`} />
+        <div className={`animate-pulse bg-[var(--card-hover)] rounded-lg ${className}`} />
     );
 }
 
@@ -10,7 +10,7 @@ export function SkeletonKPIStrip() {
     return (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="bg-[rgba(255,255,255,0.025)] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                <div key={i} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 space-y-3">
                     <SkeletonPulse className="h-3 w-16" />
                     <SkeletonPulse className="h-7 w-20" />
                     <SkeletonPulse className="h-3 w-12" />
@@ -22,13 +22,13 @@ export function SkeletonKPIStrip() {
 
 export function SkeletonChart() {
     return (
-        <div className="bg-[rgba(255,255,255,0.025)] border border-white/[0.06] rounded-2xl p-5">
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-5">
             <SkeletonPulse className="h-4 w-32 mb-4" />
             <div className="h-[260px] flex items-end gap-1 px-4">
                 {Array.from({ length: 30 }).map((_, i) => (
                     <div
                         key={i}
-                        className="flex-1 animate-pulse bg-white/[0.04] rounded-t"
+                        className="flex-1 animate-pulse bg-[var(--card-hover)] rounded-t"
                         style={{ height: `${20 + Math.random() * 60}%`, animationDelay: `${i * 50}ms` }}
                     />
                 ))}
@@ -39,7 +39,7 @@ export function SkeletonChart() {
 
 export function SkeletonTable({ rows = 8 }: { rows?: number }) {
     return (
-        <div className="bg-[rgba(255,255,255,0.025)] border border-white/[0.06] rounded-2xl p-5 space-y-3">
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-5 space-y-3">
             <SkeletonPulse className="h-4 w-28 mb-4" />
             <SkeletonPulse className="h-8 w-full rounded-lg" />
             {Array.from({ length: rows }).map((_, i) => (

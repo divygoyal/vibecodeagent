@@ -365,7 +365,7 @@ export default function RealtimePage() {
                 transition={{ delay: 0.1, duration: 0.4 }}
                 className="absolute top-4 left-4 z-20"
             >
-                <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden" style={{ minWidth: '320px', maxWidth: '400px' }}>
+                <div className="bg-[var(--dropdown-bg)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden" style={{ minWidth: '320px', maxWidth: '400px' }}>
 
                     {/* ── Header: Logo | REAL-TIME | toolbar ── */}
                     <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
@@ -499,7 +499,7 @@ export default function RealtimePage() {
             >
                 <button
                     onClick={() => window.history.back()}
-                    className="w-10 h-10 rounded-xl bg-[rgba(20,20,30,0.7)] backdrop-blur-xl border border-white/[0.06] flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.1] transition"
+                    className="w-10 h-10 rounded-xl bg-[var(--card-bg)] backdrop-blur-xl border border-white/[0.06] flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.1] transition"
                 >
                     <XIcon className="w-5 h-5" />
                 </button>
@@ -514,7 +514,7 @@ export default function RealtimePage() {
                 transition={{ delay: 0.3, duration: 0.4 }}
                 className="absolute bottom-4 left-4 z-20 w-[360px] md:w-[440px]"
             >
-                <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+                <div className="bg-[var(--dropdown-bg)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
                     <div className="max-h-[280px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                         {activityFeed.slice(0, 10).map((item, i) => (
                             <motion.div
@@ -576,7 +576,7 @@ export default function RealtimePage() {
                 transition={{ delay: 0.6 }}
                 className="absolute bottom-4 right-4 z-20"
             >
-                <div className="flex items-center gap-2 px-3 py-2 bg-[rgba(20,20,30,0.9)] backdrop-blur-xl rounded-xl border border-white/[0.06]">
+                <div className="flex items-center gap-2 px-3 py-2 bg-[var(--card-bg)] backdrop-blur-xl rounded-xl border border-white/[0.06]">
                     <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                         <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
                         <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />

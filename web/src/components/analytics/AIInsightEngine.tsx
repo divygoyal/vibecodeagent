@@ -184,7 +184,7 @@ export default function AIInsightEngine(props: InsightProps) {
     if (insights.length === 0) return null;
 
     return (
-        <div className="bg-[rgba(255,255,255,0.02)] border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="bg-[var(--card-bg)] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-3 border-b border-white/[0.06]">
                 <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500/20 to-blue-500/20 flex items-center justify-center">
                     <Sparkles className="w-3.5 h-3.5 text-violet-400" />

@@ -296,7 +296,7 @@ export default function BotPage() {
                                 <input
                                     type="text"
                                     placeholder={hasProPlan ? '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz' : 'Upgrade to Pro to connect your bot'}
-                                    className={`w-full bg-[#050508] border rounded-xl px-4 py-3.5 text-sm focus:outline-none transition-all placeholder:text-zinc-600 mb-4 font-mono ${hasProPlan ? 'border-white/[0.08] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30' : 'border-violet-500/[0.15] opacity-60 cursor-not-allowed'}`}
+                                    className={`w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3.5 text-sm focus:outline-none transition-all placeholder:text-zinc-600 mb-4 font-mono ${hasProPlan ? 'border-white/[0.08] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30' : 'border-violet-500/[0.15] opacity-60 cursor-not-allowed'}`}
                                     value={botToken}
                                     onChange={(e) => hasProPlan && setBotToken(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && hasProPlan && handleSetupBot()}
@@ -364,7 +364,7 @@ export default function BotPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-[#050508] p-4 rounded-xl border border-white/[0.04] mt-3">
+                    <div className="bg-[var(--input-bg)] p-4 rounded-xl border border-white/[0.04] mt-3">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-zinc-300 font-medium">Bot is ready and active 🚀</p>

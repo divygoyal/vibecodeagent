@@ -85,7 +85,7 @@ export default function SessionsPage() {
             </div>
 
             {/* Sessions Table */}
-            <div className="bg-[#0c0c14] border border-white/[0.06] rounded-xl overflow-hidden">
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden">
                 <AnalyticsTable
                     data={sessions}
                     searchKey={(s: any) => `${s.entryPage} ${s.exitPage} ${s.country} ${s.referrer} ${s.browser}`}

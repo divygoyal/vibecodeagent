@@ -137,7 +137,7 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
     return (
         <div className="relative w-full h-full select-none overflow-hidden">
             <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-                <rect width={MAP_W} height={MAP_H} fill="#0c0c18" />
+                <rect width={MAP_W} height={MAP_H} fill="var(--card-bg)" />
 
                 {/* Subtle grid */}
                 {Array.from({ length: 37 }).map((_, i) => (
@@ -196,7 +196,7 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="absolute pointer-events-none z-30 bg-[#0a0a14]/95 backdrop-blur-sm border border-white/[0.12] rounded-xl px-3 py-2 shadow-2xl"
+                        className="absolute pointer-events-none z-30 bg-[var(--dropdown-bg)] backdrop-blur-sm border border-[var(--card-border)] rounded-xl px-3 py-2 shadow-2xl"
                         style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
                     >
                         <p className="text-xs font-semibold text-white">{tooltip.name}</p>

@@ -21,12 +21,12 @@ const COLORS = {
     posBuckets: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'], // top3, 4-10, 11-20, 20+
 };
 
-const CARD = 'rounded-xl border border-white/[0.04] bg-white/[0.02] overflow-hidden';
+const CARD = 'rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] overflow-hidden';
 
 function ChartTooltip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-3 py-2 shadow-2xl text-[11px]">
+        <div className="bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl px-3 py-2 shadow-2xl text-[11px]">
             {label && <p className="text-zinc-500 mb-1 font-medium">{label}</p>}
             {payload.map((e: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
