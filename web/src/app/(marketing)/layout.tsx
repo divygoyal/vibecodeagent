@@ -1,26 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { Menu, X, Tag, Copy, Check } from 'lucide-react';
 
-function DiscountBanner() {
-    const [dismissed, setDismissed] = useState(false);
+const BannerContext = createContext(false);
+export const useBannerVisible = () => useContext(BannerContext);
+
+function DiscountBanner({ onDismiss }: { onDismiss: () => void }) {
     const [copied, setCopied] = useState(false);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined' && sessionStorage.getItem('discount-banner-dismissed')) {
-            setDismissed(true);
-        }
-    }, []);
-
-    const handleDismiss = () => {
-        setDismissed(true);
-        sessionStorage.setItem('discount-banner-dismissed', 'true');
-    };
 
     const handleCopy = () => {
         navigator.clipboard.writeText('NEWBEE20');
@@ -28,10 +19,8 @@ function DiscountBanner() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    if (dismissed) return null;
-
     return (
-        <div className="relative z-[60] bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-500 text-black">
+        <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-500 text-black">
             <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3 text-sm font-medium">
                 <Tag className="w-4 h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">New here? Get <strong>20% off</strong> your first month!</span>
@@ -47,7 +36,7 @@ function DiscountBanner() {
                     View plans →
                 </Link>
                 <button
-                    onClick={handleDismiss}
+                    onClick={onDismiss}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-black/10 transition-colors cursor-pointer"
                     aria-label="Dismiss banner"
                 >
@@ -58,7 +47,7 @@ function DiscountBanner() {
     );
 }
 
-function Navbar() {
+function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const { data: session } = useSession();
@@ -82,10 +71,11 @@ function Navbar() {
             initial={{ y: -100 }}
             animate={{ y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
+            className={`fixed left-0 right-0 z-50 transition-all duration-300 ${scrolled
                 ? 'bg-black/80 backdrop-blur-xl border-b border-white/[0.04]'
                 : 'bg-transparent'
                 }`}
+            style={{ top: bannerVisible ? 40 : 0 }}
         >
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                 {/* Logo */}
@@ -186,13 +176,30 @@ export default function MarketingLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const [bannerVisible, setBannerVisible] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && !sessionStorage.getItem('discount-banner-dismissed')) {
+            setBannerVisible(true);
+        }
+    }, []);
+
+    const handleDismiss = () => {
+        setBannerVisible(false);
+        sessionStorage.setItem('discount-banner-dismissed', 'true');
+    };
+
     return (
-        <div className="min-h-screen bg-black text-white overflow-x-hidden">
-            <DiscountBanner />
-            <Navbar />
-            <main id="main-content">
-                {children}
-            </main>
-        </div>
+        <BannerContext.Provider value={bannerVisible}>
+            <div className="min-h-screen bg-black text-white overflow-x-hidden">
+                {bannerVisible && <DiscountBanner onDismiss={handleDismiss} />}
+                {/* Spacer for fixed banner + navbar */}
+                <div style={{ height: bannerVisible ? 40 : 0 }} className="transition-all duration-300" />
+                <Navbar bannerVisible={bannerVisible} />
+                <main id="main-content">
+                    {children}
+                </main>
+            </div>
+        </BannerContext.Provider>
     );
 }
