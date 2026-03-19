@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 
 const RATE_LIMIT_MAP = new Map<string, number>();
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
@@ -35,45 +34,32 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Message is too long (max 2000 characters).' }, { status: 400 });
         }
 
-        const smtpHost = process.env.SMTP_HOST;
-        const smtpPort = process.env.SMTP_PORT;
-        const smtpUser = process.env.SMTP_USER;
-        const smtpPass = process.env.SMTP_PASS;
-        const contactEmail = process.env.CONTACT_EMAIL || 'trafficclaw@gmail.com';
+        // Save to admin API database
+        const adminUrl = process.env.ADMIN_API_URL;
+        const adminKey = process.env.ADMIN_API_KEY;
 
-        if (!smtpHost || !smtpUser || !smtpPass) {
-            console.error('[Contact] SMTP not configured. Logging submission:', { name, email, message: message.slice(0, 100) });
-            return NextResponse.json({ success: true, message: 'Your message has been received. We\'ll get back to you soon!' });
+        if (adminUrl && adminKey) {
+            const res = await fetch(`${adminUrl}/contact`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': adminKey,
+                },
+                body: JSON.stringify({ name, email, message, ip_address: ip }),
+            });
+
+            if (!res.ok) {
+                console.error('[Contact] Admin API error:', res.status, await res.text());
+            }
+        } else {
+            // Fallback: log to console when admin API is not configured
+            console.log('[Contact] New submission:', { name, email, message: message.slice(0, 100) });
         }
 
-        const transporter = nodemailer.createTransport({
-            host: smtpHost,
-            port: Number(smtpPort) || 587,
-            secure: Number(smtpPort) === 465,
-            auth: { user: smtpUser, pass: smtpPass },
+        return NextResponse.json({
+            success: true,
+            message: "Your message has been received! We'll get back to you soon.",
         });
-
-        await transporter.sendMail({
-            from: `"TrafficClaw Contact" <${smtpUser}>`,
-            replyTo: email,
-            to: contactEmail,
-            subject: `[TrafficClaw] New query from ${name}`,
-            text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #10b981;">New Contact Query</h2>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 8px 0; font-weight: bold; color: #666;">Name</td><td style="padding: 8px 0;">${name}</td></tr>
-                        <tr><td style="padding: 8px 0; font-weight: bold; color: #666;">Email</td><td style="padding: 8px 0;"><a href="mailto:${email}">${email}</a></td></tr>
-                    </table>
-                    <div style="margin-top: 16px; padding: 16px; background: #f4f4f5; border-radius: 8px;">
-                        <p style="margin: 0; white-space: pre-wrap;">${message}</p>
-                    </div>
-                </div>
-            `,
-        });
-
-        return NextResponse.json({ success: true, message: 'Your message has been sent! We\'ll get back to you soon.' });
     } catch (error) {
         console.error('[Contact] Error:', error);
         return NextResponse.json({ error: 'Something went wrong. Please try again later.' }, { status: 500 });

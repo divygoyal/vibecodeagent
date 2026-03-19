@@ -108,7 +108,7 @@ class ContainerEvent(Base):
 class Alert(Base):
     """System alerts"""
     __tablename__ = "alerts"
-    
+
     id = Column(Integer, primary_key=True)
     severity = Column(String(20))  # info, warning, error, critical
     message = Column(Text)
@@ -116,3 +116,16 @@ class Alert(Base):
     resolved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime)
+
+
+class ContactQuery(Base):
+    """Contact form submissions from users"""
+    __tablename__ = "contact_queries"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    email = Column(String(254), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), default="new")  # new, read, replied
+    ip_address = Column(String(45))
+    created_at = Column(DateTime, default=datetime.utcnow)
