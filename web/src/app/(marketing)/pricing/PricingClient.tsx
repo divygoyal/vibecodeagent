@@ -8,6 +8,7 @@ import Link from 'next/link';
 import {
     Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot
 } from 'lucide-react';
+import { DiscountBadge } from '@/components/DiscountBanner';
 
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
@@ -145,6 +146,9 @@ export default function PricingClient() {
                             Start free with 10 messages. Upgrade when you need more AI power.
                             No hidden fees. Cancel anytime.
                         </p>
+                        <div className="mt-6 flex justify-center">
+                            <DiscountBadge />
+                        </div>
                     </motion.div>
                 </div>
             </Section>
@@ -256,6 +260,9 @@ export default function PricingClient() {
                             Get 10 free AI messages when you sign up. No credit card required.
                             Explore the full dashboard, run audits, and see your data.
                         </p>
+                        <div className="mb-4 flex justify-center">
+                            <DiscountBadge />
+                        </div>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all text-sm"

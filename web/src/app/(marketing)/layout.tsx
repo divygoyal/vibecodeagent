@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { Menu, X } from 'lucide-react';
+import { DiscountBanner } from '@/components/DiscountBanner';
 
 function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -137,6 +138,7 @@ export default function MarketingLayout({
 }) {
     return (
         <div className="min-h-screen bg-black text-white overflow-x-hidden">
+            <DiscountBanner />
             <Navbar />
             <main id="main-content">
                 {children}

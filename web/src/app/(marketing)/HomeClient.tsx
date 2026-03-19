@@ -14,6 +14,7 @@ import {
     MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare,
     ScanSearch, Clock, Monitor, ExternalLink, Link2, Share2, Music, History, Navigation, Maximize2
 } from 'lucide-react';
+import { DiscountBadge } from '@/components/DiscountBanner';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     BarChart, Bar, PieChart, Pie, Cell
@@ -179,6 +180,9 @@ function Hero() {
                             See AI in Action
                         </a>
                     </div>
+
+                    {/* Discount badge */}
+                    <DiscountBadge className="mx-auto lg:mx-0" />
 
                     {/* Social proof */}
                     <div className="flex flex-col gap-3 justify-center lg:justify-start pt-2">
