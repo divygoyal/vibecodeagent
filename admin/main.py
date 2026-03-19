@@ -21,7 +21,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery
 from docker_manager import docker_manager
 
 
@@ -1420,6 +1420,74 @@ async def get_events(
         }
         for e in events
     ]
+
+
+# ============= Contact Queries =============
+class ContactSubmission(BaseModel):
+    name: str
+    email: str
+    message: str
+    ip_address: Optional[str] = None
+
+
+@app.post("/contact")
+async def submit_contact(data: ContactSubmission, db: AsyncSession = Depends(get_db), _=Depends(verify_admin_key)):
+    """Save a contact form submission"""
+    query = ContactQuery(
+        name=data.name[:100],
+        email=data.email[:254],
+        message=data.message[:2000],
+        ip_address=data.ip_address,
+    )
+    db.add(query)
+    await db.commit()
+    return {"success": True, "id": query.id}
+
+
+@app.get("/contact")
+async def list_contact_queries(status: Optional[str] = None, db: AsyncSession = Depends(get_db), _=Depends(verify_admin_key)):
+    """List contact form submissions"""
+    stmt = select(ContactQuery).order_by(ContactQuery.created_at.desc())
+    if status:
+        stmt = stmt.where(ContactQuery.status == status)
+    result = await db.execute(stmt)
+    queries = result.scalars().all()
+    return [
+        {
+            "id": q.id,
+            "name": q.name,
+            "email": q.email,
+            "message": q.message,
+            "status": q.status,
+            "ip_address": q.ip_address,
+            "created_at": q.created_at.isoformat() if q.created_at else None,
+        }
+        for q in queries
+    ]
+
+
+@app.patch("/contact/{query_id}")
+async def update_contact_status(query_id: int, status: str, db: AsyncSession = Depends(get_db), _=Depends(verify_admin_key)):
+    """Update status of a contact query (new, read, replied)"""
+    result = await db.execute(select(ContactQuery).where(ContactQuery.id == query_id))
+    query = result.scalar_one_or_none()
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+    query.status = status
+    await db.commit()
+    return {"success": True}
+
+
+@app.delete("/contact/{query_id}")
+async def delete_contact_query(query_id: int, db: AsyncSession = Depends(get_db), _=Depends(verify_admin_key)):
+    """Delete a contact query"""
+    result = await db.execute(select(ContactQuery).where(ContactQuery.id == query_id))
+    query = result.scalar_one_or_none()
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+    await db.delete(query)
+    await db.commit()
+    return {"success": True}
 
 
 # ============= Health Check =============
