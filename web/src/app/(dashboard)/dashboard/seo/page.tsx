@@ -7,13 +7,15 @@ import {
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
     ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download,
     Bot, PenTool, Link2, Sparkles, Brain, Radar, BarChart3, Globe,
-    FileText, Layers, Activity, Shield, Clock, Cpu
+    FileText, Layers, Activity, Shield, Clock, Cpu, ScanSearch
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import TableActionMenu, { useTableActions } from '@/components/TableActionMenu';
 import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
 import { useRegistration } from '../layout';
 
@@ -126,6 +128,9 @@ export default function SEOPage() {
     // Keyword tool
     const [kwSiteUrl, setKwSiteUrl] = useState('');
     // Linking tool uses existing pages data
+
+    const router = useRouter();
+    const { auditPage, analyzeWithAI, trackKeyword, optimizePage, viewTrend, copyToClipboard, openExternal, generateContent } = useTableActions();
 
     const runTool = async (tool: string, input: any) => {
         setToolLoading(true);
@@ -284,7 +289,7 @@ export default function SEOPage() {
             {/* KPI Cards */}
             {kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
+                    <div className="premium-card p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
                                 <MousePointer className="w-4 h-4 text-emerald-400" />
@@ -294,7 +299,7 @@ export default function SEOPage() {
                         <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
                         <div className="text-xs text-zinc-500 mt-1">Total Clicks</div>
                     </div>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
+                    <div className="premium-card p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
                                 <Eye className="w-4 h-4 text-cyan-400" />
@@ -304,7 +309,7 @@ export default function SEOPage() {
                         <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
                         <div className="text-xs text-zinc-500 mt-1">Impressions</div>
                     </div>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
+                    <div className="premium-card p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
                                 <Hash className="w-4 h-4 text-violet-400" />
@@ -314,7 +319,7 @@ export default function SEOPage() {
                         <div className="text-xl sm:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
                         <div className="text-xs text-zinc-500 mt-1">Avg. CTR</div>
                     </div>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
+                    <div className="premium-card p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
                                 <Search className="w-4 h-4 text-amber-400" />
@@ -752,11 +757,12 @@ export default function SEOPage() {
                                     <th className="text-right pb-3 font-medium">Impressions</th>
                                     <th className="text-right pb-3 font-medium hidden sm:table-cell">CTR</th>
                                     <th className="text-right pb-3 font-medium hidden md:table-cell">Position</th>
+                                    <th className="text-right pb-3 font-medium w-[60px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {queries.map((q, i) => (
-                                    <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
+                                    <tr key={i} className="table-row-premium border-b border-white/[0.03] relative">
                                         <td className="py-3">
                                             <span className="text-zinc-300 font-medium">{q.query}</span>
                                         </td>
@@ -767,6 +773,15 @@ export default function SEOPage() {
                                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${q.position <= 5 ? 'bg-emerald-400/10 text-emerald-400' : q.position <= 10 ? 'bg-amber-400/10 text-amber-400' : 'bg-red-400/10 text-red-400'}`}>
                                                 {q.position.toFixed(1)}
                                             </span>
+                                        </td>
+                                        <td className="text-right">
+                                            <TableActionMenu actions={[
+                                                trackKeyword(q.query),
+                                                viewTrend(q.query),
+                                                generateContent(q.query),
+                                                analyzeWithAI(`Deep analysis for keyword "${q.query}": position ${q.position}, CTR ${q.ctr}%, clicks ${q.clicks}, impressions ${q.impressions}. What improvements can be made?`, selectedSite),
+                                                copyToClipboard(q.query),
+                                            ]} />
                                         </td>
                                     </tr>
                                 ))}
@@ -783,15 +798,15 @@ export default function SEOPage() {
                                     <th className="text-right pb-3 font-medium hidden sm:table-cell">CTR</th>
                                     <th className="text-right pb-3 font-medium hidden md:table-cell">Position</th>
                                     <th className="text-right pb-3 font-medium">Status</th>
+                                    <th className="text-right pb-3 font-medium w-[60px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {pages.map((p, i) => (
-                                    <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
+                                    <tr key={i} className="table-row-premium border-b border-white/[0.03] relative">
                                         <td className="py-3">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-zinc-300 font-medium truncate max-w-[160px] sm:max-w-[240px]">{p.page}</span>
-                                                <ArrowUpRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
                                             </div>
                                         </td>
                                         <td className="text-right text-emerald-400 font-semibold">{p.clicks.toLocaleString()}</td>
@@ -809,6 +824,15 @@ export default function SEOPage() {
                                                 {p.status}
                                             </span>
                                         </td>
+                                        <td className="text-right">
+                                            <TableActionMenu actions={[
+                                                auditPage(p.page),
+                                                optimizePage(p.page),
+                                                analyzeWithAI(`Analyze SEO performance for page ${p.page}: position ${p.position}, CTR ${p.ctr}%, clicks ${p.clicks}, status: ${p.status}`, selectedSite),
+                                                openExternal(p.page),
+                                                copyToClipboard(p.page),
+                                            ]} />
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -816,6 +840,88 @@ export default function SEOPage() {
                     )}
                 </div>
             </div>
+
+            {/* ─── SERP Preview & Quick Actions ─── */}
+            {queries.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* SERP Preview */}
+                    <div className="premium-card p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center">
+                                <Globe className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <h3 className="text-sm font-semibold text-white">SERP Preview</h3>
+                            <span className="text-[10px] text-zinc-600">How your top result appears in Google</span>
+                        </div>
+                        {pages[0] && (
+                            <div className="serp-preview">
+                                <div className="serp-url">{pages[0].page}</div>
+                                <div className="serp-title">{pages[0].page.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Page Title'}</div>
+                                <div className="serp-desc">This page has {pages[0].clicks} clicks and {pages[0].impressions?.toLocaleString()} impressions with a CTR of {pages[0].ctr}% at position {pages[0].position.toFixed(1)}.</div>
+                            </div>
+                        )}
+                        <div className="mt-3 flex items-center gap-2">
+                            <button
+                                onClick={() => pages[0] && router.push(`/dashboard/audit?url=${encodeURIComponent(pages[0].page)}`)}
+                                className="audit-pill"
+                            >
+                                <ScanSearch className="w-3 h-3" /> Audit This Page
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Quick Domain Actions */}
+                    <div className="premium-card p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-violet-400 flex items-center justify-center">
+                                <Zap className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
+                        </div>
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(selectedSite.replace('sc-domain:', 'https://'))}`)}
+                                className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-emerald-500/20 hover:bg-emerald-500/[0.04] transition-all text-left group"
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition">
+                                    <ScanSearch className="w-4 h-4 text-emerald-400" />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-white">Full Site Audit</div>
+                                    <div className="text-[10px] text-zinc-500">50+ SEO & technical checks</div>
+                                </div>
+                                <ArrowUpRight className="w-4 h-4 text-zinc-600 ml-auto group-hover:text-emerald-400 transition" />
+                            </button>
+                            <button
+                                onClick={() => { setActiveTool('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-violet-500/20 hover:bg-violet-500/[0.04] transition-all text-left group"
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition">
+                                    <PenTool className="w-4 h-4 text-violet-400" />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-white">AI Content Writer</div>
+                                    <div className="text-[10px] text-zinc-500">Generate SEO blog posts</div>
+                                </div>
+                                <ArrowUpRight className="w-4 h-4 text-zinc-600 ml-auto group-hover:text-violet-400 transition" />
+                            </button>
+                            <button
+                                onClick={() => { setActiveTool('keywords'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-amber-500/20 hover:bg-amber-500/[0.04] transition-all text-left group"
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition">
+                                    <Brain className="w-4 h-4 text-amber-400" />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-white">Find Keywords</div>
+                                    <div className="text-[10px] text-zinc-500">AI keyword research</div>
+                                </div>
+                                <ArrowUpRight className="w-4 h-4 text-zinc-600 ml-auto group-hover:text-amber-400 transition" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

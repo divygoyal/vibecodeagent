@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
     Search, Loader2, AlertTriangle, AlertCircle, Info, CheckCircle2,
     Globe, Clock, FileText, Image, Link2, Code2, Shield, Share2,
-    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink, Zap, Copy, Check
+    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink, Zap, Copy, Check, ScanSearch
 } from 'lucide-react';
 import type { AuditReport, AuditIssue, Severity } from '@/lib/siteAudit';
 import { useContainerStatus, useSiteList, useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
@@ -33,7 +34,7 @@ function ScoreRing({ score }: { score: number }) {
     const color = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
 
     return (
-        <div className="relative w-36 h-36">
+        <div className="relative w-36 h-36 score-ring-glow">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r={radius} fill="none" stroke="#27272a" strokeWidth="8" />
                 <circle
@@ -169,6 +170,7 @@ export default function AuditPage() {
     const [error, setError] = useState('');
     const [filter, setFilter] = useState<FilterMode>('all');
     const [copied, setCopied] = useState(false);
+    const searchParams = useSearchParams();
 
     const shareReport = () => {
         if (!report) return;
@@ -184,6 +186,22 @@ export default function AuditPage() {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
+
+    // Auto-fill URL from query params (e.g., from SEO page "Audit this page" action)
+    useEffect(() => {
+        const urlParam = searchParams.get('url');
+        if (urlParam && !report && !loading) {
+            const decoded = decodeURIComponent(urlParam);
+            setUrl(decoded);
+            // Auto-run audit after a short delay
+            const timer = setTimeout(() => {
+                setUrl(decoded);
+                // Trigger audit via button click
+                document.querySelector<HTMLButtonElement>('[data-audit-btn]')?.click();
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch user's own sites and pages for quick-audit suggestions
     const { hasGoogleConnection } = useContainerStatus();
@@ -342,7 +360,7 @@ export default function AuditPage() {
                     {/* Score + Summary */}
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                         {/* Score ring */}
-                        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 flex flex-col items-center justify-center">
+                        <div className="premium-card p-6 flex flex-col items-center justify-center">
                             <ScoreRing score={report.score} />
                             <div className="mt-3 flex items-center gap-2">
                                 <a
@@ -389,7 +407,7 @@ export default function AuditPage() {
                             { label: 'Links', value: `${report.meta.links.total}`, icon: Link2 },
                             { label: 'Scripts', value: `${report.meta.scripts}`, icon: Code2 },
                         ].map(stat => (
-                            <div key={stat.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 flex items-center gap-3">
+                            <div key={stat.label} className="stat-card-hover bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 flex items-center gap-3">
                                 <stat.icon className="w-4 h-4 text-zinc-500" />
                                 <div>
                                     <div className="text-sm font-semibold text-white">{stat.value}</div>
@@ -448,14 +466,36 @@ export default function AuditPage() {
                     <div className="text-center text-[10px] text-zinc-700 pt-4">
                         Audited at {new Date(report.fetchedAt).toLocaleString()} · HTTP {report.statusCode}
                     </div>
+
+                    {/* ─── Quick Re-Audit Actions ─── */}
+                    <div className="section-divider my-6" />
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button
+                            onClick={runAudit}
+                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                            Re-Audit This Page
+                        </button>
+                        <button
+                            onClick={() => {
+                                setReport(null);
+                                setUrl('');
+                            }}
+                            className="flex items-center gap-2 px-6 py-3 bg-white/[0.04] border border-white/[0.08] text-zinc-300 font-medium text-sm rounded-xl hover:bg-white/[0.08] transition"
+                        >
+                            <Search className="w-4 h-4" />
+                            Audit Another Page
+                        </button>
+                    </div>
                 </div>
             )}
 
             {/* ─── Empty state ─── */}
             {!report && !loading && !error && (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
-                        <Search className="w-7 h-7 text-emerald-400" />
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center mb-4 glow-emerald">
+                        <ScanSearch className="w-9 h-9 text-emerald-400" />
                     </div>
                     <h3 className="text-lg font-semibold text-white mb-2">Run Your First Audit</h3>
                     <p className="text-sm text-zinc-500 max-w-md">

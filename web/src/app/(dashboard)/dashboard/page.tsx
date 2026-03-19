@@ -690,6 +690,8 @@ export default function DashboardOverview() {
         />
       </motion.div>
 
+      <div className="section-divider" />
+
       {/* ═══ 2. INTELLIGENCE — Top Stats + Filter Bar + Active Alerts ═══ */}
       {hasData && (seoData || analyticsData) && (
         <>
@@ -867,6 +869,8 @@ export default function DashboardOverview() {
         </>
       )}
 
+      <div className="section-divider" />
+
       {/* ═══ 3. COMMAND CENTER — Compact row: Score + Velocity + Branded Split ═══ */}
       {hasData && (
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
@@ -1001,6 +1005,8 @@ export default function DashboardOverview() {
         </motion.div>
       )}
 
+      <div className="section-divider" />
+
       {/* ═══ INSIGHT SECTIONS — Lazy-loaded when scrolled into view ═══ */}
       {hasGoogleConnection && (
         <motion.div ref={insightSectionRef} variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
@@ -1030,7 +1036,7 @@ export default function DashboardOverview() {
                 </div>
               </div>
 
-              <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl overflow-hidden">
+              <div className="premium-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1041,6 +1047,7 @@ export default function DashboardOverview() {
                         <th className="text-right py-3 px-4 font-medium hidden md:table-cell">Current CTR</th>
                         <th className="text-right py-3 px-4 font-medium">Potential Clicks</th>
                         <th className="text-right py-3 px-4 font-medium hidden lg:table-cell">Type</th>
+                        <th className="text-right py-3 px-4 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1054,7 +1061,7 @@ export default function DashboardOverview() {
                         const typeInfo = typeLabels[opp.type] || { label: opp.type, style: 'bg-zinc-500/10 text-zinc-400' };
 
                         return (
-                          <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition group">
+                          <tr key={i} className="table-row-premium border-b border-white/[0.03] hover:bg-white/[0.02] transition group">
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
                                 <Search className="w-3 h-3 text-zinc-600 flex-shrink-0" />
@@ -1079,6 +1086,14 @@ export default function DashboardOverview() {
                                 {typeInfo.label}
                               </span>
                             </td>
+                            <td className="text-right py-3 px-4">
+                              <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `How can I optimize my page for "${opp.query}"? Current position: ${opp.position.toFixed(1)}, CTR: ${opp.ctr}%`, site: selectedSite } }))}
+                                className="text-[9px] text-violet-400 bg-violet-500/[0.08] border border-violet-500/10 px-2 py-0.5 rounded hover:bg-violet-500/15 transition"
+                              >
+                                Optimize
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -1092,7 +1107,7 @@ export default function DashboardOverview() {
           {/* ═══ INTELLIGENCE: Insight Cards Grid ═══ */}
           <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* CTR Benchmark Card */}
-            <div className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-violet-500/20 hover:shadow-[0_0_30px_rgba(167,139,250,0.05)] transition-all duration-500 group overflow-hidden">
+            <div className="premium-card relative p-5 hover:border-violet-500/20 hover:shadow-[0_0_30px_rgba(167,139,250,0.05)] transition-all duration-500 group overflow-hidden">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
                   <MousePointer className="w-4 h-4 text-violet-400" />
@@ -1133,7 +1148,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* Keyword Distribution */}
-            <div className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(59,130,246,0.05)] transition-all duration-500 group overflow-hidden">
+            <div className="premium-card relative p-5 hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(59,130,246,0.05)] transition-all duration-500 group overflow-hidden">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                   <Hash className="w-4 h-4 text-blue-400" />
@@ -1182,7 +1197,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* Quick Trend */}
-            <div className="relative bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-emerald-500/20 hover:shadow-[0_0_30px_rgba(52,211,153,0.05)] transition-all duration-500 group overflow-hidden">
+            <div className="premium-card relative p-5 hover:border-emerald-500/20 hover:shadow-[0_0_30px_rgba(52,211,153,0.05)] transition-all duration-500 group overflow-hidden">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -1426,7 +1441,7 @@ export default function DashboardOverview() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
             {/* Site Health Pulse */}
-            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer">
+            <div onClick={() => setDrawerContent({ type: 'health', title: 'Site Health', data: { verdict: computedInsights.healthVerdict, changeUsers: analyticsKPIs?.changeUsers || 0, changeClicks: seoKPIs?.changeClicks || 0, avgCTR: seoKPIs?.avgCTR, avgPosition: seoKPIs?.avgPosition } })} className="premium-card p-5 relative overflow-hidden hover:border-emerald-500/20 hover:bg-white/[0.02] transition-all duration-500 cursor-pointer">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1474,7 +1489,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* Money Opportunities — Striking Distance */}
-            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            <div className="premium-card p-5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-amber-500/[0.06] to-transparent rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-emerald-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
@@ -1604,7 +1619,7 @@ export default function DashboardOverview() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
             {/* Quick Wins — CTR Problems */}
-            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            <div className="premium-card p-5 relative overflow-hidden">
               <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-red-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1678,7 +1693,7 @@ export default function DashboardOverview() {
             </div>
 
             {/* Top Performing Pages */}
-            <div className="bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+            <div className="premium-card p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-violet-500/[0.04] to-transparent rounded-full blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
@@ -1748,6 +1763,15 @@ export default function DashboardOverview() {
           </div>
         </motion.div>
       )}
+
+      <div className="section-divider" />
+
+      {/* Audit CTA */}
+      <div className="flex items-center gap-3">
+          <Link href="/dashboard/audit" className="audit-pill">
+              <ScanSearch className="w-3.5 h-3.5" /> Run Site Audit
+          </Link>
+      </div>
 
       {/* Quick Navigation */}
       <motion.div variants={fadeInUp} transition={{ duration: 0.35 }}>
