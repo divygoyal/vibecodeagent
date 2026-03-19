@@ -1074,6 +1074,93 @@ select:focus-visible {
   box-shadow: 0 4px 12px rgba(52, 211, 153, 0.1);
 }
 
+/* ========== SEO Dashboard Utilities ========== */
+
+/* Shimmer loading skeleton */
+.shimmer-loading {
+  background: linear-gradient(90deg, var(--card-bg) 25%, rgba(52, 211, 153, 0.05) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Cascade fade for staggered list items */
+.cascade-fade > * {
+  opacity: 0;
+  animation: cascadeFadeIn 0.4s ease forwards;
+}
+.cascade-fade > *:nth-child(1) { animation-delay: 0.05s; }
+.cascade-fade > *:nth-child(2) { animation-delay: 0.1s; }
+.cascade-fade > *:nth-child(3) { animation-delay: 0.15s; }
+.cascade-fade > *:nth-child(4) { animation-delay: 0.2s; }
+.cascade-fade > *:nth-child(5) { animation-delay: 0.25s; }
+.cascade-fade > *:nth-child(6) { animation-delay: 0.3s; }
+.cascade-fade > *:nth-child(7) { animation-delay: 0.35s; }
+.cascade-fade > *:nth-child(8) { animation-delay: 0.4s; }
+.cascade-fade > *:nth-child(n+9) { animation-delay: 0.45s; }
+
+@keyframes cascadeFadeIn {
+  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* Animated gradient border wrapper */
+.gradient-border-animated {
+  position: relative;
+  border-radius: 1rem;
+  padding: 1px;
+  background: conic-gradient(from var(--border-angle, 0deg), #34d399, #22d3ee, #a78bfa, #34d399);
+  animation: borderRotate 4s linear infinite;
+}
+.gradient-border-animated > * {
+  border-radius: calc(1rem - 1px);
+  background: var(--card-bg);
+}
+
+@keyframes borderRotate {
+  to { --border-angle: 360deg; }
+}
+
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Intent badge variants */
+.intent-badge-commercial { background: rgba(34, 211, 238, 0.1); color: #22d3ee; border-color: rgba(34, 211, 238, 0.2); }
+.intent-badge-transactional { background: rgba(52, 211, 153, 0.1); color: #34d399; border-color: rgba(52, 211, 153, 0.2); }
+.intent-badge-navigational { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border-color: rgba(139, 92, 246, 0.2); }
+.intent-badge-informational { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2); }
+
+/* Sparkline container */
+.sparkline-container {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  width: 40px;
+}
+
+/* Annotation badge variants */
+.annotation-badge-decaying { background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.2); }
+.annotation-badge-opportunity { background: rgba(52, 211, 153, 0.1); color: #34d399; border-color: rgba(52, 211, 153, 0.2); }
+.annotation-badge-cannibalizing { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
+.annotation-badge-striking { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2); }
+.annotation-badge-zombie { background: rgba(168, 85, 247, 0.1); color: #a855f7; border-color: rgba(168, 85, 247, 0.2); }
+
+/* Drawer panel */
+.drawer-panel {
+  background: var(--card-bg);
+  border-left: 1px solid var(--card-border);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Print styles */
+@media print {
+  .no-print, nav, .fab-pulse, .floating-banner { display: none !important; }
+  .premium-card { box-shadow: none; border: 1px solid #e5e7eb; }
+  body { background: white; color: black; }
+}
+
 /* Light theme premium overrides */
 [data-theme='light'] .premium-card {
   background: rgba(255, 255, 255, 0.9);
@@ -1101,3 +1188,21 @@ select:focus-visible {
 [data-theme='light'] .serp-preview .serp-title { color: #1a0dab; }
 [data-theme='light'] .serp-preview .serp-url { color: #006621; }
 [data-theme='light'] .serp-preview .serp-desc { color: #545454; }
+
+/* Light theme SEO dashboard overrides */
+[data-theme='light'] .drawer-panel {
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .shimmer-loading {
+  background: linear-gradient(90deg, var(--card-bg) 25%, rgba(0, 0, 0, 0.03) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+}
+[data-theme='light'] .intent-badge-commercial { background: rgba(34, 211, 238, 0.08); color: #0891b2; border-color: rgba(34, 211, 238, 0.15); }
+[data-theme='light'] .intent-badge-transactional { background: rgba(52, 211, 153, 0.08); color: #059669; border-color: rgba(52, 211, 153, 0.15); }
+[data-theme='light'] .intent-badge-navigational { background: rgba(139, 92, 246, 0.08); color: #7c3aed; border-color: rgba(139, 92, 246, 0.15); }
+[data-theme='light'] .intent-badge-informational { background: rgba(59, 130, 246, 0.08); color: #2563eb; border-color: rgba(59, 130, 246, 0.15); }
+[data-theme='light'] .annotation-badge-decaying { background: rgba(239, 68, 68, 0.08); color: #dc2626; border-color: rgba(239, 68, 68, 0.15); }
+[data-theme='light'] .annotation-badge-opportunity { background: rgba(52, 211, 153, 0.08); color: #059669; border-color: rgba(52, 211, 153, 0.15); }
+[data-theme='light'] .annotation-badge-cannibalizing { background: rgba(245, 158, 11, 0.08); color: #d97706; border-color: rgba(245, 158, 11, 0.15); }
+[data-theme='light'] .annotation-badge-striking { background: rgba(59, 130, 246, 0.08); color: #2563eb; border-color: rgba(59, 130, 246, 0.15); }
+[data-theme='light'] .annotation-badge-zombie { background: rgba(168, 85, 247, 0.08); color: #9333ea; border-color: rgba(168, 85, 247, 0.15); }

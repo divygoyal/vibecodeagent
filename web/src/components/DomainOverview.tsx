@@ -21,6 +21,8 @@ import {
   ExternalLink,
   Check,
   X,
+  BookOpen,
+  Brain,
 } from 'lucide-react'
 
 /* ─── Types ─── */
@@ -76,6 +78,24 @@ interface DomainOverviewData {
   technologies: string[]
   robots: { found: boolean; rules: string[]; sitemapUrls: string[] } | null
   sitemap: { found: boolean; urlCount: number } | null
+  readability: {
+    score: number
+    grade: number
+    wordCount: number
+    sentenceCount: number
+    avgWordsPerSentence: number
+    avgSyllablesPerWord: number
+    rating: string
+  } | null
+  geoReadiness: {
+    overallScore: number
+    categories: {
+      citability: { score: number; findings: string[] }
+      structure: { score: number; findings: string[] }
+      multimodal: { score: number; findings: string[] }
+      authority: { score: number; findings: string[] }
+    }
+  } | null
 }
 
 interface DomainOverviewProps {
@@ -174,6 +194,46 @@ function charCountBadge(count: number, min: number, max: number) {
       {count} chars
     </span>
   )
+}
+
+function readabilityRatingStyle(rating: string): { bg: string; text: string } {
+  switch (rating) {
+    case 'Very Easy':
+      return { bg: 'bg-green-500/10', text: 'text-green-400' }
+    case 'Easy':
+      return { bg: 'bg-emerald-500/10', text: 'text-emerald-400' }
+    case 'Fairly Easy':
+      return { bg: 'bg-cyan-500/10', text: 'text-cyan-400' }
+    case 'Standard':
+      return { bg: 'bg-blue-500/10', text: 'text-blue-400' }
+    case 'Fairly Difficult':
+      return { bg: 'bg-amber-500/10', text: 'text-amber-400' }
+    case 'Difficult':
+      return { bg: 'bg-orange-500/10', text: 'text-orange-400' }
+    case 'Very Difficult':
+      return { bg: 'bg-red-500/10', text: 'text-red-400' }
+    default:
+      return { bg: 'bg-zinc-500/10', text: 'text-zinc-400' }
+  }
+}
+
+function geoBarColor(score: number): string {
+  if (score >= 80) return 'bg-emerald-500'
+  if (score >= 60) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function geoTextColor(score: number): string {
+  if (score >= 80) return 'text-emerald-400'
+  if (score >= 60) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+function readabilityRecommendation(score: number): string {
+  if (score >= 80) return 'Your content is easy to read for a broad audience. Great for user engagement and SEO.'
+  if (score >= 60) return 'Your content has a standard readability level. Consider simplifying some sentences for wider appeal.'
+  if (score >= 40) return 'Your content may be difficult for general audiences. Try shorter sentences and simpler vocabulary.'
+  return 'Your content is quite hard to read. Consider breaking down complex sentences and using more common words.'
 }
 
 /* ─── Score Ring ─── */
@@ -861,7 +921,170 @@ export default function DomainOverview({ session }: DomainOverviewProps) {
             </Card>
           )}
 
-          {/* g) Action Buttons Row */}
+          {/* g) Readability Analysis */}
+          <Card className="p-5" delay={0.63}>
+            <SectionHeader
+              icon={BookOpen}
+              title="Readability Analysis"
+              subtitle="Flesch-Kincaid readability scoring"
+            />
+            {data.readability ? (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="relative flex items-center justify-center">
+                    <ScoreRing
+                      score={data.readability.score}
+                      size={80}
+                      label="Readability"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${readabilityRatingStyle(data.readability.rating).bg} ${readabilityRatingStyle(data.readability.rating).text}`}
+                      >
+                        {data.readability.rating}
+                      </span>
+                      <span className="text-xs text-zinc-500">
+                        Grade Level: {data.readability.grade}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      {readabilityRecommendation(data.readability.score)}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Word Count', value: data.readability.wordCount.toLocaleString() },
+                    { label: 'Sentence Count', value: data.readability.sentenceCount.toLocaleString() },
+                    { label: 'Avg Words/Sentence', value: data.readability.avgWordsPerSentence.toString() },
+                    { label: 'Avg Syllables/Word', value: data.readability.avgSyllablesPerWord.toString() },
+                  ].map((stat) => (
+                    <div
+                      key={stat.label}
+                      className="rounded-lg bg-white/[0.02] border border-white/[0.03] p-2.5 text-center"
+                    >
+                      <p className="text-lg font-bold text-zinc-200">{stat.value}</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                <p className="text-xs text-zinc-500">Analyzing readability...</p>
+              </div>
+            )}
+          </Card>
+
+          {/* h) AI Search Readiness (GEO) */}
+          <Card className="p-5" delay={0.66}>
+            <SectionHeader
+              icon={Brain}
+              title="AI Search Readiness (GEO)"
+              subtitle="Generative Engine Optimization scoring"
+            />
+            {data.geoReadiness ? (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  <div className="relative flex items-center justify-center shrink-0">
+                    <ScoreRing
+                      score={data.geoReadiness.overallScore}
+                      size={80}
+                      label="GEO Score"
+                    />
+                  </div>
+                  <div className="flex-1 w-full space-y-3">
+                    {(
+                      [
+                        { key: 'citability' as const, label: 'Citability', weight: '25%' },
+                        { key: 'structure' as const, label: 'Structural Readability', weight: '30%' },
+                        { key: 'multimodal' as const, label: 'Multi-modal Content', weight: '20%' },
+                        { key: 'authority' as const, label: 'Authority Signals', weight: '25%' },
+                      ] as const
+                    ).map(({ key, label, weight }) => {
+                      const cat = data.geoReadiness!.categories[key]
+                      return (
+                        <div key={key}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-zinc-300">
+                              {label}{' '}
+                              <span className="text-zinc-600 text-[10px]">({weight})</span>
+                            </span>
+                            <span className={`text-xs font-semibold ${geoTextColor(cat.score)}`}>
+                              {cat.score}
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-white/[0.04]">
+                            <motion.div
+                              className={`h-full rounded-full ${geoBarColor(cat.score)}`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${cat.score}%` }}
+                              transition={{ duration: 0.8, ease: 'easeOut' }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Findings details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(
+                    [
+                      { key: 'citability' as const, label: 'Citability' },
+                      { key: 'structure' as const, label: 'Structure' },
+                      { key: 'multimodal' as const, label: 'Multi-modal' },
+                      { key: 'authority' as const, label: 'Authority' },
+                    ] as const
+                  ).map(({ key, label }) => {
+                    const cat = data.geoReadiness!.categories[key]
+                    return (
+                      <div
+                        key={key}
+                        className="rounded-lg bg-white/[0.02] border border-white/[0.03] p-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                            {label}
+                          </span>
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${
+                              cat.score >= 80
+                                ? 'bg-emerald-500/10 text-emerald-400'
+                                : cat.score >= 60
+                                  ? 'bg-amber-500/10 text-amber-400'
+                                  : 'bg-red-500/10 text-red-400'
+                            }`}
+                          >
+                            {cat.score}/100
+                          </span>
+                        </div>
+                        <ul className="space-y-1">
+                          {cat.findings.map((finding, i) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-600" />
+                              <span className="text-[11px] text-zinc-400">{finding}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                <p className="text-xs text-zinc-500">Analyzing AI search readiness...</p>
+              </div>
+            )}
+          </Card>
+
+          {/* i) Action Buttons Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Link href={`/dashboard/audit?url=${encodeURIComponent(data.url)}`}>
               <motion.div

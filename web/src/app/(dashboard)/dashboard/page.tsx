@@ -15,13 +15,15 @@ import {
   DollarSign, Target, FileWarning, ArrowRight, Flame, CheckCircle2,
   Rocket, Tag, Shield,
   Crown, XCircle, Sparkles, ChevronRight, Filter, Brain,
-  MessageSquare, ExternalLink, RefreshCw
+  MessageSquare, ExternalLink, RefreshCw, FileDown, Wrench
 } from 'lucide-react';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights, useRealtimeData } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
 import { ConnectGoogleState } from '@/components/EmptyState';
 import { type AlertItem, type OpportunityItem, computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import { AnnotationBadge, getAnnotations } from '@/components/AnnotationBadge';
+import { IntentBadge } from '@/components/IntentBadge';
 import KPICard, { type KPIAction } from '@/components/dashboard/KPICard';
 import ActionCard from '@/components/dashboard/ActionCard';
 import LastUpdated from '@/components/dashboard/LastUpdated';
@@ -422,6 +424,43 @@ export default function DashboardOverview() {
       .slice(0, 3);
   }, [insights]);
 
+  // ═══ SEO REPORT GENERATOR ═══
+  const generateSeoReport = () => {
+    const lines = ['# SEO Performance Report', `Generated: ${new Date().toLocaleDateString()}`, ''];
+    if (seoData) {
+      lines.push('## Search Performance', '');
+      lines.push(`- Total Clicks: ${seoKPIs?.totalClicks ?? 'N/A'}`);
+      lines.push(`- Total Impressions: ${seoKPIs?.totalImpressions ?? 'N/A'}`);
+      lines.push(`- Average CTR: ${seoKPIs?.avgCTR ? seoKPIs.avgCTR + '%' : 'N/A'}`);
+      lines.push(`- Average Position: ${seoKPIs?.avgPosition ?? 'N/A'}`);
+      lines.push('');
+      if (seoData.queries?.length) {
+        lines.push('## Top Keywords', '');
+        lines.push('| Keyword | Position | Clicks | Impressions | CTR |');
+        lines.push('|---------|----------|--------|-------------|-----|');
+        seoData.queries.slice(0, 20).forEach((q: any) => {
+          lines.push(`| ${q.query} | ${q.position?.toFixed(1)} | ${q.clicks} | ${q.impressions} | ${(q.ctr * 100).toFixed(2)}% |`);
+        });
+        lines.push('');
+      }
+      if (seoData.pages?.length) {
+        lines.push('## Top Pages', '');
+        lines.push('| Page | Clicks | Impressions | CTR | Position |');
+        lines.push('|------|--------|-------------|-----|----------|');
+        seoData.pages.slice(0, 20).forEach((p: any) => {
+          lines.push(`| ${p.page} | ${p.clicks} | ${p.impressions} | ${(p.ctr * 100).toFixed(2)}% | ${p.position?.toFixed(1)} |`);
+        });
+      }
+    }
+    if (analyticsData) {
+      lines.push('', '## Analytics Overview', '');
+      lines.push(`- Active Users: ${analyticsKPIs?.totalUsers ?? 'N/A'}`);
+      lines.push(`- Sessions: ${analyticsKPIs?.totalPageViews ?? 'N/A'}`);
+      lines.push(`- Bounce Rate: ${analyticsKPIs?.avgBounceRate ? analyticsKPIs.avgBounceRate + '%' : 'N/A'}`);
+    }
+    return lines.join('\n');
+  };
+
   // Friendly display for selected site
   const selectedSiteLabel = selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : '';
 
@@ -472,6 +511,24 @@ export default function DashboardOverview() {
                 Growth overview for your projects.
               </p>
               <LastUpdated timestamp={lastUpdated} />
+              {hasData && (
+                <button
+                  onClick={() => {
+                    const report = generateSeoReport();
+                    const blob = new Blob([report], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'seo-report.md';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-sm"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export Report
+                </button>
+              )}
             </div>
           </div>
 
@@ -575,6 +632,28 @@ export default function DashboardOverview() {
 
           {/* Domain Overview — SEMrush-like analysis */}
           <DomainOverview session={session} />
+
+          {/* Free SEO Tools */}
+          <div className="premium-card rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Free SEO Tools</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { name: 'Robots.txt Analyzer', href: '/tools/robots-analyzer', desc: 'Check AI crawler access' },
+                { name: 'Readability Checker', href: '/tools/readability-checker', desc: 'Flesch-Kincaid scoring' },
+                { name: 'Hreflang Validator', href: '/tools/hreflang-validator', desc: 'International SEO check' },
+                { name: 'AI Search Readiness', href: '/tools/ai-search-readiness', desc: 'GEO optimization score' },
+                { name: 'Comparison Builder', href: '/tools/comparison-builder', desc: 'Generate comparison pages' },
+              ].map(tool => (
+                <a key={tool.name} href={tool.href} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-emerald-500/30 transition-colors group">
+                  <Wrench className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <div className="text-sm font-medium text-[var(--text-primary)] group-hover:text-emerald-400 transition-colors">{tool.name}</div>
+                    <div className="text-xs text-[var(--text-muted)]">{tool.desc}</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
         </motion.div>
       )}
 
@@ -1066,6 +1145,10 @@ export default function DashboardOverview() {
                               <div className="flex items-center gap-2">
                                 <Search className="w-3 h-3 text-zinc-600 flex-shrink-0" />
                                 <span className="text-zinc-300 font-medium truncate max-w-[200px]">{opp.query}</span>
+                                <IntentBadge keyword={opp.query} />
+                                {getAnnotations({ position: opp.position, ctr: opp.ctr ? parseFloat(String(opp.ctr)) / 100 : undefined, clicks: opp.clicks || 0, impressions: opp.impressions }).map(a => (
+                                  <AnnotationBadge key={a} type={a} />
+                                ))}
                               </div>
                             </td>
                             <td className="text-right py-3 px-4">
@@ -1259,7 +1342,10 @@ export default function DashboardOverview() {
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-400/10 text-emerald-400 font-bold">#{q.position.toFixed(0)}</span>
                         <Flame className="w-3 h-3 text-amber-400" />
                       </div>
-                      <p className="text-xs text-zinc-300 font-medium truncate mb-1">{q.query}</p>
+                      <div className="flex items-center gap-1 mb-1">
+                        <p className="text-xs text-zinc-300 font-medium truncate">{q.query}</p>
+                        <IntentBadge keyword={q.query} />
+                      </div>
                       <p className="text-[10px] text-zinc-500">{q.clicks} clicks &middot; {q.impressions.toLocaleString()} imp</p>
                     </div>
                   ))}
@@ -1524,7 +1610,13 @@ export default function DashboardOverview() {
 
                             <div className="flex-1 min-w-0">
                               {/* Keyword name */}
-                              <p className="text-[13px] text-zinc-200 font-medium truncate group-hover:text-white transition-colors">{kw.query}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-[13px] text-zinc-200 font-medium truncate group-hover:text-white transition-colors">{kw.query}</p>
+                                <IntentBadge keyword={kw.query} />
+                                {getAnnotations({ position: parseFloat(kw.position), impressions: kw.impressions, clicks: kw.clicks }).map(a => (
+                                  <AnnotationBadge key={a} type={a} />
+                                ))}
+                              </div>
 
                               {/* Stats row */}
                               <div className="flex items-center gap-3 mt-1.5 text-[10px] text-zinc-500">
@@ -1641,7 +1733,10 @@ export default function DashboardOverview() {
                       return (
                         <div key={i} onClick={() => setDrawerContent({ type: 'ctr', title: item.query, data: item })} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-red-500/10 transition-all cursor-pointer">
                           <div className="flex items-start justify-between gap-2 mb-2">
-                            <p className="text-[12px] text-zinc-300 flex-1 truncate font-medium">&quot;{item.query}&quot;</p>
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                              <p className="text-[12px] text-zinc-300 truncate font-medium">&quot;{item.query}&quot;</p>
+                              <IntentBadge keyword={item.query} />
+                            </div>
                             <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded font-semibold flex-shrink-0 border border-red-500/15">
                               -{item.gap}% gap
                             </span>
@@ -1730,7 +1825,12 @@ export default function DashboardOverview() {
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[12px] text-zinc-200 truncate font-medium">{page.page}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-[12px] text-zinc-200 truncate font-medium">{page.page}</p>
+                                  {getAnnotations({ clicks: page.clicks, impressions: page.impressions, position: parseFloat(page.position) }).map(a => (
+                                    <AnnotationBadge key={a} type={a} />
+                                  ))}
+                                </div>
                                 <div className="flex items-center gap-3 text-[10px] text-zinc-500 mt-1">
                                   <span className="flex items-center gap-1">
                                     <MousePointer className="w-2.5 h-2.5 text-cyan-400/50" />

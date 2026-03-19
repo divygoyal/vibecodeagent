@@ -29,7 +29,7 @@ const swrOptions = {
 // so data fetching isn't permanently blocked if registration is slow or fails.
 const REGISTRATION_TIMEOUT = 3000; // 3 seconds max wait (reduced from 5s)
 
-function useRegisteredSWR(url: string | null, options = {}) {
+function useRegisteredSWR<T = any>(url: string | null, options = {}) {
     const { isRegistered, isRegistering, registrationError } = useRegistration();
     const [timedOut, setTimedOut] = useState(false);
 
@@ -56,7 +56,7 @@ function useRegisteredSWR(url: string | null, options = {}) {
     const canFetch = isRegistered || optimistic || timedOut || !!registrationError;
     const key = canFetch ? url : null;
 
-    return useSWR(key, fetcher, { ...swrOptions, ...options });
+    return useSWR<T>(key, fetcher, { ...swrOptions, ...options });
 }
 
 export function useContainerStatus() {
@@ -230,4 +230,32 @@ export function useCredits() {
         isError: error,
         refresh: mutate,
     };
+}
+
+export function useOpportunitiesData(siteUrl: string | null, timeframe: string = '28d') {
+  const url = siteUrl
+    ? `/api/seo/opportunities?siteUrl=${encodeURIComponent(siteUrl)}&timeframe=${timeframe}`
+    : null;
+  return useRegisteredSWR<{ queries: any[]; comparisonQueries: any[] }>(url);
+}
+
+export function useKeywordDetail(siteUrl: string | null, keyword: string | null) {
+  const url = siteUrl && keyword
+    ? `/api/seo/keyword-detail?siteUrl=${encodeURIComponent(siteUrl)}&keyword=${encodeURIComponent(keyword)}`
+    : null;
+  return useRegisteredSWR<{ pages: any[]; trend: any[] }>(url);
+}
+
+export function usePageDetail(siteUrl: string | null, pageUrl: string | null) {
+  const url = siteUrl && pageUrl
+    ? `/api/seo/page-detail?siteUrl=${encodeURIComponent(siteUrl)}&pageUrl=${encodeURIComponent(pageUrl)}`
+    : null;
+  return useRegisteredSWR<{ keywords: any[]; devices: any[] }>(url);
+}
+
+export function useMobileGapData(siteUrl: string | null) {
+  const url = siteUrl
+    ? `/api/seo/mobile-gap?siteUrl=${encodeURIComponent(siteUrl)}`
+    : null;
+  return useRegisteredSWR<{ data: any[] }>(url);
 }

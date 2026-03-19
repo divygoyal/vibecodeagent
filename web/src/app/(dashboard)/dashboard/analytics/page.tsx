@@ -19,6 +19,7 @@ import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/co
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
 import TableActionMenu, { useTableActions } from '@/components/TableActionMenu';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
+import { AnnotationBadge, getAnnotations } from '@/components/AnnotationBadge';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
 import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
 import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
@@ -467,7 +468,14 @@ export default function AnalyticsPage() {
                         onRowClick={(item: any) => toggleFilter('page', item.page)}
                         activeRow={(item: any) => filters.page.includes(item.page)}
                         columns={[
-                            { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[180px] block">{item.page}</span> },
+                            { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => (
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-zinc-300 text-xs truncate max-w-[180px] block">{item.page}</span>
+                                    {getAnnotations({ clicks: item.views, impressions: item.views }).map(type => (
+                                        <AnnotationBadge key={type} type={type} />
+                                    ))}
+                                </div>
+                            ) },
                             { key: 'views', label: 'Views', align: 'right' as const, sortable: true, getValue: (item: any) => item.views, render: (item: any) => <Bar value={item.views} max={maxPageViews} color="bg-indigo-500/40" /> },
                             { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
                             {
@@ -567,7 +575,14 @@ export default function AnalyticsPage() {
                 <AnalyticsTable
                     data={fEntryPages} searchKey={(item: any) => item.page} searchPlaceholder="Search entry pages..." maxRows={15}
                     columns={[
-                        { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[280px] block">{item.page}</span> },
+                        { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-zinc-300 text-xs truncate max-w-[280px] block">{item.page}</span>
+                                {getAnnotations({ clicks: item.sessions, impressions: item.views }).map(type => (
+                                    <AnnotationBadge key={type} type={type} />
+                                ))}
+                            </div>
+                        ) },
                         { key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.sessions, render: (item: any) => <Bar value={item.sessions} max={maxEntryPageSessions} color="bg-cyan-500/40" /> },
                         { key: 'users', label: 'Users', align: 'right' as const, sortable: true, getValue: (item: any) => item.users || 0, render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span> },
                         { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },

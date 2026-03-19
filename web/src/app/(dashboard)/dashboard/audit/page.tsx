@@ -52,7 +52,7 @@ function ScoreRing({ score }: { score: number }) {
 }
 
 // ─── Issue row ───
-function IssueRow({ issue }: { issue: AuditIssue }) {
+function IssueRow({ issue, auditUrl }: { issue: AuditIssue; auditUrl?: string }) {
     const [expanded, setExpanded] = useState(false);
     const sev = severityConfig[issue.severity];
     const SevIcon = sev.icon;
@@ -85,7 +85,15 @@ function IssueRow({ issue }: { issue: AuditIssue }) {
                             <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                             <span className="flex-1">{issue.recommendation}</span>
                             {(issue.severity === 'critical' || issue.severity === 'warning') && (
-                                <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} />
+                                <>
+                                    <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} />
+                                    <FixWithBotButton
+                                        label="Fix with AI"
+                                        context={`Fix this SEO issue on ${auditUrl || 'the audited page'}: ${issue.title} - ${issue.description}`}
+                                        size="sm"
+                                        variant="ghost"
+                                    />
+                                </>
                             )}
                         </div>
                     )}
@@ -96,7 +104,7 @@ function IssueRow({ issue }: { issue: AuditIssue }) {
 }
 
 // ─── Category group ───
-function CategoryGroup({ category, issues }: { category: string; issues: AuditIssue[] }) {
+function CategoryGroup({ category, issues, auditUrl }: { category: string; issues: AuditIssue[]; auditUrl?: string }) {
     const [collapsed, setCollapsed] = useState(false);
     const CatIcon = categoryIcons[category] || FileText;
     const criticals = issues.filter(i => i.severity === 'critical').length;
@@ -120,7 +128,7 @@ function CategoryGroup({ category, issues }: { category: string; issues: AuditIs
             </button>
             {!collapsed && (
                 <div className="space-y-1.5 pl-7">
-                    {issues.map(issue => <IssueRow key={issue.id} issue={issue} />)}
+                    {issues.map(issue => <IssueRow key={issue.id} issue={issue} auditUrl={auditUrl} />)}
                 </div>
             )}
         </div>
@@ -458,7 +466,7 @@ export default function AuditPage() {
                     {/* Issues by category */}
                     <div className="space-y-4">
                         {sortedCategories.map(cat => (
-                            <CategoryGroup key={cat} category={cat} issues={groupedIssues[cat]} />
+                            <CategoryGroup key={cat} category={cat} issues={groupedIssues[cat]} auditUrl={url} />
                         ))}
                     </div>
 

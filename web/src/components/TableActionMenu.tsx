@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     MoreHorizontal, ScanSearch, Sparkles, TrendingUp, Copy,
-    ExternalLink, BarChart3, FileText, Target, Zap
+    ExternalLink, BarChart3, FileText, Target, Zap, RefreshCw, Ghost, Smartphone
 } from 'lucide-react';
 
 interface ActionItem {
@@ -134,8 +134,70 @@ export function useTableActions() {
         onClick: () => router.push(`/dashboard/analytics`),
     });
 
+    const refreshContent = (url: string) => ({
+        label: 'Refresh Content',
+        icon: RefreshCw,
+        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
+            detail: { message: `Suggest content refresh strategies for this page: ${url}` }
+        })),
+    });
+
+    const zombieAction = (url: string, diagnosis: string) => ({
+        label: `Fix ${diagnosis}`,
+        icon: Ghost,
+        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
+            detail: { message: `This page is classified as a "${diagnosis}" page (0 clicks). Suggest what to do with: ${url}` }
+        })),
+    });
+
+    const mobileOptimize = (query: string) => ({
+        label: 'Optimize for Mobile',
+        icon: Smartphone,
+        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
+            detail: { message: `Suggest mobile optimization strategies for the keyword: ${query}` }
+        })),
+    });
+
     return {
         auditPage, analyzeWithAI, trackKeyword, optimizePage,
         viewTrend, copyToClipboard, openExternal, generateContent, viewAnalytics,
+        refreshContent, zombieAction, mobileOptimize,
     };
+}
+
+interface BulkActionBarProps {
+    selectedCount: number;
+    onClearSelection: () => void;
+    actions: ActionItem[];
+}
+
+export function BulkActionBar({ selectedCount, onClearSelection, actions }: BulkActionBarProps) {
+    if (selectedCount === 0) return null;
+
+    return (
+        <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mb-4">
+            <span className="text-sm font-medium text-emerald-400">{selectedCount} selected</span>
+            <div className="flex items-center gap-2 ml-auto">
+                {actions.map((action, i) => {
+                    const Icon = action.icon;
+                    return (
+                        <button
+                            key={i}
+                            onClick={action.onClick}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                        >
+                            <Icon className="w-3.5 h-3.5" />
+                            {action.label}
+                        </button>
+                    );
+                })}
+                <button
+                    onClick={onClearSelection}
+                    className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-2 transition-colors"
+                >
+                    Clear
+                </button>
+            </div>
+        </div>
+    );
 }

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { runSiteAudit } from '@/lib/siteAudit';
 import { isBlockedUrl } from '@/lib/urlValidation';
+import * as cheerio from 'cheerio';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -270,6 +271,235 @@ async function analyzeSitemap(baseUrl: string) {
     return { found: true, urlCount };
 }
 
+// ─── 7. Readability Analysis ───
+
+function countSyllables(word: string): number {
+    word = word.toLowerCase().replace(/[^a-z]/g, '');
+    if (word.length <= 2) return 1;
+
+    // Remove trailing silent e
+    word = word.replace(/e$/, '');
+    // Count vowel groups
+    const vowelGroups = word.match(/[aeiouy]+/g);
+    const count = vowelGroups ? vowelGroups.length : 1;
+    return Math.max(1, count);
+}
+
+async function analyzeReadability(url: string) {
+    const res = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; TrafficClaw/1.0; +https://trafficclaw.com)',
+        },
+        redirect: 'follow',
+    });
+    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // Remove script/style/nav/footer elements
+    $('script, style, nav, footer, header, noscript').remove();
+    const text = $('body').text().replace(/\s+/g, ' ').trim();
+
+    // Split into sentences (period, question mark, exclamation mark followed by space or end)
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 2);
+    const sentenceCount = Math.max(1, sentences.length);
+
+    // Split into words
+    const words = text.split(/\s+/).filter(w => w.replace(/[^a-zA-Z]/g, '').length > 0);
+    const wordCount = Math.max(1, words.length);
+
+    // Count syllables
+    let totalSyllables = 0;
+    for (const word of words) {
+        totalSyllables += countSyllables(word);
+    }
+
+    const avgWordsPerSentence = wordCount / sentenceCount;
+    const avgSyllablesPerWord = totalSyllables / wordCount;
+
+    // Flesch-Kincaid readability score
+    const score = Math.max(0, Math.min(100, Math.round(
+        206.835 - 1.015 * avgWordsPerSentence - 84.6 * avgSyllablesPerWord
+    )));
+
+    // Flesch-Kincaid grade level
+    const grade = Math.max(0, parseFloat(
+        (0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59).toFixed(1)
+    ));
+
+    // Rating mapping
+    let rating: string;
+    if (score >= 90) rating = 'Very Easy';
+    else if (score >= 80) rating = 'Easy';
+    else if (score >= 70) rating = 'Fairly Easy';
+    else if (score >= 60) rating = 'Standard';
+    else if (score >= 50) rating = 'Fairly Difficult';
+    else if (score >= 30) rating = 'Difficult';
+    else rating = 'Very Difficult';
+
+    return {
+        score,
+        grade,
+        wordCount,
+        sentenceCount,
+        avgWordsPerSentence: parseFloat(avgWordsPerSentence.toFixed(1)),
+        avgSyllablesPerWord: parseFloat(avgSyllablesPerWord.toFixed(2)),
+        rating,
+    };
+}
+
+// ─── 8. GEO (AI Search Readiness) Analysis ───
+
+async function analyzeGeoReadiness(url: string) {
+    const res = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; TrafficClaw/1.0; +https://trafficclaw.com)',
+        },
+        redirect: 'follow',
+    });
+    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // ── Citability ──
+    const citabilityFindings: string[] = [];
+    const bodyText = $('body').text();
+    const numberMatches = bodyText.match(/\d+(\.\d+)?%|\$[\d,.]+|\d{2,}/g);
+    const statsCount = numberMatches ? numberMatches.length : 0;
+    citabilityFindings.push(`${statsCount} statistics/numbers found in content`);
+
+    const blockquotes = $('blockquote').length;
+    citabilityFindings.push(`${blockquotes} blockquote(s)`);
+
+    const citeElements = $('cite, [data-citation], .citation, .reference').length;
+    citabilityFindings.push(`${citeElements} citation element(s)`);
+
+    const dataTables = $('table').filter(function () {
+        return $(this).find('th, thead').length > 0;
+    }).length;
+    citabilityFindings.push(`${dataTables} data table(s)`);
+
+    let citabilityScore = Math.min(100,
+        Math.min(40, statsCount * 4) +
+        Math.min(20, blockquotes * 10) +
+        Math.min(20, citeElements * 10) +
+        Math.min(20, dataTables * 10)
+    );
+
+    // ── Structural Readability ──
+    const structureFindings: string[] = [];
+    const h1Count = $('h1').length;
+    const h2Count = $('h2').length;
+    const h3Count = $('h3').length;
+    const h4Count = $('h4').length;
+    const h5Count = $('h5').length;
+    const h6Count = $('h6').length;
+    const totalHeadings = h1Count + h2Count + h3Count + h4Count + h5Count + h6Count;
+    structureFindings.push(`${totalHeadings} headings (H1:${h1Count} H2:${h2Count} H3:${h3Count} H4:${h4Count} H5:${h5Count} H6:${h6Count})`);
+
+    const lists = $('ol, ul').length;
+    structureFindings.push(`${lists} ordered/unordered list(s)`);
+
+    // Check for short paragraphs (< 150 words)
+    const paragraphs = $('p');
+    let shortParagraphs = 0;
+    let totalParagraphs = 0;
+    paragraphs.each(function () {
+        const pText = $(this).text().trim();
+        if (pText.length > 0) {
+            totalParagraphs++;
+            const pWords = pText.split(/\s+/).length;
+            if (pWords < 150) shortParagraphs++;
+        }
+    });
+    structureFindings.push(`${shortParagraphs}/${totalParagraphs} paragraphs are concise (<150 words)`);
+
+    const faqSections = $('[itemtype*="FAQPage"], .faq, #faq, [class*="faq"], details, summary').length;
+    structureFindings.push(`${faqSections} FAQ/accordion element(s)`);
+
+    let structureScore = Math.min(100,
+        Math.min(30, totalHeadings * 5) +
+        Math.min(20, lists * 5) +
+        (totalParagraphs > 0 ? Math.min(30, Math.round((shortParagraphs / totalParagraphs) * 30)) : 0) +
+        Math.min(20, faqSections * 10)
+    );
+
+    // ── Multi-modal ──
+    const multimodalFindings: string[] = [];
+    const images = $('img');
+    let imagesWithAlt = 0;
+    images.each(function () {
+        if ($(this).attr('alt')?.trim()) imagesWithAlt++;
+    });
+    multimodalFindings.push(`${imagesWithAlt}/${images.length} images have alt text`);
+
+    const videos = $('video, iframe[src*="youtube"], iframe[src*="vimeo"], iframe[src*="wistia"]').length;
+    multimodalFindings.push(`${videos} video/iframe element(s)`);
+
+    const figures = $('figure').length;
+    const figcaptions = $('figcaption').length;
+    multimodalFindings.push(`${figures} figure(s), ${figcaptions} figcaption(s)`);
+
+    let multimodalScore = Math.min(100,
+        (images.length > 0 ? Math.min(40, Math.round((imagesWithAlt / images.length) * 40)) : 0) +
+        Math.min(10, images.length * 2) +
+        Math.min(25, videos * 12) +
+        Math.min(25, (figures + figcaptions) * 8)
+    );
+
+    // ── Authority ──
+    const authorityFindings: string[] = [];
+    const authorMeta = $('meta[name="author"], [rel="author"], .author, [itemprop="author"]').length;
+    authorityFindings.push(`${authorMeta} author indicator(s)`);
+
+    const dateMeta = $('meta[property="article:published_time"], time[datetime], [itemprop="datePublished"], meta[name="date"]').length;
+    authorityFindings.push(`${dateMeta} publish date indicator(s)`);
+
+    const jsonLd = $('script[type="application/ld+json"]').length;
+    authorityFindings.push(`${jsonLd} JSON-LD schema block(s)`);
+
+    const externalLinks = $('a[href^="http"]').filter(function () {
+        try {
+            const href = $(this).attr('href') || '';
+            const linkHost = new URL(href).hostname;
+            const pageHost = new URL(url).hostname;
+            return linkHost !== pageHost;
+        } catch {
+            return false;
+        }
+    }).length;
+    authorityFindings.push(`${externalLinks} external source link(s)`);
+
+    let authorityScore = Math.min(100,
+        Math.min(25, authorMeta * 25) +
+        Math.min(25, dateMeta * 25) +
+        Math.min(25, jsonLd * 12) +
+        Math.min(25, externalLinks * 3)
+    );
+
+    // Weighted overall
+    const overallScore = Math.round(
+        citabilityScore * 0.25 +
+        structureScore * 0.30 +
+        multimodalScore * 0.20 +
+        authorityScore * 0.25
+    );
+
+    return {
+        overallScore,
+        categories: {
+            citability: { score: citabilityScore, findings: citabilityFindings },
+            structure: { score: structureScore, findings: structureFindings },
+            multimodal: { score: multimodalScore, findings: multimodalFindings },
+            authority: { score: authorityScore, findings: authorityFindings },
+        },
+    };
+}
+
 // ─── Main Handler ───
 
 export async function POST(req: Request) {
@@ -316,6 +546,8 @@ export async function POST(req: Request) {
             techResult,
             robotsResult,
             sitemapResult,
+            readabilityResult,
+            geoResult,
         ] = await Promise.allSettled([
             analyzeSiteAudit(url),
             analyzePageSpeed(url),
@@ -323,6 +555,8 @@ export async function POST(req: Request) {
             detectTechnologies(url),
             analyzeRobots(url),
             analyzeSitemap(url),
+            analyzeReadability(url),
+            analyzeGeoReadiness(url),
         ]);
 
         return NextResponse.json({
@@ -335,6 +569,8 @@ export async function POST(req: Request) {
             technologies: techResult.status === 'fulfilled' ? techResult.value : [],
             robots: robotsResult.status === 'fulfilled' ? robotsResult.value : null,
             sitemap: sitemapResult.status === 'fulfilled' ? sitemapResult.value : null,
+            readability: readabilityResult.status === 'fulfilled' ? readabilityResult.value : null,
+            geoReadiness: geoResult.status === 'fulfilled' ? geoResult.value : null,
         });
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Analysis failed';

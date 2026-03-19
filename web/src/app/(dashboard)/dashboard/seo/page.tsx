@@ -18,6 +18,12 @@ import FixWithBotButton from '@/components/FixWithBotButton';
 import TableActionMenu, { useTableActions } from '@/components/TableActionMenu';
 import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
 import { useRegistration } from '../layout';
+import KeywordDetailDrawer from '@/components/KeywordDetailDrawer';
+import PageDetailDrawer from '@/components/PageDetailDrawer';
+import { AnnotationBadge, getAnnotations } from '@/components/AnnotationBadge';
+import { IntentBadge } from '@/components/IntentBadge';
+import ZombiePageMonitor from '@/components/dashboard/ZombiePageMonitor';
+import MobileGapWidget from '@/components/dashboard/MobileGapWidget';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -114,6 +120,8 @@ export default function SEOPage() {
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
     const { selectedSite, setSelectedSite } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
+    const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
+    const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
 
     // SEO Tools state
     const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -764,7 +772,15 @@ export default function SEOPage() {
                                 {queries.map((q, i) => (
                                     <tr key={i} className="table-row-premium border-b border-white/[0.03] relative">
                                         <td className="py-3">
-                                            <span className="text-zinc-300 font-medium">{q.query}</span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <button onClick={() => setSelectedKeyword(q.query)} className="text-left hover:text-emerald-400 transition-colors cursor-pointer">
+                                                    <span className="text-zinc-300 font-medium">{q.query}</span>
+                                                </button>
+                                                <IntentBadge keyword={q.query} />
+                                                {getAnnotations({ position: q.position, ctr: q.ctr, clicks: q.clicks, impressions: q.impressions }).map(type => (
+                                                    <AnnotationBadge key={type} type={type} />
+                                                ))}
+                                            </div>
                                         </td>
                                         <td className="text-right text-emerald-400 font-semibold">{q.clicks.toLocaleString()}</td>
                                         <td className="text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
@@ -806,7 +822,15 @@ export default function SEOPage() {
                                     <tr key={i} className="table-row-premium border-b border-white/[0.03] relative">
                                         <td className="py-3">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-zinc-300 font-medium truncate max-w-[160px] sm:max-w-[240px]">{p.page}</span>
+                                                <button
+                                                    onClick={() => setSelectedPageUrl(p.page)}
+                                                    className="text-left hover:text-emerald-400 transition-colors cursor-pointer truncate max-w-[160px] sm:max-w-[240px]"
+                                                >
+                                                    <span className="text-zinc-300 font-medium">{p.page}</span>
+                                                </button>
+                                                {getAnnotations({ clicks: p.clicks, impressions: p.impressions }).map(type => (
+                                                    <AnnotationBadge key={type} type={type} />
+                                                ))}
                                             </div>
                                         </td>
                                         <td className="text-right text-emerald-400 font-semibold">{p.clicks.toLocaleString()}</td>
@@ -840,6 +864,26 @@ export default function SEOPage() {
                     )}
                 </div>
             </div>
+
+            {/* Zombie Pages Section */}
+            {seoData?.pages && (
+                <div className="mt-8">
+                    <ZombiePageMonitor data={seoData.pages.map((p: any) => ({
+                        page: p.page || '',
+                        clicks: p.clicks || 0,
+                        impressions: p.impressions || 0,
+                        ctr: p.ctr || 0,
+                        position: p.position || 0,
+                    }))} />
+                </div>
+            )}
+
+            {/* Mobile Gap Analysis */}
+            {selectedSite && (
+                <div className="mt-8">
+                    <MobileGapWidget siteUrl={selectedSite} />
+                </div>
+            )}
 
             {/* ─── SERP Preview & Quick Actions ─── */}
             {queries.length > 0 && (
@@ -922,6 +966,19 @@ export default function SEOPage() {
                     </div>
                 </div>
             )}
+
+            <KeywordDetailDrawer
+                isOpen={!!selectedKeyword}
+                onClose={() => setSelectedKeyword(null)}
+                keyword={selectedKeyword}
+                siteUrl={selectedSite || null}
+            />
+            <PageDetailDrawer
+                isOpen={!!selectedPageUrl}
+                onClose={() => setSelectedPageUrl(null)}
+                pageUrl={selectedPageUrl}
+                siteUrl={selectedSite || null}
+            />
         </div>
     );
 }
