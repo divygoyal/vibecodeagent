@@ -17,6 +17,7 @@ import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
+import TableActionMenu, { useTableActions } from '@/components/TableActionMenu';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
 import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
@@ -91,7 +92,7 @@ const ChartTooltip = ({ active, payload, label }: any) => {
     );
 };
 
-const CARD = 'bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border border-white/[0.04] rounded-2xl hover:border-white/[0.1] transition-all duration-200';
+const CARD = 'premium-card stat-card-hover';
 
 // ─── Main Overview Page ───
 // Traffic Sources donut colors
@@ -103,6 +104,7 @@ export default function AnalyticsPage() {
     const { data: seoData } = useSeoData('all', undefined, hasGoogleConnection);
     const { filters, toggleFilter } = useFilterStore();
     const [drilldown, setDrilldown] = useState<any>(null);
+    const { auditPage, analyzeWithAI, optimizePage, copyToClipboard, openExternal } = useTableActions();
 
     if (isLoading && !analyticsData) return <SkeletonDashboard />;
     if (isError && !analyticsData) {
@@ -440,6 +442,19 @@ export default function AnalyticsPage() {
                         columns={[
                             { key: 'referrer', label: 'Referrer', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2"><ReferrerIcon referrer={item.name} /><span className="text-zinc-300 text-xs truncate max-w-[140px]">{item.name}</span></div>) },
                             { key: 'events', label: 'Events', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <Bar value={item.value} max={maxRef} /> },
+                            {
+                                key: 'actions',
+                                label: 'Actions',
+                                align: 'right' as const,
+                                width: '60px',
+                                render: (item: any) => (
+                                    <TableActionMenu size="sm" actions={[
+                                        analyzeWithAI(`Analyze traffic from referrer "${item.referrer || item.source || item.name}": how can we get more traffic from this source?`, ''),
+                                        openExternal(item.referrer || item.source || item.name || ''),
+                                        copyToClipboard(item.referrer || item.source || item.name || ''),
+                                    ]} />
+                                ),
+                            },
                         ]}
                         defaultSort={{ key: 'events', dir: 'desc' }}
                     />
@@ -455,6 +470,21 @@ export default function AnalyticsPage() {
                             { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => <span className="text-zinc-300 text-xs truncate max-w-[180px] block">{item.page}</span> },
                             { key: 'views', label: 'Views', align: 'right' as const, sortable: true, getValue: (item: any) => item.views, render: (item: any) => <Bar value={item.views} max={maxPageViews} color="bg-indigo-500/40" /> },
                             { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
+                            {
+                                key: 'actions',
+                                label: 'Actions',
+                                align: 'right' as const,
+                                width: '60px',
+                                render: (item: any) => (
+                                    <TableActionMenu size="sm" actions={[
+                                        auditPage(item.page || item.pagePath || ''),
+                                        optimizePage(item.page || item.pagePath || ''),
+                                        analyzeWithAI(`Analyze page performance: ${item.page || item.pagePath}`, ''),
+                                        openExternal(item.page || item.pagePath || ''),
+                                        copyToClipboard(item.page || item.pagePath || ''),
+                                    ]} />
+                                ),
+                            },
                         ]}
                         defaultSort={{ key: 'views', dir: 'desc' }}
                     />
@@ -496,6 +526,19 @@ export default function AnalyticsPage() {
                                     );
                                 }
                             },
+                            {
+                                key: 'actions',
+                                label: 'Actions',
+                                align: 'right' as const,
+                                width: '60px',
+                                render: (item: any) => (
+                                    <TableActionMenu size="sm" actions={[
+                                        analyzeWithAI(`Analyze traffic from referrer "${item.referrer || item.source || item.name}": how can we get more traffic from this source?`, ''),
+                                        openExternal(item.referrer || item.source || item.name || ''),
+                                        copyToClipboard(item.referrer || item.source || item.name || ''),
+                                    ]} />
+                                ),
+                            },
                         ]}
                         defaultSort={{ key: 'value', dir: 'desc' }}
                     />
@@ -528,6 +571,21 @@ export default function AnalyticsPage() {
                         { key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.sessions, render: (item: any) => <Bar value={item.sessions} max={maxEntryPageSessions} color="bg-cyan-500/40" /> },
                         { key: 'users', label: 'Users', align: 'right' as const, sortable: true, getValue: (item: any) => item.users || 0, render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span> },
                         { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
+                        {
+                            key: 'actions',
+                            label: 'Actions',
+                            align: 'right' as const,
+                            width: '60px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    auditPage(item.page || item.pagePath || ''),
+                                    optimizePage(item.page || item.pagePath || ''),
+                                    analyzeWithAI(`Analyze page performance: ${item.page || item.pagePath}`, ''),
+                                    openExternal(item.page || item.pagePath || ''),
+                                    copyToClipboard(item.page || item.pagePath || ''),
+                                ]} />
+                            ),
+                        },
                     ]}
                     defaultSort={{ key: 'sessions', dir: 'desc' }}
                 />
@@ -542,6 +600,18 @@ export default function AnalyticsPage() {
                         { key: 'name', label: 'Language', sortable: true, getValue: (item: any) => item.name, render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span> },
                         { key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span> },
                         { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span> },
+                        {
+                            key: 'actions',
+                            label: 'Actions',
+                            align: 'right' as const,
+                            width: '60px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze traffic from ${item.country || item.region || item.name}: ${item.users || item.activeUsers || item.value} users. What opportunities exist for this market?`, ''),
+                                    copyToClipboard(item.country || item.region || item.name || ''),
+                                ]} />
+                            ),
+                        },
                     ]}
                     defaultSort={{ key: 'value', dir: 'desc' }}
                 />
@@ -564,6 +634,7 @@ export default function AnalyticsPage() {
 function GeoPanel({ countries, cities, allCountries, maxUsers }: { countries: any[]; cities: any[]; allCountries: any[]; maxUsers: number }) {
     const [tab, setTab] = useState<'country' | 'city'>('country');
     const { filters, toggleFilter } = useFilterStore();
+    const { analyzeWithAI, copyToClipboard } = useTableActions();
     return (
         <div>
             <div className="flex items-center gap-3 mb-3">
@@ -588,6 +659,18 @@ function GeoPanel({ countries, cities, allCountries, maxUsers }: { countries: an
                 columns={[
                     { key: 'name', label: tab === 'country' ? 'Country' : 'City', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2"><CountryFlag country={item.name.split(',')[0]} /><span className="text-zinc-300 text-xs truncate max-w-[130px]">{item.name}</span></div>) },
                     { key: 'events', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.events, render: (item: any) => <Bar value={item.events} max={maxUsers} color="bg-violet-500/40" /> },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                        align: 'right' as const,
+                        width: '60px',
+                        render: (item: any) => (
+                            <TableActionMenu size="sm" actions={[
+                                analyzeWithAI(`Analyze traffic from ${item.country || item.region || item.name}: ${item.users || item.activeUsers || item.events} users. What opportunities exist for this market?`, ''),
+                                copyToClipboard(item.country || item.region || item.name || ''),
+                            ]} />
+                        ),
+                    },
                 ]}
                 defaultSort={{ key: 'events', dir: 'desc' }}
             />
@@ -598,6 +681,7 @@ function GeoPanel({ countries, cities, allCountries, maxUsers }: { countries: an
 function TechPanel({ devices, browsers, operatingSystems, allDevices, allBrowsers, allOS }: { devices: any[]; browsers: any[]; operatingSystems: any[]; allDevices: any[]; allBrowsers: any[]; allOS: any[] }) {
     const [tab, setTab] = useState<'device' | 'browser' | 'os'>('device');
     const { filters, toggleFilter } = useFilterStore();
+    const { analyzeWithAI, copyToClipboard } = useTableActions();
     const data = tab === 'device' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, pct: d.percentage }))
         : tab === 'browser' ? browsers.map((b: any) => ({ name: b.name, value: b.value, pct: b.percentage }))
             : operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }));
@@ -622,6 +706,18 @@ function TechPanel({ devices, browsers, operatingSystems, allDevices, allBrowser
                     { key: 'name', label: 'Name', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2">{tab === 'device' ? <DeviceIcon device={item.name} /> : tab === 'browser' ? <BrowserIcon browser={item.name} /> : <OSIcon os={item.name} />}<span className="text-zinc-300 text-xs">{item.name}</span></div>) },
                     { key: 'value', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <Bar value={item.value} max={maxVal} color="bg-cyan-500/40" /> },
                     { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.pct}%</span> },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                        align: 'right' as const,
+                        width: '60px',
+                        render: (item: any) => (
+                            <TableActionMenu size="sm" actions={[
+                                analyzeWithAI(`Analyze ${item.device || item.browser || item.os || item.name} traffic: ${item.users || item.activeUsers || item.value} users, ${item.bounceRate || item.pct}% bounce rate. Are there optimization opportunities?`, ''),
+                                copyToClipboard(item.device || item.browser || item.os || item.name || ''),
+                            ]} />
+                        ),
+                    },
                 ]}
                 defaultSort={{ key: 'value', dir: 'desc' }}
             />

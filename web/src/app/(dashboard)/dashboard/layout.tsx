@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
+const FloatingAuditBanner = dynamic(() => import('@/components/FloatingAuditBanner'), { ssr: false });
 import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
@@ -725,6 +726,9 @@ export default function DashboardLayout({
 
             {/* Global AI Chatbot — available on every page */}
             <AIChatbot />
+
+            {/* Floating audit banner — available on every page */}
+            <FloatingAuditBanner />
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
