@@ -11,7 +11,7 @@ import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
     ArrowRight, CheckCircle2, Star, Sparkles, Tag, Copy, Check,
-    MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare,
+    MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare, Send, Loader2, AlertCircle, Mail,
     ScanSearch, Clock, Monitor, ExternalLink, Link2, Share2, Music, History, Navigation, Maximize2
 } from 'lucide-react';
 import {
@@ -2128,6 +2128,176 @@ function StickyMobileCTA() {
 }
 
 /* ═══════════════════════════════════════
+   CONTACT / HELP SECTION
+   ═══════════════════════════════════════ */
+
+function ContactSection() {
+    const [form, setForm] = useState({ name: '', email: '', message: '' });
+    const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+    const [errorMsg, setErrorMsg] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setStatus('sending');
+        setErrorMsg('');
+
+        try {
+            const res = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setStatus('error');
+                setErrorMsg(data.error || 'Something went wrong.');
+                return;
+            }
+
+            setStatus('success');
+            setForm({ name: '', email: '', message: '' });
+        } catch {
+            setStatus('error');
+            setErrorMsg('Network error. Please try again.');
+        }
+    };
+
+    return (
+        <Section id="contact" className="py-24 sm:py-32 px-6">
+            <div className="max-w-3xl mx-auto">
+                <motion.div variants={fadeUp} className="text-center mb-12">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                        <MessageSquare className="w-3 h-3" />
+                        HELP & SUPPORT
+                    </div>
+                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                        Got a{' '}
+                        <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                            question?
+                        </span>
+                    </h2>
+                    <p className="text-zinc-400 text-lg max-w-xl mx-auto">
+                        Drop us a message and we&apos;ll get back to you. Whether it&apos;s about features, pricing, or feedback — we&apos;re here to help.
+                    </p>
+                </motion.div>
+
+                {status === 'success' ? (
+                    <motion.div
+                        variants={fadeUp}
+                        className="p-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] text-center"
+                    >
+                        <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+                        <h3 className="text-xl font-bold text-white mb-2">Message sent!</h3>
+                        <p className="text-sm text-zinc-400 mb-6">
+                            Thanks for reaching out. We&apos;ll get back to you soon.
+                        </p>
+                        <button
+                            onClick={() => setStatus('idle')}
+                            className="px-6 py-2.5 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
+                        >
+                            Send another message
+                        </button>
+                    </motion.div>
+                ) : (
+                    <motion.form
+                        variants={fadeUp}
+                        onSubmit={handleSubmit}
+                        className="p-6 sm:p-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] space-y-5"
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label htmlFor="contact-name" className="block text-sm font-medium text-zinc-300 mb-2">
+                                    Name
+                                </label>
+                                <input
+                                    id="contact-name"
+                                    type="text"
+                                    required
+                                    maxLength={100}
+                                    placeholder="Your name"
+                                    value={form.name}
+                                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-600 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="contact-email" className="block text-sm font-medium text-zinc-300 mb-2">
+                                    Email
+                                </label>
+                                <input
+                                    id="contact-email"
+                                    type="email"
+                                    required
+                                    maxLength={254}
+                                    placeholder="you@example.com"
+                                    value={form.email}
+                                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-600 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="contact-message" className="block text-sm font-medium text-zinc-300 mb-2">
+                                Your question or message
+                            </label>
+                            <textarea
+                                id="contact-message"
+                                required
+                                rows={4}
+                                maxLength={2000}
+                                placeholder="How can we help you?"
+                                value={form.message}
+                                onChange={(e) => setForm({ ...form, message: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-600 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors resize-none"
+                            />
+                            <div className="text-right mt-1">
+                                <span className="text-xs text-zinc-600">{form.message.length}/2000</span>
+                            </div>
+                        </div>
+
+                        {status === 'error' && (
+                            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/[0.08] border border-red-500/20 text-sm text-red-400">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                {errorMsg}
+                            </div>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                            <button
+                                type="submit"
+                                disabled={status === 'sending'}
+                                className="w-full sm:w-auto px-8 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                {status === 'sending' ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Sending...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="w-4 h-4" />
+                                        Send Message
+                                    </>
+                                )}
+                            </button>
+                            <span className="text-sm text-zinc-600">
+                                or email us at{' '}
+                                <a href="mailto:trafficclaw@gmail.com" className="text-emerald-400/80 hover:text-emerald-400 transition-colors inline-flex items-center gap-1">
+                                    <Mail className="w-3 h-3" />
+                                    trafficclaw@gmail.com
+                                </a>
+                            </span>
+                        </div>
+                    </motion.form>
+                )}
+            </div>
+        </Section>
+    );
+}
+
+/* ═══════════════════════════════════════
    FOOTER
    ═══════════════════════════════════════ */
 
@@ -2146,7 +2316,7 @@ function Footer() {
                     <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
                     <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
                     <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>
-                    <a href="mailto:support@trafficclaw.com" className="hover:text-zinc-300 transition-colors">Contact</a>
+                    <Link href="/contact" className="hover:text-zinc-300 transition-colors">Contact</Link>
                 </div>
 
                 <div className="text-xs text-zinc-600">
@@ -2188,6 +2358,8 @@ export default function LandingPage() {
             <FAQ />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <FinalCTA />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <ContactSection />
             <StickyMobileCTA />
             <Footer />
         </>
