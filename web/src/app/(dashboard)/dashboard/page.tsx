@@ -15,7 +15,7 @@ import {
   DollarSign, Target, FileWarning, ArrowRight, Flame, CheckCircle2,
   Rocket, Tag, Shield,
   Crown, XCircle, Sparkles, ChevronRight, Filter, Brain,
-  MessageSquare, ExternalLink, RefreshCw, FileDown, Wrench
+  MessageSquare, ExternalLink, RefreshCw, FileDown
 } from 'lucide-react';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useInsights, useRealtimeData } from '@/lib/useDashboardData';
 import { useRegistration } from './layout';
@@ -28,6 +28,12 @@ import KPICard, { type KPIAction } from '@/components/dashboard/KPICard';
 import ActionCard from '@/components/dashboard/ActionCard';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import useKeyboardShortcuts from '@/lib/useKeyboardShortcuts';
+import { OnboardingFunnel } from '@/components/OnboardingFunnel';
+import { WorkspaceTabs, type WorkspaceTab } from '@/components/workspace/WorkspaceTabs';
+import ContentEditor from '@/components/workspace/ContentEditor';
+import KeywordResearch from '@/components/workspace/KeywordResearch';
+import CompetitorSpy from '@/components/workspace/CompetitorSpy';
+import SiteCrawler from '@/components/workspace/SiteCrawler';
 
 import type { DrawerContent } from '@/components/OverviewDetailDrawer';
 
@@ -239,6 +245,18 @@ export default function DashboardOverview() {
   // Empty shell: Google connected but no GA4 properties and no GSC sites
   const isEmptyShell = hasGoogleConnection && !containerLoading && !sitesLoading && !propsLoading
     && sites.length === 0 && properties.length === 0;
+
+  // ═══ WORKSPACE / ONBOARDING STATE ═══
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>('analysis');
+  const [funnelCompleted, setFunnelCompleted] = useState(false);
+  const [domainData, setDomainData] = useState<any>(null);
+
+  // Initialize funnelCompleted from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setFunnelCompleted(localStorage.getItem('tc-funnel-completed') === 'true');
+    }
+  }, []);
 
   // ═══ INTELLIGENCE STATE ═══
   const [filterCategory, setFilterCategory] = useState('all');
@@ -630,30 +648,30 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          {/* Domain Overview — SEMrush-like analysis */}
-          <DomainOverview session={session} />
+          {/* Onboarding Funnel (if not completed) */}
+          {!funnelCompleted && (
+            <OnboardingFunnel
+              data={domainData}
+              onComplete={() => {
+                setFunnelCompleted(true);
+                localStorage.setItem('tc-funnel-completed', 'true');
+              }}
+              onDismiss={() => {
+                setFunnelCompleted(true);
+                localStorage.setItem('tc-funnel-completed', 'true');
+              }}
+            />
+          )}
 
-          {/* Free SEO Tools */}
-          <div className="premium-card rounded-2xl p-6">
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Free SEO Tools</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                { name: 'Robots.txt Analyzer', href: '/tools/robots-analyzer', desc: 'Check AI crawler access' },
-                { name: 'Readability Checker', href: '/tools/readability-checker', desc: 'Flesch-Kincaid scoring' },
-                { name: 'Hreflang Validator', href: '/tools/hreflang-validator', desc: 'International SEO check' },
-                { name: 'AI Search Readiness', href: '/tools/ai-search-readiness', desc: 'GEO optimization score' },
-                { name: 'Comparison Builder', href: '/tools/comparison-builder', desc: 'Generate comparison pages' },
-              ].map(tool => (
-                <a key={tool.name} href={tool.href} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-emerald-500/30 transition-colors group">
-                  <Wrench className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <div className="text-sm font-medium text-[var(--text-primary)] group-hover:text-emerald-400 transition-colors">{tool.name}</div>
-                    <div className="text-xs text-[var(--text-muted)]">{tool.desc}</div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
+          {/* Workspace Tabs */}
+          <WorkspaceTabs activeTab={activeWorkspaceTab} onTabChange={setActiveWorkspaceTab} />
+
+          {/* Active Workspace Content */}
+          {activeWorkspaceTab === 'analysis' && <DomainOverview session={session} />}
+          {activeWorkspaceTab === 'content' && <ContentEditor />}
+          {activeWorkspaceTab === 'keywords' && <KeywordResearch />}
+          {activeWorkspaceTab === 'competitor' && <CompetitorSpy />}
+          {activeWorkspaceTab === 'crawler' && <SiteCrawler />}
         </motion.div>
       )}
 
