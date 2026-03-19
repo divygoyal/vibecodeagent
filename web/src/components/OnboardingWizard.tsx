@@ -254,6 +254,7 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                                 <div className="text-sm text-zinc-500 py-4">
                                     No Search Console sites found. You can add one at{' '}
                                     <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Google Search Console</a>.
+                                    <p className="text-xs text-zinc-600 mt-2">You can skip this step and still use Site Audit, AI SEO Tools, and AI Chat right away.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2 max-h-[240px] overflow-y-auto mb-6 text-left">
@@ -313,7 +314,11 @@ export default function OnboardingWizard({ onComplete, onSelectSite, onSelectPro
                                     <Loader2 className="w-4 h-4 animate-spin" /> Loading properties...
                                 </div>
                             ) : properties.length === 0 ? (
-                                <div className="text-sm text-zinc-500 py-4">No GA4 properties found.</div>
+                                <div className="text-sm text-zinc-500 py-4">
+                                    No GA4 properties found. Create one at{' '}
+                                    <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Google Analytics</a>.
+                                    <p className="text-xs text-zinc-600 mt-2">You can skip this step and still use Site Audit, AI SEO Tools, and AI Chat right away.</p>
+                                </div>
                             ) : (
                                 <div className="space-y-2 max-h-[240px] overflow-y-auto mb-6 text-left">
                                     {properties.map((prop: any) => {
