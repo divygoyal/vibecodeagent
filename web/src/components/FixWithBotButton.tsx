@@ -19,7 +19,7 @@ export default function FixWithBotButton({
 }: FixWithBotButtonProps) {
     const sizeClasses = size === 'sm'
         ? 'px-3 py-1.5 text-[11px] gap-1.5'
-        : 'px-4 py-2 text-xs gap-2';
+        : 'px-4 py-2.5 text-xs gap-2 w-full justify-center';
 
     const variantClasses = variant === 'solid'
         ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold hover:opacity-90 shadow-lg shadow-emerald-500/10'
