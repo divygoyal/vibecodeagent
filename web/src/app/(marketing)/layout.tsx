@@ -5,7 +5,58 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Tag, Copy, Check } from 'lucide-react';
+
+function DiscountBanner() {
+    const [dismissed, setDismissed] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('discount-banner-dismissed')) {
+            setDismissed(true);
+        }
+    }, []);
+
+    const handleDismiss = () => {
+        setDismissed(true);
+        sessionStorage.setItem('discount-banner-dismissed', 'true');
+    };
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText('NEWBEE20');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (dismissed) return null;
+
+    return (
+        <div className="relative z-[60] bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-500 text-black">
+            <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3 text-sm font-medium">
+                <Tag className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">New here? Get <strong>20% off</strong> your first month!</span>
+                <span className="sm:hidden"><strong>20% off</strong> for new users!</span>
+                <button
+                    onClick={handleCopy}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/20 hover:bg-black/30 transition-colors font-mono font-bold text-xs tracking-wider cursor-pointer"
+                >
+                    NEWBEE20
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                </button>
+                <Link href="/pricing" className="hidden sm:inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline font-semibold text-xs">
+                    View plans →
+                </Link>
+                <button
+                    onClick={handleDismiss}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-black/10 transition-colors cursor-pointer"
+                    aria-label="Dismiss banner"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
+}
 
 function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -137,6 +188,7 @@ export default function MarketingLayout({
 }) {
     return (
         <div className="min-h-screen bg-black text-white overflow-x-hidden">
+            <DiscountBanner />
             <Navbar />
             <main id="main-content">
                 {children}

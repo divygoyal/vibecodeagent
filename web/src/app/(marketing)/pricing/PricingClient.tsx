@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { signIn, useSession } from 'next-auth/react';
 import { getSafeRedirectUrl } from '@/lib/checkout';
 import Link from 'next/link';
 import {
-    Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot
+    Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot, Tag, Copy, Check
 } from 'lucide-react';
 
 const fadeUp = {
@@ -114,6 +114,42 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
     );
 }
 
+function DiscountCallout() {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText('NEWBEE20');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <motion.div
+            variants={fadeUp}
+            className="max-w-2xl mx-auto p-5 rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.08] via-cyan-500/[0.06] to-emerald-500/[0.08]"
+        >
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <Tag className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                    <h3 className="text-lg font-bold text-white mb-1">New User Discount</h3>
+                    <p className="text-sm text-zinc-400">
+                        Use code <strong className="text-emerald-400">NEWBEE20</strong> at checkout to get <strong className="text-white">20% off</strong> your first month on any plan.
+                    </p>
+                </div>
+                <button
+                    onClick={handleCopy}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors font-mono font-bold text-emerald-400 text-sm tracking-wider cursor-pointer flex-shrink-0"
+                >
+                    NEWBEE20
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+            </div>
+        </motion.div>
+    );
+}
+
 export default function PricingClient() {
     const { data: session } = useSession();
 
@@ -147,6 +183,11 @@ export default function PricingClient() {
                         </p>
                     </motion.div>
                 </div>
+            </Section>
+
+            {/* Discount Banner */}
+            <Section className="pb-8 px-6">
+                <DiscountCallout />
             </Section>
 
             {/* Plan Cards */}
