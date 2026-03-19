@@ -10,7 +10,7 @@ import { VideoPhoneFrame } from "@/components/VideoPhoneFrame";
 
 import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
-    ArrowRight, CheckCircle2, Star, Sparkles,
+    ArrowRight, CheckCircle2, Star, Sparkles, Tag, Copy, Check,
     MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare,
     ScanSearch, Clock, Monitor, ExternalLink, Link2, Share2, Music, History, Navigation, Maximize2
 } from 'lucide-react';
@@ -1407,6 +1407,46 @@ function Testimonials() {
 }
 
 /* ═══════════════════════════════════════
+   PRICING DISCOUNT BANNER
+   ═══════════════════════════════════════ */
+
+function PricingDiscountBanner() {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText('NEWBEE20');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <motion.div
+            variants={fadeUp}
+            className="max-w-2xl mx-auto mb-14 p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.08] via-cyan-500/[0.06] to-emerald-500/[0.08]"
+        >
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <Tag className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-bold text-white mb-0.5">New User Discount</h3>
+                    <p className="text-sm text-zinc-400">
+                        Use code <strong className="text-emerald-400">NEWBEE20</strong> at checkout for <strong className="text-white">20% off</strong> your first month.
+                    </p>
+                </div>
+                <button
+                    onClick={handleCopy}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors font-mono font-bold text-emerald-400 text-sm tracking-wider cursor-pointer flex-shrink-0"
+                >
+                    NEWBEE20
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+            </div>
+        </motion.div>
+    );
+}
+
+/* ═══════════════════════════════════════
    PRICING SECTION — Monthly subscription plans
    ═══════════════════════════════════════ */
 
@@ -1442,12 +1482,15 @@ function Pricing() {
                 </motion.div>
 
                 {/* Free tier callout */}
-                <motion.div variants={fadeUp} className="text-center mb-14">
+                <motion.div variants={fadeUp} className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] text-sm">
                         <Sparkles className="w-4 h-4 text-emerald-400" />
                         <span className="text-emerald-300 font-medium">Every new account gets <strong className="text-emerald-400">10 free messages</strong> to start</span>
                     </div>
                 </motion.div>
+
+                {/* Discount promo */}
+                <PricingDiscountBanner />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
 
