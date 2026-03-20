@@ -38,9 +38,9 @@ function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
     if (value === 0) return <span className="text-[9px] sm:text-[10px] text-zinc-600">—</span>;
     const up = value > 0;
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-red-400'}`}>
-            {up ? <TrendingUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <TrendingDown className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
-            {up ? '+' : ''}{value}{suffix}
+        <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold tabular-nums truncate max-w-full ${up ? 'text-emerald-400' : 'text-red-400'}`}>
+            {up ? <TrendingUp className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" /> : <TrendingDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />}
+            <span className="truncate">{up ? '+' : ''}{value}{suffix}</span>
         </span>
     );
 }
@@ -62,8 +62,8 @@ function Bar({ value, max, color = 'bg-blue-500/40' }: { value: number; max: num
 function SectionHead({ title, filterDim, filterValues }: { title: string; filterDim?: string; filterValues?: string[] }) {
     const active = filterValues && filterValues.length > 0;
     return (
-        <div className="flex items-center gap-2 mb-2 sm:mb-3">
-            <h3 className="text-sm sm:text-base font-semibold text-white">{title}</h3>
+        <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
+            <h3 className="text-sm sm:text-base font-semibold text-white truncate">{title}</h3>
             {active && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-[9px] text-blue-400 font-medium">
                     <FilterIcon className="w-2.5 h-2.5" /> Filtered
@@ -269,7 +269,7 @@ export default function AnalyticsPage() {
     const seoQueries: any[] = seoData?.queries || [];
 
     return (
-        <div className="space-y-3 sm:space-y-5">
+        <div className="space-y-3 sm:space-y-5 overflow-hidden">
             {/* Data freshness timestamp */}
             {analyticsData && (
                 <div className="flex justify-end">
@@ -287,12 +287,12 @@ export default function AnalyticsPage() {
                         { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, formatted: true, isDuration: true },
                     ].map((k: any, i) => (
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                            className={`${CARD} p-3 sm:p-5`}>
-                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1.5 sm:mb-3">{k.label}</p>
-                            <div className="text-lg sm:text-2xl lg:text-[32px] font-bold text-white tabular-nums leading-none mb-1 sm:mb-2">
+                            className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
+                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1.5 sm:mb-3 truncate">{k.label}</p>
+                            <div className="text-lg sm:text-xl md:text-2xl lg:text-[32px] font-bold text-white tabular-nums leading-none mb-1 sm:mb-2 truncate">
                                 {k.isDuration ? fmtDur(k.value) : k.formatted ? `${k.value}${k.suffix || ''}` : <AnimatedCounter value={k.value} formatter={fmt} />}
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 overflow-hidden">
                                 <Change value={k.change} suffix="% vs last period" />
                             </div>
                         </motion.div>
@@ -303,26 +303,26 @@ export default function AnalyticsPage() {
             {/* ─── Traffic Trend + Traffic Sources (side by side) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-5">
                 {/* Traffic Trend chart — 3/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 lg:col-span-3`}>
-                    <div className="flex items-center justify-between mb-3 sm:mb-4">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <h3 className="text-sm sm:text-base font-semibold text-white">Traffic Trend</h3>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 lg:col-span-3 overflow-hidden min-w-0`}>
+                    <div className="flex items-center justify-between mb-3 sm:mb-4 overflow-hidden">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <h3 className="text-sm sm:text-base font-semibold text-white truncate">Traffic Trend</h3>
                             {anyFilterActive && (
-                                <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5">
+                                <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5 flex-shrink-0">
                                     <FilterIcon className="w-2.5 h-2.5" /> Filtered
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px]">
-                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Users</span>
-                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400" /> Sessions</span>
+                        <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-[11px] flex-shrink-0">
+                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" /> <span className="hidden sm:inline">Users</span><span className="sm:hidden">U</span></span>
+                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400 flex-shrink-0" /> <span className="hidden sm:inline">Sessions</span><span className="sm:hidden">S</span></span>
                             <button onClick={() => refresh()} className="p-1.5 sm:p-1 rounded text-zinc-600 hover:text-blue-400 transition ml-0.5 sm:ml-1"><RefreshCw className="w-3.5 h-3.5" /></button>
                             <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 sm:p-1 rounded text-zinc-600 hover:text-white transition"><Download className="w-3.5 h-3.5" /></button>
                         </div>
                     </div>
-                    <div className="h-[200px] sm:h-[280px]">
+                    <div className="h-[200px] sm:h-[280px] overflow-hidden">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                            <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
                                 <defs>
                                     <linearGradient id="gU" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
@@ -345,8 +345,8 @@ export default function AnalyticsPage() {
                 </motion.div>
 
                 {/* Traffic Sources donut — 2/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-3 sm:p-5 lg:col-span-2`}>
-                    <h3 className="text-sm sm:text-base font-semibold text-white mb-3 sm:mb-4">Traffic Sources</h3>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-3 sm:p-5 lg:col-span-2 overflow-hidden min-w-0`}>
+                    <h3 className="text-sm sm:text-base font-semibold text-white mb-3 sm:mb-4 truncate">Traffic Sources</h3>
                     {sourceData.length > 0 ? (
                         <div className="flex flex-col items-center">
                             <div className="h-[160px] sm:h-[180px] w-full">
@@ -379,9 +379,9 @@ export default function AnalyticsPage() {
 
             {/* ─── Top Search Queries from GSC ─── */}
             {seoQueries.length > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5`}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
-                        <h3 className="text-sm sm:text-base font-semibold text-white">Top Search Queries</h3>
+                        <h3 className="text-sm sm:text-base font-semibold text-white truncate">Top Search Queries</h3>
                         <span className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-emerald-400 font-medium">
                             <Search className="w-3 h-3" /> <span className="hidden sm:inline">From </span>GSC
                         </span>
@@ -434,7 +434,7 @@ export default function AnalyticsPage() {
 
             {/* ─── Referrers & Pages (with progress bars + filtering) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
-                <div className={`${CARD} p-3 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
                     <SectionHead title="Referrers" filterDim="referrer" filterValues={filters.referrer} />
                     <AnalyticsTable
                         data={fReferrers} searchKey={(item: any) => item.name} searchPlaceholder="Search referrers..." maxRows={12}
@@ -461,7 +461,7 @@ export default function AnalyticsPage() {
                     />
                 </div>
 
-                <div className={`${CARD} p-3 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
                     <SectionHead title="Top Pages" filterDim="page" filterValues={filters.page} />
                     <AnalyticsTable
                         data={fPages} searchKey={(item: any) => item.page} searchPlaceholder="Search pages..." maxRows={12}
@@ -501,17 +501,17 @@ export default function AnalyticsPage() {
 
             {/* ─── Geo + Map & Tech ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
-                <div className={`${CARD} p-3 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
                     <GeoPanel countries={fCountries} cities={fCities} allCountries={countries} maxUsers={maxCountryUsers} />
                 </div>
-                <div className={`${CARD} p-3 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
                     <TechPanel devices={fDevices} browsers={fBrowsers} operatingSystems={fOS} allDevices={devices} allBrowsers={browsers} allOS={operatingSystems} />
                 </div>
             </div>
 
             {/* ─── Channels & Mini Map ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
-                <div className={`${CARD} p-3 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
                     <SectionHead title="Channels" filterDim="channel" filterValues={filters.channel} />
                     <AnalyticsTable
                         data={fChannels} showSearch={false}
@@ -570,7 +570,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Entry Pages ─── */}
-            <div className={`${CARD} p-3 sm:p-5`}>
+            <div className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
                 <SectionHead title="Entry Pages" filterDim="page" filterValues={filters.page} />
                 <AnalyticsTable
                     data={fEntryPages} searchKey={(item: any) => item.page} searchPlaceholder="Search entry pages..." maxRows={15}
@@ -607,7 +607,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Languages ─── */}
-            <div className={`${CARD} p-3 sm:p-5`}>
+            <div className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
                 <SectionHead title="Languages" />
                 <AnalyticsTable
                     data={languages} showSearch={false} maxRows={10}
@@ -633,7 +633,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Intelligence Cards ─── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 overflow-hidden">
                 <EngagementCard kpis={kpis} />
                 <LoyaltyCard kpis={kpis} />
                 <DiversityCard channels={channels} />
@@ -749,8 +749,8 @@ function EngagementCard({ kpis }: { kpis: any }) {
     const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
     const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-3 sm:p-5`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3"><Target className="w-4 h-4 text-violet-400" /><h4 className="text-sm sm:text-base font-semibold text-white">Engagement Score</h4></div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0"><Target className="w-4 h-4 text-violet-400 flex-shrink-0" /><h4 className="text-sm sm:text-base font-semibold text-white truncate">Engagement Score</h4></div>
             <div className="flex items-end gap-2 mb-1.5 sm:mb-2">
                 <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
                 <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>
@@ -768,8 +768,8 @@ function LoyaltyCard({ kpis }: { kpis: any }) {
     const total = kpis.totalUsers || 1;
     const loyaltyPct = Math.round((returning / total) * 100);
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3"><Users className="w-4 h-4 text-pink-400" /><h4 className="text-sm sm:text-base font-semibold text-white">Audience Loyalty</h4></div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0"><Users className="w-4 h-4 text-pink-400 flex-shrink-0" /><h4 className="text-sm sm:text-base font-semibold text-white truncate">Audience Loyalty</h4></div>
             <div className="flex justify-between text-[10px] sm:text-xs mb-1"><span className="text-zinc-600">New</span><span className="text-zinc-600">Returning</span></div>
             <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${100 - loyaltyPct}%` }} transition={{ duration: 0.6 }} className="h-full bg-violet-500/50" />
@@ -792,8 +792,8 @@ function DiversityCard({ channels }: { channels: any[] }) {
     const score = Math.round((entropy / Math.max(maxEntropy, 0.01)) * 100);
     const color = score >= 60 ? 'text-emerald-400' : score >= 35 ? 'text-amber-400' : 'text-red-400';
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3"><Globe className="w-4 h-4 text-blue-400" /><h4 className="text-sm sm:text-base font-semibold text-white">Source Diversity</h4></div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0"><Globe className="w-4 h-4 text-blue-400 flex-shrink-0" /><h4 className="text-sm sm:text-base font-semibold text-white truncate">Source Diversity</h4></div>
             <div className="flex items-end gap-1 mb-2 sm:mb-3">
                 <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
                 <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>

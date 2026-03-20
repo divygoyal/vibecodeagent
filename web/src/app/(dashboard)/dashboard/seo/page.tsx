@@ -258,24 +258,24 @@ export default function SEOPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Export Button */}
                     <button
                         onClick={() => exportSeoData(seoData)}
                         disabled={!seoData}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors disabled:opacity-30"
+                        className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors disabled:opacity-30"
                     >
                         <Download className="w-3.5 h-3.5" />
                         Export
                     </button>
 
                     {/* Site Selector */}
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto">
                         <select
                             value={selectedSite}
                             onChange={(e) => setSelectedSite(e.target.value)}
                             disabled={sitesLoading || sites.length === 0}
-                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition min-w-0 w-full sm:min-w-[200px] sm:w-auto max-w-full"
+                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition w-full sm:min-w-[200px] sm:w-auto max-w-full"
                         >
                             {sitesLoading ? (
                                 <option>Loading sites...</option>
@@ -296,46 +296,46 @@ export default function SEOPage() {
 
             {/* KPI Cards */}
             {kpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
-                                <MousePointer className="w-4 h-4 text-emerald-400" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
+                                <MousePointer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
                             </div>
                             <ChangeIndicator value={kpis.changeClicks} />
                         </div>
-                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
-                        <div className="text-xs text-zinc-500 mt-1">Total Clicks</div>
+                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
+                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Total Clicks</div>
                     </div>
-                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
+                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
-                                <Eye className="w-4 h-4 text-cyan-400" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
+                                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
                             </div>
                             <ChangeIndicator value={kpis.changeImpressions} />
                         </div>
-                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
-                        <div className="text-xs text-zinc-500 mt-1">Impressions</div>
+                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
+                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Impressions</div>
                     </div>
-                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
+                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
-                                <Hash className="w-4 h-4 text-violet-400" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
+                                <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-400" />
                             </div>
                             <ChangeIndicator value={kpis.changeCTR} />
                         </div>
-                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
-                        <div className="text-xs text-zinc-500 mt-1">Avg. CTR</div>
+                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
+                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Avg. CTR</div>
                     </div>
-                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
+                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
-                                <Search className="w-4 h-4 text-amber-400" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
+                                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
                             </div>
                             <ChangeIndicator value={kpis.changePosition} invert />
                         </div>
-                        <div className="text-xl sm:text-2xl font-bold text-white">{kpis.avgPosition}</div>
-                        <div className="text-xs text-zinc-500 mt-1">Avg. Position</div>
+                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.avgPosition}</div>
+                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Avg. Position</div>
                     </div>
                 </div>
             )}

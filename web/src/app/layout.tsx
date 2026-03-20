@@ -77,7 +77,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <head>
         <script
           type="application/ld+json"
@@ -133,7 +133,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black overflow-x-hidden`}
       >
         <a href="#main-content" className="skip-to-content">Skip to content</a>
         <Providers>{children}</Providers>

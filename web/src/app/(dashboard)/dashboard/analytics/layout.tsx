@@ -109,16 +109,16 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
     return (
         <AnalyticsContext.Provider value={{ selectedProperty, range, setRange, hasGoogleConnection }}>
-            <div className="space-y-0">
+            <div className="space-y-0 overflow-hidden">
                 {/* ─── Sticky Top Bar ─── */}
-                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
+                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0 overflow-hidden" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
                     {/* Row 1: Property & Date Range & Controls */}
-                    <div className="flex items-center justify-between py-2 sm:py-3">
+                    <div className="flex items-center justify-between py-2 sm:py-3 overflow-hidden">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight shrink-0">Analytics</h1>
+                            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight shrink-0 truncate">Analytics</h1>
                             {/* Property selector (custom dropdown) */}
                             {properties.length > 0 && (
-                                <div className="min-w-0 max-w-[140px] sm:max-w-none">
+                                <div className="min-w-0 w-auto max-w-[120px] sm:max-w-[200px]">
                                     <PropertyDropdown
                                         properties={properties}
                                         value={selectedProperty}

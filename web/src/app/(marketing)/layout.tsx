@@ -196,7 +196,7 @@ export default function MarketingLayout({
                 {/* Spacer for fixed banner + navbar */}
                 <div style={{ height: bannerVisible ? 40 : 0 }} className="transition-all duration-300" />
                 <Navbar bannerVisible={bannerVisible} />
-                <main id="main-content">
+                <main id="main-content" className="overflow-x-hidden">
                     {children}
                 </main>
             </div>

@@ -20,6 +20,18 @@
   }
 }
 
+/* Prevent horizontal overflow on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Ensure all content stays within viewport */
+main {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 :root {
   --background: #000000;
   --foreground: #f0f0f0;

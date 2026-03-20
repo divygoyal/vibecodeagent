@@ -512,20 +512,20 @@ export default function DashboardOverview() {
   // The useRegisteredSWR hook handles optimistic fetching for returning users
 
   return (
-    <motion.div className="space-y-8 pb-6" initial="initial" animate="animate" variants={stagger}>
+    <motion.div className="space-y-4 sm:space-y-6 md:space-y-8 pb-6 overflow-hidden" initial="initial" animate="animate" variants={stagger}>
       {/* Hero Header — Site Selector + Live Metrics */}
       <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="relative">
         {/* Header gradient background */}
-        <div className="absolute inset-0 -mx-6 -mt-6 h-[200px] bg-gradient-to-b from-emerald-500/[0.04] via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 -mx-3 sm:-mx-6 -mt-3 sm:-mt-6 h-[200px] bg-gradient-to-b from-emerald-500/[0.04] via-transparent to-transparent pointer-events-none" />
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-cyan-500/[0.03] to-transparent rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold text-white mb-1.5 tracking-tight">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white mb-1.5 tracking-tight">
               Welcome back{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''} <span className="inline-block animate-[wave_2s_ease-in-out_infinite]">👋</span>
             </h1>
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-zinc-500">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <p className="text-xs sm:text-sm text-zinc-500">
                 Growth overview for your projects.
               </p>
               <LastUpdated timestamp={lastUpdated} />
@@ -541,9 +541,9 @@ export default function DashboardOverview() {
                     a.click();
                     URL.revokeObjectURL(url);
                   }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-xs sm:text-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-xs"
                 >
-                  <FileDown className="w-4 h-4" />
+                  <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   Export Report
                 </button>
               )}
@@ -690,7 +690,7 @@ export default function DashboardOverview() {
 
       {!isEmptyShell && (<>
       {/* ═══ 1. KPI GRID — Top of visual hierarchy ═══ */}
-      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4" role="region" aria-label="Key metrics">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4" role="region" aria-label="Key metrics">
         <KPICard
           loading={isRef && !hasData}
           icon={Users}

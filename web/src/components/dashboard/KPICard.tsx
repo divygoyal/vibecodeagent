@@ -70,7 +70,7 @@ function KPICardInner({
   const severityDot = statusSeverity === 'critical' ? 'bg-red-400' : statusSeverity === 'warning' ? 'bg-amber-400' : 'bg-emerald-400';
 
   return (
-    <div className="relative group h-full">
+    <div className="relative group h-full overflow-hidden">
       <Link
         href={href}
         className="relative block h-full bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-3 sm:p-5 hover:border-white/[0.12] transition-all duration-500"
@@ -112,15 +112,15 @@ function KPICardInner({
         </div>
 
         {/* Value */}
-        <div className="text-xl sm:text-[26px] font-extrabold text-[var(--text-primary)] mb-0.5 font-mono tracking-tight relative">
+        <div className="text-lg sm:text-xl md:text-[26px] font-extrabold text-[var(--text-primary)] mb-0.5 font-mono tracking-tight relative truncate">
           {displayValue}
         </div>
 
         {/* Label + Previous */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[11px] text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
+        <div className="flex items-center gap-2 mb-1 overflow-hidden">
+          <span className="text-[11px] text-zinc-500 font-medium tracking-wide uppercase truncate">{label}</span>
           {prev !== null && (
-            <span className="text-[10px] text-zinc-600 font-mono">
+            <span className="text-[10px] text-zinc-600 font-mono truncate">
               was {prev.toLocaleString()}
             </span>
           )}
@@ -136,7 +136,7 @@ function KPICardInner({
 
         {/* Sparkline */}
         {sparkData.length > 0 && (
-          <div className={`h-10 -mx-1 relative ${!statusLine ? 'mt-2' : ''}`} aria-hidden="true">
+          <div className={`h-10 -mx-1 relative overflow-hidden ${!statusLine ? 'mt-2' : ''}`} aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
                 <defs>
