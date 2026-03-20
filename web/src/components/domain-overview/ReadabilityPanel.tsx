@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, Loader2 } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import { ScoreRing } from './ScoreRing'
 import { readabilityRatingStyle, readabilityRecommendation } from './types'
 import type { DomainOverviewData } from './types'
@@ -17,41 +17,30 @@ export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps
   return (
     <div className="premium-card rounded-2xl p-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04]">
-          <BookOpen className="h-4 w-4 text-zinc-400" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Readability Analysis</h3>
-          <p className="text-xs text-zinc-500">Flesch-Kincaid readability scoring</p>
-        </div>
+      <div className="flex items-center gap-2 mb-4">
+        <BookOpen className="h-4 w-4 text-zinc-400" />
+        <h3 className="text-sm font-semibold text-zinc-200">Readability Analysis</h3>
       </div>
 
       {r ? (
         <div className="space-y-4">
           {/* Score + Info */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="relative flex items-center justify-center score-ring-glow">
-              <ScoreRing score={r.score} size="lg" label="Readability" />
-            </div>
+            <ScoreRing score={r.score} size="lg" label="Readability" />
             <div className="flex-1 space-y-2">
               <p className="text-xs text-zinc-500">
                 Grade Level: {r.grade}
               </p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span
-                  className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${readabilityRatingStyle(r.rating).bg} ${readabilityRatingStyle(r.rating).text}`}
-                >
-                  {r.rating}
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400">
+              <p className={`text-xs font-medium ${readabilityRatingStyle(r.rating).text}`}>
+                {r.rating}
+              </p>
+              <p className="text-xs text-zinc-500">
                 {readabilityRecommendation(r.score)}
               </p>
               <FixWithBotButton
                 label="Improve Readability"
                 size="sm"
-                variant="ghost"
+                variant="link"
                 context={`Improve content readability for ${domain}. Current score: ${r.score} (${r.rating})`}
               />
             </div>
@@ -67,7 +56,7 @@ export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="stat-card-hover rounded-lg bg-white/[0.02] border border-white/[0.03] p-2.5 text-center"
+                className="rounded-lg border border-white/[0.05] p-2.5 text-center"
               >
                 <p className="text-lg font-bold text-zinc-200">{stat.value}</p>
                 <p className="text-[10px] text-zinc-500 mt-0.5">{stat.label}</p>
@@ -75,12 +64,7 @@ export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps
             ))}
           </div>
         </div>
-      ) : (
-        <div className="flex items-center gap-2 py-4 animate-pulse">
-          <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-          <p className="text-xs text-zinc-500">Analyzing...</p>
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }

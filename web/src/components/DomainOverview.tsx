@@ -120,7 +120,7 @@ export default function DomainOverview({ session, onDataReady }: DomainOverviewP
   }, [domain, recentDomains])
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-6">
       {/* Domain Input */}
       <DomainInputBar
         value={domain}
@@ -152,62 +152,28 @@ export default function DomainOverview({ session, onDataReady }: DomainOverviewP
 
       {/* Results Dashboard */}
       {data && !loading && (
-        <div className="space-y-2 cascade-fade">
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Overview Scores</h2>
-          </div>
+        <div className="space-y-6">
           <ScoreOverviewRow data={data} domain={data.domain} />
 
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Core Web Vitals</h2>
-          </div>
           <CoreWebVitals data={data} domain={data.domain} />
 
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Site Health & Page Analysis</h2>
-          </div>
+          <h3 className="text-sm font-medium text-[var(--text-secondary)] mt-12 mb-4">Site Health</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <IssuesPanel data={data} domain={data.domain} auditUrl={data.url} />
             <PageAnalysis data={data} domain={data.domain} />
           </div>
 
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Keyword Opportunities</h2>
-          </div>
+          <h3 className="text-sm font-medium text-[var(--text-secondary)] mt-12 mb-4">Keywords</h3>
           <KeywordTable data={data} domain={data.domain} />
 
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Technical Infrastructure</h2>
-          </div>
+          <h3 className="text-sm font-medium text-[var(--text-secondary)] mt-12 mb-4">Technical</h3>
           <TechStackPanel data={data} domain={data.domain} />
 
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Performance Optimization</h2>
-          </div>
+          <h3 className="text-sm font-medium text-[var(--text-secondary)] mt-12 mb-4">Performance & Content</h3>
           <PageSpeedOpportunities data={data} domain={data.domain} />
-
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Content Quality</h2>
-          </div>
           <ReadabilityPanel data={data} domain={data.domain} />
-
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">AI Search Readiness</h2>
-          </div>
           <GeoReadiness data={data} domain={data.domain} />
 
-          <div className="flex items-center gap-3 mt-10 mb-5">
-            <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">Next Steps</h2>
-          </div>
           <ActionButtonsRow domain={data.domain} auditUrl={data.url} />
         </div>
       )}

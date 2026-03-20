@@ -7,7 +7,7 @@ interface FixWithBotButtonProps {
     context?: string;
     site?: string;
     size?: 'sm' | 'md';
-    variant?: 'solid' | 'ghost';
+    variant?: 'solid' | 'ghost' | 'link';
 }
 
 export default function FixWithBotButton({
@@ -23,7 +23,9 @@ export default function FixWithBotButton({
 
     const variantClasses = variant === 'solid'
         ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold hover:opacity-90 shadow-lg shadow-emerald-500/10'
-        : 'bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-400 font-medium hover:bg-emerald-500/[0.15]';
+        : variant === 'link'
+            ? 'text-zinc-500 hover:text-zinc-300 font-medium'
+            : 'bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-400 font-medium hover:bg-emerald-500/[0.15]';
 
     const handleClick = () => {
         const question = context || 'Analyze this issue and tell me how to fix it';

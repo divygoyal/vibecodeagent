@@ -27,14 +27,9 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
   return (
     <div className="premium-card rounded-2xl p-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04]">
-          <Target className="h-4 w-4 text-zinc-400" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Keyword Opportunities</h3>
-          <p className="text-xs text-zinc-500">AI-Powered Keyword Research</p>
-        </div>
+      <div className="flex items-center gap-2 mb-4">
+        <Target className="h-4 w-4 text-zinc-400" />
+        <h3 className="text-sm font-semibold text-zinc-200">Keyword Opportunities</h3>
       </div>
 
       <div className="overflow-x-auto -mx-6">
@@ -44,14 +39,14 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
               {['Keyword', 'Volume', 'Difficulty', 'Intent', 'Content Type', ''].map((h) => (
                 <th
                   key={h || 'actions'}
-                  className="sticky top-0 bg-[var(--card-bg)]/90 backdrop-blur-sm z-10 px-6 py-2.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500"
+                  className="px-6 py-2.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500"
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="cascade-fade">
+          <tbody>
             {data.keywords.map((kw) => {
               const db = difficultyBadge(kw.difficulty)
               const expanded = expandedKeyword === kw.keyword
@@ -74,12 +69,8 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
                     <td className="px-6 py-3 text-xs text-zinc-400">
                       {kw.volume.toLocaleString()}
                     </td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-medium ${db.bg} ${db.text}`}
-                      >
-                        {kw.difficulty}
-                      </span>
+                    <td className={`px-6 py-3 text-xs font-medium ${db.text}`}>
+                      {kw.difficulty}
                     </td>
                     <td className={`px-6 py-3 text-xs font-medium ${intentColor(kw.intent)}`}>
                       {kw.intent}
@@ -122,12 +113,12 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           transition={{ duration: 0.2 }}
-                          className="glass-card rounded-lg p-3"
+                          className="pl-7"
                         >
                           <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-1">
                             Why this keyword?
                           </p>
-                          <p className="text-xs text-zinc-400">{kw.reason}</p>
+                          <p className="text-xs text-zinc-500">{kw.reason}</p>
                         </motion.div>
                       </td>
                     </tr>
