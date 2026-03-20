@@ -135,7 +135,7 @@ function Hero() {
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/[0.02] rounded-full blur-[128px]" />
             </div>
 
-            <div className="relative w-full max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center z-10">
+            <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center z-10">
                 {/* Left Side: Marketing Copy */}
                 <motion.div
                     initial={{ opacity: 0, x: -40 }}
@@ -151,7 +151,7 @@ function Hero() {
                         Early Access — Limited Spots
                     </div>
 
-                    <h1 className="text-5xl sm:text-6xl lg:text-[5rem] font-bold tracking-tight leading-[1.05]">
+                    <h1 className="text-3xl sm:text-5xl lg:text-[5rem] font-bold tracking-tight leading-[1.05]">
                         <span className="block pb-2 text-white drop-shadow-md font-extrabold" style={{ textShadow: "0px 4px 40px rgba(52,211,153,0.2)" }}>
                             Ask AI about
                         </span>
@@ -167,14 +167,14 @@ function Hero() {
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-4">
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                            className="group px-8 h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
+                            className="group px-8 min-h-[48px] h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
                         >
                             Try Free — 10 AI Messages Included
                             <ArrowRight className="inline-block ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
                         <a
                             href="#ai-demo"
-                            className="px-8 h-14 text-[15px] font-medium text-zinc-300 border border-white/10 rounded-xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 w-full sm:w-auto flex items-center justify-center backdrop-blur-sm whitespace-nowrap"
+                            className="px-8 min-h-[48px] h-14 text-[15px] font-medium text-zinc-300 border border-white/10 rounded-xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 w-full sm:w-auto flex items-center justify-center backdrop-blur-sm whitespace-nowrap"
                         >
                             See AI in Action
                         </a>
@@ -489,13 +489,13 @@ function Features() {
     ];
 
     return (
-        <Section id="features" className="py-24 sm:py-32 px-6">
+        <Section id="features" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         FEATURES
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Everything you need to{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                             grow faster
@@ -543,13 +543,13 @@ function InteractiveDemo() {
     const [hasClickedGlobe, setHasClickedGlobe] = useState(false);
 
     return (
-        <Section id="demo" className="py-24 sm:py-32 px-6">
+        <Section id="demo" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         LIVE PREVIEW
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Your AI-powered{' '}
                         <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
                             command center
@@ -1076,13 +1076,13 @@ function AIChatDemo() {
     }, [phase]);
 
     return (
-        <Section id="ai-demo" className="py-24 sm:py-32 px-6">
+        <Section id="ai-demo" className="py-24 sm:py-32 px-4 sm:px-6">
             <div ref={sectionRef} className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         <MessageSquare className="w-3 h-3" /> LIVE DEMO
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Ask anything.{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                             Get verdicts.
@@ -1161,7 +1161,7 @@ function AIChatDemo() {
                                     {/* KPI Cards */}
                                     {visibleSections >= 1 && (
                                         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-                                            className="grid grid-cols-4 gap-2">
+                                            className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             {[
                                                 { label: 'CLICKS', value: '8,965', icon: '📈', color: 'text-emerald-400' },
                                                 { label: 'IMPRESSIONS', value: '228,974', icon: '👁', color: 'text-blue-400' },
@@ -1364,13 +1364,13 @@ function Testimonials() {
     ];
 
     return (
-        <Section className="py-24 sm:py-32 px-6">
+        <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-amber-400 mb-4">
                         TESTIMONIALS
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Loved by{' '}
                         <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
                             builders
@@ -1463,13 +1463,13 @@ function Pricing() {
     };
 
     return (
-        <Section id="pricing" className="py-24 sm:py-32 px-6">
+        <Section id="pricing" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-6xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-violet-400 mb-4">
                         PRICING
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Simple{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                             monthly plans
@@ -1503,7 +1503,7 @@ function Pricing() {
                         <p className="text-xs text-zinc-500 mb-5">Perfect for personal sites & side projects</p>
 
                         <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-4xl font-bold text-white">$9</span>
+                            <span className="text-3xl sm:text-4xl font-bold text-white">$9</span>
                             <span className="text-sm text-zinc-500">/mo</span>
                         </div>
                         <div className="text-sm text-cyan-400 font-medium mb-6">50 AI credits/month</div>
@@ -1535,7 +1535,7 @@ function Pricing() {
                         <p className="text-xs text-zinc-500 mb-5">For growing businesses & content teams</p>
 
                         <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">$19</span>
+                            <span className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">$19</span>
                             <span className="text-sm text-zinc-500">/mo</span>
                         </div>
                         <div className="flex items-center gap-2 mb-6">
@@ -1573,7 +1573,7 @@ function Pricing() {
                             <p className="text-xs text-zinc-500 mb-5">For agencies & power users — everything unlocked</p>
 
                             <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-4xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">$29</span>
+                                <span className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">$29</span>
                                 <span className="text-sm text-zinc-500">/mo</span>
                             </div>
                             <div className="flex items-center gap-2 mb-6">
@@ -1664,7 +1664,7 @@ function StatsBar() {
     ];
 
     return (
-        <section className="py-16 px-6 border-y border-white/[0.04]">
+        <section className="py-16 px-4 sm:px-6 border-y border-white/[0.04]">
             <div className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-8">
                 {stats.map((stat, i) => (
                     <div key={i} ref={stat.ref} className="text-center">
@@ -1714,13 +1714,13 @@ function HowItWorks() {
     ];
 
     return (
-        <Section className="py-24 sm:py-32 px-6">
+        <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-20">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         HOW IT WORKS
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Three steps to{' '}
                         <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                             effortless growth
@@ -1855,7 +1855,7 @@ const PERSONAS = [
 
 function WhoItsFor() {
     return (
-        <Section className="py-24 sm:py-32 px-6">
+        <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-5xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
@@ -1910,7 +1910,7 @@ const COMPARISON_ROWS = [
 
 function ComparisonTable() {
     return (
-        <Section className="py-24 sm:py-32 px-6">
+        <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-4xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-12">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
@@ -2007,13 +2007,13 @@ function FAQ() {
     ];
 
     return (
-        <Section id="faq" className="py-24 sm:py-32 px-6">
+        <Section id="faq" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-3xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         FAQ
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Common{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                             questions
@@ -2054,7 +2054,7 @@ function FAQ() {
 
 function FinalCTA() {
     return (
-        <Section className="py-24 sm:py-32 px-6">
+        <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-4xl mx-auto text-center">
                 <motion.div
                     variants={fadeUp}
@@ -2069,7 +2069,7 @@ function FinalCTA() {
                             <Clock className="w-3 h-3" />
                             Limited early access — spots filling up
                         </div>
-                        <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                             Stop guessing.{' '}
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                                 Start asking.
@@ -2164,14 +2164,14 @@ function ContactSection() {
     };
 
     return (
-        <Section id="contact" className="py-24 sm:py-32 px-6">
+        <Section id="contact" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-3xl mx-auto">
                 <motion.div variants={fadeUp} className="text-center mb-12">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         <MessageSquare className="w-3 h-3" />
                         HELP & SUPPORT
                     </div>
-                    <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                         Got a{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                             question?
@@ -2303,14 +2303,14 @@ function ContactSection() {
 
 function Footer() {
     return (
-        <footer className="border-t border-white/[0.04] py-12 px-6">
+        <footer className="border-t border-white/[0.04] py-12 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto space-y-10">
                 {/* Featured On */}
                 <div className="flex flex-col items-center gap-4">
                     <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">Featured on</span>
-                    <div className="flex flex-wrap items-center justify-center gap-6">
+                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
                         <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
-                            <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
+                            <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" className="max-w-full h-auto" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
                         </a>
                         {/* Add more directory badges here as you submit:
                         <a href="https://betalist.com/..." target="_blank" rel="noopener noreferrer">

@@ -84,7 +84,7 @@ export default function ActionButtonsRow({ domain, auditUrl }: ActionButtonsRowP
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: i * 0.05 }}
             onClick={() => handleClick(action)}
-            className={`premium-card rounded-2xl p-5 group cursor-pointer flex items-center gap-3 transition-all hover:shadow-lg ${hoverBorderMap[action.color]}`}
+            className={`premium-card rounded-2xl p-5 group cursor-pointer flex items-center gap-3 transition-all hover:shadow-lg min-h-[48px] ${hoverBorderMap[action.color]}`}
           >
             <div
               className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradientMap[action.color]} flex items-center justify-center`}

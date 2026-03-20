@@ -275,7 +275,7 @@ export default function SEOPage() {
                             value={selectedSite}
                             onChange={(e) => setSelectedSite(e.target.value)}
                             disabled={sitesLoading || sites.length === 0}
-                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition min-w-[200px]"
+                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition min-w-0 w-full sm:min-w-[200px] sm:w-auto max-w-full"
                         >
                             {sitesLoading ? (
                                 <option>Loading sites...</option>
@@ -297,7 +297,7 @@ export default function SEOPage() {
             {/* KPI Cards */}
             {kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="premium-card p-5 stat-card-hover">
+                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
                                 <MousePointer className="w-4 h-4 text-emerald-400" />
@@ -307,7 +307,7 @@ export default function SEOPage() {
                         <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
                         <div className="text-xs text-zinc-500 mt-1">Total Clicks</div>
                     </div>
-                    <div className="premium-card p-5 stat-card-hover">
+                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
                                 <Eye className="w-4 h-4 text-cyan-400" />
@@ -317,7 +317,7 @@ export default function SEOPage() {
                         <div className="text-xl sm:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
                         <div className="text-xs text-zinc-500 mt-1">Impressions</div>
                     </div>
-                    <div className="premium-card p-5 stat-card-hover">
+                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
                                 <Hash className="w-4 h-4 text-violet-400" />
@@ -327,7 +327,7 @@ export default function SEOPage() {
                         <div className="text-xl sm:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
                         <div className="text-xs text-zinc-500 mt-1">Avg. CTR</div>
                     </div>
-                    <div className="premium-card p-5 stat-card-hover">
+                    <div className="premium-card p-4 sm:p-5 stat-card-hover">
                         <div className="flex items-center justify-between mb-3">
                             <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
                                 <Search className="w-4 h-4 text-amber-400" />
@@ -356,7 +356,7 @@ export default function SEOPage() {
                         const config = severityConfig[rec.severity] || severityConfig.low;
                         const TypeIcon = typeIcons[rec.type] || Lightbulb;
                         return (
-                            <div key={rec.id} className={`${config.bg} border ${config.border} rounded-xl p-4 hover:bg-opacity-10 transition`}>
+                            <div key={rec.id} className={`${config.bg} border ${config.border} rounded-xl p-3 sm:p-4 hover:bg-opacity-10 transition`}>
                                 <div className="flex items-start gap-3">
                                     <div className="mt-0.5">
                                         <TypeIcon className="w-4 h-4 text-zinc-400" />
@@ -385,7 +385,7 @@ export default function SEOPage() {
             </div>
 
             {/* ─── SEO Robot / AI SEO Bot ─── */}
-            <div className="bg-gradient-to-br from-violet-500/[0.04] to-emerald-500/[0.04] border border-violet-500/[0.12] rounded-2xl p-6">
+            <div className="bg-gradient-to-br from-violet-500/[0.04] to-emerald-500/[0.04] border border-violet-500/[0.12] rounded-2xl p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-5">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-violet-500/20">
                         <Bot className="w-5 h-5 text-white" />
@@ -449,7 +449,7 @@ export default function SEOPage() {
 
                 {/* ─── Active Tool Panel ─── */}
                 {activeTool && (
-                    <div className="mt-4 bg-white/[0.02] border border-white/[0.08] rounded-xl p-5">
+                    <div className="mt-4 bg-white/[0.02] border border-white/[0.08] rounded-xl p-4 sm:p-5">
                         {/* Blog Writer Panel */}
                         {activeTool === 'blog' && (
                             <div className="space-y-3">
@@ -586,7 +586,7 @@ export default function SEOPage() {
             {/* ─── Deep SEO Intelligence Features ─── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Content Decay Detector */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
                             <Activity className="w-4 h-4 text-red-400" />
@@ -615,7 +615,7 @@ export default function SEOPage() {
                 </div>
 
                 {/* Keyword Cannibalization */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
                             <Shuffle className="w-4 h-4 text-amber-400" />
@@ -644,7 +644,7 @@ export default function SEOPage() {
                 </div>
 
                 {/* Competitor Gap Analysis */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
                             <Radar className="w-4 h-4 text-cyan-400" />
@@ -663,7 +663,7 @@ export default function SEOPage() {
                 </div>
 
                 {/* Core Web Vitals Monitor */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                             <Cpu className="w-4 h-4 text-emerald-400" />
@@ -675,7 +675,7 @@ export default function SEOPage() {
                 </div>
 
                 {/* Daily Rank Tracker */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
                             <BarChart3 className="w-4 h-4 text-pink-400" />
@@ -698,7 +698,7 @@ export default function SEOPage() {
                 </div>
 
                 {/* Programmatic SEO */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
                             <Layers className="w-4 h-4 text-violet-400" />
@@ -711,7 +711,7 @@ export default function SEOPage() {
             </div>
 
             {/* Search Trend Chart */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
                 <h3 className="text-sm font-semibold text-white mb-4">Search Performance Trend</h3>
                 <div className="h-[280px]">
                     <ResponsiveContainer width="100%" height="100%">
@@ -739,17 +739,17 @@ export default function SEOPage() {
             </div>
 
             {/* Queries / Pages Tab */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
                 <div className="flex items-center gap-1 mb-4 bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5 w-fit">
                     <button
                         onClick={() => setActiveTab('queries')}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${activeTab === 'queries' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`px-4 py-2 min-h-[44px] text-xs font-medium rounded-md transition ${activeTab === 'queries' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         Top Queries
                     </button>
                     <button
                         onClick={() => setActiveTab('pages')}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${activeTab === 'pages' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`px-4 py-2 min-h-[44px] text-xs font-medium rounded-md transition ${activeTab === 'pages' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         Top Pages
                     </button>
@@ -889,7 +889,7 @@ export default function SEOPage() {
             {queries.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* SERP Preview */}
-                    <div className="premium-card p-5">
+                    <div className="premium-card p-4 sm:p-5">
                         <div className="flex items-center gap-2 mb-4">
                             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center">
                                 <Globe className="w-3.5 h-3.5 text-white" />
@@ -915,7 +915,7 @@ export default function SEOPage() {
                     </div>
 
                     {/* Quick Domain Actions */}
-                    <div className="premium-card p-5">
+                    <div className="premium-card p-4 sm:p-5">
                         <div className="flex items-center gap-2 mb-4">
                             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-violet-400 flex items-center justify-center">
                                 <Zap className="w-3.5 h-3.5 text-white" />

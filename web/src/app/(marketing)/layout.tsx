@@ -21,13 +21,13 @@ function DiscountBanner({ onDismiss }: { onDismiss: () => void }) {
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-500 text-black">
-            <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3 text-sm font-medium">
+            <div className="max-w-7xl mx-auto px-4 py-1.5 sm:py-2.5 flex items-center justify-center gap-3 text-[10px] sm:text-xs font-medium">
                 <Tag className="w-4 h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">New here? Get <strong>20% off</strong> your first month!</span>
                 <span className="sm:hidden"><strong>20% off</strong> for new users!</span>
                 <button
                     onClick={handleCopy}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/20 hover:bg-black/30 transition-colors font-mono font-bold text-xs tracking-wider cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1 rounded-md bg-black/20 hover:bg-black/30 transition-colors font-mono font-bold text-[10px] sm:text-xs tracking-wider cursor-pointer"
                 >
                     NEWBEE20
                     {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -37,7 +37,7 @@ function DiscountBanner({ onDismiss }: { onDismiss: () => void }) {
                 </Link>
                 <button
                     onClick={onDismiss}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-black/10 transition-colors cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-black/10 transition-colors cursor-pointer"
                     aria-label="Dismiss banner"
                 >
                     <X className="w-4 h-4" />
@@ -78,7 +78,7 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
                 }`}
             style={{ top: bannerVisible ? 40 : 0 }}
         >
-            <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2.5 group">
                     <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg" />
@@ -129,7 +129,7 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
 
                 {/* Mobile toggle */}
                 <button
-                    className="md:hidden text-zinc-400 p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors"
+                    className="md:hidden text-zinc-400 p-2 rounded-lg hover:bg-white/[0.05] transition-colors"
                     onClick={() => setMobileOpen(!mobileOpen)}
                     aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
                     aria-expanded={mobileOpen}
@@ -145,9 +145,9 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden bg-black/95 backdrop-blur-xl border-b border-white/[0.04]"
+                        className="md:hidden bg-black/95 backdrop-blur-xl border-b border-white/[0.04] max-h-[80vh] overflow-y-auto"
                     >
-                        <div className="px-6 py-4 flex flex-col gap-4">
+                        <div className="px-4 sm:px-6 py-4 flex flex-col gap-4">
                             {navLinks.map((link) => (
                                 <a
                                     key={link.href}

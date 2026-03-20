@@ -28,7 +28,7 @@ export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
   }
 
   return (
-    <div className="premium-card rounded-2xl p-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Brain className="h-4 w-4 text-zinc-400" />
@@ -51,9 +51,9 @@ export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
                     title={`Click to ask AI about improving ${label}`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-[var(--text-primary)]">
+                      <span className="text-xs sm:text-sm text-[var(--text-primary)]">
                         {label}{' '}
-                        <span className="text-xs text-[var(--text-secondary)]">({weight})</span>
+                        <span className="text-[10px] sm:text-xs text-[var(--text-secondary)]">({weight})</span>
                       </span>
                       <span className={`text-sm font-semibold ${geoTextColor(cat.score)}`}>
                         {cat.score}
@@ -74,14 +74,14 @@ export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
           </div>
 
           {/* Findings */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {categories.map(({ key, label }) => {
               const cat = geo.categories[key]
               if (!cat.findings.length) return null
 
               return (
                 <div key={key} className="space-y-1.5">
-                  <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                  <p className="text-[10px] sm:text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                     {label}
                   </p>
                   <ul className="space-y-1">

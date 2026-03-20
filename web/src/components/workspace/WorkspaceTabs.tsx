@@ -29,14 +29,15 @@ export function WorkspaceTabs({ activeTab, onTabChange }: WorkspaceTabsProps) {
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap shrink-0 border-b-2 ${
                 isActive
                   ? 'text-emerald-400 border-emerald-400'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-transparent'
               }`}
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              {tab.label}
+              <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
             </button>
           );
         })}

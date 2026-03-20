@@ -21,7 +21,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
 
   if (!meta) {
     return (
-      <div className="premium-card rounded-2xl p-6">
+      <div className="premium-card rounded-2xl p-4 sm:p-6">
         <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Page Analysis</h3>
         <div className="text-center py-8">
           <FileText className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
@@ -41,7 +41,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
   ]
 
   return (
-    <div className="premium-card rounded-2xl p-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
       <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-5">Page Analysis</h3>
 
       <div className="space-y-0">
@@ -113,7 +113,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-3 gap-2.5 mt-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-5">
         {stats.map((s) => (
           <div
             key={s.label}
@@ -124,7 +124,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
             }}
             className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] cursor-pointer hover:border-emerald-500/30 transition-colors"
           >
-            <p className="text-2xl font-bold text-[var(--text-primary)]">{s.value}</p>
+            <p className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">{s.value}</p>
             <p className="text-xs text-[var(--text-secondary)] mt-1">{s.label}</p>
           </div>
         ))}

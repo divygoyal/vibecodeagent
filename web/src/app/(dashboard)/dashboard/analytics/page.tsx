@@ -287,9 +287,9 @@ export default function AnalyticsPage() {
                         { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, formatted: true, isDuration: true },
                     ].map((k: any, i) => (
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                            className={`${CARD} p-5`}>
+                            className={`${CARD} p-4 sm:p-5`}>
                             <p className="text-xs text-zinc-500 mb-3">{k.label}</p>
-                            <div className="text-2xl sm:text-[32px] font-bold text-white tabular-nums leading-none mb-2">
+                            <div className="text-xl sm:text-2xl lg:text-[32px] font-bold text-white tabular-nums leading-none mb-2">
                                 {k.isDuration ? fmtDur(k.value) : k.formatted ? `${k.value}${k.suffix || ''}` : <AnimatedCounter value={k.value} formatter={fmt} />}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -303,7 +303,7 @@ export default function AnalyticsPage() {
             {/* ─── Traffic Trend + Traffic Sources (side by side) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
                 {/* Traffic Trend chart — 3/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-5 lg:col-span-3`}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-4 sm:p-5 lg:col-span-3`}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <h3 className="text-sm font-semibold text-white">Traffic Trend</h3>
@@ -345,7 +345,7 @@ export default function AnalyticsPage() {
                 </motion.div>
 
                 {/* Traffic Sources donut — 2/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-5 lg:col-span-2`}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-4 sm:p-5 lg:col-span-2`}>
                     <h3 className="text-sm font-semibold text-white mb-4">Traffic Sources</h3>
                     {sourceData.length > 0 ? (
                         <div className="flex flex-col items-center">
@@ -379,7 +379,7 @@ export default function AnalyticsPage() {
 
             {/* ─── Top Search Queries from GSC ─── */}
             {seoQueries.length > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-5`}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-4 sm:p-5`}>
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold text-white">Top Search Queries</h3>
                         <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
@@ -434,7 +434,7 @@ export default function AnalyticsPage() {
 
             {/* ─── Referrers & Pages (with progress bars + filtering) ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className={`${CARD} p-5`}>
+                <div className={`${CARD} p-4 sm:p-5`}>
                     <SectionHead title="Referrers" filterDim="referrer" filterValues={filters.referrer} />
                     <AnalyticsTable
                         data={fReferrers} searchKey={(item: any) => item.name} searchPlaceholder="Search referrers..." maxRows={12}
@@ -461,7 +461,7 @@ export default function AnalyticsPage() {
                     />
                 </div>
 
-                <div className={`${CARD} p-5`}>
+                <div className={`${CARD} p-4 sm:p-5`}>
                     <SectionHead title="Top Pages" filterDim="page" filterValues={filters.page} />
                     <AnalyticsTable
                         data={fPages} searchKey={(item: any) => item.page} searchPlaceholder="Search pages..." maxRows={12}
@@ -501,17 +501,17 @@ export default function AnalyticsPage() {
 
             {/* ─── Geo + Map & Tech ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className={`${CARD} p-5`}>
+                <div className={`${CARD} p-4 sm:p-5`}>
                     <GeoPanel countries={fCountries} cities={fCities} allCountries={countries} maxUsers={maxCountryUsers} />
                 </div>
-                <div className={`${CARD} p-5`}>
+                <div className={`${CARD} p-4 sm:p-5`}>
                     <TechPanel devices={fDevices} browsers={fBrowsers} operatingSystems={fOS} allDevices={devices} allBrowsers={browsers} allOS={operatingSystems} />
                 </div>
             </div>
 
             {/* ─── Channels & Mini Map ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className={`${CARD} p-5`}>
+                <div className={`${CARD} p-4 sm:p-5`}>
                     <SectionHead title="Channels" filterDim="channel" filterValues={filters.channel} />
                     <AnalyticsTable
                         data={fChannels} showSearch={false}
@@ -749,7 +749,7 @@ function EngagementCard({ kpis }: { kpis: any }) {
     const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
     const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-5`}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-4 sm:p-5`}>
             <div className="flex items-center gap-2 mb-3"><Target className="w-4 h-4 text-violet-400" /><h4 className="text-sm font-semibold text-white">Engagement Score</h4></div>
             <div className="flex items-end gap-2 mb-2">
                 <AnimatedCounter value={score} className={`text-3xl font-bold ${color}`} />
@@ -768,7 +768,7 @@ function LoyaltyCard({ kpis }: { kpis: any }) {
     const total = kpis.totalUsers || 1;
     const loyaltyPct = Math.round((returning / total) * 100);
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-5`}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-4 sm:p-5`}>
             <div className="flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-pink-400" /><h4 className="text-sm font-semibold text-white">Audience Loyalty</h4></div>
             <div className="flex justify-between text-xs mb-1"><span className="text-zinc-600">New</span><span className="text-zinc-600">Returning</span></div>
             <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
@@ -792,7 +792,7 @@ function DiversityCard({ channels }: { channels: any[] }) {
     const score = Math.round((entropy / Math.max(maxEntropy, 0.01)) * 100);
     const color = score >= 60 ? 'text-emerald-400' : score >= 35 ? 'text-amber-400' : 'text-red-400';
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-5`}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-4 sm:p-5`}>
             <div className="flex items-center gap-2 mb-3"><Globe className="w-4 h-4 text-blue-400" /><h4 className="text-sm font-semibold text-white">Source Diversity</h4></div>
             <div className="flex items-end gap-1 mb-3">
                 <AnimatedCounter value={score} className={`text-3xl font-bold ${color}`} />

@@ -31,7 +31,7 @@ export function CoreWebVitals({ data, domain }: Props) {
   ]
 
   return (
-    <div className="glass-card rounded-2xl p-6">
+    <div className="glass-card rounded-2xl p-3 sm:p-4 md:p-6">
       {/* Section Header */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--card-bg)]">
@@ -44,7 +44,7 @@ export function CoreWebVitals({ data, domain }: Props) {
       </div>
 
       {/* 5-column grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {metrics.map(({ label, data: metric }) => {
           const rating = ratingColor(metric.rating)
           const isPoor = metric.rating === 'POOR'
@@ -53,14 +53,14 @@ export function CoreWebVitals({ data, domain }: Props) {
           return (
             <div
               key={label}
-              className={`stat-card-hover rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] flex flex-col items-center gap-2 ${
+              className={`stat-card-hover rounded-xl p-3 sm:p-4 bg-[var(--card-bg)] border border-[var(--card-border)] flex flex-col items-center gap-2 ${
                 isPoor ? 'border-red-500/30 animate-pulse' : ''
               }`}
             >
-              <span className="text-[11px] text-[var(--text-tertiary)] font-medium">
+              <span className="text-[10px] sm:text-[11px] text-[var(--text-tertiary)] font-medium">
                 {label}
               </span>
-              <span className="text-lg font-bold text-[var(--text-primary)]">
+              <span className="text-base sm:text-lg font-bold text-[var(--text-primary)]">
                 {metric.value}
                 <span className="text-xs font-normal text-[var(--text-tertiary)] ml-0.5">
                   {metric.unit}

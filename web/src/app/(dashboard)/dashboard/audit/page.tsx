@@ -48,7 +48,7 @@ function ScoreRing({ score }: { score: number }) {
     const label = score >= 80 ? 'Healthy' : score >= 50 ? 'Needs Work' : 'Critical';
 
     return (
-        <div className="relative w-44 h-44 score-ring-glow">
+        <div className="relative w-32 h-32 sm:w-44 sm:h-44 score-ring-glow">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--card-border, #27272a)" strokeWidth="7" />
                 <motion.circle
@@ -61,7 +61,7 @@ function ScoreRing({ score }: { score: number }) {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <motion.span
-                    className="text-4xl font-bold"
+                    className="text-3xl sm:text-4xl font-bold"
                     style={{ color }}
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -131,7 +131,7 @@ function DetailTable<T>({ data, columns, maxHeight = '320px' }: { data: T[]; col
                                 <th
                                     key={col.key}
                                     onClick={() => col.sortValue && handleSort(col.key)}
-                                    className={`text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] ${col.sortValue ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
+                                    className={`text-left px-2 py-2 sm:px-4 sm:py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] ${col.sortValue ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
                                     style={col.width ? { width: col.width } : undefined}
                                 >
                                     <span className="flex items-center gap-1">
@@ -151,7 +151,7 @@ function DetailTable<T>({ data, columns, maxHeight = '320px' }: { data: T[]; col
                         {sorted.map((row, i) => (
                             <tr key={i} className="table-row-premium border-b border-[var(--card-border)] last:border-0 hover:bg-white/[0.02] transition-colors">
                                 {columns.map(col => (
-                                    <td key={col.key} className="px-4 py-2.5 text-[var(--text-secondary)]">
+                                    <td key={col.key} className="px-2 py-2 sm:px-4 sm:py-2.5 text-[var(--text-secondary)]">
                                         {col.render(row)}
                                     </td>
                                 ))}
@@ -259,7 +259,7 @@ function IssueRow({ issue, auditUrl, report, index, isEven }: { issue: AuditIssu
                 role={canExpand ? 'button' : undefined}
                 tabIndex={canExpand ? 0 : undefined}
                 onKeyDown={canExpand ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } } : undefined}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border-l-2 ${sev.borderLeft} border border-[var(--card-border)] transition-all duration-150 ${canExpand ? 'cursor-pointer' : ''} ${expanded ? 'bg-white/[0.02] border-[var(--card-border-hover,rgba(255,255,255,0.15))]' : `${isEven ? 'bg-white/[0.01]' : sev.glowBg}`} ${canExpand ? 'hover:bg-white/[0.03] hover:border-l-emerald-500 active:bg-white/[0.05]' : ''}`}
+                className={`flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 px-3 py-3 sm:px-5 sm:py-4 rounded-xl border-l-2 ${sev.borderLeft} border border-[var(--card-border)] transition-all duration-150 ${canExpand ? 'cursor-pointer' : ''} ${expanded ? 'bg-white/[0.02] border-[var(--card-border-hover,rgba(255,255,255,0.15))]' : `${isEven ? 'bg-white/[0.01]' : sev.glowBg}`} ${canExpand ? 'hover:bg-white/[0.03] hover:border-l-emerald-500 active:bg-white/[0.05]' : ''}`}
             >
                 {/* Severity icon */}
                 <div className={`w-7 h-7 rounded-lg ${sev.bg} flex items-center justify-center flex-shrink-0 transition-shadow duration-150 group-hover:shadow-[0_0_8px_rgba(16,185,129,0.15)]`}>
@@ -493,7 +493,7 @@ function CategoryGroup({ category, issues, auditUrl, report, index }: { category
             {/* Category header */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="w-full flex items-center gap-4 px-6 py-5 text-left group cursor-pointer hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
+                className="w-full flex items-center gap-4 px-4 py-3 sm:px-6 sm:py-5 text-left group cursor-pointer hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
             >
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/10 flex items-center justify-center flex-shrink-0">
                     <CatIcon className="w-5 h-5 text-emerald-400" />
@@ -536,7 +536,7 @@ function CategoryGroup({ category, issues, auditUrl, report, index }: { category
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden"
                     >
-                        <div className="px-6 pb-5 space-y-2 border-t border-[var(--card-border)] pt-4">
+                        <div className="px-4 pb-4 sm:px-6 sm:pb-5 space-y-2 border-t border-[var(--card-border)] pt-4">
                             {issues.map((issue, i) => (
                                 <IssueRow key={issue.id} issue={issue} auditUrl={auditUrl} report={report} index={i} isEven={i % 2 === 0} />
                             ))}
@@ -700,8 +700,8 @@ function AuditPageInner() {
             {/* ════════════════════════════════════════ */}
             {/* ─── URL INPUT ─── */}
             {/* ════════════════════════════════════════ */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }} className="glass-card rounded-2xl p-6">
-                <div className="flex gap-3">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }} className="glass-card rounded-2xl p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex-1 relative">
                         <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                         <input
@@ -718,7 +718,7 @@ function AuditPageInner() {
                         data-audit-btn
                         onClick={runAudit}
                         disabled={loading || !url.trim()}
-                        className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 disabled:hover:from-emerald-500 disabled:hover:to-cyan-500 text-black font-semibold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
+                        className="px-6 py-3 min-h-[44px] bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 disabled:hover:from-emerald-500 disabled:hover:to-cyan-500 text-black font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 w-full sm:w-auto"
                     >
                         {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Auditing...</> : <><Search className="w-4 h-4" /> Run Audit</>}
                     </button>
@@ -729,7 +729,7 @@ function AuditPageInner() {
             {/* ─── QUICK AUDIT: USER'S OWN PAGES ─── */}
             {/* ════════════════════════════════════════ */}
             {userSiteUrl && userPages.length > 0 && !report && !loading && (
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }} className="premium-card rounded-2xl p-6">
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }} className="premium-card rounded-2xl p-4 sm:p-6">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/10 flex items-center justify-center">
                             <Zap className="w-4 h-4 text-emerald-400" />
@@ -793,7 +793,7 @@ function AuditPageInner() {
                     </div>
 
                     {/* ─── SCORE + SEVERITY SUMMARY ─── */}
-                    <div className="premium-card rounded-2xl p-8">
+                    <div className="premium-card rounded-2xl p-4 sm:p-6 lg:p-8">
                         <div className="flex flex-col lg:flex-row items-center gap-8">
                             <div className="flex flex-col items-center">
                                 <ScoreRing score={report.score} />
@@ -820,7 +820,7 @@ function AuditPageInner() {
                                          'Needs attention. Multiple critical issues detected.'}
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                                     {([
                                         { key: 'critical' as Severity, accentColor: 'bg-red-500' },
                                         { key: 'warning' as Severity, accentColor: 'bg-amber-500' },
@@ -854,7 +854,7 @@ function AuditPageInner() {
                     </div>
 
                     {/* ─── PAGE OVERVIEW (interactive stat cards with detail expansion) ─── */}
-                    <div className="premium-card rounded-2xl p-6">
+                    <div className="premium-card rounded-2xl p-4 sm:p-6">
                         <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-2">
                             <Layers className="w-4 h-4 text-emerald-400" />
                             Page Overview
@@ -863,7 +863,7 @@ function AuditPageInner() {
 
                         {/* Title & Description cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                            <div className="glass-card rounded-xl p-4">
+                            <div className="glass-card rounded-xl p-3 sm:p-4">
                                 <div className="flex items-center justify-between mb-1.5">
                                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Title Tag</span>
                                     <CharCountBadge count={report.meta.title?.length || 0} min={30} max={60} />
@@ -872,7 +872,7 @@ function AuditPageInner() {
                                     {report.meta.title || <span className="text-red-400 italic">Missing title tag</span>}
                                 </p>
                             </div>
-                            <div className="glass-card rounded-xl p-4">
+                            <div className="glass-card rounded-xl p-3 sm:p-4">
                                 <div className="flex items-center justify-between mb-1.5">
                                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Meta Description</span>
                                     <CharCountBadge count={report.meta.description?.length || 0} min={120} max={160} />
@@ -884,7 +884,7 @@ function AuditPageInner() {
                         </div>
 
                         {/* Interactive stat cards grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                             <OverviewCard
                                 icon={Link2}
                                 label="Links"
@@ -932,8 +932,8 @@ function AuditPageInner() {
                     </div>
 
                     {/* ─── ACTION BAR (filters + actions) ─── */}
-                    <div className="glass-card rounded-xl px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                    <div className="glass-card rounded-xl px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-2 pb-1 sm:pb-0">
                             {(['all', 'critical', 'warning', 'info', 'passed'] as FilterMode[]).map(f => {
                                 const isActive = filter === f;
                                 const count = f === 'all' ? report.summary.total : report.summary[f as Severity];
@@ -953,18 +953,18 @@ function AuditPageInner() {
                                 );
                             })}
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                             {(report.summary.critical > 0 || report.summary.warning > 0) && (
                                 <FixWithBotButton label="Analyze All Issues" size="md" variant="solid" context="Get deep analysis and fix recommendations from your bot" site={url} />
                             )}
-                            <button onClick={() => exportAuditCSV(report)} className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                            <button onClick={() => exportAuditCSV(report)} className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
                                 <Download className="w-3.5 h-3.5" /> Export CSV
                             </button>
-                            <button onClick={shareReport} className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                            <button onClick={shareReport} className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
                                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                                 {copied ? 'Copied!' : 'Share'}
                             </button>
-                            <button onClick={runAudit} className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                            <button onClick={runAudit} className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
                                 <RotateCcw className="w-3.5 h-3.5" /> Re-audit
                             </button>
                         </div>
@@ -991,11 +991,11 @@ function AuditPageInner() {
 
                     {/* ─── QUICK RE-AUDIT ─── */}
                     <div className="section-divider my-6" />
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <button onClick={runAudit} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
+                        <button onClick={runAudit} className="flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20">
                             <RotateCcw className="w-4 h-4" /> Re-Audit This Page
                         </button>
-                        <button onClick={() => { setReport(null); setUrl(''); }} className="flex items-center gap-2 px-6 py-3 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] font-medium text-sm rounded-xl hover:bg-white/[0.08] transition">
+                        <button onClick={() => { setReport(null); setUrl(''); }} className="flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] w-full sm:w-auto bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] font-medium text-sm rounded-xl hover:bg-white/[0.08] transition">
                             <Search className="w-4 h-4" /> Audit Another Page
                         </button>
                     </div>

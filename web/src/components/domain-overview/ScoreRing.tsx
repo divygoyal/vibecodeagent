@@ -11,12 +11,13 @@ interface ScoreRingProps {
   colorFn?: (score: number) => string
 }
 
-const sizeMap = { sm: 48, md: 64, lg: 80 } as const
-const fontSizeMap = { sm: 'text-sm', md: 'text-lg', lg: 'text-2xl' } as const
+const sizeMap = { sm: { mobile: 48, desktop: 48 }, md: { mobile: 56, desktop: 64 }, lg: { mobile: 64, desktop: 80 } } as const
+const fontSizeMap = { sm: 'text-xs sm:text-sm', md: 'text-base sm:text-lg', lg: 'text-xl sm:text-2xl' } as const
+const ringClassMap = { sm: 'w-12 h-12 sm:w-12 sm:h-12', md: 'w-14 h-14 sm:w-16 sm:h-16', lg: 'w-16 h-16 sm:w-20 sm:h-20' } as const
 
 export function ScoreRing({ score, size = 'lg', label, colorFn }: ScoreRingProps) {
   const resolvedColor = (colorFn ?? scoreColor)(score)
-  const px = sizeMap[size]
+  const px = sizeMap[size].desktop
   const radius = (px - 8) / 2
   const circumference = 2 * Math.PI * radius
   const progress = (score / 100) * circumference
@@ -50,12 +51,12 @@ export function ScoreRing({ score, size = 'lg', label, colorFn }: ScoreRingProps
     <div className="flex flex-col items-center gap-2">
       {/* Glow wrapper */}
       <div
-        className="score-ring-glow relative"
+        className={`score-ring-glow relative ${ringClassMap[size]}`}
         style={{
           filter: `drop-shadow(0 0 6px ${resolvedColor}33)`,
         }}
       >
-        <svg width={px} height={px} className="-rotate-90">
+        <svg viewBox={`0 0 ${px} ${px}`} className="-rotate-90 w-full h-full">
           <circle
             cx={px / 2}
             cy={px / 2}
@@ -80,7 +81,6 @@ export function ScoreRing({ score, size = 'lg', label, colorFn }: ScoreRingProps
         </svg>
         <div
           className="absolute inset-0 flex items-center justify-center"
-          style={{ width: px, height: px }}
         >
           <span className={`${fontSizeMap[size]} font-bold`} style={{ color: resolvedColor }}>
             {displayed}

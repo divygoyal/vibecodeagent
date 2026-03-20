@@ -489,10 +489,10 @@ export default function DashboardLayout({
             {/* ─── Main content area ─── */}
             <div className="flex-1 flex flex-col min-h-screen">
                 {/* Top bar */}
-                <header className="h-16 flex items-center justify-between px-4 sm:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
+                <header className="h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
                     {/* Mobile menu button */}
                     <button
-                        className="lg:hidden text-zinc-400 hover:text-white"
+                        className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0"
                         onClick={() => setMobileOpen(!mobileOpen)}
                         aria-label="Open navigation menu"
                         aria-expanded={mobileOpen}
@@ -501,8 +501,8 @@ export default function DashboardLayout({
                     </button>
 
                     {/* Breadcrumb navigation */}
-                    <nav className="flex items-center gap-1.5 text-sm" aria-label="Breadcrumb">
-                        <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 transition-colors font-medium">
+                    <nav className="flex items-center gap-1.5 text-sm flex-wrap overflow-hidden" aria-label="Breadcrumb">
+                        <Link href="/dashboard" className="hidden sm:inline text-zinc-500 hover:text-zinc-300 transition-colors font-medium">
                             Dashboard
                         </Link>
                         {pathname !== '/dashboard' && (() => {
@@ -512,13 +512,13 @@ export default function DashboardLayout({
                             );
                             return (
                                 <>
-                                    <ChevronRight className="w-3 h-3 text-zinc-600" />
-                                    <span className="text-zinc-300 font-semibold">
+                                    <ChevronRight className="hidden sm:block w-3 h-3 text-zinc-600" />
+                                    <span className={`text-zinc-300 font-semibold ${segments.length > 1 ? 'hidden sm:inline' : ''}`}>
                                         {currentItem?.label || segments[segments.length - 1]?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                     </span>
                                     {segments.length > 1 && currentItem && (
                                         <>
-                                            <ChevronRight className="w-3 h-3 text-zinc-600" />
+                                            <ChevronRight className="hidden sm:block w-3 h-3 text-zinc-600" />
                                             <span className="text-zinc-300 font-semibold">
                                                 {segments[segments.length - 1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                             </span>
@@ -530,13 +530,13 @@ export default function DashboardLayout({
                     </nav>
 
                     {/* Right side */}
-                    <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                         {/* Global Site Switcher */}
                         {gscSites.length > 1 && (
                             <div className="relative">
                                 <button
                                     onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition max-w-[160px]"
+                                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition max-w-[120px] sm:max-w-[160px] md:max-w-[200px]"
                                     aria-label="Switch site"
                                 >
                                     <Globe className="w-3.5 h-3.5 flex-shrink-0" />
@@ -546,7 +546,7 @@ export default function DashboardLayout({
                                 {siteDropdownOpen && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
-                                        <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[200px] max-h-[260px] overflow-y-auto">
+                                        <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[200px] max-w-[calc(100vw-2rem)] max-h-[260px] overflow-y-auto">
                                             {gscSites.map((site: any) => {
                                                 const url = site.siteUrl || site;
                                                 const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
@@ -574,16 +574,16 @@ export default function DashboardLayout({
                         <div className="relative">
                             <button
                                 onClick={() => setRangeDropdownOpen(!rangeDropdownOpen)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
+                                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition flex-shrink-0"
                             >
                                 <CalendarDays className="w-3.5 h-3.5" />
-                                {RANGES.find(r => r.value === range)?.label || '30 days'}
-                                <ChevronDown className={`w-3 h-3 transition-transform ${rangeDropdownOpen ? 'rotate-180' : ''}`} />
+                                <span className="hidden sm:inline">{RANGES.find(r => r.value === range)?.label || '30 days'}</span>
+                                <ChevronDown className={`hidden sm:block w-3 h-3 transition-transform ${rangeDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
                             {rangeDropdownOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setRangeDropdownOpen(false)} />
-                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[140px]">
+                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[140px] max-w-[calc(100vw-2rem)]">
                                         {RANGES.map(r => (
                                             <button
                                                 key={r.value}
@@ -603,7 +603,7 @@ export default function DashboardLayout({
                         <div className="relative" ref={bellRef}>
                             <button
                                 onClick={() => setBellOpen(!bellOpen)}
-                                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0"
                                 aria-label={`Alerts${criticalAlertCount > 0 ? ` (${criticalAlertCount} active)` : ''}`}
                                 aria-expanded={bellOpen}
                                 aria-haspopup="true"
@@ -618,7 +618,7 @@ export default function DashboardLayout({
                             </button>
                             {bellOpen && (
                                 <>
-                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 w-[320px] max-h-[400px] overflow-hidden">
+                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden">
                                         <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
                                             <span className="text-xs font-semibold text-white">Alerts</span>
                                             {alertCount > 0 && (
@@ -669,7 +669,7 @@ export default function DashboardLayout({
                         {/* Theme toggle */}
                         <button
                             onClick={toggleTheme}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0"
                             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                         >
@@ -716,7 +716,7 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Page content */}
-                <main id="main-content" className="flex-1 p-4 sm:p-6 overflow-y-auto" role="main">
+                <main id="main-content" className="flex-1 p-4 sm:p-6 overflow-y-auto overflow-x-hidden" role="main">
                     <div className="max-w-7xl mx-auto">
                         <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
                             {children}
@@ -753,7 +753,7 @@ export default function DashboardLayout({
                         className="fixed inset-0 bg-black/60 z-50 lg:hidden"
                         onClick={() => setMobileOpen(false)}
                     />
-                    <div className="fixed left-0 top-0 bottom-0 w-[260px] bg-[var(--sidebar-bg)] border-r border-[var(--card-border)] z-50 lg:hidden flex flex-col">
+                    <div className="fixed left-0 top-0 bottom-0 w-[280px] max-w-[85vw] bg-[var(--sidebar-bg)] border-r border-[var(--card-border)] z-50 lg:hidden flex flex-col">
                         <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--divider)]">
                             <Link href="/dashboard" className="flex items-center gap-2.5">
                                 <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg" />
@@ -763,14 +763,14 @@ export default function DashboardLayout({
                             </Link>
                             <button
                                 onClick={() => setMobileOpen(false)}
-                                className="text-zinc-400"
+                                className="text-zinc-400 p-2 -mr-2 hover:text-white transition-colors"
                                 aria-label="Close navigation menu"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <nav className="flex-1 py-3 px-2 space-y-1">
+                        <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
                             {sidebarItems.map((item) => {
                                 const isActive = pathname === item.href ||
                                     (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -780,7 +780,7 @@ export default function DashboardLayout({
                                         key={item.href}
                                         href={item.href}
                                         onClick={() => setMobileOpen(false)}
-                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                                        className={`flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-xl text-sm font-medium transition-all ${isActive
                                             ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
                                             : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                             }`}
@@ -803,7 +803,7 @@ export default function DashboardLayout({
                                         key={item.href}
                                         href={item.href}
                                         onClick={() => setMobileOpen(false)}
-                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                                        className={`flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-xl text-sm font-medium transition-all ${isActive
                                             ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
                                             : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                             }`}

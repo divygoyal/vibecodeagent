@@ -20,7 +20,7 @@ export default function TechStackPanel({ data, domain }: TechStackPanelProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {/* Technology Stack */}
       <div className="premium-card rounded-2xl p-5">
         <div className="flex items-center gap-3 mb-4">

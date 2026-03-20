@@ -40,7 +40,7 @@ const ActionLink = ({ label }: { label: string }) => (
 const Card = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
   <div
     onClick={onClick}
-    className="premium-card rounded-2xl p-6 flex flex-col justify-between gap-4 cursor-pointer hover:border-[var(--card-hover)] transition-all duration-200 active:scale-[0.98]"
+    className="premium-card rounded-2xl p-4 sm:p-6 flex flex-col justify-between gap-4 cursor-pointer hover:border-[var(--card-hover)] transition-all duration-200 active:scale-[0.98]"
   >
     {children}
   </div>
@@ -78,7 +78,7 @@ export function ScoreOverviewRow({ data }: Props) {
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">SEO Health</p>
           <div className="flex items-center gap-4 mb-3">
             <ScoreRing score={seoScore} size="sm" label="" />
-            <span className="text-4xl font-bold text-[var(--text-primary)]">{seoScore}</span>
+            <span className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)]">{seoScore}</span>
           </div>
           <Bar value={seoScore} max={100} level={seo.level} />
           <p className={`text-xs font-medium mt-2 ${statusColor(seo.level).text}`}>{seo.label}</p>
@@ -89,7 +89,7 @@ export function ScoreOverviewRow({ data }: Props) {
       <Card onClick={() => askAI(`My performance score is ${perfScore}/100 (${perf.label}). How can I boost my page speed?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">Performance</p>
-          <p className="text-4xl font-bold text-[var(--text-primary)] mb-3">{perfScore}</p>
+          <p className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-3">{perfScore}</p>
           <Bar value={perfScore} max={100} level={perf.level} />
           <p className={`text-xs font-medium mt-2 ${statusColor(perf.level).text}`}>{perf.label}</p>
         </div>
@@ -99,7 +99,7 @@ export function ScoreOverviewRow({ data }: Props) {
       <Card onClick={() => askAI(`I have ${issueCount} issues: ${criticals} critical, ${warnings} warnings, ${infos} informational. How should I prioritize fixing these?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">Issues Found</p>
-          <p className="text-4xl font-bold text-[var(--text-primary)] mb-3">{issueCount}</p>
+          <p className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-3">{issueCount}</p>
           <p className="text-xs text-[var(--text-secondary)] font-mono">
             <span className="text-red-400">{criticals}C</span>{' · '}
             <span className="text-amber-400">{warnings}W</span>{' · '}
@@ -112,7 +112,7 @@ export function ScoreOverviewRow({ data }: Props) {
       <Card onClick={() => askAI(`My page load time is ${loadSec.toFixed(2)}s (${lt.label}). How can I speed up my site?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">Load Time</p>
-          <p className="text-4xl font-bold text-[var(--text-primary)] mb-3">
+          <p className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-3">
             {data.audit ? loadSec.toFixed(2) : '--'}
             <span className="text-lg font-normal text-[var(--text-tertiary)] ml-1">s</span>
           </p>

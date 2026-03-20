@@ -37,7 +37,7 @@ export default function DomainInputBar({
             onKeyDown={handleKeyDown}
             disabled={loading}
             placeholder="Enter domain to analyze"
-            className="w-full rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] pl-10 pr-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-all focus:border-emerald-500/30 focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] pl-10 pr-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-all focus:border-emerald-500/30 focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
           />
         </div>
 
@@ -54,7 +54,7 @@ export default function DomainInputBar({
       </div>
 
       {recentDomains && recentDomains.length > 0 && (
-        <p className="mt-2 text-xs text-[var(--text-muted)]">
+        <p className="mt-2 text-xs text-[var(--text-muted)] break-words">
           Recent:{' '}
           {recentDomains.map((d, i) => (
             <span key={d}>

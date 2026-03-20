@@ -33,7 +33,7 @@ export function IssuesPanel({ data, domain, auditUrl }: Props) {
   const totalCount = sortedIssues.length
 
   return (
-    <div className="premium-card rounded-2xl p-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">
@@ -78,16 +78,16 @@ export function IssuesPanel({ data, domain, auditUrl }: Props) {
                       <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 inline-block ${color.replace('text-', 'bg-')}`} />
 
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                        <p className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">
                           {issue.title}
                         </p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-0.5 line-clamp-1">
+                        <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mt-0.5 line-clamp-1">
                           {issue.description}
                         </p>
                       </div>
                     </div>
                     {!isPassed && (
-                      <span className="shrink-0 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors mt-0.5">
+                      <span className="shrink-0 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors mt-0.5 min-h-[48px] sm:min-h-0 flex items-center">
                         Fix&nbsp;&rarr;
                       </span>
                     )}

@@ -21,7 +21,7 @@ export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps
   }
 
   return (
-    <div className="premium-card rounded-2xl p-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <BookOpen className="h-4 w-4 text-zinc-400" />
@@ -55,7 +55,7 @@ export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: 'Word Count', value: r.wordCount.toLocaleString() },
               { label: 'Sentence Count', value: r.sentenceCount.toLocaleString() },
@@ -66,7 +66,7 @@ export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps
                 key={stat.label}
                 className="rounded-lg border border-white/[0.05] p-2.5 text-center"
               >
-                <p className="text-xl font-bold text-[var(--text-primary)]">{stat.value}</p>
+                <p className="text-lg sm:text-xl font-bold text-[var(--text-primary)]">{stat.value}</p>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">{stat.label}</p>
               </div>
             ))}
