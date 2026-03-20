@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, Loader2, AlertTriangle, AlertCircle, Info, CheckCircle2,
     Globe, Clock, FileText, Image, Link2, Code2, Shield, Share2,
-    ChevronDown, ChevronRight, Download, RotateCcw, ExternalLink, Zap, Copy, Check, ScanSearch,
-    Target, BarChart3, Hash
+    ChevronDown, ChevronUp, Download, RotateCcw, ExternalLink, Zap, Copy, Check, ScanSearch,
+    Target, Hash, Layers, ArrowUpDown, Type, ScrollText
 } from 'lucide-react';
 import type { AuditReport, AuditIssue, Severity } from '@/lib/siteAudit';
 import { useContainerStatus, useSiteList, useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
 import FixWithBotButton from '@/components/FixWithBotButton';
 
-// ─── Severity config ───
+// ════════════════════════════════════════════════════════════════
+// ─── CONSTANTS & CONFIGS ───
+// ════════════════════════════════════════════════════════════════
+
 const severityConfig: Record<Severity, { label: string; color: string; textColor: string; bg: string; border: string; borderLeft: string; glowBg: string; icon: React.ElementType }> = {
     critical: { label: 'Critical', color: 'text-red-400', textColor: 'text-red-300', bg: 'bg-red-500/10', border: 'border-red-500/20', borderLeft: 'border-l-red-500', glowBg: 'bg-red-500/[0.03]', icon: AlertTriangle },
     warning: { label: 'Warning', color: 'text-amber-400', textColor: 'text-amber-300', bg: 'bg-amber-500/10', border: 'border-amber-500/20', borderLeft: 'border-l-amber-500', glowBg: 'bg-amber-500/[0.03]', icon: AlertCircle },
@@ -23,14 +26,21 @@ const severityConfig: Record<Severity, { label: string; color: string; textColor
 
 const categoryIcons: Record<string, React.ElementType> = {
     'HTTP': Globe, 'Security': Shield, 'Performance': Clock, 'Title': FileText,
-    'Meta': FileText, 'Head': Code2, 'Headings': FileText, 'Content': FileText,
+    'Meta': FileText, 'Head': Code2, 'Headings': Type, 'Content': ScrollText,
     'Images': Image, 'Links': Link2, 'Social': Share2, 'Structured Data': Code2,
     'Mobile': Globe, 'SEO': Search,
 };
 
-// ─── Score ring ───
-function ScoreRing({ score, size = 'lg' }: { score: number; size?: 'lg' | 'xl' }) {
-    const dims = size === 'xl' ? 'w-44 h-44' : 'w-36 h-36';
+type FilterMode = 'all' | 'critical' | 'warning' | 'info' | 'passed';
+type SortDir = 'asc' | 'desc';
+
+const sampleUrls = ['google.com', 'github.com', 'wikipedia.org', 'reddit.com'];
+
+// ════════════════════════════════════════════════════════════════
+// ─── SCORE RING ───
+// ════════════════════════════════════════════════════════════════
+
+function ScoreRing({ score }: { score: number }) {
     const radius = 54;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (score / 100) * circumference;
@@ -38,7 +48,7 @@ function ScoreRing({ score, size = 'lg' }: { score: number; size?: 'lg' | 'xl' }
     const label = score >= 80 ? 'Healthy' : score >= 50 ? 'Needs Work' : 'Critical';
 
     return (
-        <div className={`relative ${dims} score-ring-glow`}>
+        <div className="relative w-44 h-44 score-ring-glow">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--card-border, #27272a)" strokeWidth="7" />
                 <motion.circle
@@ -65,41 +75,211 @@ function ScoreRing({ score, size = 'lg' }: { score: number; size?: 'lg' | 'xl' }
     );
 }
 
-// ─── Issue row ───
-function IssueRow({ issue, auditUrl, index }: { issue: AuditIssue; auditUrl?: string; index: number }) {
+// ════════════════════════════════════════════════════════════════
+// ─── SORTABLE DETAIL TABLE ───
+// ════════════════════════════════════════════════════════════════
+
+interface Column<T> {
+    key: string;
+    label: string;
+    render: (row: T) => React.ReactNode;
+    sortValue?: (row: T) => string | number | boolean;
+    width?: string;
+}
+
+function DetailTable<T>({ data, columns, maxHeight = '320px' }: { data: T[]; columns: Column<T>[]; maxHeight?: string }) {
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+    const handleSort = (key: string) => {
+        if (sortKey === key) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    const sorted = useMemo(() => {
+        if (!sortKey) return data;
+        const col = columns.find(c => c.key === sortKey);
+        if (!col?.sortValue) return data;
+        return [...data].sort((a, b) => {
+            const av = col.sortValue!(a);
+            const bv = col.sortValue!(b);
+            if (typeof av === 'string' && typeof bv === 'string') {
+                return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+            }
+            if (typeof av === 'boolean' && typeof bv === 'boolean') {
+                return sortDir === 'asc' ? (av === bv ? 0 : av ? -1 : 1) : (av === bv ? 0 : av ? 1 : -1);
+            }
+            return sortDir === 'asc' ? Number(av) - Number(bv) : Number(bv) - Number(av);
+        });
+    }, [data, sortKey, sortDir, columns]);
+
+    if (data.length === 0) {
+        return <p className="text-xs text-[var(--text-muted)] italic py-4 text-center">No items found.</p>;
+    }
+
+    return (
+        <div className="glass-card rounded-xl overflow-hidden border border-[var(--card-border)]">
+            <div className="overflow-auto" style={{ maxHeight }}>
+                <table className="w-full text-xs">
+                    <thead className="sticky top-0 z-10 bg-[var(--card-bg)] border-b border-[var(--card-border)]">
+                        <tr>
+                            {columns.map(col => (
+                                <th
+                                    key={col.key}
+                                    onClick={() => col.sortValue && handleSort(col.key)}
+                                    className={`text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] ${col.sortValue ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
+                                    style={col.width ? { width: col.width } : undefined}
+                                >
+                                    <span className="flex items-center gap-1">
+                                        {col.label}
+                                        {col.sortValue && sortKey === col.key && (
+                                            sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                                        )}
+                                        {col.sortValue && sortKey !== col.key && (
+                                            <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                        )}
+                                    </span>
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sorted.map((row, i) => (
+                            <tr key={i} className="table-row-premium border-b border-[var(--card-border)] last:border-0 hover:bg-white/[0.02] transition-colors">
+                                {columns.map(col => (
+                                    <td key={col.key} className="px-4 py-2.5 text-[var(--text-secondary)]">
+                                        {col.render(row)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="px-4 py-2 border-t border-[var(--card-border)] text-[10px] text-[var(--text-muted)] bg-[var(--card-bg)]">
+                {data.length} item{data.length !== 1 ? 's' : ''}
+            </div>
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ─── PAGE OVERVIEW STAT CARD (clickable with detail expansion) ───
+// ════════════════════════════════════════════════════════════════
+
+function OverviewCard({ icon: Icon, label, value, subtext, warn, expandedContent }: {
+    icon: React.ElementType;
+    label: string;
+    value: string;
+    subtext?: string;
+    warn?: boolean;
+    expandedContent?: React.ReactNode;
+}) {
+    const [open, setOpen] = useState(false);
+    const hasContent = !!expandedContent;
+
+    return (
+        <div className="flex flex-col">
+            <button
+                onClick={() => hasContent && setOpen(!open)}
+                className={`stat-card-hover rounded-xl p-4 text-left border border-[var(--card-border)] transition-all relative overflow-hidden ${hasContent ? 'cursor-pointer' : 'cursor-default'} ${open ? 'ring-2 ring-emerald-500/20 border-emerald-500/20' : ''}`}
+            >
+                <div className={`absolute top-0 left-0 right-0 h-0.5 ${warn ? 'bg-amber-500' : 'bg-gradient-to-r from-emerald-500 to-cyan-500'}`} />
+                <div className="flex items-start justify-between mb-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${warn ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+                        <Icon className={`w-4 h-4 ${warn ? 'text-amber-400' : 'text-emerald-400'}`} />
+                    </div>
+                    {hasContent && (
+                        <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
+                    )}
+                </div>
+                <div className="text-lg font-bold text-[var(--text-primary)]">{value}</div>
+                <div className="text-[10px] text-[var(--text-muted)]">{label}</div>
+                {subtext && <div className="text-[10px] text-[var(--text-muted)] mt-0.5 opacity-70">{subtext}</div>}
+            </button>
+            <AnimatePresence>
+                {open && expandedContent && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="pt-3">{expandedContent}</div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ─── CHAR COUNT BADGE ───
+// ════════════════════════════════════════════════════════════════
+
+function CharCountBadge({ count, min, max }: { count: number; min: number; max: number }) {
+    const color = count >= min && count <= max ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                  count > 0 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                  'text-red-400 bg-red-500/10 border-red-500/20';
+    return (
+        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${color}`}>
+            {count} chars
+        </span>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ─── ISSUE ROW (professional, with inline detail expansion) ───
+// ════════════════════════════════════════════════════════════════
+
+function IssueRow({ issue, auditUrl, report, index }: { issue: AuditIssue; auditUrl?: string; report: AuditReport; index: number }) {
     const [expanded, setExpanded] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
     const sev = severityConfig[issue.severity];
     const SevIcon = sev.icon;
 
+    // Determine if this issue has detail data we can show
+    const detailType = getDetailTypeForIssue(issue);
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.03, duration: 0.25 }}
-            className={`border-l-2 ${sev.borderLeft} rounded-xl overflow-hidden transition-all ${sev.glowBg} border border-[var(--card-border)] hover:border-[var(--card-border-hover,rgba(255,255,255,0.12))]`}
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.02, duration: 0.2 }}
+            className="group"
         >
-            <button
-                onClick={() => setExpanded(!expanded)}
-                aria-expanded={expanded}
-                className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
-            >
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border-l-2 ${sev.borderLeft} ${sev.glowBg} border border-[var(--card-border)] hover:border-[var(--card-border-hover,rgba(255,255,255,0.12))] transition-all`}>
+                {/* Severity icon */}
                 <div className={`w-7 h-7 rounded-lg ${sev.bg} flex items-center justify-center flex-shrink-0`}>
                     <SevIcon className={`w-3.5 h-3.5 ${sev.color}`} />
                 </div>
+
+                {/* Title + description */}
                 <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-[var(--text-primary)]">{issue.title}</span>
                     {issue.description && !expanded && (
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{issue.description}</p>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{issue.description}</p>
                     )}
                 </div>
+
+                {/* Value badge */}
                 {issue.value && (
                     <span className="text-xs text-[var(--text-muted)] font-mono px-2.5 py-1 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg flex-shrink-0">
                         {issue.value}
                     </span>
                 )}
+
+                {/* Severity pill */}
                 <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${sev.bg} ${sev.color} flex-shrink-0`}>
                     {sev.label}
                 </span>
+
+                {/* Fix button */}
                 {issue.severity !== 'passed' && (
                     <FixWithBotButton
                         label="Fix"
@@ -108,14 +288,20 @@ function IssueRow({ issue, auditUrl, index }: { issue: AuditIssue; auditUrl?: st
                         variant={issue.severity === 'critical' ? 'solid' : 'ghost'}
                     />
                 )}
-                {(issue.description || issue.recommendation) ? (
-                    <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                        <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
-                    </motion.div>
-                ) : null}
-            </button>
+
+                {/* Expand toggle */}
+                {(issue.description || issue.recommendation) && (
+                    <button onClick={() => setExpanded(!expanded)} className="p-1 rounded-lg hover:bg-white/[0.05] transition-colors">
+                        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                            <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                        </motion.div>
+                    </button>
+                )}
+            </div>
+
+            {/* Expanded recommendation + detail drilldown */}
             <AnimatePresence>
-                {expanded && (issue.description || issue.recommendation) && (
+                {expanded && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
@@ -123,9 +309,9 @@ function IssueRow({ issue, auditUrl, index }: { issue: AuditIssue; auditUrl?: st
                         transition={{ duration: 0.25 }}
                         className="overflow-hidden"
                     >
-                        <div className="px-5 pb-4 pt-0 space-y-3 border-t border-[var(--card-border)]">
+                        <div className="ml-6 pl-6 border-l border-[var(--card-border)] py-3 space-y-3">
                             {issue.description && (
-                                <p className="text-sm text-[var(--text-secondary)] mt-3 leading-relaxed">{issue.description}</p>
+                                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{issue.description}</p>
                             )}
                             {issue.recommendation && (
                                 <div className="glass-card rounded-xl p-4 space-y-3">
@@ -134,36 +320,36 @@ function IssueRow({ issue, auditUrl, index }: { issue: AuditIssue; auditUrl?: st
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                                         </div>
                                         <div className="flex-1">
-                                            <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Recommendation</p>
+                                            <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Recommendation</p>
                                             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{issue.recommendation}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 pl-8">
-                                        <FixWithBotButton
-                                            label="Fix with AI"
-                                            context={`Fix this SEO issue on ${auditUrl || 'the audited page'}: ${issue.title} - ${issue.description}`}
-                                            size="sm"
-                                            variant="solid"
-                                        />
-                                        <FixWithBotButton
-                                            label="Analyze"
-                                            size="sm"
-                                            variant="ghost"
-                                            context={`Get detailed analysis: ${issue.title}`}
-                                        />
+                                        <FixWithBotButton label="Fix with AI" context={`Fix this SEO issue on ${auditUrl || 'the audited page'}: ${issue.title} - ${issue.description}`} size="sm" variant="solid" />
+                                        <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get detailed analysis: ${issue.title}`} />
                                         {auditUrl && (
-                                            <a
-                                                href={auditUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors"
-                                            >
-                                                <ExternalLink className="w-3 h-3" />
-                                                View on Page
+                                            <a href={auditUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                                                <ExternalLink className="w-3 h-3" /> View Page
                                             </a>
                                         )}
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Detail drilldown button */}
+                            {detailType && (
+                                <button
+                                    onClick={() => setShowDetails(!showDetails)}
+                                    className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-emerald-400 bg-emerald-500/[0.06] border border-emerald-500/15 rounded-lg hover:bg-emerald-500/[0.12] transition-colors"
+                                >
+                                    <Layers className="w-3.5 h-3.5" />
+                                    {showDetails ? 'Hide' : 'View'} {getDetailLabel(detailType, report)}
+                                </button>
+                            )}
+                            {showDetails && detailType && (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+                                    {renderDetailForType(detailType, report)}
+                                </motion.div>
                             )}
                         </div>
                     </motion.div>
@@ -173,22 +359,129 @@ function IssueRow({ issue, auditUrl, index }: { issue: AuditIssue; auditUrl?: st
     );
 }
 
-// ─── Category group ───
-function CategoryGroup({ category, issues, auditUrl, index }: { category: string; issues: AuditIssue[]; auditUrl?: string; index: number }) {
-    const [collapsed, setCollapsed] = useState(false);
+// ════════════════════════════════════════════════════════════════
+// ─── DETAIL TYPE HELPERS ───
+// ════════════════════════════════════════════════════════════════
+
+type DetailType = 'links' | 'images' | 'headings' | 'scripts' | 'stylesheets' | 'structuredData';
+
+function getDetailTypeForIssue(issue: AuditIssue): DetailType | null {
+    const cat = issue.category.toLowerCase();
+    const title = issue.title.toLowerCase();
+    if (cat === 'links' || title.includes('link')) return 'links';
+    if (cat === 'images' || title.includes('image') || title.includes('alt')) return 'images';
+    if (cat === 'headings' || title.includes('heading') || title.includes('h1') || title.includes('h2')) return 'headings';
+    if (title.includes('script')) return 'scripts';
+    if (title.includes('stylesheet') || title.includes('css')) return 'stylesheets';
+    if (title.includes('structured data') || title.includes('schema')) return 'structuredData';
+    return null;
+}
+
+function getDetailLabel(type: DetailType, report: AuditReport): string {
+    const d = report.details;
+    switch (type) {
+        case 'links': return `all ${d.links.length} links`;
+        case 'images': return `all ${d.images.length} images`;
+        case 'headings': return `all ${d.headings.length} headings`;
+        case 'scripts': return `all ${d.scripts.length} scripts`;
+        case 'stylesheets': return `all ${d.stylesheets.length} stylesheets`;
+        case 'structuredData': return `all ${d.structuredData.length} items`;
+    }
+}
+
+function renderDetailForType(type: DetailType, report: AuditReport): React.ReactNode {
+    const d = report.details;
+    switch (type) {
+        case 'links':
+            return (
+                <DetailTable
+                    data={d.links}
+                    columns={[
+                        { key: 'url', label: 'URL', render: r => <span className="font-mono text-[11px] break-all max-w-[300px] block">{r.url}</span>, sortValue: r => r.url },
+                        { key: 'text', label: 'Anchor Text', render: r => <span className="truncate block max-w-[200px]">{r.text || <span className="italic opacity-50">empty</span>}</span>, sortValue: r => r.text },
+                        { key: 'type', label: 'Type', render: r => <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${r.type === 'internal' ? 'text-cyan-400 bg-cyan-500/10' : 'text-purple-400 bg-purple-500/10'}`}>{r.type}</span>, sortValue: r => r.type, width: '100px' },
+                        { key: 'nofollow', label: 'Nofollow', render: r => r.nofollow ? <span className="text-amber-400">Yes</span> : <span className="text-[var(--text-muted)]">No</span>, sortValue: r => r.nofollow, width: '80px' },
+                    ]}
+                />
+            );
+        case 'images':
+            return (
+                <DetailTable
+                    data={d.images}
+                    columns={[
+                        { key: 'src', label: 'Source', render: r => (
+                            <div className="flex items-center gap-2">
+                                {r.src && <img src={r.src} alt="" className="w-8 h-8 rounded object-cover bg-white/5 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                                <span className="font-mono text-[11px] break-all max-w-[250px] block">{r.src}</span>
+                            </div>
+                        ), sortValue: r => r.src },
+                        { key: 'alt', label: 'Alt Text', render: r => r.alt ? <span className="truncate block max-w-[200px]">{r.alt}</span> : <span className="text-red-400 italic">Missing</span>, sortValue: r => r.alt },
+                        { key: 'hasAlt', label: 'Has Alt', render: r => r.hasAlt ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <AlertTriangle className="w-3.5 h-3.5 text-red-400" />, sortValue: r => r.hasAlt, width: '70px' },
+                        { key: 'lazy', label: 'Lazy', render: r => r.lazy ? <span className="text-emerald-400">Yes</span> : <span className="text-[var(--text-muted)]">No</span>, sortValue: r => r.lazy, width: '60px' },
+                    ]}
+                />
+            );
+        case 'headings':
+            return (
+                <DetailTable
+                    data={d.headings}
+                    columns={[
+                        { key: 'level', label: 'Level', render: r => <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.level === 1 ? 'text-emerald-400 bg-emerald-500/10' : r.level === 2 ? 'text-cyan-400 bg-cyan-500/10' : 'text-blue-400 bg-blue-500/10'}`}>H{r.level}</span>, sortValue: r => r.level, width: '70px' },
+                        { key: 'text', label: 'Text', render: r => <span style={{ paddingLeft: `${(r.level - 1) * 16}px` }} className="block">{r.text || <span className="italic opacity-50">empty</span>}</span>, sortValue: r => r.text },
+                    ]}
+                />
+            );
+        case 'scripts':
+            return (
+                <DetailTable
+                    data={d.scripts}
+                    columns={[
+                        { key: 'src', label: 'Script URL', render: r => <span className="font-mono text-[11px] break-all">{r.src || <span className="italic opacity-50">inline script</span>}</span>, sortValue: r => r.src },
+                    ]}
+                />
+            );
+        case 'stylesheets':
+            return (
+                <DetailTable
+                    data={d.stylesheets}
+                    columns={[
+                        { key: 'href', label: 'Stylesheet URL', render: r => <span className="font-mono text-[11px] break-all">{r.href}</span>, sortValue: r => r.href },
+                    ]}
+                />
+            );
+        case 'structuredData':
+            return (
+                <DetailTable
+                    data={d.structuredData}
+                    columns={[
+                        { key: 'type', label: 'Type', render: r => <span className="font-semibold text-cyan-400">{r.type}</span>, sortValue: r => r.type, width: '150px' },
+                        { key: 'data', label: 'Data', render: r => <pre className="text-[10px] font-mono max-w-[400px] truncate opacity-70">{r.data}</pre> },
+                    ]}
+                />
+            );
+    }
+}
+
+// ════════════════════════════════════════════════════════════════
+// ─── CATEGORY GROUP (premium card) ───
+// ════════════════════════════════════════════════════════════════
+
+function CategoryGroup({ category, issues, auditUrl, report, index }: { category: string; issues: AuditIssue[]; auditUrl?: string; report: AuditReport; index: number }) {
+    const hasProblems = issues.some(i => i.severity !== 'passed');
+    const [collapsed, setCollapsed] = useState(!hasProblems);
     const CatIcon = categoryIcons[category] || FileText;
     const criticals = issues.filter(i => i.severity === 'critical').length;
     const warnings = issues.filter(i => i.severity === 'warning').length;
     const passed = issues.filter(i => i.severity === 'passed').length;
-    const infos = issues.filter(i => i.severity === 'info').length;
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.3 }}
+            transition={{ delay: index * 0.04, duration: 0.3 }}
             className="premium-card rounded-2xl overflow-hidden"
         >
+            {/* Category header */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
                 className="w-full flex items-center gap-4 px-6 py-5 text-left group hover:bg-white/[0.01] transition-colors"
@@ -198,38 +491,33 @@ function CategoryGroup({ category, issues, auditUrl, index }: { category: string
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-[var(--text-primary)]">{category}</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{issues.length} check{issues.length !== 1 ? 's' : ''}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        {issues.length} check{issues.length !== 1 ? 's' : ''} &middot; {passed} passed
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     {criticals > 0 && (
-                        <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-full">
-                            {criticals} critical
+                        <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> {criticals}
                         </span>
                     )}
                     {warnings > 0 && (
-                        <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-full">
-                            {warnings} warning
+                        <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {warnings}
                         </span>
                     )}
-                    {infos > 0 && (
-                        <span className="text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-full">
-                            {infos} info
-                        </span>
-                    )}
-                    {passed > 0 && (
-                        <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
-                            {passed} passed
+                    {!hasProblems && (
+                        <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> All passed
                         </span>
                     )}
                 </div>
-                <motion.div
-                    animate={{ rotate: collapsed ? -90 : 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex-shrink-0"
-                >
+                <motion.div animate={{ rotate: collapsed ? -90 : 0 }} transition={{ duration: 0.2 }} className="flex-shrink-0">
                     <ChevronDown className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
                 </motion.div>
             </button>
+
+            {/* Issues list */}
             <AnimatePresence>
                 {!collapsed && (
                     <motion.div
@@ -239,12 +527,10 @@ function CategoryGroup({ category, issues, auditUrl, index }: { category: string
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden"
                     >
-                        <div className="px-6 pb-5 space-y-2.5 border-t border-[var(--card-border)]">
-                            <div className="pt-4 space-y-2.5">
-                                {issues.map((issue, i) => (
-                                    <IssueRow key={issue.id} issue={issue} auditUrl={auditUrl} index={i} />
-                                ))}
-                            </div>
+                        <div className="px-6 pb-5 space-y-2 border-t border-[var(--card-border)] pt-4">
+                            {issues.map((issue, i) => (
+                                <IssueRow key={issue.id} issue={issue} auditUrl={auditUrl} report={report} index={i} />
+                            ))}
                         </div>
                     </motion.div>
                 )}
@@ -253,7 +539,10 @@ function CategoryGroup({ category, issues, auditUrl, index }: { category: string
     );
 }
 
-// ─── Export helper ───
+// ════════════════════════════════════════════════════════════════
+// ─── CSV EXPORT ───
+// ════════════════════════════════════════════════════════════════
+
 function csvEscape(val: string): string {
     if (!val) return '';
     if (val.includes(',') || val.includes('"') || val.includes('\n') || val.includes('\r')) {
@@ -267,9 +556,7 @@ function exportAuditCSV(report: AuditReport) {
         ['Severity', 'Category', 'Issue', 'Description', 'Value', 'Recommendation'],
         ...report.issues.map(i => [
             csvEscape(i.severity), csvEscape(i.category), csvEscape(i.title),
-            csvEscape(i.description || ''),
-            csvEscape(i.value || ''),
-            csvEscape(i.recommendation || '')
+            csvEscape(i.description || ''), csvEscape(i.value || ''), csvEscape(i.recommendation || '')
         ])
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
@@ -281,24 +568,9 @@ function exportAuditCSV(report: AuditReport) {
     URL.revokeObjectURL(a.href);
 }
 
-// ─── Filter bar ───
-type FilterMode = 'all' | 'critical' | 'warning' | 'info' | 'passed';
-
-// ─── Title length badge ───
-function CharCountBadge({ count, min, max }: { count: number; min: number; max: number }) {
-    const color = count >= min && count <= max ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                  count > 0 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                  'text-red-400 bg-red-500/10 border-red-500/20';
-    return (
-        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${color}`}>
-            {count} chars
-        </span>
-    );
-}
-
-// ═══════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
 // ─── MAIN PAGE COMPONENT ───
-// ═══════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
 
 export default function AuditPage() {
     return (
@@ -324,22 +596,18 @@ function AuditPageInner() {
     const [copied, setCopied] = useState(false);
     const searchParams = useSearchParams();
 
-    const shareReport = () => {
+    // ─── Share report ───
+    const shareReport = useCallback(() => {
         if (!report) return;
-        const shareData = {
-            url: report.url,
-            score: report.score,
-            summary: report.summary,
-            date: new Date().toISOString(),
-        };
+        const shareData = { url: report.url, score: report.score, summary: report.summary, date: new Date().toISOString() };
         const encoded = btoa(JSON.stringify(shareData));
         const shareUrl = `${window.location.origin}/dashboard/audit?report=${encoded}`;
         navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-    };
+    }, [report]);
 
-    // Auto-fill URL from query params (e.g., from SEO page "Audit this page" action)
+    // ─── Auto-fill URL from query params ───
     useEffect(() => {
         const urlParam = searchParams.get('url');
         if (urlParam && !report && !loading) {
@@ -353,7 +621,7 @@ function AuditPageInner() {
         }
     }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Fetch user's own sites and pages for quick-audit suggestions
+    // ─── User sites for quick audit ───
     const { hasGoogleConnection } = useContainerStatus();
     const { sites } = useSiteList(hasGoogleConnection);
     const { properties } = usePropertyList(hasGoogleConnection);
@@ -365,12 +633,12 @@ function AuditPageInner() {
     const userPages: string[] = (analyticsData?.pages || []).slice(0, 8).map((p: any) => p.page);
     const userSiteUrl = sites.length > 0 ? sites[0].siteUrl.replace('sc-domain:', 'https://') : '';
 
-    const runAudit = async () => {
+    // ─── Run audit ───
+    const runAudit = useCallback(async () => {
         if (!url.trim()) return;
         setLoading(true);
         setError('');
         setReport(null);
-
         try {
             const res = await fetch('/api/audit', {
                 method: 'POST',
@@ -385,51 +653,45 @@ function AuditPageInner() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [url]);
 
-    // Group issues by category
-    const groupedIssues: Record<string, AuditIssue[]> = {};
-    if (report) {
-        const filtered = filter === 'all' ? report.issues : report.issues.filter(i => i.severity === filter);
-        for (const issue of filtered) {
-            if (!groupedIssues[issue.category]) groupedIssues[issue.category] = [];
-            groupedIssues[issue.category].push(issue);
+    // ─── Group & sort issues ───
+    const { groupedIssues, sortedCategories } = useMemo(() => {
+        const grouped: Record<string, AuditIssue[]> = {};
+        if (report) {
+            const filtered = filter === 'all' ? report.issues : report.issues.filter(i => i.severity === filter);
+            for (const issue of filtered) {
+                if (!grouped[issue.category]) grouped[issue.category] = [];
+                grouped[issue.category].push(issue);
+            }
         }
-    }
-
-    // Sort categories: those with criticals first
-    const sortedCategories = Object.keys(groupedIssues).sort((a, b) => {
-        const aCrit = groupedIssues[a].filter(i => i.severity === 'critical').length;
-        const bCrit = groupedIssues[b].filter(i => i.severity === 'critical').length;
-        if (aCrit !== bCrit) return bCrit - aCrit;
-        const aWarn = groupedIssues[a].filter(i => i.severity === 'warning').length;
-        const bWarn = groupedIssues[b].filter(i => i.severity === 'warning').length;
-        return bWarn - aWarn;
-    });
-
-    const sampleUrls = ['google.com', 'github.com', 'wikipedia.org', 'reddit.com'];
+        const sorted = Object.keys(grouped).sort((a, b) => {
+            const aCrit = grouped[a].filter(i => i.severity === 'critical').length;
+            const bCrit = grouped[b].filter(i => i.severity === 'critical').length;
+            if (aCrit !== bCrit) return bCrit - aCrit;
+            const aWarn = grouped[a].filter(i => i.severity === 'warning').length;
+            const bWarn = grouped[b].filter(i => i.severity === 'warning').length;
+            return bWarn - aWarn;
+        });
+        return { groupedIssues: grouped, sortedCategories: sorted };
+    }, [report, filter]);
 
     return (
         <div className="space-y-6">
-            {/* ─── Hero Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-            >
+            {/* ════════════════════════════════════════ */}
+            {/* ─── HERO HEADER ─── */}
+            {/* ════════════════════════════════════════ */}
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                 <h2 className="text-2xl md:text-3xl font-bold gradient-text mb-1">Site Audit</h2>
                 <p className="text-sm text-[var(--text-muted)] max-w-xl">
                     Analyze any page for 50+ SEO and technical issues. Get actionable recommendations powered by AI.
                 </p>
             </motion.div>
 
-            {/* ─── URL Input ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-                className="glass-card rounded-2xl p-6"
-            >
+            {/* ════════════════════════════════════════ */}
+            {/* ─── URL INPUT ─── */}
+            {/* ════════════════════════════════════════ */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }} className="glass-card rounded-2xl p-6">
                 <div className="flex gap-3">
                     <div className="flex-1 relative">
                         <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
@@ -449,29 +711,16 @@ function AuditPageInner() {
                         disabled={loading || !url.trim()}
                         className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 disabled:hover:from-emerald-500 disabled:hover:to-cyan-500 text-black font-semibold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
                     >
-                        {loading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Auditing...
-                            </>
-                        ) : (
-                            <>
-                                <Search className="w-4 h-4" />
-                                Run Audit
-                            </>
-                        )}
+                        {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Auditing...</> : <><Search className="w-4 h-4" /> Run Audit</>}
                     </button>
                 </div>
             </motion.div>
 
-            {/* ─── Quick Audit: User's Own Pages ─── */}
+            {/* ════════════════════════════════════════ */}
+            {/* ─── QUICK AUDIT: USER'S OWN PAGES ─── */}
+            {/* ════════════════════════════════════════ */}
             {userSiteUrl && userPages.length > 0 && !report && !loading && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.4 }}
-                    className="premium-card rounded-2xl p-6"
-                >
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }} className="premium-card rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/10 flex items-center justify-center">
                             <Zap className="w-4 h-4 text-emerald-400" />
@@ -487,13 +736,11 @@ function AuditPageInner() {
                             return (
                                 <button
                                     key={i}
-                                    onClick={() => { setUrl(fullUrl); }}
+                                    onClick={() => setUrl(fullUrl)}
                                     onDoubleClick={() => { setUrl(fullUrl); setTimeout(() => { document.querySelector<HTMLButtonElement>('[data-audit-btn]')?.click(); }, 50); }}
                                     className="premium-card rounded-xl px-4 py-3 text-left hover:border-emerald-500/20 transition-all group"
                                 >
-                                    <div className="text-xs text-[var(--text-secondary)] group-hover:text-emerald-400 truncate font-medium transition-colors">
-                                        {page}
-                                    </div>
+                                    <div className="text-xs text-[var(--text-secondary)] group-hover:text-emerald-400 truncate font-medium transition-colors">{page}</div>
                                     <div className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{fullUrl}</div>
                                 </button>
                             );
@@ -505,12 +752,7 @@ function AuditPageInner() {
             {/* ─── Error ─── */}
             <AnimatePresence>
                 {error && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="flex items-center gap-3 px-5 py-4 bg-red-500/10 border border-red-500/20 rounded-xl"
-                    >
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex items-center gap-3 px-5 py-4 bg-red-500/10 border border-red-500/20 rounded-xl">
                         <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
                         <p className="text-sm text-red-400 font-medium">{error}</p>
                     </motion.div>
@@ -520,66 +762,44 @@ function AuditPageInner() {
             {/* ─── Loading skeleton ─── */}
             {loading && (
                 <div className="space-y-4">
-                    {/* Score skeleton */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="shimmer-loading rounded-2xl h-56" />
-                        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-5 gap-3">
-                            {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className="shimmer-loading rounded-xl h-24" />
-                            ))}
+                        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="shimmer-loading rounded-xl h-28" />)}
                         </div>
                     </div>
-                    {/* Meta skeleton */}
-                    <div className="shimmer-loading rounded-2xl h-32" />
-                    {/* Action bar skeleton */}
                     <div className="shimmer-loading rounded-xl h-14" />
-                    {/* Category skeletons */}
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="shimmer-loading rounded-2xl h-28" />
-                    ))}
+                    {[1, 2, 3].map(i => <div key={i} className="shimmer-loading rounded-2xl h-28" />)}
                 </div>
             )}
 
-            {/* ─── Report ─── */}
+            {/* ════════════════════════════════════════ */}
+            {/* ─── AUDIT REPORT ─── */}
+            {/* ════════════════════════════════════════ */}
             {report && !loading && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5 }}
-                    className="space-y-6"
-                >
-                    {/* Audit timestamp */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="space-y-6">
+                    {/* Timestamp */}
                     <div className="flex justify-end text-[10px] text-[var(--text-muted)]">
                         Audited {new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
 
-                    {/* ─── Score + Summary Dashboard ─── */}
+                    {/* ─── SCORE + SEVERITY SUMMARY ─── */}
                     <div className="premium-card rounded-2xl p-8">
                         <div className="flex flex-col lg:flex-row items-center gap-8">
-                            {/* Score ring */}
                             <div className="flex flex-col items-center">
-                                <ScoreRing score={report.score} size="xl" />
-                                <a
-                                    href={report.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-3 text-xs text-[var(--text-muted)] hover:text-emerald-400 transition-colors flex items-center gap-1 truncate max-w-[220px]"
-                                >
+                                <ScoreRing score={report.score} />
+                                <a href={report.url} target="_blank" rel="noopener noreferrer" className="mt-3 text-xs text-[var(--text-muted)] hover:text-emerald-400 transition-colors flex items-center gap-1 truncate max-w-[220px]">
                                     {new URL(report.url).hostname}
                                     <ExternalLink className="w-3 h-3 flex-shrink-0" />
                                 </a>
                             </div>
-
-                            {/* Score details */}
                             <div className="flex-1 w-full space-y-5">
                                 <div>
                                     <h3 className="text-xl font-bold text-[var(--text-primary)]">SEO Health Score: {report.score}/100</h3>
                                     <div className="mt-2 w-full h-3 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full overflow-hidden">
                                         <motion.div
                                             className="h-full rounded-full"
-                                            style={{
-                                                background: `linear-gradient(to right, ${report.score >= 80 ? '#22c55e' : report.score >= 50 ? '#f59e0b' : '#ef4444'}, ${report.score >= 80 ? '#06b6d4' : report.score >= 50 ? '#f59e0b' : '#ef4444'})`,
-                                            }}
+                                            style={{ background: `linear-gradient(to right, ${report.score >= 80 ? '#22c55e' : report.score >= 50 ? '#f59e0b' : '#ef4444'}, ${report.score >= 80 ? '#06b6d4' : report.score >= 50 ? '#f59e0b' : '#ef4444'})` }}
                                             initial={{ width: 0 }}
                                             animate={{ width: `${report.score}%` }}
                                             transition={{ duration: 1, ease: 'easeOut' }}
@@ -591,8 +811,6 @@ function AuditPageInner() {
                                          'Needs attention. Multiple critical issues detected.'}
                                     </p>
                                 </div>
-
-                                {/* Summary stat cards */}
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     {([
                                         { key: 'critical' as Severity, accentColor: 'bg-red-500' },
@@ -610,9 +828,7 @@ function AuditPageInner() {
                                             >
                                                 <div className={`absolute top-0 left-0 right-0 h-1 ${accentColor} rounded-t-xl`} />
                                                 <Icon className={`w-5 h-5 ${config.color} mb-2`} />
-                                                <div className={`text-2xl font-bold ${config.color}`}>
-                                                    {report.summary[key]}
-                                                </div>
+                                                <div className={`text-2xl font-bold ${config.color}`}>{report.summary[key]}</div>
                                                 <div className="text-xs text-[var(--text-muted)] capitalize">{config.label}</div>
                                             </button>
                                         );
@@ -620,9 +836,7 @@ function AuditPageInner() {
                                     <div className="stat-card-hover rounded-xl p-4 text-left border border-[var(--card-border)] relative overflow-hidden">
                                         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-t-xl" />
                                         <Hash className="w-5 h-5 text-[var(--text-muted)] mb-2" />
-                                        <div className="text-2xl font-bold text-[var(--text-primary)]">
-                                            {report.summary.total}
-                                        </div>
+                                        <div className="text-2xl font-bold text-[var(--text-primary)]">{report.summary.total}</div>
                                         <div className="text-xs text-[var(--text-muted)]">Total Checks</div>
                                     </div>
                                 </div>
@@ -630,21 +844,22 @@ function AuditPageInner() {
                         </div>
                     </div>
 
-                    {/* ─── Page Meta Section ─── */}
+                    {/* ─── PAGE OVERVIEW (interactive stat cards with detail expansion) ─── */}
                     <div className="premium-card rounded-2xl p-6">
-                        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-emerald-400" />
-                            Page Metadata
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-emerald-400" />
+                            Page Overview
+                            <span className="text-[10px] text-[var(--text-muted)] font-normal ml-1">Click any card to drill down</span>
                         </h3>
 
-                        {/* Title & Description */}
-                        <div className="space-y-3 mb-5">
+                        {/* Title & Description cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                             <div className="glass-card rounded-xl p-4">
                                 <div className="flex items-center justify-between mb-1.5">
                                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Title Tag</span>
                                     <CharCountBadge count={report.meta.title?.length || 0} min={30} max={60} />
                                 </div>
-                                <p className="text-sm text-[var(--text-primary)] font-medium">
+                                <p className="text-sm text-[var(--text-primary)] font-medium leading-relaxed">
                                     {report.meta.title || <span className="text-red-400 italic">Missing title tag</span>}
                                 </p>
                             </div>
@@ -653,38 +868,62 @@ function AuditPageInner() {
                                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Meta Description</span>
                                     <CharCountBadge count={report.meta.description?.length || 0} min={120} max={160} />
                                 </div>
-                                <p className="text-sm text-[var(--text-secondary)]">
+                                <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2">
                                     {report.meta.description || <span className="text-amber-400 italic">Missing meta description</span>}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Stats grid */}
+                        {/* Interactive stat cards grid */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                            {[
-                                { label: 'Response Time', value: `${report.responseTime}ms`, icon: Clock, warn: report.responseTime > 2000 },
-                                { label: 'Page Size', value: `${Math.round(report.meta.pageSize / 1024)}KB`, icon: FileText, warn: report.meta.pageSize > 500000 },
-                                { label: 'Word Count', value: `${report.meta.wordCount}`, icon: Target, warn: report.meta.wordCount < 300 },
-                                { label: 'Images', value: `${report.meta.images.total}`, icon: Image, warn: false },
-                                { label: 'Links', value: `${report.meta.links.total}`, icon: Link2, warn: false },
-                                { label: 'Scripts', value: `${report.meta.scripts}`, icon: Code2, warn: report.meta.scripts > 15 },
-                            ].map(stat => (
-                                <div key={stat.label} className="stat-card-hover rounded-xl p-3.5 flex items-center gap-3 border border-[var(--card-border)]">
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${stat.warn ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
-                                        <stat.icon className={`w-4 h-4 ${stat.warn ? 'text-amber-400' : 'text-emerald-400'}`} />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-bold text-[var(--text-primary)]">{stat.value}</div>
-                                        <div className="text-[10px] text-[var(--text-muted)]">{stat.label}</div>
-                                    </div>
-                                </div>
-                            ))}
+                            <OverviewCard
+                                icon={Link2}
+                                label="Links"
+                                value={String(report.meta.links.total)}
+                                subtext={`${report.meta.links.internal} int / ${report.meta.links.external} ext`}
+                                expandedContent={renderDetailForType('links', report)}
+                            />
+                            <OverviewCard
+                                icon={Image}
+                                label="Images"
+                                value={String(report.meta.images.total)}
+                                subtext={`${report.meta.images.withAlt} with alt / ${report.meta.images.withoutAlt} without`}
+                                warn={report.meta.images.withoutAlt > 0}
+                                expandedContent={renderDetailForType('images', report)}
+                            />
+                            <OverviewCard
+                                icon={Type}
+                                label="Headings"
+                                value={String(Object.values(report.meta.headings).reduce((a, b) => a + b, 0))}
+                                subtext={`H1:${report.meta.headings.h1} H2:${report.meta.headings.h2} H3:${report.meta.headings.h3}`}
+                                warn={report.meta.headings.h1 !== 1}
+                                expandedContent={renderDetailForType('headings', report)}
+                            />
+                            <OverviewCard
+                                icon={Clock}
+                                label="Response Time"
+                                value={`${report.responseTime}ms`}
+                                warn={report.responseTime > 2000}
+                            />
+                            <OverviewCard
+                                icon={Code2}
+                                label="Scripts"
+                                value={String(report.meta.scripts)}
+                                warn={report.meta.scripts > 15}
+                                expandedContent={renderDetailForType('scripts', report)}
+                            />
+                            <OverviewCard
+                                icon={Target}
+                                label="Word Count"
+                                value={String(report.meta.wordCount)}
+                                subtext={`${Math.round(report.meta.pageSize / 1024)}KB page`}
+                                warn={report.meta.wordCount < 300}
+                            />
                         </div>
                     </div>
 
-                    {/* ─── Action Bar ─── */}
+                    {/* ─── ACTION BAR (filters + actions) ─── */}
                     <div className="glass-card rounded-xl px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        {/* Filter pills */}
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
                             {(['all', 'critical', 'warning', 'info', 'passed'] as FilterMode[]).map(f => {
                                 const isActive = filter === f;
@@ -700,119 +939,79 @@ function AuditPageInner() {
                                         }`}
                                     >
                                         {f === 'all' ? 'All' : severityConfig[f as Severity].label}
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-emerald-500/20' : 'bg-white/[0.05]'}`}>
-                                            {count}
-                                        </span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-emerald-500/20' : 'bg-white/[0.05]'}`}>{count}</span>
                                     </button>
                                 );
                             })}
                         </div>
-
-                        {/* Action buttons */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                             {(report.summary.critical > 0 || report.summary.warning > 0) && (
                                 <FixWithBotButton label="Analyze All Issues" size="md" variant="solid" context="Get deep analysis and fix recommendations from your bot" site={url} />
                             )}
-                            <button
-                                onClick={() => exportAuditCSV(report)}
-                                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors"
-                            >
-                                <Download className="w-3.5 h-3.5" />
-                                Export CSV
+                            <button onClick={() => exportAuditCSV(report)} className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                                <Download className="w-3.5 h-3.5" /> Export CSV
                             </button>
-                            <button
-                                onClick={shareReport}
-                                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors"
-                            >
+                            <button onClick={shareReport} className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
                                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                                 {copied ? 'Copied!' : 'Share'}
                             </button>
-                            <button
-                                onClick={runAudit}
-                                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                Re-audit
+                            <button onClick={runAudit} className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                                <RotateCcw className="w-3.5 h-3.5" /> Re-audit
                             </button>
                         </div>
                     </div>
 
-                    {/* ─── Issues by category ─── */}
+                    {/* ─── ISSUES BY CATEGORY ─── */}
                     <div className="space-y-4">
                         {sortedCategories.length === 0 && (
                             <div className="premium-card rounded-2xl p-8 text-center">
                                 <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
                                 <p className="text-sm text-[var(--text-secondary)]">No issues found for this filter.</p>
-                                <button onClick={() => setFilter('all')} className="text-xs text-emerald-400 hover:underline mt-2">
-                                    Show all checks
-                                </button>
+                                <button onClick={() => setFilter('all')} className="text-xs text-emerald-400 hover:underline mt-2">Show all checks</button>
                             </div>
                         )}
                         {sortedCategories.map((cat, i) => (
-                            <CategoryGroup key={cat} category={cat} issues={groupedIssues[cat]} auditUrl={url} index={i} />
+                            <CategoryGroup key={cat} category={cat} issues={groupedIssues[cat]} auditUrl={url} report={report} index={i} />
                         ))}
                     </div>
 
-                    {/* ─── Footer timestamp ─── */}
+                    {/* ─── FOOTER ─── */}
                     <div className="text-center text-[10px] text-[var(--text-muted)] pt-4">
                         Audited at {new Date(report.fetchedAt).toLocaleString()} &middot; HTTP {report.statusCode}
                     </div>
 
-                    {/* ─── Quick Re-Audit Actions ─── */}
+                    {/* ─── QUICK RE-AUDIT ─── */}
                     <div className="section-divider my-6" />
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <button
-                            onClick={runAudit}
-                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                            Re-Audit This Page
+                        <button onClick={runAudit} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20">
+                            <RotateCcw className="w-4 h-4" /> Re-Audit This Page
                         </button>
-                        <button
-                            onClick={() => {
-                                setReport(null);
-                                setUrl('');
-                            }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] font-medium text-sm rounded-xl hover:bg-white/[0.08] transition"
-                        >
-                            <Search className="w-4 h-4" />
-                            Audit Another Page
+                        <button onClick={() => { setReport(null); setUrl(''); }} className="flex items-center gap-2 px-6 py-3 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] font-medium text-sm rounded-xl hover:bg-white/[0.08] transition">
+                            <Search className="w-4 h-4" /> Audit Another Page
                         </button>
                     </div>
                 </motion.div>
             )}
 
-            {/* ─── Empty state ─── */}
+            {/* ════════════════════════════════════════ */}
+            {/* ─── EMPTY STATE ─── */}
+            {/* ════════════════════════════════════════ */}
             {!report && !loading && !error && (
-                <motion.div
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
-                    className="flex flex-col items-center justify-center py-20 text-center"
-                >
+                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }} className="flex flex-col items-center justify-center py-20 text-center">
                     <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center mb-6 glow-emerald">
                         <ScanSearch className="w-11 h-11 text-emerald-400" />
                     </div>
                     <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">Enter a URL to Analyze</h3>
                     <p className="text-sm text-[var(--text-muted)] max-w-md mb-8">
-                        Get a comprehensive SEO audit with actionable recommendations.
-                        Checks 50+ technical and on-page SEO factors.
+                        Get a comprehensive SEO audit with actionable recommendations. Checks 50+ technical and on-page SEO factors.
                     </p>
-
-                    {/* Sample URL chips */}
                     <div className="flex flex-wrap justify-center gap-2 mb-8">
                         {sampleUrls.map(sampleUrl => (
-                            <button
-                                key={sampleUrl}
-                                onClick={() => setUrl(sampleUrl)}
-                                className="px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-emerald-400 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full hover:border-emerald-500/20 hover:bg-emerald-500/[0.05] transition-all"
-                            >
+                            <button key={sampleUrl} onClick={() => setUrl(sampleUrl)} className="px-4 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-emerald-400 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full hover:border-emerald-500/20 hover:bg-emerald-500/[0.05] transition-all">
                                 {sampleUrl}
                             </button>
                         ))}
                     </div>
-
-                    {/* Category badges */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-[var(--text-muted)]">
                         {['Meta Tags', 'Headings', 'Images', 'Performance', 'Security', 'Social Tags', 'Structured Data', 'Links'].map(cat => (
                             <div key={cat} className="stat-card-hover px-4 py-2.5 border border-[var(--card-border)] rounded-lg flex items-center gap-2">

@@ -39,6 +39,14 @@ export interface AuditReport {
         scripts: number;
         stylesheets: number;
     };
+    details: {
+        links: { url: string; text: string; type: 'internal' | 'external'; nofollow: boolean }[];
+        images: { src: string; alt: string; hasAlt: boolean; lazy: boolean }[];
+        headings: { level: number; text: string }[];
+        scripts: { src: string }[];
+        stylesheets: { href: string }[];
+        structuredData: { type: string; data: string }[];
+    };
 }
 
 // ─── Helpers ───
@@ -147,10 +155,15 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     const images = $('img');
     let imagesWithAlt = 0;
     let imagesWithoutAlt = 0;
+    const imageDetails: { src: string; alt: string; hasAlt: boolean; lazy: boolean }[] = [];
     images.each((_, el) => {
         const alt = $(el).attr('alt');
         if (alt && alt.trim().length > 0) imagesWithAlt++;
         else imagesWithoutAlt++;
+        const src = $(el).attr('src') || $(el).attr('data-src') || '';
+        const altText = alt || '';
+        const loading = $(el).attr('loading') || '';
+        imageDetails.push({ src: src.slice(0, 200), alt: altText.slice(0, 200), hasAlt: !!(alt && alt.trim()), lazy: loading === 'lazy' });
     });
 
     // Links
@@ -158,16 +171,50 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     let internalLinks = 0;
     let externalLinks = 0;
     const brokenLinkCandidates: string[] = [];
+    const linkDetails: { url: string; text: string; type: 'internal' | 'external'; nofollow: boolean }[] = [];
     allLinks.each((_, el) => {
         const href = $(el).attr('href') || '';
+        const text = $(el).text().trim().slice(0, 100);
+        const rel = $(el).attr('rel') || '';
         if (href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+        let isInternal = false;
         try {
             const linkUrl = new URL(href, finalUrl);
-            if (linkUrl.hostname === hostname) internalLinks++;
+            if (linkUrl.hostname === hostname) { internalLinks++; isInternal = true; }
             else externalLinks++;
         } catch {
             internalLinks++; // relative URL
+            isInternal = true;
         }
+        linkDetails.push({ url: href, text, type: isInternal ? 'internal' : 'external', nofollow: rel.includes('nofollow') });
+    });
+
+    // Collect heading details
+    const headingDetails: { level: number; text: string }[] = [];
+    (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const).forEach((tag, i) => {
+        $(tag).each((_, el) => {
+            headingDetails.push({ level: i + 1, text: $(el).text().trim().slice(0, 200) });
+        });
+    });
+
+    // Collect script details (before removal)
+    const scriptDetails: { src: string }[] = [];
+    $('script[src]').each((_, el) => { scriptDetails.push({ src: $(el).attr('src') || '' }); });
+
+    // Collect stylesheet details (before removal)
+    const stylesheetDetails: { href: string }[] = [];
+    $('link[rel="stylesheet"]').each((_, el) => { stylesheetDetails.push({ href: $(el).attr('href') || '' }); });
+
+    // Collect structured data details (before removal)
+    const structuredDataDetails: { type: string; data: string }[] = [];
+    $('script[type="application/ld+json"]').each((_, el) => {
+        const text = $(el).html() || '';
+        let schemaType = 'Unknown';
+        try {
+            const parsed = JSON.parse(text);
+            schemaType = parsed['@type'] || parsed.type || 'Unknown';
+        } catch { /* invalid JSON */ }
+        structuredDataDetails.push({ type: schemaType, data: text.slice(0, 500) });
     });
 
     // Body text
@@ -640,6 +687,14 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
             links: { internal: internalLinks, external: externalLinks, total: internalLinks + externalLinks },
             scripts: scriptCount,
             stylesheets: stylesheetCount,
+        },
+        details: {
+            links: linkDetails.slice(0, 200),
+            images: imageDetails.slice(0, 100),
+            headings: headingDetails,
+            scripts: scriptDetails,
+            stylesheets: stylesheetDetails,
+            structuredData: structuredDataDetails,
         },
     };
 }
