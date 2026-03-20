@@ -108,7 +108,7 @@ function Section({ children, className = '', id }: { children: React.ReactNode; 
 
 function Hero() {
     return (
-        <section className="relative min-h-screen flex items-center justify-center pt-16 sm:pt-24 pb-8 sm:pb-16 overflow-hidden bg-black"> {/* True black background for maximum contrast */}
+        <section className="relative flex items-center justify-center pt-16 sm:pt-24 pb-8 sm:pb-16 overflow-hidden bg-black sm:min-h-screen"> {/* min-h-screen only on desktop */}
             {/* Background gradient meshes */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/[0.04] rounded-full blur-[128px]" />
@@ -470,7 +470,7 @@ function InteractiveDemo() {
     const [hasClickedGlobe, setHasClickedGlobe] = useState(false);
 
     return (
-        <Section id="demo" className="py-24 sm:py-32 px-4 sm:px-6">
+        <Section id="demo" className="py-12 sm:py-24 lg:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
                 <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
@@ -985,7 +985,7 @@ function AIChatDemo() {
     }, [phase]);
 
     return (
-        <Section id="ai-demo" className="py-24 sm:py-32 px-4 sm:px-6">
+        <Section id="ai-demo" className="py-12 sm:py-24 lg:py-32 px-4 sm:px-6">
             <div ref={sectionRef} className="max-w-5xl mx-auto">
                 <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
