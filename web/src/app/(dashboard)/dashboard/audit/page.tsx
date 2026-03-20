@@ -237,11 +237,12 @@ function CharCountBadge({ count, min, max }: { count: number; min: number; max: 
 // ─── ISSUE ROW (professional, with inline detail expansion) ───
 // ════════════════════════════════════════════════════════════════
 
-function IssueRow({ issue, auditUrl, report, index }: { issue: AuditIssue; auditUrl?: string; report: AuditReport; index: number }) {
+function IssueRow({ issue, auditUrl, report, index, isEven }: { issue: AuditIssue; auditUrl?: string; report: AuditReport; index: number; isEven?: boolean }) {
     const [expanded, setExpanded] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const sev = severityConfig[issue.severity];
     const SevIcon = sev.icon;
+    const canExpand = !!(issue.description || issue.recommendation);
 
     // Determine if this issue has detail data we can show
     const detailType = getDetailTypeForIssue(issue);
@@ -251,11 +252,17 @@ function IssueRow({ issue, auditUrl, report, index }: { issue: AuditIssue; audit
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.02, duration: 0.2 }}
-            className="group"
+            className={`group ${index > 0 ? 'border-t border-[var(--card-border)]/50' : ''}`}
         >
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border-l-2 ${sev.borderLeft} ${sev.glowBg} border border-[var(--card-border)] hover:border-[var(--card-border-hover,rgba(255,255,255,0.12))] transition-all`}>
+            <div
+                onClick={() => canExpand && setExpanded(!expanded)}
+                role={canExpand ? 'button' : undefined}
+                tabIndex={canExpand ? 0 : undefined}
+                onKeyDown={canExpand ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } } : undefined}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border-l-2 ${sev.borderLeft} border border-[var(--card-border)] transition-all duration-150 ${canExpand ? 'cursor-pointer' : ''} ${expanded ? 'bg-white/[0.02] border-[var(--card-border-hover,rgba(255,255,255,0.15))]' : `${isEven ? 'bg-white/[0.01]' : sev.glowBg}`} ${canExpand ? 'hover:bg-white/[0.03] hover:border-l-emerald-500 active:bg-white/[0.05]' : ''}`}
+            >
                 {/* Severity icon */}
-                <div className={`w-7 h-7 rounded-lg ${sev.bg} flex items-center justify-center flex-shrink-0`}>
+                <div className={`w-7 h-7 rounded-lg ${sev.bg} flex items-center justify-center flex-shrink-0 transition-shadow duration-150 group-hover:shadow-[0_0_8px_rgba(16,185,129,0.15)]`}>
                     <SevIcon className={`w-3.5 h-3.5 ${sev.color}`} />
                 </div>
 
@@ -281,21 +288,23 @@ function IssueRow({ issue, auditUrl, report, index }: { issue: AuditIssue; audit
 
                 {/* Fix button */}
                 {issue.severity !== 'passed' && (
-                    <FixWithBotButton
-                        label="Fix"
-                        context={`Fix this SEO issue on ${auditUrl || 'the audited page'}: ${issue.title} - ${issue.description || ''}`}
-                        size="sm"
-                        variant={issue.severity === 'critical' ? 'solid' : 'ghost'}
-                    />
+                    <span onClick={(e) => e.stopPropagation()} className="flex-shrink-0 transition-transform duration-150 group-hover:scale-105">
+                        <FixWithBotButton
+                            label="Fix"
+                            context={`Fix this SEO issue on ${auditUrl || 'the audited page'}: ${issue.title} - ${issue.description || ''}`}
+                            size="sm"
+                            variant={issue.severity === 'critical' ? 'solid' : 'ghost'}
+                        />
+                    </span>
                 )}
 
-                {/* Expand toggle */}
-                {(issue.description || issue.recommendation) && (
-                    <button onClick={() => setExpanded(!expanded)} className="p-1 rounded-lg hover:bg-white/[0.05] transition-colors">
+                {/* Expand indicator */}
+                {canExpand && (
+                    <div className="p-1 rounded-lg flex-shrink-0">
                         <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                            <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                            <ChevronDown className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
                         </motion.div>
-                    </button>
+                    </div>
                 )}
             </div>
 
@@ -479,12 +488,12 @@ function CategoryGroup({ category, issues, auditUrl, report, index }: { category
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.04, duration: 0.3 }}
-            className="premium-card rounded-2xl overflow-hidden"
+            className={`premium-card rounded-2xl overflow-hidden transition-all duration-200 ${!collapsed ? 'border-[var(--card-border-hover,rgba(255,255,255,0.15))] ring-1 ring-white/[0.03]' : ''}`}
         >
             {/* Category header */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="w-full flex items-center gap-4 px-6 py-5 text-left group hover:bg-white/[0.01] transition-colors"
+                className="w-full flex items-center gap-4 px-6 py-5 text-left group cursor-pointer hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
             >
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/10 flex items-center justify-center flex-shrink-0">
                     <CatIcon className="w-5 h-5 text-emerald-400" />
@@ -492,7 +501,7 @@ function CategoryGroup({ category, issues, auditUrl, report, index }: { category
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-[var(--text-primary)]">{category}</h3>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                        {issues.length} check{issues.length !== 1 ? 's' : ''} &middot; {passed} passed
+                        {issues.length} check{issues.length !== 1 ? 's' : ''} &middot; {issues.length - passed} issue{issues.length - passed !== 1 ? 's' : ''} &middot; {passed} passed
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -513,7 +522,7 @@ function CategoryGroup({ category, issues, auditUrl, report, index }: { category
                     )}
                 </div>
                 <motion.div animate={{ rotate: collapsed ? -90 : 0 }} transition={{ duration: 0.2 }} className="flex-shrink-0">
-                    <ChevronDown className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
+                    <ChevronDown className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
                 </motion.div>
             </button>
 
@@ -529,7 +538,7 @@ function CategoryGroup({ category, issues, auditUrl, report, index }: { category
                     >
                         <div className="px-6 pb-5 space-y-2 border-t border-[var(--card-border)] pt-4">
                             {issues.map((issue, i) => (
-                                <IssueRow key={issue.id} issue={issue} auditUrl={auditUrl} report={report} index={i} />
+                                <IssueRow key={issue.id} issue={issue} auditUrl={auditUrl} report={report} index={i} isEven={i % 2 === 0} />
                             ))}
                         </div>
                     </motion.div>

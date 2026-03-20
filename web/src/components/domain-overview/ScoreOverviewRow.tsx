@@ -40,7 +40,7 @@ const ActionLink = ({ label }: { label: string }) => (
 const Card = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
   <div
     onClick={onClick}
-    className="premium-card rounded-2xl p-6 flex flex-col justify-between gap-4 cursor-pointer hover:border-[var(--card-hover)] transition-colors"
+    className="premium-card rounded-2xl p-6 flex flex-col justify-between gap-4 cursor-pointer hover:border-[var(--card-hover)] transition-all duration-200 active:scale-[0.98]"
   >
     {children}
   </div>
@@ -56,7 +56,7 @@ const Bar = ({ value, max, level }: { value: number; max: number; level: Level }
 )
 
 function askAI(prompt: string) {
-  window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { message: prompt } }))
+  window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: prompt } }))
 }
 
 export function ScoreOverviewRow({ data }: Props) {

@@ -621,15 +621,16 @@ export default function DashboardOverview() {
       {isEmptyShell && (
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
           {/* Connect Your Data Banner */}
-          <div className="bg-gradient-to-r from-blue-500/[0.04] to-cyan-500/[0.03] border border-blue-500/[0.12] rounded-2xl p-5">
-            <div className="flex flex-col md:flex-row md:items-center gap-4">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center flex-shrink-0">
-                  <BarChart3 className="w-5 h-5 text-blue-400" />
+          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500/[0.08] via-cyan-500/[0.06] to-blue-500/[0.08] border border-emerald-500/30 rounded-2xl p-6 animate-pulse-border">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.03] via-transparent to-cyan-500/[0.03] animate-shimmer" />
+            <div className="relative flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/10">
+                  <BarChart3 className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Connect Google Analytics &amp; Search Console</h3>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Connect Google Analytics &amp; Search Console</h3>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
                     Set up{' '}
                     <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">GA4</a>
                     {' '}and{' '}
@@ -640,7 +641,7 @@ export default function DashboardOverview() {
               </div>
               <button
                 onClick={() => window.location.reload()}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-medium text-white hover:bg-white/[0.1] transition-all flex-shrink-0"
+                className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/20 flex-shrink-0"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Check for Properties
