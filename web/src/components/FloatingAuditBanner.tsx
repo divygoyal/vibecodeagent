@@ -24,7 +24,7 @@ export default function FloatingAuditBanner() {
 
     if (!expanded) {
         return (
-            <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2">
+            <div className="hidden sm:flex fixed bottom-6 right-6 z-40 items-center gap-2">
                 <button
                     onClick={() => setExpanded(true)}
                     className="fab-pulse group flex items-center gap-2.5 px-5 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-full shadow-xl hover:shadow-2xl hover:shadow-emerald-500/20 transition-all hover:scale-105"
@@ -37,7 +37,7 @@ export default function FloatingAuditBanner() {
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-40 w-[340px]">
+        <div className="hidden sm:flex fixed bottom-6 right-6 z-40 w-[340px]">
             <div className="toolbar-glass rounded-2xl p-4 shadow-2xl shadow-black/40">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">

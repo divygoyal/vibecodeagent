@@ -728,6 +728,15 @@ select:focus-visible {
   top: 16px;
 }
 
+/* ========== Scrollbar hide utility (for mobile tabs) ========== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* ========== Keyboard shortcut badge ========== */
 .kbd-hint {
   display: inline-flex;

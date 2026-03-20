@@ -84,25 +84,25 @@ export default function AnalyticsTable<T>({
     return (
         <div>
             {showSearch && searchKey && (
-                <div className="relative mb-3">
+                <div className="relative mb-2 sm:mb-3">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder={searchPlaceholder}
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-white/[0.03] border border-white/[0.06] rounded-lg text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
+                        className="w-full pl-9 pr-3 py-2.5 sm:py-2 text-sm sm:text-xs bg-white/[0.03] border border-white/[0.06] rounded-lg text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition min-h-[44px] sm:min-h-0"
                     />
                 </div>
             )}
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+            <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                <table className="w-full text-xs sm:text-sm">
                     <thead>
                         <tr className="border-b border-white/[0.06]">
                             {columns.map(col => (
                                 <th
                                     key={col.key}
-                                    className={`py-2.5 px-3 font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap ${
+                                    className={`py-2 sm:py-2.5 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap ${
                                         col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                                     } ${col.sortable ? 'cursor-pointer hover:text-zinc-300 select-none' : ''}`}
                                     style={col.width ? { width: col.width } : undefined}
@@ -139,7 +139,7 @@ export default function AnalyticsTable<T>({
                                     {columns.map(col => (
                                         <td
                                             key={col.key}
-                                            className={`py-2.5 px-3 ${
+                                            className={`py-2 sm:py-2.5 px-2 sm:px-3 ${
                                                 col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                                             }`}
                                         >
@@ -156,7 +156,7 @@ export default function AnalyticsTable<T>({
             {maxRows && filtered.length > maxRows && (
                 <button
                     onClick={() => setShowAll(!showAll)}
-                    className="mt-3 w-full py-2 text-[11px] text-zinc-500 hover:text-white bg-white/[0.02] border border-white/[0.04] rounded-lg hover:bg-white/[0.04] transition flex items-center justify-center gap-1"
+                    className="mt-2 sm:mt-3 w-full py-2.5 sm:py-2 text-xs sm:text-[11px] text-zinc-500 hover:text-white bg-white/[0.02] border border-white/[0.04] rounded-lg hover:bg-white/[0.04] transition flex items-center justify-center gap-1 min-h-[40px] sm:min-h-0"
                 >
                     {showAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     {showAll ? 'Show less' : `Show all ${filtered.length} rows`}

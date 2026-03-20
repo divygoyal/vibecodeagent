@@ -21,10 +21,9 @@ function DiscountBanner({ onDismiss }: { onDismiss: () => void }) {
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-500 text-black">
-            <div className="max-w-7xl mx-auto px-4 py-1.5 sm:py-2.5 flex items-center justify-center gap-3 text-[10px] sm:text-xs font-medium">
-                <Tag className="w-4 h-4 flex-shrink-0" />
+            <div className="max-w-7xl mx-auto px-4 py-1 sm:py-1.5 flex items-center justify-center gap-2 sm:gap-3 text-[10px] sm:text-xs font-medium">
+                <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">New here? Get <strong>20% off</strong> your first month!</span>
-                <span className="sm:hidden"><strong>20% off</strong> for new users!</span>
                 <button
                     onClick={handleCopy}
                     className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1 rounded-md bg-black/20 hover:bg-black/30 transition-colors font-mono font-bold text-[10px] sm:text-xs tracking-wider cursor-pointer"
@@ -37,10 +36,10 @@ function DiscountBanner({ onDismiss }: { onDismiss: () => void }) {
                 </Link>
                 <button
                     onClick={onDismiss}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-black/10 transition-colors cursor-pointer"
+                    className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1 sm:p-2 rounded-md hover:bg-black/10 transition-colors cursor-pointer"
                     aria-label="Dismiss banner"
                 >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
             </div>
         </div>

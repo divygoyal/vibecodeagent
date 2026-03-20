@@ -44,12 +44,12 @@ function PropertyDropdown({ properties, value, onChange }: { properties: any[]; 
         <div className="relative">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] hover:border-white/[0.12] transition min-w-[140px]"
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 text-[11px] text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] hover:border-white/[0.12] transition min-w-0 sm:min-w-[140px]"
             >
                 <div className="w-4 h-4 rounded bg-blue-500/20 flex items-center justify-center flex-shrink-0">
                     <BarChart3 className="w-2.5 h-2.5 text-blue-400" />
                 </div>
-                <span className="truncate max-w-[160px] font-medium">{current?.displayName || current?.property || 'Select property'}</span>
+                <span className="truncate max-w-[80px] sm:max-w-[160px] font-medium">{current?.displayName || current?.property || 'Select property'}</span>
                 <ChevronDown className={`w-3 h-3 text-zinc-500 ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && (
@@ -113,24 +113,26 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 {/* ─── Sticky Top Bar ─── */}
                 <div className="sticky top-0 z-20 -mx-6 px-6 pb-0" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
                     {/* Row 1: Property & Date Range & Controls */}
-                    <div className="flex items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-lg font-bold text-white tracking-tight">Analytics</h1>
+                    <div className="flex items-center justify-between py-2 sm:py-3">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight shrink-0">Analytics</h1>
                             {/* Property selector (custom dropdown) */}
                             {properties.length > 0 && (
-                                <PropertyDropdown
-                                    properties={properties}
-                                    value={selectedProperty}
-                                    onChange={setSelectedProperty}
-                                />
+                                <div className="min-w-0 max-w-[140px] sm:max-w-none">
+                                    <PropertyDropdown
+                                        properties={properties}
+                                        value={selectedProperty}
+                                        onChange={setSelectedProperty}
+                                    />
+                                </div>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             {/* Compare mode */}
                             <button
                                 onClick={() => setCompareMode(!compareMode)}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-lg border transition ${
+                                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] rounded-lg border transition ${
                                     compareMode
                                         ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                                         : 'bg-white/[0.03] border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1]'
@@ -138,40 +140,42 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                 title="Compare with previous period"
                             >
                                 <GitCompare className="w-3 h-3" />
-                                Compare
+                                <span className="hidden sm:inline">Compare</span>
                             </button>
 
                         </div>
                     </div>
 
-                    {/* Row 2: Tabs */}
-                    <div className="flex items-center gap-0 -mb-px border-b border-white/[0.04]">
-                        {TABS.map(tab => {
-                            const href = `/dashboard/analytics${tab.key}`;
-                            const isActive = tab.key === ''
-                                ? pathname === '/dashboard/analytics'
-                                : pathname === href;
-                            return (
-                                <Link
-                                    key={tab.key}
-                                    href={href}
-                                    className={`flex items-center gap-2 px-4 py-2.5 text-[11px] font-medium border-b-2 transition-colors ${
-                                        isActive
-                                            ? 'text-blue-400 border-blue-400'
-                                            : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-white/[0.1]'
-                                    }`}
-                                >
-                                    <tab.icon className="w-3.5 h-3.5" />
-                                    {tab.label}
-                                    {tab.key === '/realtime' && (
-                                        <span className="relative flex h-1.5 w-1.5 ml-0.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-                                        </span>
-                                    )}
-                                </Link>
-                            );
-                        })}
+                    {/* Row 2: Tabs — full-width on mobile, scrollable */}
+                    <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0 scrollbar-hide">
+                        <div className="flex items-center gap-0 -mb-px border-b border-white/[0.04] min-w-0 w-full sm:w-auto">
+                            {TABS.map(tab => {
+                                const href = `/dashboard/analytics${tab.key}`;
+                                const isActive = tab.key === ''
+                                    ? pathname === '/dashboard/analytics'
+                                    : pathname === href;
+                                return (
+                                    <Link
+                                        key={tab.key}
+                                        href={href}
+                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-1 sm:flex-none px-2 sm:px-4 py-3 sm:py-2.5 min-h-[44px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                                            isActive
+                                                ? 'text-emerald-400 border-emerald-400 sm:text-blue-400 sm:border-blue-400'
+                                                : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-white/[0.1]'
+                                        }`}
+                                    >
+                                        <tab.icon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                                        {tab.label}
+                                        {tab.key === '/realtime' && (
+                                            <span className="relative flex h-1.5 w-1.5 ml-0.5">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                                            </span>
+                                        )}
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
@@ -216,7 +220,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 </AnimatePresence>
 
                 {/* ─── Page content ─── */}
-                <div className="pt-5">
+                <div className="pt-3 sm:pt-5">
                     {(propsLoading || containerLoading) ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />

@@ -35,11 +35,11 @@ function fmt(n: number): string {
 function fmtDur(s: number) { return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`; }
 
 function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
-    if (value === 0) return <span className="text-[10px] text-zinc-600">—</span>;
+    if (value === 0) return <span className="text-[9px] sm:text-[10px] text-zinc-600">—</span>;
     const up = value > 0;
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-red-400'}`}>
-            {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-red-400'}`}>
+            {up ? <TrendingUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <TrendingDown className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
             {up ? '+' : ''}{value}{suffix}
         </span>
     );
@@ -49,9 +49,9 @@ function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
 function Bar({ value, max, color = 'bg-blue-500/40' }: { value: number; max: number; color?: string }) {
     const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
     return (
-        <div className="flex items-center gap-2">
-            <span className="text-zinc-300 text-xs tabular-nums font-medium min-w-[40px] text-right">{value?.toLocaleString()}</span>
-            <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[60px]">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-zinc-300 text-xs tabular-nums font-medium min-w-[32px] sm:min-w-[40px] text-right">{value?.toLocaleString()}</span>
+            <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[40px] sm:min-w-[60px]">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%`, transition: 'width 0.4s ease' }} />
             </div>
         </div>
@@ -62,8 +62,8 @@ function Bar({ value, max, color = 'bg-blue-500/40' }: { value: number; max: num
 function SectionHead({ title, filterDim, filterValues }: { title: string; filterDim?: string; filterValues?: string[] }) {
     const active = filterValues && filterValues.length > 0;
     return (
-        <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            <h3 className="text-sm sm:text-base font-semibold text-white">{title}</h3>
             {active && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-[9px] text-blue-400 font-medium">
                     <FilterIcon className="w-2.5 h-2.5" /> Filtered
@@ -269,7 +269,7 @@ export default function AnalyticsPage() {
     const seoQueries: any[] = seoData?.queries || [];
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-3 sm:space-y-5">
             {/* Data freshness timestamp */}
             {analyticsData && (
                 <div className="flex justify-end">
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
 
             {/* ─── KPI Cards (clean, matching reference) ─── */}
             {kpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
                     {[
                         { label: 'Active Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, formatted: false },
                         { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, formatted: false },
@@ -287,12 +287,12 @@ export default function AnalyticsPage() {
                         { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, formatted: true, isDuration: true },
                     ].map((k: any, i) => (
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                            className={`${CARD} p-4 sm:p-5`}>
-                            <p className="text-xs text-zinc-500 mb-3">{k.label}</p>
-                            <div className="text-xl sm:text-2xl lg:text-[32px] font-bold text-white tabular-nums leading-none mb-2">
+                            className={`${CARD} p-3 sm:p-5`}>
+                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1.5 sm:mb-3">{k.label}</p>
+                            <div className="text-lg sm:text-2xl lg:text-[32px] font-bold text-white tabular-nums leading-none mb-1 sm:mb-2">
                                 {k.isDuration ? fmtDur(k.value) : k.formatted ? `${k.value}${k.suffix || ''}` : <AnimatedCounter value={k.value} formatter={fmt} />}
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                                 <Change value={k.change} suffix="% vs last period" />
                             </div>
                         </motion.div>
@@ -301,26 +301,26 @@ export default function AnalyticsPage() {
             )}
 
             {/* ─── Traffic Trend + Traffic Sources (side by side) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-5">
                 {/* Traffic Trend chart — 3/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-4 sm:p-5 lg:col-span-3`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <h3 className="text-sm font-semibold text-white">Traffic Trend</h3>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 lg:col-span-3`}>
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <h3 className="text-sm sm:text-base font-semibold text-white">Traffic Trend</h3>
                             {anyFilterActive && (
                                 <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5">
                                     <FilterIcon className="w-2.5 h-2.5" /> Filtered
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-3 text-[11px]">
-                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Users</span>
-                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400" /> Sessions</span>
-                            <button onClick={() => refresh()} className="p-1 rounded text-zinc-600 hover:text-blue-400 transition ml-1"><RefreshCw className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1 rounded text-zinc-600 hover:text-white transition"><Download className="w-3.5 h-3.5" /></button>
+                        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px]">
+                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Users</span>
+                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400" /> Sessions</span>
+                            <button onClick={() => refresh()} className="p-1.5 sm:p-1 rounded text-zinc-600 hover:text-blue-400 transition ml-0.5 sm:ml-1"><RefreshCw className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 sm:p-1 rounded text-zinc-600 hover:text-white transition"><Download className="w-3.5 h-3.5" /></button>
                         </div>
                     </div>
-                    <div className="h-[260px]">
+                    <div className="h-[200px] sm:h-[280px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                                 <defs>
@@ -345,14 +345,14 @@ export default function AnalyticsPage() {
                 </motion.div>
 
                 {/* Traffic Sources donut — 2/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-4 sm:p-5 lg:col-span-2`}>
-                    <h3 className="text-sm font-semibold text-white mb-4">Traffic Sources</h3>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-3 sm:p-5 lg:col-span-2`}>
+                    <h3 className="text-sm sm:text-base font-semibold text-white mb-3 sm:mb-4">Traffic Sources</h3>
                     {sourceData.length > 0 ? (
                         <div className="flex flex-col items-center">
-                            <div className="h-[180px] w-full">
+                            <div className="h-[160px] sm:h-[180px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={50} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
+                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value" stroke="none">
                                             {sourceData.map((_: any, idx: number) => (
                                                 <Cell key={idx} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
                                             ))}
@@ -361,40 +361,40 @@ export default function AnalyticsPage() {
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-2 w-full max-w-[280px]">
+                            <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-1.5 sm:gap-y-2 mt-2 w-full max-w-[280px]">
                                 {sourceData.map((s: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
-                                        <span className="text-[11px] text-zinc-400 truncate">{s.name}</span>
-                                        <span className="text-[11px] text-white font-semibold ml-auto tabular-nums">{s.pct}%</span>
+                                    <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+                                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
+                                        <span className="text-[10px] sm:text-[11px] text-zinc-400 truncate">{s.name}</span>
+                                        <span className="text-[10px] sm:text-[11px] text-white font-semibold ml-auto tabular-nums">{s.pct}%</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">No source data</div>
+                        <div className="flex items-center justify-center h-[160px] sm:h-[200px] text-zinc-600 text-sm">No source data</div>
                     )}
                 </motion.div>
             </div>
 
             {/* ─── Top Search Queries from GSC ─── */}
             {seoQueries.length > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-4 sm:p-5`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold text-white">Top Search Queries</h3>
-                        <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
-                            <Search className="w-3 h-3" /> From Google Search Console
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5`}>
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                        <h3 className="text-sm sm:text-base font-semibold text-white">Top Search Queries</h3>
+                        <span className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-emerald-400 font-medium">
+                            <Search className="w-3 h-3" /> <span className="hidden sm:inline">From </span>GSC
                         </span>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
+                    <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                        <table className="w-full min-w-[400px] sm:min-w-0">
                             <thead>
                                 <tr className="border-b border-white/[0.04]">
-                                    <th className="text-left text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 pr-4">Query</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">Clicks</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">Impressions</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 px-4">CTR</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-3 pl-4">Position</th>
+                                    <th className="text-left text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 pr-2 sm:pr-4">Query</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 px-2 sm:px-4">Clicks</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 px-2 sm:px-4 hidden sm:table-cell">Impressions</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 px-2 sm:px-4">CTR</th>
+                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 pl-2 sm:pl-4">Pos</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -403,24 +403,24 @@ export default function AnalyticsPage() {
                                     const barW = Math.round(((q.clicks || 0) / maxClicks) * 100);
                                     return (
                                         <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
-                                            <td className="py-3 pr-4">
-                                                <span className="text-xs text-zinc-300">{String(q.query || '')}</span>
+                                            <td className="py-2 sm:py-3 pr-2 sm:pr-4">
+                                                <span className="text-xs sm:text-sm text-zinc-300 line-clamp-1">{String(q.query || '')}</span>
                                             </td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <div className="w-[80px] h-[5px] bg-white/[0.04] rounded-full overflow-hidden">
+                                            <td className="py-2 sm:py-3 px-2 sm:px-4">
+                                                <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+                                                    <div className="w-[50px] sm:w-[80px] h-[5px] bg-white/[0.04] rounded-full overflow-hidden">
                                                         <div className="h-full rounded-full bg-emerald-500/50" style={{ width: `${barW}%` }} />
                                                     </div>
-                                                    <span className="text-xs text-white font-semibold tabular-nums min-w-[40px] text-right">{(q.clicks || 0).toLocaleString()}</span>
+                                                    <span className="text-xs text-white font-semibold tabular-nums min-w-[30px] sm:min-w-[40px] text-right">{(q.clicks || 0).toLocaleString()}</span>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4 text-right">
+                                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-right hidden sm:table-cell">
                                                 <span className="text-xs text-zinc-400 tabular-nums">{(q.impressions || 0).toLocaleString()}</span>
                                             </td>
-                                            <td className="py-3 px-4 text-right">
+                                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-right">
                                                 <span className={`text-xs font-medium tabular-nums ${(q.ctr || 0) >= 5 ? 'text-emerald-400' : 'text-zinc-400'}`}>{q.ctr || 0}%</span>
                                             </td>
-                                            <td className="py-3 pl-4 text-right">
+                                            <td className="py-2 sm:py-3 pl-2 sm:pl-4 text-right">
                                                 <span className="text-xs text-zinc-400 tabular-nums">{q.position || 0}</span>
                                             </td>
                                         </tr>
@@ -433,8 +433,8 @@ export default function AnalyticsPage() {
             )}
 
             {/* ─── Referrers & Pages (with progress bars + filtering) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className={`${CARD} p-4 sm:p-5`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
+                <div className={`${CARD} p-3 sm:p-5`}>
                     <SectionHead title="Referrers" filterDim="referrer" filterValues={filters.referrer} />
                     <AnalyticsTable
                         data={fReferrers} searchKey={(item: any) => item.name} searchPlaceholder="Search referrers..." maxRows={12}
@@ -461,7 +461,7 @@ export default function AnalyticsPage() {
                     />
                 </div>
 
-                <div className={`${CARD} p-4 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5`}>
                     <SectionHead title="Top Pages" filterDim="page" filterValues={filters.page} />
                     <AnalyticsTable
                         data={fPages} searchKey={(item: any) => item.page} searchPlaceholder="Search pages..." maxRows={12}
@@ -500,18 +500,18 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Geo + Map & Tech ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className={`${CARD} p-4 sm:p-5`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
+                <div className={`${CARD} p-3 sm:p-5`}>
                     <GeoPanel countries={fCountries} cities={fCities} allCountries={countries} maxUsers={maxCountryUsers} />
                 </div>
-                <div className={`${CARD} p-4 sm:p-5`}>
+                <div className={`${CARD} p-3 sm:p-5`}>
                     <TechPanel devices={fDevices} browsers={fBrowsers} operatingSystems={fOS} allDevices={devices} allBrowsers={browsers} allOS={operatingSystems} />
                 </div>
             </div>
 
             {/* ─── Channels & Mini Map ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className={`${CARD} p-4 sm:p-5`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
+                <div className={`${CARD} p-3 sm:p-5`}>
                     <SectionHead title="Channels" filterDim="channel" filterValues={filters.channel} />
                     <AnalyticsTable
                         data={fChannels} showSearch={false}
@@ -554,11 +554,11 @@ export default function AnalyticsPage() {
 
                 {/* Mini Map Widget */}
                 <div className={`${CARD} overflow-hidden`}>
-                    <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+                    <div className="flex items-center gap-2 px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
                         <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                        <h3 className="text-sm font-semibold text-white">Map</h3>
+                        <h3 className="text-sm sm:text-base font-semibold text-white">Map</h3>
                     </div>
-                    <div className="h-[280px]">
+                    <div className="h-[220px] sm:h-[280px]">
                         <WorldMap
                             byCountry={countries.map((c: any) => ({ country: c.country, users: c.users }))}
                             byCity={cities.map((c: any) => ({ city: c.city, country: c.country, users: c.users }))}
@@ -570,7 +570,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Entry Pages ─── */}
-            <div className={`${CARD} p-5`}>
+            <div className={`${CARD} p-3 sm:p-5`}>
                 <SectionHead title="Entry Pages" filterDim="page" filterValues={filters.page} />
                 <AnalyticsTable
                     data={fEntryPages} searchKey={(item: any) => item.page} searchPlaceholder="Search entry pages..." maxRows={15}
@@ -607,7 +607,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Languages ─── */}
-            <div className={`${CARD} p-5`}>
+            <div className={`${CARD} p-3 sm:p-5`}>
                 <SectionHead title="Languages" />
                 <AnalyticsTable
                     data={languages} showSearch={false} maxRows={10}
@@ -633,7 +633,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── Intelligence Cards ─── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 <EngagementCard kpis={kpis} />
                 <LoyaltyCard kpis={kpis} />
                 <DiversityCard channels={channels} />
@@ -652,13 +652,13 @@ function GeoPanel({ countries, cities, allCountries, maxUsers }: { countries: an
     const { analyzeWithAI, copyToClipboard } = useTableActions();
     return (
         <div>
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                 <SectionHead title="Geo" filterDim="country" filterValues={filters.country} />
-                <div className="flex items-center ml-auto">{allCountries.slice(0, 8).map((c: any, i: number) => <CountryFlag key={i} country={c.country} />)}</div>
+                <div className="flex items-center ml-auto">{allCountries.slice(0, 5).map((c: any, i: number) => <CountryFlag key={i} country={c.country} />)}</div>
             </div>
-            <div className="flex gap-1 mb-3">
+            <div className="flex gap-1 mb-2 sm:mb-3">
                 {(['country', 'city'] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)} className={`px-2.5 py-1 text-[11px] rounded-md font-medium transition ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                    <button key={t} onClick={() => setTab(t)} className={`px-3 sm:px-2.5 py-1.5 sm:py-1 text-xs sm:text-[11px] rounded-md font-medium transition min-h-[36px] sm:min-h-0 ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
                         {t === 'country' ? 'Country' : 'City'}
                     </button>
                 ))}
@@ -706,9 +706,9 @@ function TechPanel({ devices, browsers, operatingSystems, allDevices, allBrowser
     return (
         <div>
             <SectionHead title="Technology" filterDim={dim} filterValues={filters[dim]} />
-            <div className="flex gap-1 mb-3">
+            <div className="flex gap-1 mb-2 sm:mb-3">
                 {(['device', 'browser', 'os'] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)} className={`px-2.5 py-1 text-[11px] rounded-md font-medium transition ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                    <button key={t} onClick={() => setTab(t)} className={`px-3 sm:px-2.5 py-1.5 sm:py-1 text-xs sm:text-[11px] rounded-md font-medium transition min-h-[36px] sm:min-h-0 ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
                         {t === 'device' ? 'Device' : t === 'browser' ? 'Browser' : 'OS'}
                     </button>
                 ))}
@@ -749,11 +749,11 @@ function EngagementCard({ kpis }: { kpis: any }) {
     const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
     const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-4 sm:p-5`}>
-            <div className="flex items-center gap-2 mb-3"><Target className="w-4 h-4 text-violet-400" /><h4 className="text-sm font-semibold text-white">Engagement Score</h4></div>
-            <div className="flex items-end gap-2 mb-2">
-                <AnimatedCounter value={score} className={`text-3xl font-bold ${color}`} />
-                <span className="text-xs text-zinc-600 mb-1">/ 100</span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-3 sm:p-5`}>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3"><Target className="w-4 h-4 text-violet-400" /><h4 className="text-sm sm:text-base font-semibold text-white">Engagement Score</h4></div>
+            <div className="flex items-end gap-2 mb-1.5 sm:mb-2">
+                <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
+                <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>
             </div>
             <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ duration: 0.8 }} className={`h-full rounded-full ${bg}`} />
@@ -768,9 +768,9 @@ function LoyaltyCard({ kpis }: { kpis: any }) {
     const total = kpis.totalUsers || 1;
     const loyaltyPct = Math.round((returning / total) * 100);
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-4 sm:p-5`}>
-            <div className="flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-pink-400" /><h4 className="text-sm font-semibold text-white">Audience Loyalty</h4></div>
-            <div className="flex justify-between text-xs mb-1"><span className="text-zinc-600">New</span><span className="text-zinc-600">Returning</span></div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5`}>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3"><Users className="w-4 h-4 text-pink-400" /><h4 className="text-sm sm:text-base font-semibold text-white">Audience Loyalty</h4></div>
+            <div className="flex justify-between text-[10px] sm:text-xs mb-1"><span className="text-zinc-600">New</span><span className="text-zinc-600">Returning</span></div>
             <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${100 - loyaltyPct}%` }} transition={{ duration: 0.6 }} className="h-full bg-violet-500/50" />
                 <motion.div initial={{ width: 0 }} animate={{ width: `${loyaltyPct}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full bg-emerald-500/50" />
@@ -792,11 +792,11 @@ function DiversityCard({ channels }: { channels: any[] }) {
     const score = Math.round((entropy / Math.max(maxEntropy, 0.01)) * 100);
     const color = score >= 60 ? 'text-emerald-400' : score >= 35 ? 'text-amber-400' : 'text-red-400';
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-4 sm:p-5`}>
-            <div className="flex items-center gap-2 mb-3"><Globe className="w-4 h-4 text-blue-400" /><h4 className="text-sm font-semibold text-white">Source Diversity</h4></div>
-            <div className="flex items-end gap-1 mb-3">
-                <AnimatedCounter value={score} className={`text-3xl font-bold ${color}`} />
-                <span className="text-xs text-zinc-600 mb-1">/ 100</span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5`}>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3"><Globe className="w-4 h-4 text-blue-400" /><h4 className="text-sm sm:text-base font-semibold text-white">Source Diversity</h4></div>
+            <div className="flex items-end gap-1 mb-2 sm:mb-3">
+                <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
+                <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>
             </div>
             <div className="space-y-1.5">
                 {channels.slice(0, 4).map((c: any, i: number) => {
