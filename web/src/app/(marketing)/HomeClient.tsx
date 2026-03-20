@@ -108,7 +108,7 @@ function Section({ children, className = '', id }: { children: React.ReactNode; 
 
 function Hero() {
     return (
-        <section className="relative min-h-screen flex items-center justify-center pt-24 pb-16 overflow-hidden bg-black"> {/* True black background for maximum contrast */}
+        <section className="relative min-h-screen flex items-center justify-center pt-16 sm:pt-24 pb-8 sm:pb-16 overflow-hidden bg-black"> {/* True black background for maximum contrast */}
             {/* Background gradient meshes */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/[0.04] rounded-full blur-[128px]" />
@@ -122,7 +122,7 @@ function Hero() {
                     initial={{ opacity: 0, x: -40 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex flex-col gap-4 sm:gap-6 lg:gap-8 order-1 text-center lg:text-left"
+                    className="flex flex-col gap-3 sm:gap-6 lg:gap-8 order-1 text-center lg:text-left"
                 >
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium w-fit mx-auto lg:mx-0 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
                         <span className="relative flex h-2 w-2">
@@ -145,7 +145,7 @@ function Hero() {
                         The only SEO tool where you can chat with AI about <span className="text-white font-medium">your own</span> Google Analytics & Search Console data. Get verdicts, not generic advice.
                     </p>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-4">
+                    <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 justify-center lg:justify-start pt-2 sm:pt-4">
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
                             className="group px-5 sm:px-8 min-h-[44px] h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
@@ -1571,7 +1571,7 @@ function StatsBar() {
     ];
 
     return (
-        <section className="py-16 px-4 sm:px-6 border-y border-white/[0.04]">
+        <section className="hidden sm:block py-16 px-4 sm:px-6 border-y border-white/[0.04]">
             <div className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
                 {stats.map((stat, i) => (
                     <div key={i} ref={stat.ref} className="text-center">
