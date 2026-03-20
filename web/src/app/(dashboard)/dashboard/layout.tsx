@@ -330,7 +330,7 @@ export default function DashboardLayout({
     }
 
     return (
-        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex overflow-x-hidden max-w-[100vw]">
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex max-w-[100vw]">
             <a href="#main-content" className="skip-to-content">Skip to content</a>
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
@@ -482,7 +482,7 @@ export default function DashboardLayout({
             </aside>
 
             {/* ─── Main content area ─── */}
-            <div className="flex-1 flex flex-col min-h-screen overflow-hidden w-full">
+            <div className="flex-1 flex flex-col min-h-screen w-full min-w-0">
                 {/* Top bar */}
                 <header className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
                     {/* Mobile menu button */}

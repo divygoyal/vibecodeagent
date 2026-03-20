@@ -20,16 +20,10 @@
   }
 }
 
-/* Prevent horizontal overflow on mobile */
-html, body {
-  overflow-x: hidden;
+/* Prevent horizontal overflow on mobile — only on body, not html (html overflow breaks sticky) */
+body {
+  overflow-x: clip;
   max-width: 100vw;
-}
-
-/* Ensure all content stays within viewport */
-main {
-  overflow-x: hidden;
-  max-width: 100%;
 }
 
 :root {
