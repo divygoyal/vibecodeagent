@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { signIn, useSession } from 'next-auth/react';
@@ -91,33 +91,14 @@ const pagePerformance = [
     { page: '/docs/getting-started', views: 1956, bounce: 22 },
 ];
 
-/* ═══════════════════════════════════════
-   ANIMATION VARIANTS
-   ═══════════════════════════════════════ */
-
-const fadeUp = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const } }
-};
-
-const stagger = {
-    visible: { transition: { staggerChildren: 0.1 } }
-};
-
 function Section({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
-    const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: '-80px' });
     return (
-        <motion.section
-            ref={ref}
+        <section
             id={id}
-            initial="hidden"
-            animate={isInView ? 'visible' : 'hidden'}
-            variants={stagger}
             className={`relative ${className}`}
         >
             {children}
-        </motion.section>
+        </section>
     );
 }
 
@@ -201,11 +182,7 @@ function Hero() {
                 <div className="order-2 hidden lg:flex justify-center lg:justify-center relative lg:pl-12 w-full lg:h-[600px] items-center">
 
                     {/* Floating Element 1 (Traffic Spike) */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20, x: -20 }}
-                        animate={{ opacity: 1, y: 0, x: 0 }}
-                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(52,211,153,0.3)" }}
-                        transition={{ duration: 0.5, delay: 0.8 }}
+                    <div
                         className="absolute hidden lg:flex flex-col gap-2 z-30 lg:-left-20 top-[10%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-emerald-500/30 transition-colors w-[180px]"
                     >
                         <div className="flex items-center justify-between">
@@ -219,24 +196,17 @@ function Hero() {
                         {/* Mini Bar Chart */}
                         <div className="flex items-end gap-1.5 h-8 mt-1">
                             {[40, 30, 50, 40, 60, 80, 100].map((height, i) => (
-                                <motion.div
+                                <div
                                     key={i}
-                                    style={{ originY: 1 }}
-                                    initial={{ scaleY: 0 }}
-                                    animate={{ scaleY: height / 100 }}
-                                    transition={{ duration: 1, delay: 1 + (i * 0.1), ease: "easeOut" }}
                                     className="w-full h-full bg-emerald-500 rounded-sm origin-bottom"
                                 />
                             ))}
                         </div>
 
                         {/* Connecting Sweep Right */}
-                        <motion.svg
+                        <svg
                             className="absolute pointer-events-none w-[70px] h-[80px] top-1/2 -right-[75px] -translate-y-1/2"
                             viewBox="0 0 70 80"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 1.5, duration: 1 }}
                         >
                             <defs>
                                 <linearGradient id="grad-tl" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -244,25 +214,18 @@ function Hero() {
                                     <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
                                 </linearGradient>
                             </defs>
-                            <motion.path
+                            <path
                                 d="M 0 10 C 35 10, 35 70, 70 70"
                                 fill="none"
                                 stroke="url(#grad-tl)"
                                 strokeWidth="1.5"
                                 strokeDasharray="4 4"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ duration: 1.5, ease: "easeOut", delay: 1 }}
                             />
-                        </motion.svg>
-                    </motion.div>
+                        </svg>
+                    </div>
 
                     {/* Floating Element 2 (Keyword Rank) */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20, x: -20 }}
-                        animate={{ opacity: 1, y: 0, x: 0 }}
-                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(56,189,248,0.3)" }}
-                        transition={{ duration: 0.5, delay: 1.0 }}
+                    <div
                         className="absolute hidden lg:flex flex-col gap-3 z-30 lg:-left-8 bottom-[18%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-sky-500/30 transition-colors w-[200px]"
                     >
                         <div className="flex justify-between items-center">
@@ -278,12 +241,9 @@ function Hero() {
                         </div>
 
                         {/* Connecting Sweep Right-Up */}
-                        <motion.svg
+                        <svg
                             className="absolute pointer-events-none w-[90px] h-[60px] top-1/2 -right-[95px] -translate-y-1/2"
                             viewBox="0 0 90 60"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 1.7, duration: 1 }}
                         >
                             <defs>
                                 <linearGradient id="grad-bl" x1="0%" y1="100%" x2="100%" y2="0%">
@@ -291,50 +251,37 @@ function Hero() {
                                     <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
                                 </linearGradient>
                             </defs>
-                            <motion.path
+                            <path
                                 d="M 0 50 C 45 50, 45 10, 90 10"
                                 fill="none"
                                 stroke="url(#grad-bl)"
                                 strokeWidth="1.5"
                                 strokeDasharray="4 4"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ duration: 1.5, ease: "easeOut", delay: 1.2 }}
                             />
-                        </motion.svg>
-                    </motion.div>
+                        </svg>
+                    </div>
 
                     {/* Main Phone Frame */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    <div
                         className="relative z-20 flex justify-center"
                     >
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-emerald-500/[0.05] rounded-[5rem] blur-3xl pointer-events-none" />
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-cyan-500/[0.06] rounded-[5rem] blur-2xl pointer-events-none" />
                         <VideoPhoneFrame />
-                    </motion.div>
+                    </div>
 
                     {/* Floating Element 3 (Site Health) */}
-                    <motion.div
-                        initial={{ opacity: 0, y: -20, x: 20 }}
-                        animate={{ opacity: 1, y: 0, x: 0 }}
-                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(168,85,247,0.3)" }}
-                        transition={{ duration: 0.5, delay: 1.2 }}
+                    <div
                         className="absolute hidden lg:flex items-center gap-4 z-30 lg:-right-24 top-[25%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl cursor-pointer hover:border-purple-500/30 transition-colors"
                     >
                         <div className="relative w-12 h-12 flex items-center justify-center">
                             <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                 <path className="text-white/10" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                                <motion.path
+                                <path
                                     className="text-purple-500"
                                     strokeDasharray="100, 100"
                                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                     fill="none" stroke="currentColor" strokeWidth="3"
-                                    initial={{ strokeDasharray: "0, 100" }}
-                                    animate={{ strokeDasharray: "98, 100" }}
-                                    transition={{ duration: 1.5, delay: 1.5, ease: "easeOut" }}
                                 />
                             </svg>
                             <span className="absolute text-xs font-bold text-white">98</span>
@@ -345,12 +292,9 @@ function Hero() {
                         </div>
 
                         {/* Connecting Sweep Left */}
-                        <motion.svg
+                        <svg
                             className="absolute pointer-events-none w-[50px] h-[60px] top-1/2 -left-[55px] -translate-y-1/2"
                             viewBox="0 0 50 60"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 1.9, duration: 1 }}
                         >
                             <defs>
                                 <linearGradient id="grad-rt" x1="100%" y1="0%" x2="0%" y2="100%">
@@ -358,25 +302,18 @@ function Hero() {
                                     <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
                                 </linearGradient>
                             </defs>
-                            <motion.path
+                            <path
                                 d="M 50 10 C 25 10, 25 50, 0 50"
                                 fill="none"
                                 stroke="url(#grad-rt)"
                                 strokeWidth="1.5"
                                 strokeDasharray="4 4"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ duration: 1.5, ease: "easeOut", delay: 1.4 }}
                             />
-                        </motion.svg>
-                    </motion.div>
+                        </svg>
+                    </div>
 
                     {/* Floating Element 4 (Alert) */}
-                    <motion.div
-                        initial={{ opacity: 0, y: -20, x: 20 }}
-                        animate={{ opacity: 1, y: 0, x: 0 }}
-                        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 20px 40px -10px rgba(244,63,94,0.3)" }}
-                        transition={{ duration: 0.5, delay: 1.4 }}
+                    <div
                         className="absolute hidden lg:flex flex-col gap-2 z-30 lg:-right-24 bottom-[30%] bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl max-w-[210px] cursor-pointer hover:border-rose-500/30 transition-colors"
                     >
                         <div className="flex items-center gap-2">
@@ -393,12 +330,9 @@ function Hero() {
                         </p>
 
                         {/* Connecting Sweep Left-Up */}
-                        <motion.svg
+                        <svg
                             className="absolute pointer-events-none w-[30px] h-[40px] top-1/2 -left-[35px] -translate-y-1/2"
                             viewBox="0 0 30 40"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 2.1, duration: 1 }}
                         >
                             <defs>
                                 <linearGradient id="grad-rb" x1="100%" y1="100%" x2="0%" y2="0%">
@@ -406,18 +340,15 @@ function Hero() {
                                     <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
                                 </linearGradient>
                             </defs>
-                            <motion.path
+                            <path
                                 d="M 30 30 C 15 30, 15 10, 0 10"
                                 fill="none"
                                 stroke="url(#grad-rb)"
                                 strokeWidth="1.5"
                                 strokeDasharray="4 4"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ duration: 1.5, ease: "easeOut", delay: 1.6 }}
                             />
-                        </motion.svg>
-                    </motion.div>
+                        </svg>
+                    </div>
                 </div>
             </div>
         </section>
@@ -430,10 +361,7 @@ function ChatMessage({
     sender: string; avatar: string; children: React.ReactNode; delay?: number; isBot?: boolean;
 }) {
     return (
-        <motion.div
-            initial={{ opacity: 0, x: isBot ? -10 : 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, delay }}
+        <div
             className="flex gap-3"
         >
             <div className="text-lg flex-shrink-0 mt-0.5">{avatar}</div>
@@ -441,7 +369,7 @@ function ChatMessage({
                 <div className={`text-xs mb-1 ${isBot ? 'text-emerald-400' : 'text-zinc-500'}`}>{sender}</div>
                 <div className="text-zinc-300 leading-relaxed">{children}</div>
             </div>
-        </motion.div>
+        </div>
     );
 }
 
@@ -491,7 +419,7 @@ function Features() {
     return (
         <Section id="features" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         FEATURES
                     </div>
@@ -505,13 +433,12 @@ function Features() {
                         Stop switching between Google Analytics, Search Console, and your IDE.
                         TrafficClaw brings everything into one intelligent interface.
                     </p>
-                </motion.div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {features.map((feature, i) => (
-                        <motion.div
+                        <div
                             key={feature.title}
-                            variants={fadeUp}
                             className="group relative p-4 sm:p-6 rounded-2xl bg-white/[0.02] backdrop-blur border border-white/[0.04] hover:border-emerald-500/15 transition-all duration-300"
                         >
                             {/* Icon */}
@@ -526,7 +453,7 @@ function Features() {
 
                             <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
                             <p className="text-sm text-zinc-400 leading-relaxed">{feature.description}</p>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -545,7 +472,7 @@ function InteractiveDemo() {
     return (
         <Section id="demo" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         LIVE PREVIEW
                     </div>
@@ -606,30 +533,24 @@ function InteractiveDemo() {
 
                         {/* "Try this" callout — hidden after first click */}
                         {!hasClickedGlobe && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 0.5, duration: 0.3 }}
+                            <div
                                 className="mt-4 pointer-events-none"
                             >
-                                <motion.div
-                                    animate={{ y: [0, -4, 0] }}
-                                    transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+                                <div
                                     className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20"
                                 >
                                     <span className="text-xs font-medium text-zinc-300">
                                         Try this <span className="text-amber-400">&#10024;</span>
                                     </span>
                                     <span className="text-xs text-emerald-400/80 font-medium">(people are addicted)</span>
-                                </motion.div>
-                            </motion.div>
+                                </div>
+                            </div>
                         )}
                     </div>
-                </motion.div>
+                </div>
 
                 {/* Dashboard preview card */}
-                <motion.div
-                    variants={fadeUp}
+                <div
                     className="relative mt-8"
                 >
                     <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-violet-500/10 rounded-3xl blur-2xl" />
@@ -805,10 +726,7 @@ function InteractiveDemo() {
                                         </div>
 
                                         {/* ─── TOP-LEFT: Stats Panel (exact realtime page clone) ─── */}
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.1, duration: 0.4 }}
+                                        <div
                                             className="absolute top-4 left-4 z-20"
                                         >
                                             <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden w-[calc(100vw-4rem)] sm:w-auto" style={{ minWidth: 0, maxWidth: '400px' }}>
@@ -901,23 +819,17 @@ function InteractiveDemo() {
                                                     </div>
                                                 </div>
                                             </div>
-                                        </motion.div>
+                                        </div>
 
                                         {/* ─── BOTTOM-LEFT: Activity Feed (exact realtime page clone) ─── */}
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.3, duration: 0.4 }}
+                                        <div
                                             className="absolute bottom-4 left-4 right-4 sm:right-auto z-20 sm:w-[360px] md:w-[440px] hidden sm:block"
                                         >
                                             <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
                                                 <div className="max-h-[280px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                                     {DEMO_ACTIVITY.map((item, i) => (
-                                                        <motion.div
+                                                        <div
                                                             key={item.id}
-                                                            initial={{ opacity: 0, x: -10 }}
-                                                            animate={{ opacity: 1, x: 0 }}
-                                                            transition={{ delay: 0.4 + i * 0.04 }}
                                                             className="px-4 py-2.5 border-b border-white/[0.03] last:border-b-0 group"
                                                         >
                                                             <div className="flex items-start gap-2.5">
@@ -952,17 +864,14 @@ function InteractiveDemo() {
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </motion.div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                        </motion.div>
+                                        </div>
 
                                         {/* ─── BOTTOM-RIGHT: Powered By ─── */}
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: 0.6 }}
+                                        <div
                                             className="absolute bottom-4 right-4 z-20"
                                         >
                                             <div className="flex items-center gap-2 px-3 py-2 bg-[rgba(20,20,30,0.9)] backdrop-blur-xl rounded-xl border border-white/[0.06]">
@@ -973,13 +882,13 @@ function InteractiveDemo() {
                                                 </svg>
                                                 <span className="text-[11px] text-zinc-400 font-medium">Powered by TrafficClaw</span>
                                             </div>
-                                        </motion.div>
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </Section>
     );
@@ -1078,7 +987,7 @@ function AIChatDemo() {
     return (
         <Section id="ai-demo" className="py-24 sm:py-32 px-4 sm:px-6">
             <div ref={sectionRef} className="max-w-5xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         <MessageSquare className="w-3 h-3" /> LIVE DEMO
                     </div>
@@ -1091,10 +1000,10 @@ function AIChatDemo() {
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
                         Our AI analyst doesn&apos;t give generic advice — it analyzes your real data and delivers actionable verdicts with evidence.
                     </p>
-                </motion.div>
+                </div>
 
                 {/* Chat window mock */}
-                <motion.div variants={fadeUp} className="relative rounded-2xl border border-white/[0.06] bg-[#050508] overflow-hidden shadow-2xl shadow-black/50">
+                <div className="relative rounded-2xl border border-white/[0.06] bg-[#050508] overflow-hidden shadow-2xl shadow-black/50">
                     {/* Chat header */}
                     <div className="flex items-center gap-3 px-5 py-3.5 border-b border-white/[0.04] bg-[#0a0a0f]">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
@@ -1160,7 +1069,7 @@ function AIChatDemo() {
                                 <div className="flex-1 space-y-3 max-w-[90%]">
                                     {/* KPI Cards */}
                                     {visibleSections >= 1 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             {[
                                                 { label: 'CLICKS', value: '8,965', icon: '📈', color: 'text-emerald-400' },
@@ -1174,23 +1083,23 @@ function AIChatDemo() {
                                                     <div className="text-[8px] text-zinc-600 uppercase tracking-wider mt-0.5">{kpi.label}</div>
                                                 </div>
                                             ))}
-                                        </motion.div>
+                                        </div>
                                     )}
 
                                     {/* Critical verdict */}
                                     {visibleSections >= 2 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="bg-red-500/[0.06] border border-red-500/[0.12] rounded-xl p-4">
                                             <div className="text-sm font-bold text-red-400 mb-2">🚨 CRITICAL: YOUR ORGANIC SEARCH IS COLLAPSING</div>
                                             <p className="text-xs text-zinc-400 leading-relaxed">
                                                 Your organic traffic is in a death spiral, down <span className="text-red-400 font-semibold">64.9%</span> in 28 days. You are bleeding search visibility on high-intent troubleshooting queries that are your primary acquisition engine.
                                             </p>
-                                        </motion.div>
+                                        </div>
                                     )}
 
                                     {/* Evidence table */}
                                     {visibleSections >= 3 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="bg-white/[0.02] border border-white/[0.04] rounded-xl overflow-hidden">
                                             <div className="px-4 py-2 border-b border-white/[0.04]">
                                                 <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">📋 Evidence</span>
@@ -1229,23 +1138,23 @@ function AIChatDemo() {
                                                     </tr>
                                                 </tbody>
                                             </table>
-                                        </motion.div>
+                                        </div>
                                     )}
 
                                     {/* Verdict */}
                                     {visibleSections >= 4 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
                                             <div className="text-sm font-bold text-amber-400 mb-2">⚖️ VERDICT: CATASTROPHIC TECHNICAL EVENT ON FEB 14</div>
                                             <p className="text-xs text-zinc-400 leading-relaxed">
                                                 Your traffic didn&apos;t just &quot;drop&quot; — it was decapitated. On February 14th, your site lost <span className="text-white font-semibold">90%+</span> of its search visibility overnight, shifting from ~24,000 daily impressions to fewer than 1,000. This is not a slow decline; it is a critical technical failure or a manual penalty.
                                             </p>
-                                        </motion.div>
+                                        </div>
                                     )}
 
                                     {/* Revenue Impact */}
                                     {visibleSections >= 5 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="bg-amber-500/[0.04] border border-amber-500/[0.1] rounded-xl p-4">
                                             <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">💰 Revenue Impact</div>
                                             <div className="space-y-1.5 text-xs text-zinc-400">
@@ -1253,12 +1162,12 @@ function AIChatDemo() {
                                                 <div>Monthly Loss: <span className="text-red-400 font-semibold">19,500 clicks</span></div>
                                                 <div>Estimated Revenue Bleed: <span className="text-red-400 font-semibold">$1,900 per month</span> in potential value</div>
                                             </div>
-                                        </motion.div>
+                                        </div>
                                     )}
 
                                     {/* Action items */}
                                     {visibleSections >= 6 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="bg-emerald-500/[0.04] border border-emerald-500/[0.1] rounded-xl p-4">
                                             <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3">🎯 ACTION: EMERGENCY RECOVERY STEPS</div>
                                             <div className="space-y-2 text-xs text-zinc-400">
@@ -1279,12 +1188,12 @@ function AIChatDemo() {
                                                     <span><strong className="text-zinc-200">Sitemap Verification</strong> — Re-submit your XML sitemap in GSC to force Google to recrawl</span>
                                                 </div>
                                             </div>
-                                        </motion.div>
+                                        </div>
                                     )}
 
                                     {/* Follow-up suggestions */}
                                     {visibleSections >= 7 && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                                        <div
                                             className="flex flex-wrap gap-2">
                                             {[
                                                 'Check my GSC indexing report for errors starting Feb 14',
@@ -1295,7 +1204,7 @@ function AIChatDemo() {
                                                     {q}
                                                 </button>
                                             ))}
-                                        </motion.div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -1314,10 +1223,10 @@ function AIChatDemo() {
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </div>
 
                 {/* Bottom tagline + CTA */}
-                <motion.div variants={fadeUp} className="text-center mt-8 space-y-4">
+                <div className="text-center mt-8 space-y-4">
                     <p className="text-sm text-zinc-600">
                         Real response from TrafficClaw AI · Powered by your live Google Search Console data
                     </p>
@@ -1328,7 +1237,7 @@ function AIChatDemo() {
                         Try This With Your Own Data
                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </button>
-                </motion.div>
+                </div>
             </div>
         </Section>
     );
@@ -1366,7 +1275,7 @@ function Testimonials() {
     return (
         <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-amber-400 mb-4">
                         TESTIMONIALS
                     </div>
@@ -1376,13 +1285,12 @@ function Testimonials() {
                             builders
                         </span>
                     </h2>
-                </motion.div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {reviews.map((review, i) => (
-                        <motion.div
+                        <div
                             key={i}
-                            variants={fadeUp}
                             className="p-4 sm:p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
                         >
                             <div className="flex gap-0.5 mb-4">
@@ -1398,7 +1306,7 @@ function Testimonials() {
                                     <div className="text-xs text-zinc-500">{review.role}</div>
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -1420,8 +1328,7 @@ function PricingDiscountBanner() {
     };
 
     return (
-        <motion.div
-            variants={fadeUp}
+        <div
             className="max-w-2xl mx-auto mb-14 p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.08] via-cyan-500/[0.06] to-emerald-500/[0.08]"
         >
             <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
@@ -1442,7 +1349,7 @@ function PricingDiscountBanner() {
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 </button>
             </div>
-        </motion.div>
+        </div>
     );
 }
 
@@ -1465,7 +1372,7 @@ function Pricing() {
     return (
         <Section id="pricing" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-6xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-6">
+                <div className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-violet-400 mb-4">
                         PRICING
                     </div>
@@ -1479,15 +1386,15 @@ function Pricing() {
                         All website features are free. Pick a plan for AI-powered insights.<br />
                         <span className="text-emerald-400 font-medium">Credits reset each month — no rollover.</span>
                     </p>
-                </motion.div>
+                </div>
 
                 {/* Free tier callout */}
-                <motion.div variants={fadeUp} className="text-center mb-6">
+                <div className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] text-sm">
                         <Sparkles className="w-4 h-4 text-emerald-400" />
                         <span className="text-emerald-300 font-medium">Every new account gets <strong className="text-emerald-400">10 free messages</strong> to start</span>
                     </div>
-                </motion.div>
+                </div>
 
                 {/* Discount promo */}
                 <PricingDiscountBanner />
@@ -1495,7 +1402,7 @@ function Pricing() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
 
                     {/* ── STARTER ── */}
-                    <motion.div variants={fadeUp} className="relative p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/[0.2] transition-all duration-300 group">
+                    <div className="relative p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/[0.2] transition-all duration-300 group">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400/20 to-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                             <Zap className="w-5 h-5 text-cyan-400" />
                         </div>
@@ -1521,10 +1428,10 @@ function Pricing() {
                                 </li>
                             ))}
                         </ul>
-                    </motion.div>
+                    </div>
 
                     {/* ── GROWTH (highlighted) ── */}
-                    <motion.div variants={fadeUp} className="relative p-4 sm:p-6 rounded-2xl border-2 border-emerald-500/[0.3] bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.03] to-transparent transition-all duration-300 group md:-mt-2 md:mb-[-8px]">
+                    <div className="relative p-4 sm:p-6 rounded-2xl border-2 border-emerald-500/[0.3] bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.03] to-transparent transition-all duration-300 group md:-mt-2 md:mb-[-8px]">
                         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[10px] font-bold text-black uppercase tracking-wider shadow-lg shadow-emerald-500/20">
                             Most Popular
                         </div>
@@ -1556,10 +1463,10 @@ function Pricing() {
                                 </li>
                             ))}
                         </ul>
-                    </motion.div>
+                    </div>
 
                     {/* ── PRO (best value) ── */}
-                    <motion.div variants={fadeUp} className="relative p-4 sm:p-6 pt-8 rounded-2xl border border-violet-500/[0.15] bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.03] to-transparent hover:border-violet-500/[0.3] transition-all duration-300 group">
+                    <div className="relative p-4 sm:p-6 pt-8 rounded-2xl border border-violet-500/[0.15] bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.03] to-transparent hover:border-violet-500/[0.3] transition-all duration-300 group">
                         <div className="absolute -top-3.5 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20 z-10">
                             Best Value
                         </div>
@@ -1608,16 +1515,16 @@ function Pricing() {
                                 ))}
                             </ul>
                         </div>
-                    </motion.div>
+                    </div>
 
                 </div>
 
                 {/* Bottom trust line */}
-                <motion.div variants={fadeUp} className="text-center mt-10">
+                <div className="text-center mt-10">
                     <p className="text-xs text-zinc-600">
                         Secure payments by Dodo Payments • Cancel anytime • Credits reset monthly
                     </p>
-                </motion.div>
+                </div>
             </div>
         </Section>
     );
@@ -1716,7 +1623,7 @@ function HowItWorks() {
     return (
         <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-5xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-20">
+                <div className="text-center mb-20">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         HOW IT WORKS
                     </div>
@@ -1726,7 +1633,7 @@ function HowItWorks() {
                             effortless growth
                         </span>
                     </h2>
-                </motion.div>
+                </div>
 
                 <div className="relative">
                     {/* Connecting line */}
@@ -1734,9 +1641,8 @@ function HowItWorks() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                         {steps.map((step, i) => (
-                            <motion.div
+                            <div
                                 key={step.step}
-                                variants={fadeUp}
                                 className="relative text-center"
                             >
                                 {/* Step number circle */}
@@ -1765,7 +1671,7 @@ function HowItWorks() {
                                         </span>
                                     ))}
                                 </div>
-                            </motion.div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -1857,7 +1763,7 @@ function WhoItsFor() {
     return (
         <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-5xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         WHO IT&apos;S FOR
                     </div>
@@ -1868,14 +1774,13 @@ function WhoItsFor() {
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
                         Whether you&apos;re a solo founder or a marketing team, TrafficClaw gives you the tools to grow smarter.
                     </p>
-                </motion.div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {PERSONAS.map((p, i) => {
                         const Icon = p.icon;
                         return (
-                            <motion.div
+                            <div
                                 key={i}
-                                variants={fadeUp}
                                 className={`p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${p.bg} hover:border-white/[0.12] transition-all group`}
                             >
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-white/[0.06]`}>
@@ -1883,7 +1788,7 @@ function WhoItsFor() {
                                 </div>
                                 <h3 className="text-lg font-bold text-white mb-2">{p.title}</h3>
                                 <p className="text-sm text-zinc-400 leading-relaxed">{p.desc}</p>
-                            </motion.div>
+                            </div>
                         );
                     })}
                 </div>
@@ -1912,7 +1817,7 @@ function ComparisonTable() {
     return (
         <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-4xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-12">
+                <div className="text-center mb-12">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-cyan-400 mb-4">
                         COMPARE
                     </div>
@@ -1922,8 +1827,8 @@ function ComparisonTable() {
                     <p className="text-zinc-400 max-w-xl mx-auto">
                         TrafficClaw combines analytics + SEO + AI in one tool — at a fraction of the cost.
                     </p>
-                </motion.div>
-                <motion.div variants={fadeUp} className="overflow-x-auto">
+                </div>
+                <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-white/[0.06]">
@@ -1958,7 +1863,7 @@ function ComparisonTable() {
                             ))}
                         </tbody>
                     </table>
-                </motion.div>
+                </div>
             </div>
         </Section>
     );
@@ -2009,7 +1914,7 @@ function FAQ() {
     return (
         <Section id="faq" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-3xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-16">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         FAQ
                     </div>
@@ -2020,9 +1925,9 @@ function FAQ() {
                         </span>
                     </h2>
                     <p className="text-zinc-400 text-lg">Everything you need to know about TrafficClaw.</p>
-                </motion.div>
+                </div>
 
-                <motion.div variants={fadeUp} className="space-y-3">
+                <div className="space-y-3">
                     {faqs.map((faq, i) => (
                         <div
                             key={i}
@@ -2042,7 +1947,7 @@ function FAQ() {
                             )}
                         </div>
                     ))}
-                </motion.div>
+                </div>
             </div>
         </Section>
     );
@@ -2056,8 +1961,7 @@ function FinalCTA() {
     return (
         <Section className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-4xl mx-auto text-center">
-                <motion.div
-                    variants={fadeUp}
+                <div
                     className="relative p-6 sm:p-12 lg:p-16 rounded-3xl overflow-hidden"
                 >
                     {/* Background gradient */}
@@ -2090,7 +1994,7 @@ function FinalCTA() {
                             <ArrowRight className="inline-block ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </Section>
     );
@@ -2166,7 +2070,7 @@ function ContactSection() {
     return (
         <Section id="contact" className="py-24 sm:py-32 px-4 sm:px-6">
             <div className="max-w-3xl mx-auto">
-                <motion.div variants={fadeUp} className="text-center mb-12">
+                <div className="text-center mb-12">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
                         <MessageSquare className="w-3 h-3" />
                         HELP & SUPPORT
@@ -2180,11 +2084,10 @@ function ContactSection() {
                     <p className="text-zinc-400 text-lg max-w-xl mx-auto">
                         Drop us a message and we&apos;ll get back to you. Whether it&apos;s about features, pricing, or feedback — we&apos;re here to help.
                     </p>
-                </motion.div>
+                </div>
 
                 {status === 'success' ? (
-                    <motion.div
-                        variants={fadeUp}
+                    <div
                         className="p-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] text-center"
                     >
                         <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
@@ -2198,10 +2101,9 @@ function ContactSection() {
                         >
                             Send another message
                         </button>
-                    </motion.div>
+                    </div>
                 ) : (
-                    <motion.form
-                        variants={fadeUp}
+                    <form
                         onSubmit={handleSubmit}
                         className="p-4 sm:p-6 lg:p-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] space-y-5"
                     >
@@ -2290,7 +2192,7 @@ function ContactSection() {
                                 </a>
                             </span>
                         </div>
-                    </motion.form>
+                    </form>
                 )}
             </div>
         </Section>

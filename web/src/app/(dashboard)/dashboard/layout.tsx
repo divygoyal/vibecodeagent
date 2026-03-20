@@ -14,7 +14,7 @@ import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
-    Book, Newspaper, Sun, Moon, Coins, MessageSquare,
+    Book, Newspaper, Coins, MessageSquare,
     CalendarDays, ChevronDown, Bell, Globe, CreditCard, Sparkles, Target
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
@@ -210,12 +210,7 @@ export default function DashboardLayout({
         if (range && user) localStorage.setItem(getUserKey('tc-last-range'), range);
     }, [range, user, getUserKey]);
 
-    const toggleTheme = () => {
-        const next = theme === 'dark' ? 'light' : 'dark';
-        setTheme(next);
-        localStorage.setItem('gc-theme', next);
-        document.documentElement.setAttribute('data-theme', next);
-    };
+    // Dark mode only — theme toggle removed
 
     // Registration state — check sessionStorage first to avoid re-registering on refresh
     // Bug #3 fix: validate cached registration belongs to current user
@@ -680,15 +675,7 @@ export default function DashboardLayout({
                                 </>
                             )}
                         </div>
-                        {/* Theme toggle */}
-                        <button
-                            onClick={toggleTheme}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0"
-                            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                        >
-                            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                        </button>
+                        {/* Theme toggle removed — dark mode only */}
                         {/* Credits badge — hidden on mobile, shown in mobile sidebar */}
                         {credits !== null && (
                             <Link href="/dashboard/plan" className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${credits < 20
