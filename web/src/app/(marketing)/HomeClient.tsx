@@ -2304,23 +2304,41 @@ function ContactSection() {
 function Footer() {
     return (
         <footer className="border-t border-white/[0.04] py-12 px-6">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-2">
-                    <img src="/icon.svg" alt="TrafficClaw" className="w-6 h-6 rounded-md" />
-                    <span className="text-sm font-bold text-white">
-                        Traffic<span className="text-emerald-400">Claw</span>
-                    </span>
+            <div className="max-w-7xl mx-auto space-y-10">
+                {/* Featured On */}
+                <div className="flex flex-col items-center gap-4">
+                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">Featured on</span>
+                    <div className="flex flex-wrap items-center justify-center gap-6">
+                        <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+                            <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
+                        </a>
+                        {/* Add more directory badges here as you submit:
+                        <a href="https://betalist.com/..." target="_blank" rel="noopener noreferrer">
+                            <img src="..." alt="Featured on BetaList" />
+                        </a>
+                        */}
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-6 text-sm text-zinc-500">
-                    <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
-                    <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
-                    <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>
-                    <Link href="/contact" className="hover:text-zinc-300 transition-colors">Contact</Link>
-                </div>
+                {/* Footer Links */}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-2">
+                        <img src="/icon.svg" alt="TrafficClaw" className="w-6 h-6 rounded-md" />
+                        <span className="text-sm font-bold text-white">
+                            Traffic<span className="text-emerald-400">Claw</span>
+                        </span>
+                    </div>
 
-                <div className="text-xs text-zinc-600">
-                    © 2026 TrafficClaw. All rights reserved.
+                    <div className="flex items-center gap-6 text-sm text-zinc-500">
+                        <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
+                        <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
+                        <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>
+                        <Link href="/contact" className="hover:text-zinc-300 transition-colors">Contact</Link>
+                    </div>
+
+                    <div className="text-xs text-zinc-600">
+                        © 2026 TrafficClaw. All rights reserved.
+                    </div>
                 </div>
             </div>
         </footer>
