@@ -85,7 +85,7 @@ export default function StrikingDistanceWidget({ queries, siteUrl }: StrikingDis
 
   if (strikingDistance.length === 0) {
     return (
-      <div className="premium-card rounded-2xl p-6">
+      <div className="premium-card rounded-2xl p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center">
             <Target className="w-5 h-5 text-emerald-400" />
@@ -105,7 +105,7 @@ export default function StrikingDistanceWidget({ queries, siteUrl }: StrikingDis
   }
 
   return (
-    <div className="premium-card rounded-2xl p-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/20 flex items-center justify-center">

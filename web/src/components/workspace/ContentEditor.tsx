@@ -151,8 +151,8 @@ export default function ContentEditor() {
   }, [keywordDensity, readability.score, wordCount, headings.warnings, metaTitle]);
 
   return (
-    <div className="premium-card rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
           <PenTool className="w-5 h-5 text-emerald-400" />
         </div>
@@ -173,7 +173,7 @@ export default function ContentEditor() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="Target keyword..."
-              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none"
+              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none min-h-[44px]"
             />
           </div>
 
@@ -182,7 +182,7 @@ export default function ContentEditor() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Start writing your content here... Use # for headings (markdown supported)"
-            className="w-full min-h-[400px] p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] resize-y focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/30 outline-none transition-all font-mono text-sm leading-relaxed"
+            className="w-full min-h-[200px] sm:min-h-[400px] p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] resize-y focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/30 outline-none transition-all font-mono text-sm leading-relaxed"
           />
 
           {/* Word + Char count */}

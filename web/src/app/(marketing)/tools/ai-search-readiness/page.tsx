@@ -131,9 +131,9 @@ export default function AiSearchReadinessPage() {
                         <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
                             <Sparkles className="w-5 h-5" />
                         </div>
-                        <h1 className="text-3xl font-bold">AI Search Readiness</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold">AI Search Readiness</h1>
                     </div>
-                    <p className="text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
                         Check if your content is optimized for AI search engines like ChatGPT, Perplexity, and Google AI Overviews.
                     </p>
                 </motion.div>
@@ -144,21 +144,21 @@ export default function AiSearchReadinessPage() {
                     initial="hidden"
                     animate="visible"
                     variants={fadeUp}
-                    className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-8"
+                    className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6 mb-8"
                 >
                     <label className="block text-sm font-medium text-zinc-300 mb-2">Page URL</label>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                         <input
                             type="url"
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
                             placeholder="https://example.com/page"
-                            className="flex-1 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                            className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
                         />
                         <button
                             type="submit"
                             disabled={loading || !url.trim()}
-                            className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             <Search className="w-4 h-4" /> Analyze
                         </button>
@@ -176,7 +176,7 @@ export default function AiSearchReadinessPage() {
                 {result && (
                     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="space-y-6">
                         {/* Overall Score */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <div className="flex flex-col sm:flex-row items-center gap-6">
                                 <ScoreRing score={result.overallScore} />
                                 <div className="text-center sm:text-left">
@@ -193,7 +193,7 @@ export default function AiSearchReadinessPage() {
                         </motion.div>
 
                         {/* Category Breakdown */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-5">Category Breakdown</h2>
                             <div className="space-y-4">
                                 {result.categories.map((cat) => (
@@ -204,7 +204,7 @@ export default function AiSearchReadinessPage() {
 
                         {/* Detailed Category Cards */}
                         {result.categories.map((cat) => (
-                            <motion.div key={cat.name} variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                            <motion.div key={cat.name} variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                                 <div className="flex items-center gap-2.5 mb-4">
                                     <span className="text-emerald-400">{categoryIcons[cat.name]}</span>
                                     <h3 className="text-base font-semibold">{cat.name}</h3>

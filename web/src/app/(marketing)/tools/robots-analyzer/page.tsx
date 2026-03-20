@@ -107,9 +107,9 @@ export default function RobotsAnalyzerPage() {
                         <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
                             <FileText className="w-5 h-5" />
                         </div>
-                        <h1 className="text-3xl font-bold">Robots.txt Analyzer</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold">Robots.txt Analyzer</h1>
                     </div>
-                    <p className="text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
                         Check your robots.txt for issues and see which AI crawlers can access your site.
                     </p>
                 </motion.div>
@@ -120,21 +120,21 @@ export default function RobotsAnalyzerPage() {
                     initial="hidden"
                     animate="visible"
                     variants={fadeUp}
-                    className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-8"
+                    className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6 mb-8"
                 >
                     <label className="block text-sm font-medium text-zinc-300 mb-2">Domain</label>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                         <input
                             type="text"
                             value={domain}
                             onChange={(e) => setDomain(e.target.value)}
                             placeholder="example.com"
-                            className="flex-1 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                            className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
                         />
                         <button
                             type="submit"
                             disabled={loading || !domain.trim()}
-                            className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             <Search className="w-4 h-4" />
                             Analyze
@@ -156,7 +156,7 @@ export default function RobotsAnalyzerPage() {
                 {result && (
                     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="space-y-6">
                         {/* AI Crawler Access */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-4">AI Crawler Access</h2>
                             <div className="space-y-2">
                                 {result.crawlers.map((c) => (
@@ -174,7 +174,7 @@ export default function RobotsAnalyzerPage() {
                         </motion.div>
 
                         {/* Parsed Directives */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-4">Parsed Directives</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
@@ -206,7 +206,7 @@ export default function RobotsAnalyzerPage() {
 
                         {/* Sitemaps */}
                         {result.sitemaps.length > 0 && (
-                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                                 <h2 className="text-lg font-semibold mb-3">Sitemaps</h2>
                                 <ul className="space-y-1.5">
                                     {result.sitemaps.map((s, i) => (
@@ -218,7 +218,7 @@ export default function RobotsAnalyzerPage() {
 
                         {/* Issues */}
                         {result.issues.length > 0 && (
-                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                                 <h2 className="text-lg font-semibold mb-4">Issues Found</h2>
                                 <div className="space-y-2">
                                     {result.issues.map((issue, i) => (
@@ -232,7 +232,7 @@ export default function RobotsAnalyzerPage() {
                         )}
 
                         {/* Raw Content */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-3">Raw robots.txt</h2>
                             <pre className="text-xs font-mono text-zinc-400 bg-black/40 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap">
                                 {result.raw}

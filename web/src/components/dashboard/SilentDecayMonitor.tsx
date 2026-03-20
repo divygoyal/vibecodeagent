@@ -138,7 +138,7 @@ export default function SilentDecayMonitor({ queries, comparisonQueries, siteUrl
   };
 
   return (
-    <div className="premium-card rounded-2xl p-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">

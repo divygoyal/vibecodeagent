@@ -40,7 +40,7 @@ const TIMEFRAMES = [
 
 function SkeletonCard() {
   return (
-    <div className="premium-card rounded-2xl p-6 animate-pulse">
+    <div className="premium-card rounded-2xl p-4 sm:p-6 animate-pulse">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-white/[0.06]" />
         <div className="space-y-2">
@@ -157,7 +157,7 @@ function OpportunitiesPageInner() {
             <button
               key={tf.value}
               onClick={() => setTimeframe(tf.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              className={`px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium rounded-md transition-all min-h-[44px] ${
                 timeframe === tf.value
                   ? 'bg-white/[0.1] text-white'
                   : 'text-zinc-500 hover:text-zinc-300'
@@ -178,7 +178,7 @@ function OpportunitiesPageInner() {
             <button
               key={tab.key}
               onClick={() => handleTabChange(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all min-h-[44px] ${
                 isActive
                   ? 'bg-white/[0.1] text-white shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
@@ -195,7 +195,7 @@ function OpportunitiesPageInner() {
       {isLoading && !data ? (
         <SkeletonCard />
       ) : error && !data ? (
-        <div className="premium-card rounded-2xl p-6">
+        <div className="premium-card rounded-2xl p-4 sm:p-6">
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
               <AlertTriangle className="w-7 h-7 text-red-400" />

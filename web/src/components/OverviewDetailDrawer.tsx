@@ -439,18 +439,18 @@ export default function OverviewDetailDrawer({ open, onClose, content }: Props) 
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-[var(--sidebar-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
+                        className="fixed right-0 top-0 bottom-0 w-full sm:max-w-md z-50 bg-[var(--sidebar-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
                     >
-                        <div className="sticky top-0 bg-[var(--sidebar-bg)] backdrop-blur-md border-b border-[var(--divider)] px-6 py-4 flex items-center justify-between z-10">
+                        <div className="sticky top-0 bg-[var(--sidebar-bg)] backdrop-blur-md border-b border-[var(--divider)] px-4 sm:px-6 py-4 flex items-center justify-between z-10">
                             <div>
                                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Details</p>
                                 <h2 className="text-lg font-bold text-[var(--text-primary)] mt-0.5">{content.title}</h2>
                             </div>
-                            <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-white transition">
+                            <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-white transition">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <div className="p-6">
+                        <div className="p-4 sm:p-6">
                             {renderContent()}
                         </div>
                     </motion.div>

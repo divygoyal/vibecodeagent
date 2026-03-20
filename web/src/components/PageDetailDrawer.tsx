@@ -85,7 +85,7 @@ function DrawerSkeleton() {
   return (
     <div className="space-y-5 animate-pulse">
       <div className="h-16 bg-white/[0.02] rounded-xl border border-white/[0.04]" />
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3">
             <div className="h-2.5 w-12 bg-white/[0.06] rounded mb-2" />
@@ -234,17 +234,17 @@ export default function PageDetailDrawer({ isOpen, onClose, pageUrl, siteUrl }: 
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-lg z-50 bg-[var(--card-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
+            className="fixed right-0 top-0 bottom-0 w-full sm:max-w-lg z-50 bg-[var(--card-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
           >
             {/* Header */}
-            <div className="sticky top-0 bg-[var(--card-bg)] backdrop-blur-md border-b border-[var(--card-border)] px-6 py-4 flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-[var(--card-bg)] backdrop-blur-md border-b border-[var(--card-border)] px-4 sm:px-6 py-4 flex items-center justify-between z-10">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                   <FileText className="w-4 h-4 text-emerald-400" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">Page Detail</p>
-                  <h2 className="text-sm font-bold text-[var(--text-primary)] truncate mt-0.5" title={pageUrl ?? ''}>
+                  <h2 className="text-sm font-bold text-[var(--text-primary)] truncate break-all mt-0.5" title={pageUrl ?? ''}>
                     {pageUrl ? truncateUrl(pageUrl, 35) : '--'}
                   </h2>
                 </div>
@@ -266,14 +266,14 @@ export default function PageDetailDrawer({ isOpen, onClose, pageUrl, siteUrl }: 
                     <ExternalLink className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
+                <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-white/[0.06] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {isLoading && <DrawerSkeleton />}
 
               {error && (
@@ -286,7 +286,7 @@ export default function PageDetailDrawer({ isOpen, onClose, pageUrl, siteUrl }: 
               {data && !isLoading && (
                 <div className="space-y-6">
                   {/* Summary Stats */}
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <MiniMetricCard label="Clicks" value={fmtNum(totalClicks)} color="emerald" />
                     <MiniMetricCard label="Impressions" value={fmtNum(totalImpressions)} color="cyan" />
                     <MiniMetricCard label="Avg Pos" value={avgPosition?.toString() ?? '--'} color={avgPosition && avgPosition <= 10 ? 'emerald' : 'amber'} />
@@ -328,7 +328,7 @@ export default function PageDetailDrawer({ isOpen, onClose, pageUrl, siteUrl }: 
                     {sortedKeywords.length === 0 ? (
                       <p className="text-xs text-[var(--text-muted)] text-center py-6">No keywords found</p>
                     ) : (
-                      <div className="border border-white/[0.04] rounded-xl overflow-hidden">
+                      <div className="border border-white/[0.04] rounded-xl overflow-hidden overflow-x-auto">
                         {/* Table Header */}
                         <div className="grid grid-cols-[1fr_55px_55px_50px_50px] gap-1 px-3 py-2 bg-white/[0.02] border-b border-white/[0.04]">
                           <button onClick={() => handleSort('query')} className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium hover:text-[var(--text-secondary)] transition text-left">
@@ -425,7 +425,7 @@ export default function PageDetailDrawer({ isOpen, onClose, pageUrl, siteUrl }: 
                   {/* Quick Actions */}
                   <div className="border-t border-[var(--card-border)] pt-4">
                     <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Quick Actions</h3>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <ActionButton
                         icon={ScanSearch}
                         label="Audit Page"
@@ -504,7 +504,7 @@ function ActionButton({ icon: Icon, label, color, onClick }: { icon: React.Eleme
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] rounded-xl text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+      className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] rounded-xl text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
     >
       <Icon className={`w-3.5 h-3.5 ${color}`} />
       {label}

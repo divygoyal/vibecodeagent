@@ -141,7 +141,7 @@ function Hero() {
                     initial={{ opacity: 0, x: -40 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex flex-col gap-8 order-1 text-center lg:text-left"
+                    className="flex flex-col gap-4 sm:gap-6 lg:gap-8 order-1 text-center lg:text-left"
                 >
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium w-fit mx-auto lg:mx-0 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
                         <span className="relative flex h-2 w-2">
@@ -160,21 +160,21 @@ function Hero() {
                         </span>
                     </h1>
 
-                    <p className="text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0 font-light">
+                    <p className="text-sm sm:text-base lg:text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0 font-light">
                         The only SEO tool where you can chat with AI about <span className="text-white font-medium">your own</span> Google Analytics & Search Console data. Get verdicts, not generic advice.
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-4">
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                            className="group px-8 min-h-[48px] h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
+                            className="group px-5 sm:px-8 min-h-[44px] h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
                         >
                             Try Free — 10 AI Messages Included
                             <ArrowRight className="inline-block ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
                         <a
                             href="#ai-demo"
-                            className="px-8 min-h-[48px] h-14 text-[15px] font-medium text-zinc-300 border border-white/10 rounded-xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 w-full sm:w-auto flex items-center justify-center backdrop-blur-sm whitespace-nowrap"
+                            className="px-5 sm:px-8 min-h-[44px] h-14 text-[15px] font-medium text-zinc-300 border border-white/10 rounded-xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 w-full sm:w-auto flex items-center justify-center backdrop-blur-sm whitespace-nowrap"
                         >
                             See AI in Action
                         </a>
@@ -512,7 +512,7 @@ function Features() {
                         <motion.div
                             key={feature.title}
                             variants={fadeUp}
-                            className="group relative p-6 rounded-2xl bg-white/[0.02] backdrop-blur border border-white/[0.04] hover:border-emerald-500/15 transition-all duration-300"
+                            className="group relative p-4 sm:p-6 rounded-2xl bg-white/[0.02] backdrop-blur border border-white/[0.04] hover:border-emerald-500/15 transition-all duration-300"
                         >
                             {/* Icon */}
                             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
@@ -636,7 +636,7 @@ function InteractiveDemo() {
 
                     <div className="relative bg-[#050508] border border-white/[0.08] rounded-2xl overflow-hidden">
                         {/* Dashboard header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
+                        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-white/[0.04]">
                             <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                                 <span className="text-sm font-medium text-white">
@@ -660,7 +660,7 @@ function InteractiveDemo() {
                                     transition={{ duration: 0.2 }}
                                 >
                                     {/* KPI Cards */}
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6">
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 sm:p-6">
                                         <KPICard label="Active Users" value="24,582" change="+22.4%" positive />
                                         <KPICard label="Search Clicks" value="8,965" change="+18.7%" positive />
                                         <KPICard label="Avg Position" value="7.1" change="-0.4%" positive />
@@ -668,7 +668,7 @@ function InteractiveDemo() {
                                     </div>
 
                                     {/* Charts row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6 pb-6">
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-4 sm:px-6 pb-4 sm:pb-6">
                                         {/* Traffic chart - spans 2 cols */}
                                         <div className="lg:col-span-2 bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
                                             <div className="flex items-center justify-between mb-4">
@@ -746,8 +746,8 @@ function InteractiveDemo() {
                                     </div>
 
                                     {/* Top Queries table */}
-                                    <div className="px-6 pb-6">
-                                        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
+                                    <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                                        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-3 sm:p-5">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-sm font-medium text-white">Top Search Queries</h3>
                                                 <span className="text-xs text-emerald-400 flex items-center gap-1">
@@ -793,7 +793,7 @@ function InteractiveDemo() {
                                     className="relative"
                                 >
                                     {/* Globe view — exact clone of realtime page layout */}
-                                    <div className="relative h-[400px] sm:h-[500px] lg:h-[600px] overflow-hidden">
+                                    <div className="relative h-[280px] sm:h-[400px] lg:h-[600px] overflow-hidden">
                                         {/* Mapbox GL Globe */}
                                         <div className="absolute inset-0">
                                             <RealtimeMapbox
@@ -1383,7 +1383,7 @@ function Testimonials() {
                         <motion.div
                             key={i}
                             variants={fadeUp}
-                            className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
+                            className="p-4 sm:p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
                         >
                             <div className="flex gap-0.5 mb-4">
                                 {Array.from({ length: review.stars }).map((_, j) => (
@@ -1495,7 +1495,7 @@ function Pricing() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
 
                     {/* ── STARTER ── */}
-                    <motion.div variants={fadeUp} className="relative p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/[0.2] transition-all duration-300 group">
+                    <motion.div variants={fadeUp} className="relative p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/[0.2] transition-all duration-300 group">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400/20 to-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                             <Zap className="w-5 h-5 text-cyan-400" />
                         </div>
@@ -1503,19 +1503,19 @@ function Pricing() {
                         <p className="text-xs text-zinc-500 mb-5">Perfect for personal sites & side projects</p>
 
                         <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-3xl sm:text-4xl font-bold text-white">$9</span>
+                            <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">$9</span>
                             <span className="text-sm text-zinc-500">/mo</span>
                         </div>
                         <div className="text-sm text-cyan-400 font-medium mb-6">50 AI credits/month</div>
 
                         <button onClick={() => handleCheckout('pdt_0NaLMLyWwiO355QaGlQwq')}
-                            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-6 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2] cursor-pointer">
+                            className="w-full py-2.5 sm:py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-6 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2] cursor-pointer">
                             Get Starter
                         </button>
 
                         <ul className="space-y-3">
                             {['50 AI messages per month', 'Full SEO & analytics dashboard', 'Site audit reports', 'AI content tools'].map((f, i) => (
-                                <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-400">
+                                <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-zinc-600" />
                                     {f}
                                 </li>
@@ -1524,7 +1524,7 @@ function Pricing() {
                     </motion.div>
 
                     {/* ── GROWTH (highlighted) ── */}
-                    <motion.div variants={fadeUp} className="relative p-6 rounded-2xl border-2 border-emerald-500/[0.3] bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.03] to-transparent transition-all duration-300 group md:-mt-2 md:mb-[-8px]">
+                    <motion.div variants={fadeUp} className="relative p-4 sm:p-6 rounded-2xl border-2 border-emerald-500/[0.3] bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.03] to-transparent transition-all duration-300 group md:-mt-2 md:mb-[-8px]">
                         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[10px] font-bold text-black uppercase tracking-wider shadow-lg shadow-emerald-500/20">
                             Most Popular
                         </div>
@@ -1535,7 +1535,7 @@ function Pricing() {
                         <p className="text-xs text-zinc-500 mb-5">For growing businesses & content teams</p>
 
                         <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">$19</span>
+                            <span className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">$19</span>
                             <span className="text-sm text-zinc-500">/mo</span>
                         </div>
                         <div className="flex items-center gap-2 mb-6">
@@ -1544,13 +1544,13 @@ function Pricing() {
                         </div>
 
                         <button onClick={() => handleCheckout('pdt_0NaLMM1bLW9wAbmxcsebm')}
-                            className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all duration-200 mb-6 block text-center cursor-pointer">
+                            className="w-full py-2.5 sm:py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all duration-200 mb-6 block text-center cursor-pointer">
                             Get Growth
                         </button>
 
                         <ul className="space-y-3">
                             {['150 AI messages per month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence', 'AI visibility tracking', 'AEO optimization tools'].map((f, i) => (
-                                <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
+                                <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
                                     {f}
                                 </li>
@@ -1559,7 +1559,7 @@ function Pricing() {
                     </motion.div>
 
                     {/* ── PRO (best value) ── */}
-                    <motion.div variants={fadeUp} className="relative p-6 pt-8 rounded-2xl border border-violet-500/[0.15] bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.03] to-transparent hover:border-violet-500/[0.3] transition-all duration-300 group">
+                    <motion.div variants={fadeUp} className="relative p-4 sm:p-6 pt-8 rounded-2xl border border-violet-500/[0.15] bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.03] to-transparent hover:border-violet-500/[0.3] transition-all duration-300 group">
                         <div className="absolute -top-3.5 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20 z-10">
                             Best Value
                         </div>
@@ -1573,7 +1573,7 @@ function Pricing() {
                             <p className="text-xs text-zinc-500 mb-5">For agencies & power users — everything unlocked</p>
 
                             <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">$29</span>
+                                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">$29</span>
                                 <span className="text-sm text-zinc-500">/mo</span>
                             </div>
                             <div className="flex items-center gap-2 mb-6">
@@ -1582,7 +1582,7 @@ function Pricing() {
                             </div>
 
                             <button onClick={() => handleCheckout('pdt_0NaLMM4r23kncRahthuyj')}
-                                className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-200 mb-6 block text-center cursor-pointer">
+                                className="w-full py-2.5 sm:py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-200 mb-6 block text-center cursor-pointer">
                                 Get Pro
                             </button>
 
@@ -1601,7 +1601,7 @@ function Pricing() {
 
                             <ul className="space-y-3">
                                 {['300 AI messages per month', 'Everything in Growth', 'Priority support', 'Custom content strategies', 'Early access to new features'].map((f, i) => (
-                                    <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
+                                    <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                         <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-violet-400" />
                                         {f}
                                     </li>
@@ -1665,7 +1665,7 @@ function StatsBar() {
 
     return (
         <section className="py-16 px-4 sm:px-6 border-y border-white/[0.04]">
-            <div className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
                 {stats.map((stat, i) => (
                     <div key={i} ref={stat.ref} className="text-center">
                         <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
@@ -1732,7 +1732,7 @@ function HowItWorks() {
                     {/* Connecting line */}
                     <div className="hidden lg:block absolute top-[60px] left-[calc(16.67%+20px)] right-[calc(16.67%+20px)] h-[2px] bg-gradient-to-r from-emerald-500/30 via-cyan-500/30 to-violet-500/30" />
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                         {steps.map((step, i) => (
                             <motion.div
                                 key={step.step}
@@ -1876,7 +1876,7 @@ function WhoItsFor() {
                             <motion.div
                                 key={i}
                                 variants={fadeUp}
-                                className={`p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${p.bg} hover:border-white/[0.12] transition-all group`}
+                                className={`p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${p.bg} hover:border-white/[0.12] transition-all group`}
                             >
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-white/[0.06]`}>
                                     <Icon className={`w-5 h-5 ${p.color}`} />
@@ -2030,13 +2030,13 @@ function FAQ() {
                         >
                             <button
                                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                                className="w-full flex items-center justify-between px-6 py-5 text-left"
+                                className="w-full flex items-center justify-between px-4 py-3 sm:px-6 sm:py-5 text-left"
                             >
                                 <span className="text-sm font-medium text-white pr-4">{faq.q}</span>
                                 <ChevronRight className={`w-4 h-4 text-zinc-500 flex-shrink-0 transition-transform duration-200 ${openIndex === i ? 'rotate-90' : ''}`} />
                             </button>
                             {openIndex === i && (
-                                <div className="px-6 pb-5 -mt-1">
+                                <div className="px-4 pb-4 sm:px-6 sm:pb-5 -mt-1">
                                     <p className="text-sm text-zinc-400 leading-relaxed">{faq.a}</p>
                                 </div>
                             )}
@@ -2058,7 +2058,7 @@ function FinalCTA() {
             <div className="max-w-4xl mx-auto text-center">
                 <motion.div
                     variants={fadeUp}
-                    className="relative p-12 sm:p-16 rounded-3xl overflow-hidden"
+                    className="relative p-6 sm:p-12 lg:p-16 rounded-3xl overflow-hidden"
                 >
                     {/* Background gradient */}
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.1] via-cyan-500/[0.05] to-violet-500/[0.1]" />
@@ -2084,7 +2084,7 @@ function FinalCTA() {
                         </p>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                            className="group px-10 py-4 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
+                            className="group px-6 sm:px-10 py-3 sm:py-4 min-h-[44px] text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
                         >
                             Start Free — Connect with Google
                             <ArrowRight className="inline-block ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -2118,7 +2118,7 @@ function StickyMobileCTA() {
         <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-black/90 backdrop-blur-xl border-t border-white/[0.06] px-4 py-3 safe-area-bottom">
             <button
                 onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                className="w-full py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl flex items-center justify-center gap-2"
+                className="w-full py-3 min-h-[44px] text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl flex items-center justify-center gap-2"
             >
                 Start Free — No Credit Card
                 <ArrowRight className="w-4 h-4" />
@@ -2194,7 +2194,7 @@ function ContactSection() {
                         </p>
                         <button
                             onClick={() => setStatus('idle')}
-                            className="px-6 py-2.5 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
+                            className="px-6 py-2.5 min-h-[44px] text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
                         >
                             Send another message
                         </button>
@@ -2203,7 +2203,7 @@ function ContactSection() {
                     <motion.form
                         variants={fadeUp}
                         onSubmit={handleSubmit}
-                        className="p-6 sm:p-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] space-y-5"
+                        className="p-4 sm:p-6 lg:p-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] space-y-5"
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                             <div>
@@ -2268,7 +2268,7 @@ function ContactSection() {
                             <button
                                 type="submit"
                                 disabled={status === 'sending'}
-                                className="w-full sm:w-auto px-8 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                                className="w-full sm:w-auto px-5 sm:px-8 py-3 min-h-[44px] text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                             >
                                 {status === 'sending' ? (
                                     <>
@@ -2310,7 +2310,7 @@ function Footer() {
                     <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">Featured on</span>
                     <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
                         <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
-                            <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" className="max-w-full h-auto" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
+                            <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" className="max-w-[200px] sm:max-w-none h-auto" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
                         </a>
                         {/* Add more directory badges here as you submit:
                         <a href="https://betalist.com/..." target="_blank" rel="noopener noreferrer">
@@ -2321,7 +2321,7 @@ function Footer() {
                 </div>
 
                 {/* Footer Links */}
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between md:gap-6">
                     <div className="flex items-center gap-2">
                         <img src="/icon.svg" alt="TrafficClaw" className="w-6 h-6 rounded-md" />
                         <span className="text-sm font-bold text-white">
@@ -2329,7 +2329,7 @@ function Footer() {
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-6 text-sm text-zinc-500">
+                    <div className="flex items-center gap-3 sm:gap-6 text-sm text-zinc-500">
                         <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
                         <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
                         <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>

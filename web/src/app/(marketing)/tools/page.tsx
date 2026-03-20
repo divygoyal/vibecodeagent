@@ -91,13 +91,13 @@ export default function ToolsIndexPage() {
                 initial="hidden"
                 animate="visible"
                 variants={stagger}
-                className="max-w-4xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-5"
+                className="max-w-4xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5"
             >
                 {tools.map((tool) => (
                     <motion.div key={tool.href} variants={fadeUp}>
                         <Link
                             href={tool.href}
-                            className={`group block rounded-2xl border border-white/[0.06] bg-gradient-to-br ${tool.gradient} p-6 hover:border-white/[0.12] transition-all duration-300 hover:scale-[1.02]`}
+                            className={`group block rounded-2xl border border-white/[0.06] bg-gradient-to-br ${tool.gradient} p-4 sm:p-6 hover:border-white/[0.12] transition-all duration-300 hover:scale-[1.02]`}
                         >
                             <div className="flex items-start gap-4">
                                 <div className={`p-2.5 rounded-xl bg-white/[0.06] ${tool.iconColor}`}>
@@ -127,14 +127,14 @@ export default function ToolsIndexPage() {
                 transition={{ delay: 0.6, duration: 0.6 }}
                 className="max-w-4xl mx-auto text-center px-6 mt-16"
             >
-                <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 p-8">
-                    <h2 className="text-2xl font-bold mb-2">Want deeper insights?</h2>
+                <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 p-4 sm:p-8">
+                    <h2 className="text-xl sm:text-2xl font-bold mb-2">Want deeper insights?</h2>
                     <p className="text-zinc-400 mb-5">
                         Connect Google Analytics & Search Console for AI-powered recommendations.
                     </p>
                     <Link
                         href="/pricing"
-                        className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg hover:opacity-90 transition-opacity"
                     >
                         Sign up for free <ArrowRight className="w-4 h-4" />
                     </Link>

@@ -44,7 +44,7 @@ function KPICardInner({
 
   if (loading && !showValue) {
     return (
-      <Link href={href} className="kpi-card-skeleton bg-zinc-900/60 border border-white/[0.06] rounded-2xl p-5" aria-label={`Loading ${label}`}>
+      <Link href={href} className="kpi-card-skeleton bg-zinc-900/60 border border-white/[0.06] rounded-2xl p-3 sm:p-5" aria-label={`Loading ${label}`}>
         <div className="flex justify-between mb-3">
           <Skeleton className="w-10 h-10 rounded-xl" />
           <Skeleton className="w-14 h-5 rounded-full" />
@@ -73,7 +73,7 @@ function KPICardInner({
     <div className="relative group h-full">
       <Link
         href={href}
-        className="relative block h-full bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-all duration-500"
+        className="relative block h-full bg-[#0a0a12]/80 border border-white/[0.06] rounded-2xl p-3 sm:p-5 hover:border-white/[0.12] transition-all duration-500"
         aria-label={`${label}: ${showValue ? displayValue : 'No data'}${change !== undefined ? `, ${change > 0 ? '+' : ''}${change}% change` : ''}`}
       >
         {/* Subtle gradient glow on hover — clipped to card bounds */}
@@ -112,7 +112,7 @@ function KPICardInner({
         </div>
 
         {/* Value */}
-        <div className="text-[26px] font-extrabold text-[var(--text-primary)] mb-0.5 font-mono tracking-tight relative">
+        <div className="text-xl sm:text-[26px] font-extrabold text-[var(--text-primary)] mb-0.5 font-mono tracking-tight relative">
           {displayValue}
         </div>
 

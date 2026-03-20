@@ -169,10 +169,10 @@ export default function KeywordDetailDrawer({ isOpen, onClose, keyword, siteUrl 
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-lg z-50 bg-[var(--card-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
+            className="fixed right-0 top-0 bottom-0 w-full sm:max-w-lg z-50 bg-[var(--card-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto"
           >
             {/* Header */}
-            <div className="sticky top-0 bg-[var(--card-bg)] backdrop-blur-md border-b border-[var(--card-border)] px-6 py-4 flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-[var(--card-bg)] backdrop-blur-md border-b border-[var(--card-border)] px-4 sm:px-6 py-4 flex items-center justify-between z-10">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
                   <Search className="w-4 h-4 text-cyan-400" />
@@ -187,13 +187,13 @@ export default function KeywordDetailDrawer({ isOpen, onClose, keyword, siteUrl 
                   </span>
                 )}
               </div>
-              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
+              <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-white/[0.06] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {isLoading && <DrawerSkeleton />}
 
               {error && (
@@ -348,7 +348,7 @@ export default function KeywordDetailDrawer({ isOpen, onClose, keyword, siteUrl 
                   {/* Quick Actions */}
                   <div className="border-t border-[var(--card-border)] pt-4">
                     <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Quick Actions</h3>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <ActionButton
                         icon={Target}
                         label="Track Keyword"
@@ -426,7 +426,7 @@ function ActionButton({ icon: Icon, label, color, onClick }: { icon: React.Eleme
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] rounded-xl text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+      className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] rounded-xl text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
     >
       <Icon className={`w-3.5 h-3.5 ${color}`} />
       {label}

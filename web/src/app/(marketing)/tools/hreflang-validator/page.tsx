@@ -101,9 +101,9 @@ export default function HreflangValidatorPage() {
                         <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-400">
                             <Globe className="w-5 h-5" />
                         </div>
-                        <h1 className="text-3xl font-bold">Hreflang Validator</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold">Hreflang Validator</h1>
                     </div>
-                    <p className="text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
                         Validate international targeting with hreflang tag checks.
                     </p>
                 </motion.div>
@@ -114,21 +114,21 @@ export default function HreflangValidatorPage() {
                     initial="hidden"
                     animate="visible"
                     variants={fadeUp}
-                    className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-8"
+                    className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6 mb-8"
                 >
                     <label className="block text-sm font-medium text-zinc-300 mb-2">Page URL</label>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                         <input
                             type="url"
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
                             placeholder="https://example.com/page"
-                            className="flex-1 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                            className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
                         />
                         <button
                             type="submit"
                             disabled={loading || !url.trim()}
-                            className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             <Search className="w-4 h-4" /> Validate
                         </button>
@@ -146,7 +146,7 @@ export default function HreflangValidatorPage() {
                 {result && (
                     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="space-y-6">
                         {/* Source info */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-lg font-semibold">Hreflang Tags Found</h2>
                                 <span className="text-xs px-2.5 py-1 rounded-full bg-white/[0.06] text-zinc-400 capitalize">
@@ -188,7 +188,7 @@ export default function HreflangValidatorPage() {
                         </motion.div>
 
                         {/* Validation Checks */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-4">Validation Checks</h2>
                             <div className="space-y-2">
                                 {result.checks.map((check, i) => (
@@ -209,7 +209,7 @@ export default function HreflangValidatorPage() {
 
                         {/* Issues */}
                         {result.issues.length > 0 && (
-                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                                 <h2 className="text-lg font-semibold mb-4">Issues</h2>
                                 <div className="space-y-2">
                                     {result.issues.map((issue, i) => (

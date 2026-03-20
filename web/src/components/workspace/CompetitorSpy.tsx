@@ -69,7 +69,7 @@ function TrendIcon({ winner, side }: { winner: 'a' | 'b' | 'tie'; side: 'a' | 'b
 
 function ShimmerCard() {
     return (
-        <div className="glass-card rounded-2xl p-6 space-y-4 animate-pulse">
+        <div className="glass-card rounded-2xl p-4 sm:p-6 space-y-4 animate-pulse">
             <div className="h-5 w-40 rounded bg-white/[0.06]" />
             <div className="space-y-3">
                 {[1, 2, 3, 4].map(i => (
@@ -208,9 +208,9 @@ export default function CompetitorSpy() {
     const overallWinner = winsA > winsB ? 'a' : winsB > winsA ? 'b' : 'tie';
 
     return (
-        <div className="premium-card rounded-2xl p-6">
+        <div className="premium-card rounded-2xl p-4 sm:p-6">
             {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4 sm:mb-6">
                 <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 border border-violet-500/10">
                     <Users className="w-5 h-5 text-violet-400" />
                 </div>
@@ -221,7 +221,7 @@ export default function CompetitorSpy() {
             </div>
 
             {/* Domain Inputs */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 mb-4 sm:mb-6">
                 <div className="flex-1">
                     <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">Your Domain</label>
                     <div className="relative">
@@ -231,7 +231,7 @@ export default function CompetitorSpy() {
                             value={domainA}
                             onChange={(e) => setDomainA(e.target.value)}
                             placeholder="yoursite.com"
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all"
+                            className="w-full pl-10 pr-4 py-2.5 min-h-[44px] rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all"
                             onKeyDown={(e) => e.key === 'Enter' && handleCompare()}
                         />
                     </div>
@@ -250,7 +250,7 @@ export default function CompetitorSpy() {
                             value={domainB}
                             onChange={(e) => setDomainB(e.target.value)}
                             placeholder="competitor.com"
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all"
+                            className="w-full pl-10 pr-4 py-2.5 min-h-[44px] rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all"
                             onKeyDown={(e) => e.key === 'Enter' && handleCompare()}
                         />
                     </div>
@@ -259,7 +259,7 @@ export default function CompetitorSpy() {
                 <button
                     onClick={handleCompare}
                     disabled={loading || !domainA.trim() || !domainB.trim()}
-                    className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/10"
+                    className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/10"
                 >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                     Compare
@@ -294,7 +294,7 @@ export default function CompetitorSpy() {
             {resultA && resultB && (
                 <div className="space-y-6">
                     {/* Score Comparison */}
-                    <div className="glass-card rounded-2xl p-5">
+                    <div className="glass-card rounded-2xl p-4 sm:p-5">
                         <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Score Comparison</h4>
 
                         {/* Column headers */}
@@ -343,7 +343,7 @@ export default function CompetitorSpy() {
 
                     {/* Technology Overlap */}
                     {(sharedTech.length > 0 || uniqueToA.length > 0 || uniqueToB.length > 0) && (
-                        <div className="premium-card rounded-2xl p-5">
+                        <div className="premium-card rounded-2xl p-4 sm:p-5">
                             <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Technology Stack</h4>
 
                             {sharedTech.length > 0 && (
@@ -391,7 +391,7 @@ export default function CompetitorSpy() {
 
                     {/* Keyword Gap */}
                     {allKeywords.length > 0 && (
-                        <div className="premium-card rounded-2xl p-5">
+                        <div className="premium-card rounded-2xl p-4 sm:p-5">
                             <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Keyword Gap Analysis</h4>
 
                             <div className="space-y-1.5 mb-4">

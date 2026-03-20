@@ -153,9 +153,9 @@ export default function ComparisonBuilderPage() {
                         <div className="p-2.5 rounded-xl bg-pink-500/10 text-pink-400">
                             <GitCompareArrows className="w-5 h-5" />
                         </div>
-                        <h1 className="text-3xl font-bold">Comparison Builder</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold">Comparison Builder</h1>
                     </div>
-                    <p className="text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
                         Generate professional comparison pages with structured data schema markup.
                     </p>
                 </motion.div>
@@ -163,19 +163,19 @@ export default function ComparisonBuilderPage() {
                 {/* Builder Form */}
                 <motion.div initial="hidden" animate="visible" variants={fadeUp} className="space-y-6">
                     {/* Title */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                         <label className="block text-sm font-medium text-zinc-300 mb-2">Comparison Title</label>
                         <input
                             type="text"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="e.g., Best Project Management Tools 2026"
-                            className="w-full px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                            className="w-full px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
                         />
                     </div>
 
                     {/* Products */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold">Products / Items</h2>
                             <button
@@ -218,7 +218,7 @@ export default function ComparisonBuilderPage() {
                     </div>
 
                     {/* Features */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold">Comparison Features</h2>
                             <button
@@ -283,7 +283,7 @@ export default function ComparisonBuilderPage() {
                     <button
                         onClick={handleGenerate}
                         disabled={!isValid}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className="w-full py-3 min-h-[44px] rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                         Generate Comparison
                     </button>
@@ -298,7 +298,7 @@ export default function ComparisonBuilderPage() {
                         className="mt-8 space-y-6"
                     >
                         {/* Preview Table */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-4">Preview</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm border-collapse">
@@ -325,7 +325,7 @@ export default function ComparisonBuilderPage() {
                         </motion.div>
 
                         {/* Schema Markup */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-3">
                                 <button
                                     onClick={() => setShowSchema(!showSchema)}
@@ -350,7 +350,7 @@ export default function ComparisonBuilderPage() {
                         </motion.div>
 
                         {/* HTML Output */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-3">
                                 <button
                                     onClick={() => setShowHTML(!showHTML)}

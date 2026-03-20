@@ -178,15 +178,15 @@ export default function ReadabilityCheckerPage() {
                         <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">
                             <BookOpen className="w-5 h-5" />
                         </div>
-                        <h1 className="text-3xl font-bold">Readability Checker</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold">Readability Checker</h1>
                     </div>
-                    <p className="text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
                         Analyze content readability using the Flesch-Kincaid scoring system.
                     </p>
                 </motion.div>
 
                 {/* Input */}
-                <motion.div initial="hidden" animate="visible" variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-8">
+                <motion.div initial="hidden" animate="visible" variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6 mb-8">
                     {/* Tab toggle */}
                     <div className="flex gap-1 p-1 rounded-lg bg-white/[0.04] w-fit mb-5">
                         <button
@@ -205,18 +205,18 @@ export default function ReadabilityCheckerPage() {
 
                     <form onSubmit={handleSubmit}>
                         {mode === 'url' ? (
-                            <div className="flex gap-3">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <input
                                     type="url"
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
                                     placeholder="https://example.com/blog-post"
-                                    className="flex-1 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                    className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
                                 />
                                 <button
                                     type="submit"
                                     disabled={loading || !url.trim()}
-                                    className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     <Search className="w-4 h-4" /> Analyze
                                 </button>
@@ -233,7 +233,7 @@ export default function ReadabilityCheckerPage() {
                                 <button
                                     type="submit"
                                     disabled={!text.trim()}
-                                    className="mt-3 px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="mt-3 min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     <Search className="w-4 h-4" /> Analyze
                                 </button>
@@ -253,7 +253,7 @@ export default function ReadabilityCheckerPage() {
                 {result && (
                     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="space-y-6">
                         {/* Score + Rating */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                             <div className="flex flex-col sm:flex-row items-center gap-6">
                                 <ScoreRing score={result.score} />
                                 <div className="text-center sm:text-left">
@@ -282,7 +282,7 @@ export default function ReadabilityCheckerPage() {
 
                         {/* Recommendations */}
                         {result.recommendations.length > 0 && (
-                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
                                 <h2 className="text-lg font-semibold mb-3">Recommendations</h2>
                                 <ul className="space-y-2">
                                     {result.recommendations.map((rec, i) => (

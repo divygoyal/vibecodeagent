@@ -105,12 +105,12 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ duration: 0.3 }}
-        className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-6 shadow-2xl"
+        className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 sm:p-6 mx-4 sm:mx-0 shadow-2xl"
       >
         {/* Close button */}
         <button
           onClick={onDismiss}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition-all"
+          className="absolute top-4 right-4 p-2 w-10 h-10 flex items-center justify-center rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition-all"
         >
           <X className="w-4 h-4" />
         </button>
@@ -126,7 +126,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
             transition={{ duration: 0.4 }}
           >
             <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+              <h3 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
                 What do you want to achieve?
               </h3>
               <p className="text-sm text-[var(--text-secondary)]">
@@ -147,7 +147,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
                     whileTap={{ scale: 0.97 }}
                     animate={isSelected ? { scale: 1.02 } : { scale: 1 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    className={`premium-card rounded-xl p-5 text-left transition-all cursor-pointer ${
+                    className={`premium-card rounded-xl p-4 sm:p-5 text-left transition-all cursor-pointer ${
                       isSelected
                         ? 'border-emerald-500/50 ring-2 ring-emerald-500/20'
                         : 'hover:border-[var(--card-border-hover)]'
@@ -178,7 +178,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
               <button
                 onClick={handleContinue}
                 disabled={selectedGoals.length === 0}
-                className="bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold px-8 py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 flex items-center gap-2"
+                className="bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold px-8 py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 flex items-center gap-2 w-full sm:w-auto justify-center min-h-[44px]"
               >
                 Continue
                 <ChevronRight className="w-4 h-4" />
@@ -197,7 +197,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
             transition={{ duration: 0.4 }}
           >
             <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+              <h3 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
                 Your Personalized SEO Action Plan
               </h3>
               <p className="text-sm text-[var(--text-secondary)]">
@@ -243,7 +243,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
                         {items.map((item) => (
                           <div
                             key={item.id}
-                            className="premium-card rounded-xl p-4 flex items-start gap-3"
+                            className="premium-card rounded-xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3"
                           >
                             <div className={`w-2 h-2 rounded-full ${config.dot} mt-1.5 shrink-0`} />
                             <div className="flex-1 min-w-0">
@@ -286,7 +286,7 @@ export function OnboardingFunnel({ data, onComplete, onDismiss }: OnboardingFunn
             <div className="flex items-center justify-center gap-4 mt-8">
               <button
                 onClick={handleComplete}
-                className="bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold px-8 py-3 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
+                className="bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold px-8 py-3 rounded-xl hover:opacity-90 transition-all flex items-center gap-2 w-full sm:w-auto justify-center min-h-[44px]"
               >
                 Start Working
                 <ArrowRight className="w-4 h-4" />

@@ -347,9 +347,9 @@ export default function SiteCrawler() {
     const pagesNeedingWork = donePages.filter(p => (p.score ?? 100) < 80).length;
 
     return (
-        <div className="premium-card rounded-2xl p-6">
+        <div className="premium-card rounded-2xl p-4 sm:p-6">
             {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4 sm:mb-6">
                 <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/10">
                     <Bug className="w-5 h-5 text-orange-400" />
                 </div>
@@ -360,7 +360,7 @@ export default function SiteCrawler() {
             </div>
 
             {/* Input Section */}
-            <div className="glass-card rounded-xl p-4 mb-6">
+            <div className="glass-card rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                     <div className="flex-1">
                         <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">Domain</label>
@@ -372,7 +372,7 @@ export default function SiteCrawler() {
                                 onChange={(e) => setDomain(e.target.value)}
                                 placeholder="example.com"
                                 disabled={crawling}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all disabled:opacity-50"
+                                className="w-full pl-10 pr-4 py-2.5 min-h-[44px] rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all disabled:opacity-50"
                                 onKeyDown={(e) => e.key === 'Enter' && !crawling && startCrawl()}
                             />
                         </div>
@@ -384,7 +384,7 @@ export default function SiteCrawler() {
                             value={pageLimit}
                             onChange={(e) => setPageLimit(Number(e.target.value))}
                             disabled={crawling}
-                            className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all disabled:opacity-50 appearance-none cursor-pointer"
+                            className="w-full px-3 py-2.5 min-h-[44px] rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all disabled:opacity-50 appearance-none cursor-pointer"
                         >
                             <option value={5}>5 pages</option>
                             <option value={10}>10 pages</option>
@@ -396,7 +396,7 @@ export default function SiteCrawler() {
                         <button
                             onClick={completed ? reCrawl : startCrawl}
                             disabled={!domain.trim()}
-                            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/10"
+                            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/10"
                         >
                             {completed ? (
                                 <>
@@ -413,7 +413,7 @@ export default function SiteCrawler() {
                     ) : (
                         <button
                             onClick={cancelCrawl}
-                            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/20 transition-all"
+                            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/20 transition-all"
                         >
                             Cancel
                         </button>
@@ -479,7 +479,7 @@ export default function SiteCrawler() {
 
             {/* Sort Options */}
             {donePages.length > 1 && (
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
                     <span className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider">Sort by:</span>
                     {([
                         { key: 'score' as SortMode, label: 'Worst Score' },

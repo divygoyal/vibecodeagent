@@ -63,7 +63,7 @@ export default function SettingsPage() {
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 text-xs font-medium rounded-lg transition-all capitalize ${
+                        className={`px-4 py-2.5 min-h-[44px] text-xs font-medium rounded-lg transition-all capitalize ${
                             activeTab === tab
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                 : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
@@ -76,7 +76,7 @@ export default function SettingsPage() {
 
             {activeTab === 'account' && (<>
             {/* Profile */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
                 <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Profile</h2>
                 <div className="flex items-center gap-4">
                     {session?.user?.image ? (
@@ -123,7 +123,7 @@ export default function SettingsPage() {
             <ReferralSection email={session?.user?.email || ''} />
 
             {/* Danger Zone */}
-            <div className="bg-red-500/[0.03] border border-red-500/[0.1] rounded-2xl p-6">
+            <div className="bg-red-500/[0.03] border border-red-500/[0.1] rounded-2xl p-4 sm:p-6">
                 <h2 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-4">Danger Zone</h2>
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -133,7 +133,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             onClick={() => signOut({ callbackUrl: '/' })}
-                            className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 border border-red-500/[0.2] rounded-xl hover:bg-red-500/[0.08] transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] text-sm text-red-400 border border-red-500/[0.2] rounded-xl hover:bg-red-500/[0.08] transition-colors"
                         >
                             <LogOut className="w-3.5 h-3.5" />
                             Sign Out
@@ -146,7 +146,7 @@ export default function SettingsPage() {
 
             {activeTab === 'notifications' && (<>
             {/* Notification Preferences */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
                 <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Notifications</h2>
                 <div className="space-y-4">
                     <NotificationRow label="SEO Alerts" description="Position drops, crawl errors, new keyword opportunities" checked={notifications.seoAlerts} onChange={() => toggleNotification('seoAlerts')} />
@@ -158,7 +158,7 @@ export default function SettingsPage() {
 
             {/* Browser Push Notifications */}
             {isPushSupported() && (
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
                     <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <BellRing className="w-3.5 h-3.5" />
                         Browser Push Notifications
@@ -216,7 +216,7 @@ function ReferralSection({ email }: { email: string }) {
     };
 
     return (
-        <div className="bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] border border-emerald-500/[0.15] rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] border border-emerald-500/[0.15] rounded-2xl p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-3">
                 <Gift className="w-4 h-4 text-emerald-400" />
                 <h2 className="text-sm font-semibold text-white">Invite Friends, Earn Credits</h2>
@@ -230,7 +230,7 @@ function ReferralSection({ email }: { email: string }) {
                 </div>
                 <button
                     onClick={copyLink}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition"
+                    className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition"
                 >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     {copied ? 'Copied!' : 'Copy'}

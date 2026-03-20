@@ -541,7 +541,7 @@ export default function DashboardOverview() {
                     a.click();
                     URL.revokeObjectURL(url);
                   }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-xs sm:text-sm"
                 >
                   <FileDown className="w-4 h-4" />
                   Export Report
@@ -550,7 +550,7 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* Real-time Active Users */}
             {activeUsers !== null && (
               <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-500/[0.06] border border-emerald-500/[0.12] rounded-xl backdrop-blur-sm">
@@ -568,7 +568,7 @@ export default function DashboardOverview() {
             <button
               onClick={() => !isInit && setDropdownOpen(!dropdownOpen)}
               disabled={isInit}
-              className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm rounded-lg pl-3 pr-3 py-2 hover:border-[var(--card-hover)] focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 outline-none min-w-[220px] transition-all disabled:opacity-50"
+              className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm rounded-lg pl-3 pr-3 py-2 hover:border-[var(--card-hover)] focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 outline-none w-full sm:w-auto sm:min-w-[220px] transition-all disabled:opacity-50"
               aria-label="Select website"
               aria-expanded={dropdownOpen}
               aria-haspopup="listbox"
@@ -625,8 +625,8 @@ export default function DashboardOverview() {
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.03] via-transparent to-cyan-500/[0.03] animate-shimmer" />
             <div className="relative flex flex-col md:flex-row md:items-center gap-4">
               <div className="flex items-center gap-4 flex-1">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/10">
-                  <BarChart3 className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/10">
+                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-[var(--text-primary)]">Connect Google Analytics &amp; Search Console</h3>
@@ -690,7 +690,7 @@ export default function DashboardOverview() {
 
       {!isEmptyShell && (<>
       {/* ═══ 1. KPI GRID — Top of visual hierarchy ═══ */}
-      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Key metrics">
+      <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4" role="region" aria-label="Key metrics">
         <KPICard
           loading={isRef && !hasData}
           icon={Users}

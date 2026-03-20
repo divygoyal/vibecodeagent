@@ -66,8 +66,8 @@ export default function KeywordResearch() {
   };
 
   return (
-    <div className="premium-card rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="premium-card rounded-2xl p-4 sm:p-6">
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
           <Search className="w-5 h-5 text-violet-400" />
         </div>
@@ -78,7 +78,7 @@ export default function KeywordResearch() {
       </div>
 
       {/* Input Section */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 sm:mb-6">
         <div className="flex-1 glass-card rounded-xl p-3 flex items-center gap-3">
           <Target className="w-4 h-4 text-emerald-400 shrink-0" />
           <input
@@ -87,7 +87,7 @@ export default function KeywordResearch() {
             onChange={(e) => setSeedKeyword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Enter a seed keyword..."
-            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none"
+            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none min-h-[44px]"
           />
         </div>
         <div className="sm:w-48 glass-card rounded-xl p-3 flex items-center gap-3">
@@ -98,13 +98,13 @@ export default function KeywordResearch() {
             onChange={(e) => setDomain(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Domain (optional)"
-            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none"
+            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none min-h-[44px]"
           />
         </div>
         <button
           onClick={handleSearch}
           disabled={!seedKeyword.trim() || isLoading}
-          className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 justify-center shrink-0"
+          className="w-full sm:w-auto min-h-[44px] px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 justify-center shrink-0"
         >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           Research
@@ -120,7 +120,7 @@ export default function KeywordResearch() {
 
       {/* Intent Filter Tabs */}
       {keywords.length > 0 && (
-        <div className="flex items-center gap-1 mb-4 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-1 mb-4 overflow-x-auto pb-1">
           <Filter className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 mr-1" />
           {INTENT_TABS.map((tab) => (
             <button
@@ -156,8 +156,8 @@ export default function KeywordResearch() {
                 <th className="pb-3 pl-4 font-medium">Keyword</th>
                 <th className="pb-3 font-medium">Volume</th>
                 <th className="pb-3 font-medium">Difficulty</th>
-                <th className="pb-3 font-medium">Intent</th>
-                <th className="pb-3 font-medium">Content Type</th>
+                <th className="pb-3 font-medium hidden sm:table-cell">Intent</th>
+                <th className="pb-3 font-medium hidden md:table-cell">Content Type</th>
                 <th className="pb-3 pr-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
@@ -188,12 +188,12 @@ export default function KeywordResearch() {
                         {kw.difficulty}
                       </span>
                     </td>
-                    <td className="py-3">
+                    <td className="py-3 hidden sm:table-cell">
                       <span className={`text-xs font-medium ${intentColor[kw.intent] || 'text-[var(--text-secondary)]'}`}>
                         {kw.intent}
                       </span>
                     </td>
-                    <td className="py-3">
+                    <td className="py-3 hidden md:table-cell">
                       <span className="text-xs text-[var(--text-muted)]">{kw.contentType}</span>
                     </td>
                     <td className="py-3 pr-4 text-right" onClick={(e) => e.stopPropagation()}>

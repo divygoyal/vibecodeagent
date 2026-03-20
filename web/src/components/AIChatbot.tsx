@@ -65,8 +65,8 @@ const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming
     const isUser = msg.role === 'user';
     return (
         <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-            <div className={`${isExpanded ? 'max-w-[75%]' : 'max-w-[88%]'} text-sm leading-relaxed ${isUser
-                ? 'bg-white/[0.07] text-zinc-100 rounded-[20px] rounded-br-md px-4 py-3'
+            <div className={`${isExpanded ? 'max-w-[90%] sm:max-w-[75%]' : 'max-w-[88%]'} text-sm leading-relaxed ${isUser
+                ? 'bg-white/[0.07] text-zinc-100 rounded-[20px] rounded-br-md px-3 py-2.5 sm:px-4 sm:py-3'
                 : 'text-zinc-300 px-1 py-1'
                 }`}>
                 {msg.role === 'assistant' ? (
@@ -505,7 +505,7 @@ export default function AIChatbot() {
                 aria-label="Open AI chat"
             >
                 <div className="relative">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 via-cyan-400 to-teal-400 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all hover:scale-110 flex items-center justify-center">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-emerald-400 via-cyan-400 to-teal-400 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all hover:scale-110 flex items-center justify-center">
                         <Sparkles className="w-6 h-6 text-black group-hover:rotate-12 transition-transform" />
                     </div>
                     <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
@@ -520,8 +520,8 @@ export default function AIChatbot() {
 
     // ─── Chat window ───
     return (
-        <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-6 right-6 w-[440px] h-[640px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[var(--sidebar-bg)] border border-[var(--card-border)] rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
+        <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-0 right-0 w-full h-full sm:bottom-6 sm:right-6 sm:w-[440px] sm:h-[640px]'} transition-all duration-300`}>
+            <div className="w-full h-full bg-[var(--sidebar-bg)] border border-[var(--card-border)] rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
                 {/* ── Header ── */}
                 <div className="px-4 py-3 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--header-bg)]">
                     <div className="flex items-center gap-2.5">
@@ -530,7 +530,7 @@ export default function AIChatbot() {
                             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[var(--header-bg)]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-semibold text-white leading-none">AI Analyst</h3>
+                            <h3 className="text-sm sm:text-base font-semibold text-white leading-none">AI Analyst</h3>
                             {/* Site selector inline */}
                             <div className="relative">
                                 <button
@@ -652,7 +652,7 @@ export default function AIChatbot() {
                                     key={i}
                                     onClick={() => sendMessage(prompt)}
                                     disabled={!dataReady}
-                                    className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-500 disabled:hover:border-white/[0.04] disabled:hover:bg-white/[0.02]"
+                                    className="text-xs px-3 py-2 sm:text-[11px] sm:px-2.5 sm:py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-500 disabled:hover:border-white/[0.04] disabled:hover:bg-white/[0.02]"
                                 >
                                     {prompt}
                                 </button>
@@ -683,7 +683,7 @@ export default function AIChatbot() {
                         <button
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}
-                            className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200 flex-shrink-0"
+                            className="w-10 h-10 sm:w-8 sm:h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200 flex-shrink-0"
                             aria-label="Send message"
                         >
                             <Send className="w-3.5 h-3.5" />
