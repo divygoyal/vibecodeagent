@@ -40,10 +40,10 @@ export default function TableActionMenu({ actions, size = 'sm' }: TableActionMen
         <div ref={ref} className="relative inline-flex">
             <button
                 onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-                className={`action-menu inline-flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.06] ${size === 'sm' ? 'w-7 h-7' : 'w-8 h-8'}`}
+                className={`action-menu group inline-flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.06] ${size === 'sm' ? 'w-7 h-7' : 'w-8 h-8'}`}
                 aria-label="Actions"
             >
-                <MoreHorizontal className={`${iconSize} text-zinc-500`} />
+                <MoreHorizontal className={`${iconSize} text-[var(--text-secondary)] opacity-60 group-hover:opacity-100 transition-opacity`} />
             </button>
 
             {open && (

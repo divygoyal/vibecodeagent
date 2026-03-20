@@ -93,11 +93,11 @@ export default function ActionButtonsRow({ domain, auditUrl }: ActionButtonsRowP
             </div>
             <div>
               <p
-                className={`text-sm font-semibold text-zinc-200 transition-colors ${hoverTextMap[action.color]}`}
+                className={`text-sm font-semibold text-[var(--text-primary)] transition-colors ${hoverTextMap[action.color]}`}
               >
                 {action.title}
               </p>
-              <p className="text-[11px] text-zinc-500">{action.subtitle}</p>
+              <p className="text-xs text-[var(--text-secondary)]">{action.subtitle}</p>
             </div>
           </motion.div>
         )

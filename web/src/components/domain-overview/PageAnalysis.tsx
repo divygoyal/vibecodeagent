@@ -49,7 +49,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
         <div className="py-3">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Title</span>
+              <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Title</span>
               {meta.title ? (
                 <span className={`text-[11px] font-medium ${charColor(meta.title.length, 60, 70)}`}>
                   {meta.title.length} chars
@@ -67,7 +67,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
                 : `Add a title tag for ${domain}. The page currently has no title tag set.`}
             />
           </div>
-          <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed break-all">
+          <p className="text-sm text-[var(--text-primary)] leading-relaxed break-all">
             {meta.title || <span className="italic text-red-400/80">No title tag set</span>}
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
         <div className="py-3">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Description</span>
+              <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Description</span>
               {meta.description ? (
                 <span className={`text-[11px] font-medium ${charColor(meta.description.length, 160, 180)}`}>
                   {meta.description.length} chars
@@ -96,7 +96,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
                 : `Add a meta description for ${domain}. The page currently has no meta description.`}
             />
           </div>
-          <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed line-clamp-3 break-all">
+          <p className="text-sm text-[var(--text-primary)] leading-relaxed line-clamp-3 break-all">
             {meta.description || <span className="italic text-red-400/80">No meta description set</span>}
           </p>
         </div>
@@ -105,8 +105,8 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
 
         {/* Canonical */}
         <div className="py-3">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Canonical</span>
-          <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed break-all font-mono mt-1">
+          <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Canonical</span>
+          <p className="text-sm text-[var(--text-primary)] leading-relaxed break-all font-mono mt-1">
             {meta.canonical || <span className="italic text-red-400/80 font-sans">No canonical URL set</span>}
           </p>
         </div>
@@ -117,10 +117,15 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-[var(--text-muted)]/30 transition-colors"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
+                detail: { question: `Analyze the ${s.label} metric for ${domain}. Current value: ${s.value}. Is this good? How can it be improved?` }
+              }))
+            }}
+            className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] cursor-pointer hover:border-emerald-500/30 transition-colors"
           >
-            <p className="text-xl font-semibold text-[var(--text-primary)]">{s.value}</p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">{s.label}</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{s.value}</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">{s.label}</p>
           </div>
         ))}
       </div>

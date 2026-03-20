@@ -28,8 +28,8 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
     <div className="premium-card rounded-2xl p-6">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
-        <Target className="h-4 w-4 text-zinc-400" />
-        <h3 className="text-sm font-semibold text-zinc-200">Keyword Opportunities</h3>
+        <Target className="h-4 w-4 text-[var(--text-secondary)]" />
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Keyword Opportunities</h3>
       </div>
 
       <div className="overflow-x-auto -mx-6">
@@ -39,7 +39,7 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
               {['Keyword', 'Volume', 'Difficulty', 'Intent', 'Content Type', ''].map((h) => (
                 <th
                   key={h || 'actions'}
-                  className="px-6 py-2.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500"
+                  className="px-6 py-2.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]"
                 >
                   {h}
                 </th>
@@ -54,19 +54,29 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
                 <Fragment key={kw.keyword}>
                   <tr
                     onClick={() => setExpandedKeyword(expanded ? null : kw.keyword)}
-                    className="table-row-premium border-b border-white/[0.03] hover:bg-white/[0.02] cursor-pointer transition-colors"
+                    className="table-row-premium border-b border-white/[0.03] hover:bg-[var(--card-bg)] cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-2">
                         {expanded ? (
-                          <ChevronUp className="h-3 w-3 text-zinc-500 shrink-0" />
+                          <ChevronUp className="h-3 w-3 text-[var(--text-secondary)] shrink-0" />
                         ) : (
-                          <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
+                          <ChevronDown className="h-3 w-3 text-[var(--text-secondary)] shrink-0" />
                         )}
-                        <span className="text-xs text-zinc-300">{kw.keyword}</span>
+                        <span
+                          className="text-sm text-[var(--text-primary)] hover:text-emerald-400 cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
+                              detail: { question: `Analyze the keyword "${kw.keyword}" for ${domain}. Volume: ${kw.volume}, Difficulty: ${kw.difficulty}, Intent: ${kw.intent}. What's the best strategy to target this keyword?` }
+                            }))
+                          }}
+                        >
+                          {kw.keyword}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-6 py-3 text-xs text-zinc-400">
+                    <td className="px-6 py-3 text-sm font-medium text-[var(--text-primary)]">
                       {kw.volume.toLocaleString()}
                     </td>
                     <td className={`px-6 py-3 text-xs font-medium ${db.text}`}>
@@ -75,7 +85,7 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
                     <td className={`px-6 py-3 text-xs font-medium ${intentColor(kw.intent)}`}>
                       {kw.intent}
                     </td>
-                    <td className="px-6 py-3 text-xs text-zinc-400">{kw.contentType}</td>
+                    <td className="px-6 py-3 text-sm text-[var(--text-secondary)]">{kw.contentType}</td>
                     <td className="px-6 py-3">
                       <TableActionMenu
                         actions={[
@@ -115,10 +125,10 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
                           transition={{ duration: 0.2 }}
                           className="pl-7"
                         >
-                          <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-1">
+                          <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-1">
                             Why this keyword?
                           </p>
-                          <p className="text-xs text-zinc-500">{kw.reason}</p>
+                          <p className="text-sm text-[var(--text-secondary)]">{kw.reason}</p>
                         </motion.div>
                       </td>
                     </tr>

@@ -22,12 +22,17 @@ const categories = [
 export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
   const geo = data.geoReadiness
 
+  const handleCategoryClick = (label: string, score: number) => {
+    const question = `How can I improve my "${label}" score for AI search readiness (GEO)? Current score: ${score}/100. Give me specific, actionable steps.`
+    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question } }))
+  }
+
   return (
     <div className="premium-card rounded-2xl p-6">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Brain className="h-4 w-4 text-zinc-400" />
-        <h3 className="text-sm font-semibold text-zinc-200">AI Search Readiness (GEO)</h3>
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">AI Search Readiness (GEO)</h3>
       </div>
 
       {geo ? (
@@ -39,17 +44,22 @@ export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
               {categories.map(({ key, label, weight }) => {
                 const cat = geo.categories[key]
                 return (
-                  <div key={key}>
+                  <button
+                    key={key}
+                    onClick={() => handleCategoryClick(label, cat.score)}
+                    className="block w-full text-left cursor-pointer hover:bg-white/[0.02] rounded-lg p-1 -m-1 transition-colors"
+                    title={`Click to ask AI about improving ${label}`}
+                  >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-zinc-300">
+                      <span className="text-sm text-[var(--text-primary)]">
                         {label}{' '}
-                        <span className="text-zinc-600 text-[10px]">({weight})</span>
+                        <span className="text-xs text-[var(--text-secondary)]">({weight})</span>
                       </span>
-                      <span className={`text-xs font-semibold ${geoTextColor(cat.score)}`}>
+                      <span className={`text-sm font-semibold ${geoTextColor(cat.score)}`}>
                         {cat.score}
                       </span>
                     </div>
-                    <div className="h-1 w-full rounded-full bg-white/[0.04]">
+                    <div className="h-1.5 w-full rounded-full bg-white/[0.04]">
                       <motion.div
                         className={`h-full rounded-full ${geoBarColor(cat.score)}`}
                         initial={{ width: 0 }}
@@ -57,7 +67,7 @@ export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
                         transition={{ duration: 0.8, ease: 'easeOut' }}
                       />
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -71,14 +81,14 @@ export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
 
               return (
                 <div key={key} className="space-y-1.5">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                  <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                     {label}
                   </p>
                   <ul className="space-y-1">
                     {cat.findings.map((finding, i) => (
                       <li key={i} className="flex items-start gap-1.5">
-                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-600" />
-                        <span className="text-[11px] text-zinc-500">{finding}</span>
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-500" />
+                        <span className="text-sm text-[var(--text-secondary)]">{finding}</span>
                       </li>
                     ))}
                   </ul>

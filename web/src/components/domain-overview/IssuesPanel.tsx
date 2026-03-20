@@ -14,10 +14,10 @@ interface Props {
 }
 
 const dotColor: Record<string, string> = {
-  critical: 'text-red-500',
-  warning: 'text-amber-500',
-  info: 'text-blue-500',
-  passed: 'text-emerald-500',
+  critical: 'text-red-400',
+  warning: 'text-amber-400',
+  info: 'text-blue-400',
+  passed: 'text-emerald-400',
 }
 
 export function IssuesPanel({ data, domain, auditUrl }: Props) {
@@ -40,7 +40,7 @@ export function IssuesPanel({ data, domain, auditUrl }: Props) {
           Top Issues
         </h3>
         {totalCount > 0 && (
-          <span className="text-xs font-medium text-[var(--text-muted)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-md px-2 py-0.5">
+          <span className="text-xs font-medium text-[var(--text-secondary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-md px-2 py-0.5">
             {totalCount}
           </span>
         )}
@@ -71,24 +71,23 @@ export function IssuesPanel({ data, domain, auditUrl }: Props) {
                       ? setExpandedId(isExpanded ? null : issue.id)
                       : undefined
                   }
-                  className="w-full text-left py-3 group"
+                  className="w-full text-left py-3 group hover:bg-[var(--card-bg)] rounded-lg px-2 -mx-2 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2.5 min-w-0">
-                      <span className={`mt-1 text-[10px] leading-none ${color}`}>
-                        ●
-                      </span>
+                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 inline-block ${color.replace('text-', 'bg-')}`} />
+
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-[var(--text-primary)]">
                           {issue.title}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">
+                        <p className="text-xs text-[var(--text-secondary)] mt-0.5 line-clamp-1">
                           {issue.description}
                         </p>
                       </div>
                     </div>
                     {!isPassed && (
-                      <span className="shrink-0 text-xs text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                      <span className="shrink-0 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors mt-0.5">
                         Fix&nbsp;&rarr;
                       </span>
                     )}
@@ -98,7 +97,7 @@ export function IssuesPanel({ data, domain, auditUrl }: Props) {
                 {/* Expanded recommendation */}
                 {isExpanded && issue.recommendation && (
                   <div className="pb-3 pl-5">
-                    <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-2">
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-2">
                       {issue.recommendation}
                     </p>
                     <FixWithBotButton

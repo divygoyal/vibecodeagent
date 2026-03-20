@@ -8,9 +8,9 @@ interface Props { data: DomainOverviewData; domain: string }
 type Level = 'good' | 'mid' | 'bad'
 
 function statusColor(level: Level) {
-  if (level === 'good') return { text: 'text-emerald-500', bar: 'bg-emerald-500' }
-  if (level === 'mid') return { text: 'text-amber-500', bar: 'bg-amber-500' }
-  return { text: 'text-red-500', bar: 'bg-red-500' }
+  if (level === 'good') return { text: 'text-emerald-400', bar: 'bg-emerald-500' }
+  if (level === 'mid') return { text: 'text-amber-400', bar: 'bg-amber-500' }
+  return { text: 'text-red-400', bar: 'bg-red-500' }
 }
 
 function scoreTier(s: number): { label: string; level: Level } {
@@ -32,23 +32,32 @@ function loadTier(s: number): { label: string; level: Level } {
 }
 
 const ActionLink = ({ label }: { label: string }) => (
-  <span className="text-xs font-medium text-emerald-500 hover:text-emerald-400 transition-colors cursor-pointer">
+  <span className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer">
     {label} &rarr;
   </span>
 )
 
-const Card = ({ children }: { children: React.ReactNode }) => (
-  <div className="premium-card rounded-2xl p-6 flex flex-col justify-between gap-4">{children}</div>
+const Card = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
+  <div
+    onClick={onClick}
+    className="premium-card rounded-2xl p-6 flex flex-col justify-between gap-4 cursor-pointer hover:border-[var(--card-hover)] transition-colors"
+  >
+    {children}
+  </div>
 )
 
 const Bar = ({ value, max, level }: { value: number; max: number; level: Level }) => (
-  <div className="w-full h-[3px] rounded-full bg-[var(--border-primary)] overflow-hidden">
+  <div className="w-full h-1.5 rounded-full bg-[var(--border-primary)] overflow-hidden">
     <div
       className={`h-full rounded-full ${statusColor(level).bar} transition-all duration-700`}
       style={{ width: `${max > 0 ? Math.min((value / max) * 100, 100) : 0}%` }}
     />
   </div>
 )
+
+function askAI(prompt: string) {
+  window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { message: prompt } }))
+}
 
 export function ScoreOverviewRow({ data }: Props) {
   const seoScore = data.audit?.score ?? 0
@@ -64,7 +73,7 @@ export function ScoreOverviewRow({ data }: Props) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      <Card>
+      <Card onClick={() => askAI(`My SEO health score is ${seoScore}/100 (${seo.label}). How can I improve my SEO health?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">SEO Health</p>
           <div className="flex items-center gap-4 mb-3">
@@ -77,7 +86,7 @@ export function ScoreOverviewRow({ data }: Props) {
         <ActionLink label="Improve" />
       </Card>
 
-      <Card>
+      <Card onClick={() => askAI(`My performance score is ${perfScore}/100 (${perf.label}). How can I boost my page speed?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">Performance</p>
           <p className="text-4xl font-bold text-[var(--text-primary)] mb-3">{perfScore}</p>
@@ -87,20 +96,20 @@ export function ScoreOverviewRow({ data }: Props) {
         <ActionLink label="Boost Speed" />
       </Card>
 
-      <Card>
+      <Card onClick={() => askAI(`I have ${issueCount} issues: ${criticals} critical, ${warnings} warnings, ${infos} informational. How should I prioritize fixing these?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">Issues Found</p>
           <p className="text-4xl font-bold text-[var(--text-primary)] mb-3">{issueCount}</p>
           <p className="text-xs text-[var(--text-secondary)] font-mono">
-            <span className="text-red-500">{criticals}C</span>{' · '}
-            <span className="text-amber-500">{warnings}W</span>{' · '}
+            <span className="text-red-400">{criticals}C</span>{' · '}
+            <span className="text-amber-400">{warnings}W</span>{' · '}
             <span className="text-blue-400">{infos}I</span>
           </p>
         </div>
         <ActionLink label={criticals > 0 ? 'Fix Critical' : 'Fix All'} />
       </Card>
 
-      <Card>
+      <Card onClick={() => askAI(`My page load time is ${loadSec.toFixed(2)}s (${lt.label}). How can I speed up my site?`)}>
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] mb-4">Load Time</p>
           <p className="text-4xl font-bold text-[var(--text-primary)] mb-3">
