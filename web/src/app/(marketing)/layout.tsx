@@ -74,8 +74,8 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
             animate={{ y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={`fixed left-0 right-0 z-50 transition-all duration-300 ${scrolled
-                ? 'bg-black/80 backdrop-blur-xl border-b border-white/[0.04]'
-                : 'bg-transparent'
+                ? 'bg-black/90 backdrop-blur-xl border-b border-white/[0.06]'
+                : 'bg-black/60 backdrop-blur-md sm:bg-transparent'
                 }`}
             style={{ top: bannerVisible ? 40 : 0 }}
         >
