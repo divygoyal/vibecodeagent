@@ -62,6 +62,7 @@ const sidebarItems = [
     { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
     { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
     { icon: CreditCard, label: 'Plan', href: '/dashboard/plan' },
+    { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
 

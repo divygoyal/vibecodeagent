@@ -1,0 +1,803 @@
+'use client';
+
+import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+// ─── Types ───
+export interface GlobeVisitor {
+    id: string;
+    name: string;
+    country: string;
+    lat: number;
+    lng: number;
+    warmth: number;
+    avatarColor: string;
+    avatarInitial: string;
+}
+
+function getAvatarUrl(seed: string): string {
+    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
+}
+
+export interface RealtimeMapboxProps {
+    visitors: GlobeVisitor[];
+    byCountry?: { country: string; users: number }[];
+    byCity?: { city: string; country: string; users: number }[];
+    autoPan?: boolean;
+    onAutoPanChange?: (enabled: boolean) => void;
+}
+
+export interface RealtimeMapboxHandle {
+    toggleAutoPan: () => boolean;
+    isAutoPanning: () => boolean;
+}
+
+function getWarmthColor(warmth: number): string {
+    if (warmth > 0.6) return '#ef4444';
+    if (warmth > 0.4) return '#f97316';
+    if (warmth > 0.25) return '#eab308';
+    return '#3b82f6';
+}
+
+// ═══════════════════════════════════════════════════════
+// Custom WebGL Star Layer — renders stars on a sky sphere
+// at radius 200, just like Mapbox's setFog star-intensity.
+// Stars move naturally with camera rotation (pitch/bearing/center).
+// ═══════════════════════════════════════════════════════
+
+function createStarLayer(mapInstance: any) {
+    const NUM_STARS = 12000;
+    const RADIUS = 200;
+
+    let program: WebGLProgram | null = null;
+    let posBuffer: WebGLBuffer | null = null;
+    let attribBuffer: WebGLBuffer | null = null;
+    let uMatrix: WebGLUniformLocation | null = null;
+    let uIntensity: WebGLUniformLocation | null = null;
+    let uSizeMult: WebGLUniformLocation | null = null;
+    let aPos = -1, aSize = -1, aOpacity = -1;
+
+    // Seeded PRNG (same as Mapbox's mulberry32)
+    function mulberry32(seed: number) {
+        return () => {
+            seed |= 0;
+            seed = (seed + 0x6D2B79F5) | 0;
+            let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function generateStars() {
+        const rand = mulberry32(42);
+        const positions = new Float32Array(NUM_STARS * 3);
+        const attributes = new Float32Array(NUM_STARS * 2);
+        for (let i = 0; i < NUM_STARS; i++) {
+            const theta = rand() * Math.PI * 2;
+            const phi = Math.acos(2 * rand() - 1);
+            positions[i * 3] = RADIUS * Math.sin(phi) * Math.cos(theta);
+            positions[i * 3 + 1] = RADIUS * Math.sin(phi) * Math.sin(theta);
+            positions[i * 3 + 2] = RADIUS * Math.cos(phi);
+            const r = rand();
+            if (r < 0.55) {
+                attributes[i * 2] = rand() * 0.5 + 0.3;        // size: 0.3-0.8
+                attributes[i * 2 + 1] = rand() * 0.2 + 0.6;      // opacity: 0.6-0.8
+            } else if (r < 0.82) {
+                attributes[i * 2] = rand() * 0.6 + 0.7;        // size: 0.7-1.3
+                attributes[i * 2 + 1] = rand() * 0.2 + 0.7;    // opacity: 0.7-0.9
+            } else {
+                attributes[i * 2] = rand() * 0.6 + 1.2;        // size: 1.2-1.8
+                attributes[i * 2 + 1] = rand() * 0.1 + 0.9;    // opacity: 0.9-1.0
+            }
+        }
+        return { positions, attributes };
+    }
+
+    // ── Inline 4x4 matrix math (column-major, no gl-matrix dep) ──
+    function mat4Mul(a: Float32Array, b: Float32Array): Float32Array {
+        const o = new Float32Array(16);
+        for (let c = 0; c < 4; c++)
+            for (let r = 0; r < 4; r++)
+                o[c * 4 + r] =
+                    a[0 * 4 + r] * b[c * 4 + 0] +
+                    a[1 * 4 + r] * b[c * 4 + 1] +
+                    a[2 * 4 + r] * b[c * 4 + 2] +
+                    a[3 * 4 + r] * b[c * 4 + 3];
+        return o;
+    }
+    function rotX(a: number): Float32Array {
+        const c = Math.cos(a), s = Math.sin(a);
+        return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
+    }
+    function rotY(a: number): Float32Array {
+        const c = Math.cos(a), s = Math.sin(a);
+        return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
+    }
+    function rotZ(a: number): Float32Array {
+        const c = Math.cos(a), s = Math.sin(a);
+        return new Float32Array([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    }
+    function persp(fov: number, aspect: number, near: number, far: number): Float32Array {
+        const f = 1.0 / Math.tan(fov / 2), nf = 1 / (near - far);
+        return new Float32Array([f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0]);
+    }
+
+    return {
+        id: 'custom-stars',
+        type: 'custom' as const,
+        renderingMode: '3d' as const,
+
+        onAdd(_map: any, gl: WebGLRenderingContext) {
+            const vs = gl.createShader(gl.VERTEX_SHADER)!;
+            gl.shaderSource(vs, `
+                attribute vec3 a_pos;
+                attribute float a_size;
+                attribute float a_opacity;
+                uniform mat4 u_matrix;
+                uniform float u_size_mult;
+                varying float v_opacity;
+                void main() {
+                    gl_Position = u_matrix * vec4(a_pos, 1.0);
+                    gl_PointSize = a_size * u_size_mult;
+                    v_opacity = a_opacity;
+                }
+            `);
+            gl.compileShader(vs);
+
+            const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+            gl.shaderSource(fs, `
+                precision mediump float;
+                varying float v_opacity;
+                uniform float u_intensity;
+                void main() {
+                    float d = length(gl_PointCoord - vec2(0.5)) * 2.0;
+                    float alpha = 1.0 - smoothstep(0.6, 1.0, d);
+                    alpha *= v_opacity * u_intensity;
+                    gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+                }
+            `);
+            gl.compileShader(fs);
+
+            program = gl.createProgram()!;
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+
+            aPos = gl.getAttribLocation(program, 'a_pos');
+            aSize = gl.getAttribLocation(program, 'a_size');
+            aOpacity = gl.getAttribLocation(program, 'a_opacity');
+            uMatrix = gl.getUniformLocation(program, 'u_matrix');
+            uIntensity = gl.getUniformLocation(program, 'u_intensity');
+            uSizeMult = gl.getUniformLocation(program, 'u_size_mult');
+
+            const { positions, attributes } = generateStars();
+            posBuffer = gl.createBuffer()!;
+            gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+            attribBuffer = gl.createBuffer()!;
+            gl.bindBuffer(gl.ARRAY_BUFFER, attribBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, attributes, gl.STATIC_DRAW);
+        },
+
+        render(gl: WebGLRenderingContext, _matrix: any) {
+            if (!program) return;
+
+            const center = mapInstance.getCenter();
+            const pitch = mapInstance.getPitch() * Math.PI / 180;
+            const bearing = mapInstance.getBearing() * Math.PI / 180;
+            const zoom = mapInstance.getZoom();
+            const lat = center.lat * Math.PI / 180;
+            const lng = center.lng * Math.PI / 180;
+
+            // Match user's Mapbox config: star-intensity: 0.7
+            const intensity = zoom < 5 ? 1.15 : zoom < 7 ? 1.15 * (1 - (zoom - 5) / 2) : 0;
+            if (intensity <= 0) return;
+
+            const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
+
+            // MVP: perspective * rotX(-pitch) * rotZ(-bearing) * rotX(lat) * rotY(-lng)
+            let mvp = persp(0.6435, aspect, 1, 500);
+            mvp = mat4Mul(mvp, rotX(-pitch));
+            mvp = mat4Mul(mvp, rotZ(-bearing));
+            mvp = mat4Mul(mvp, rotX(lat));
+            mvp = mat4Mul(mvp, rotY(-lng));
+
+            gl.useProgram(program);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+            gl.enableVertexAttribArray(aPos);
+            gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, attribBuffer);
+            gl.enableVertexAttribArray(aSize);
+            gl.vertexAttribPointer(aSize, 1, gl.FLOAT, false, 8, 0);
+            gl.enableVertexAttribArray(aOpacity);
+            gl.vertexAttribPointer(aOpacity, 1, gl.FLOAT, false, 8, 4);
+
+            gl.uniformMatrix4fv(uMatrix, false, mvp);
+            gl.uniform1f(uIntensity, intensity);
+            gl.uniform1f(uSizeMult, 1.4);
+
+            // Premultiplied alpha blending (Mapbox style)
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+            gl.depthMask(false);
+            gl.disable(gl.DEPTH_TEST);
+
+            gl.drawArrays(gl.POINTS, 0, NUM_STARS);
+
+            // Restore GL state for MapLibre
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthMask(true);
+            gl.disableVertexAttribArray(aPos);
+            gl.disableVertexAttribArray(aSize);
+            gl.disableVertexAttribArray(aOpacity);
+        },
+
+        onRemove(_map: any, gl: WebGLRenderingContext) {
+            if (program) gl.deleteProgram(program);
+            if (posBuffer) gl.deleteBuffer(posBuffer);
+            if (attribBuffer) gl.deleteBuffer(attribBuffer);
+        },
+    };
+}
+
+// ═══════════════════════════════════════════════════
+// Fresnel atmosphere glow layer
+// ═══════════════════════════════════════════════════
+function createFresnelLayer(map: any) {
+    let program: WebGLProgram | null = null;
+    let vertexBuffer: WebGLBuffer | null = null;
+    let indexBuffer: WebGLBuffer | null = null;
+    let uCenter: WebGLUniformLocation | null = null;
+    let uRadius: WebGLUniformLocation | null = null;
+    let uResolution: WebGLUniformLocation | null = null;
+    let uIntensity: WebGLUniformLocation | null = null;
+    let uMode: WebGLUniformLocation | null = null;
+    let aPos: number = -1;
+
+    const VERT = `
+        attribute vec2 a_pos;
+        varying vec2 v_uv;
+        void main() {
+            v_uv = a_pos;
+            gl_Position = vec4(a_pos, 0.0, 1.0);
+        }
+    `;
+
+    const FRAG = `
+        precision highp float;
+        varying vec2 v_uv;
+        uniform vec2 u_center;
+        uniform float u_radius;
+        uniform vec2 u_resolution;
+        uniform float u_intensity;
+        uniform float u_mode;
+
+        void main() {
+            vec2 pixel = (v_uv * 0.5 + 0.5) * u_resolution;
+            float dist = length(pixel - u_center) / u_radius;
+
+            if (u_mode < 0.5) {
+                // === LIMB DARKENING PASS ===
+                if (dist >= 1.0) { discard; }
+                float darken = smoothstep(0.55, 1.0, dist);
+                darken *= darken;
+                float alpha = darken * 0.45 * u_intensity;
+                gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+            } else {
+                // === GLOW PASS — thin atmospheric rim ===
+                float inner = 0.0;
+                if (dist < 1.0) {
+                    inner = smoothstep(0.94, 1.0, dist);
+                    inner *= inner;
+                }
+                float outer = 0.0;
+                if (dist >= 1.0) {
+                    outer = exp(-(dist - 1.0) * 50.0) * 0.30;
+                }
+                float glow = (inner * 0.18 + outer * 0.07) * u_intensity;
+                vec3 color = vec3(0.5, 0.6, 0.82);
+                gl_FragColor = vec4(color * glow, glow);
+            }
+        }
+    `;
+
+    function compileShader(gl: WebGLRenderingContext, type: number, src: string) {
+        const s = gl.createShader(type)!;
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+    }
+
+    return {
+        id: 'fresnel-atmosphere',
+        type: 'custom' as const,
+        renderingMode: '2d' as const,
+
+        onAdd(_map: any, gl: WebGLRenderingContext) {
+            const vs = compileShader(gl, gl.VERTEX_SHADER, VERT);
+            const fs = compileShader(gl, gl.FRAGMENT_SHADER, FRAG);
+            program = gl.createProgram()!;
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+            gl.deleteShader(vs);
+            gl.deleteShader(fs);
+
+            aPos = gl.getAttribLocation(program, 'a_pos');
+            uCenter = gl.getUniformLocation(program, 'u_center');
+            uRadius = gl.getUniformLocation(program, 'u_radius');
+            uResolution = gl.getUniformLocation(program, 'u_resolution');
+            uIntensity = gl.getUniformLocation(program, 'u_intensity');
+            uMode = gl.getUniformLocation(program, 'u_mode');
+
+            // Full-screen quad in NDC
+            const verts = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]);
+            vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+            const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+            indexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+        },
+
+        render(gl: WebGLRenderingContext) {
+            if (!program) return;
+
+            // Zoom-based intensity: full below 3.5, fade to 0 by 5.5
+            const zoom = map.getZoom();
+            const intensity = zoom < 3.5 ? 1.0 : zoom > 5.5 ? 0.0 : 1.0 - (zoom - 3.5) / 2.0;
+            if (intensity <= 0) return;
+
+            const canvas = map.getCanvas();
+            const dpr = devicePixelRatio || 1;
+            const cx = canvas.clientWidth / 2;
+            const cy = canvas.clientHeight / 2;
+
+            // Estimate globe screen radius from 4 points at 30° offset
+            const center = map.getCenter();
+            const offsets = [
+                [30, 0], [-30, 0], [0, 30], [0, -30],
+            ] as const;
+            let totalDist = 0;
+            let validCount = 0;
+            for (const [dlat, dlng] of offsets) {
+                try {
+                    const p = map.project([center.lng + dlng, center.lat + dlat]);
+                    const dx = p.x - cx;
+                    const dy = p.y - cy;
+                    totalDist += Math.sqrt(dx * dx + dy * dy);
+                    validCount++;
+                } catch { /**/ }
+            }
+            if (validCount === 0) return;
+            const avgDist = totalDist / validCount;
+            const radius = avgDist / Math.sin((30 * Math.PI) / 180); // sin(30°) = 0.5
+
+            // Physical pixel coords for shader
+            const pxCenter = [cx * dpr, cy * dpr] as const;
+            const pxRadius = radius * dpr;
+            const resolution = [canvas.width, canvas.height] as const;
+
+            // Save GL state
+            const prevBlend = gl.getParameter(gl.BLEND);
+            const prevDepth = gl.getParameter(gl.DEPTH_TEST);
+            const prevSrcRGB = gl.getParameter(gl.BLEND_SRC_RGB);
+            const prevDstRGB = gl.getParameter(gl.BLEND_DST_RGB);
+
+            gl.useProgram(program);
+            gl.enable(gl.BLEND);
+            gl.disable(gl.DEPTH_TEST);
+
+            gl.uniform2f(uCenter, pxCenter[0], resolution[1] - pxCenter[1]); // flip Y
+            gl.uniform1f(uRadius, pxRadius);
+            gl.uniform2f(uResolution, resolution[0], resolution[1]);
+            gl.uniform1f(uIntensity, intensity);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.enableVertexAttribArray(aPos);
+            gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+            // --- Pass 1: Limb darkening ---
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.uniform1f(uMode, 0.0);
+            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+            // --- Pass 2: Edge glow ---
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+            gl.uniform1f(uMode, 1.0);
+            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+            // Restore GL state
+            gl.disableVertexAttribArray(aPos);
+            if (!prevBlend) gl.disable(gl.BLEND);
+            else gl.blendFunc(prevSrcRGB, prevDstRGB);
+            if (prevDepth) gl.enable(gl.DEPTH_TEST);
+        },
+
+        onRemove(_map: any, gl: WebGLRenderingContext) {
+            if (program) gl.deleteProgram(program);
+            if (vertexBuffer) gl.deleteBuffer(vertexBuffer);
+            if (indexBuffer) gl.deleteBuffer(indexBuffer);
+        },
+    };
+}
+
+// ═══════════════════════════════════════════════════
+// Cache Map + Marker constructors
+// ═══════════════════════════════════════════════════
+let _MapClass: any = null;
+let _MarkerClass: any = null;
+async function loadMapLibreGL() {
+    if (_MapClass) return;
+    const mod: any = await import('maplibre-gl');
+    _MapClass = mod.Map ?? mod.default?.Map ?? mod.default;
+    _MarkerClass = mod.Marker ?? mod.default?.Marker;
+}
+
+// ═══════════════════════════════════════════════════
+// Main component
+// ═══════════════════════════════════════════════════
+const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, autoPan: autoPanProp = false, onAutoPanChange }, ref) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<any>(null);
+    const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; lngLat: [number, number] }>>(new Map());
+    const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+    const [errorMsg, setErrorMsg] = useState('');
+    const retryCountRef = useRef(0);
+    const autoPanRef = useRef(autoPanProp);
+    const autoPanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const autoPanDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const visitorsRef = useRef(visitors);
+    const onAutoPanChangeRef = useRef(onAutoPanChange);
+    visitorsRef.current = visitors;
+    onAutoPanChangeRef.current = onAutoPanChange;
+
+    const stopAutoPan = useCallback(() => {
+        if (autoPanTimerRef.current) { clearInterval(autoPanTimerRef.current); autoPanTimerRef.current = null; }
+        if (autoPanDelayRef.current) { clearTimeout(autoPanDelayRef.current); autoPanDelayRef.current = null; }
+    }, []);
+
+    const startAutoPan = useCallback(() => {
+        stopAutoPan();
+        if (!mapRef.current) return;
+        autoPanTimerRef.current = setInterval(() => {
+            if (!autoPanRef.current || !mapRef.current) return;
+            const c = mapRef.current.getCenter();
+            mapRef.current.setCenter([c.lng + 0.3, c.lat]);
+        }, 50);
+    }, [stopAutoPan]);
+
+    useImperativeHandle(ref, () => ({
+        toggleAutoPan: () => {
+            autoPanRef.current = !autoPanRef.current;
+            if (autoPanRef.current) startAutoPan(); else stopAutoPan();
+            return autoPanRef.current;
+        },
+        isAutoPanning: () => autoPanRef.current,
+    }));
+
+    const initMap = useCallback(() => {
+        if (!containerRef.current) { setStatus('error'); setErrorMsg('Container not available'); return; }
+
+        let map: any;
+        let destroyed = false;
+        setStatus('loading');
+
+        (async () => {
+            try {
+                await loadMapLibreGL();
+                if (destroyed || !containerRef.current || !_MapClass) return;
+
+                while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
+
+                map = new _MapClass({
+                    container: containerRef.current,
+                    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                    center: [30, 25],
+                    zoom: 1.8,
+                    attributionControl: false,
+                    fadeDuration: 0,
+                    renderWorldCopies: false,
+                });
+
+                map.on('error', (e: any) => console.warn('MapLibre error:', e?.error?.message || 'Unknown'));
+
+                map.on('load', () => {
+                    if (destroyed) return;
+                    mapRef.current = map;
+                    setStatus('ready');
+                    retryCountRef.current = 0;
+
+                    const logo = containerRef.current?.querySelector('.maplibregl-ctrl-logo');
+                    if (logo) (logo as HTMLElement).style.display = 'none';
+                    const attrib = containerRef.current?.querySelector('.maplibregl-ctrl-attrib');
+                    if (attrib) (attrib as HTMLElement).style.display = 'none';
+
+                    if (autoPanRef.current) startAutoPan();
+                });
+
+                map.on('style.load', () => {
+                    if (destroyed) return;
+
+                    // Globe projection
+                    try { map.setProjection({ type: 'globe' }); } catch (e) { console.warn('setProjection:', e); }
+
+                    // Sky: all colors match space background, no atmosphere shader
+                    try {
+                        map.setSky({
+                            'sky-color': '#050507',
+                            'horizon-color': '#050507',
+                            'fog-color': '#050507',
+                            'fog-ground-blend': 1,
+                            'horizon-fog-blend': 1,
+                            'sky-horizon-blend': 0,
+                            'atmosphere-blend': 0,
+                        });
+                    } catch (e) { console.warn('setSky:', e); }
+
+
+                    // ── WebGL star layer (behind all map layers) ──
+                    try {
+                        const layers = map.getStyle().layers;
+                        const firstId = layers?.[0]?.id;
+                        map.addLayer(createStarLayer(map), firstId);
+                    } catch (e) { console.warn('star layer:', e); }
+
+                    // ── Fills: match Mapbox dark-v11 globe CENTER brightness ──
+                    // Fog handles edge-darkening; base fills match center
+                    try {
+                        const style = map.getStyle();
+                        if (style?.layers) {
+                            for (const layer of style.layers) {
+                                try {
+                                    if (layer.type === 'background') {
+                                        map.setPaintProperty(layer.id, 'background-color', '#292929');
+                                    } else if (layer.type === 'fill') {
+                                        if (layer.id.includes('water')) {
+                                            map.setPaintProperty(layer.id, 'fill-color', '#1E1E1F');
+                                        } else {
+                                            map.setPaintProperty(layer.id, 'fill-color', '#292929');
+                                        }
+                                    } else if (layer.type === 'line') {
+                                        if (layer.id.includes('boundary') || layer.id.includes('border')) {
+                                            map.setPaintProperty(layer.id, 'line-color', '#3d3d42');
+                                            map.setPaintProperty(layer.id, 'line-opacity', 0.5);
+                                        } else {
+                                            map.setPaintProperty(layer.id, 'line-color', '#333336');
+                                            map.setPaintProperty(layer.id, 'line-opacity', 0.35);
+                                        }
+                                    }
+                                } catch { /**/ }
+                            }
+                        }
+                    } catch { /**/ }
+
+                    // ── GeoJSON country borders (visible at globe zoom) ──
+                    try {
+                        const labelLayer = map.getStyle()?.layers?.find((l: any) => l.type === 'symbol');
+                        const beforeId = labelLayer?.id;
+                        map.addSource('countries-geo', {
+                            type: 'geojson',
+                            data: 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_admin_0_countries.geojson',
+                        });
+                        map.addLayer({
+                            id: 'country-borders-geo',
+                            type: 'line',
+                            source: 'countries-geo',
+                            paint: {
+                                'line-color': '#4a4a50',
+                                'line-width': 0.5,
+                                'line-opacity': 0.45,
+                            },
+                        }, beforeId);
+                    } catch (e) { console.warn('country borders:', e); }
+
+                    // ── GeoJSON state/province borders (visible at globe zoom) ──
+                    try {
+                        const labelLayer = map.getStyle()?.layers?.find((l: any) => l.type === 'symbol');
+                        const stateBeforeId = labelLayer?.id;
+                        map.addSource('states-geo', {
+                            type: 'geojson',
+                            data: 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_admin_1_states_provinces.geojson',
+                        });
+                        map.addLayer({
+                            id: 'state-borders-geo',
+                            type: 'line',
+                            source: 'states-geo',
+                            minzoom: 0,
+                            paint: {
+                                'line-color': '#424246',
+                                'line-width': 0.5,
+                                'line-opacity': 0.4,
+                            },
+                        }, stateBeforeId);
+                    } catch (e) { console.warn('state borders:', e); }
+
+                    // ── Labels: brightened to match Mapbox dark-v11 readability ──
+                    const labelFixes: Record<string, { color: string; hide?: boolean; spacing?: number }> = {
+                        place_continent: { color: '#4a4a50', spacing: 0.15 },
+                        place_country_1: { color: '#5a5a60' },
+                        place_country_2: { color: '#555558' },
+                        place_state: { color: '#4a4a50' },
+                        place_city_r6: { color: '#585860' },
+                        place_city_r5: { color: '#585860' },
+                        place_city_dot_r7: { color: '#555558' },
+                        place_city_dot_r4: { color: '#555558' },
+                        place_city_dot_r2: { color: '#555558' },
+                        place_city_dot_z7: { color: '#555558' },
+                        place_capital_dot_z7: { color: '#5a5a60' },
+                        place_town: { color: '#4a4a50' },
+                        place_villages: { hide: true, color: '#333' },
+                        place_suburbs: { hide: true, color: '#333' },
+                        place_hamlet: { hide: true, color: '#333' },
+                        watername_ocean: { color: '#58585f', spacing: 0.25 },
+                        watername_sea: { color: '#505058', spacing: 0.2 },
+                        watername_lake: { color: '#4a4a52' },
+                        watername_lake_line: { color: '#4a4a52' },
+                        waterway_label: { color: '#4a4a52' },
+                        place_island: { color: '#555558' },
+                        poi_stadium: { hide: true, color: '#2a2a2a' },
+                        poi_park: { hide: true, color: '#2a2a2a' },
+                        roadname_minor: { hide: true, color: '#2a2a2a' },
+                        roadname_sec: { color: '#4a4a50' },
+                        roadname_pri: { color: '#4a4a50' },
+                        roadname_major: { color: '#505055' },
+                        housenumber: { hide: true, color: '#2a2a2a' },
+                    };
+                    for (const [id, cfg] of Object.entries(labelFixes)) {
+                        try {
+                            map.setLayoutProperty(id, 'text-transform', 'none');
+                            map.setPaintProperty(id, 'text-color', cfg.color);
+                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.6)');
+                            map.setPaintProperty(id, 'text-halo-width', 0.8);
+                            if (cfg.spacing) map.setLayoutProperty(id, 'text-letter-spacing', cfg.spacing);
+                            if (cfg.hide) map.setLayoutProperty(id, 'visibility', 'none');
+                        } catch { /**/ }
+                    }
+                });
+
+                // ── Fresnel atmosphere glow (on top of all layers) ──
+                try {
+                    map.addLayer(createFresnelLayer(map));
+                } catch (e) { console.warn('fresnel layer:', e); }
+
+                const disableAutoPan = () => {
+                    if (autoPanRef.current) {
+                        stopAutoPan();
+                        autoPanRef.current = false;
+                        onAutoPanChangeRef.current?.(false);
+                    }
+                };
+                map.on('dragstart', disableAutoPan);
+                map.on('zoomstart', disableAutoPan);
+
+            } catch (err: any) {
+                console.warn('MapLibre init failed:', err?.message || err);
+                if (!destroyed) { setStatus('error'); setErrorMsg(err?.message || 'Failed to initialize map'); }
+            }
+        })();
+
+        return () => {
+            destroyed = true;
+            stopAutoPan();
+            markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
+            markersRef.current = new Map();
+            if (map) { try { map.remove(); } catch { /**/ } }
+            mapRef.current = null;
+        };
+    }, [startAutoPan, stopAutoPan]);
+
+    useEffect(() => { const cleanup = initMap(); return cleanup; }, [initMap]);
+
+    const createMarkerElement = useCallback((v: GlobeVisitor) => {
+        const warmthColor = getWarmthColor(v.warmth);
+        const avatarUrl = getAvatarUrl(v.name);
+
+        const el = document.createElement('div');
+        el.style.cssText = 'width:60px;height:60px;cursor:pointer;z-index:10;';
+        el.title = `${v.name} — ${v.country}`;
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:relative;width:100%;height:100%;';
+
+        const frame = document.createElement('div');
+        frame.style.cssText = `width:56px;height:56px;margin:2px;border-radius:50%;background:${v.avatarColor};border:2.5px solid rgba(255,255,255,0.25);box-shadow:0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${warmthColor}40;overflow:hidden;`;
+
+        const img = document.createElement('img');
+        img.src = avatarUrl;
+        img.alt = v.name;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        img.onerror = () => {
+            img.remove();
+            frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
+            frame.textContent = v.avatarInitial;
+        };
+        frame.appendChild(img);
+        wrapper.appendChild(frame);
+
+        const dot = document.createElement('div');
+        dot.style.cssText = `position:absolute;top:0;right:0;width:14px;height:14px;border-radius:50%;background:${warmthColor};border:3px solid rgba(8,12,24,0.95);z-index:2;box-shadow:0 0 8px ${warmthColor}80;`;
+        wrapper.appendChild(dot);
+        el.appendChild(wrapper);
+
+        el.onmouseenter = () => { frame.style.transform = 'scale(1.15)'; frame.style.transition = 'transform 0.2s ease'; };
+        el.onmouseleave = () => { frame.style.transform = ''; };
+
+        return el;
+    }, []);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || status !== 'ready' || !_MarkerClass || !_MapClass) return;
+        const currentMap = markersRef.current;
+        const newIds = new Set<string>();
+
+        visitors.forEach((v) => {
+            if (v.lat === 0 && v.lng === 0) return;
+            newIds.add(v.id);
+            const existing = currentMap.get(v.id);
+            if (existing) {
+                const [oldLng, oldLat] = existing.lngLat;
+                if (Math.abs(oldLng - v.lng) > 0.01 || Math.abs(oldLat - v.lat) > 0.01) {
+                    existing.marker.setLngLat([v.lng, v.lat]);
+                    existing.lngLat = [v.lng, v.lat];
+                }
+            } else {
+                const el = createMarkerElement(v);
+                const lngLat: [number, number] = [v.lng, v.lat];
+                const marker = new _MarkerClass({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map);
+                currentMap.set(v.id, { marker, el, lngLat });
+            }
+        });
+
+        for (const [id, entry] of currentMap) {
+            if (!newIds.has(id)) { try { entry.marker.remove(); } catch { /**/ } currentMap.delete(id); }
+        }
+    }, [visitors, status, createMarkerElement]);
+
+    const handleRetry = useCallback(() => {
+        retryCountRef.current++;
+        if (containerRef.current) while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
+        mapRef.current = null;
+        markersRef.current = new Map();
+        initMap();
+    }, [initMap]);
+
+    return (
+        <div className="w-full h-full relative" style={{ backgroundColor: '#06060e' }}>
+            <style>{`
+                .maplibregl-ctrl-logo { display: none !important; }
+                .maplibregl-ctrl-attrib { display: none !important; }
+            `}</style>
+            <div ref={containerRef} className="absolute inset-0" />
+            {status === 'loading' && (
+                <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#06060e' }}>
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                        <span className="text-zinc-500 text-sm">Loading globe...</span>
+                    </div>
+                </div>
+            )}
+            {status === 'error' && (
+                <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#06060e' }}>
+                    <div className="flex flex-col items-center gap-3 text-center px-4">
+                        <span className="text-zinc-400 text-sm">{errorMsg || 'Globe failed to load'}</span>
+                        <button onClick={handleRetry} className="px-4 py-2 text-sm bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition border border-emerald-500/20">Retry</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}));
+
+const RealtimeMapbox = forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapbox(props, ref) {
+    return <RealtimeMapboxInner {...props} ref={ref} />;
+});
+
+export default RealtimeMapbox;
