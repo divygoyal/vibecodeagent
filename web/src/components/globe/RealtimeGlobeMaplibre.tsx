@@ -338,10 +338,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 map.on('style.load', () => {
                     if (destroyed) return;
 
-                    // Globe projection (MapLibre 5.x requires ProjectionSpecification object)
+                    // Critical: globe projection + sky (fast, must be sync)
                     try { map.setProjection({ type: 'globe' }); } catch (e) { console.warn('setProjection:', e); }
-
-                    // Sky: no atmosphere, clean globe edge
                     try {
                         map.setSky({
                             'sky-color': '#06060e',
@@ -352,38 +350,36 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                             'sky-horizon-blend': 0,
                             'atmosphere-blend': 0,
                         });
-                    } catch (e) { console.warn('setSky:', e); }
+                    } catch { /**/ }
 
-
-                    // ── WebGL star layer (behind all map layers) ──
+                    // Star layer (behind everything)
                     try {
                         const layers = map.getStyle().layers;
                         const firstId = layers?.[0]?.id;
                         map.addLayer(createStarLayer(map), firstId);
-                    } catch (e) { console.warn('star layer:', e); }
+                    } catch { /**/ }
 
-                    // ── Fills: match Mapbox dark-v11 globe CENTER brightness ──
-                    // Fog handles edge-darkening; base fills match center
+                    // Make country labels visible at globe zoom (minzoom 0) + brighten
                     try {
                         const style = map.getStyle();
                         if (style?.layers) {
                             for (const layer of style.layers) {
                                 try {
-                                    if (layer.type === 'background') {
-                                        map.setPaintProperty(layer.id, 'background-color', '#292929');
-                                    } else if (layer.type === 'fill') {
-                                        if (layer.id.includes('water')) {
-                                            map.setPaintProperty(layer.id, 'fill-color', '#1E1E1F');
-                                        } else {
-                                            map.setPaintProperty(layer.id, 'fill-color', '#292929');
-                                        }
-                                    } else if (layer.type === 'line') {
-                                        if (layer.id.includes('boundary') || layer.id.includes('border')) {
-                                            map.setPaintProperty(layer.id, 'line-color', '#3d3d42');
-                                            map.setPaintProperty(layer.id, 'line-opacity', 0.5);
-                                        } else {
-                                            map.setPaintProperty(layer.id, 'line-color', '#333336');
-                                            map.setPaintProperty(layer.id, 'line-opacity', 0.35);
+                                    if (layer.type === 'symbol') {
+                                        const id = layer.id;
+                                        // Country/continent labels: show from zoom 0, brighten
+                                        if (id.includes('country') || id.includes('continent')) {
+                                            map.setLayerZoomRange(id, 0, 24);
+                                            map.setPaintProperty(id, 'text-color', '#8a8a95');
+                                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.7)');
+                                            map.setPaintProperty(id, 'text-halo-width', 1.2);
+                                        } else if (id.includes('city') || id.includes('capital') || id.includes('state')) {
+                                            map.setPaintProperty(id, 'text-color', '#6a6a72');
+                                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.6)');
+                                            map.setPaintProperty(id, 'text-halo-width', 0.8);
+                                        } else if (id.includes('village') || id.includes('suburb') || id.includes('hamlet') ||
+                                                   id.includes('housenumber') || id.includes('poi') || id.includes('roadname_minor')) {
+                                            map.setLayoutProperty(id, 'visibility', 'none');
                                         }
                                     }
                                 } catch { /**/ }
@@ -391,71 +387,27 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                         }
                     } catch { /**/ }
 
-                    // ── GeoJSON country borders (visible at globe zoom) ──
-                    try {
-                        const labelLayer = map.getStyle()?.layers?.find((l: any) => l.type === 'symbol');
-                        const beforeId = labelLayer?.id;
-                        map.addSource('countries-geo', {
-                            type: 'geojson',
-                            data: 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_admin_0_countries.geojson',
-                        });
-                        map.addLayer({
-                            id: 'country-borders-geo',
-                            type: 'line',
-                            source: 'countries-geo',
-                            paint: {
-                                'line-color': '#4a4a50',
-                                'line-width': 0.5,
-                                'line-opacity': 0.45,
-                            },
-                        }, beforeId);
-                    } catch (e) { console.warn('country borders:', e); }
-
-                    // State/province borders removed — CloudFront source returns 403
-
-                    // ── Labels: brightened to match Mapbox dark-v11 readability ──
-                    const labelFixes: Record<string, { color: string; hide?: boolean; spacing?: number }> = {
-                        place_continent: { color: '#4a4a50', spacing: 0.15 },
-                        place_country_1: { color: '#5a5a60' },
-                        place_country_2: { color: '#555558' },
-                        place_state: { color: '#4a4a50' },
-                        place_city_r6: { color: '#585860' },
-                        place_city_r5: { color: '#585860' },
-                        place_city_dot_r7: { color: '#555558' },
-                        place_city_dot_r4: { color: '#555558' },
-                        place_city_dot_r2: { color: '#555558' },
-                        place_city_dot_z7: { color: '#555558' },
-                        place_capital_dot_z7: { color: '#5a5a60' },
-                        place_town: { color: '#4a4a50' },
-                        place_villages: { hide: true, color: '#333' },
-                        place_suburbs: { hide: true, color: '#333' },
-                        place_hamlet: { hide: true, color: '#333' },
-                        watername_ocean: { color: '#58585f', spacing: 0.25 },
-                        watername_sea: { color: '#505058', spacing: 0.2 },
-                        watername_lake: { color: '#4a4a52' },
-                        watername_lake_line: { color: '#4a4a52' },
-                        waterway_label: { color: '#4a4a52' },
-                        place_island: { color: '#555558' },
-                        poi_stadium: { hide: true, color: '#2a2a2a' },
-                        poi_park: { hide: true, color: '#2a2a2a' },
-                        roadname_minor: { hide: true, color: '#2a2a2a' },
-                        roadname_sec: { color: '#4a4a50' },
-                        roadname_pri: { color: '#4a4a50' },
-                        roadname_major: { color: '#505055' },
-                        housenumber: { hide: true, color: '#2a2a2a' },
-                    };
-                    for (const [id, cfg] of Object.entries(labelFixes)) {
+                    // Defer heavy layer restyling to avoid blocking first paint
+                    setTimeout(() => {
+                        if (destroyed || !map) return;
                         try {
-                            map.setLayoutProperty(id, 'text-transform', 'none');
-                            map.setPaintProperty(id, 'text-color', cfg.color);
-                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.6)');
-                            map.setPaintProperty(id, 'text-halo-width', 0.8);
-                            if (cfg.spacing) map.setLayoutProperty(id, 'text-letter-spacing', cfg.spacing);
-                            if (cfg.hide) map.setLayoutProperty(id, 'visibility', 'none');
+                            const style = map.getStyle();
+                            if (!style?.layers) return;
+                            for (const layer of style.layers) {
+                                try {
+                                    if (layer.type === 'background') {
+                                        map.setPaintProperty(layer.id, 'background-color', '#292929');
+                                    } else if (layer.type === 'fill') {
+                                        map.setPaintProperty(layer.id, 'fill-color', layer.id.includes('water') ? '#1E1E1F' : '#292929');
+                                    } else if (layer.type === 'line') {
+                                        const isBorder = layer.id.includes('boundary') || layer.id.includes('border');
+                                        map.setPaintProperty(layer.id, 'line-color', isBorder ? '#3d3d42' : '#333336');
+                                        map.setPaintProperty(layer.id, 'line-opacity', isBorder ? 0.5 : 0.35);
+                                    }
+                                } catch { /**/ }
+                            }
                         } catch { /**/ }
-                    }
-
-                    // Style customizations complete
+                    }, 0);
                 });
 
                 const disableAutoPan = () => {
