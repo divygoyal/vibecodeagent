@@ -552,6 +552,31 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         }
     }, [visitors, status, createMarkerElement]);
 
+    // Globe occlusion: hide markers on the back side of the globe
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || status !== 'ready') return;
+
+        const DEG2RAD = Math.PI / 180;
+        function updateOcclusion() {
+            const center = map.getCenter();
+            const cLat = center.lat * DEG2RAD;
+            const cLng = center.lng * DEG2RAD;
+            for (const [, entry] of markersRef.current) {
+                const [lng, lat] = entry.lngLat;
+                const mLat = lat * DEG2RAD;
+                const mLng = lng * DEG2RAD;
+                // cos of angular distance — negative means back side
+                const cosAngle = Math.sin(cLat) * Math.sin(mLat) + Math.cos(cLat) * Math.cos(mLat) * Math.cos(mLng - cLng);
+                entry.el.style.display = cosAngle > -0.05 ? '' : 'none';
+            }
+        }
+
+        map.on('move', updateOcclusion);
+        updateOcclusion();
+        return () => { map.off('move', updateOcclusion); };
+    }, [status]);
+
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
         if (containerRef.current) while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
