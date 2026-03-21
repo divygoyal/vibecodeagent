@@ -498,21 +498,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
                 map = new _MapClass({
                     container: containerRef.current,
-                    style: {
-                        version: 8,
-                        sources: {
-                            'carto-dark': {
-                                type: 'raster',
-                                tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
-                                tileSize: 256,
-                                attribution: '&copy; CARTO',
-                            },
-                        },
-                        layers: [
-                            { id: 'background', type: 'background', paint: { 'background-color': '#080c18' } },
-                            { id: 'carto-tiles', type: 'raster', source: 'carto-dark', minzoom: 0, maxzoom: 19 },
-                        ],
-                    },
+                    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                     center: [30, 25],
                     zoom: 1.8,
                     attributionControl: false,
@@ -525,22 +511,19 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 map.on('load', () => {
                     if (destroyed) return;
                     mapRef.current = map;
-                    setStatus('ready');
                     retryCountRef.current = 0;
 
                     const logo = containerRef.current?.querySelector('.maplibregl-ctrl-logo');
                     if (logo) (logo as HTMLElement).style.display = 'none';
                     const attrib = containerRef.current?.querySelector('.maplibregl-ctrl-attrib');
                     if (attrib) (attrib as HTMLElement).style.display = 'none';
-
-                    if (autoPanRef.current) startAutoPan();
                 });
 
                 map.on('style.load', () => {
                     if (destroyed) return;
 
                     // Globe projection
-                    try { map.setProjection({ type: 'globe' }); } catch (e) { console.warn('setProjection:', e); }
+                    try { map.setProjection('globe'); } catch (e) { console.warn('setProjection:', e); }
 
                     // Sky: all colors match space background, no atmosphere shader
                     try {
@@ -674,6 +657,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                             if (cfg.hide) map.setLayoutProperty(id, 'visibility', 'none');
                         } catch { /**/ }
                     }
+
+                    // Globe setup complete — mark ready and start auto-pan
+                    setStatus('ready');
+                    if (autoPanRef.current) startAutoPan();
                 });
 
                 // ── Fresnel atmosphere glow (on top of all layers) ──
