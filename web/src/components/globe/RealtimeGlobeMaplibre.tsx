@@ -441,18 +441,21 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     useEffect(() => { const cleanup = initMap(); return cleanup; }, [initMap]);
 
     const createMarkerElement = useCallback((v: GlobeVisitor) => {
+        const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+        const sz = isMobile ? 44 : 60;
+        const inner = isMobile ? 40 : 56;
         const warmthColor = getWarmthColor(v.warmth);
         const avatarUrl = getAvatarUrl(v.name);
 
         const el = document.createElement('div');
-        el.style.cssText = 'width:60px;height:60px;cursor:pointer;z-index:10;';
+        el.style.cssText = `width:${sz}px;height:${sz}px;cursor:pointer;z-index:10;`;
         el.title = `${v.name} — ${v.country}`;
 
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'position:relative;width:100%;height:100%;';
 
         const frame = document.createElement('div');
-        frame.style.cssText = `width:56px;height:56px;margin:2px;border-radius:50%;background:${v.avatarColor};border:2.5px solid rgba(255,255,255,0.25);box-shadow:0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${warmthColor}40;overflow:hidden;`;
+        frame.style.cssText = `width:${inner}px;height:${inner}px;margin:${(sz - inner) / 2}px;border-radius:50%;background:${v.avatarColor};border:${isMobile ? 2 : 2.5}px solid rgba(255,255,255,0.25);box-shadow:0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${warmthColor}40;overflow:hidden;`;
 
         const img = document.createElement('img');
         img.src = avatarUrl;
@@ -460,14 +463,14 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
         img.onerror = () => {
             img.remove();
-            frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;background:${v.avatarColor};`;
+            frame.style.cssText += `display:flex;align-items:center;justify-content:center;font-size:${isMobile ? 15 : 20}px;font-weight:700;color:white;background:${v.avatarColor};`;
             frame.textContent = v.avatarInitial;
         };
         frame.appendChild(img);
         wrapper.appendChild(frame);
 
         const dot = document.createElement('div');
-        dot.style.cssText = `position:absolute;top:0;right:0;width:14px;height:14px;border-radius:50%;background:${warmthColor};border:3px solid rgba(8,12,24,0.95);z-index:2;box-shadow:0 0 8px ${warmthColor}80;`;
+        dot.style.cssText = `position:absolute;top:0;right:0;width:${isMobile ? 11 : 14}px;height:${isMobile ? 11 : 14}px;border-radius:50%;background:${warmthColor};border:${isMobile ? 2 : 3}px solid rgba(8,12,24,0.95);z-index:2;box-shadow:0 0 8px ${warmthColor}80;`;
         wrapper.appendChild(dot);
         el.appendChild(wrapper);
 

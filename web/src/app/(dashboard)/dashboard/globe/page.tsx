@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import {
     Share2, Music, History, Maximize2, Navigation, Monitor, Smartphone, Tablet,
     Link2, ExternalLink, Copy, Check, Code2, Zap, Globe,
-    ChevronRight, BookOpen, Server, Palette, DollarSign, Shield
+    ChevronRight, ChevronUp, BookOpen, Server, Palette, DollarSign, Shield
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
@@ -132,12 +132,12 @@ function CodeBlock({ code, language = 'html' }: { code: string; language?: strin
 
     return (
         <div className="relative group">
-            <pre className="bg-zinc-950 border border-white/[0.06] rounded-xl p-4 overflow-x-auto text-[13px] leading-relaxed font-mono text-zinc-300">
+            <pre className="bg-zinc-950 border border-white/[0.06] rounded-xl p-3 sm:p-4 overflow-x-auto text-[13px] leading-relaxed font-mono text-zinc-300">
                 <code>{code}</code>
             </pre>
             <button
                 onClick={handleCopy}
-                className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/[0.08] text-[11px] text-zinc-400 hover:text-white transition opacity-0 group-hover:opacity-100"
+                className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/[0.08] text-[11px] text-zinc-400 hover:text-white transition sm:opacity-0 sm:group-hover:opacity-100"
             >
                 {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 {copied ? 'Copied' : 'Copy'}
@@ -150,6 +150,7 @@ export default function GlobeApiPage() {
     const [mounted, setMounted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isAutoPanning, setIsAutoPanning] = useState(false);
+    const [showMobileFeed, setShowMobileFeed] = useState(false);
     const mapRef = useRef<RealtimeMapboxHandle>(null);
 
     // ─── Real GA4 data hooks ───
@@ -380,7 +381,7 @@ export default function GlobeApiPage() {
     }
 
     return (
-        <div className="space-y-8 pb-12">
+        <div className="space-y-6 sm:space-y-8 pb-6 sm:pb-12">
             {/* ─── Page Header ─── */}
             <div>
                 <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2">
@@ -396,7 +397,7 @@ export default function GlobeApiPage() {
             {/* ══════════════════════════════════════════════════════ */}
             {/* ─── SECTION 1: LIVE DEMO ─── */}
             {/* ══════════════════════════════════════════════════════ */}
-            <div className="relative w-full h-[400px] sm:h-[500px] lg:h-[600px] rounded-2xl border border-[var(--card-border)]" style={{ background: '#080c18' }}>
+            <div className="relative w-full h-[60vh] min-h-[320px] max-h-[500px] sm:h-[500px] sm:min-h-0 sm:max-h-none lg:h-[600px] rounded-2xl border border-[var(--card-border)]" style={{ background: '#080c18' }}>
                 {/* Globe Component */}
                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
                     <RealtimeGlobeMaplibre
@@ -494,8 +495,8 @@ export default function GlobeApiPage() {
                                 </div>
                             </div>
 
-                            {/* Devices */}
-                            <div className="flex items-start gap-3">
+                            {/* Devices — hidden on mobile for compact view */}
+                            <div className="hidden sm:flex items-start gap-3">
                                 <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Devices</span>
                                 <div className="flex flex-wrap gap-1.5">
                                     {hasRealData ? byDevice.map((d: any, i: number) => {
@@ -625,13 +626,101 @@ export default function GlobeApiPage() {
                 </motion.div>
 
                 {/* ═══════════════════════════════════════════════ */}
+                {/* ─── MOBILE: Activity Feed Bottom Sheet ─── */}
+                {/* ═══════════════════════════════════════════════ */}
+                <div className="sm:hidden">
+                    {showMobileFeed ? (
+                        <motion.div
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            className="absolute bottom-0 left-0 right-0 z-30 bg-black/85 backdrop-blur-xl rounded-t-2xl border-t border-x border-white/10"
+                        >
+                            <button
+                                onClick={() => setShowMobileFeed(false)}
+                                className="w-full flex flex-col items-center pt-2.5 pb-1 active:opacity-70"
+                            >
+                                <div className="w-8 h-1 rounded-full bg-zinc-600" />
+                            </button>
+                            <div className="flex items-center justify-between px-4 pb-2">
+                                <span className="text-xs font-semibold text-zinc-300">Activity Feed</span>
+                                <span className="text-[10px] text-zinc-500">{displayActivity.length} events</span>
+                            </div>
+                            <div className="max-h-[35vh] overflow-y-auto overscroll-contain" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                {displayActivity.map((item) => (
+                                    <div key={item.id} className="px-4 py-2.5 border-t border-white/[0.04]">
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="relative flex-shrink-0 mt-0.5">
+                                                <div
+                                                    className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800"
+                                                    style={{ boxShadow: `0 0 0 1.5px ${getWarmthRing(item.warmth)}` }}
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={getAvatarUrl(item.name)} alt="" className="w-full h-full" />
+                                                </div>
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full border border-black ${getWarmthDot(item.warmth)}`} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center flex-wrap gap-x-1 leading-snug">
+                                                    <span className="text-[11px] font-bold text-white">{item.name}</span>
+                                                    <CountryFlag country={item.country} />
+                                                    <span className="text-[11px] text-zinc-500">{item.event}</span>
+                                                    {item.event === 'visited' ? (
+                                                        <span className="text-[11px] text-zinc-300 font-mono truncate">{item.page}</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-zinc-500 truncate">{item.exitUrl}</span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[9px] text-zinc-600">{formatTimeAgo(item.timestamp)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/[0.04]">
+                                <svg width="10" height="10" viewBox="0 0 20 20" fill="none">
+                                    <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                                    <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                                    <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                                </svg>
+                                <span className="text-[10px] text-zinc-500">Powered by TrafficClaw</span>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.button
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.4 }}
+                            onClick={() => setShowMobileFeed(true)}
+                            className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between px-3 py-2.5 bg-black/70 backdrop-blur-sm rounded-xl border border-white/10 active:bg-black/90 transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                                </span>
+                                <span className="text-[11px] text-zinc-300 font-medium">{displayActivity.length} recent events</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <svg width="10" height="10" viewBox="0 0 20 20" fill="none">
+                                    <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                                    <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                                    <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                                </svg>
+                                <ChevronUp className="w-3 h-3 text-zinc-500" />
+                            </div>
+                        </motion.button>
+                    )}
+                </div>
+
+                {/* ═══════════════════════════════════════════════ */}
                 {/* ─── BOTTOM-RIGHT: Powered By Badge ─── */}
                 {/* ═══════════════════════════════════════════════ */}
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.6 }}
-                    className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20"
+                    className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 hidden sm:block"
                 >
                     <div className="flex items-center gap-2 px-3 py-2 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
                         <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
@@ -661,6 +750,10 @@ export default function GlobeApiPage() {
                         </div>
                     </div>
 
+                    {!propertyToUse && (
+                        <p className="text-xs text-zinc-500 italic">Select a GA4 property to auto-fill your site ID.</p>
+                    )}
+
                     <div className="space-y-8">
                         {/* Step 1 */}
                         <div>
@@ -676,7 +769,7 @@ export default function GlobeApiPage() {
                                 code={`<!-- TrafficClaw Analytics -->
 <script
   src="https://cdn.trafficclaw.com/tracker.js"
-  data-site-id="YOUR_SITE_ID"
+  data-site-id="${propertyToUse || 'YOUR_SITE_ID'}"
   data-api="https://api.trafficclaw.com"
   defer
 ></script>`}
@@ -696,7 +789,7 @@ export default function GlobeApiPage() {
                                 language="html"
                                 code={`<!-- TrafficClaw Realtime Globe -->
 <iframe
-  src="https://app.trafficclaw.com/embed/globe?site=YOUR_SITE_ID&theme=dark"
+  src="https://app.trafficclaw.com/embed/globe?site=${propertyToUse || 'YOUR_SITE_ID'}&theme=dark"
   width="100%"
   height="600"
   frameborder="0"
@@ -742,8 +835,8 @@ export default function GlobeApiPage() {
                     {/* Parameters table */}
                     <div className="mb-6">
                         <h3 className="text-sm font-semibold text-zinc-300 mb-3">Parameters</h3>
-                        <div className="border border-white/[0.06] rounded-xl overflow-hidden">
-                            <table className="w-full text-sm">
+                        <div className="border border-white/[0.06] rounded-xl overflow-x-auto">
+                            <table className="w-full text-sm min-w-[420px]">
                                 <thead>
                                     <tr className="border-b border-white/[0.06] bg-zinc-900/50">
                                         <th className="text-left px-4 py-2.5 text-zinc-400 font-medium text-xs">Parameter</th>
