@@ -370,13 +370,13 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                                         // Country/continent labels: show from zoom 0, brighten
                                         if (id.includes('country') || id.includes('continent')) {
                                             map.setLayerZoomRange(id, 0, 24);
-                                            map.setPaintProperty(id, 'text-color', '#8a8a95');
-                                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.7)');
-                                            map.setPaintProperty(id, 'text-halo-width', 1.2);
-                                        } else if (id.includes('city') || id.includes('capital') || id.includes('state')) {
-                                            map.setPaintProperty(id, 'text-color', '#6a6a72');
+                                            map.setPaintProperty(id, 'text-color', '#55555d');
                                             map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.6)');
                                             map.setPaintProperty(id, 'text-halo-width', 0.8);
+                                        } else if (id.includes('city') || id.includes('capital') || id.includes('state')) {
+                                            map.setPaintProperty(id, 'text-color', '#4a4a52');
+                                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.5)');
+                                            map.setPaintProperty(id, 'text-halo-width', 0.6);
                                         } else if (id.includes('village') || id.includes('suburb') || id.includes('hamlet') ||
                                                    id.includes('housenumber') || id.includes('poi') || id.includes('roadname_minor')) {
                                             map.setLayoutProperty(id, 'visibility', 'none');
