@@ -326,6 +326,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     if (destroyed) return;
                     mapRef.current = map;
                     retryCountRef.current = 0;
+                    setStatus('ready');
+                    if (autoPanRef.current) startAutoPan();
 
                     const logo = containerRef.current?.querySelector('.maplibregl-ctrl-logo');
                     if (logo) (logo as HTMLElement).style.display = 'none';
@@ -453,9 +455,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                         } catch { /**/ }
                     }
 
-                    // Globe setup complete — mark ready and start auto-pan
-                    setStatus('ready');
-                    if (autoPanRef.current) startAutoPan();
+                    // Style customizations complete
                 });
 
                 const disableAutoPan = () => {
