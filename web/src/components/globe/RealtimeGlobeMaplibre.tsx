@@ -498,7 +498,21 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
                 map = new _MapClass({
                     container: containerRef.current,
-                    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                    style: {
+                        version: 8,
+                        sources: {
+                            'carto-dark': {
+                                type: 'raster',
+                                tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+                                tileSize: 256,
+                                attribution: '&copy; CARTO',
+                            },
+                        },
+                        layers: [
+                            { id: 'background', type: 'background', paint: { 'background-color': '#080c18' } },
+                            { id: 'carto-tiles', type: 'raster', source: 'carto-dark', minzoom: 0, maxzoom: 19 },
+                        ],
+                    },
                     center: [30, 25],
                     zoom: 1.8,
                     attributionControl: false,
