@@ -370,10 +370,12 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                                         // Country/continent labels: show from zoom 0, brighten
                                         if (id.includes('country') || id.includes('continent')) {
                                             map.setLayerZoomRange(id, 0, 24);
-                                            map.setPaintProperty(id, 'text-color', '#55555d');
+                                            map.setLayoutProperty(id, 'text-transform', 'none');
+                                            map.setPaintProperty(id, 'text-color', '#5a5a62');
                                             map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.6)');
                                             map.setPaintProperty(id, 'text-halo-width', 0.8);
                                         } else if (id.includes('city') || id.includes('capital') || id.includes('state')) {
+                                            map.setLayoutProperty(id, 'text-transform', 'none');
                                             map.setPaintProperty(id, 'text-color', '#4a4a52');
                                             map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.5)');
                                             map.setPaintProperty(id, 'text-halo-width', 0.6);
