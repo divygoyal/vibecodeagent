@@ -243,192 +243,6 @@ function createStarLayer(mapInstance: any) {
 }
 
 // ═══════════════════════════════════════════════════
-// Fresnel atmosphere glow layer
-// ═══════════════════════════════════════════════════
-function createFresnelLayer(map: any) {
-    let program: WebGLProgram | null = null;
-    let vertexBuffer: WebGLBuffer | null = null;
-    let indexBuffer: WebGLBuffer | null = null;
-    let uCenter: WebGLUniformLocation | null = null;
-    let uRadius: WebGLUniformLocation | null = null;
-    let uResolution: WebGLUniformLocation | null = null;
-    let uIntensity: WebGLUniformLocation | null = null;
-    let uMode: WebGLUniformLocation | null = null;
-    let aPos: number = -1;
-
-    const VERT = `
-        attribute vec2 a_pos;
-        varying vec2 v_uv;
-        void main() {
-            v_uv = a_pos;
-            gl_Position = vec4(a_pos, 0.0, 1.0);
-        }
-    `;
-
-    const FRAG = `
-        precision highp float;
-        varying vec2 v_uv;
-        uniform vec2 u_center;
-        uniform float u_radius;
-        uniform vec2 u_resolution;
-        uniform float u_intensity;
-        uniform float u_mode;
-
-        void main() {
-            vec2 pixel = (v_uv * 0.5 + 0.5) * u_resolution;
-            float dist = length(pixel - u_center) / u_radius;
-
-            if (u_mode < 0.5) {
-                // === LIMB DARKENING PASS ===
-                if (dist >= 1.0) { discard; }
-                float darken = smoothstep(0.55, 1.0, dist);
-                darken *= darken;
-                float alpha = darken * 0.45 * u_intensity;
-                gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
-            } else {
-                // === GLOW PASS — thin atmospheric rim ===
-                float inner = 0.0;
-                if (dist < 1.0) {
-                    inner = smoothstep(0.94, 1.0, dist);
-                    inner *= inner;
-                }
-                float outer = 0.0;
-                if (dist >= 1.0) {
-                    outer = exp(-(dist - 1.0) * 50.0) * 0.30;
-                }
-                float glow = (inner * 0.18 + outer * 0.07) * u_intensity;
-                vec3 color = vec3(0.5, 0.6, 0.82);
-                gl_FragColor = vec4(color * glow, glow);
-            }
-        }
-    `;
-
-    function compileShader(gl: WebGLRenderingContext, type: number, src: string) {
-        const s = gl.createShader(type)!;
-        gl.shaderSource(s, src);
-        gl.compileShader(s);
-        return s;
-    }
-
-    return {
-        id: 'fresnel-atmosphere',
-        type: 'custom' as const,
-        renderingMode: '2d' as const,
-
-        onAdd(_map: any, gl: WebGLRenderingContext) {
-            const vs = compileShader(gl, gl.VERTEX_SHADER, VERT);
-            const fs = compileShader(gl, gl.FRAGMENT_SHADER, FRAG);
-            program = gl.createProgram()!;
-            gl.attachShader(program, vs);
-            gl.attachShader(program, fs);
-            gl.linkProgram(program);
-            gl.deleteShader(vs);
-            gl.deleteShader(fs);
-
-            aPos = gl.getAttribLocation(program, 'a_pos');
-            uCenter = gl.getUniformLocation(program, 'u_center');
-            uRadius = gl.getUniformLocation(program, 'u_radius');
-            uResolution = gl.getUniformLocation(program, 'u_resolution');
-            uIntensity = gl.getUniformLocation(program, 'u_intensity');
-            uMode = gl.getUniformLocation(program, 'u_mode');
-
-            // Full-screen quad in NDC
-            const verts = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]);
-            vertexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-
-            const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
-            indexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-        },
-
-        render(gl: WebGLRenderingContext) {
-            if (!program) return;
-
-            // Zoom-based intensity: full below 3.5, fade to 0 by 5.5
-            const zoom = map.getZoom();
-            const intensity = zoom < 3.5 ? 1.0 : zoom > 5.5 ? 0.0 : 1.0 - (zoom - 3.5) / 2.0;
-            if (intensity <= 0) return;
-
-            const canvas = map.getCanvas();
-            const dpr = devicePixelRatio || 1;
-            const cx = canvas.clientWidth / 2;
-            const cy = canvas.clientHeight / 2;
-
-            // Estimate globe screen radius from 4 points at 30° offset
-            const center = map.getCenter();
-            const offsets = [
-                [30, 0], [-30, 0], [0, 30], [0, -30],
-            ] as const;
-            let totalDist = 0;
-            let validCount = 0;
-            for (const [dlat, dlng] of offsets) {
-                try {
-                    const p = map.project([center.lng + dlng, center.lat + dlat]);
-                    const dx = p.x - cx;
-                    const dy = p.y - cy;
-                    totalDist += Math.sqrt(dx * dx + dy * dy);
-                    validCount++;
-                } catch { /**/ }
-            }
-            if (validCount === 0) return;
-            const avgDist = totalDist / validCount;
-            const radius = avgDist / Math.sin((30 * Math.PI) / 180); // sin(30°) = 0.5
-
-            // Physical pixel coords for shader
-            const pxCenter = [cx * dpr, cy * dpr] as const;
-            const pxRadius = radius * dpr;
-            const resolution = [canvas.width, canvas.height] as const;
-
-            // Save GL state
-            const prevBlend = gl.getParameter(gl.BLEND);
-            const prevDepth = gl.getParameter(gl.DEPTH_TEST);
-            const prevSrcRGB = gl.getParameter(gl.BLEND_SRC_RGB);
-            const prevDstRGB = gl.getParameter(gl.BLEND_DST_RGB);
-
-            gl.useProgram(program);
-            gl.enable(gl.BLEND);
-            gl.disable(gl.DEPTH_TEST);
-
-            gl.uniform2f(uCenter, pxCenter[0], resolution[1] - pxCenter[1]); // flip Y
-            gl.uniform1f(uRadius, pxRadius);
-            gl.uniform2f(uResolution, resolution[0], resolution[1]);
-            gl.uniform1f(uIntensity, intensity);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-            gl.enableVertexAttribArray(aPos);
-            gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
-            // --- Pass 1: Limb darkening ---
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.uniform1f(uMode, 0.0);
-            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-
-            // --- Pass 2: Edge glow ---
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-            gl.uniform1f(uMode, 1.0);
-            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-
-            // Restore GL state
-            gl.disableVertexAttribArray(aPos);
-            if (!prevBlend) gl.disable(gl.BLEND);
-            else gl.blendFunc(prevSrcRGB, prevDstRGB);
-            if (prevDepth) gl.enable(gl.DEPTH_TEST);
-        },
-
-        onRemove(_map: any, gl: WebGLRenderingContext) {
-            if (program) gl.deleteProgram(program);
-            if (vertexBuffer) gl.deleteBuffer(vertexBuffer);
-            if (indexBuffer) gl.deleteBuffer(indexBuffer);
-        },
-    };
-}
-
-// ═══════════════════════════════════════════════════
 // Cache Map + Marker constructors
 // ═══════════════════════════════════════════════════
 let _MapClass: any = null;
@@ -522,15 +336,15 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 map.on('style.load', () => {
                     if (destroyed) return;
 
-                    // Globe projection
-                    try { map.setProjection('globe'); } catch (e) { console.warn('setProjection:', e); }
+                    // Globe projection (MapLibre 5.x requires ProjectionSpecification object)
+                    try { map.setProjection({ type: 'globe' }); } catch (e) { console.warn('setProjection:', e); }
 
-                    // Sky: all colors match space background, no atmosphere shader
+                    // Sky: no atmosphere, clean globe edge
                     try {
                         map.setSky({
-                            'sky-color': '#050507',
-                            'horizon-color': '#050507',
-                            'fog-color': '#050507',
+                            'sky-color': '#06060e',
+                            'horizon-color': '#06060e',
+                            'fog-color': '#06060e',
                             'fog-ground-blend': 1,
                             'horizon-fog-blend': 1,
                             'sky-horizon-blend': 0,
@@ -595,26 +409,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                         }, beforeId);
                     } catch (e) { console.warn('country borders:', e); }
 
-                    // ── GeoJSON state/province borders (visible at globe zoom) ──
-                    try {
-                        const labelLayer = map.getStyle()?.layers?.find((l: any) => l.type === 'symbol');
-                        const stateBeforeId = labelLayer?.id;
-                        map.addSource('states-geo', {
-                            type: 'geojson',
-                            data: 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_admin_1_states_provinces.geojson',
-                        });
-                        map.addLayer({
-                            id: 'state-borders-geo',
-                            type: 'line',
-                            source: 'states-geo',
-                            minzoom: 0,
-                            paint: {
-                                'line-color': '#424246',
-                                'line-width': 0.5,
-                                'line-opacity': 0.4,
-                            },
-                        }, stateBeforeId);
-                    } catch (e) { console.warn('state borders:', e); }
+                    // State/province borders removed — CloudFront source returns 403
 
                     // ── Labels: brightened to match Mapbox dark-v11 readability ──
                     const labelFixes: Record<string, { color: string; hide?: boolean; spacing?: number }> = {
@@ -662,11 +457,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     setStatus('ready');
                     if (autoPanRef.current) startAutoPan();
                 });
-
-                // ── Fresnel atmosphere glow (on top of all layers) ──
-                try {
-                    map.addLayer(createFresnelLayer(map));
-                } catch (e) { console.warn('fresnel layer:', e); }
 
                 const disableAutoPan = () => {
                     if (autoPanRef.current) {
@@ -771,14 +561,14 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     }, [initMap]);
 
     return (
-        <div className="w-full h-full relative" style={{ backgroundColor: '#06060e' }}>
+        <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#06060e' }}>
             <style>{`
                 .maplibregl-ctrl-logo { display: none !important; }
                 .maplibregl-ctrl-attrib { display: none !important; }
             `}</style>
-            <div ref={containerRef} className="absolute inset-0" />
+            <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
             {status === 'loading' && (
-                <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#06060e' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, background: '#06060e' }}>
                     <div className="flex flex-col items-center gap-3">
                         <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
                         <span className="text-zinc-500 text-sm">Loading globe...</span>
@@ -786,7 +576,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 </div>
             )}
             {status === 'error' && (
-                <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#06060e' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, background: '#06060e' }}>
                     <div className="flex flex-col items-center gap-3 text-center px-4">
                         <span className="text-zinc-400 text-sm">{errorMsg || 'Globe failed to load'}</span>
                         <button onClick={handleRetry} className="px-4 py-2 text-sm bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition border border-emerald-500/20">Retry</button>
