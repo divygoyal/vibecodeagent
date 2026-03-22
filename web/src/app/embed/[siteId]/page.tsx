@@ -235,9 +235,9 @@ export default function EmbedGlobePage() {
                 </div>
             </div>
 
-            {/* ═══ TOP-RIGHT: Controls ═══ */}
-            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 hidden sm:block">
-                <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-xl p-1 border border-white/10">
+            {/* ═══ RIGHT: Controls (below top edge to avoid overlap with map controls) ═══ */}
+            <div className="absolute top-16 right-3 sm:top-16 sm:right-4 z-20 hidden sm:block">
+                <div className="flex flex-col items-center gap-1 bg-black/50 backdrop-blur-sm rounded-xl p-1 border border-white/10">
                     <button
                         onClick={toggleAutoPan}
                         className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${isAutoPanning ? 'bg-emerald-500/15 text-emerald-400' : 'hover:bg-white/[0.08] text-zinc-500 hover:text-white'}`}
