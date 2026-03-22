@@ -713,9 +713,10 @@ function InteractiveDemo() {
                                     transition={{ duration: 0.2 }}
                                     className="relative"
                                 >
-                                    {/* Globe view — exact clone of realtime page layout */}
-                                    <div className="relative h-[280px] sm:h-[400px] lg:h-[600px] overflow-hidden">
+                                    {/* Globe view — stacked layout: stats above, globe middle, feed below */}
+                                    <div className="flex flex-col relative h-[calc(100vh-200px)] sm:block sm:h-[400px] lg:h-[600px] overflow-hidden">
                                         {/* Mapbox GL Globe */}
+                                        <div className="relative flex-1 min-h-0 order-0 sm:absolute sm:inset-0 overflow-hidden">
                                         <div className="absolute inset-0">
                                             <RealtimeMapbox
                                                 visitors={DEMO_VISITORS}
@@ -724,12 +725,13 @@ function InteractiveDemo() {
                                                 autoPan={false}
                                             />
                                         </div>
+                                        </div>
 
-                                        {/* ─── TOP-LEFT: Stats Panel (exact realtime page clone) ─── */}
+                                        {/* ─── TOP-LEFT: Stats Panel ─── */}
                                         <div
-                                            className="absolute top-4 left-4 z-20"
+                                            className="relative z-10 flex-shrink-0 -order-1 sm:absolute sm:top-4 sm:left-4 sm:z-20"
                                         >
-                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden sm:w-auto" style={{ minWidth: 0, maxWidth: '400px' }}>
+                                            <div className="bg-[rgba(20,20,30,0.95)] sm:backdrop-blur-2xl sm:rounded-2xl sm:shadow-2xl sm:shadow-black/50 overflow-hidden sm:w-auto" style={{ minWidth: 0, maxWidth: '400px' }}>
                                                 {/* Header: Logo | REAL-TIME | toolbar */}
                                                 <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
                                                     <div className="flex items-center gap-1.5">
@@ -821,12 +823,12 @@ function InteractiveDemo() {
                                             </div>
                                         </div>
 
-                                        {/* ─── BOTTOM-LEFT: Activity Feed (exact realtime page clone) ─── */}
+                                        {/* ─── Activity Feed ─── */}
                                         <div
-                                            className="absolute bottom-4 left-4 right-4 sm:right-auto z-20 sm:w-[360px] md:w-[440px] hidden sm:block"
+                                            className="relative z-10 flex-shrink-0 order-1 sm:absolute sm:bottom-4 sm:left-4 sm:z-20 sm:w-[360px] md:w-[440px]"
                                         >
-                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
-                                                <div className="max-h-[280px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                            <div className="sm:bg-[rgba(20,20,30,0.95)] sm:backdrop-blur-2xl sm:rounded-2xl sm:shadow-2xl sm:shadow-black/50 overflow-hidden">
+                                                <div className="max-h-[160px] sm:max-h-[280px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                                     {DEMO_ACTIVITY.map((item, i) => (
                                                         <div
                                                             key={item.id}

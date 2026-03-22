@@ -437,15 +437,17 @@ export default function GlobeApiPage() {
             {/* ══════════════════════════════════════════════════════ */}
             {/* ─── SECTION 1: LIVE DEMO ─── */}
             {/* ══════════════════════════════════════════════════════ */}
-            <div className="relative w-full h-[60vh] min-h-[320px] max-h-[500px] sm:h-[500px] sm:min-h-0 sm:max-h-none lg:h-[600px] rounded-2xl border border-[var(--card-border)]" style={{ background: '#080c18' }}>
+            <div className="flex flex-col relative w-full h-[calc(100vh-140px)] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-[var(--card-border)] overflow-hidden" style={{ background: '#080c18' }}>
                 {/* Globe Component */}
-                <div className="absolute inset-0 rounded-2xl overflow-hidden">
+                <div className="relative flex-1 min-h-0 sm:absolute sm:inset-0 rounded-2xl overflow-hidden order-0">
+                <div className="absolute inset-0">
                     <RealtimeGlobeMaplibre
                         ref={mapRef}
                         visitors={displayVisitors}
                         autoPan={isAutoPanning}
                         onAutoPanChange={handleAutoPanChange}
                     />
+                </div>
                 </div>
 
                 {/* ═══════════════════════════════════════════════ */}
@@ -455,33 +457,11 @@ export default function GlobeApiPage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1, duration: 0.4 }}
-                    className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20"
+                    className="relative z-10 flex-shrink-0 -order-1 sm:absolute sm:top-4 sm:left-4 sm:z-20"
                 >
-                    <div className="bg-black/60 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10 max-w-[280px] sm:max-w-xs">
-                        {/* Mobile: Compact toggle bar */}
-                        <button
-                            className="flex sm:hidden items-center gap-2 w-full text-left"
-                            onClick={() => setMobileStatsOpen(!mobileStatsOpen)}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                                <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
-                                <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
-                                <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
-                            </svg>
-                            <span className="text-[13px] font-bold text-white tracking-tight">TrafficClaw</span>
-                            <div className="w-px h-3.5 bg-zinc-600/50" />
-                            <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-                            </span>
-                            <span className="text-[12px] text-zinc-300">{displayActiveUsers} visitors</span>
-                            <span className="ml-auto">
-                                {mobileStatsOpen ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
-                            </span>
-                        </button>
-
-                        {/* Desktop: Full header */}
-                        <div className="hidden sm:flex items-center gap-2 mb-2">
+                    <div className="p-3 sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:p-4 sm:border sm:border-white/10 sm:max-w-xs">
+                        {/* Header */}
+                        <div className="flex items-center gap-2 mb-2">
                             <div className="flex items-center gap-1.5">
                                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
                                     <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
@@ -493,9 +473,6 @@ export default function GlobeApiPage() {
                             <div className="w-px h-4 bg-zinc-600/50 mx-0.5" />
                             <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
                         </div>
-
-                        {/* Expandable content (desktop: always visible, mobile: toggle) */}
-                        <div className={`${mobileStatsOpen ? '' : 'hidden'} sm:block`}>
                         {/* Visitor count line */}
                         <div className="flex items-center gap-1.5 mb-3 flex-wrap">
                             <span className="relative flex h-2 w-2 flex-shrink-0">
@@ -585,7 +562,6 @@ export default function GlobeApiPage() {
                                 </div>
                             </div>
                         </div>
-                        </div>
                     </div>
                 </motion.div>
 
@@ -596,7 +572,7 @@ export default function GlobeApiPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"
+                    className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 hidden sm:block"
                 >
                     <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-xl p-1 border border-white/10">
                         <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" title="Share">
@@ -632,10 +608,10 @@ export default function GlobeApiPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3, duration: 0.4 }}
-                    className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 max-w-[300px] sm:max-w-sm hidden sm:block"
+                    className="relative z-10 flex-shrink-0 order-1 sm:absolute sm:bottom-4 sm:left-4 sm:z-20 max-w-full sm:max-w-sm"
                 >
-                    <div className="bg-black/60 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
-                        <div className="max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                    <div className="sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:border sm:border-white/10 overflow-hidden">
+                        <div className="max-h-[180px] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                             {displayActivity.map((item, i) => (
                                 <motion.div
                                     key={item.id}
@@ -690,93 +666,6 @@ export default function GlobeApiPage() {
                     </div>
                 </motion.div>
 
-                {/* ═══════════════════════════════════════════════ */}
-                {/* ─── MOBILE: Activity Feed Bottom Sheet ─── */}
-                {/* ═══════════════════════════════════════════════ */}
-                <div className="sm:hidden">
-                    {showMobileFeed ? (
-                        <motion.div
-                            initial={{ opacity: 0, y: 40 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                            className="absolute bottom-0 left-0 right-0 z-30 bg-black/85 backdrop-blur-xl rounded-t-2xl border-t border-x border-white/10"
-                        >
-                            <button
-                                onClick={() => setShowMobileFeed(false)}
-                                className="w-full flex flex-col items-center pt-2.5 pb-1 active:opacity-70"
-                            >
-                                <div className="w-8 h-1 rounded-full bg-zinc-600" />
-                            </button>
-                            <div className="flex items-center justify-between px-4 pb-2">
-                                <span className="text-xs font-semibold text-zinc-300">Activity Feed</span>
-                                <span className="text-[10px] text-zinc-500">{displayActivity.length} events</span>
-                            </div>
-                            <div className="max-h-[35vh] overflow-y-auto overscroll-contain" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-                                {displayActivity.map((item) => (
-                                    <div key={item.id} className="px-4 py-2.5 border-t border-white/[0.04]">
-                                        <div className="flex items-start gap-2.5">
-                                            <div className="relative flex-shrink-0 mt-0.5">
-                                                <div
-                                                    className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800"
-                                                    style={{ boxShadow: `0 0 0 1.5px ${getWarmthRing(item.warmth)}` }}
-                                                >
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img src={getAvatarUrl(item.name)} alt="" className="w-full h-full" />
-                                                </div>
-                                                <div className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full border border-black ${getWarmthDot(item.warmth)}`} />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center flex-wrap gap-x-1 leading-snug">
-                                                    <span className="text-[11px] font-bold text-white">{item.name}</span>
-                                                    <CountryFlag country={item.country} />
-                                                    <span className="text-[11px] text-zinc-500">{item.event}</span>
-                                                    {item.event === 'visited' ? (
-                                                        <span className="text-[11px] text-zinc-300 font-mono truncate">{item.page}</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-zinc-500 truncate">{item.exitUrl}</span>
-                                                    )}
-                                                </div>
-                                                <span className="text-[9px] text-zinc-600">{formatTimeAgo(item.timestamp)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/[0.04]">
-                                <svg width="10" height="10" viewBox="0 0 20 20" fill="none">
-                                    <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
-                                    <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
-                                    <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
-                                </svg>
-                                <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-500 hover:text-zinc-300 transition">Powered by TrafficClaw</a>
-                            </div>
-                        </motion.div>
-                    ) : (
-                        <motion.button
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.4 }}
-                            onClick={() => setShowMobileFeed(true)}
-                            className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between px-3 py-2.5 bg-black/70 backdrop-blur-sm rounded-xl border border-white/10 active:bg-black/90 transition-colors"
-                        >
-                            <div className="flex items-center gap-2">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                                </span>
-                                <span className="text-[11px] text-zinc-300 font-medium">{displayActivity.length} recent events</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <svg width="10" height="10" viewBox="0 0 20 20" fill="none">
-                                    <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
-                                    <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
-                                    <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
-                                </svg>
-                                <ChevronUp className="w-3 h-3 text-zinc-500" />
-                            </div>
-                        </motion.button>
-                    )}
-                </div>
 
                 {/* ═══════════════════════════════════════════════ */}
                 {/* ─── BOTTOM-RIGHT: Powered By Badge ─── */}
