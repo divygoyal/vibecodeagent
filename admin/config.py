@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     
     # Network
     BASE_PORT: int = 9000  # First user gets 9000, second 9001, etc.
-    MAX_USERS: int = 6     # ~6 users at 1GB each on 8GB RAM (leave 2GB for system)
+    MAX_USERS: int = 50    # Override via MAX_USERS env var for your server capacity
     
     # Paths
     PLUGINS_DIR: str = "/home/ubuntu/vibecodeagent/plugins" # Host path for plugins (skills)
