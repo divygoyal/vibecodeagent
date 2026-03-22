@@ -251,6 +251,37 @@ function EmbedTokenManager({ propertyId }: { propertyId: string }) {
                 <span className="text-sm text-emerald-300">Embed Status: <span className="font-semibold">{activeToken ? 'Live Data' : 'Demo Mode'}</span></span>
                 {activeToken && <span className="text-xs text-zinc-500 ml-auto">Polls every 60s</span>}
             </div>
+
+            {/* How it works */}
+            <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-zinc-500" />
+                    How It Works
+                </h3>
+                <div className="space-y-2 text-xs text-zinc-500">
+                    <div className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-900/30 border border-white/[0.04]">
+                        <Zap className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                        <p><span className="text-zinc-300 font-medium">Data source:</span> Real visitor data comes from your connected Google Analytics. No tracking script needed &mdash; GA4 already runs on your site.</p>
+                    </div>
+                    <div className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-900/30 border border-white/[0.04]">
+                        <Globe className="w-3.5 h-3.5 text-cyan-500 mt-0.5 flex-shrink-0" />
+                        <p><span className="text-zinc-300 font-medium">Adaptive polling:</span> The embed fetches new data every 60s when visible, slows to 120s when unchanged, and pauses completely when the browser tab is hidden.</p>
+                    </div>
+                    <div className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-900/30 border border-white/[0.04]">
+                        <Shield className="w-3.5 h-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p><span className="text-zinc-300 font-medium">Token security:</span> The embed token is visible in your page&apos;s HTML source. This is by design &mdash; it&apos;s similar to how Google Maps API keys or analytics IDs work in frontend code. Here&apos;s why it&apos;s safe:</p>
+                            <ul className="mt-1.5 space-y-1 text-zinc-600 list-disc list-inside">
+                                <li><span className="text-zinc-500">Read-only</span> &mdash; can only view live visitor counts, nothing else</li>
+                                <li><span className="text-zinc-500">Scoped</span> &mdash; limited to one GA4 property&apos;s realtime data</li>
+                                <li><span className="text-zinc-500">Rate-limited</span> &mdash; max 4 requests per minute per token</li>
+                                <li><span className="text-zinc-500">Revocable</span> &mdash; revoke instantly from this dashboard if compromised</li>
+                                <li><span className="text-zinc-500">No credentials exposed</span> &mdash; your Google OAuth tokens are never sent to the browser</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

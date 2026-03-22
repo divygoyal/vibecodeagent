@@ -35,7 +35,7 @@ export async function POST(req: Request) {
                 'X-API-Key': ADMIN_API_KEY,
             },
             body: JSON.stringify({
-                user_id: parseInt(session.user.id),
+                user_identifier: session.user.id,
                 property_id: propertyId,
                 label: label || undefined,
             }),
@@ -67,7 +67,7 @@ export async function GET() {
         }
 
         const res = await fetch(
-            `${ADMIN_API_URL}/api/embed-tokens?user_id=${encodeURIComponent(session.user.id)}`,
+            `${ADMIN_API_URL}/api/embed-tokens?user_identifier=${encodeURIComponent(session.user.id)}`,
             { headers: { 'X-API-Key': ADMIN_API_KEY } }
         );
 

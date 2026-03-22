@@ -1492,7 +1492,7 @@ async def delete_contact_query(query_id: int, db: AsyncSession = Depends(get_db)
 
 # ============= Embed Tokens =============
 class EmbedTokenCreate(BaseModel):
-    user_id: int
+    user_identifier: str  # GitHub ID, provider account ID, or email
     property_id: str
     label: Optional[str] = None
     allowed_origins: Optional[List[str]] = None
@@ -1505,10 +1505,14 @@ async def create_embed_token(
     _: bool = Depends(verify_admin_key)
 ):
     """Create an embed token scoped to a GA4 property."""
+    user = await get_user_by_identifier(db, body.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     token = secrets.token_hex(32)
     embed_token = EmbedToken(
         token=token,
-        user_id=body.user_id,
+        user_id=user.id,
         property_id=body.property_id,
         label=body.label,
         allowed_origins=json.dumps(body.allowed_origins) if body.allowed_origins else None,
@@ -1526,13 +1530,17 @@ async def create_embed_token(
 
 @app.get("/api/embed-tokens")
 async def list_embed_tokens(
-    user_id: int,
+    user_identifier: str,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
     """List all embed tokens for a user."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     result = await db.execute(
-        select(EmbedToken).where(EmbedToken.user_id == user_id)
+        select(EmbedToken).where(EmbedToken.user_id == user.id)
     )
     tokens = result.scalars().all()
     return [
