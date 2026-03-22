@@ -399,20 +399,24 @@ export default function GlobeApiPage() {
 
             {/* ─── No-Properties Banner ─── */}
             {showNoPropertiesBanner && (
-                <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded-2xl p-4 sm:p-5">
-                    <div className="flex items-start gap-3 sm:gap-4">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-                            <AlertTriangle className="w-4.5 h-4.5 text-amber-400" />
+                <div className="relative overflow-hidden bg-gradient-to-r from-amber-500/[0.1] via-amber-500/[0.06] to-orange-500/[0.08] border border-amber-500/25 rounded-2xl p-4 sm:p-5">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-orange-500 rounded-l-2xl" />
+                    <div className="flex items-start gap-3 sm:gap-4 pl-2">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/10">
+                            <AlertTriangle className="w-5 h-5 text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-bold text-white mb-1">Showing Demo Data</h3>
-                            <p className="text-[13px] text-zinc-400 mb-3">
+                            <div className="flex items-center flex-wrap gap-2 mb-1">
+                                <h3 className="text-sm sm:text-base font-bold text-white">Showing Demo Data</h3>
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-[10px] font-bold text-amber-400 uppercase tracking-wider">Demo Mode</span>
+                            </div>
+                            <p className="text-[13px] text-zinc-300 mb-3">
                                 Your Google account doesn&apos;t have any GA4 properties. Connect a different account to see live visitor data.
                             </p>
                             <div className="flex flex-wrap items-center gap-2.5">
                                 <button
                                     onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' }, { prompt: 'select_account consent' })}
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/15 transition"
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-amber-500/20"
                                 >
                                     Connect Different Account
                                 </button>
@@ -420,7 +424,7 @@ export default function GlobeApiPage() {
                                     href="https://analytics.google.com"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-sm text-zinc-400 hover:text-zinc-300 transition"
+                                    className="text-sm text-amber-400/70 hover:text-amber-300 font-medium transition"
                                 >
                                     Set up GA4 &rarr;
                                 </a>

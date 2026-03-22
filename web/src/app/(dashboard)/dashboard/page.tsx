@@ -633,47 +633,96 @@ export default function DashboardOverview() {
       {isEmptyShell && (
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
           {/* Connect Your Data Banner */}
-          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500/[0.08] via-cyan-500/[0.06] to-blue-500/[0.08] border border-emerald-500/30 rounded-2xl p-6 animate-pulse-border">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.03] via-transparent to-cyan-500/[0.03] animate-shimmer" />
-            <div className="relative flex flex-col md:flex-row md:items-center gap-4">
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/10">
-                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.12] via-cyan-500/[0.08] to-blue-500/[0.12] border border-emerald-500/30 rounded-2xl p-5 sm:p-6 animate-pulse-border">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.05] via-transparent to-cyan-500/[0.05] animate-shimmer" />
+            <div className="relative">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-emerald-500/25 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
+                    <BarChart3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center flex-wrap gap-2 mb-1.5">
+                      <h3 className="text-base sm:text-lg font-bold text-white">Connect Your Analytics</h3>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-[10px] font-bold text-amber-400 uppercase tracking-wider">Action Required</span>
+                    </div>
+                    <p className="text-sm text-zinc-300 mb-3">
+                      Link your{' '}
+                      <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-medium underline decoration-emerald-500/30 underline-offset-2">Google Analytics</a>
+                      {' '}&amp;{' '}
+                      <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 font-medium underline decoration-cyan-500/30 underline-offset-2">Search Console</a>
+                      {' '}to unlock your full dashboard.
+                    </p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-zinc-400">
+                      <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-emerald-400" />Live traffic data</span>
+                      <span className="flex items-center gap-1.5"><TrendingUp className="w-3 h-3 text-cyan-400" />Keyword rankings</span>
+                      <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-violet-400" />AI-powered insights</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Connect Google Analytics &amp; Search Console</h3>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                    Set up{' '}
-                    <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">GA4</a>
-                    {' '}and{' '}
-                    <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300">Search Console</a>
-                    {' '}to unlock the full dashboard with live traffic data, keyword rankings, and AI insights.
-                  </p>
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' })}
+                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
+                  >
+                    Connect Different Account
+                  </button>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15] text-xs font-medium transition-all"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Check for Properties
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/20 flex-shrink-0"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Check for Properties
-              </button>
             </div>
           </div>
 
-          {/* Globe Preview Card */}
+          {/* Globe Preview Card — MVP Feature Showcase */}
           <div className="bg-[var(--card-bg)] border border-cyan-500/20 rounded-2xl overflow-hidden">
-            <div className="h-[280px] sm:h-[300px] relative" style={{ background: '#080c18' }}>
+            <div className="h-[360px] sm:h-[420px] relative" style={{ background: '#080c18' }}>
               <RealtimeGlobeMaplibre visitors={PREVIEW_VISITORS} />
+              <div className="absolute top-4 right-4 z-10">
+                <div className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 backdrop-blur-sm shadow-lg shadow-emerald-500/10">
+                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Free for all users</span>
+                </div>
+              </div>
             </div>
             <div className="p-5 sm:p-6">
-              <div className="flex items-center gap-2.5 mb-2">
-                <Globe className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-base font-bold text-[var(--text-primary)]">Realtime Visitor Globe — Free for Everyone</h3>
+              <div className="flex items-center gap-2.5 mb-1">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/15 to-emerald-500/15 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                  <Globe className="w-5 h-5 text-cyan-400" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-white">Realtime Visitor Globe</h3>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
-                Embed a live visitor globe on your website. See where your traffic comes from worldwide.
+              <p className="text-sm text-zinc-400 mb-5">
+                Embed a live 3D globe on your website showing real-time visitor locations. Works with any site — just paste one line of code.
               </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-emerald-500/20 transition-colors">
+                  <Zap className="w-4 h-4 text-emerald-400 mb-1.5" />
+                  <span className="text-[13px] font-semibold text-white block">Real-time</span>
+                  <span className="text-[11px] text-zinc-500">Live visitor stream</span>
+                </div>
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-cyan-500/20 transition-colors">
+                  <ExternalLink className="w-4 h-4 text-cyan-400 mb-1.5" />
+                  <span className="text-[13px] font-semibold text-white block">Embed Anywhere</span>
+                  <span className="text-[11px] text-zinc-500">One-line iframe</span>
+                </div>
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-violet-500/20 transition-colors">
+                  <Shield className="w-4 h-4 text-violet-400 mb-1.5" />
+                  <span className="text-[13px] font-semibold text-white block">Privacy First</span>
+                  <span className="text-[11px] text-zinc-500">Anonymous visitors</span>
+                </div>
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-amber-500/20 transition-colors">
+                  <Rocket className="w-4 h-4 text-amber-400 mb-1.5" />
+                  <span className="text-[13px] font-semibold text-white block">Zero Setup</span>
+                  <span className="text-[11px] text-zinc-500">Plug and play</span>
+                </div>
+              </div>
+
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 <Link
                   href="/dashboard/globe"
@@ -684,15 +733,25 @@ export default function DashboardOverview() {
                 </Link>
                 <button
                   onClick={() => signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' })}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-zinc-600 text-sm font-medium transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15] text-sm font-medium transition-all"
                 >
                   Connect Different Account
                 </button>
               </div>
-              <p className="text-xs text-zinc-500 flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                Your Google account has no GA4 properties. Connect a different account for real analytics.
-              </p>
+
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/[0.08] border border-amber-500/20">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <p className="text-[13px] text-amber-300/80">
+                  Your Google account has no GA4 properties.{' '}
+                  <button
+                    onClick={() => signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' })}
+                    className="text-amber-300 hover:text-amber-200 font-medium underline underline-offset-2 decoration-amber-500/30"
+                  >
+                    Connect a different account
+                  </button>
+                  {' '}for real analytics.
+                </p>
+              </div>
             </div>
           </div>
 
