@@ -3,16 +3,13 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import type { GlobeVisitor as MapboxGlobeVisitor } from '@/components/analytics/RealtimeGlobe';
-import type { RealtimeMapboxHandle } from '@/components/analytics/RealtimeMapbox';
+import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 import {
     convertCitiesToGlobeVisitors, convertToActivityFeed,
     getWarmthDot, type ActivityFeedItem, type GlobeVisitor,
 } from '@/lib/globeUtils';
 
-const RealtimeMapbox = dynamic(() => import('@/components/analytics/RealtimeMapbox'), { ssr: false });
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGl2eWdveWFsIiwiYSI6ImNtbWc3OXY3OTBkeG8yb3NjZXhtdnphMzUifQ.hKvgr-e2sYAMbMq1PvgrAA';
+const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
 // ─── Demo visitors (fallback when no token or API error) ───
 const DEMO_VISITORS: GlobeVisitor[] = [
@@ -167,10 +164,9 @@ export default function EmbedGlobePage() {
         <div className="relative w-screen h-screen overflow-hidden bg-[#080c18]">
             {/* ─── Full-screen Globe ─── */}
             <div className="absolute inset-0">
-                <RealtimeMapbox
+                <RealtimeGlobeMaplibre
                     ref={mapRef}
-                    visitors={displayVisitors as MapboxGlobeVisitor[]}
-                    mapboxToken={MAPBOX_TOKEN}
+                    visitors={displayVisitors}
                     byCountry={displayByCountry}
                     autoPan={true}
                     onAutoPanChange={handleAutoPanChange}

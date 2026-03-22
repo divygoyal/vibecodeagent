@@ -164,8 +164,10 @@ function EmbedTokenManager({ propertyId }: { propertyId: string }) {
         setTimeout(() => setCopied(null), 2000);
     };
 
+    // Strip "properties/" prefix to avoid slash in URL path (causes 404)
+    const embedPropertyId = propertyId.replace(/^properties\//, '');
     const embedUrl = activeToken
-        ? `https://trafficclaw.com/embed/${propertyId}?token=${activeToken.token}`
+        ? `https://trafficclaw.com/embed/${embedPropertyId}?token=${activeToken.token}`
         : null;
 
     const embedCode = embedUrl
