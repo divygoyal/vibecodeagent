@@ -466,8 +466,8 @@ function Features() {
    ═══════════════════════════════════════ */
 
 function InteractiveDemo() {
-    const [activeTab, setActiveTab] = useState<'analytics' | 'globe'>('analytics');
-    const [hasClickedGlobe, setHasClickedGlobe] = useState(false);
+    const [activeTab, setActiveTab] = useState<'analytics' | 'globe'>('globe');
+    const [hasClickedGlobe, setHasClickedGlobe] = useState(true);
 
     return (
         <Section id="demo" className="py-12 sm:py-24 lg:py-32 px-4 sm:px-6">
@@ -729,7 +729,7 @@ function InteractiveDemo() {
                                         <div
                                             className="absolute top-4 left-4 z-20"
                                         >
-                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden w-[calc(100vw-4rem)] sm:w-auto" style={{ minWidth: 0, maxWidth: '400px' }}>
+                                            <div className="bg-[rgba(20,20,30,0.95)] backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden sm:w-auto" style={{ minWidth: 0, maxWidth: '400px' }}>
                                                 {/* Header: Logo | REAL-TIME | toolbar */}
                                                 <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
                                                     <div className="flex items-center gap-1.5">
@@ -742,7 +742,7 @@ function InteractiveDemo() {
                                                     </div>
                                                     <div className="w-px h-4 bg-zinc-600/50 mx-0.5" />
                                                     <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
-                                                    <div className="flex items-center gap-0 ml-auto">
+                                                    <div className="hidden sm:flex items-center gap-0 ml-auto">
                                                         <button className="w-7 h-7 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Share">
                                                             <Share2 className="w-3.5 h-3.5" />
                                                         </button>
@@ -774,10 +774,10 @@ function InteractiveDemo() {
                                                     <span className="text-[13px] text-zinc-500">(est. value: <span className="text-emerald-400 font-semibold">$1</span>)</span>
                                                 </div>
 
-                                                <div className="h-px bg-white/[0.05]" />
+                                                <div className="h-px bg-white/[0.05] hidden sm:block" />
 
                                                 {/* Stats: Referrers / Countries / Devices */}
-                                                <div className="px-4 py-2.5 space-y-2">
+                                                <div className="px-4 py-2.5 space-y-2 hidden sm:block">
                                                     <div className="flex items-start gap-3">
                                                         <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Referrers</span>
                                                         <div className="flex flex-wrap gap-1">
