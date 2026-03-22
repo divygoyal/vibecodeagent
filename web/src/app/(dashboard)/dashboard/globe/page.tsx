@@ -10,10 +10,15 @@ import {
     ChevronRight, ChevronUp, ChevronDown, BookOpen, Server, Palette, DollarSign, Shield, AlertTriangle
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
-import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
+import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 import { useRealtimeData, useContainerStatus, usePropertyList } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
-import { COUNTRY_COORDS, CITY_COORDS } from '@/components/analytics/RealtimeGlobe';
+import {
+    ADJECTIVES, ANIMALS, AVATAR_COLORS, COUNTRY_COORDS, CITY_COORDS,
+    hashStr, predictWarmth, getWarmthDot, makeName,
+    convertCitiesToGlobeVisitors, convertToActivityFeed,
+    type GlobeVisitor, type ActivityFeedItem,
+} from '@/lib/globeUtils';
 
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
@@ -39,18 +44,7 @@ const DEMO_VISITORS: GlobeVisitor[] = [
 ];
 
 // ─── Demo activity feed items ───
-interface DemoActivityItem {
-    id: string;
-    name: string;
-    country: string;
-    page: string;
-    event: 'visited' | 'exited to';
-    exitUrl?: string;
-    timestamp: number;
-    warmth: number;
-    estValue: string;
-    confidence: number;
-}
+type DemoActivityItem = ActivityFeedItem;
 
 const DEMO_ACTIVITY: DemoActivityItem[] = [
     { id: 'a1', name: 'moss tiger', country: 'United States', page: '/dashboard/analytics', event: 'visited', timestamp: Date.now() - 8000, warmth: 0.7, estValue: '$2.45', confidence: 82 },
@@ -75,44 +69,7 @@ const DEMO_COUNTRIES = [
     { country: 'Dominican Republic', users: 1 },
 ];
 
-// ─── Anonymous names (adjective + animal, matching realtime page) ───
-const ADJECTIVES = ['amaranth', 'bronze', 'blue', 'orange', 'crimson', 'golden', 'silver', 'jade', 'coral', 'violet',
-    'scarlet', 'ivory', 'copper', 'magenta', 'teal', 'indigo', 'amber', 'cobalt', 'sage', 'ruby',
-    'gold', 'iron', 'pearl', 'onyx', 'topaz', 'opal', 'slate', 'rose', 'ash', 'moss'];
-const ANIMALS = ['finch', 'ptarmigan', 'salmon', 'aardvark', 'falcon', 'panda', 'fox', 'owl', 'bear', 'wolf',
-    'hawk', 'lynx', 'deer', 'seal', 'crow', 'hare', 'orca', 'viper', 'tiger', 'koala',
-    'xerinae', 'condor', 'marten', 'egret', 'ibis', 'robin', 'wren', 'crane', 'swift', 'lark'];
-
-const AVATAR_COLORS = [
-    '#e11d48', '#7c3aed', '#0891b2', '#059669', '#d97706', '#4f46e5', '#65a30d', '#db2777',
-    '#0d9488', '#dc2626', '#9333ea', '#2563eb', '#16a34a', '#ca8a04', '#c026d3', '#0284c7',
-];
-
-function hashStr(s: string): number {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
-    return Math.abs(h);
-}
-
-function predictWarmth(country: string, device: string, pageIdx: number): number {
-    const hotCountries = ['United States', 'United Kingdom', 'Germany', 'Canada', 'Australia', 'France', 'Japan', 'Netherlands', 'Switzerland', 'Sweden'];
-    const warmCountries = ['India', 'Brazil', 'South Korea', 'Singapore', 'Israel', 'United Arab Emirates'];
-    let score = 0.2;
-    if (hotCountries.includes(country)) score += 0.35;
-    else if (warmCountries.includes(country)) score += 0.2;
-    if (device === 'desktop') score += 0.15;
-    if (pageIdx > 2) score += 0.1;
-    score += (hashStr(country + device) % 20) / 100;
-    return Math.min(1, Math.max(0, score));
-}
-
-// ─── Warmth color helpers ───
-function getWarmthDot(warmth: number): string {
-    if (warmth > 0.6) return 'bg-red-500';
-    if (warmth > 0.4) return 'bg-orange-400';
-    if (warmth > 0.25) return 'bg-yellow-400';
-    return 'bg-blue-400';
-}
+// ─── Warmth ring color (used by globe markers) ───
 
 function getWarmthRing(warmth: number): string {
     if (warmth > 0.6) return '#ef4444';
@@ -143,6 +100,157 @@ function CodeBlock({ code, language = 'html' }: { code: string; language?: strin
                 {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 {copied ? 'Copied' : 'Copy'}
             </button>
+        </div>
+    );
+}
+
+// ─── Embed Token Manager ───
+interface EmbedTokenData {
+    token: string;
+    property_id: string;
+    label: string | null;
+    is_active: boolean;
+    created_at: string | null;
+    last_used_at: string | null;
+}
+
+function EmbedTokenManager({ propertyId }: { propertyId: string }) {
+    const [tokens, setTokens] = useState<EmbedTokenData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [generating, setGenerating] = useState(false);
+    const [copied, setCopied] = useState<string | null>(null);
+
+    // Fetch existing tokens
+    useEffect(() => {
+        setLoading(true);
+        fetch('/api/embed/tokens')
+            .then(res => res.ok ? res.json() : [])
+            .then(data => setTokens(Array.isArray(data) ? data : []))
+            .catch(() => setTokens([]))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const activeToken = tokens.find(t => t.is_active && t.property_id === propertyId);
+
+    const generateToken = async () => {
+        if (!propertyId) return;
+        setGenerating(true);
+        try {
+            const res = await fetch('/api/embed/tokens', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ propertyId, label: 'Globe Embed' }),
+            });
+            if (res.ok) {
+                const newToken = await res.json();
+                setTokens(prev => [...prev, { ...newToken, property_id: propertyId, is_active: true }]);
+            }
+        } catch { /* ignore */ }
+        setGenerating(false);
+    };
+
+    const revokeToken = async (token: string) => {
+        try {
+            const res = await fetch(`/api/embed/tokens?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
+            if (res.ok) {
+                setTokens(prev => prev.map(t => t.token === token ? { ...t, is_active: false } : t));
+            }
+        } catch { /* ignore */ }
+    };
+
+    const copyText = (text: string, id: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(id);
+        setTimeout(() => setCopied(null), 2000);
+    };
+
+    const embedUrl = activeToken
+        ? `https://trafficclaw.com/embed/${propertyId}?token=${activeToken.token}`
+        : null;
+
+    const embedCode = embedUrl
+        ? `<!-- TrafficClaw Realtime Globe -->\n<iframe\n  src="${embedUrl}"\n  width="100%"\n  height="600"\n  frameborder="0"\n  style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);"\n  allow="fullscreen"\n></iframe>`
+        : null;
+
+    return (
+        <div className="space-y-6">
+            {/* Step 1: Generate Token */}
+            <div>
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">1</div>
+                    <div>
+                        <h3 className="text-sm font-semibold text-white">Generate Embed Token</h3>
+                        <p className="text-xs text-zinc-500">Create a token to show real visitor data on your embedded globe</p>
+                    </div>
+                </div>
+
+                {activeToken ? (
+                    <div className="bg-zinc-900/50 border border-white/[0.06] rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                <span className="text-xs text-emerald-400 font-medium">Token Active</span>
+                            </div>
+                            <button
+                                onClick={() => revokeToken(activeToken.token)}
+                                className="text-[10px] text-red-400 hover:text-red-300 transition"
+                            >
+                                Revoke
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 text-[11px] text-zinc-400 font-mono bg-zinc-950 px-3 py-1.5 rounded-lg truncate">
+                                {activeToken.token.slice(0, 16)}...{activeToken.token.slice(-8)}
+                            </code>
+                            <button
+                                onClick={() => copyText(activeToken.token, 'token')}
+                                className="px-2 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/[0.06] text-[10px] text-zinc-400 hover:text-white transition"
+                            >
+                                {copied === 'token' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                        </div>
+                        {activeToken.last_used_at && (
+                            <p className="text-[10px] text-zinc-600">Last used: {new Date(activeToken.last_used_at).toLocaleDateString()}</p>
+                        )}
+                    </div>
+                ) : (
+                    <button
+                        onClick={generateToken}
+                        disabled={generating || !propertyId}
+                        className="w-full px-4 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {generating ? 'Generating...' : 'Generate Embed Token'}
+                    </button>
+                )}
+            </div>
+
+            {/* Step 2: Copy Embed Code */}
+            <div>
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">2</div>
+                    <div>
+                        <h3 className="text-sm font-semibold text-white">Copy Embed Code</h3>
+                        <p className="text-xs text-zinc-500">{embedCode ? 'Add this iframe to your website' : 'Generate a token first to get your embed code'}</p>
+                    </div>
+                </div>
+                {embedCode ? (
+                    <CodeBlock language="html" code={embedCode} />
+                ) : (
+                    <div className="bg-zinc-900/30 border border-white/[0.04] rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-500">Generate an embed token above to see your personalized embed code</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Status indicator */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                </span>
+                <span className="text-sm text-emerald-300">Embed Status: <span className="font-semibold">{activeToken ? 'Live Data' : 'Demo Mode'}</span></span>
+                {activeToken && <span className="text-xs text-zinc-500 ml-auto">Polls every 60s</span>}
+            </div>
         </div>
     );
 }
@@ -192,126 +300,13 @@ export default function GlobeApiPage() {
     // ─── Globe visitors from real data ───
     const realGlobeVisitors = useMemo<GlobeVisitor[]>(() => {
         if (!hasRealData) return [];
-        const visitors: GlobeVisitor[] = [];
-        const usedKeys = new Set<string>();
-
-        const isCityInCountry = (cityCoord: [number, number], countryCoord: [number, number]) => {
-            const dLat = Math.abs(cityCoord[0] - countryCoord[0]);
-            const dLng = Math.abs(cityCoord[1] - countryCoord[1]);
-            return dLat < 20 && dLng < 30;
-        };
-
-        const makeName = (seed: string) => {
-            const h = hashStr(seed);
-            return `${ADJECTIVES[h % ADJECTIVES.length]} ${ANIMALS[(h >> 4) % ANIMALS.length]}`;
-        };
-
-        const sortedCities = [...byCity].sort((a: any, b: any) => {
-            const ka = `${a.country}-${a.city}`;
-            const kb = `${b.country}-${b.city}`;
-            return ka.localeCompare(kb);
-        });
-
-        sortedCities.slice(0, 15).forEach((c: any) => {
-            if (visitors.length >= 12) return;
-            const cityStr = String(c.city ?? '');
-            const countryStr = String(c.country ?? '');
-            const countryCoord = COUNTRY_COORDS[countryStr];
-            if (!countryCoord) return;
-
-            let coord = countryCoord;
-            if (cityStr && !cityStr.startsWith('(')) {
-                const cityCoord = CITY_COORDS[cityStr];
-                if (cityCoord && isCityInCountry(cityCoord, countryCoord)) {
-                    coord = cityCoord;
-                }
-            }
-
-            const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
-            const cityHash = hashStr(`${cityStr}-${countryStr}`);
-            let lat = coord[0];
-            let lng = coord[1];
-            if (usedKeys.has(key)) {
-                const angle = (cityHash % 360) * (Math.PI / 180);
-                const radius = 1.2 + (cityHash % 5) * 0.6;
-                lat += Math.cos(angle) * radius;
-                lng += Math.sin(angle) * radius;
-            }
-            usedKeys.add(key);
-
-            const seed = `${cityStr}-${countryStr}`;
-            const name = makeName(seed);
-            const hash = hashStr(seed);
-            const warmth = predictWarmth(countryStr, 'desktop', 0);
-
-            visitors.push({
-                id: seed, lat, lng, name, country: countryStr,
-                avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
-                avatarInitial: name.charAt(0).toUpperCase(),
-                warmth,
-            });
-        });
-
-        if (visitors.length < 8) {
-            const sortedCountries = [...byCountry].sort((a: any, b: any) =>
-                String(a.country ?? '').localeCompare(String(b.country ?? ''))
-            );
-            sortedCountries.forEach((c: any) => {
-                if (visitors.length >= 12) return;
-                const countryStr = String(c.country ?? '');
-                const coord = COUNTRY_COORDS[countryStr];
-                if (!coord) return;
-                if (visitors.some(v => v.country === countryStr)) return;
-
-                const seed = `${countryStr}-country`;
-                const name = makeName(seed);
-                const hash = hashStr(seed);
-                const warmth = predictWarmth(countryStr, 'desktop', 0);
-
-                visitors.push({
-                    id: seed, lat: coord[0], lng: coord[1], name, country: countryStr,
-                    avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
-                    avatarInitial: name.charAt(0).toUpperCase(),
-                    warmth,
-                });
-            });
-        }
-
-        return visitors;
+        return convertCitiesToGlobeVisitors(byCity, byCountry);
     }, [hasRealData, byCity, byCountry]);
 
     // ─── Activity feed from real data ───
     const realActivityFeed = useMemo<DemoActivityItem[]>(() => {
         if (!hasRealData) return [];
-        const feedCounts = new Map<string, number>();
-        return byCity.slice(0, 20).map((c: any, i: number) => {
-            const cityStr = String(c.city ?? 'Unknown');
-            const countryStr = String(c.country ?? 'Unknown');
-            const feedKey = `${cityStr}-${countryStr}`;
-            const count = feedCounts.get(feedKey) || 0;
-            feedCounts.set(feedKey, count + 1);
-            const hash = hashStr(`${feedKey}-${count}`);
-            const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
-            const page = String(byPage[i % Math.max(byPage.length, 1)]?.page ?? '/');
-            const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
-            const isExit = i % 8 === 0;
-            const warmth = predictWarmth(countryStr, device, i);
-            const confidence = Math.round(50 + warmth * 40 + (hash % 10));
-            const estVal = (warmth * 3.5 + (hash % 100) / 100).toFixed(2);
-
-            return {
-                id: `${cityStr}-${i}`,
-                name,
-                country: countryStr,
-                page: isExit ? '' : page,
-                event: isExit ? 'exited to' as const : 'visited' as const,
-                exitUrl: isExit ? 'apps.apple.com/app/...' : undefined,
-                timestamp: Date.now() - i * 12000,
-                warmth,
-                estValue: `$${estVal}`,
-                confidence,
-            };
-        });
+        return convertToActivityFeed(byCity, byPage, byDevice);
     }, [hasRealData, byCity, byPage, byDevice]);
 
     // ─── Country breakdown from real data ───
@@ -708,63 +703,7 @@ export default function GlobeApiPage() {
                         <p className="text-xs text-zinc-500 italic">Select a GA4 property to auto-fill your site ID.</p>
                     )}
 
-                    <div className="space-y-8">
-                        {/* Step 1 */}
-                        <div>
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">1</div>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-white">Embed Globe</h3>
-                                    <p className="text-xs text-zinc-500">Add this iframe wherever you want the globe to appear</p>
-                                </div>
-                            </div>
-                            <CodeBlock
-                                language="html"
-                                code={`<!-- TrafficClaw Realtime Globe -->
-<iframe
-  src="https://agent.divygoyal.in/embed/${propertyToUse || 'YOUR_SITE_ID'}"
-  width="100%"
-  height="600"
-  frameborder="0"
-  style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);"
-  allow="fullscreen"
-></iframe>`}
-                            />
-                        </div>
-
-                        {/* Step 2 */}
-                        <div>
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">2</div>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-white">Customize Theme</h3>
-                                    <p className="text-xs text-zinc-500">Add <code className="text-zinc-400 bg-zinc-800 px-1 rounded">?theme=dark</code> or <code className="text-zinc-400 bg-zinc-800 px-1 rounded">?theme=light</code> to match your site</p>
-                                </div>
-                            </div>
-                            <CodeBlock
-                                language="html"
-                                code={`<!-- Dark theme variant -->
-<iframe
-  src="https://agent.divygoyal.in/embed/${propertyToUse || 'YOUR_SITE_ID'}?theme=dark"
-  width="100%"
-  height="600"
-  frameborder="0"
-  style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);"
-  allow="fullscreen"
-></iframe>`}
-                            />
-                        </div>
-
-                        {/* Status indicator */}
-                        <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
-                            <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-                            </span>
-                            <span className="text-sm text-emerald-300">API Status: <span className="font-semibold">Operational</span></span>
-                            <span className="text-xs text-zinc-500 ml-auto">99.9% uptime</span>
-                        </div>
-                    </div>
+                    <EmbedTokenManager propertyId={propertyToUse} />
                 </div>
 
                 {/* ─── API Documentation ─── */}

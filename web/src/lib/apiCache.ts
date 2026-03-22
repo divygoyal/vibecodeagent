@@ -74,4 +74,7 @@ export const CACHE_TTL = {
     PROPERTY_LIST: 5 * 60 * 1000,    // 5 minutes - property/site lists rarely change
     DASHBOARD_DATA: 3 * 60 * 1000,   // 3 minutes - dashboard data
     CONTAINER_STATUS: 10 * 1000,      // 10 seconds - container status
+    REALTIME: 15 * 1000,              // 15 seconds - dashboard realtime
+    EMBED_REALTIME: 60 * 1000,        // 60 seconds - embed realtime (lower frequency)
+    EMBED_TOKEN: 5 * 60 * 1000,      // 5 minutes - embed token validation
 } as const;

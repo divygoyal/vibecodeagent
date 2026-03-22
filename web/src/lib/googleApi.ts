@@ -551,6 +551,96 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
     return result;
 }
 
+/**
+ * Lean realtime fetch for embeds — only 4 queries (skips byDevice, byReferrer).
+ * Reduces GA4 API token usage by ~33%.
+ */
+export async function fetchRealtimeForEmbed(token: string, propertyId: string) {
+    const pid = cleanPropertyId(propertyId);
+    const result: any = { activeUsers: 0, byCountry: [], byCity: [], byPage: [] };
+
+    const [totalData, countryData, cityData, pageData] = await Promise.all([
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            metrics: [{ name: 'activeUsers' }],
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'country' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 20,
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'city' }, { name: 'country' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 20,
+        }).catch(() => null),
+        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
+            dimensions: [{ name: 'unifiedScreenName' }],
+            metrics: [{ name: 'activeUsers' }],
+            limit: 15,
+        }).catch(() => null),
+    ]);
+
+    if (totalData?.rows?.[0]) {
+        result.activeUsers = parseInt(totalData.rows[0].metricValues[0].value) || 0;
+    }
+    if (countryData?.rows) {
+        result.byCountry = countryData.rows.map((row: any) => ({
+            country: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+    if (cityData?.rows) {
+        result.byCity = cityData.rows.map((row: any) => ({
+            city: row.dimensionValues[0].value,
+            country: row.dimensionValues[1].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+    if (pageData?.rows) {
+        result.byPage = pageData.rows.map((row: any) => ({
+            page: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value) || 0,
+        }));
+    }
+
+    return result;
+}
+
+
+/**
+ * Validate an embed token and retrieve the owner's Google OAuth credentials.
+ * Called by the public embed realtime API route.
+ */
+export async function fetchEmbedTokenCredentials(token: string): Promise<{
+    propertyId: string;
+    accessToken: string;
+    refreshToken: string;
+    userId: number;
+    allowedOrigins: string[] | null;
+    plan: string;
+} | null> {
+    if (!ADMIN_API_KEY) return null;
+    try {
+        const res = await fetch(
+            `${ADMIN_API_URL}/api/embed-tokens/${encodeURIComponent(token)}/google-tokens`,
+            { headers: { 'X-API-Key': ADMIN_API_KEY } }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        return {
+            propertyId: data.property_id,
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            userId: data.user_id,
+            allowedOrigins: data.allowed_origins || null,
+            plan: data.plan || 'free',
+        };
+    } catch {
+        return null;
+    }
+}
+
+
 // ─── Google Search Console API ───
 
 const GSC_BASE = 'https://www.googleapis.com/webmasters/v3';

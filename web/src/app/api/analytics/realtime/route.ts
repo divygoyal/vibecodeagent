@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getValidAccessToken, fetchGoogleTokensFromDb, fetchRealtimeVisitors } from '@/lib/googleApi';
+import { cachedFetch } from '@/lib/apiCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,13 @@ export async function GET(req: Request) {
         }
 
         const token = await getValidAccessToken(accessToken, refreshToken);
-        const data = await fetchRealtimeVisitors(token, propertyId);
+
+        // Shared cache: same key as embed API so dashboard + embed don't double-fetch
+        const data = await cachedFetch(
+            `realtime:${propertyId}`,
+            15_000, // 15s TTL for dashboard (more frequent than embed's 60s)
+            () => fetchRealtimeVisitors(token, propertyId)
+        );
 
         return NextResponse.json(data);
     } catch (err: any) {

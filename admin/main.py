@@ -21,7 +21,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken
 from docker_manager import docker_manager
 
 
@@ -1488,6 +1488,129 @@ async def delete_contact_query(query_id: int, db: AsyncSession = Depends(get_db)
     await db.delete(query)
     await db.commit()
     return {"success": True}
+
+
+# ============= Embed Tokens =============
+class EmbedTokenCreate(BaseModel):
+    user_id: int
+    property_id: str
+    label: Optional[str] = None
+    allowed_origins: Optional[List[str]] = None
+
+
+@app.post("/api/embed-tokens")
+async def create_embed_token(
+    body: EmbedTokenCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Create an embed token scoped to a GA4 property."""
+    token = secrets.token_hex(32)
+    embed_token = EmbedToken(
+        token=token,
+        user_id=body.user_id,
+        property_id=body.property_id,
+        label=body.label,
+        allowed_origins=json.dumps(body.allowed_origins) if body.allowed_origins else None,
+    )
+    db.add(embed_token)
+    await db.commit()
+    await db.refresh(embed_token)
+    return {
+        "token": embed_token.token,
+        "property_id": embed_token.property_id,
+        "label": embed_token.label,
+        "created_at": embed_token.created_at.isoformat() if embed_token.created_at else None,
+    }
+
+
+@app.get("/api/embed-tokens")
+async def list_embed_tokens(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """List all embed tokens for a user."""
+    result = await db.execute(
+        select(EmbedToken).where(EmbedToken.user_id == user_id)
+    )
+    tokens = result.scalars().all()
+    return [
+        {
+            "token": t.token,
+            "property_id": t.property_id,
+            "label": t.label,
+            "is_active": t.is_active,
+            "allowed_origins": json.loads(t.allowed_origins) if t.allowed_origins else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "last_used_at": t.last_used_at.isoformat() if t.last_used_at else None,
+        }
+        for t in tokens
+    ]
+
+
+@app.delete("/api/embed-tokens/{token}")
+async def revoke_embed_token(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Revoke an embed token (soft delete)."""
+    result = await db.execute(
+        select(EmbedToken).where(EmbedToken.token == token)
+    )
+    embed_token = result.scalar_one_or_none()
+    if not embed_token:
+        raise HTTPException(status_code=404, detail="Token not found")
+    embed_token.is_active = False
+    await db.commit()
+    return {"success": True}
+
+
+@app.get("/api/embed-tokens/{token}/google-tokens")
+async def get_embed_token_google_creds(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Validate embed token and return the owner's Google OAuth credentials."""
+    result = await db.execute(
+        select(EmbedToken).where(EmbedToken.token == token, EmbedToken.is_active == True)
+    )
+    embed_token = result.scalar_one_or_none()
+    if not embed_token:
+        raise HTTPException(status_code=404, detail="Invalid or revoked token")
+
+    # Update last_used_at
+    embed_token.last_used_at = datetime.utcnow()
+
+    # Get the owner's Google OAuth connection
+    oauth_result = await db.execute(
+        select(OAuthConnection).where(
+            OAuthConnection.user_id == embed_token.user_id,
+            OAuthConnection.provider == "google"
+        )
+    )
+    oauth = oauth_result.scalars().first()
+    if not oauth or not oauth.access_token:
+        await db.commit()
+        raise HTTPException(status_code=404, detail="Owner has no Google connection")
+
+    # Get the owner's plan for gating
+    user_result = await db.execute(
+        select(User).where(User.id == embed_token.user_id)
+    )
+    user = user_result.scalar_one_or_none()
+
+    await db.commit()
+    return {
+        "property_id": embed_token.property_id,
+        "access_token": oauth.access_token,
+        "refresh_token": oauth.refresh_token,
+        "user_id": embed_token.user_id,
+        "allowed_origins": json.loads(embed_token.allowed_origins) if embed_token.allowed_origins else None,
+        "plan": user.plan if user else "free",
+    }
 
 
 # ============= Health Check =============

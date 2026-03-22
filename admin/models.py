@@ -118,6 +118,21 @@ class Alert(Base):
     resolved_at = Column(DateTime)
 
 
+class EmbedToken(Base):
+    """Tokens that authorize public embed pages to fetch GA4 realtime data"""
+    __tablename__ = "embed_tokens"
+
+    id = Column(Integer, primary_key=True)
+    token = Column(String(64), unique=True, index=True, nullable=False)  # secrets.token_hex(32)
+    user_id = Column(Integer, nullable=False, index=True)
+    property_id = Column(String(100), nullable=False)  # GA4 property e.g. "properties/513732772"
+    label = Column(String(100))  # user-friendly name e.g. "My Blog Globe"
+    is_active = Column(Boolean, default=True)
+    allowed_origins = Column(Text)  # optional JSON array e.g. '["myblog.com"]'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime)
+
+
 class ContactQuery(Base):
     """Contact form submissions from users"""
     __tablename__ = "contact_queries"

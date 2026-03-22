@@ -1,15 +1,20 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import type { GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
+import type { GlobeVisitor as MapboxGlobeVisitor } from '@/components/analytics/RealtimeGlobe';
 import type { RealtimeMapboxHandle } from '@/components/analytics/RealtimeMapbox';
+import {
+    convertCitiesToGlobeVisitors, convertToActivityFeed,
+    getWarmthDot, type ActivityFeedItem, type GlobeVisitor,
+} from '@/lib/globeUtils';
 
 const RealtimeMapbox = dynamic(() => import('@/components/analytics/RealtimeMapbox'), { ssr: false });
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGl2eWdveWFsIiwiYSI6ImNtbWc3OXY3OTBkeG8yb3NjZXhtdnphMzUifQ.hKvgr-e2sYAMbMq1PvgrAA';
 
-// ─── Demo visitors (same 12 as dashboard globe) ───
+// ─── Demo visitors (fallback when no token or API error) ───
 const DEMO_VISITORS: GlobeVisitor[] = [
     { id: '1', lat: 37.77, lng: -122.42, name: 'coral falcon', country: 'United States', avatarColor: '#f87171', avatarInitial: 'CF', warmth: 0.8, users: 3 },
     { id: '2', lat: 51.51, lng: -0.13, name: 'jade owl', country: 'United Kingdom', avatarColor: '#34d399', avatarInitial: 'JO', warmth: 0.7, users: 2 },
@@ -24,9 +29,7 @@ const DEMO_VISITORS: GlobeVisitor[] = [
     { id: '11', lat: 37.57, lng: 126.98, name: 'golden swift', country: 'South Korea', avatarColor: '#facc15', avatarInitial: 'GS', warmth: 0.45, users: 1 },
     { id: '12', lat: 43.65, lng: -79.38, name: 'ivory lark', country: 'Canada', avatarColor: '#c084fc', avatarInitial: 'IL', warmth: 0.55, users: 1 },
 ];
-
-const DEMO_BY_COUNTRY = DEMO_VISITORS.map(v => ({ country: v.country, users: v.users }));
-
+const DEMO_BY_COUNTRY = DEMO_VISITORS.map(v => ({ country: v.country, users: v.users ?? 1 }));
 const DEMO_ACTIVITY = [
     { id: 'a1', name: 'coral falcon', country: 'United States', page: '500+ Agent Skills for Claude Code, Cursor & AI Assistants', event: 'visited' as const, warmth: 0.8, time: 'a few seconds ago' },
     { id: 'a2', name: 'jade owl', country: 'United Kingdom', page: 'Your Site | 1,500+ MCP Servers, AI Rules', event: 'visited' as const, warmth: 0.7, time: '8 seconds ago' },
@@ -38,27 +41,127 @@ const DEMO_ACTIVITY = [
     { id: 'a8', name: 'topaz crow', country: 'Denmark', page: 'Getting Started with MCP Protocol', event: 'visited' as const, warmth: 0.4, time: '2 minutes ago' },
 ];
 
-function getWarmthDot(warmth: number) {
-    if (warmth > 0.6) return 'bg-red-500';
-    if (warmth > 0.4) return 'bg-orange-400';
-    if (warmth > 0.25) return 'bg-yellow-400';
-    return 'bg-blue-400';
-}
-
 function getAvatarUrl(seed: string): string {
     return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
 }
 
-export default function EmbedGlobePage({ params }: { params: { siteId: string } }) {
+function formatTimeAgo(timestamp: number): string {
+    const diff = Math.floor((Date.now() - timestamp) / 1000);
+    if (diff < 5) return 'a few seconds ago';
+    if (diff < 60) return `${diff} seconds ago`;
+    if (diff < 120) return '1 minute ago';
+    return `${Math.floor(diff / 60)} minutes ago`;
+}
+
+export default function EmbedGlobePage() {
+    const searchParams = useSearchParams();
+    const token = searchParams.get('token');
     const mapRef = useRef<RealtimeMapboxHandle>(null);
-    const [isAutoPanning, setIsAutoPanning] = useState(true);
 
-    const handleAutoPanChange = useCallback((enabled: boolean) => {
-        setIsAutoPanning(enabled);
-    }, []);
+    // ─── Real data state ───
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [realtimeData, setRealtimeData] = useState<Record<string, any> | null>(null);
+    const [isDemo, setIsDemo] = useState(!token);
+    const lastDataRef = useRef<string>('');
+    const intervalRef = useRef<number>(60_000); // start at 60s
 
-    const totalVisitors = useMemo(() => DEMO_VISITORS.reduce((sum, v) => sum + v.users, 0), []);
-    const totalCountries = DEMO_BY_COUNTRY.length;
+    // ─── Adaptive polling with visibility API ───
+    useEffect(() => {
+        if (!token) return;
+
+        let timeoutId: ReturnType<typeof setTimeout>;
+        let cancelled = false;
+
+        const fetchData = async () => {
+            try {
+                const res = await fetch(`/api/embed/realtime?token=${encodeURIComponent(token)}`);
+                if (res.status === 429) {
+                    // Rate limited — back off to 180s
+                    intervalRef.current = 180_000;
+                } else if (res.ok) {
+                    const data = await res.json();
+                    const dataStr = JSON.stringify(data);
+
+                    // Adaptive interval: 60s if data changed, 120s if unchanged
+                    if (dataStr !== lastDataRef.current) {
+                        intervalRef.current = 60_000;
+                    } else {
+                        intervalRef.current = 120_000;
+                    }
+                    lastDataRef.current = dataStr;
+
+                    setRealtimeData(data);
+                    setIsDemo(false);
+                } else {
+                    // API error — keep showing last data or demo
+                    if (!realtimeData) setIsDemo(true);
+                }
+            } catch {
+                if (!realtimeData) setIsDemo(true);
+            }
+
+            // Schedule next poll if visible
+            if (!cancelled && document.visibilityState === 'visible') {
+                timeoutId = setTimeout(fetchData, intervalRef.current);
+            }
+        };
+
+        // Visibility change handler — pause/resume polling
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                fetchData(); // Resume immediately
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibility);
+        fetchData(); // Initial fetch
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleAutoPanChange = useCallback(() => {}, []);
+
+    // ─── Convert real data to globe format ───
+    const realVisitors = useMemo(() => {
+        if (!realtimeData || isDemo) return [];
+        const byCity = Array.isArray(realtimeData.byCity) ? realtimeData.byCity : [];
+        const byCountry = Array.isArray(realtimeData.byCountry) ? realtimeData.byCountry : [];
+        return convertCitiesToGlobeVisitors(byCity, byCountry);
+    }, [realtimeData, isDemo]);
+
+    const realActivity = useMemo<ActivityFeedItem[]>(() => {
+        if (!realtimeData || isDemo) return [];
+        const byCity = Array.isArray(realtimeData.byCity) ? realtimeData.byCity : [];
+        const byPage = Array.isArray(realtimeData.byPage) ? realtimeData.byPage : [];
+        return convertToActivityFeed(byCity, byPage, []);
+    }, [realtimeData, isDemo]);
+
+    const realByCountry = useMemo<{ country: string; users: number }[]>(() => {
+        if (!realtimeData || isDemo) return [];
+        return (Array.isArray(realtimeData.byCountry) ? realtimeData.byCountry : []).map((c: { country?: string; users?: number }) => ({
+            country: String(c.country ?? ''),
+            users: Number(c.users) || 0,
+        }));
+    }, [realtimeData, isDemo]);
+
+    // ─── Select display data ───
+    const hasRealData = !isDemo && realVisitors.length > 0;
+    const displayVisitors = hasRealData ? realVisitors : DEMO_VISITORS;
+    const displayByCountry = hasRealData ? realByCountry : DEMO_BY_COUNTRY;
+    const activeUsers = hasRealData ? (realtimeData?.activeUsers || 0) : DEMO_VISITORS.reduce((s, v) => s + (v.users ?? 1), 0);
+    const totalCountries = displayByCountry.length;
+
+    // Activity feed: use real data with computed times, or demo with static times
+    const displayActivity = hasRealData
+        ? realActivity.map(item => ({
+            ...item,
+            time: formatTimeAgo(item.timestamp),
+        }))
+        : DEMO_ACTIVITY;
 
     return (
         <div className="relative w-screen h-screen overflow-hidden bg-[#080c18]">
@@ -66,9 +169,9 @@ export default function EmbedGlobePage({ params }: { params: { siteId: string } 
             <div className="absolute inset-0">
                 <RealtimeMapbox
                     ref={mapRef}
-                    visitors={DEMO_VISITORS}
+                    visitors={displayVisitors as MapboxGlobeVisitor[]}
                     mapboxToken={MAPBOX_TOKEN}
-                    byCountry={DEMO_BY_COUNTRY}
+                    byCountry={displayByCountry}
                     autoPan={true}
                     onAutoPanChange={handleAutoPanChange}
                 />
@@ -78,7 +181,7 @@ export default function EmbedGlobePage({ params }: { params: { siteId: string } 
             <div className="absolute top-4 left-4 z-10 space-y-2">
                 <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 min-w-[180px]">
                     <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Live Visitors</div>
-                    <div className="text-3xl font-bold text-white tabular-nums">{totalVisitors}</div>
+                    <div className="text-3xl font-bold text-white tabular-nums">{activeUsers}</div>
                 </div>
                 <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 min-w-[180px]">
                     <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Countries</div>
@@ -87,7 +190,7 @@ export default function EmbedGlobePage({ params }: { params: { siteId: string } 
                 <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2.5 min-w-[180px]">
                     <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1.5">Top Countries</div>
                     <div className="space-y-1">
-                        {DEMO_BY_COUNTRY.slice(0, 5).map(c => (
+                        {displayByCountry.slice(0, 5).map(c => (
                             <div key={c.country} className="flex items-center justify-between text-xs">
                                 <span className="text-zinc-300 truncate mr-2">{c.country}</span>
                                 <span className="text-zinc-500 tabular-nums">{c.users}</span>
@@ -95,6 +198,11 @@ export default function EmbedGlobePage({ params }: { params: { siteId: string } 
                         ))}
                     </div>
                 </div>
+                {isDemo && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5">
+                        <span className="text-[9px] uppercase tracking-wider text-yellow-500/80 font-semibold">Demo Data</span>
+                    </div>
+                )}
             </div>
 
             {/* ─── Activity feed (bottom-left) ─── */}
@@ -104,7 +212,7 @@ export default function EmbedGlobePage({ params }: { params: { siteId: string } 
                         <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Live Activity</span>
                     </div>
                     <div className="max-h-[260px] overflow-y-auto">
-                        {DEMO_ACTIVITY.map(item => (
+                        {displayActivity.map(item => (
                             <div key={item.id} className="px-4 py-2.5 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition">
                                 <div className="flex items-start gap-2.5">
                                     <img
