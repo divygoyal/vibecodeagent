@@ -714,19 +714,21 @@ export default function GlobeApiPage() {
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">1</div>
                                 <div>
-                                    <h3 className="text-sm font-semibold text-white">Add Tracking Script</h3>
-                                    <p className="text-xs text-zinc-500">Place this snippet before the closing <code className="text-zinc-400 bg-zinc-800 px-1 rounded">&lt;/head&gt;</code> tag</p>
+                                    <h3 className="text-sm font-semibold text-white">Embed Globe</h3>
+                                    <p className="text-xs text-zinc-500">Add this iframe wherever you want the globe to appear</p>
                                 </div>
                             </div>
                             <CodeBlock
                                 language="html"
-                                code={`<!-- TrafficClaw Analytics -->
-<script
-  src="https://cdn.trafficclaw.com/tracker.js"
-  data-site-id="${propertyToUse || 'YOUR_SITE_ID'}"
-  data-api="https://api.trafficclaw.com"
-  defer
-></script>`}
+                                code={`<!-- TrafficClaw Realtime Globe -->
+<iframe
+  src="https://agent.divygoyal.in/embed/${propertyToUse || 'YOUR_SITE_ID'}"
+  width="100%"
+  height="600"
+  frameborder="0"
+  style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);"
+  allow="fullscreen"
+></iframe>`}
                             />
                         </div>
 
@@ -735,15 +737,15 @@ export default function GlobeApiPage() {
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">2</div>
                                 <div>
-                                    <h3 className="text-sm font-semibold text-white">Embed Globe</h3>
-                                    <p className="text-xs text-zinc-500">Add the iframe wherever you want the globe to appear</p>
+                                    <h3 className="text-sm font-semibold text-white">Customize Theme</h3>
+                                    <p className="text-xs text-zinc-500">Add <code className="text-zinc-400 bg-zinc-800 px-1 rounded">?theme=dark</code> or <code className="text-zinc-400 bg-zinc-800 px-1 rounded">?theme=light</code> to match your site</p>
                                 </div>
                             </div>
                             <CodeBlock
                                 language="html"
-                                code={`<!-- TrafficClaw Realtime Globe -->
+                                code={`<!-- Dark theme variant -->
 <iframe
-  src="https://app.trafficclaw.com/embed/globe?site=${propertyToUse || 'YOUR_SITE_ID'}&theme=dark"
+  src="https://agent.divygoyal.in/embed/${propertyToUse || 'YOUR_SITE_ID'}?theme=dark"
   width="100%"
   height="600"
   frameborder="0"
