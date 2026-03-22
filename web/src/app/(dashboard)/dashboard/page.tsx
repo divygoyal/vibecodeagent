@@ -658,7 +658,7 @@ export default function DashboardOverview() {
 
           {/* Globe Preview Card — MVP Feature Showcase */}
           <div className="bg-[var(--card-bg)] border border-cyan-500/20 rounded-2xl overflow-hidden">
-            <div className="h-[260px] sm:h-[420px] relative" style={{ background: '#080c18' }}>
+            <div className="h-[calc(100vh-200px)] sm:h-[420px] relative" style={{ background: '#080c18' }}>
               <RealtimeGlobeMaplibre visitors={PREVIEW_VISITORS} initialZoom={1.2} />
 
               {/* Mini Stats Panel (top-left) */}
