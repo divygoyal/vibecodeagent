@@ -144,20 +144,22 @@ export default function EmbedGlobePage() {
     }, []);
 
     return (
-        <div className="relative w-screen h-screen overflow-hidden bg-[#080c18] flex flex-col">
-            {/* ─── Globe (full background) ─── */}
-            <div className="absolute inset-0">
-                <RealtimeGlobeMaplibre
-                    ref={mapRef}
-                    visitors={displayVisitors}
-                    byCountry={displayByCountry}
-                    autoPan={isAutoPanning}
-                    onAutoPanChange={handleAutoPanChange}
-                />
+        <div className="flex flex-col relative w-screen h-screen overflow-hidden sm:block" style={{ background: '#080c18' }}>
+            {/* ─── Globe ─── */}
+            <div className="relative flex-1 min-h-0 sm:absolute sm:inset-0 order-0">
+                <div className="absolute inset-0">
+                    <RealtimeGlobeMaplibre
+                        ref={mapRef}
+                        visitors={displayVisitors}
+                        byCountry={displayByCountry}
+                        autoPan={isAutoPanning}
+                        onAutoPanChange={handleAutoPanChange}
+                    />
+                </div>
             </div>
 
-            {/* ═══ TOP-LEFT: Stats Panel (same as dashboard) ═══ */}
-            <div className="relative z-10 flex-shrink-0">
+            {/* ═══ TOP-LEFT: Stats Panel ═══ */}
+            <div className="relative z-10 flex-shrink-0 -order-1 sm:absolute sm:top-4 sm:left-4 sm:z-20">
                 <div className="p-3 sm:absolute sm:top-4 sm:left-4 sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:p-4 sm:border sm:border-white/10 sm:max-w-xs">
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
@@ -242,8 +244,8 @@ export default function EmbedGlobePage() {
                 </div>
             </div>
 
-            {/* ═══ BOTTOM-LEFT: Activity Feed (same format as dashboard) ═══ */}
-            <div className="relative z-10 flex-shrink-0 mt-auto sm:absolute sm:bottom-4 sm:left-4 sm:z-20 max-w-full sm:max-w-sm">
+            {/* ═══ BOTTOM-LEFT: Activity Feed ═══ */}
+            <div className="relative z-10 flex-shrink-0 order-1 sm:absolute sm:bottom-4 sm:left-4 sm:z-20 max-w-full sm:max-w-sm">
                 <div className="sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:border sm:border-white/10 overflow-hidden">
                     <div className="max-h-[180px] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                         {displayActivity.map((item, i) => (

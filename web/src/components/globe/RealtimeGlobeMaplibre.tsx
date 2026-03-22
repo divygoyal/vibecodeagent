@@ -248,11 +248,13 @@ function createStarLayer(mapInstance: any) {
 // ═══════════════════════════════════════════════════
 let _MapClass: any = null;
 let _MarkerClass: any = null;
+let _PopupClass: any = null;
 async function loadMapLibreGL() {
     if (_MapClass) return;
     const mod: any = await import('maplibre-gl');
     _MapClass = mod.Map ?? mod.default?.Map ?? mod.default;
     _MarkerClass = mod.Marker ?? mod.default?.Marker;
+    _PopupClass = mod.Popup ?? mod.default?.Popup;
 }
 
 // ═══════════════════════════════════════════════════
@@ -262,6 +264,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
     const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; lngLat: [number, number] }>>(new Map());
+    const activePopupRef = useRef<any>(null);
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
     const retryCountRef = useRef(0);
@@ -432,6 +435,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         return () => {
             destroyed = true;
             stopAutoPan();
+            if (activePopupRef.current) { try { activePopupRef.current.remove(); } catch { /**/ } activePopupRef.current = null; }
             markersRef.current.forEach(m => { try { m.marker.remove(); } catch { /**/ } });
             markersRef.current = new Map();
             if (map) { try { map.remove(); } catch { /**/ } }
@@ -477,6 +481,66 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
         el.onmouseenter = () => { frame.style.transform = 'scale(1.15)'; frame.style.transition = 'transform 0.2s ease'; };
         el.onmouseleave = () => { frame.style.transform = ''; };
+
+        // Click → show visitor card popup
+        el.onclick = (e) => {
+            e.stopPropagation();
+            if (!mapRef.current || !_PopupClass) return;
+
+            // Close any existing popup
+            if (activePopupRef.current) { try { activePopupRef.current.remove(); } catch { /**/ } }
+
+            const warmthLabel = v.warmth > 0.6 ? 'Hot' : v.warmth > 0.4 ? 'Warm' : v.warmth > 0.25 ? 'Mild' : 'Cool';
+            const warmthHex = getWarmthColor(v.warmth);
+
+            const popupHTML = `
+                <div style="background:#13131D;border-radius:16px;padding:16px;min-width:220px;max-width:280px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <div style="width:44px;height:44px;border-radius:50%;background:${v.avatarColor};border:2px solid rgba(255,255,255,0.15);overflow:hidden;flex-shrink:0;box-shadow:0 0 12px ${warmthHex}40;">
+                            <img src="${getAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='18px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:14px;font-weight:700;color:white;margin-bottom:2px;">${v.name}</div>
+                            <div style="font-size:11px;color:#a1a1aa;">${v.country}</div>
+                        </div>
+                        <div style="width:10px;height:10px;border-radius:50%;background:${warmthHex};box-shadow:0 0 8px ${warmthHex}80;flex-shrink:0;" title="${warmthLabel}"></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:11px;color:#71717a;">Engagement</span>
+                            <span style="font-size:11px;font-weight:600;color:${warmthHex};">${warmthLabel}</span>
+                        </div>
+                        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                            <div style="height:100%;width:${Math.round(v.warmth * 100)}%;background:${warmthHex};border-radius:2px;transition:width 0.3s;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#71717a;margin-bottom:2px;">Location</div>
+                            <div style="font-size:12px;color:#d4d4d8;font-weight:500;">${v.country}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#71717a;margin-bottom:2px;">Warmth</div>
+                            <div style="font-size:12px;color:#d4d4d8;font-weight:500;">${Math.round(v.warmth * 100)}%</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const popup = new _PopupClass({
+                closeButton: true,
+                closeOnClick: true,
+                maxWidth: '300px',
+                offset: [0, -35],
+                className: 'tc-visitor-popup',
+            })
+                .setLngLat([v.lng, v.lat])
+                .setHTML(popupHTML)
+                .addTo(mapRef.current);
+
+            activePopupRef.current = popup;
+            popup.on('close', () => { activePopupRef.current = null; });
+        };
 
         return el;
     }, []);
@@ -548,6 +612,32 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             <style>{`
                 .maplibregl-ctrl-logo { display: none !important; }
                 .maplibregl-ctrl-attrib { display: none !important; }
+                .tc-visitor-popup .maplibregl-popup-content {
+                    background: transparent !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                    border-radius: 16px !important;
+                }
+                .tc-visitor-popup .maplibregl-popup-tip {
+                    border-top-color: #13131D !important;
+                }
+                .tc-visitor-popup .maplibregl-popup-close-button {
+                    color: #71717a !important;
+                    font-size: 18px !important;
+                    right: 8px !important;
+                    top: 8px !important;
+                    width: 24px !important;
+                    height: 24px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    border-radius: 50% !important;
+                    z-index: 5 !important;
+                }
+                .tc-visitor-popup .maplibregl-popup-close-button:hover {
+                    background: rgba(255,255,255,0.1) !important;
+                    color: white !important;
+                }
             `}</style>
             <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
             {status === 'loading' && (
