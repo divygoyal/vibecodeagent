@@ -2399,6 +2399,10 @@ function GlobeEmbedPromo() {
   allow="fullscreen"
 ></iframe>`;
 
+    const handleGetEmbed = () => {
+        signIn('github', { callbackUrl: '/dashboard/globe' });
+    };
+
     return (
         <Section className="py-16 sm:py-24 px-4 sm:px-6">
             <div ref={sectionRef} className="max-w-5xl mx-auto">
@@ -2406,17 +2410,19 @@ function GlobeEmbedPromo() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={isInView ? { opacity: 1, y: 0 } : {}}
                     transition={{ duration: 0.6 }}
-                    className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.06] via-[#080c18] to-cyan-500/[0.06]"
+                    className="relative overflow-hidden rounded-3xl border border-emerald-500/20"
+                    style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, #080c18 40%, rgba(6,182,212,0.08) 100%)' }}
                 >
                     {/* Glow effects */}
                     <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
                     <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/[0.03] rounded-full blur-[100px] pointer-events-none" />
 
                     <div className="relative z-10 p-8 sm:p-12 lg:p-16">
                         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-                            {/* Left — copy */}
+                            {/* Left */}
                             <div>
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-6">
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-6">
                                     <Sparkles className="w-3.5 h-3.5" />
                                     Free for everyone
                                 </div>
@@ -2428,70 +2434,73 @@ function GlobeEmbedPromo() {
                                     Show your visitors where your audience is — in real time. One iframe, real GA4 data,
                                     beautiful 3D globe with live activity feed. No tracking scripts needed.
                                 </p>
-                                <div className="flex flex-wrap gap-4 mb-8">
+                                <div className="grid grid-cols-2 gap-3 mb-8">
                                     {[
                                         { icon: Globe, text: 'Interactive 3D globe' },
                                         { icon: Zap, text: 'Real-time GA4 data' },
                                         { icon: Shield, text: 'No tracking script' },
                                         { icon: Eye, text: 'Click visitor profiles' },
                                     ].map((item, i) => (
-                                        <div key={i} className="flex items-center gap-2 text-sm text-zinc-300">
-                                            <item.icon className="w-4 h-4 text-emerald-400" />
+                                        <div key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
+                                            <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
+                                                <item.icon className="w-3.5 h-3.5 text-emerald-400" />
+                                            </div>
                                             {item.text}
                                         </div>
                                     ))}
                                 </div>
                                 <div className="flex flex-wrap gap-3">
-                                    <Link
-                                        href="/dashboard/globe"
+                                    <button
+                                        onClick={handleGetEmbed}
                                         className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
                                     >
                                         Get your embed code
                                         <ArrowRight className="w-4 h-4" />
-                                    </Link>
-                                    <Link
-                                        href="/dashboard/globe"
+                                    </button>
+                                    <a
+                                        href="#demo"
                                         className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/[0.04] transition"
                                     >
                                         See live demo
-                                    </Link>
+                                    </a>
                                 </div>
                             </div>
 
-                            {/* Right — code preview */}
+                            {/* Right — premium code card */}
                             <div>
-                                <div className="bg-[#0a0e1a] border border-white/[0.06] rounded-2xl overflow-hidden">
-                                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
-                                        <div className="flex items-center gap-2">
-                                            <Code2 className="w-4 h-4 text-emerald-400" />
-                                            <span className="text-xs font-medium text-zinc-400">embed.html</span>
+                                <div className="bg-[#0d1117] border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
+                                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex gap-1.5">
+                                                <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                                                <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+                                                <div className="w-3 h-3 rounded-full bg-green-500/60" />
+                                            </div>
+                                            <span className="text-xs font-medium text-zinc-500">embed.html</span>
                                         </div>
                                         <button
                                             onClick={() => { navigator.clipboard.writeText(embedCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[11px] text-zinc-400 hover:text-white transition"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[11px] text-zinc-400 hover:text-white transition border border-white/[0.04]"
                                         >
                                             {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                            {copied ? 'Copied' : 'Copy'}
+                                            {copied ? 'Copied!' : 'Copy'}
                                         </button>
                                     </div>
-                                    <pre className="p-4 text-[13px] leading-relaxed font-mono text-zinc-300 overflow-x-auto">
-                                        <code>{embedCode}</code>
-                                    </pre>
-                                </div>
-                                <div className="flex items-center gap-4 mt-4 px-1">
-                                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                        Polls every 60s
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                                        Pauses when hidden
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
-                                        MapLibre (free)
+                                    <div className="p-5">
+                                        <pre className="text-[13px] leading-relaxed font-mono text-zinc-400 overflow-x-auto">
+                                            <code>
+                                                <span className="text-zinc-600">{'<!-- One line. That\'s it. -->'}</span>{'\n'}
+                                                <span className="text-cyan-400">{'<iframe'}</span>{'\n'}
+                                                {'  '}src=<span className="text-emerald-400">{'"https://trafficclaw.com/embed/...'}</span>{'\n'}
+                                                {'  '}width=<span className="text-emerald-400">{'"100%"'}</span> height=<span className="text-emerald-400">{'"600"'}</span>{'\n'}
+                                                {'  '}frameborder=<span className="text-emerald-400">{'"0"'}</span>{'\n'}
+                                                {'  '}allow=<span className="text-emerald-400">{'"fullscreen"'}</span>{'\n'}
+                                                <span className="text-cyan-400">{'></iframe>'}</span>
+                                            </code>
+                                        </pre>
                                     </div>
                                 </div>
+                                <p className="text-center text-zinc-600 text-xs mt-4">Works with any website, CMS, or framework</p>
                             </div>
                         </div>
                     </div>
