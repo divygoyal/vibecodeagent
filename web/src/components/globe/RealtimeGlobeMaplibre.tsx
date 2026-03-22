@@ -490,38 +490,53 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             // Close any existing popup
             if (activePopupRef.current) { try { activePopupRef.current.remove(); } catch { /**/ } }
 
+            const warmthPct = Math.round(v.warmth * 100);
             const warmthLabel = v.warmth > 0.6 ? 'Hot' : v.warmth > 0.4 ? 'Warm' : v.warmth > 0.25 ? 'Mild' : 'Cool';
             const warmthHex = getWarmthColor(v.warmth);
+            const lat = v.lat.toFixed(2);
+            const lng = v.lng.toFixed(2);
 
             const popupHTML = `
-                <div style="background:#13131D;border-radius:16px;padding:16px;min-width:220px;max-width:280px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 60px rgba(0,0,0,0.6);">
-                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                        <div style="width:44px;height:44px;border-radius:50%;background:${v.avatarColor};border:2px solid rgba(255,255,255,0.15);overflow:hidden;flex-shrink:0;box-shadow:0 0 12px ${warmthHex}40;">
-                            <img src="${getAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='18px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
+                <div style="background:#13131D;border-radius:14px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);overflow:hidden;">
+                    <!-- Header -->
+                    <div style="padding:14px 16px 12px;display:flex;align-items:center;gap:12px;">
+                        <div style="position:relative;flex-shrink:0;">
+                            <div style="width:42px;height:42px;border-radius:50%;background:${v.avatarColor};border:2.5px solid ${warmthHex}50;overflow:hidden;box-shadow:0 0 16px ${warmthHex}30;">
+                                <img src="${getAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='17px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
+                            </div>
+                            <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid #13131D;box-shadow:0 0 6px ${warmthHex}80;"></div>
                         </div>
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:14px;font-weight:700;color:white;margin-bottom:2px;">${v.name}</div>
-                            <div style="font-size:11px;color:#a1a1aa;">${v.country}</div>
-                        </div>
-                        <div style="width:10px;height:10px;border-radius:50%;background:${warmthHex};box-shadow:0 0 8px ${warmthHex}80;flex-shrink:0;" title="${warmthLabel}"></div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <span style="font-size:11px;color:#71717a;">Engagement</span>
-                            <span style="font-size:11px;font-weight:600;color:${warmthHex};">${warmthLabel}</span>
-                        </div>
-                        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
-                            <div style="height:100%;width:${Math.round(v.warmth * 100)}%;background:${warmthHex};border-radius:2px;transition:width 0.3s;"></div>
+                            <div style="font-size:14px;font-weight:700;color:white;line-height:1.2;">${v.name}</div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+                                <span style="font-size:11px;color:#a1a1aa;">📍 ${v.country}</span>
+                            </div>
                         </div>
                     </div>
-                    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                        <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;">
-                            <div style="font-size:10px;color:#71717a;margin-bottom:2px;">Location</div>
-                            <div style="font-size:12px;color:#d4d4d8;font-weight:500;">${v.country}</div>
+
+                    <!-- Divider -->
+                    <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 16px;"></div>
+
+                    <!-- Stats rows -->
+                    <div style="padding:10px 16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+                            <span style="font-size:12px;color:#71717a;">Engagement</span>
+                            <span style="font-size:12px;font-weight:600;color:${warmthHex};">${warmthLabel}</span>
                         </div>
-                        <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;">
-                            <div style="font-size:10px;color:#71717a;margin-bottom:2px;">Warmth</div>
-                            <div style="font-size:12px;color:#d4d4d8;font-weight:500;">${Math.round(v.warmth * 100)}%</div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+                            <span style="font-size:12px;color:#71717a;">Coordinates</span>
+                            <span style="font-size:12px;color:#d4d4d8;font-family:ui-monospace,monospace;">${lat}, ${lng}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+                            <span style="font-size:12px;color:#71717a;">Warmth Score</span>
+                            <span style="font-size:12px;color:#d4d4d8;font-weight:600;">${warmthPct}%</span>
+                        </div>
+                    </div>
+
+                    <!-- Warmth bar -->
+                    <div style="padding:0 16px 14px;">
+                        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+                            <div style="height:100%;width:${warmthPct}%;background:linear-gradient(90deg,${warmthHex},${warmthHex}cc);border-radius:99px;"></div>
                         </div>
                     </div>
                 </div>
@@ -530,8 +545,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const popup = new _PopupClass({
                 closeButton: true,
                 closeOnClick: true,
-                maxWidth: '300px',
-                offset: [0, -35],
+                maxWidth: '320px',
+                offset: [0, -38],
                 className: 'tc-visitor-popup',
             })
                 .setLngLat([v.lng, v.lat])
@@ -612,31 +627,36 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             <style>{`
                 .maplibregl-ctrl-logo { display: none !important; }
                 .maplibregl-ctrl-attrib { display: none !important; }
+                .tc-visitor-popup {
+                    z-index: 100 !important;
+                }
                 .tc-visitor-popup .maplibregl-popup-content {
                     background: transparent !important;
                     padding: 0 !important;
                     box-shadow: none !important;
-                    border-radius: 16px !important;
+                    border-radius: 14px !important;
+                    overflow: visible !important;
                 }
                 .tc-visitor-popup .maplibregl-popup-tip {
                     border-top-color: #13131D !important;
                 }
                 .tc-visitor-popup .maplibregl-popup-close-button {
-                    color: #71717a !important;
-                    font-size: 18px !important;
-                    right: 8px !important;
-                    top: 8px !important;
-                    width: 24px !important;
-                    height: 24px !important;
+                    color: #52525b !important;
+                    font-size: 16px !important;
+                    right: 10px !important;
+                    top: 10px !important;
+                    width: 22px !important;
+                    height: 22px !important;
                     display: flex !important;
                     align-items: center !important;
                     justify-content: center !important;
                     border-radius: 50% !important;
                     z-index: 5 !important;
+                    line-height: 1 !important;
                 }
                 .tc-visitor-popup .maplibregl-popup-close-button:hover {
-                    background: rgba(255,255,255,0.1) !important;
-                    color: white !important;
+                    background: rgba(255,255,255,0.08) !important;
+                    color: #a1a1aa !important;
                 }
             `}</style>
             <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
