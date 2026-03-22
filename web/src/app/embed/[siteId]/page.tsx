@@ -158,20 +158,11 @@ export default function EmbedGlobePage() {
                 </div>
             </div>
 
-            {/* ═══ TOP-LEFT: Stats Panel ═══ */}
+            {/* ═══ TOP-LEFT: Stats Panel (matches dashboard exactly) ═══ */}
             <div className="relative z-10 flex-shrink-0 -order-1 sm:absolute sm:top-4 sm:left-4 sm:z-20">
-                <div className="p-3 sm:absolute sm:top-4 sm:left-4 sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:p-4 sm:border sm:border-white/10 sm:max-w-xs">
-                    {/* Header */}
+                <div className="p-3 sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:p-4 sm:border sm:border-white/10 sm:max-w-xs">
+                    {/* Header — no TrafficClaw branding, just Real-Time label */}
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="flex items-center gap-1.5">
-                            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                                <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
-                                <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
-                                <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
-                            </svg>
-                            <span className="text-[14px] font-bold text-white tracking-tight">TrafficClaw</span>
-                        </div>
-                        <div className="w-px h-4 bg-zinc-600/50 mx-0.5" />
                         <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
                         {isDemo && (
                             <>
@@ -196,8 +187,21 @@ export default function EmbedGlobePage() {
 
                     <div className="h-px bg-white/[0.05] mb-2" />
 
-                    {/* Countries */}
+                    {/* Stats rows — same structure as dashboard */}
                     <div className="space-y-2">
+                        {/* Referrers */}
+                        <div className="flex items-start gap-3">
+                            <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Referrers</span>
+                            <div className="flex flex-wrap gap-1">
+                                <div className="flex items-center gap-1 text-[12px]">
+                                    <Link2 className="w-3 h-3 text-zinc-400" />
+                                    <span className="text-zinc-300">Direct</span>
+                                    <span className="text-zinc-500">({activeUsers})</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Countries */}
                         <div className="flex items-start gap-3">
                             <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Countries</span>
                             <div className="flex flex-wrap gap-1">
@@ -209,14 +213,14 @@ export default function EmbedGlobePage() {
                                     </div>
                                 ))}
                                 {displayByCountry.length > 4 && (
-                                    <span className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center text-[9px] text-zinc-400">
+                                    <span className="w-5 h-5 rounded-full bg-white/[0.06] inline-flex items-center justify-center text-[9px] text-zinc-400">
                                         +{displayByCountry.length - 4}
                                     </span>
                                 )}
                             </div>
                         </div>
 
-                        {/* Devices (desktop only) */}
+                        {/* Devices */}
                         <div className="hidden sm:flex items-start gap-3">
                             <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Devices</span>
                             <div className="flex flex-wrap gap-1.5">
