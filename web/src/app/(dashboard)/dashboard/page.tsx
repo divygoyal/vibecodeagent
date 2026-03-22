@@ -633,49 +633,26 @@ export default function DashboardOverview() {
       {isEmptyShell && (
         <motion.div variants={fadeInUp} transition={{ duration: 0.35 }} className="space-y-5">
           {/* Connect Your Data Banner */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.12] via-cyan-500/[0.08] to-blue-500/[0.12] border border-emerald-500/30 rounded-2xl p-5 sm:p-6 animate-pulse-border">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.05] via-transparent to-cyan-500/[0.05] animate-shimmer" />
-            <div className="relative">
-              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-emerald-500/25 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
-                    <BarChart3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center flex-wrap gap-2 mb-1.5">
-                      <h3 className="text-base sm:text-lg font-bold text-white">Connect Your Analytics</h3>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-[10px] font-bold text-amber-400 uppercase tracking-wider">Action Required</span>
-                    </div>
-                    <p className="text-sm text-zinc-300 mb-3">
-                      Link your{' '}
-                      <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-medium underline decoration-emerald-500/30 underline-offset-2">Google Analytics</a>
-                      {' '}&amp;{' '}
-                      <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 font-medium underline decoration-cyan-500/30 underline-offset-2">Search Console</a>
-                      {' '}to unlock your full dashboard.
-                    </p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-zinc-400">
-                      <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-emerald-400" />Live traffic data</span>
-                      <span className="flex items-center gap-1.5"><TrendingUp className="w-3 h-3 text-cyan-400" />Keyword rankings</span>
-                      <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-violet-400" />AI-powered insights</span>
-                    </div>
-                  </div>
+          <div className="rounded-2xl border border-emerald-500/15 bg-gradient-to-r from-emerald-500/[0.06] to-cyan-500/[0.04] p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                  <BarChart3 className="w-5 h-5 text-emerald-400" />
                 </div>
-                <div className="flex flex-col gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' })}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
-                  >
-                    Connect Different Account
-                  </button>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15] text-xs font-medium transition-all"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    Check for Properties
-                  </button>
+                <div>
+                  <h3 className="text-base font-bold text-white">Connect Google Analytics &amp; Search Console</h3>
+                  <p className="text-sm text-zinc-400 mt-0.5">
+                    Your account has no GA4 properties. Connect a different Google account to see live traffic, rankings, and AI insights.
+                  </p>
                 </div>
               </div>
+              <button
+                onClick={() => signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' })}
+                className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/20 flex-shrink-0 whitespace-nowrap"
+              >
+                Connect Account
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -683,9 +660,52 @@ export default function DashboardOverview() {
           <div className="bg-[var(--card-bg)] border border-cyan-500/20 rounded-2xl overflow-hidden">
             <div className="h-[360px] sm:h-[420px] relative" style={{ background: '#080c18' }}>
               <RealtimeGlobeMaplibre visitors={PREVIEW_VISITORS} />
-              <div className="absolute top-4 right-4 z-10">
+
+              {/* Mini Stats Panel (top-left) */}
+              <div className="absolute top-3 left-3 z-10">
+                <div className="bg-black/60 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                      <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                      <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                      <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                    </svg>
+                    <span className="text-[12px] font-bold text-white">TrafficClaw</span>
+                    <div className="w-px h-3 bg-zinc-600/50" />
+                    <span className="text-[9px] font-semibold text-zinc-400 uppercase tracking-[0.12em]">Real-Time</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                    </span>
+                    <span className="text-[11px] text-zinc-300"><span className="font-bold text-white">{PREVIEW_VISITORS.length}</span> visitors on your site</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* FREE badge (top-right) */}
+              <div className="absolute top-3 right-3 z-10">
                 <div className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 backdrop-blur-sm shadow-lg shadow-emerald-500/10">
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Free for all users</span>
+                </div>
+              </div>
+
+              {/* Mini Activity Feed (bottom-left, desktop only) */}
+              <div className="absolute bottom-3 left-3 z-10 hidden sm:block">
+                <div className="bg-black/60 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+                  {PREVIEW_VISITORS.slice(0, 3).map((v) => (
+                    <div key={v.id} className="px-3 py-2 border-b border-white/[0.03] last:border-b-0">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style={{ backgroundColor: v.avatarColor }}>
+                          {v.avatarInitial}
+                        </div>
+                        <span className="text-[11px] font-bold text-white">{v.name}</span>
+                        <span className="text-[11px] text-zinc-500">from</span>
+                        <span className="text-[11px] text-zinc-300">{v.country}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
