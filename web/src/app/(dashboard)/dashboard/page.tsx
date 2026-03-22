@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import { useState, useEffect, useRef, useMemo, useCallback, RefObject } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,11 +36,13 @@ import CompetitorSpy from '@/components/workspace/CompetitorSpy';
 import SiteCrawler from '@/components/workspace/SiteCrawler';
 
 import type { DrawerContent } from '@/components/OverviewDetailDrawer';
+import type { GlobeVisitor } from '@/components/globe/RealtimeGlobeMaplibre';
 
 // Dynamic imports for heavy components (code splitting)
 const OverviewInsights = dynamic(() => import('@/components/OverviewInsights'), { ssr: false });
 const OverviewDetailDrawer = dynamic(() => import('@/components/OverviewDetailDrawer'), { ssr: false });
 const DomainOverview = dynamic(() => import('@/components/DomainOverview'), { ssr: false });
+const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
 /* ─── Animation variants ─── */
 const fadeInUp = {
@@ -144,6 +146,16 @@ function fmtNum(n?: number | string): string {
 function Skeleton({ className }: { className?: string }) {
   return <div className={`skeleton ${className}`} />;
 }
+
+/* ─── Preview visitors for globe demo ─── */
+const PREVIEW_VISITORS: GlobeVisitor[] = [
+  { id: 'p1', name: 'moss tiger', country: 'United States', lat: 37.09, lng: -95.71, warmth: 0.7, avatarColor: '#059669', avatarInitial: 'M' },
+  { id: 'p2', name: 'amber fox', country: 'United Kingdom', lat: 55.37, lng: -3.43, warmth: 0.6, avatarColor: '#d97706', avatarInitial: 'A' },
+  { id: 'p3', name: 'bronze owl', country: 'India', lat: 20.59, lng: 78.96, warmth: 0.5, avatarColor: '#0891b2', avatarInitial: 'B' },
+  { id: 'p4', name: 'coral falcon', country: 'Germany', lat: 51.16, lng: 10.45, warmth: 0.65, avatarColor: '#e11d48', avatarInitial: 'C' },
+  { id: 'p5', name: 'indigo finch', country: 'Brazil', lat: -14.23, lng: -51.92, warmth: 0.35, avatarColor: '#4f46e5', avatarInitial: 'I' },
+  { id: 'p6', name: 'ruby wolf', country: 'Japan', lat: 36.20, lng: 138.25, warmth: 0.8, avatarColor: '#dc2626', avatarInitial: 'R' },
+];
 
 export default function DashboardOverview() {
   const { data: session } = useSession();
@@ -646,6 +658,41 @@ export default function DashboardOverview() {
                 <RefreshCw className="w-3.5 h-3.5" />
                 Check for Properties
               </button>
+            </div>
+          </div>
+
+          {/* Globe Preview Card */}
+          <div className="bg-[var(--card-bg)] border border-cyan-500/20 rounded-2xl overflow-hidden">
+            <div className="h-[280px] sm:h-[300px] relative" style={{ background: '#080c18' }}>
+              <RealtimeGlobeMaplibre visitors={PREVIEW_VISITORS} />
+            </div>
+            <div className="p-5 sm:p-6">
+              <div className="flex items-center gap-2.5 mb-2">
+                <Globe className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Realtime Visitor Globe — Free for Everyone</h3>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
+                Embed a live visitor globe on your website. See where your traffic comes from worldwide.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <Link
+                  href="/dashboard/globe"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-black font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20"
+                >
+                  Explore Globe Demo
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <button
+                  onClick={() => signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' })}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-zinc-600 text-sm font-medium transition-all"
+                >
+                  Connect Different Account
+                </button>
+              </div>
+              <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                Your Google account has no GA4 properties. Connect a different account for real analytics.
+              </p>
             </div>
           </div>
 

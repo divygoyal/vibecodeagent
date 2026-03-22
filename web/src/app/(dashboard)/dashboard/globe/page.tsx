@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
+import { signIn } from 'next-auth/react';
 import {
     Share2, Music, History, Maximize2, Navigation, Monitor, Smartphone, Tablet,
     Link2, ExternalLink, Copy, Check, Code2, Zap, Globe,
-    ChevronRight, ChevronUp, BookOpen, Server, Palette, DollarSign, Shield
+    ChevronRight, ChevronUp, ChevronDown, BookOpen, Server, Palette, DollarSign, Shield, AlertTriangle
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
@@ -151,13 +152,15 @@ export default function GlobeApiPage() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isAutoPanning, setIsAutoPanning] = useState(false);
     const [showMobileFeed, setShowMobileFeed] = useState(false);
+    const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
     const mapRef = useRef<RealtimeMapboxHandle>(null);
 
     // ─── Real GA4 data hooks ───
     const { selectedProperty } = useRegistration();
     const { hasGoogleConnection } = useContainerStatus();
-    const { properties } = usePropertyList(hasGoogleConnection);
+    const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const propertyToUse = selectedProperty || (properties.length > 0 ? properties[0].property : '');
+    const showNoPropertiesBanner = hasGoogleConnection && !propsLoading && properties.length === 0;
     const { data: realtimeData } = useRealtimeData(propertyToUse, hasGoogleConnection);
 
     // ─── Data extraction (real GA4 or empty) ───
@@ -394,6 +397,39 @@ export default function GlobeApiPage() {
                 <p className="text-zinc-400 mt-1 text-sm sm:text-base">Embed a live visitor globe on your website. Real-time analytics visualization powered by TrafficClaw.</p>
             </div>
 
+            {/* ─── No-Properties Banner ─── */}
+            {showNoPropertiesBanner && (
+                <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded-2xl p-4 sm:p-5">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="w-4.5 h-4.5 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-bold text-white mb-1">Showing Demo Data</h3>
+                            <p className="text-[13px] text-zinc-400 mb-3">
+                                Your Google account doesn&apos;t have any GA4 properties. Connect a different account to see live visitor data.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                <button
+                                    onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' }, { prompt: 'select_account consent' })}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/15 transition"
+                                >
+                                    Connect Different Account
+                                </button>
+                                <a
+                                    href="https://analytics.google.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-zinc-400 hover:text-zinc-300 transition"
+                                >
+                                    Set up GA4 &rarr;
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ══════════════════════════════════════════════════════ */}
             {/* ─── SECTION 1: LIVE DEMO ─── */}
             {/* ══════════════════════════════════════════════════════ */}
@@ -418,8 +454,30 @@ export default function GlobeApiPage() {
                     className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20"
                 >
                     <div className="bg-black/60 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10 max-w-[280px] sm:max-w-xs">
-                        {/* Header: Logo + REAL-TIME */}
-                        <div className="flex items-center gap-2 mb-2">
+                        {/* Mobile: Compact toggle bar */}
+                        <button
+                            className="flex sm:hidden items-center gap-2 w-full text-left"
+                            onClick={() => setMobileStatsOpen(!mobileStatsOpen)}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                                <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                                <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                                <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                            </svg>
+                            <span className="text-[13px] font-bold text-white tracking-tight">TrafficClaw</span>
+                            <div className="w-px h-3.5 bg-zinc-600/50" />
+                            <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                            </span>
+                            <span className="text-[12px] text-zinc-300">{displayActiveUsers} visitors</span>
+                            <span className="ml-auto">
+                                {mobileStatsOpen ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+                            </span>
+                        </button>
+
+                        {/* Desktop: Full header */}
+                        <div className="hidden sm:flex items-center gap-2 mb-2">
                             <div className="flex items-center gap-1.5">
                                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
                                     <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
@@ -432,6 +490,8 @@ export default function GlobeApiPage() {
                             <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
                         </div>
 
+                        {/* Expandable content (desktop: always visible, mobile: toggle) */}
+                        <div className={`${mobileStatsOpen ? '' : 'hidden'} sm:block`}>
                         {/* Visitor count line */}
                         <div className="flex items-center gap-1.5 mb-3 flex-wrap">
                             <span className="relative flex h-2 w-2 flex-shrink-0">
@@ -521,6 +581,7 @@ export default function GlobeApiPage() {
                                 </div>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </motion.div>
 
@@ -534,13 +595,13 @@ export default function GlobeApiPage() {
                     className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"
                 >
                     <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-xl p-1 border border-white/10">
-                        <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Share">
+                        <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" title="Share">
                             <Share2 className="w-3.5 h-3.5" />
                         </button>
-                        <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Sound">
+                        <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" title="Sound">
                             <Music className="w-3.5 h-3.5" />
                         </button>
-                        <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition" title="Timer">
+                        <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" title="Timer">
                             <History className="w-3.5 h-3.5" />
                         </button>
                         <button
@@ -683,7 +744,7 @@ export default function GlobeApiPage() {
                                     <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
                                     <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                                 </svg>
-                                <span className="text-[10px] text-zinc-500">Powered by TrafficClaw</span>
+                                <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-500 hover:text-zinc-300 transition">Powered by TrafficClaw</a>
                             </div>
                         </motion.div>
                     ) : (
@@ -728,7 +789,7 @@ export default function GlobeApiPage() {
                             <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
                             <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                         </svg>
-                        <span className="text-[11px] text-zinc-400 font-medium">Powered by TrafficClaw</span>
+                        <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition">Powered by TrafficClaw</a>
                     </div>
                 </motion.div>
             </div>
