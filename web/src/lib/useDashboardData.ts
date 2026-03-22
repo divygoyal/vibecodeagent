@@ -27,7 +27,7 @@ const swrOptions = {
 
 // Bug #4/#6 fix: Hook that waits for registration but has a timeout fallback
 // so data fetching isn't permanently blocked if registration is slow or fails.
-const REGISTRATION_TIMEOUT = 3000; // 3 seconds max wait (reduced from 5s)
+const REGISTRATION_TIMEOUT = 1500; // 1.5 seconds max wait (reduced from 3s)
 
 function useRegisteredSWR<T = any>(url: string | null, options = {}) {
     const { isRegistered, isRegistering, registrationError } = useRegistration();
@@ -59,8 +59,14 @@ function useRegisteredSWR<T = any>(url: string | null, options = {}) {
     return useSWR<T>(key, fetcher, { ...swrOptions, ...options });
 }
 
+// Immediate SWR — bypasses the registration gate entirely.
+// Used for endpoints that handle unregistered users gracefully (e.g. /api/container returns 404 → "not_provisioned").
+function useImmediateSWR<T = any>(url: string | null, options = {}) {
+    return useSWR<T>(url, fetcher, { ...swrOptions, ...options });
+}
+
 export function useContainerStatus() {
-    const { data, error, isLoading, mutate } = useRegisteredSWR('/api/container');
+    const { data, error, isLoading, mutate } = useImmediateSWR('/api/container');
     const { data: session } = useSession();
 
     // Bug #5 fix: Check from admin DB providers

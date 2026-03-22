@@ -248,11 +248,23 @@ export default function DashboardOverview() {
     }
   }, [analyticsKPIs, seoKPIs]);
 
-  // Loading States - don't block on registration if we have a cached site (optimistic)
-  const isInit = (!hasCachedSite && isRegistering) || containerLoading || (hasGoogleConnection && sitesLoading && !selectedSite);
+  // Early "Connect Google" signal from JWT — avoids waiting for /api/container
+  const sessionUser = session?.user as any;
+  const sessionHasGoogleToken = !!sessionUser?.googleAccessToken;
+
+  // Loading States — container status no longer waits for registration
+  const isInit = containerLoading || (hasGoogleConnection && sitesLoading && !selectedSite);
   const isRef = analyticsLoading || seoLoading;
   // True when we have SOME data (even stale) — prevents re-showing skeletons
   const hasData = !!(analyticsKPIs || seoKPIs);
+
+  // Show "Connect Google" early using JWT signal while container is still loading
+  const showConnectGoogle = !containerLoading
+    ? !hasGoogleConnection
+    : !sessionHasGoogleToken;
+
+  // Skeleton state: Google connected, container resolved, but sites/properties still loading
+  const isCheckingData = hasGoogleConnection && !containerLoading && (sitesLoading || propsLoading);
 
   // Empty shell: Google connected but no GA4 properties and no GSC sites
   const isEmptyShell = hasGoogleConnection && !containerLoading && !sitesLoading && !propsLoading
@@ -587,7 +599,12 @@ export default function DashboardOverview() {
             >
               <Globe className="w-4 h-4 text-zinc-500 flex-shrink-0" />
               <span className="flex-1 text-left truncate">
-                {isInit ? 'Loading sites...' : selectedSiteLabel || 'No sites found'}
+                {isInit ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-zinc-700 animate-pulse" />
+                    <span className="w-24 h-3.5 rounded bg-zinc-700 animate-pulse" />
+                  </span>
+                ) : selectedSiteLabel || 'No sites found'}
               </span>
               <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -624,9 +641,22 @@ export default function DashboardOverview() {
         </div>
       </motion.div>
 
-      {/* Setup Prompt - shown when Google not connected */}
-      {!containerLoading && !hasGoogleConnection && (
+      {/* Setup Prompt - shown when Google not connected (uses JWT early signal) */}
+      {showConnectGoogle && (
         <ConnectGoogleState feature="real-time traffic insights, SEO performance tracking, keyword rankings, and AI-powered recommendations" />
+      )}
+
+      {/* Skeleton while checking sites/properties after Google is connected */}
+      {isCheckingData && !hasData && (
+        <motion.div variants={fadeInUp} transition={{ duration: 0.3 }} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 space-y-3">
+              <div className="w-20 h-3 rounded bg-zinc-800 animate-pulse" />
+              <div className="w-16 h-7 rounded bg-zinc-800 animate-pulse" />
+              <div className="w-12 h-3 rounded bg-zinc-800 animate-pulse" />
+            </div>
+          ))}
+        </motion.div>
       )}
 
       {/* Getting Started - shown when Google connected but no properties/sites */}

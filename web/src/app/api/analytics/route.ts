@@ -219,7 +219,12 @@ export async function GET(req: Request) {
 
     const isProduction = !!ADMIN_API_KEY
 
-    const session = await getServerSession(authOptions)
+    // Parallelize session and JWT token lookups — they're independent
+    const [session, jwt] = await Promise.all([
+        getServerSession(authOptions),
+        getToken({ req: req as any }) as Promise<any>,
+    ]);
+
     if (isProduction && !session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -228,9 +233,6 @@ export async function GET(req: Request) {
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const userId = session.user.id
-
-            // Get Google tokens from JWT first, fall back to admin DB
-            const jwt = await getToken({ req: req as any }) as any
             let googleAccess = jwt?.googleAccessToken as string | undefined
             let googleRefresh = jwt?.googleRefreshToken as string | undefined
 

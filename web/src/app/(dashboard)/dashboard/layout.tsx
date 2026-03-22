@@ -99,6 +99,21 @@ export default function DashboardLayout({
         return uid ? `${key}:${uid}` : key;
     }, [user?.id, user?.email]);
 
+    // Immediate onboarding check — runs on session, NOT registration
+    useEffect(() => {
+        if (!user) return;
+        const welcomeKey = getUserKey('tc-welcomed');
+        const onboardKey = getUserKey('tc-onboarded');
+        if (!localStorage.getItem(welcomeKey)) {
+            localStorage.setItem(welcomeKey, 'true');
+            if (!localStorage.getItem(onboardKey)) {
+                setShowOnboarding(true);
+            } else {
+                setShowWelcome(true);
+            }
+        }
+    }, [user, getUserKey]);
+
     const [selectedProperty, setSelectedProperty] = useState('');
     const [selectedSite, setSelectedSite] = useState('');
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -279,17 +294,6 @@ export default function DashboardLayout({
                         isRegistering: false,
                         registrationError: null,
                     });
-                    // Show onboarding wizard on FIRST EVER signup (or credit welcome if already onboarded)
-                    const welcomeKey = getUserKey('tc-welcomed');
-                    const onboardKey = getUserKey('tc-onboarded');
-                    if (!localStorage.getItem(welcomeKey)) {
-                        localStorage.setItem(welcomeKey, 'true');
-                        if (!localStorage.getItem(onboardKey)) {
-                            setShowOnboarding(true);
-                        } else {
-                            setShowWelcome(true);
-                        }
-                    }
                 } else {
                     const data = await res.json().catch(() => ({}));
                     throw new Error(data.error || 'Failed to register provider');

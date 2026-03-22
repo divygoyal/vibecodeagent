@@ -36,12 +36,19 @@ vibecodeagent/
 ├── admin/            # FastAPI admin API (Python, port 8000)
 ├── plugins/          # Node.js plugin packages (google-analytics, google-search-console, github-ghost)
 ├── clawbot/          # Custom OpenClaw container image
+├── picoclaw/         # Picoclaw container image
 ├── nginx/            # Reverse proxy config
 ├── scripts/          # deploy.sh, setup.sh, maintenance.sh, provision_user.py
+├── templates/        # OpenClaw config templates
+├── config/           # Configuration files
+├── docs/             # Documentation
+├── Dockerfile.nanobot # Nanobot image build (LLM fallback wrapper)
 └── docker-compose.yml
 ```
 
-**Docker service startup order:** admin-api (must pass healthcheck) → watchdog + web → nginx. All services communicate over the `clawbot-network` bridge. Admin API mounts the Docker socket to manage per-user ClawBot containers.
+**Docker services:** admin-api, web, watchdog, nginx, `clawbot-image` (builder), `nanobot-image` (LLM fallback wrapper). Startup order: admin-api (must pass healthcheck) → watchdog + web → nginx. All services communicate over the `clawbot-network` bridge. Admin API mounts the Docker socket to manage per-user ClawBot containers.
+
+**Production domain:** `agent.divygoyal.in`
 
 ### Web App Structure (`web/src/`)
 
@@ -55,20 +62,26 @@ vibecodeagent/
 - `api/analytics` — GA4 data fetching; `api/analytics/realtime` and `api/analytics/properties` sub-routes
 - `api/seo` — Google Search Console data; `api/seo/sites` sub-route
 - `api/seo-tools` — AI-powered SEO tool generation (schema, blog, keywords, linking)
-- `api/ai-visibility` — AI visibility tracking
+- `api/admin` — Admin operations
 - `api/alerts` — Anomaly alert system; `api/cron/daily-alerts` for scheduled runs
-- `api/insights` — Auto-generated insights
-- `api/credits` — Message credit system
 - `api/audit` — Site audit
+- `api/contact` — Contact form
 - `api/container` — User container management
-- `api/auth/register-provider` — Multi-provider OAuth registration
+- `api/credits` — Message credit system
+- `api/domain-overview` — SEMrush-like domain overview
 - `api/github` — GitHub integration
+- `api/insights` — Auto-generated insights
+- `api/provision` — User provisioning
+- `api/setup-bot` — Bot setup
+- `api/subscription` — Subscription management (cancel, etc.)
+- `api/superadmin` — Superadmin operations
+- `api/auth/register-provider` — Multi-provider OAuth registration
 - `api/webhooks/dodo` — Payment webhook
 
 **Code organization:**
-- `services/` — Business logic: `aiChatTools.ts` (tool declarations + execution for Gemini), `siteAudit.ts`
-- `lib/` — Shared utilities: `auth.ts` (NextAuth), `googleApi.ts` (OAuth tokens, GSC/GA4 APIs), `apiCache.ts` (in-memory TTL cache), `useDashboardData.ts` (SWR hook)
-- `stores/` — Zustand stores: `analyticsFilterStore.ts` (dashboard filters)
+- `services/` — Business logic: `aiChatTools.ts` (tool declarations + execution for Gemini)
+- `lib/` — Shared utilities: `auth.ts` (NextAuth), `googleApi.ts` (OAuth tokens, GSC/GA4 APIs), `apiCache.ts` (in-memory TTL cache), `useDashboardData.ts` (SWR hook), `siteAudit.ts` (site audit logic), `chatUtils.ts`, `checkout.ts` (Dodo Payments checkout), `exportUtils.ts`, `github-auth.ts`, `pushNotifications.ts`, `urlValidation.ts`, `useKeyboardShortcuts.ts`, `alertEngine.ts`
+- `stores/` — Zustand stores: `analyticsFilterStore.ts` (dashboard filters), `chatStore.ts` (chat state)
 - `components/` — React components: `AIChatbot.tsx` (chat UI with streaming)
 - `types/` — Types are colocated in their respective lib/service files, not centralized here
 
@@ -130,7 +143,16 @@ NextAuth.js with dual OAuth providers:
 - Zustand for client state, SWR for data fetching
 - `@google/genai` SDK for Gemini API
 - Framer Motion for animations, Recharts for charts, Lucide for icons
+- `dodopayments` for payment processing, `cheerio` for HTML parsing (audits)
+- `sonner` for toast notifications, `react-markdown` + `remark-gfm` for markdown rendering
+- `mapbox-gl` for maps, `cobe` for globe visualization
 - Admin: FastAPI, SQLAlchemy 2.0 (async), aiosqlite
+
+## Subscription Tiers
+
+- **Free** — Basic access with limited resources
+- **Starter ($30/mo)** — Increased limits
+- **Pro ($50/mo)** — Full access with highest resource limits
 
 ## Styling
 
