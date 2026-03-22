@@ -12,7 +12,8 @@ import {
     Bot, BarChart3, Search, Zap, TrendingUp, Globe, Shield,
     ArrowRight, CheckCircle2, Star, Sparkles, Tag, Copy, Check,
     MousePointerClick, ArrowUpRight, ChevronRight, MessageSquare, Send, Loader2, AlertCircle, Mail,
-    ScanSearch, Clock, Monitor, ExternalLink, Link2, Share2, Music, History, Navigation, Maximize2
+    ScanSearch, Clock, Monitor, ExternalLink, Link2, Share2, Music, History, Navigation, Maximize2,
+    Code2, Eye, Gauge, Users
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -2383,6 +2384,205 @@ function Footer() {
    LANDING PAGE — MAIN EXPORT
    ═══════════════════════════════════════ */
 
+/* ═══════════════════════════════════════
+   GLOBE EMBED PROMO — below the interactive demo
+   ═══════════════════════════════════════ */
+
+function GlobeEmbedPromo() {
+    const [copied, setCopied] = useState(false);
+    const sectionRef = useRef<HTMLDivElement>(null);
+    const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
+    const embedCode = `<iframe
+  src="https://trafficclaw.com/embed/YOUR_SITE_ID?token=YOUR_TOKEN"
+  width="100%" height="600" frameborder="0"
+  style="border-radius: 16px;"
+  allow="fullscreen"
+></iframe>`;
+
+    return (
+        <Section className="py-16 sm:py-24 px-4 sm:px-6">
+            <div ref={sectionRef} className="max-w-5xl mx-auto">
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={isInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.6 }}
+                    className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.06] via-[#080c18] to-cyan-500/[0.06]"
+                >
+                    {/* Glow effects */}
+                    <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
+                    <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+                    <div className="relative z-10 p-8 sm:p-12 lg:p-16">
+                        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+                            {/* Left — copy */}
+                            <div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-6">
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Free for everyone
+                                </div>
+                                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">
+                                    Embed a live visitor globe on{' '}
+                                    <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">your website</span>
+                                </h2>
+                                <p className="text-zinc-400 text-base sm:text-lg mb-8 leading-relaxed">
+                                    Show your visitors where your audience is — in real time. One iframe, real GA4 data,
+                                    beautiful 3D globe with live activity feed. No tracking scripts needed.
+                                </p>
+                                <div className="flex flex-wrap gap-4 mb-8">
+                                    {[
+                                        { icon: Globe, text: 'Interactive 3D globe' },
+                                        { icon: Zap, text: 'Real-time GA4 data' },
+                                        { icon: Shield, text: 'No tracking script' },
+                                        { icon: Eye, text: 'Click visitor profiles' },
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-sm text-zinc-300">
+                                            <item.icon className="w-4 h-4 text-emerald-400" />
+                                            {item.text}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                    <Link
+                                        href="/dashboard/globe"
+                                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
+                                    >
+                                        Get your embed code
+                                        <ArrowRight className="w-4 h-4" />
+                                    </Link>
+                                    <Link
+                                        href="/dashboard/globe"
+                                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/[0.04] transition"
+                                    >
+                                        See live demo
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {/* Right — code preview */}
+                            <div>
+                                <div className="bg-[#0a0e1a] border border-white/[0.06] rounded-2xl overflow-hidden">
+                                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+                                        <div className="flex items-center gap-2">
+                                            <Code2 className="w-4 h-4 text-emerald-400" />
+                                            <span className="text-xs font-medium text-zinc-400">embed.html</span>
+                                        </div>
+                                        <button
+                                            onClick={() => { navigator.clipboard.writeText(embedCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[11px] text-zinc-400 hover:text-white transition"
+                                        >
+                                            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                            {copied ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                    <pre className="p-4 text-[13px] leading-relaxed font-mono text-zinc-300 overflow-x-auto">
+                                        <code>{embedCode}</code>
+                                    </pre>
+                                </div>
+                                <div className="flex items-center gap-4 mt-4 px-1">
+                                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                        Polls every 60s
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                        Pauses when hidden
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                                        MapLibre (free)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </Section>
+    );
+}
+
+
+/* ═══════════════════════════════════════
+   GLOBE API SECTION — near pricing
+   ═══════════════════════════════════════ */
+
+function GlobeAPISection() {
+    const sectionRef = useRef<HTMLDivElement>(null);
+    const isInView = useInView(sectionRef, { once: true, amount: 0.2 });
+
+    const features = [
+        { icon: Globe, title: 'Real-Time Globe', desc: 'Interactive 3D globe showing live visitors from Google Analytics. Click markers to see visitor details.' },
+        { icon: Gauge, title: 'Adaptive Polling', desc: 'Smart polling that adapts to activity: 60s when active, 120s when idle, pauses when tab is hidden.' },
+        { icon: Shield, title: 'Token-Based Auth', desc: 'Secure embed tokens scoped to one property. Read-only, rate-limited, revocable from your dashboard.' },
+        { icon: Eye, title: 'Visitor Profiles', desc: 'Click any visitor marker to see their country, engagement warmth, coordinates, and session details.' },
+        { icon: Users, title: 'Activity Feed', desc: 'Live feed showing visitor actions: pages visited, exit events, country flags, and timestamps.' },
+        { icon: Code2, title: 'One-Line Embed', desc: 'Just paste an iframe. No tracking scripts, no SDK, no build steps. Works with any website or CMS.' },
+    ];
+
+    return (
+        <Section id="globe-api" className="py-24 sm:py-32 px-4 sm:px-6">
+            <div ref={sectionRef} className="max-w-6xl mx-auto">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={isInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.5 }}
+                    className="text-center mb-16"
+                >
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                        GLOBE API
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
+                        Embed a live analytics globe{' '}
+                        <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                            on any website
+                        </span>
+                    </h2>
+                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+                        Show your visitors where your audience is — real-time, interactive, and free.
+                        Powered by your Google Analytics data.
+                    </p>
+                </motion.div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {features.map((f, i) => (
+                        <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={isInView ? { opacity: 1, y: 0 } : {}}
+                            transition={{ duration: 0.4, delay: i * 0.08 }}
+                            className="p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-emerald-500/20 hover:bg-white/[0.03] transition-all duration-300 group"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/15 to-cyan-500/15 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <f.icon className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <h3 className="text-base font-bold text-white mb-2">{f.title}</h3>
+                            <p className="text-sm text-zinc-500 leading-relaxed">{f.desc}</p>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* CTA */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={isInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.5, delay: 0.5 }}
+                    className="text-center mt-12"
+                >
+                    <Link
+                        href="/dashboard/globe"
+                        className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
+                    >
+                        Get your free embed code
+                        <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <p className="text-zinc-600 text-xs mt-3">No credit card required. Works with any GA4 property.</p>
+                </motion.div>
+            </div>
+        </Section>
+    );
+}
+
+
 export default function LandingPage() {
     return (
         <>
@@ -2397,11 +2597,15 @@ export default function LandingPage() {
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <InteractiveDemo />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <GlobeEmbedPromo />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <IntegrationMarquee />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Testimonials />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <Pricing />
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+            <GlobeAPISection />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
             <ComparisonTable />
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
