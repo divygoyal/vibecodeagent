@@ -48,7 +48,7 @@ vibecodeagent/
 
 **Docker services:** admin-api, web, watchdog, nginx, `clawbot-image` (builder), `nanobot-image` (LLM fallback wrapper). Startup order: admin-api (must pass healthcheck) → watchdog + web → nginx. All services communicate over the `clawbot-network` bridge. Admin API mounts the Docker socket to manage per-user ClawBot containers.
 
-**Production domain:** `agent.divygoyal.in`
+**Production domain:** `trafficclaw.com` (deployed on Coolify with Traefik, NOT the nginx config in this repo)
 
 ### Web App Structure (`web/src/`)
 
@@ -77,10 +77,12 @@ vibecodeagent/
 - `api/superadmin` — Superadmin operations
 - `api/auth/register-provider` — Multi-provider OAuth registration
 - `api/webhooks/dodo` — Payment webhook
+- `api/embed/realtime` — Public (no session) embed realtime data, authenticated via embed token
+- `api/embed/tokens` — Authenticated embed token CRUD (create, list, revoke)
 
 **Code organization:**
 - `services/` — Business logic: `aiChatTools.ts` (tool declarations + execution for Gemini)
-- `lib/` — Shared utilities: `auth.ts` (NextAuth), `googleApi.ts` (OAuth tokens, GSC/GA4 APIs), `apiCache.ts` (in-memory TTL cache), `useDashboardData.ts` (SWR hook), `siteAudit.ts` (site audit logic), `chatUtils.ts`, `checkout.ts` (Dodo Payments checkout), `exportUtils.ts`, `github-auth.ts`, `pushNotifications.ts`, `urlValidation.ts`, `useKeyboardShortcuts.ts`, `alertEngine.ts`
+- `lib/` — Shared utilities: `auth.ts` (NextAuth), `googleApi.ts` (OAuth tokens, GSC/GA4 APIs), `apiCache.ts` (in-memory TTL cache), `useDashboardData.ts` (SWR hook), `siteAudit.ts` (site audit logic), `chatUtils.ts`, `checkout.ts` (Dodo Payments checkout), `exportUtils.ts`, `github-auth.ts`, `pushNotifications.ts`, `urlValidation.ts`, `useKeyboardShortcuts.ts`, `alertEngine.ts`, `globeUtils.ts` (shared globe conversion: GA4 data → GlobeVisitor[] + activity feed)
 - `stores/` — Zustand stores: `analyticsFilterStore.ts` (dashboard filters), `chatStore.ts` (chat state)
 - `components/` — React components: `AIChatbot.tsx` (chat UI with streaming)
 - `types/` — Types are colocated in their respective lib/service files, not centralized here
@@ -89,7 +91,7 @@ vibecodeagent/
 
 FastAPI + Uvicorn with async SQLAlchemy 2.0 + aiosqlite (SQLite):
 - `main.py` — All REST endpoints (user CRUD, OAuth connections, container management, plugin execution)
-- `models.py` — SQLAlchemy models: `User`, `OAuthConnection`, `UsageLog`, `ContainerEvent`, `Alert`
+- `models.py` — SQLAlchemy models: `User`, `OAuthConnection`, `UsageLog`, `ContainerEvent`, `Alert`, `EmbedToken`
 - `docker_manager.py` — Container lifecycle (create, start, stop, destroy per-user ClawBot instances)
 - `watchdog.py` — Health monitoring service, auto-restarts unhealthy containers, Telegram alerts
 - `alerts.py` — Alert engine
@@ -127,6 +129,12 @@ NextAuth.js with dual OAuth providers:
 - Google tokens stored in DB via admin API, refreshed via `getValidAccessToken()`
 - Multi-provider OAuth: `OAuthConnection` table supports GitHub, Google, WordPress connections per user
 - No Next.js middleware — auth is checked via `useSession()` client-side and `getServerSession()` in API routes
+
+**CRITICAL — User Identity Mapping:**
+- `session.user.id` (from `token.sub`) is the **OAuth provider ID** (GitHub ID string like `"12345678"`), NOT the database `User.id` (auto-increment integer like `1`, `2`, `3`)
+- When calling admin API endpoints that need a user reference, always pass `session.user.id` as a **string identifier** and use `get_user_by_identifier()` on the admin side to resolve the actual DB user
+- Never use `parseInt(session.user.id)` as a database user_id — it will silently create records with wrong foreign keys
+- Pattern: Web sends GitHub ID string → Admin API resolves via `get_user_by_identifier(db, identifier)` → gets `User.id` for DB operations
 
 ### Communication Between Services
 
