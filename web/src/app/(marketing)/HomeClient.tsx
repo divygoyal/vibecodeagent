@@ -134,15 +134,15 @@ function Hero() {
 
                     <h1 className="text-3xl sm:text-5xl lg:text-[5rem] font-bold tracking-tight leading-[1.05]">
                         <span className="block pb-2 text-white drop-shadow-md font-extrabold" style={{ textShadow: "0px 4px 40px rgba(52,211,153,0.2)" }}>
-                            Ask AI about
+                            Talk to your traffic.
                         </span>
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent block pb-2">
-                            your traffic data.
+                            Grow it together.
                         </span>
                     </h1>
 
                     <p className="text-sm sm:text-base lg:text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0 font-light">
-                        The only SEO tool where you can chat with AI about <span className="text-white font-medium">your own</span> Google Analytics & Search Console data. Get verdicts, not generic advice.
+                        Ask. Fix. Grow. <span className="text-white font-medium">Your traffic</span>, one conversation at a time.
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 justify-center lg:justify-start pt-2 sm:pt-4">
@@ -920,6 +920,7 @@ function AIChatDemo() {
     const [phase, setPhase] = useState(0);
     const [typedQuestion, setTypedQuestion] = useState('');
     const [showThinking, setShowThinking] = useState(false);
+    const [toolCallPhase, setToolCallPhase] = useState(0);
     const [visibleSections, setVisibleSections] = useState(0);
 
     // Auto-scroll chat area to bottom as new content appears
@@ -927,7 +928,7 @@ function AIChatDemo() {
         if (chatAreaRef.current) {
             chatAreaRef.current.scrollTo({ top: chatAreaRef.current.scrollHeight, behavior: 'smooth' });
         }
-    }, [typedQuestion, showThinking, visibleSections]);
+    }, [typedQuestion, showThinking, toolCallPhase, visibleSections]);
 
     const question = 'why is my traffic dropping';
 
@@ -937,13 +938,14 @@ function AIChatDemo() {
             setPhase(0);
             setTypedQuestion('');
             setShowThinking(false);
+            setToolCallPhase(0);
             setVisibleSections(0);
         }
     }, [isInView]);
 
     useEffect(() => {
         if (!isInView) return;
-        // Phase 1: Type the user question
+        // Phase 0: Type the user question
         let i = 0;
         const typeInterval = setInterval(() => {
             if (i <= question.length) {
@@ -959,25 +961,35 @@ function AIChatDemo() {
 
     useEffect(() => {
         if (phase !== 1) return;
-        // Phase 2: Show "thinking" after question sent
+        // Phase 1: Pause after question sent
         const t1 = setTimeout(() => { setShowThinking(true); setPhase(2); }, 600);
         return () => clearTimeout(t1);
     }, [phase]);
 
     useEffect(() => {
         if (phase !== 2) return;
-        // Phase 3: Start revealing bot response sections one by one
-        const t2 = setTimeout(() => { setShowThinking(false); setPhase(3); }, 1200);
+        // Phase 2: Thinking dots (800ms)
+        const t2 = setTimeout(() => { setShowThinking(false); setPhase(3); }, 800);
         return () => clearTimeout(t2);
     }, [phase]);
 
     useEffect(() => {
         if (phase !== 3) return;
-        // Reveal sections one by one
+        // Phase 3: Tool call animation
+        setToolCallPhase(1);
+        const t1 = setTimeout(() => setToolCallPhase(2), 700);
+        const t2 = setTimeout(() => setToolCallPhase(3), 1400);
+        const t3 = setTimeout(() => setPhase(4), 1800);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    }, [phase]);
+
+    useEffect(() => {
+        if (phase !== 4) return;
+        // Phase 4: Reveal response sections one by one
         let s = 0;
         const revealInterval = setInterval(() => {
             s++;
-            if (s <= 7) {
+            if (s <= 9) {
                 setVisibleSections(s);
             } else {
                 clearInterval(revealInterval);
@@ -1014,13 +1026,13 @@ function AIChatDemo() {
                         <div>
                             <div className="text-sm font-semibold text-white">AI Analyst</div>
                             <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online · yoursite.com
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online · antigravity.codes
                             </div>
                         </div>
                     </div>
 
                     {/* Chat messages area — fixed height to prevent layout shift */}
-                    <div ref={chatAreaRef} className="p-5 space-y-4 relative h-[520px] sm:h-[480px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                    <div ref={chatAreaRef} className="p-5 space-y-4 relative h-[560px] sm:h-[520px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         {/* Bot greeting */}
                         <div className="flex gap-3">
                             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -1062,6 +1074,34 @@ function AIChatDemo() {
                             </div>
                         )}
 
+                        {/* Tool call animation */}
+                        {toolCallPhase > 0 && visibleSections === 0 && (
+                            <div className="flex gap-3">
+                                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                                    <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                                </div>
+                                <div className="bg-white/[0.03] border border-white/[0.04] rounded-2xl rounded-tl-md px-4 py-3 space-y-2">
+                                    <div className="text-xs text-zinc-500 font-medium">Using tools...</div>
+                                    <div className="flex items-center gap-2 text-xs">
+                                        {toolCallPhase >= 2 ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                        ) : (
+                                            <Loader2 className="w-3.5 h-3.5 text-zinc-500 animate-spin" />
+                                        )}
+                                        <span className={toolCallPhase >= 2 ? 'text-zinc-300' : 'text-zinc-500'}>Search Performance</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs">
+                                        {toolCallPhase >= 3 ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                        ) : (
+                                            <Loader2 className="w-3.5 h-3.5 text-zinc-500 animate-spin" />
+                                        )}
+                                        <span className={toolCallPhase >= 3 ? 'text-zinc-300' : 'text-zinc-500'}>Analytics Breakdown</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Bot response - reveals section by section */}
                         {visibleSections > 0 && (
                             <div className="flex gap-3">
@@ -1090,117 +1130,207 @@ function AIChatDemo() {
 
                                     {/* Critical verdict */}
                                     {visibleSections >= 2 && (
-                                        <div
-                                            className="bg-red-500/[0.06] border border-red-500/[0.12] rounded-xl p-4">
+                                        <div className="bg-red-500/[0.06] border border-red-500/[0.12] rounded-xl p-4">
                                             <div className="text-sm font-bold text-red-400 mb-2">🚨 CRITICAL: YOUR ORGANIC SEARCH IS COLLAPSING</div>
                                             <p className="text-xs text-zinc-400 leading-relaxed">
-                                                Your organic traffic is in a death spiral, down <span className="text-red-400 font-semibold">64.9%</span> in 28 days. You are bleeding search visibility on high-intent troubleshooting queries that are your primary acquisition engine.
+                                                Your organic traffic is in a death spiral, down <span className="text-red-400 font-semibold">64.9%</span> in 28 days. I found a catastrophic event on <span className="text-white font-semibold">Feb 14</span> — a bad <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-red-300">robots.txt</code> deploy wiped out 23,000+ daily impressions overnight. Your top 5 MCP &amp; AI IDE queries have been pushed off page 1. <strong className="text-white">I know exactly what happened and how to fix it.</strong>
                                             </p>
                                         </div>
                                     )}
 
                                     {/* Evidence table */}
                                     {visibleSections >= 3 && (
-                                        <div
-                                            className="bg-white/[0.02] border border-white/[0.04] rounded-xl overflow-hidden">
+                                        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl overflow-hidden">
                                             <div className="px-4 py-2 border-b border-white/[0.04]">
-                                                <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">📋 Evidence</span>
+                                                <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">📋 Evidence — Daily Performance</span>
                                             </div>
-                                            <table className="w-full text-[11px]">
-                                                <thead>
-                                                    <tr className="border-b border-white/[0.03]">
-                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Date</th>
-                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Impressions</th>
-                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Clicks</th>
-                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">CTR</th>
-                                                        <th className="text-left px-4 py-2 text-zinc-600 font-medium">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr className="border-b border-white/[0.02]">
-                                                        <td className="px-4 py-2 text-zinc-400">Feb 13</td>
-                                                        <td className="px-4 py-2 text-zinc-300 font-mono">24,692</td>
-                                                        <td className="px-4 py-2 text-zinc-300 font-mono">745</td>
-                                                        <td className="px-4 py-2 text-zinc-300">3.82%</td>
-                                                        <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400">Normal</span></td>
-                                                    </tr>
-                                                    <tr className="border-b border-white/[0.02]">
-                                                        <td className="px-4 py-2 text-zinc-400">Feb 14</td>
-                                                        <td className="px-4 py-2 text-red-400 font-mono font-bold">638</td>
-                                                        <td className="px-4 py-2 text-red-400 font-mono font-bold">59</td>
-                                                        <td className="px-4 py-2 text-zinc-300">9.25%</td>
-                                                        <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-400">🔴 CRASH</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="px-4 py-2 text-zinc-400">Mar 03</td>
-                                                        <td className="px-4 py-2 text-zinc-500 font-mono">1,569</td>
-                                                        <td className="px-4 py-2 text-zinc-500 font-mono">103</td>
-                                                        <td className="px-4 py-2 text-zinc-500">6.06%</td>
-                                                        <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-500/10 text-zinc-500">Flatlined</span></td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-[11px]">
+                                                    <thead>
+                                                        <tr className="border-b border-white/[0.03]">
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Date</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Impressions</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Clicks</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">CTR</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr className="border-b border-white/[0.02]">
+                                                            <td className="px-4 py-2 text-zinc-400">Feb 13</td>
+                                                            <td className="px-4 py-2 text-zinc-300 font-mono">24,692</td>
+                                                            <td className="px-4 py-2 text-zinc-300 font-mono">745</td>
+                                                            <td className="px-4 py-2 text-zinc-300">3.82%</td>
+                                                            <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400">Normal</span></td>
+                                                        </tr>
+                                                        <tr className="border-b border-white/[0.02]">
+                                                            <td className="px-4 py-2 text-zinc-400">Feb 14</td>
+                                                            <td className="px-4 py-2 text-red-400 font-mono font-bold">638</td>
+                                                            <td className="px-4 py-2 text-red-400 font-mono font-bold">59</td>
+                                                            <td className="px-4 py-2 text-zinc-300">9.25%</td>
+                                                            <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-400">🔴 CRASH</span></td>
+                                                        </tr>
+                                                        <tr className="border-b border-white/[0.02]">
+                                                            <td className="px-4 py-2 text-zinc-400">Feb 21</td>
+                                                            <td className="px-4 py-2 text-amber-400 font-mono">892</td>
+                                                            <td className="px-4 py-2 text-amber-400 font-mono">71</td>
+                                                            <td className="px-4 py-2 text-zinc-300">7.96%</td>
+                                                            <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-400">No Recovery</span></td>
+                                                        </tr>
+                                                        <tr className="border-b border-white/[0.02]">
+                                                            <td className="px-4 py-2 text-zinc-400">Mar 03</td>
+                                                            <td className="px-4 py-2 text-zinc-500 font-mono">1,569</td>
+                                                            <td className="px-4 py-2 text-zinc-500 font-mono">103</td>
+                                                            <td className="px-4 py-2 text-zinc-500">6.06%</td>
+                                                            <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-500/10 text-zinc-500">Flatlined</span></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="px-4 py-2 text-zinc-400">Mar 14</td>
+                                                            <td className="px-4 py-2 text-red-400 font-mono">1,241</td>
+                                                            <td className="px-4 py-2 text-red-400 font-mono">87</td>
+                                                            <td className="px-4 py-2 text-zinc-300">7.01%</td>
+                                                            <td className="px-4 py-2"><span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-400">Declining</span></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                     )}
 
-                                    {/* Verdict */}
+                                    {/* Affected queries */}
                                     {visibleSections >= 4 && (
-                                        <div
-                                            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
-                                            <div className="text-sm font-bold text-amber-400 mb-2">⚖️ VERDICT: CATASTROPHIC TECHNICAL EVENT ON FEB 14</div>
+                                        <div className="bg-violet-500/[0.04] border border-violet-500/[0.1] rounded-xl overflow-hidden">
+                                            <div className="px-4 py-2 border-b border-white/[0.04]">
+                                                <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">🔍 Hardest Hit Queries</span>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-[11px]">
+                                                    <thead>
+                                                        <tr className="border-b border-white/[0.03]">
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Query</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Before</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">After</th>
+                                                            <th className="text-left px-4 py-2 text-zinc-600 font-medium">Change</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {[
+                                                            { query: 'best mcp servers 2025', before: '134/day', after: '3/day', change: '-97.8%' },
+                                                            { query: 'cursor vs antigravity', before: '87/day', after: '2/day', change: '-97.7%' },
+                                                            { query: 'next.js hydration error fix', before: '96/day', after: '5/day', change: '-94.8%' },
+                                                            { query: 'how to setup mcp server', before: '71/day', after: '1/day', change: '-98.6%' },
+                                                            { query: 'typescript strict mode rules', before: '58/day', after: '4/day', change: '-93.1%' },
+                                                        ].map(row => (
+                                                            <tr key={row.query} className="border-b border-white/[0.02]">
+                                                                <td className="px-4 py-2 text-zinc-300 font-medium">{row.query}</td>
+                                                                <td className="px-4 py-2 text-emerald-400 font-mono font-semibold">{row.before}</td>
+                                                                <td className="px-4 py-2 text-red-400 font-mono font-bold">{row.after}</td>
+                                                                <td className="px-4 py-2 text-red-400 font-semibold">{row.change}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Root cause */}
+                                    {visibleSections >= 5 && (
+                                        <div className="bg-emerald-500/[0.04] border border-emerald-500/[0.1] rounded-xl p-4">
+                                            <div className="text-sm font-bold text-emerald-400 mb-2">✅ ROOT CAUSE FOUND: robots.txt BLOCKING GOOGLEBOT</div>
                                             <p className="text-xs text-zinc-400 leading-relaxed">
-                                                Your traffic didn&apos;t just &quot;drop&quot; — it was decapitated. On February 14th, your site lost <span className="text-white font-semibold">90%+</span> of its search visibility overnight, shifting from ~24,000 daily impressions to fewer than 1,000. This is not a slow decline; it is a critical technical failure or a manual penalty.
+                                                I checked your crawl stats — <span className="text-white font-semibold">Googlebot requests dropped to zero on Feb 14</span>. Your <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">robots.txt</code> was updated in a deploy that day and added <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-red-300">Disallow: /</code>, blocking all crawling. This is <strong className="text-white">confirmed</strong> — not a penalty, not an algorithm update. Your pages are still in Google&apos;s index but haven&apos;t been re-crawled since the block. <strong className="text-emerald-300">This is fully reversible.</strong>
                                             </p>
                                         </div>
                                     )}
 
                                     {/* Revenue Impact */}
-                                    {visibleSections >= 5 && (
-                                        <div
-                                            className="bg-amber-500/[0.04] border border-amber-500/[0.1] rounded-xl p-4">
+                                    {visibleSections >= 6 && (
+                                        <div className="bg-amber-500/[0.04] border border-amber-500/[0.1] rounded-xl p-4">
                                             <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">💰 Revenue Impact</div>
-                                            <div className="space-y-1.5 text-xs text-zinc-400">
-                                                <div>Daily Loss: <span className="text-red-400 font-semibold">~650 clicks</span></div>
-                                                <div>Monthly Loss: <span className="text-red-400 font-semibold">19,500 clicks</span></div>
-                                                <div>Estimated Revenue Bleed: <span className="text-red-400 font-semibold">$1,900 per month</span> in potential value</div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400">
+                                                <div>Daily Clicks Lost: <span className="text-red-400 font-semibold">~650/day</span></div>
+                                                <div>Monthly Traffic Lost: <span className="text-red-400 font-semibold">~19,500 visits</span></div>
+                                                <div>Conversion Value Lost: <span className="text-red-400 font-semibold">$3,120/mo</span> <span className="text-zinc-600">@ 2.4% CVR</span></div>
+                                                <div>Each Week Delayed: <span className="text-red-400 font-semibold">$780 lost</span></div>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Action items */}
-                                    {visibleSections >= 6 && (
-                                        <div
-                                            className="bg-emerald-500/[0.04] border border-emerald-500/[0.1] rounded-xl p-4">
-                                            <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3">🎯 ACTION: EMERGENCY RECOVERY STEPS</div>
+                                    {/* Action steps */}
+                                    {visibleSections >= 7 && (
+                                        <div className="bg-emerald-500/[0.04] border border-emerald-500/[0.1] rounded-xl p-4">
+                                            <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3">🔧 FIX: STEP-BY-STEP RECOVERY</div>
                                             <div className="space-y-2 text-xs text-zinc-400">
                                                 <div className="flex items-start gap-2">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                                                    <span><strong className="text-zinc-200">Check Search Console &quot;Manual Actions&quot;</strong> — Look for a manual penalty in GSC &gt; Security &amp; Manual Actions</span>
+                                                    <span className="text-emerald-400 font-bold text-[10px] mt-0.5 flex-shrink-0">1.</span>
+                                                    <span><strong className="text-zinc-200">Revert robots.txt NOW</strong> — Remove <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-red-300">Disallow: /</code> and replace with <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">User-agent: * Allow: /</code></span>
                                                 </div>
                                                 <div className="flex items-start gap-2">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                                                    <span><strong className="text-zinc-200">Audit Indexing Status</strong> — Check &quot;Excluded&quot; pages starting Feb 14 for &quot;Blocked by robots.txt&quot;</span>
+                                                    <span className="text-emerald-400 font-bold text-[10px] mt-0.5 flex-shrink-0">2.</span>
+                                                    <span><strong className="text-zinc-200">Verify the fix is live</strong> — Run <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">curl -I antigravity.codes/robots.txt</code> — clear CDN cache if using Cloudflare/Vercel</span>
                                                 </div>
                                                 <div className="flex items-start gap-2">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                                                    <span><strong className="text-zinc-200">Inspect robots.txt</strong> — Ensure you haven&apos;t accidentally added <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">Disallow: /</code></span>
+                                                    <span className="text-emerald-400 font-bold text-[10px] mt-0.5 flex-shrink-0">3.</span>
+                                                    <span><strong className="text-zinc-200">Force Google to re-crawl</strong> — GSC &gt; URL Inspection &gt; paste homepage &gt; &quot;Request Indexing&quot;. Do this for your top 10 pages</span>
                                                 </div>
                                                 <div className="flex items-start gap-2">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                                                    <span><strong className="text-zinc-200">Sitemap Verification</strong> — Re-submit your XML sitemap in GSC to force Google to recrawl</span>
+                                                    <span className="text-emerald-400 font-bold text-[10px] mt-0.5 flex-shrink-0">4.</span>
+                                                    <span><strong className="text-zinc-200">Re-submit sitemap</strong> — GSC &gt; Sitemaps &gt; submit <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">antigravity.codes/sitemap.xml</code></span>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-emerald-400 font-bold text-[10px] mt-0.5 flex-shrink-0">5.</span>
+                                                    <span><strong className="text-zinc-200">Audit the Feb 14 deploy</strong> — Run <code className="px-1 py-0.5 bg-white/[0.06] rounded text-[10px] text-emerald-300">git log --after=&quot;2025-02-13&quot; --before=&quot;2025-02-15&quot;</code> to find the commit</span>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-emerald-400 font-bold text-[10px] mt-0.5 flex-shrink-0">6.</span>
+                                                    <span><strong className="text-zinc-200">Monitor re-crawl</strong> — GSC &gt; Crawl Stats. Googlebot requests should spike within 48-72 hours</span>
                                                 </div>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Recovery timeline */}
+                                    {visibleSections >= 8 && (
+                                        <div className="bg-cyan-500/[0.04] border border-cyan-500/[0.1] rounded-xl p-4">
+                                            <div className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-3">📅 Recovery Timeline</div>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                                                    <span className="text-zinc-500 font-mono w-16 flex-shrink-0">Days 1-3</span>
+                                                    <span className="text-zinc-300">Revert robots.txt &amp; re-submit sitemap</span>
+                                                    <span className="text-emerald-400 text-[9px] font-semibold ml-auto flex-shrink-0">YOU ARE HERE</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-2 h-2 rounded-full border border-zinc-600 flex-shrink-0" />
+                                                    <span className="text-zinc-500 font-mono w-16 flex-shrink-0">Week 1-2</span>
+                                                    <span className="text-zinc-400">Googlebot re-crawls all pages</span>
+                                                    <span className="text-zinc-600 text-[9px] ml-auto flex-shrink-0">~30% restored</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-2 h-2 rounded-full border border-zinc-600 flex-shrink-0" />
+                                                    <span className="text-zinc-500 font-mono w-16 flex-shrink-0">Week 3-4</span>
+                                                    <span className="text-zinc-400">Rankings return for top queries</span>
+                                                    <span className="text-zinc-600 text-[9px] ml-auto flex-shrink-0">~60% restored</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-2 h-2 rounded-full border border-zinc-600 flex-shrink-0" />
+                                                    <span className="text-zinc-500 font-mono w-16 flex-shrink-0">Week 5-8</span>
+                                                    <span className="text-zinc-400">Full recovery to pre-Feb 14 levels</span>
+                                                    <span className="text-zinc-600 text-[9px] ml-auto flex-shrink-0">90-100%</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-zinc-600 mt-3">Since this is a crawl block (not a penalty), recovery is predictable once the fix is deployed.</p>
                                         </div>
                                     )}
 
                                     {/* Follow-up suggestions */}
-                                    {visibleSections >= 7 && (
-                                        <div
-                                            className="flex flex-wrap gap-2">
+                                    {visibleSections >= 9 && (
+                                        <div className="flex flex-wrap gap-2">
                                             {[
-                                                'Check my GSC indexing report for errors starting Feb 14',
-                                                'Which of my top pages are currently cannibalizing each other?',
-                                                'How do I optimize my site for mobile to stop the ranking decline?',
+                                                'Verify my robots.txt is fixed and Googlebot can crawl',
+                                                'Show me which pages need re-indexing first',
+                                                'Set up alerts so this never happens again',
                                             ].map(q => (
                                                 <button key={q} className="px-3 py-1.5 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/[0.12] text-[10px] text-emerald-400 hover:bg-emerald-500/[0.15] transition-colors">
                                                     {q}
