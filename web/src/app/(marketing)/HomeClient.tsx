@@ -2400,7 +2400,7 @@ function GlobeEmbedPromo() {
 ></iframe>`;
 
     const handleGetEmbed = () => {
-        signIn('github', { callbackUrl: '/dashboard/globe' });
+        signIn('google', { callbackUrl: '/dashboard/globe' });
     };
 
     return (

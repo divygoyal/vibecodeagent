@@ -131,6 +131,8 @@ export default function EmbedGlobePage() {
     const displayActivity = hasRealData ? realActivity : DEMO_ACTIVITY;
     const activeUsers = hasRealData ? (realtimeData?.activeUsers || 0) : DEMO_VISITORS.reduce((s, v) => s + (v.users ?? 1), 0);
     const estTotalValue = Math.max(1, Math.round(activeUsers * 0.08));
+    // Show branding for free users and demo mode; paid users can remove it
+    const showBranding = isDemo || !realtimeData || realtimeData.showBranding !== false;
 
     const toggleAutoPan = useCallback(() => {
         if (mapRef.current) {
@@ -292,19 +294,21 @@ export default function EmbedGlobePage() {
                 </div>
             </div>
 
-            {/* ═══ BOTTOM-RIGHT: Powered By ═══ */}
-            <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 hidden sm:block">
-                <div className="flex items-center gap-2 px-3 py-2 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
-                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-                        <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
-                        <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
-                        <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
-                    </svg>
-                    <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition">
-                        Powered by <span className="text-emerald-400 font-semibold">TrafficClaw</span>
-                    </a>
+            {/* ═══ BOTTOM-RIGHT: Powered By (hidden for paid users) ═══ */}
+            {showBranding && (
+                <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 hidden sm:block">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                            <rect x="2" y="10" width="4" height="8" rx="1" fill="#10b981" />
+                            <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
+                            <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
+                        </svg>
+                        <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition">
+                            Powered by <span className="text-emerald-400 font-semibold">TrafficClaw</span>
+                        </a>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

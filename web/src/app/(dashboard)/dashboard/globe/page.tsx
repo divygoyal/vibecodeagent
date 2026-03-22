@@ -284,6 +284,14 @@ function EmbedTokenManager({ propertyId }: { propertyId: string }) {
                     </div>
                 </div>
             </div>
+
+            {/* Watermark / pricing note */}
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-emerald-500/[0.04] border border-emerald-500/10">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-zinc-500">
+                    <p><span className="text-emerald-400 font-medium">100% free to use.</span> The Globe API and embed are completely free for all users. Upgrade to any paid plan to remove the &quot;Powered by TrafficClaw&quot; watermark from your embedded globe.</p>
+                </div>
+            </div>
         </div>
     );
 }

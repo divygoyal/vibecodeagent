@@ -102,7 +102,7 @@ export default function GlobePublicPage() {
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                         <button
-                            onClick={() => signIn('github', { callbackUrl: '/dashboard/globe' })}
+                            onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' })}
                             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
                         >
                             Get your embed code
@@ -273,7 +273,7 @@ export default function GlobePublicPage() {
                             <div className="flex-1">
                                 <h3 className="text-base font-semibold text-white mb-1">Sign up and connect Google Analytics</h3>
                                 <p className="text-sm text-zinc-500 mb-3">Sign in with GitHub, then connect your Google account to authorize GA4 access.</p>
-                                <button onClick={() => signIn('github', { callbackUrl: '/dashboard/globe' })} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition">
+                                <button onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' })} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition">
                                     Sign up free <ArrowRight className="w-4 h-4" />
                                 </button>
                             </div>

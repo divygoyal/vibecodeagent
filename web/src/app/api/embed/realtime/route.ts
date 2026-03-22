@@ -85,7 +85,10 @@ export async function GET(req: Request) {
             () => fetchRealtimeForEmbed(accessToken, tokenData.propertyId)
         );
 
-        return NextResponse.json(data, {
+        // Free users see "Powered by TrafficClaw" watermark; paid users can remove it
+        const showBranding = tokenData.plan === 'free';
+
+        return NextResponse.json({ ...data, showBranding }, {
             headers: {
                 'Cache-Control': 'public, max-age=30',
                 'Access-Control-Allow-Origin': '*',
