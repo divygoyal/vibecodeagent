@@ -658,8 +658,8 @@ export default function DashboardOverview() {
 
           {/* Globe Preview Card — MVP Feature Showcase */}
           <div className="bg-[var(--card-bg)] border border-cyan-500/20 rounded-2xl overflow-hidden">
-            <div className="h-[360px] sm:h-[420px] relative" style={{ background: '#080c18' }}>
-              <RealtimeGlobeMaplibre visitors={PREVIEW_VISITORS} />
+            <div className="h-[260px] sm:h-[420px] relative" style={{ background: '#080c18' }}>
+              <RealtimeGlobeMaplibre visitors={PREVIEW_VISITORS} initialZoom={1.2} />
 
               {/* Mini Stats Panel (top-left) */}
               <div className="absolute top-3 left-3 z-10">
@@ -681,13 +681,6 @@ export default function DashboardOverview() {
                     </span>
                     <span className="text-[11px] text-zinc-300"><span className="font-bold text-white">{PREVIEW_VISITORS.length}</span> visitors on your site</span>
                   </div>
-                </div>
-              </div>
-
-              {/* FREE badge (top-right) */}
-              <div className="absolute top-3 right-3 z-10">
-                <div className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 backdrop-blur-sm shadow-lg shadow-emerald-500/10">
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Free for all users</span>
                 </div>
               </div>
 

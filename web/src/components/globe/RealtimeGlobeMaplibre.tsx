@@ -25,6 +25,7 @@ export interface RealtimeMapboxProps {
     byCity?: { city: string; country: string; users: number }[];
     autoPan?: boolean;
     onAutoPanChange?: (enabled: boolean) => void;
+    initialZoom?: number;
 }
 
 export interface RealtimeMapboxHandle {
@@ -257,7 +258,7 @@ async function loadMapLibreGL() {
 // ═══════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════
-const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, autoPan: autoPanProp = false, onAutoPanChange }, ref) {
+const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, autoPan: autoPanProp = false, onAutoPanChange, initialZoom }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
     const markersRef = useRef<Map<string, { marker: any; el: HTMLDivElement; lngLat: [number, number] }>>(new Map());
@@ -314,7 +315,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     container: containerRef.current,
                     style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                     center: [30, 25],
-                    zoom: 1.8,
+                    zoom: initialZoom ?? 1.8,
                     attributionControl: false,
                     fadeDuration: 0,
                     renderWorldCopies: false,
