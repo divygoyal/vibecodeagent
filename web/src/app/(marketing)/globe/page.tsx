@@ -140,7 +140,7 @@ export default function GlobePublicPage() {
                 </div>
 
                 {/* ─── Globe Demo (same as dashboard) ─── */}
-                <div className="flex flex-col relative w-full h-[calc(100vh-200px)] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-white/[0.06] overflow-hidden mb-16" style={{ background: '#080c18' }}>
+                <div className="flex flex-col relative w-full h-[420px] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-white/[0.06] overflow-hidden mb-16" style={{ background: '#080c18' }}>
                     {/* Globe */}
                     <div className="relative flex-1 min-h-0 sm:absolute sm:inset-0 rounded-2xl overflow-hidden order-0">
                         <div className="absolute inset-0">
@@ -149,6 +149,7 @@ export default function GlobePublicPage() {
                                 visitors={DEMO_VISITORS}
                                 autoPan={isAutoPanning}
                                 onAutoPanChange={handleAutoPanChange}
+                                initialZoom={1.3}
                             />
                         </div>
                     </div>
