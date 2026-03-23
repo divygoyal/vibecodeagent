@@ -1650,21 +1650,8 @@ function Pricing() {
                                 Get Pro
                             </button>
 
-                            {/* Telegram Bot MVP Highlight */}
-                            <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-sky-500/[0.08] to-violet-500/[0.08] border border-sky-500/[0.15]">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center flex-shrink-0">
-                                        <Bot className="w-4 h-4 text-sky-400" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-bold text-white">Telegram Bot Included</div>
-                                        <div className="text-[11px] text-zinc-400">Your AI SEO assistant, right in Telegram. Get alerts, ask questions, monitor traffic — all from your phone.</div>
-                                    </div>
-                                </div>
-                            </div>
-
                             <ul className="space-y-3">
-                                {['300 AI messages per month', 'Everything in Growth', 'Globe API (no watermark)', 'Priority support', 'Early access to new features'].map((f, i) => (
+                                {['300 AI messages per month', 'Everything in Growth', 'Globe API (no watermark)', 'Telegram AI Bot', 'Priority support', 'Early access to new features'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                         <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-violet-400" />
                                         {f}

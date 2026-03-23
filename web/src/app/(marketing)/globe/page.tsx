@@ -101,9 +101,15 @@ export default function GlobePublicPage() {
                         Embed an interactive 3D globe showing live visitors from Google Analytics.
                         One iframe, no tracking scripts, no SDK.
                     </p>
-                    <p className="text-emerald-400 font-medium text-sm mb-8">
-                        Free forever. Upgrade to any plan to remove the &quot;Powered by TrafficClaw&quot; watermark.
-                    </p>
+                    <div className="inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-emerald-500/[0.08] border border-emerald-500/20 mb-8">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-emerald-400 font-bold text-sm">Free forever. No limits. No credit card.</p>
+                            <p className="text-zinc-500 text-xs">Upgrade to any paid plan to remove the &quot;Powered by TrafficClaw&quot; watermark.</p>
+                        </div>
+                    </div>
                     <div className="flex flex-wrap justify-center gap-3">
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' })}

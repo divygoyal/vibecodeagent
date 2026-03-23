@@ -95,11 +95,11 @@ const PLANS = [
             { text: '300 AI credits/month', included: true },
             { text: 'Everything in Growth', included: true },
             { text: 'Globe API (no watermark)', included: true },
+            { text: 'Telegram AI Bot', included: true },
             { text: 'Priority support', included: true },
             { text: 'Unlimited audits', included: true },
             { text: 'Early access to features', included: true },
         ],
-        telegramBot: true,
     },
 ];
 
@@ -287,21 +287,6 @@ export default function PricingClient() {
                                     >
                                         Get {plan.name}
                                     </button>
-                                )}
-
-                                {/* Telegram Bot MVP Highlight for Pro */}
-                                {'telegramBot' in plan && plan.telegramBot && (
-                                    <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-sky-500/[0.08] to-violet-500/[0.08] border border-sky-500/[0.15]">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center flex-shrink-0">
-                                                <Bot className="w-4 h-4 text-sky-400" />
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-bold text-white">Telegram Bot Included</div>
-                                                <div className="text-[11px] text-zinc-400">Your AI SEO assistant in Telegram. Alerts, questions, traffic monitoring — from your phone.</div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 )}
 
                                 <ul className="space-y-3 flex-1">
