@@ -15,7 +15,7 @@ export function VideoPhoneFrame() {
                     loop
                     muted
                     playsInline
-                    preload="auto"
+                    preload="none"
                     className="w-full h-full object-cover"
                 >
                     <source src="/telegram-demo-final.mp4" type="video/mp4" />

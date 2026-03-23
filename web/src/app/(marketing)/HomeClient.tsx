@@ -917,7 +917,7 @@ function KPICard({ label, value, change, positive }: { label: string; value: str
 function AIChatDemo() {
     const sectionRef = useRef<HTMLDivElement>(null);
     const chatAreaRef = useRef<HTMLDivElement>(null);
-    const isInView = useInView(sectionRef, { once: false, amount: 0.3 });
+    const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
     const [phase, setPhase] = useState(0);
     const [typedQuestion, setTypedQuestion] = useState('');
     const [showThinking, setShowThinking] = useState(false);
@@ -2526,8 +2526,8 @@ function GlobeEmbedPromo() {
                                             {copied ? 'Copied!' : 'Copy'}
                                         </button>
                                     </div>
-                                    <div className="p-5">
-                                        <pre className="text-[13px] leading-relaxed font-mono text-zinc-400 overflow-x-auto">
+                                    <div className="p-4 sm:p-5 max-w-full overflow-hidden">
+                                        <pre className="text-[11px] sm:text-[13px] leading-relaxed font-mono text-zinc-400 overflow-x-auto max-w-full whitespace-pre-wrap break-words">
                                             <code>
                                                 <span className="text-zinc-600">{'<!-- One line. That\'s it. -->'}</span>{'\n'}
                                                 <span className="text-cyan-400">{'<iframe'}</span>{'\n'}

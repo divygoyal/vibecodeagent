@@ -319,11 +319,11 @@ export default function GlobePublicPage() {
                         {/* Step 3 */}
                         <div className="flex gap-4">
                             <div className="w-8 h-8 rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm font-bold flex-shrink-0">3</div>
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <h3 className="text-base font-semibold text-white mb-1">Paste the iframe on your website</h3>
                                 <p className="text-sm text-zinc-500 mb-3">Copy the embed code and add it anywhere on your site.</p>
-                                <div className="bg-[#0d1117] border border-white/[0.08] rounded-xl overflow-hidden">
-                                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+                                <div className="bg-[#0d1117] border border-white/[0.08] rounded-xl overflow-hidden max-w-full">
+                                    <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-white/[0.06]">
                                         <div className="flex items-center gap-2">
                                             <Code2 className="w-4 h-4 text-emerald-400" />
                                             <span className="text-xs text-zinc-500">embed.html</span>
@@ -333,7 +333,7 @@ export default function GlobePublicPage() {
                                             {copied ? 'Copied!' : 'Copy'}
                                         </button>
                                     </div>
-                                    <pre className="p-4 text-[13px] leading-relaxed font-mono text-zinc-400 overflow-x-auto"><code>{embedCode}</code></pre>
+                                    <pre className="p-3 sm:p-4 text-[11px] sm:text-[13px] leading-relaxed font-mono text-zinc-400 overflow-x-auto max-w-full whitespace-pre-wrap break-all"><code>{embedCode}</code></pre>
                                 </div>
                             </div>
                         </div>
