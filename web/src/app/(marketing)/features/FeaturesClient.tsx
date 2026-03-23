@@ -78,7 +78,7 @@ const FEATURES = [
     },
     {
         icon: Brain,
-        title: 'AI SEO Tools',
+        title: 'AI Content Tools',
         desc: 'Generate schema markup, blog outlines, keyword clusters, and internal linking maps — all AI-powered.',
         color: 'text-pink-400',
         gradient: 'from-pink-500/10 to-rose-500/10',
@@ -183,11 +183,11 @@ export default function FeaturesClient() {
                                 </div>
                             </div>
                             <p className="text-sm text-zinc-400 leading-relaxed mb-5">
-                                Your own AI SEO assistant running inside Telegram. Each user gets an isolated container with full access to
-                                your analytics data. Ask about traffic, get ranking alerts, generate content strategies — all from your phone.
+                                Your own OpenClaw agent running inside Telegram — with Google Analytics and Search Console pre-connected.
+                                Each user gets an isolated container. Ask questions, get alerts, run audits — all from your phone.
                             </p>
                             <div className="grid grid-cols-2 gap-2 mb-5">
-                                {['Isolated per-user container', 'Real-time traffic queries', 'Ranking drop alerts', 'Daily digest reports', 'Content strategy AI', 'Runs 24/7 for you'].map((h, i) => (
+                                {['OpenClaw powered agent', 'GA4 & GSC pre-connected', 'Isolated per-user container', 'Daily digest reports', 'On-demand queries', 'Runs 24/7 for you'].map((h, i) => (
                                     <div key={i} className="flex items-center gap-2 text-xs text-zinc-300">
                                         <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
                                         {h}
@@ -279,7 +279,7 @@ export default function FeaturesClient() {
                             { q: 'What data sources does TrafficClaw support?', a: 'TrafficClaw connects to Google Analytics 4 and Google Search Console. We also integrate with GitHub for code-level SEO fixes and Telegram for mobile notifications and queries.' },
                             { q: 'How does the AI Chat work?', a: 'The AI Chat uses Google Gemini with function calling to analyze your real analytics and SEO data. It can run page audits, calculate revenue impact, and generate content strategies — all based on your actual data, not generic advice.' },
                             { q: 'Is the Globe Embed really free?', a: 'Yes. The embeddable real-time visitor globe is completely free for all users. The only paid perk is removing the small "Powered by TrafficClaw" watermark — available on any paid plan.' },
-                            { q: 'What is the Telegram Bot powered by?', a: 'The Telegram bot runs on OpenClaw — each Pro user gets their own isolated container with full access to analytics data. It runs 24/7 and can answer questions, send alerts, and generate reports directly in Telegram.' },
+                            { q: 'What is the Telegram Bot powered by?', a: 'The Telegram bot is your own OpenClaw agent with Google Analytics and Search Console pre-connected. Each Pro user gets an isolated container that runs 24/7. Ask questions, get alerts, and run audits — all from Telegram.' },
                             { q: 'Can I use TrafficClaw for multiple websites?', a: 'Yes. Growth and Pro plans support multiple Google Analytics properties and Search Console sites. Switch between sites instantly from the dashboard.' },
                         ].map((faq, i) => (
                             <details key={i} className="group p-4 rounded-xl border border-white/[0.06] bg-white/[0.02]">
