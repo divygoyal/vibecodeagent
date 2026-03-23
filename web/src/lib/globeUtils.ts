@@ -101,8 +101,8 @@ export function convertCitiesToGlobeVisitors(
         return ka.localeCompare(kb);
     });
 
-    sortedCities.slice(0, 15).forEach((c) => {
-        if (visitors.length >= 12) return;
+    sortedCities.slice(0, 40).forEach((c) => {
+        if (visitors.length >= 30) return;
         const cityStr = String(c.city ?? '');
         const countryStr = String(c.country ?? '');
         const countryCoord = COUNTRY_COORDS[countryStr];
@@ -143,12 +143,12 @@ export function convertCitiesToGlobeVisitors(
     });
 
     // Backfill from country data if fewer than 8 city-based visitors
-    if (visitors.length < 8) {
+    if (visitors.length < 15) {
         const sortedCountries = [...byCountry].sort((a, b) =>
             String(a.country ?? '').localeCompare(String(b.country ?? ''))
         );
         sortedCountries.forEach((c) => {
-            if (visitors.length >= 12) return;
+            if (visitors.length >= 30) return;
             const countryStr = String(c.country ?? '');
             const coord = COUNTRY_COORDS[countryStr];
             if (!coord) return;

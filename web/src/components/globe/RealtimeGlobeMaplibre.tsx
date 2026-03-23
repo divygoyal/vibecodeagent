@@ -493,11 +493,9 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const warmthPct = Math.round(v.warmth * 100);
             const warmthLabel = v.warmth > 0.6 ? 'Hot' : v.warmth > 0.4 ? 'Warm' : v.warmth > 0.25 ? 'Mild' : 'Cool';
             const warmthHex = getWarmthColor(v.warmth);
-            const lat = v.lat.toFixed(2);
-            const lng = v.lng.toFixed(2);
 
             const popupHTML = `
-                <div style="background:#13131D;border-radius:14px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);overflow:hidden;">
+                <div style="background:#13131D;border-radius:14px;min-width:240px;max-width:280px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);overflow:hidden;">
                     <!-- Header -->
                     <div style="padding:14px 16px 12px;display:flex;align-items:center;gap:12px;">
                         <div style="position:relative;flex-shrink:0;">
@@ -520,16 +518,12 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     <!-- Stats rows -->
                     <div style="padding:10px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+                            <span style="font-size:12px;color:#71717a;">Country</span>
+                            <span style="font-size:12px;font-weight:500;color:#d4d4d8;">${v.country}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
                             <span style="font-size:12px;color:#71717a;">Engagement</span>
                             <span style="font-size:12px;font-weight:600;color:${warmthHex};">${warmthLabel}</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:12px;color:#71717a;">Coordinates</span>
-                            <span style="font-size:12px;color:#d4d4d8;font-family:ui-monospace,monospace;">${lat}, ${lng}</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:12px;color:#71717a;">Warmth Score</span>
-                            <span style="font-size:12px;color:#d4d4d8;font-weight:600;">${warmthPct}%</span>
                         </div>
                     </div>
 
