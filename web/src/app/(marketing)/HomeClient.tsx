@@ -1549,7 +1549,14 @@ function Pricing() {
                         </Link>
 
                         <ul className="space-y-3">
-                            {['Full analytics dashboard', 'Real-time visitor globe', 'Embeddable globe widget', 'SEO tools & site audit', 'Google Analytics integration', '10 AI messages to start'].map((f, i) => (
+                            {[
+                                'Full analytics dashboard',
+                                'Real-time visitor globe',
+                                'Globe embed (with watermark)',
+                                'SEO tools & site audit',
+                                'Google Search Console',
+                                '10 AI messages to start',
+                            ].map((f, i) => (
                                 <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500" />
                                     {f}
@@ -1564,7 +1571,7 @@ function Pricing() {
                             <Zap className="w-5 h-5 text-cyan-400" />
                         </div>
                         <h3 className="text-lg font-bold text-white mb-1">Starter</h3>
-                        <p className="text-xs text-zinc-500 mb-5">Perfect for personal sites & side projects</p>
+                        <p className="text-xs text-zinc-500 mb-5">For creators who need AI power</p>
 
                         <div className="flex items-baseline gap-1 mb-1">
                             <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">$9</span>
@@ -1578,9 +1585,16 @@ function Pricing() {
                         </button>
 
                         <ul className="space-y-3">
-                            {['50 AI messages per month', 'Everything in Free', 'Remove globe watermark', 'Site audit reports', 'AI content tools'].map((f, i) => (
+                            {[
+                                '50 AI messages / month',
+                                'Globe embed — no watermark',
+                                'AI-powered SEO chat',
+                                'AI content generation tools',
+                                'CSV & JSON data export',
+                                'Site audit reports (3/day)',
+                            ].map((f, i) => (
                                 <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
-                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-zinc-600" />
+                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-cyan-500" />
                                     {f}
                                 </li>
                             ))}
@@ -1613,7 +1627,14 @@ function Pricing() {
                         </button>
 
                         <ul className="space-y-3">
-                            {['150 AI messages per month', 'Everything in Starter', 'Globe API (no watermark)', 'Priority AI responses', 'Advanced SEO intelligence', 'AEO optimization tools'].map((f, i) => (
+                            {[
+                                '150 AI messages / month',
+                                'Everything in Starter +',
+                                'Priority AI responses',
+                                'Advanced SEO intelligence',
+                                'Multi-site support',
+                                'AEO optimization tools',
+                            ].map((f, i) => (
                                 <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
                                     {f}
@@ -1651,7 +1672,15 @@ function Pricing() {
                             </button>
 
                             <ul className="space-y-3">
-                                {['300 AI messages per month', 'Everything in Growth', 'Globe API (no watermark)', 'Telegram AI Bot', 'Priority support', 'Early access to new features'].map((f, i) => (
+                                {[
+                                    '300 AI messages / month',
+                                    'Everything in Growth +',
+                                    'Telegram AI SEO bot',
+                                    'Custom alert rules',
+                                    'Unlimited site audits',
+                                    'Priority support',
+                                    'Early access to features',
+                                ].map((f, i) => (
                                     <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                         <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-violet-400" />
                                         {f}
