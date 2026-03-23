@@ -6,7 +6,7 @@ import { signIn, useSession } from 'next-auth/react';
 import { getSafeRedirectUrl } from '@/lib/checkout';
 import Link from 'next/link';
 import {
-    Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot, Tag, Copy, Check
+    Zap, TrendingUp, Shield, CheckCircle2, ArrowRight, X, Bot, Tag, Copy, Check, Sparkles
 } from 'lucide-react';
 
 const fadeUp = {
@@ -20,6 +20,26 @@ const stagger = {
 
 const PLANS = [
     {
+        key: 'free',
+        name: 'Free',
+        price: '$0',
+        credits: 10,
+        icon: Sparkles,
+        color: 'emerald',
+        gradient: 'from-emerald-400 to-green-500',
+        description: 'More than most tools charge for.',
+        freeForever: true,
+        features: [
+            { text: 'Full analytics dashboard', included: true },
+            { text: 'Real-time visitor globe', included: true },
+            { text: 'Embeddable globe (with watermark)', included: true },
+            { text: 'SEO tools & site audit', included: true },
+            { text: 'Google Analytics integration', included: true },
+            { text: '10 AI messages to start', included: true },
+            { text: 'Remove globe watermark', included: false },
+        ],
+    },
+    {
         key: 'starter',
         name: 'Starter',
         price: '$9',
@@ -31,8 +51,8 @@ const PLANS = [
         productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
         features: [
             { text: '50 AI credits/month', included: true },
-            { text: 'Full analytics dashboard', included: true },
-            { text: 'SEO tools & audit', included: true },
+            { text: 'Everything in Free', included: true },
+            { text: 'Globe API (no watermark)', included: true },
             { text: 'AI chat assistant', included: true },
             { text: 'CSV & JSON export', included: true },
             { text: 'Telegram bot', included: false },
@@ -53,8 +73,8 @@ const PLANS = [
         features: [
             { text: '150 AI credits/month', included: true },
             { text: 'Everything in Starter', included: true },
+            { text: 'Globe API (no watermark)', included: true },
             { text: 'Priority AI responses', included: true },
-            { text: 'Advanced SEO intelligence', included: true },
             { text: 'Multi-site support', included: true },
             { text: 'Telegram bot', included: false },
             { text: 'Priority support', included: false },
@@ -74,8 +94,8 @@ const PLANS = [
         features: [
             { text: '300 AI credits/month', included: true },
             { text: 'Everything in Growth', included: true },
+            { text: 'Globe API (no watermark)', included: true },
             { text: 'Priority support', included: true },
-            { text: 'Custom alert rules', included: true },
             { text: 'Unlimited audits', included: true },
             { text: 'Early access to features', included: true },
         ],
@@ -84,18 +104,19 @@ const PLANS = [
 ];
 
 const COMPARISON_FEATURES = [
-    { name: 'AI Credits', starter: '50/mo', growth: '150/mo', pro: '300/mo' },
-    { name: 'Analytics Dashboard', starter: true, growth: true, pro: true },
-    { name: 'SEO Intelligence', starter: true, growth: true, pro: true },
-    { name: 'Site Audit', starter: '3/day', growth: '10/day', pro: 'Unlimited' },
-    { name: 'AI Chat', starter: true, growth: true, pro: true },
-    { name: 'CSV/JSON Export', starter: true, growth: true, pro: true },
-    { name: 'Multi-site Support', starter: false, growth: true, pro: true },
-    { name: 'Priority AI Responses', starter: false, growth: true, pro: true },
-    { name: 'Telegram Bot (AI SEO Assistant)', starter: false, growth: false, pro: true },
-    { name: 'Custom Alerts', starter: false, growth: false, pro: true },
-    { name: 'Priority Support', starter: false, growth: false, pro: true },
-    { name: 'Early Feature Access', starter: false, growth: false, pro: true },
+    { name: 'AI Credits', free: '10 total', starter: '50/mo', growth: '150/mo', pro: '300/mo' },
+    { name: 'Analytics Dashboard', free: true, starter: true, growth: true, pro: true },
+    { name: 'Real-time Globe', free: true, starter: true, growth: true, pro: true },
+    { name: 'Embeddable Globe Widget', free: 'With watermark', starter: 'No watermark', growth: 'No watermark', pro: 'No watermark' },
+    { name: 'SEO Intelligence', free: true, starter: true, growth: true, pro: true },
+    { name: 'Site Audit', free: '1/day', starter: '3/day', growth: '10/day', pro: 'Unlimited' },
+    { name: 'AI Chat', free: true, starter: true, growth: true, pro: true },
+    { name: 'CSV/JSON Export', free: false, starter: true, growth: true, pro: true },
+    { name: 'Multi-site Support', free: false, starter: false, growth: true, pro: true },
+    { name: 'Priority AI Responses', free: false, starter: false, growth: true, pro: true },
+    { name: 'Telegram Bot (AI SEO Assistant)', free: false, starter: false, growth: false, pro: true },
+    { name: 'Custom Alerts', free: false, starter: false, growth: false, pro: true },
+    { name: 'Priority Support', free: false, starter: false, growth: false, pro: true },
 ];
 
 function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -192,7 +213,7 @@ export default function PricingClient() {
 
             {/* Plan Cards */}
             <Section className="pb-24 px-6">
-                <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-5">
                     {PLANS.map((plan) => {
                         const IconComp = plan.icon;
                         return (
@@ -200,13 +221,20 @@ export default function PricingClient() {
                                 key={plan.key}
                                 variants={fadeUp}
                                 className={`relative flex flex-col p-6 rounded-2xl border transition-all group ${
-                                    plan.popular
+                                    plan.key === 'free'
+                                        ? 'bg-gradient-to-b from-emerald-500/[0.06] to-transparent border-emerald-500/20 pt-8'
+                                        : plan.popular
                                         ? 'bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.02] to-transparent border-2 border-emerald-500/30'
                                         : plan.key === 'pro'
                                         ? 'bg-gradient-to-b from-violet-500/[0.06] to-transparent border-violet-500/20 pt-8'
                                         : 'bg-white/[0.02] border-white/[0.06]'
                                 }`}
                             >
+                                {'freeForever' in plan && plan.freeForever && (
+                                    <span className="absolute -top-3 left-4 px-3 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-[9px] font-bold text-emerald-400 uppercase tracking-wider z-10">
+                                        Free Forever
+                                    </span>
+                                )}
                                 {plan.popular && (
                                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[9px] font-bold text-black uppercase tracking-wider z-10">
                                         Most Popular
@@ -230,27 +258,36 @@ export default function PricingClient() {
 
                                 <div className="flex items-baseline gap-1 mb-1">
                                     <span className="text-4xl font-bold text-white">{plan.price}</span>
-                                    <span className="text-sm text-zinc-500">/month</span>
+                                    <span className="text-sm text-zinc-500">{'freeForever' in plan ? '/forever' : '/month'}</span>
                                 </div>
                                 <p className={`text-xs font-medium mb-6 ${
                                     plan.color === 'emerald' ? 'text-emerald-400' :
                                     plan.color === 'violet' ? 'text-violet-400' : 'text-cyan-400'
                                 }`}>
-                                    {plan.credits} AI credits/month
+                                    {'freeForever' in plan ? `${plan.credits} AI credits to start` : `${plan.credits} AI credits/month`}
                                 </p>
 
-                                <button
-                                    onClick={() => handleCheckout(plan.productId)}
-                                    className={`w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all cursor-pointer ${
-                                        plan.popular
-                                            ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_20px_rgba(52,211,153,0.3)]'
-                                            : plan.key === 'pro'
-                                            ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]'
-                                            : 'bg-white/[0.06] text-white hover:bg-white/[0.12] border border-white/[0.06]'
-                                    }`}
-                                >
-                                    Get {plan.name}
-                                </button>
+                                {'freeForever' in plan ? (
+                                    <Link
+                                        href="/dashboard"
+                                        className="w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20"
+                                    >
+                                        Start Free
+                                    </Link>
+                                ) : (
+                                    <button
+                                        onClick={() => 'productId' in plan && handleCheckout(plan.productId as string)}
+                                        className={`w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all cursor-pointer ${
+                                            plan.popular
+                                                ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_20px_rgba(52,211,153,0.3)]'
+                                                : plan.key === 'pro'
+                                                ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]'
+                                                : 'bg-white/[0.06] text-white hover:bg-white/[0.12] border border-white/[0.06]'
+                                        }`}
+                                    >
+                                        Get {plan.name}
+                                    </button>
+                                )}
 
                                 {/* Telegram Bot MVP Highlight for Pro */}
                                 {'telegramBot' in plan && plan.telegramBot && (
@@ -320,22 +357,24 @@ export default function PricingClient() {
                             <thead>
                                 <tr className="border-b border-white/[0.06]">
                                     <th className="text-left py-4 pr-4 text-zinc-500 font-medium">Feature</th>
-                                    <th className="text-center py-4 px-4 text-cyan-400 font-semibold">Starter</th>
-                                    <th className="text-center py-4 px-4 text-emerald-400 font-semibold">Growth</th>
-                                    <th className="text-center py-4 px-4 text-violet-400 font-semibold">Pro</th>
+                                    <th className="text-center py-4 px-3 text-emerald-400 font-semibold">Free</th>
+                                    <th className="text-center py-4 px-3 text-cyan-400 font-semibold">Starter</th>
+                                    <th className="text-center py-4 px-3 text-emerald-400 font-semibold">Growth</th>
+                                    <th className="text-center py-4 px-3 text-violet-400 font-semibold">Pro</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {COMPARISON_FEATURES.map((feature, i) => (
                                     <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                                         <td className="py-3.5 pr-4 text-zinc-300">{feature.name}</td>
-                                        {(['starter', 'growth', 'pro'] as const).map(plan => {
+                                        {(['free', 'starter', 'growth', 'pro'] as const).map(plan => {
                                             const val = feature[plan];
                                             return (
-                                                <td key={plan} className="text-center py-3.5 px-4">
+                                                <td key={plan} className="text-center py-3.5 px-3">
                                                     {typeof val === 'boolean' ? (
                                                         val ? (
                                                             <CheckCircle2 className={`w-4 h-4 mx-auto ${
+                                                                plan === 'free' ? 'text-emerald-400' :
                                                                 plan === 'starter' ? 'text-cyan-400' :
                                                                 plan === 'growth' ? 'text-emerald-400' : 'text-violet-400'
                                                             }`} />
@@ -343,7 +382,7 @@ export default function PricingClient() {
                                                             <span className="text-zinc-700">—</span>
                                                         )
                                                     ) : (
-                                                        <span className="text-zinc-300 font-medium">{val}</span>
+                                                        <span className="text-zinc-300 font-medium text-xs">{val}</span>
                                                     )}
                                                 </td>
                                             );

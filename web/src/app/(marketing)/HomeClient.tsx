@@ -1521,18 +1521,42 @@ function Pricing() {
                     </p>
                 </div>
 
-                {/* Free tier callout */}
-                <div className="text-center mb-6">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] text-sm">
-                        <Sparkles className="w-4 h-4 text-emerald-400" />
-                        <span className="text-emerald-300 font-medium">Every new account gets <strong className="text-emerald-400">10 free messages</strong> to start</span>
-                    </div>
-                </div>
-
                 {/* Discount promo */}
                 <PricingDiscountBanner />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-start">
+
+                    {/* ── FREE ── */}
+                    <div className="relative p-4 sm:p-6 rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.06] to-transparent transition-all duration-300 group">
+                        <div className="absolute -top-3.5 left-4 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                            Free Forever
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-green-500/20 flex items-center justify-center mb-4 mt-2 group-hover:scale-110 transition-transform">
+                            <Sparkles className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-white mb-1">Free</h3>
+                        <p className="text-xs text-zinc-500 mb-5">More than most tools charge for</p>
+
+                        <div className="flex items-baseline gap-1 mb-1">
+                            <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">$0</span>
+                            <span className="text-sm text-zinc-500">/forever</span>
+                        </div>
+                        <div className="text-sm text-emerald-400 font-medium mb-6">10 AI credits to start</div>
+
+                        <Link href="/dashboard"
+                            className="w-full py-2.5 sm:py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all duration-200 mb-6 block text-center border border-emerald-500/20 hover:border-emerald-500/30">
+                            Start Free
+                        </Link>
+
+                        <ul className="space-y-3">
+                            {['Full analytics dashboard', 'Real-time visitor globe', 'Embeddable globe widget', 'SEO tools & site audit', 'Google Analytics integration', '10 AI messages to start'].map((f, i) => (
+                                <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
+                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500" />
+                                    {f}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
 
                     {/* ── STARTER ── */}
                     <div className="relative p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/[0.2] transition-all duration-300 group">
@@ -1554,7 +1578,7 @@ function Pricing() {
                         </button>
 
                         <ul className="space-y-3">
-                            {['50 AI messages per month', 'Full SEO & analytics dashboard', 'Site audit reports', 'AI content tools'].map((f, i) => (
+                            {['50 AI messages per month', 'Everything in Free', 'Remove globe watermark', 'Site audit reports', 'AI content tools'].map((f, i) => (
                                 <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-zinc-600" />
                                     {f}
@@ -1589,7 +1613,7 @@ function Pricing() {
                         </button>
 
                         <ul className="space-y-3">
-                            {['150 AI messages per month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence', 'AI visibility tracking', 'AEO optimization tools'].map((f, i) => (
+                            {['150 AI messages per month', 'Everything in Starter', 'Globe API (no watermark)', 'Priority AI responses', 'Advanced SEO intelligence', 'AEO optimization tools'].map((f, i) => (
                                 <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
                                     {f}
@@ -1640,7 +1664,7 @@ function Pricing() {
                             </div>
 
                             <ul className="space-y-3">
-                                {['300 AI messages per month', 'Everything in Growth', 'Priority support', 'Custom content strategies', 'Early access to new features'].map((f, i) => (
+                                {['300 AI messages per month', 'Everything in Growth', 'Globe API (no watermark)', 'Priority support', 'Early access to new features'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
                                         <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-violet-400" />
                                         {f}

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { signIn } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import {
-    Globe, ArrowRight, Code2, Copy, Check, Navigation,
+    Globe, ArrowRight, Code2, Copy, Check, Navigation, CheckCircle2,
     Share2, Music, History, Maximize2, Monitor, Link2, ExternalLink,
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
@@ -89,25 +89,47 @@ export default function GlobePublicPage() {
             <div className="max-w-7xl mx-auto">
                 {/* ─── Header ─── */}
                 <div className="text-center mb-12">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.04] text-xs font-medium text-emerald-400 mb-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-6">
                         <Globe className="w-3.5 h-3.5" />
-                        GLOBE API
+                        100% Free &mdash; No Credit Card Required
                     </div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight">
                         Real-time visitor globe for{' '}
                         <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">your website</span>
                     </h1>
-                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto mb-8">
-                        Embed an interactive 3D globe showing live visitors from Google Analytics. Free to use, one iframe, no tracking scripts.
+                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto mb-4">
+                        Embed an interactive 3D globe showing live visitors from Google Analytics.
+                        One iframe, no tracking scripts, no SDK.
+                    </p>
+                    <p className="text-emerald-400 font-medium text-sm mb-8">
+                        Free forever. Upgrade to any plan to remove the &quot;Powered by TrafficClaw&quot; watermark.
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' })}
                             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-emerald-500/25"
                         >
-                            Get your embed code
+                            Get your free embed code
                             <ArrowRight className="w-4 h-4" />
                         </button>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-6 mt-6">
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            Free forever
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            Real GA4 data
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            No tracking scripts
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            Click visitor profiles
+                        </div>
                     </div>
                 </div>
 
