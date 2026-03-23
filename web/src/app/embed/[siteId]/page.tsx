@@ -60,7 +60,8 @@ export default function EmbedGlobePage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [realtimeData, setRealtimeData] = useState<Record<string, any> | null>(null);
-    const [isDemo, setIsDemo] = useState(!token);
+    // Always start as demo to avoid hydration mismatch (server has no search params)
+    const [isDemo, setIsDemo] = useState(true);
     const lastDataRef = useRef<string>('');
     const intervalRef = useRef<number>(60_000);
 
