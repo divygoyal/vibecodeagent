@@ -2390,6 +2390,9 @@ function Footer() {
                         <a href="https://dang.ai/" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity">
                             <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Featured on Dang.ai" width="150" height="54" className="h-auto" />
                         </a>
+                        <a href="https://twelve.tools" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity">
+                            <img src="https://twelve.tools/badge1-light.svg" alt="Featured on Twelve Tools" width="200" height="54" className="h-auto" />
+                        </a>
                     </div>
                 </div>
 
