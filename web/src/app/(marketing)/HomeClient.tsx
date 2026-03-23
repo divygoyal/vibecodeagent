@@ -2387,7 +2387,7 @@ function Footer() {
                         <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
                             <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" className="max-w-[200px] sm:max-w-none h-auto" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
                         </a>
-                        <a href="https://dang.ai/" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+                        <a href="https://dang.ai/" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity">
                             <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Featured on Dang.ai" width="150" height="54" className="h-auto" />
                         </a>
                     </div>
