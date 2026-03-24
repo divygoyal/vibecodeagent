@@ -2397,6 +2397,9 @@ function Footer() {
             <a href="https://tinylaunch.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://tinylaunch.com/tinylaunch_badge_featured_on.svg" alt="Featured on TinyLaunch" width="202" height="54" className="w-[202px] shrink-0 h-auto max-w-none" />
             </a>
+            <a href="https://startupfa.me/s/trafficclaw?utm_source=trafficclaw.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://startupfa.me/badges/featured-badge.webp" alt="Featured on Startup Fame" width="171" height="54" className="w-[171px] shrink-0 h-auto max-w-none" />
+            </a>
         </>
     );
 
