@@ -2393,6 +2393,9 @@ function Footer() {
                         <a href="https://twelve.tools" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity">
                             <img src="https://twelve.tools/badge1-light.svg" alt="Featured on Twelve Tools" width="200" height="54" className="h-auto" />
                         </a>
+                        <a href="https://wired.business" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity">
+                            <img src="https://wired.business/badge1-light.svg" alt="Featured on Wired Business" width="200" height="54" className="h-auto" />
+                        </a>
                     </div>
                 </div>
 
