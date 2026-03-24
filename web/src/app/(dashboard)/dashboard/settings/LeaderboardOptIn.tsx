@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
     Trophy, ShieldCheck, ExternalLink, ChevronDown, Loader2,
-    CheckCircle2, XCircle, Globe, Twitter
+    CheckCircle2, XCircle, Globe, Twitter, Copy, Check, Code2
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -40,6 +40,9 @@ export default function LeaderboardOptIn() {
     const [leaving, setLeaving] = useState(false);
     const [message, setMessage] = useState('');
     const [properties, setProperties] = useState<GAProperty[]>([]);
+    const [entryId, setEntryId] = useState<number | null>(null);
+    const [showBadgeEmbed, setShowBadgeEmbed] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
 
     // Form state
     const [form, setForm] = useState({
@@ -75,6 +78,7 @@ export default function LeaderboardOptIn() {
                     twitter_handle: data.twitter_handle || '',
                     ga_property_id: data.ga_property_id || '',
                 });
+                setEntryId(data.id || null);
                 setStatus(data.is_active ? 'joined' : 'idle');
             } else {
                 setStatus('idle');
@@ -120,6 +124,7 @@ export default function LeaderboardOptIn() {
 
             const data = await res.json();
             if (data.success) {
+                setEntryId(data.id || null);
                 setStatus('joined');
                 setMessage('🎉 You\'re on the leaderboard!');
             } else {
@@ -400,6 +405,125 @@ export default function LeaderboardOptIn() {
                     )}
                 </div>
             </form>
+
+            {/* Share & Badge Section — shown when joined */}
+            {status === 'joined' && entryId && (
+                <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-4">
+                    {/* Share heading */}
+                    <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Share your listing</h3>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Share on X */}
+                        <a
+                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                                `Just got verified on TrafficClaw! Check out ${form.startup_name || 'my startup'}'s real traffic stats https://trafficclaw.com/leaderboard/${entryId}`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
+                        >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            Share on X
+                        </a>
+
+                        {/* Copy Link */}
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(`https://trafficclaw.com/leaderboard/${entryId}`);
+                                setCopiedField('link');
+                                setTimeout(() => setCopiedField(null), 2000);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
+                        >
+                            {copiedField === 'link' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedField === 'link' ? 'Copied!' : 'Copy Link'}
+                        </button>
+
+                        {/* View Profile */}
+                        <a
+                            href={`/leaderboard/${entryId}`}
+                            target="_blank"
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            View Profile
+                        </a>
+                    </div>
+
+                    {/* Embed Badge Toggle */}
+                    <button
+                        onClick={() => setShowBadgeEmbed(!showBadgeEmbed)}
+                        className="flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-300 transition"
+                    >
+                        <Code2 className="w-3.5 h-3.5" />
+                        Add a badge to your website
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showBadgeEmbed ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showBadgeEmbed && (
+                        <div className="space-y-3 animate-in fade-in duration-200">
+                            {/* Badge Preview */}
+                            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-xl p-4 flex flex-col items-center gap-2">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src="/badges/verified_on_trafficclaw.svg" alt="Verified on TrafficClaw" height={32} />
+                                <span className="text-[10px] text-zinc-600">Default height is 32px. You can change the height value.</span>
+                            </div>
+
+                            {/* HTML */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">HTML</span>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(
+                                                `<a href="https://trafficclaw.com/leaderboard/${entryId}" target="_blank" rel="noopener noreferrer">\n  <img src="https://trafficclaw.com/badges/verified_on_trafficclaw.svg" alt="Verified on TrafficClaw" height="32" />\n</a>`
+                                            );
+                                            setCopiedField('html');
+                                            setTimeout(() => setCopiedField(null), 2000);
+                                        }}
+                                        className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-white transition"
+                                    >
+                                        {copiedField === 'html' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                        {copiedField === 'html' ? 'Copied!' : 'Copy HTML'}
+                                    </button>
+                                </div>
+                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-2.5 text-[10px] text-zinc-500 font-mono overflow-x-auto whitespace-pre-wrap break-all">
+{`<a href="https://trafficclaw.com/leaderboard/${entryId}" target="_blank" rel="noopener noreferrer">
+  <img src="https://trafficclaw.com/badges/verified_on_trafficclaw.svg" alt="Verified on TrafficClaw" height="32" />
+</a>`}
+                                </pre>
+                            </div>
+
+                            {/* Markdown */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Markdown</span>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(
+                                                `[![Verified on TrafficClaw](https://trafficclaw.com/badges/verified_on_trafficclaw.svg)](https://trafficclaw.com/leaderboard/${entryId})`
+                                            );
+                                            setCopiedField('md');
+                                            setTimeout(() => setCopiedField(null), 2000);
+                                        }}
+                                        className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-white transition"
+                                    >
+                                        {copiedField === 'md' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                        {copiedField === 'md' ? 'Copied!' : 'Copy Markdown'}
+                                    </button>
+                                </div>
+                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-2.5 text-[10px] text-zinc-500 font-mono overflow-x-auto whitespace-pre-wrap break-all">
+{`[![Verified on TrafficClaw](https://trafficclaw.com/badges/verified_on_trafficclaw.svg)](https://trafficclaw.com/leaderboard/${entryId})`}
+                                </pre>
+                            </div>
+
+                            <p className="text-[10px] text-zinc-600 text-center">
+                                When someone clicks this badge, it links back to your verified listing — free backlink! 🔗
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

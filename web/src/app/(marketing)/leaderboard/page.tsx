@@ -338,7 +338,8 @@ export default function LeaderboardPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                                    className="group relative bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all"
+                                    className="group relative bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all cursor-pointer"
+                                    onClick={() => window.location.href = `/leaderboard/${entry.id}`}
                                 >
                                     <div className="grid grid-cols-1 sm:grid-cols-[48px_1fr_140px_100px] gap-3 sm:gap-4 items-center">
                                         {/* Rank */}

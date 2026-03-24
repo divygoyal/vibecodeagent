@@ -1648,6 +1648,44 @@ class LeaderboardUpdateRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
+@app.get("/api/leaderboard/{entry_id}/detail")
+async def get_leaderboard_entry_detail(
+    entry_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint — get a single leaderboard entry's full details."""
+    result = await db.execute(
+        select(LeaderboardEntry).where(
+            LeaderboardEntry.id == entry_id,
+            LeaderboardEntry.is_active == True
+        )
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    return {
+        "id": entry.id,
+        "startup_name": entry.startup_name,
+        "description": entry.description,
+        "website_url": entry.website_url,
+        "logo_url": entry.logo_url,
+        "category": entry.category,
+        "mrr_range": entry.mrr_range,
+        "looking_for": json.loads(entry.looking_for) if entry.looking_for else [],
+        "twitter_handle": entry.twitter_handle,
+        "monthly_visitors": entry.monthly_visitors,
+        "monthly_pageviews": entry.monthly_pageviews,
+        "engagement_rate": entry.engagement_rate,
+        "bounce_rate": entry.bounce_rate,
+        "avg_session_duration": entry.avg_session_duration,
+        "visitor_trend": entry.visitor_trend,
+        "is_verified": entry.is_verified,
+        "last_refreshed": entry.last_refreshed.isoformat() if entry.last_refreshed else None,
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+    }
+
+
 @app.get("/api/leaderboard")
 async def list_leaderboard(
     sort: str = "traffic",
@@ -1825,6 +1863,7 @@ async def get_leaderboard_status(
         return {"joined": False}
     return {
         "joined": True,
+        "id": entry.id,
         "is_active": entry.is_active,
         "startup_name": entry.startup_name,
         "description": entry.description,
