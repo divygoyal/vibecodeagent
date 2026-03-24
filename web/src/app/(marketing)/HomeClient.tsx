@@ -2400,6 +2400,9 @@ function Footer() {
             <a href="https://startupfa.me/s/trafficclaw?utm_source=trafficclaw.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://startupfa.me/badges/featured-badge.webp" alt="Featured on Startup Fame" width="171" height="54" className="w-[171px] shrink-0 h-auto max-w-none" />
             </a>
+            <a href="https://turbo0.com/item/trafficclaw" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://img.turbo0.com/badge-listed-light.svg" alt="Listed on Turbo0" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
+            </a>
         </>
     );
 
