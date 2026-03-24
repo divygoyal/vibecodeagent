@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { BellRing } from 'lucide-react';
 import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } from '@/lib/pushNotifications';
+import LeaderboardOptIn from './LeaderboardOptIn';
 
 function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: string }) {
     return (
@@ -46,7 +47,7 @@ export default function SettingsPage() {
         });
     };
 
-    const [activeTab, setActiveTab] = useState<'account' | 'notifications'>('account');
+    const [activeTab, setActiveTab] = useState<'account' | 'notifications' | 'leaderboard'>('account');
 
     return (
         <div className="space-y-6 max-w-2xl">
@@ -59,7 +60,7 @@ export default function SettingsPage() {
 
             {/* Tab Navigation */}
             <div className="flex items-center gap-1 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit">
-                {(['account', 'notifications'] as const).map(tab => (
+                {(['account', 'notifications', 'leaderboard'] as const).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -167,6 +168,10 @@ export default function SettingsPage() {
                 </div>
             )}
             </>)}
+
+            {activeTab === 'leaderboard' && (
+                <LeaderboardOptIn />
+            )}
         </div>
     );
 }

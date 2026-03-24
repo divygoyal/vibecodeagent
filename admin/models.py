@@ -144,3 +144,37 @@ class ContactQuery(Base):
     status = Column(String(20), default="new")  # new, read, replied
     ip_address = Column(String(45))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LeaderboardEntry(Base):
+    """Public leaderboard entries — opt-in verified traffic sharing"""
+    __tablename__ = "leaderboard_entries"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, unique=True, index=True)
+
+    # Profile info (user-provided)
+    startup_name = Column(String(100), nullable=False)
+    description = Column(Text)
+    website_url = Column(String(500))
+    logo_url = Column(String(500))
+    category = Column(String(50))  # SaaS, E-commerce, Blog, Agency, Tool, Other
+    mrr_range = Column(String(30))  # $0-500, $500-1K, $1K-5K, $5K-10K, $10K+
+    looking_for = Column(Text)  # JSON array: ["partner","visibility","buyer"]
+    twitter_handle = Column(String(100))
+
+    # GA4-verified stats (cron-refreshed daily)
+    ga_property_id = Column(String(100))
+    monthly_visitors = Column(Integer, default=0)
+    monthly_pageviews = Column(Integer, default=0)
+    engagement_rate = Column(Float, default=0.0)
+    bounce_rate = Column(Float, default=0.0)
+    avg_session_duration = Column(Float, default=0.0)
+    visitor_trend = Column(Float, default=0.0)  # % change vs prev month
+
+    # Meta
+    is_verified = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    last_refreshed = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

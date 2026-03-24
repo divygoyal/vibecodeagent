@@ -21,7 +21,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, LeaderboardEntry
 from docker_manager import docker_manager
 
 
@@ -1619,6 +1619,302 @@ async def get_embed_token_google_creds(
         "allowed_origins": json.loads(embed_token.allowed_origins) if embed_token.allowed_origins else None,
         "plan": user.plan if user else "free",
     }
+
+
+# ============= Leaderboard =============
+
+class LeaderboardJoinRequest(BaseModel):
+    startup_name: str
+    description: Optional[str] = None
+    website_url: Optional[str] = None
+    logo_url: Optional[str] = None
+    category: Optional[str] = None
+    mrr_range: Optional[str] = None
+    looking_for: Optional[List[str]] = None
+    twitter_handle: Optional[str] = None
+    ga_property_id: Optional[str] = None
+
+
+class LeaderboardUpdateRequest(BaseModel):
+    startup_name: Optional[str] = None
+    description: Optional[str] = None
+    website_url: Optional[str] = None
+    logo_url: Optional[str] = None
+    category: Optional[str] = None
+    mrr_range: Optional[str] = None
+    looking_for: Optional[List[str]] = None
+    twitter_handle: Optional[str] = None
+    ga_property_id: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@app.get("/api/leaderboard")
+async def list_leaderboard(
+    sort: str = "traffic",
+    category: Optional[str] = None,
+    mrr: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint — list all active leaderboard entries."""
+    query = select(LeaderboardEntry).where(LeaderboardEntry.is_active == True)
+
+    if category and category != "all":
+        query = query.where(LeaderboardEntry.category == category)
+    if mrr and mrr != "all":
+        query = query.where(LeaderboardEntry.mrr_range == mrr)
+
+    if sort == "engagement":
+        query = query.order_by(LeaderboardEntry.engagement_rate.desc())
+    elif sort == "newest":
+        query = query.order_by(LeaderboardEntry.created_at.desc())
+    else:  # "traffic" default
+        query = query.order_by(LeaderboardEntry.monthly_visitors.desc())
+
+    result = await db.execute(query)
+    entries = result.scalars().all()
+
+    return [
+        {
+            "id": e.id,
+            "startup_name": e.startup_name,
+            "description": e.description,
+            "website_url": e.website_url,
+            "logo_url": e.logo_url,
+            "category": e.category,
+            "mrr_range": e.mrr_range,
+            "looking_for": json.loads(e.looking_for) if e.looking_for else [],
+            "twitter_handle": e.twitter_handle,
+            "monthly_visitors": e.monthly_visitors,
+            "monthly_pageviews": e.monthly_pageviews,
+            "engagement_rate": e.engagement_rate,
+            "bounce_rate": e.bounce_rate,
+            "visitor_trend": e.visitor_trend,
+            "is_verified": e.is_verified,
+            "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in entries
+    ]
+
+
+@app.post("/api/leaderboard/join")
+async def join_leaderboard(
+    data: LeaderboardJoinRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Opt-in to the leaderboard. Requires user_id header."""
+    user_id = data.ga_property_id  # Will extract from header in practice
+    # Extract user_id from a custom header instead
+    return await _join_leaderboard_impl(data, db)
+
+
+async def _join_leaderboard_impl(data: LeaderboardJoinRequest, db: AsyncSession, user_id: int = None):
+    """Internal impl for join."""
+    # This will be called from the Next.js API route which passes user_id
+    pass
+
+
+@app.post("/api/leaderboard/{user_id}/join")
+async def join_leaderboard_for_user(
+    user_id: int,
+    data: LeaderboardJoinRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Create or update a leaderboard entry for the given user."""
+    # Check user exists
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if already has an entry
+    existing = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+    )
+    entry = existing.scalar_one_or_none()
+
+    if entry:
+        # Update existing
+        entry.startup_name = data.startup_name
+        if data.description is not None: entry.description = data.description
+        if data.website_url is not None: entry.website_url = data.website_url
+        if data.logo_url is not None: entry.logo_url = data.logo_url
+        if data.category is not None: entry.category = data.category
+        if data.mrr_range is not None: entry.mrr_range = data.mrr_range
+        if data.looking_for is not None: entry.looking_for = json.dumps(data.looking_for)
+        if data.twitter_handle is not None: entry.twitter_handle = data.twitter_handle
+        if data.ga_property_id is not None: entry.ga_property_id = data.ga_property_id
+        entry.is_active = True
+        entry.updated_at = datetime.utcnow()
+    else:
+        entry = LeaderboardEntry(
+            user_id=user_id,
+            startup_name=data.startup_name,
+            description=data.description,
+            website_url=data.website_url,
+            logo_url=data.logo_url,
+            category=data.category or "Other",
+            mrr_range=data.mrr_range or "$0-500",
+            looking_for=json.dumps(data.looking_for or []),
+            twitter_handle=data.twitter_handle,
+            ga_property_id=data.ga_property_id,
+        )
+        db.add(entry)
+
+    await db.commit()
+    await db.refresh(entry)
+    return {
+        "success": True,
+        "id": entry.id,
+        "message": "Joined leaderboard" if not existing.scalar_one_or_none else "Updated leaderboard entry",
+    }
+
+
+@app.put("/api/leaderboard/{user_id}")
+async def update_leaderboard_entry(
+    user_id: int,
+    data: LeaderboardUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Update a leaderboard entry."""
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Leaderboard entry not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "looking_for" in update_data and update_data["looking_for"] is not None:
+        update_data["looking_for"] = json.dumps(update_data["looking_for"])
+
+    for key, value in update_data.items():
+        setattr(entry, key, value)
+    entry.updated_at = datetime.utcnow()
+
+    await db.commit()
+    return {"success": True, "message": "Entry updated"}
+
+
+@app.delete("/api/leaderboard/{user_id}")
+async def leave_leaderboard(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Opt-out of the leaderboard (soft delete — sets is_active=False)."""
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Leaderboard entry not found")
+
+    entry.is_active = False
+    entry.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"success": True, "message": "Left leaderboard"}
+
+
+@app.get("/api/leaderboard/{user_id}/status")
+async def get_leaderboard_status(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Check if a user has a leaderboard entry."""
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        return {"joined": False}
+    return {
+        "joined": True,
+        "is_active": entry.is_active,
+        "startup_name": entry.startup_name,
+        "description": entry.description,
+        "website_url": entry.website_url,
+        "logo_url": entry.logo_url,
+        "category": entry.category,
+        "mrr_range": entry.mrr_range,
+        "looking_for": json.loads(entry.looking_for) if entry.looking_for else [],
+        "twitter_handle": entry.twitter_handle,
+        "ga_property_id": entry.ga_property_id,
+        "monthly_visitors": entry.monthly_visitors,
+        "is_verified": entry.is_verified,
+    }
+
+
+@app.post("/api/leaderboard/refresh")
+async def refresh_leaderboard_stats(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Trigger a refresh of all leaderboard entries' GA4 stats.
+    Called by the cron job. Returns list of user_ids + their Google OAuth tokens."""
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.is_active == True)
+    )
+    entries = result.scalars().all()
+
+    refresh_list = []
+    for entry in entries:
+        # Get the user's Google OAuth credentials
+        oauth_result = await db.execute(
+            select(OAuthConnection).where(
+                OAuthConnection.user_id == entry.user_id,
+                OAuthConnection.provider == "google"
+            )
+        )
+        oauth = oauth_result.scalars().first()
+        if oauth and oauth.access_token:
+            refresh_list.append({
+                "user_id": entry.user_id,
+                "entry_id": entry.id,
+                "ga_property_id": entry.ga_property_id,
+                "access_token": oauth.access_token,
+                "refresh_token": oauth.refresh_token,
+            })
+
+    return {"entries": refresh_list, "total": len(refresh_list)}
+
+
+@app.patch("/api/leaderboard/{entry_id}/stats")
+async def update_leaderboard_stats(
+    entry_id: int,
+    stats: dict,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Update GA4 stats for a leaderboard entry (called by cron after fetching GA4 data)."""
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    if "monthly_visitors" in stats:
+        entry.monthly_visitors = stats["monthly_visitors"]
+    if "monthly_pageviews" in stats:
+        entry.monthly_pageviews = stats["monthly_pageviews"]
+    if "engagement_rate" in stats:
+        entry.engagement_rate = stats["engagement_rate"]
+    if "bounce_rate" in stats:
+        entry.bounce_rate = stats["bounce_rate"]
+    if "avg_session_duration" in stats:
+        entry.avg_session_duration = stats["avg_session_duration"]
+    if "visitor_trend" in stats:
+        entry.visitor_trend = stats["visitor_trend"]
+
+    entry.is_verified = True
+    entry.last_refreshed = datetime.utcnow()
+    await db.commit()
+    return {"success": True}
 
 
 # ============= Health Check =============

@@ -6,10 +6,17 @@ import DodoPayments from 'dodopayments';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-const client = new DodoPayments({
-    bearerToken: process.env.DODO_PAYMENTS_API_KEY,
-    environment: 'live_mode',
-});
+// Lazy-init to avoid crashing at build time when env vars aren't set
+let _client: DodoPayments | null = null;
+function getClient() {
+    if (!_client) {
+        _client = new DodoPayments({
+            bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+            environment: 'live_mode',
+        });
+    }
+    return _client;
+}
 
 export async function POST() {
     try {
@@ -52,7 +59,7 @@ export async function POST() {
         // If subscription_id not in DB, search Dodo Payments by email
         if (!subscriptionId && userEmail) {
             try {
-                const subs = client.subscriptions.list({ page_size: 10 });
+                const subs = getClient().subscriptions.list({ page_size: 10 });
                 for await (const sub of subs) {
                     if (
                         sub.customer?.email === userEmail &&
@@ -72,7 +79,7 @@ export async function POST() {
         }
 
         // Cancel subscription via Dodo Payments API
-        await client.subscriptions.update(subscriptionId, {
+        await getClient().subscriptions.update(subscriptionId, {
             status: 'cancelled',
         });
 

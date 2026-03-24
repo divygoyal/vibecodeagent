@@ -4,10 +4,18 @@ import DodoPayments, { type DodoPayments as DodoPaymentsNS } from 'dodopayments'
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-const client = new DodoPayments({
-    bearerToken: process.env.DODO_PAYMENTS_API_KEY,
-    environment: 'live_mode',
-});
+const client_lazy = (() => {
+    let _client: DodoPayments | null = null;
+    return () => {
+        if (!_client) {
+            _client = new DodoPayments({
+                bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+                environment: 'live_mode',
+            });
+        }
+        return _client;
+    };
+})();
 
 // Product ID → plan config (live mode product IDs)
 const PLANS: Record<string, { plan: string; credits: number; telegramBot: boolean }> = {
@@ -81,7 +89,7 @@ export async function POST(req: Request) {
 
         let event: WebhookEvent;
         try {
-            event = client.webhooks.unwrap(rawBody, {
+            event = client_lazy().webhooks.unwrap(rawBody, {
                 headers: Object.fromEntries(req.headers.entries()),
                 key: webhookKey,
             });
