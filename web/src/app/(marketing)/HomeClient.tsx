@@ -2394,6 +2394,9 @@ function Footer() {
             <a href="https://launchigniter.com/product/trafficclaw?ref=badge-trafficclaw" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://launchigniter.com/api/badge/trafficclaw?theme=neutral" alt="Featured on LaunchIgniter" width="212" height="55" className="w-[212px] shrink-0 h-auto max-w-none" />
             </a>
+            <a href="https://tinylaunch.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://tinylaunch.com/tinylaunch_badge_featured_on.svg" alt="Featured on TinyLaunch" width="202" height="54" className="w-[202px] shrink-0 h-auto max-w-none" />
+            </a>
         </>
     );
 
