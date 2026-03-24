@@ -2391,7 +2391,9 @@ function Footer() {
             <a href="https://wired.business" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://wired.business/badge1-light.svg" alt="Featured on Wired Business" width="200" height="54" className="w-[200px] shrink-0 h-auto max-w-none" />
             </a>
-            {/* Add your other 20+ backlinks here */}
+            <a href="https://launchigniter.com/product/trafficclaw?ref=badge-trafficclaw" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://launchigniter.com/api/badge/trafficclaw?theme=neutral" alt="Featured on LaunchIgniter" width="212" height="55" className="w-[212px] shrink-0 h-auto max-w-none" />
+            </a>
         </>
     );
 
