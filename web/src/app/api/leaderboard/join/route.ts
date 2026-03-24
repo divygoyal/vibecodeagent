@@ -31,14 +31,14 @@ async function refreshEntryStats(entryId: number, gaPropertyId: string, userId: 
 
         if (!oauthRes.ok) {
             console.error('[Leaderboard Instant] Failed to get refresh list');
-            return;
+            return null;
         }
 
         const { entries } = await oauthRes.json();
         const entry = entries.find((e: { user_id: number }) => e.user_id === userId);
         if (!entry || !entry.access_token) {
             console.log('[Leaderboard Instant] No OAuth token found for user, skipping stats fetch');
-            return;
+            return null;
         }
 
         // 2. Get a valid access token
@@ -75,7 +75,7 @@ async function refreshEntryStats(entryId: number, gaPropertyId: string, userId: 
 
         if (!currentRes.ok) {
             console.error('[Leaderboard Instant] GA4 API error:', await currentRes.text());
-            return;
+            return null;
         }
 
         const currentData = await currentRes.json();
@@ -84,7 +84,7 @@ async function refreshEntryStats(entryId: number, gaPropertyId: string, userId: 
 
         if (!row) {
             console.log('[Leaderboard Instant] No GA4 data found for property');
-            return;
+            return null;
         }
 
         const mv = row.metricValues;
@@ -114,11 +114,14 @@ async function refreshEntryStats(entryId: number, gaPropertyId: string, userId: 
 
         if (updateRes.ok) {
             console.log(`[Leaderboard Instant] ✓ Entry ${entryId} updated: ${stats.monthly_visitors} visitors, ${stats.engagement_rate}% engagement`);
+            return stats;
         } else {
             console.error(`[Leaderboard Instant] ✗ Failed to update entry ${entryId}`);
+            return stats; // Still return stats even if DB update failed
         }
     } catch (err) {
-        console.error('[Leaderboard Instant] Background stats refresh failed:', err);
+        console.error('[Leaderboard Instant] Stats refresh failed:', err);
+        return null;
     }
 }
 
@@ -168,12 +171,18 @@ export async function POST(req: Request) {
             return NextResponse.json(data, { status: res.status });
         }
 
-        // Fire-and-forget: fetch GA4 stats immediately in the background
+        // Fetch GA4 stats synchronously so data is ready instantly
+        let stats = null;
         if (data.success && data.id && body.ga_property_id) {
-            refreshEntryStats(data.id, body.ga_property_id, userId).catch(() => {});
+            try {
+                stats = await refreshEntryStats(data.id, body.ga_property_id, userId);
+            } catch {
+                // Stats fetch failed, join still succeeded — stats will be updated by daily cron
+                console.log('[Leaderboard Join] Stats fetch failed, will retry via cron');
+            }
         }
 
-        return NextResponse.json(data);
+        return NextResponse.json({ ...data, stats });
     } catch (err) {
         console.error('Leaderboard join error:', err);
         return NextResponse.json({ error: 'Failed to join leaderboard', detail: String(err) }, { status: 500 });
