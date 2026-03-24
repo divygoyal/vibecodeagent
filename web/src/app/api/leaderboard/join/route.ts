@@ -35,7 +35,13 @@ export async function POST(req: Request) {
             signal: AbortSignal.timeout(10000),
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch {
+            console.error('Leaderboard join: non-JSON response:', text.slice(0, 200));
+            return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
+        }
+
         if (!res.ok) {
             return NextResponse.json(data, { status: res.status });
         }
@@ -68,7 +74,13 @@ export async function GET() {
             signal: AbortSignal.timeout(10000),
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch {
+            console.error('Leaderboard status: non-JSON response:', text.slice(0, 200));
+            return NextResponse.json({ joined: false });
+        }
+
         return NextResponse.json(data);
     } catch (err) {
         console.error('Leaderboard status error:', err);
@@ -101,7 +113,13 @@ export async function PUT(req: Request) {
             signal: AbortSignal.timeout(10000),
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch {
+            console.error('Leaderboard update: non-JSON response:', text.slice(0, 200));
+            return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
+        }
+
         return NextResponse.json(data, { status: res.status });
     } catch (err) {
         console.error('Leaderboard update error:', err);
@@ -128,7 +146,13 @@ export async function DELETE() {
             signal: AbortSignal.timeout(10000),
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch {
+            console.error('Leaderboard leave: non-JSON response:', text.slice(0, 200));
+            return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
+        }
+
         return NextResponse.json(data, { status: res.status });
     } catch (err) {
         console.error('Leaderboard leave error:', err);
