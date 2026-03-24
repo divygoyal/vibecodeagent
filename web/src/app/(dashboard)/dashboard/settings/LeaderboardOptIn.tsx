@@ -136,15 +136,29 @@ export default function LeaderboardOptIn() {
         if (!confirm('Are you sure you want to leave the leaderboard?')) return;
 
         setLeaving(true);
+        setMessage('');
         try {
             const res = await fetch('/api/leaderboard/join', { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
                 setStatus('idle');
-                setMessage('You\'ve been removed from the leaderboard');
+                setForm({
+                    startup_name: '',
+                    description: '',
+                    website_url: '',
+                    logo_url: '',
+                    category: 'SaaS',
+                    mrr_range: '$0-500',
+                    looking_for: [],
+                    twitter_handle: '',
+                    ga_property_id: '',
+                });
+                setMessage('✅ You\'ve been removed from the leaderboard');
+            } else {
+                setMessage(data.detail || data.error || 'Failed to leave leaderboard');
             }
         } catch {
-            setMessage('Failed to leave');
+            setMessage('Network error — please try again');
         } finally {
             setLeaving(false);
         }
@@ -193,7 +207,7 @@ export default function LeaderboardOptIn() {
             {/* Message */}
             {message && (
                 <div className={`text-xs px-3 py-2 rounded-lg mb-4 ${
-                    message.includes('🎉') || message.includes('removed')
+                    message.includes('🎉') || message.includes('✅')
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15'
                         : 'bg-red-500/10 text-red-400 border border-red-500/15'
                 }`}>
