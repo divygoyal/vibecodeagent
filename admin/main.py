@@ -1697,29 +1697,25 @@ async def list_leaderboard(
     ]
 
 
-@app.post("/api/leaderboard/{user_id}/join")
+@app.post("/api/leaderboard/{identifier}/join")
 async def join_leaderboard_for_user(
-    user_id: int,
+    identifier: str,
     data: LeaderboardJoinRequest,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
     """Create or update a leaderboard entry for the given user."""
-    # Check user exists
-    user_result = await db.execute(select(User).where(User.id == user_id))
-    user = user_result.scalar_one_or_none()
+    user = await get_user_by_identifier(db, identifier)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Check if already has an entry
     existing = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
     )
     entry = existing.scalar_one_or_none()
-    is_update = entry is not None
+    is_new = entry is None
 
     if entry:
-        # Update existing
         entry.startup_name = data.startup_name
         if data.description is not None: entry.description = data.description
         if data.website_url is not None: entry.website_url = data.website_url
@@ -1733,7 +1729,7 @@ async def join_leaderboard_for_user(
         entry.updated_at = datetime.utcnow()
     else:
         entry = LeaderboardEntry(
-            user_id=user_id,
+            user_id=user.id,
             startup_name=data.startup_name,
             description=data.description,
             website_url=data.website_url,
@@ -1751,20 +1747,24 @@ async def join_leaderboard_for_user(
     return {
         "success": True,
         "id": entry.id,
-        "message": "Updated leaderboard entry" if is_update else "Joined leaderboard",
+        "message": "Joined leaderboard" if is_new else "Updated leaderboard entry",
     }
 
 
-@app.put("/api/leaderboard/{user_id}")
+@app.put("/api/leaderboard/{identifier}")
 async def update_leaderboard_entry(
-    user_id: int,
+    identifier: str,
     data: LeaderboardUpdateRequest,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
     """Update a leaderboard entry."""
+    user = await get_user_by_identifier(db, identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     result = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
     )
     entry = result.scalar_one_or_none()
     if not entry:
@@ -1782,15 +1782,19 @@ async def update_leaderboard_entry(
     return {"success": True, "message": "Entry updated"}
 
 
-@app.delete("/api/leaderboard/{user_id}")
+@app.delete("/api/leaderboard/{identifier}")
 async def leave_leaderboard(
-    user_id: int,
+    identifier: str,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
     """Opt-out of the leaderboard (soft delete — sets is_active=False)."""
+    user = await get_user_by_identifier(db, identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     result = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
     )
     entry = result.scalar_one_or_none()
     if not entry:
@@ -1802,15 +1806,19 @@ async def leave_leaderboard(
     return {"success": True, "message": "Left leaderboard"}
 
 
-@app.get("/api/leaderboard/{user_id}/status")
+@app.get("/api/leaderboard/{identifier}/status")
 async def get_leaderboard_status(
-    user_id: int,
+    identifier: str,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
     """Check if a user has a leaderboard entry."""
+    user = await get_user_by_identifier(db, identifier)
+    if not user:
+        return {"joined": False}
+
     result = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
+        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
     )
     entry = result.scalar_one_or_none()
     if not entry:
