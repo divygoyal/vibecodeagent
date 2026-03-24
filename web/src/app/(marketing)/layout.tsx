@@ -62,7 +62,6 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
     const navLinks = [
         { label: 'AI Demo', href: '/#ai-demo' },
         { label: 'Features', href: '/features' },
-        { label: 'Leaderboard', href: '/leaderboard' },
         { label: 'Globe', href: '/globe' },
         { label: 'Pricing', href: '/pricing' },
         { label: 'Contact', href: '/contact' },
