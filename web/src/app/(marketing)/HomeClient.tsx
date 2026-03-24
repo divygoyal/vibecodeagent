@@ -2379,17 +2379,17 @@ function ContactSection() {
 function Footer() {
     const backlinks = (
         <>
-            <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity flex-shrink-0">
-                <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" className="max-w-[200px] sm:max-w-none h-auto" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
+            <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img alt="TrafficClaw - Talk to your SEO & Analytics data | Product Hunt" width="250" height="54" className="w-[200px] sm:w-[250px] shrink-0 h-auto max-w-none" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
             </a>
-            <a href="https://dang.ai/" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity flex-shrink-0">
-                <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Featured on Dang.ai" width="150" height="54" className="h-auto" />
+            <a href="https://dang.ai/" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Featured on Dang.ai" width="150" height="54" className="w-[150px] shrink-0 h-auto max-w-none" />
             </a>
-            <a href="https://twelve.tools" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity flex-shrink-0">
-                <img src="https://twelve.tools/badge1-light.svg" alt="Featured on Twelve Tools" width="200" height="54" className="h-auto" />
+            <a href="https://twelve.tools" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://twelve.tools/badge1-light.svg" alt="Featured on Twelve Tools" width="200" height="54" className="w-[200px] shrink-0 h-auto max-w-none" />
             </a>
-            <a href="https://wired.business" target="_blank" rel="noopener" className="hover:opacity-80 transition-opacity flex-shrink-0">
-                <img src="https://wired.business/badge1-light.svg" alt="Featured on Wired Business" width="200" height="54" className="h-auto" />
+            <a href="https://wired.business" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://wired.business/badge1-light.svg" alt="Featured on Wired Business" width="200" height="54" className="w-[200px] shrink-0 h-auto max-w-none" />
             </a>
             {/* Add your other 20+ backlinks here */}
         </>
@@ -2402,22 +2402,17 @@ function Footer() {
                 <div className="flex flex-col items-center gap-6 w-full">
                     <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest text-center w-full block">Featured on</span>
                     <div className="relative w-full overflow-hidden flex items-center">
-                        {/* Adding subtle gradients on the edges masks the entry and exit. Set to from-black if body is pitch black. */}
-                        <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
-                        <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
-                        
                         <motion.div
-                            className="flex gap-4 sm:gap-6 items-center w-max pr-4 sm:pr-6"
+                            className="flex items-center w-max"
                             animate={{ x: ["0%", "-50%"] }}
                             transition={{
                                 ease: "linear",
-                                duration: 40,
+                                duration: 30,
                                 repeat: Infinity,
                             }}
                         >
-                            {[1, 2].map((group) => (
-                                <div key={group} className="flex gap-4 sm:gap-6 items-center">
-                                    {backlinks}
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="flex gap-4 sm:gap-6 items-center shrink-0 pr-4 sm:pr-6">
                                     {backlinks}
                                 </div>
                             ))}
