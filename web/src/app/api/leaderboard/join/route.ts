@@ -1,11 +1,126 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { getValidAccessToken } from '@/lib/googleApi';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 
 export const dynamic = 'force-dynamic';
+
+function cleanPropertyId(id: string): string {
+    if (!id.startsWith('properties/') && /^\d+$/.test(id)) {
+        return `properties/${id}`;
+    }
+    return id;
+}
+
+/**
+ * Fetch GA4 stats and update the leaderboard entry in the background.
+ * This runs fire-and-forget after a successful join so the user sees real data immediately.
+ */
+async function refreshEntryStats(entryId: number, gaPropertyId: string, userId: number) {
+    try {
+        // 1. Get the user's OAuth tokens from admin API
+        const oauthRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/refresh`, {
+            method: 'POST',
+            headers: { 'X-API-Key': ADMIN_API_KEY },
+            signal: AbortSignal.timeout(10000),
+        });
+
+        if (!oauthRes.ok) {
+            console.error('[Leaderboard Instant] Failed to get refresh list');
+            return;
+        }
+
+        const { entries } = await oauthRes.json();
+        const entry = entries.find((e: { user_id: number }) => e.user_id === userId);
+        if (!entry || !entry.access_token) {
+            console.log('[Leaderboard Instant] No OAuth token found for user, skipping stats fetch');
+            return;
+        }
+
+        // 2. Get a valid access token
+        const token = await getValidAccessToken(entry.access_token, entry.refresh_token);
+        const pid = cleanPropertyId(gaPropertyId);
+
+        // 3. Fetch current + previous month stats from GA4
+        const [currentRes, prevRes] = await Promise.all([
+            fetch(`${GA_DATA_BASE}/${pid}:runReport`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dateRanges: [{ startDate: '28daysAgo', endDate: 'today' }],
+                    metrics: [
+                        { name: 'activeUsers' },
+                        { name: 'screenPageViews' },
+                        { name: 'engagementRate' },
+                        { name: 'bounceRate' },
+                        { name: 'averageSessionDuration' },
+                    ],
+                }),
+                signal: AbortSignal.timeout(15000),
+            }),
+            fetch(`${GA_DATA_BASE}/${pid}:runReport`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dateRanges: [{ startDate: '56daysAgo', endDate: '29daysAgo' }],
+                    metrics: [{ name: 'activeUsers' }],
+                }),
+                signal: AbortSignal.timeout(15000),
+            }),
+        ]);
+
+        if (!currentRes.ok) {
+            console.error('[Leaderboard Instant] GA4 API error:', await currentRes.text());
+            return;
+        }
+
+        const currentData = await currentRes.json();
+        const prevData = prevRes.ok ? await prevRes.json() : null;
+        const row = currentData.rows?.[0];
+
+        if (!row) {
+            console.log('[Leaderboard Instant] No GA4 data found for property');
+            return;
+        }
+
+        const mv = row.metricValues;
+        const currentUsers = parseInt(mv[0].value) || 0;
+        const prevUsers = prevData?.rows?.[0]?.metricValues?.[0]?.value
+            ? parseInt(prevData.rows[0].metricValues[0].value)
+            : 0;
+        const trend = prevUsers > 0
+            ? +((currentUsers - prevUsers) / prevUsers * 100).toFixed(1)
+            : 0;
+
+        const stats = {
+            monthly_visitors: currentUsers,
+            monthly_pageviews: parseInt(mv[1].value) || 0,
+            engagement_rate: +((parseFloat(mv[2].value) || 0) * 100).toFixed(1),
+            bounce_rate: +((parseFloat(mv[3].value) || 0) * 100).toFixed(1),
+            avg_session_duration: Math.round(parseFloat(mv[4].value) || 0),
+            visitor_trend: trend,
+        };
+
+        // 4. Update the entry with real stats
+        const updateRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/${entryId}/stats`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+            body: JSON.stringify(stats),
+        });
+
+        if (updateRes.ok) {
+            console.log(`[Leaderboard Instant] ✓ Entry ${entryId} updated: ${stats.monthly_visitors} visitors, ${stats.engagement_rate}% engagement`);
+        } else {
+            console.error(`[Leaderboard Instant] ✗ Failed to update entry ${entryId}`);
+        }
+    } catch (err) {
+        console.error('[Leaderboard Instant] Background stats refresh failed:', err);
+    }
+}
 
 /**
  * Join the leaderboard (opt-in). Requires authentication.
@@ -51,6 +166,11 @@ export async function POST(req: Request) {
 
         if (!res.ok) {
             return NextResponse.json(data, { status: res.status });
+        }
+
+        // Fire-and-forget: fetch GA4 stats immediately in the background
+        if (data.success && data.id && body.ga_property_id) {
+            refreshEntryStats(data.id, body.ga_property_id, userId).catch(() => {});
         }
 
         return NextResponse.json(data);
