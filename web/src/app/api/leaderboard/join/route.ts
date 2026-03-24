@@ -17,33 +17,21 @@ function cleanPropertyId(id: string): string {
 }
 
 /**
- * Fetch GA4 stats and update the leaderboard entry in the background.
- * This runs fire-and-forget after a successful join so the user sees real data immediately.
+ * Fetch GA4 stats and update the leaderboard entry.
+ * Uses the user's Google tokens directly from the session.
  */
-async function refreshEntryStats(entryId: number, gaPropertyId: string, userId: number) {
+async function refreshEntryStats(
+    entryId: number,
+    gaPropertyId: string,
+    googleAccessToken: string,
+    googleRefreshToken?: string,
+) {
     try {
-        // 1. Get the user's OAuth tokens from admin API
-        const oauthRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/refresh`, {
-            method: 'POST',
-            headers: { 'X-API-Key': ADMIN_API_KEY },
-            signal: AbortSignal.timeout(10000),
-        });
-
-        if (!oauthRes.ok) {
-            console.error('[Leaderboard Instant] Failed to get refresh list');
-            return null;
-        }
-
-        const { entries } = await oauthRes.json();
-        const entry = entries.find((e: { user_id: number }) => e.user_id === userId);
-        if (!entry || !entry.access_token) {
-            console.log('[Leaderboard Instant] No OAuth token found for user, skipping stats fetch');
-            return null;
-        }
-
-        // 2. Get a valid access token
-        const token = await getValidAccessToken(entry.access_token, entry.refresh_token);
+        // 1. Get a valid access token (refreshes if needed)
+        const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
         const pid = cleanPropertyId(gaPropertyId);
+
+        console.log(`[Leaderboard Instant] Fetching GA4 stats for property ${pid}, entry ${entryId}`);
 
         // 3. Fetch current + previous month stats from GA4
         const [currentRes, prevRes] = await Promise.all([
@@ -136,6 +124,11 @@ export async function POST(req: Request) {
 
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
+    // @ts-expect-error - googleAccessToken added in callbacks
+    const googleAccessToken: string | undefined = session.user.googleAccessToken;
+    // @ts-expect-error - refreshToken added in callbacks
+    const googleRefreshToken: string | undefined = session.user.refreshToken;
+
     if (!userId) {
         return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
     }
@@ -173,13 +166,14 @@ export async function POST(req: Request) {
 
         // Fetch GA4 stats synchronously so data is ready instantly
         let stats = null;
-        if (data.success && data.id && body.ga_property_id) {
+        if (data.success && data.id && body.ga_property_id && googleAccessToken) {
             try {
-                stats = await refreshEntryStats(data.id, body.ga_property_id, userId);
-            } catch {
-                // Stats fetch failed, join still succeeded — stats will be updated by daily cron
-                console.log('[Leaderboard Join] Stats fetch failed, will retry via cron');
+                stats = await refreshEntryStats(data.id, body.ga_property_id, googleAccessToken, googleRefreshToken);
+            } catch (statsErr) {
+                console.error('[Leaderboard Join] Stats fetch failed, will retry via cron:', statsErr);
             }
+        } else {
+            console.log(`[Leaderboard Join] Skipping stats fetch: success=${data.success}, id=${data.id}, ga_property=${body.ga_property_id}, hasGoogleToken=${!!googleAccessToken}`);
         }
 
         return NextResponse.json({ ...data, stats });
@@ -276,13 +270,18 @@ export async function DELETE() {
     const userId = session.user.id;
 
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${userId}`, {
+        const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}`;
+        console.log(`[Leaderboard Leave] DELETE ${adminUrl} for user ${userId}`);
+
+        const res = await fetch(adminUrl, {
             method: 'DELETE',
             headers: { 'X-API-Key': ADMIN_API_KEY },
             signal: AbortSignal.timeout(10000),
         });
 
         const text = await res.text();
+        console.log(`[Leaderboard Leave] Response: ${res.status} ${text.substring(0, 300)}`);
+
         let data;
         try { data = JSON.parse(text); } catch {
             console.error('Leaderboard leave: non-JSON response:', text.slice(0, 200));
