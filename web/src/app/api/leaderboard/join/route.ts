@@ -25,7 +25,10 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
 
-        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${userId}/join`, {
+        const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}/join`;
+        console.log(`[Leaderboard Join] POST ${adminUrl} for user ${userId}`);
+
+        const res = await fetch(adminUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -35,11 +38,15 @@ export async function POST(req: Request) {
             signal: AbortSignal.timeout(10000),
         });
 
-        const text = await res.text();
+        const responseText = await res.text();
+        console.log(`[Leaderboard Join] Admin API response: ${res.status} ${responseText.substring(0, 500)}`);
+
         let data;
-        try { data = JSON.parse(text); } catch {
-            console.error('Leaderboard join: non-JSON response:', text.slice(0, 200));
-            return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
+        try {
+            data = JSON.parse(responseText);
+        } catch {
+            console.error('[Leaderboard Join] Non-JSON response from admin API:', responseText.substring(0, 200));
+            return NextResponse.json({ error: 'Admin API returned non-JSON response', detail: responseText.substring(0, 200) }, { status: 502 });
         }
 
         if (!res.ok) {
@@ -49,7 +56,7 @@ export async function POST(req: Request) {
         return NextResponse.json(data);
     } catch (err) {
         console.error('Leaderboard join error:', err);
-        return NextResponse.json({ error: 'Failed to join leaderboard' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to join leaderboard', detail: String(err) }, { status: 500 });
     }
 }
 

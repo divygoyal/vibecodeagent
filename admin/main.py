@@ -1697,24 +1697,6 @@ async def list_leaderboard(
     ]
 
 
-@app.post("/api/leaderboard/join")
-async def join_leaderboard(
-    data: LeaderboardJoinRequest,
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_admin_key),
-):
-    """Opt-in to the leaderboard. Requires user_id header."""
-    user_id = data.ga_property_id  # Will extract from header in practice
-    # Extract user_id from a custom header instead
-    return await _join_leaderboard_impl(data, db)
-
-
-async def _join_leaderboard_impl(data: LeaderboardJoinRequest, db: AsyncSession, user_id: int = None):
-    """Internal impl for join."""
-    # This will be called from the Next.js API route which passes user_id
-    pass
-
-
 @app.post("/api/leaderboard/{user_id}/join")
 async def join_leaderboard_for_user(
     user_id: int,
@@ -1734,6 +1716,7 @@ async def join_leaderboard_for_user(
         select(LeaderboardEntry).where(LeaderboardEntry.user_id == user_id)
     )
     entry = existing.scalar_one_or_none()
+    is_update = entry is not None
 
     if entry:
         # Update existing
@@ -1768,7 +1751,7 @@ async def join_leaderboard_for_user(
     return {
         "success": True,
         "id": entry.id,
-        "message": "Joined leaderboard" if not existing.scalar_one_or_none else "Updated leaderboard entry",
+        "message": "Updated leaderboard entry" if is_update else "Joined leaderboard",
     }
 
 

@@ -123,10 +123,10 @@ export default function LeaderboardOptIn() {
                 setStatus('joined');
                 setMessage('🎉 You\'re on the leaderboard!');
             } else {
-                setMessage(data.error || 'Failed to join');
+                setMessage(data.detail || data.error || 'Failed to join leaderboard');
             }
         } catch {
-            setMessage('Something went wrong');
+            setMessage('Network error — please try again');
         } finally {
             setSaving(false);
         }
