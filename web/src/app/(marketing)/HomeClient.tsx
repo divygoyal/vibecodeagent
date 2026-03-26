@@ -2409,6 +2409,9 @@ function Footer() {
             <a href="https://neeed.directory/products/trafficclaw?utm_source=trafficclaw" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://neeed.directory/badges/neeed-badge-light.svg" alt="Featured on neeed.directory" width="139" height="54" className="w-[139px] shrink-0 h-auto max-w-none" />
             </a>
+            <a href="https://toshilist.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toshilist.com/assets/images/badge.png" alt="Toshi List" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
+            </a>
         </>
     );
 
