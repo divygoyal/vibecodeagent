@@ -2406,6 +2406,9 @@ function Footer() {
             <a href="https://findly.tools/trafficclaw?utm_source=trafficclaw" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://findly.tools/badges/findly-tools-badge-light.svg" alt="Featured on Findly.tools" width="175" height="55" className="w-[175px] shrink-0 h-auto max-w-none" />
             </a>
+            <a href="https://neeed.directory/products/trafficclaw?utm_source=trafficclaw" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://neeed.directory/badges/neeed-badge-light.svg" alt="Featured on neeed.directory" width="139" height="54" className="w-[139px] shrink-0 h-auto max-w-none" />
+            </a>
         </>
     );
 
