@@ -2442,6 +2442,9 @@ function Footer() {
             <a href="https://starterbest.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://starterbest.com/badages-awards.svg" alt="Featured on Starter Best" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
             </a>
+            <a href="https://dofollow.tools" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://dofollow.tools/badge/badge_light.svg" alt="Featured on Dofollow.Tools" width="200" height="54" className="w-[200px] shrink-0 h-auto max-w-none" />
+            </a>
         </>
     );
 
