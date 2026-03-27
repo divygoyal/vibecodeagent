@@ -2412,6 +2412,24 @@ function Footer() {
             <a href="https://toshilist.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://toshilist.com/assets/images/badge.png" alt="Toshi List" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
             </a>
+            <a href="https://www.aiheron.com/" target="_blank" rel="noopener" title="智鹭AI导航" className="block hover:opacity-80 transition-opacity shrink-0 text-zinc-300 text-sm font-medium px-3 py-2 border border-white/10 rounded-lg">
+                AiHeron
+            </a>
+            <a href="https://aitop10.tools/" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0 text-zinc-300 text-sm font-medium px-3 py-2 border border-white/10 rounded-lg">
+                AiTop10 Tools
+            </a>
+            <a href="https://yo.directory/" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://cdn.prod.website-files.com/65c1546fa73ea974db789e3d/65e1e171f89ebfa7bd0129ac_yodirectory-featured.png" alt="yo.directory" width="150" height="54" className="w-[150px] h-[54px] shrink-0 max-w-none" />
+            </a>
+            <a href="https://startupbenchmarks.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://startupbenchmarks.com/assets/images/badge.png" alt="Startup Benchmarks" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
+            </a>
+            <a href="https://startupfa.st" target="_blank" rel="noopener" title="Powered by Startup Fast" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://startupfa.st/images/badges/powered-by-light.svg" alt="Powered by Startup Fast" width="150" height="44" className="w-[150px] h-[44px] shrink-0 max-w-none" />
+            </a>
+            <a href="https://dayslaunch.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://dayslaunch.com/badages-awards.svg" alt="Featured on Days Launch" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
+            </a>
         </>
     );
 
