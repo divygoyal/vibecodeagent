@@ -2430,6 +2430,18 @@ function Footer() {
             <a href="https://dayslaunch.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://dayslaunch.com/badages-awards.svg" alt="Featured on Days Launch" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
             </a>
+            <a href="https://similarlabs.com" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://similarlabs.com/similarlabs-embed-badge-light.svg" alt="Featured on SimilarLabs" width="124" height="40" className="w-[124px] h-[40px] shrink-0 max-w-none" />
+            </a>
+            <a href="https://right-ai.com/" target="_blank" rel="noopener" title="RightAI Tools Directory" className="block hover:opacity-80 transition-opacity shrink-0 text-zinc-300 text-sm font-medium px-3 py-2 border border-white/10 rounded-lg">
+                RightAI Tools Directory
+            </a>
+            <a href="https://www.superlaun.ch/products/2033" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://www.superlaun.ch/badge.png" alt="Featured on Super Launch" width="150" height="54" className="w-[150px] h-[54px] shrink-0 max-w-none object-contain" />
+            </a>
+            <a href="https://starterbest.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://starterbest.com/badages-awards.svg" alt="Featured on Starter Best" height="54" className="h-[54px] shrink-0 w-auto max-w-none" />
+            </a>
         </>
     );
 
