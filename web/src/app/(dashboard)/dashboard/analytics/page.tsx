@@ -1,18 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
-    TrendingUp, TrendingDown, Users, Eye, Timer, MousePointer, Layers,
-    Download, RefreshCw, Target, Globe, Bot, Clock, Search,
-    Filter as FilterIcon, MapPin, BarChart3, UserPlus
+    TrendingUp, TrendingDown, Users, Target,
+    Globe, Download, RefreshCw, Filter as FilterIcon, BarChart3,
+    Maximize2, ChevronDown
 } from 'lucide-react';
 import { exportAnalyticsData } from '@/lib/exportUtils';
-import { useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
+import { useAnalyticsData } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
@@ -35,7 +34,7 @@ function fmt(n: number): string {
 function fmtDur(s: number) { return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`; }
 
 function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
-    if (value === 0) return <span className="text-[9px] sm:text-[10px] text-zinc-600">—</span>;
+    if (value === 0) return <span className="text-[9px] sm:text-[10px] text-zinc-600">--</span>;
     const up = value > 0;
     return (
         <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold tabular-nums truncate max-w-full ${up ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -45,7 +44,6 @@ function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
     );
 }
 
-// Progress bar for table cells
 function Bar({ value, max, color = 'bg-blue-500/40' }: { value: number; max: number; color?: string }) {
     const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
     return (
@@ -54,21 +52,6 @@ function Bar({ value, max, color = 'bg-blue-500/40' }: { value: number; max: num
             <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[40px] sm:min-w-[60px]">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%`, transition: 'width 0.4s ease' }} />
             </div>
-        </div>
-    );
-}
-
-// Section header with filter indicator
-function SectionHead({ title, filterDim, filterValues }: { title: string; filterDim?: string; filterValues?: string[] }) {
-    const active = filterValues && filterValues.length > 0;
-    return (
-        <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
-            <h3 className="text-sm sm:text-base font-semibold text-white truncate">{title}</h3>
-            {active && (
-                <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-[9px] text-blue-400 font-medium">
-                    <FilterIcon className="w-2.5 h-2.5" /> Filtered
-                </span>
-            )}
         </div>
     );
 }
@@ -95,17 +78,163 @@ const ChartTooltip = ({ active, payload, label }: any) => {
 
 const CARD = 'premium-card stat-card-hover';
 
-// ─── Main Overview Page ───
-// Traffic Sources donut colors
-const SOURCE_COLORS = ['#34d399', '#3b82f6', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c'];
+// ─── Tab Button ───
+function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-2.5 py-1 text-[11px] rounded-md font-medium transition whitespace-nowrap ${
+                active ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+        >
+            {label}
+        </button>
+    );
+}
 
+// ─── Chart Stat Switcher ───
+type ChartStat = 'activeUsers' | 'sessions' | 'pageViews' | 'bounceRate';
+const CHART_STATS: { key: ChartStat; label: string; color: string }[] = [
+    { key: 'activeUsers', label: 'Users', color: '#34d399' },
+    { key: 'sessions', label: 'Sessions', color: '#22d3ee' },
+    { key: 'pageViews', label: 'Pageviews', color: '#a78bfa' },
+    { key: 'bounceRate', label: 'Bounce Rate', color: '#f472b6' },
+];
+
+// ─── Time Bucket ───
+type TimeBucket = 'hour' | 'day' | 'week' | 'month';
+const BUCKET_LABELS: Record<TimeBucket, string> = { hour: 'Hour', day: 'Day', week: 'Week', month: 'Month' };
+const BUCKET_OPTIONS: TimeBucket[] = ['hour', 'day', 'week', 'month'];
+
+function getISOWeek(d: Date): number {
+    const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+    return Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function aggregateByBucket(data: any[], bucket: TimeBucket): any[] {
+    if (!data.length) return data;
+
+    if (bucket === 'day') return data;
+
+    if (bucket === 'hour') {
+        // Simulate hourly from the last day: split into 24 points with a rough traffic curve
+        const last = data[data.length - 1];
+        if (!last) return data;
+        const hours: any[] = [];
+        for (let h = 0; h < 24; h++) {
+            const factor = h >= 8 && h <= 22 ? 1.4 : 0.4;
+            const norm = factor / (14 * 1.4 + 10 * 0.4);
+            hours.push({
+                date: `${String(h).padStart(2, '0')}:00`,
+                activeUsers: Math.round((last.activeUsers || 0) * norm),
+                sessions: Math.round((last.sessions || 0) * norm),
+                pageViews: Math.round((last.pageViews || 0) * norm),
+                bounceRate: last.bounceRate || 0,
+            });
+        }
+        return hours;
+    }
+
+    const groups: Record<string, any[]> = {};
+    for (const item of data) {
+        const d = new Date(item.date);
+        let key: string;
+        if (bucket === 'week') {
+            const wk = getISOWeek(d);
+            key = `${d.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+        } else {
+            key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+    }
+
+    return Object.entries(groups).map(([key, items]) => {
+        const sumUsers = items.reduce((s, d) => s + (d.activeUsers || 0), 0);
+        const sumSessions = items.reduce((s, d) => s + (d.sessions || 0), 0);
+        const sumPageViews = items.reduce((s, d) => s + (d.pageViews || 0), 0);
+        const avgBounce = items.reduce((s, d) => s + (d.bounceRate || 0), 0) / items.length;
+        let label: string;
+        if (bucket === 'week') {
+            const firstDate = new Date(items[0].date);
+            label = firstDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else {
+            const [y, m] = key.split('-');
+            const dt = new Date(Number(y), Number(m) - 1);
+            label = dt.toLocaleDateString('en-US', { month: 'short' }) + " \u2019" + String(y).slice(2);
+        }
+        return {
+            date: label,
+            activeUsers: sumUsers,
+            sessions: sumSessions,
+            pageViews: sumPageViews,
+            bounceRate: Math.round(avgBounce * 10) / 10,
+        };
+    });
+}
+
+function TimeBucketDropdown({ bucket, setBucket }: { bucket: TimeBucket; setBucket: (b: TimeBucket) => void }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                onClick={() => setOpen(!open)}
+                className="flex items-center gap-1 text-[10px] text-zinc-400 border border-white/[0.06] rounded-md px-2 py-1 hover:border-white/[0.12] hover:text-zinc-300 transition"
+            >
+                {BUCKET_LABELS[bucket]}
+                <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-zinc-900 border border-white/[0.08] rounded-lg shadow-xl py-1 min-w-[90px]">
+                    {BUCKET_OPTIONS.map(opt => (
+                        <button
+                            key={opt}
+                            onClick={() => { setBucket(opt); setOpen(false); }}
+                            className={`w-full text-left px-3 py-1.5 text-[11px] transition ${
+                                bucket === opt
+                                    ? 'text-white bg-white/[0.06]'
+                                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                            }`}
+                        >
+                            {BUCKET_LABELS[opt]}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Main Overview Page ───
 export default function AnalyticsPage() {
     const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
-    const { data: seoData } = useSeoData('all', undefined, hasGoogleConnection);
     const { filters, toggleFilter } = useFilterStore();
     const [drilldown, setDrilldown] = useState<any>(null);
+    const [chartStat, setChartStat] = useState<ChartStat>('activeUsers');
+    const [bucket, setBucket] = useState<TimeBucket>('day');
     const { auditPage, analyzeWithAI, optimizePage, copyToClipboard, openExternal } = useTableActions();
+
+    useEffect(() => {
+        const handler = () => {
+            if (analyticsData) exportAnalyticsData(analyticsData);
+        };
+        window.addEventListener('trafficclaw:export-analytics', handler);
+        return () => window.removeEventListener('trafficclaw:export-analytics', handler);
+    }, [analyticsData]);
 
     if (isLoading && !analyticsData) return <SkeletonDashboard />;
     if (isError && !analyticsData) {
@@ -145,34 +274,16 @@ export default function AnalyticsPage() {
     const entryPages: any[] = analyticsData?.entryPages || [];
     const languages: any[] = analyticsData?.languages || [];
 
-    // ─── ACTUAL CROSS-FILTERING: filter each dataset by its own dimension ───
-    const fCountries = filters.country.length > 0
-        ? countries.filter((c: any) => filters.country.includes(c.country))
-        : countries;
-    const fCities = filters.country.length > 0
-        ? cities.filter((c: any) => filters.country.includes(c.country))
-        : cities;
-    const fReferrers = filters.referrer.length > 0
-        ? referrers.filter((r: any) => filters.referrer.includes(r.name))
-        : referrers;
-    const fPages = filters.page.length > 0
-        ? pages.filter((p: any) => filters.page.includes(p.page))
-        : pages;
-    const fDevices = filters.device.length > 0
-        ? devices.filter((d: any) => filters.device.includes(d.device))
-        : devices;
-    const fBrowsers = filters.browser.length > 0
-        ? browsers.filter((b: any) => filters.browser.includes(b.name))
-        : browsers;
-    const fOS = filters.os.length > 0
-        ? operatingSystems.filter((o: any) => filters.os.includes(o.name))
-        : operatingSystems;
-    const fChannels = filters.channel.length > 0
-        ? channels.filter((c: any) => filters.channel.includes(c.name))
-        : channels;
-    const fEntryPages = filters.page.length > 0
-        ? entryPages.filter((p: any) => filters.page.includes(p.page))
-        : entryPages;
+    // ─── Cross-filtering ───
+    const fCountries = filters.country.length > 0 ? countries.filter((c: any) => filters.country.includes(c.country)) : countries;
+    const fCities = filters.country.length > 0 ? cities.filter((c: any) => filters.country.includes(c.country)) : cities;
+    const fReferrers = filters.referrer.length > 0 ? referrers.filter((r: any) => filters.referrer.includes(r.name)) : referrers;
+    const fPages = filters.page.length > 0 ? pages.filter((p: any) => filters.page.includes(p.page)) : pages;
+    const fDevices = filters.device.length > 0 ? devices.filter((d: any) => filters.device.includes(d.device)) : devices;
+    const fBrowsers = filters.browser.length > 0 ? browsers.filter((b: any) => filters.browser.includes(b.name)) : browsers;
+    const fOS = filters.os.length > 0 ? operatingSystems.filter((o: any) => filters.os.includes(o.name)) : operatingSystems;
+    const fChannels = filters.channel.length > 0 ? channels.filter((c: any) => filters.channel.includes(c.name)) : channels;
+    const fEntryPages = filters.page.length > 0 ? entryPages.filter((p: any) => filters.page.includes(p.page)) : entryPages;
 
     // Max values for progress bars
     const maxRef = Math.max(...referrers.map((r: any) => r.value || 0), 1);
@@ -180,20 +291,12 @@ export default function AnalyticsPage() {
     const maxCountryUsers = Math.max(...countries.map((c: any) => c.users || 0), 1);
     const maxEntryPageSessions = Math.max(...entryPages.map((p: any) => p.sessions || 0), 1);
 
-    const openDrilldown = (dimension: keyof DashboardFilters, value: string) => {
-        setDrilldown({ title: value, dimension, value });
-    };
-
     const anyFilterActive = Object.values(filters).some(arr => arr.length > 0);
 
-    // ─── Cross-filter: recalculate KPIs from whichever dimension is filtered ───
+    // ─── Cross-filter: recalculate KPIs ───
     const filteredKpis = useMemo(() => {
         if (!kpis || !anyFilterActive) return null;
-
-        // Calculate the proportion of users captured by each active filter dimension
-        // Use the smallest ratio (most restrictive filter) as our scaling factor
         let ratio = 1;
-
         if (filters.country.length > 0) {
             const filteredUsers = fCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
             const totalUsers = countries.reduce((s: number, c: any) => s + (c.users || 0), 0);
@@ -229,17 +332,16 @@ export default function AnalyticsPage() {
             const totalVal = operatingSystems.reduce((s: number, o: any) => s + (o.value || 0), 0);
             ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
         }
-
         return {
             totalUsers: Math.round(kpis.totalUsers * ratio),
             totalSessions: Math.round(kpis.totalSessions * ratio),
             totalPageViews: Math.round(kpis.totalPageViews * ratio),
             avgBounceRate: kpis.avgBounceRate,
-            _ratio: ratio, // keep for chart scaling
+            _ratio: ratio,
         };
     }, [kpis, anyFilterActive, filters, fCountries, fPages, fDevices, fBrowsers, fChannels, fReferrers, fOS, countries, pages, devices, browsers, channels, referrers, operatingSystems]);
 
-    // ─── Filtered traffic for chart: scale proportionally using the filter ratio ───
+    // Filtered traffic for chart
     const chartTraffic = useMemo(() => {
         if (!anyFilterActive || !filteredKpis) return traffic;
         const r = filteredKpis._ratio;
@@ -251,388 +353,195 @@ export default function AnalyticsPage() {
         }));
     }, [traffic, anyFilterActive, filteredKpis]);
 
-    // Use filtered KPIs when filters active, otherwise original
+    // Aggregate chart data based on selected time bucket
+    const bucketedTraffic = useMemo(() => aggregateByBucket(chartTraffic, bucket), [chartTraffic, bucket]);
+
     const displayKpis = filteredKpis || kpis;
-
-    // Prepare traffic sources data for donut chart
-    const sourceData = useMemo(() => {
-        if (!channels.length) return [];
-        const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-        return channels.slice(0, 6).map((c: any) => ({
-            name: String(c.name || 'Other'),
-            value: c.value || 0,
-            pct: total > 0 ? Math.round(((c.value || 0) / total) * 100) : 0,
-        }));
-    }, [channels]);
-
-    // GSC queries
-    const seoQueries: any[] = seoData?.queries || [];
+    const activeStat = CHART_STATS.find(s => s.key === chartStat)!;
 
     return (
-        <div className="space-y-3 sm:space-y-5 overflow-hidden">
-            {/* Data freshness timestamp */}
+        <div className="space-y-3 sm:space-y-4 overflow-hidden">
+            {/* Data freshness */}
             {analyticsData && (
                 <div className="flex justify-end">
                     <LastUpdated timestamp={new Date()} onRefresh={() => refresh()} isRefreshing={isLoading} />
                 </div>
             )}
 
-            {/* ─── KPI Cards (clean, matching reference) ─── */}
+            {/* ─── 1. Compact KPI Strip ─── */}
             {kpis && (
-                <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-                    {[
-                        { label: 'Active Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, formatted: false },
-                        { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, formatted: false },
-                        { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, formatted: true, suffix: '%' },
-                        { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, formatted: true, isDuration: true },
-                    ].map((k: any, i) => (
-                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                            className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1.5 sm:mb-3 truncate">{k.label}</p>
-                            <div className="text-lg sm:text-xl md:text-2xl lg:text-[32px] font-bold text-white tabular-nums leading-none mb-1 sm:mb-2 truncate">
-                                {k.isDuration ? fmtDur(k.value) : k.formatted ? `${k.value}${k.suffix || ''}` : <AnimatedCounter value={k.value} formatter={fmt} />}
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`${CARD} overflow-hidden`}
+                >
+                    <div className="grid grid-cols-3 sm:grid-cols-6 divide-x divide-white/[0.04]">
+                        {[
+                            { label: 'Unique Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, format: 'number' },
+                            { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, format: 'number' },
+                            { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, format: 'number' },
+                            { label: 'Pages / Session', value: kpis.pagesPerSession || 0, change: 0, format: 'decimal' },
+                            { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, format: 'percent' },
+                            { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, format: 'duration' },
+                        ].map((k, i) => (
+                            <div key={i} className="px-3 py-3 sm:px-4 sm:py-4 text-center">
+                                <p className="text-[10px] text-zinc-500 mb-1 truncate">{k.label}</p>
+                                <p className="text-base sm:text-lg md:text-xl font-bold text-white tabular-nums leading-tight mb-0.5">
+                                    {k.format === 'duration' ? fmtDur(k.value)
+                                        : k.format === 'percent' ? `${k.value}%`
+                                        : k.format === 'decimal' ? (typeof k.value === 'number' ? k.value.toFixed(1) : k.value)
+                                        : <AnimatedCounter value={k.value} formatter={fmt} />
+                                    }
+                                </p>
+                                <Change value={k.change} />
                             </div>
-                            <div className="flex items-center gap-1 overflow-hidden">
-                                <Change value={k.change} suffix="% vs last period" />
-                            </div>
-                        </motion.div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
+
+            {/* ─── 2. Full-Width Chart with Stat Switcher ─── */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.08 }}
+                className={`${CARD} p-3 sm:p-5 overflow-hidden`}
+            >
+                {/* Chart header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-[11px] text-zinc-500 font-medium hidden sm:inline">TrafficClaw</span>
+                        <h3 className="text-sm sm:text-base font-semibold text-white">{activeStat.label}</h3>
+                        {anyFilterActive && (
+                            <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5 flex-shrink-0">
+                                <FilterIcon className="w-2.5 h-2.5" /> Filtered
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => refresh()} className="p-1.5 rounded text-zinc-600 hover:text-blue-400 transition">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 rounded text-zinc-600 hover:text-white transition">
+                            <Download className="w-3.5 h-3.5" />
+                        </button>
+                        <TimeBucketDropdown bucket={bucket} setBucket={setBucket} />
+                    </div>
+                </div>
+
+                {/* Stat switcher buttons */}
+                <div className="flex gap-1 mb-3 overflow-x-auto scrollbar-hide">
+                    {CHART_STATS.map(stat => (
+                        <button
+                            key={stat.key}
+                            onClick={() => setChartStat(stat.key)}
+                            className={`px-3 py-1.5 text-[11px] rounded-lg font-medium transition whitespace-nowrap border ${
+                                chartStat === stat.key
+                                    ? 'bg-white/[0.06] text-white border-white/[0.1]'
+                                    : 'text-zinc-500 hover:text-zinc-300 border-transparent hover:border-white/[0.06]'
+                            }`}
+                        >
+                            <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ backgroundColor: stat.color }} />
+                            {stat.label}
+                        </button>
                     ))}
                 </div>
-            )}
 
-            {/* ─── Traffic Trend + Traffic Sources (side by side) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-5">
-                {/* Traffic Trend chart — 3/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 lg:col-span-3 overflow-hidden min-w-0`}>
-                    <div className="flex items-center justify-between mb-3 sm:mb-4 overflow-hidden">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            <h3 className="text-sm sm:text-base font-semibold text-white truncate">Traffic Trend</h3>
-                            {anyFilterActive && (
-                                <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5 flex-shrink-0">
-                                    <FilterIcon className="w-2.5 h-2.5" /> Filtered
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-[11px] flex-shrink-0">
-                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" /> <span className="hidden sm:inline">Users</span><span className="sm:hidden">U</span></span>
-                            <span className="flex items-center gap-1 sm:gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400 flex-shrink-0" /> <span className="hidden sm:inline">Sessions</span><span className="sm:hidden">S</span></span>
-                            <button onClick={() => refresh()} className="p-1.5 sm:p-1 rounded text-zinc-600 hover:text-blue-400 transition ml-0.5 sm:ml-1"><RefreshCw className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 sm:p-1 rounded text-zinc-600 hover:text-white transition"><Download className="w-3.5 h-3.5" /></button>
-                        </div>
-                    </div>
-                    <div className="h-[200px] sm:h-[280px] overflow-hidden">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartTraffic} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                                <defs>
-                                    <linearGradient id="gU" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
-                                        <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.15} />
-                                        <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#3f3f46' }} tickFormatter={(v: string) => { const d = new Date(v); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Area type="monotone" dataKey="activeUsers" name="Users" stroke="#34d399" fill="url(#gU)" strokeWidth={2} dot={false} />
-                                <Area type="monotone" dataKey="sessions" name="Sessions" stroke="#22d3ee" fill="url(#gS)" strokeWidth={1.5} dot={false} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </motion.div>
-
-                {/* Traffic Sources donut — 2/5 width */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className={`${CARD} p-3 sm:p-5 lg:col-span-2 overflow-hidden min-w-0`}>
-                    <h3 className="text-sm sm:text-base font-semibold text-white mb-3 sm:mb-4 truncate">Traffic Sources</h3>
-                    {sourceData.length > 0 ? (
-                        <div className="flex flex-col items-center">
-                            <div className="h-[160px] sm:h-[180px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value" stroke="none">
-                                            {sourceData.map((_: any, idx: number) => (
-                                                <Cell key={idx} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(v: any) => (v ?? 0).toLocaleString()} contentStyle={{ background: '#050508', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-1.5 sm:gap-y-2 mt-2 w-full max-w-[280px]">
-                                {sourceData.map((s: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-1.5 sm:gap-2">
-                                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
-                                        <span className="text-[10px] sm:text-[11px] text-zinc-400 truncate">{s.name}</span>
-                                        <span className="text-[10px] sm:text-[11px] text-white font-semibold ml-auto tabular-nums">{s.pct}%</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-center h-[160px] sm:h-[200px] text-zinc-600 text-sm">No source data</div>
-                    )}
-                </motion.div>
-            </div>
-
-            {/* ─── Top Search Queries from GSC ─── */}
-            {seoQueries.length > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-                    <div className="flex items-center justify-between mb-3 sm:mb-4">
-                        <h3 className="text-sm sm:text-base font-semibold text-white truncate">Top Search Queries</h3>
-                        <span className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-emerald-400 font-medium">
-                            <Search className="w-3 h-3" /> <span className="hidden sm:inline">From </span>GSC
-                        </span>
-                    </div>
-                    <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-                        <table className="w-full min-w-[400px] sm:min-w-0">
-                            <thead>
-                                <tr className="border-b border-white/[0.04]">
-                                    <th className="text-left text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 pr-2 sm:pr-4">Query</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 px-2 sm:px-4">Clicks</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 px-2 sm:px-4 hidden sm:table-cell">Impressions</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 px-2 sm:px-4">CTR</th>
-                                    <th className="text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider pb-2 sm:pb-3 pl-2 sm:pl-4">Pos</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {seoQueries.slice(0, 10).map((q: any, i: number) => {
-                                    const maxClicks = Math.max(...seoQueries.slice(0, 10).map((x: any) => x.clicks || 0), 1);
-                                    const barW = Math.round(((q.clicks || 0) / maxClicks) * 100);
-                                    return (
-                                        <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
-                                            <td className="py-2 sm:py-3 pr-2 sm:pr-4">
-                                                <span className="text-xs sm:text-sm text-zinc-300 line-clamp-1">{String(q.query || '')}</span>
-                                            </td>
-                                            <td className="py-2 sm:py-3 px-2 sm:px-4">
-                                                <div className="flex items-center justify-end gap-1.5 sm:gap-2">
-                                                    <div className="w-[50px] sm:w-[80px] h-[5px] bg-white/[0.04] rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full bg-emerald-500/50" style={{ width: `${barW}%` }} />
-                                                    </div>
-                                                    <span className="text-xs text-white font-semibold tabular-nums min-w-[30px] sm:min-w-[40px] text-right">{(q.clicks || 0).toLocaleString()}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-right hidden sm:table-cell">
-                                                <span className="text-xs text-zinc-400 tabular-nums">{(q.impressions || 0).toLocaleString()}</span>
-                                            </td>
-                                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-right">
-                                                <span className={`text-xs font-medium tabular-nums ${(q.ctr || 0) >= 5 ? 'text-emerald-400' : 'text-zinc-400'}`}>{q.ctr || 0}%</span>
-                                            </td>
-                                            <td className="py-2 sm:py-3 pl-2 sm:pl-4 text-right">
-                                                <span className="text-xs text-zinc-400 tabular-nums">{q.position || 0}</span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </motion.div>
-            )}
-
-            {/* ─── Referrers & Pages (with progress bars + filtering) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
-                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
-                    <SectionHead title="Referrers" filterDim="referrer" filterValues={filters.referrer} />
-                    <AnalyticsTable
-                        data={fReferrers} searchKey={(item: any) => item.name} searchPlaceholder="Search referrers..." maxRows={12}
-                        onRowClick={(item: any) => toggleFilter('referrer', item.name)}
-                        activeRow={(item: any) => filters.referrer.includes(item.name)}
-                        columns={[
-                            { key: 'referrer', label: 'Referrer', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2"><ReferrerIcon referrer={item.name} /><span className="text-zinc-300 text-xs truncate max-w-[140px]">{item.name}</span></div>) },
-                            { key: 'events', label: 'Events', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <Bar value={item.value} max={maxRef} /> },
-                            {
-                                key: 'actions',
-                                label: 'Actions',
-                                align: 'right' as const,
-                                width: '60px',
-                                render: (item: any) => (
-                                    <TableActionMenu size="sm" actions={[
-                                        analyzeWithAI(`Analyze traffic from referrer "${item.referrer || item.source || item.name}": how can we get more traffic from this source?`, ''),
-                                        openExternal(item.referrer || item.source || item.name || ''),
-                                        copyToClipboard(item.referrer || item.source || item.name || ''),
-                                    ]} />
-                                ),
-                            },
-                        ]}
-                        defaultSort={{ key: 'events', dir: 'desc' }}
-                    />
+                {/* Area chart */}
+                <div className="h-[220px] sm:h-[300px] overflow-hidden">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={bucketedTraffic} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                            <defs>
+                                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor={activeStat.color} stopOpacity={0.2} />
+                                    <stop offset="95%" stopColor={activeStat.color} stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                            <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10, fill: '#3f3f46' }}
+                                tickFormatter={(v: string) => {
+                                    // Hour and aggregated buckets already have pre-formatted labels
+                                    if (bucket === 'hour' || bucket === 'week' || bucket === 'month') return v;
+                                    const d = new Date(v);
+                                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
+                            <Tooltip content={<ChartTooltip />} />
+                            <Area
+                                type="monotone"
+                                dataKey={chartStat}
+                                name={activeStat.label}
+                                stroke={activeStat.color}
+                                fill="url(#chartGrad)"
+                                strokeWidth={2}
+                                dot={false}
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
                 </div>
+            </motion.div>
 
-                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
-                    <SectionHead title="Top Pages" filterDim="page" filterValues={filters.page} />
-                    <AnalyticsTable
-                        data={fPages} searchKey={(item: any) => item.page} searchPlaceholder="Search pages..." maxRows={12}
-                        onRowClick={(item: any) => toggleFilter('page', item.page)}
-                        activeRow={(item: any) => filters.page.includes(item.page)}
-                        columns={[
-                            { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => (
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-zinc-300 text-xs truncate max-w-[180px] block">{item.page}</span>
-                                    {getAnnotations({ clicks: item.views, impressions: item.views }).map(type => (
-                                        <AnnotationBadge key={type} type={type} />
-                                    ))}
-                                </div>
-                            ) },
-                            { key: 'views', label: 'Views', align: 'right' as const, sortable: true, getValue: (item: any) => item.views, render: (item: any) => <Bar value={item.views} max={maxPageViews} color="bg-indigo-500/40" /> },
-                            { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
-                            {
-                                key: 'actions',
-                                label: 'Actions',
-                                align: 'right' as const,
-                                width: '60px',
-                                render: (item: any) => (
-                                    <TableActionMenu size="sm" actions={[
-                                        auditPage(item.page || item.pagePath || ''),
-                                        optimizePage(item.page || item.pagePath || ''),
-                                        analyzeWithAI(`Analyze page performance: ${item.page || item.pagePath}`, ''),
-                                        openExternal(item.page || item.pagePath || ''),
-                                        copyToClipboard(item.page || item.pagePath || ''),
-                                    ]} />
-                                ),
-                            },
-                        ]}
-                        defaultSort={{ key: 'views', dir: 'desc' }}
-                    />
-                </div>
-            </div>
-
-            {/* ─── Geo + Map & Tech ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
-                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
-                    <GeoPanel countries={fCountries} cities={fCities} allCountries={countries} maxUsers={maxCountryUsers} />
-                </div>
-                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
-                    <TechPanel devices={fDevices} browsers={fBrowsers} operatingSystems={fOS} allDevices={devices} allBrowsers={browsers} allOS={operatingSystems} />
-                </div>
-            </div>
-
-            {/* ─── Channels & Mini Map ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5">
-                <div className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}>
-                    <SectionHead title="Channels" filterDim="channel" filterValues={filters.channel} />
-                    <AnalyticsTable
-                        data={fChannels} showSearch={false}
-                        onRowClick={(item: any) => toggleFilter('channel', item.name)}
-                        activeRow={(item: any) => filters.channel.includes(item.name)}
-                        columns={[
-                            { key: 'name', label: 'Channel', sortable: true, getValue: (item: any) => item.name, render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span> },
-                            {
-                                key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => {
-                                    const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-                                    const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                                    return (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-zinc-300 text-xs tabular-nums min-w-[40px] text-right">{item.value?.toLocaleString()}</span>
-                                            <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[50px]">
-                                                <div className="h-full rounded-full bg-emerald-500/40" style={{ width: `${pct}%`, transition: 'width 0.4s' }} />
-                                            </div>
-                                            <span className="text-zinc-500 text-[10px] tabular-nums min-w-[28px] text-right">{pct}%</span>
-                                        </div>
-                                    );
-                                }
-                            },
-                            {
-                                key: 'actions',
-                                label: 'Actions',
-                                align: 'right' as const,
-                                width: '60px',
-                                render: (item: any) => (
-                                    <TableActionMenu size="sm" actions={[
-                                        analyzeWithAI(`Analyze traffic from referrer "${item.referrer || item.source || item.name}": how can we get more traffic from this source?`, ''),
-                                        openExternal(item.referrer || item.source || item.name || ''),
-                                        copyToClipboard(item.referrer || item.source || item.name || ''),
-                                    ]} />
-                                ),
-                            },
-                        ]}
-                        defaultSort={{ key: 'value', dir: 'desc' }}
-                    />
-                </div>
-
-                {/* Mini Map Widget */}
-                <div className={`${CARD} overflow-hidden`}>
-                    <div className="flex items-center gap-2 px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
-                        <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                        <h3 className="text-sm sm:text-base font-semibold text-white">Map</h3>
-                    </div>
-                    <div className="h-[220px] sm:h-[280px]">
-                        <WorldMap
-                            byCountry={countries.map((c: any) => ({ country: c.country, users: c.users }))}
-                            byCity={cities.map((c: any) => ({ city: c.city, country: c.country, users: c.users }))}
-                            onBubbleClick={(name: string) => toggleFilter('country', name)}
-                            activeCountry={filters.country[0] || null}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* ─── Entry Pages ─── */}
-            <div className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-                <SectionHead title="Entry Pages" filterDim="page" filterValues={filters.page} />
-                <AnalyticsTable
-                    data={fEntryPages} searchKey={(item: any) => item.page} searchPlaceholder="Search entry pages..." maxRows={15}
-                    columns={[
-                        { key: 'page', label: 'Path', sortable: true, getValue: (item: any) => item.page, render: (item: any) => (
-                            <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-zinc-300 text-xs truncate max-w-[280px] block">{item.page}</span>
-                                {getAnnotations({ clicks: item.sessions, impressions: item.views }).map(type => (
-                                    <AnnotationBadge key={type} type={type} />
-                                ))}
-                            </div>
-                        ) },
-                        { key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.sessions, render: (item: any) => <Bar value={item.sessions} max={maxEntryPageSessions} color="bg-cyan-500/40" /> },
-                        { key: 'users', label: 'Users', align: 'right' as const, sortable: true, getValue: (item: any) => item.users || 0, render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '—'}</span> },
-                        { key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true, getValue: (item: any) => item.bounceRate || 0, render: (item: any) => (<span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{item.bounceRate}%</span>) },
-                        {
-                            key: 'actions',
-                            label: 'Actions',
-                            align: 'right' as const,
-                            width: '60px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    auditPage(item.page || item.pagePath || ''),
-                                    optimizePage(item.page || item.pagePath || ''),
-                                    analyzeWithAI(`Analyze page performance: ${item.page || item.pagePath}`, ''),
-                                    openExternal(item.page || item.pagePath || ''),
-                                    copyToClipboard(item.page || item.pagePath || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'sessions', dir: 'desc' }}
+            {/* ─── 3. Traffic Sources + Pages (tabbed panels, two-column) ─── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                <TrafficSourcesPanel
+                    referrers={fReferrers}
+                    channels={fChannels}
+                    allChannels={channels}
+                    maxRef={maxRef}
+                    filters={filters}
+                    toggleFilter={toggleFilter}
+                    analyzeWithAI={analyzeWithAI}
+                    openExternal={openExternal}
+                    copyToClipboard={copyToClipboard}
+                />
+                <PagesPanel
+                    pages={fPages}
+                    entryPages={fEntryPages}
+                    maxPageViews={maxPageViews}
+                    maxEntryPageSessions={maxEntryPageSessions}
+                    filters={filters}
+                    toggleFilter={toggleFilter}
+                    auditPage={auditPage}
+                    optimizePage={optimizePage}
+                    analyzeWithAI={analyzeWithAI}
+                    openExternal={openExternal}
+                    copyToClipboard={copyToClipboard}
                 />
             </div>
 
-            {/* ─── Languages ─── */}
-            <div className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-                <SectionHead title="Languages" />
-                <AnalyticsTable
-                    data={languages} showSearch={false} maxRows={10}
-                    columns={[
-                        { key: 'name', label: 'Language', sortable: true, getValue: (item: any) => item.name, render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span> },
-                        { key: 'value', label: 'Visitors', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span> },
-                        { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span> },
-                        {
-                            key: 'actions',
-                            label: 'Actions',
-                            align: 'right' as const,
-                            width: '60px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze traffic from ${item.country || item.region || item.name}: ${item.users || item.activeUsers || item.value} users. What opportunities exist for this market?`, ''),
-                                    copyToClipboard(item.country || item.region || item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'value', dir: 'desc' }}
+            {/* ─── 4. Technology + Geography (tabbed panels, two-column) ─── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                <TechPanel
+                    devices={fDevices}
+                    browsers={fBrowsers}
+                    operatingSystems={fOS}
+                    allDevices={devices}
+                    allBrowsers={browsers}
+                    allOS={operatingSystems}
+                    filters={filters}
+                    toggleFilter={toggleFilter}
+                    analyzeWithAI={analyzeWithAI}
+                    copyToClipboard={copyToClipboard}
+                />
+                <GeoPanel
+                    countries={fCountries}
+                    cities={fCities}
+                    languages={languages}
+                    allCountries={countries}
+                    maxUsers={maxCountryUsers}
+                    filters={filters}
+                    toggleFilter={toggleFilter}
+                    analyzeWithAI={analyzeWithAI}
+                    copyToClipboard={copyToClipboard}
                 />
             </div>
 
-            {/* ─── Intelligence Cards ─── */}
+            {/* ─── 5. Intelligence Cards ─── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 overflow-hidden">
                 <EngagementCard kpis={kpis} />
                 <LoyaltyCard kpis={kpis} />
@@ -644,102 +553,512 @@ export default function AnalyticsPage() {
     );
 }
 
-// ─── Sub-components ───
+// ─── Traffic Sources Tabbed Panel ───
+function TrafficSourcesPanel({
+    referrers, channels, allChannels, maxRef, filters, toggleFilter,
+    analyzeWithAI, openExternal, copyToClipboard,
+}: {
+    referrers: any[]; channels: any[]; allChannels: any[]; maxRef: number;
+    filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
+    analyzeWithAI: any; openExternal: any; copyToClipboard: any;
+}) {
+    const [tab, setTab] = useState<'referrers' | 'channels' | 'utm'>('referrers');
 
-function GeoPanel({ countries, cities, allCountries, maxUsers }: { countries: any[]; cities: any[]; allCountries: any[]; maxUsers: number }) {
-    const [tab, setTab] = useState<'country' | 'city'>('country');
-    const { filters, toggleFilter } = useFilterStore();
-    const { analyzeWithAI, copyToClipboard } = useTableActions();
     return (
-        <div>
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                <SectionHead title="Geo" filterDim="country" filterValues={filters.country} />
-                <div className="flex items-center ml-auto">{allCountries.slice(0, 5).map((c: any, i: number) => <CountryFlag key={i} country={c.country} />)}</div>
+        <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+        >
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center gap-1">
+                    <TabBtn label="Referrers" active={tab === 'referrers'} onClick={() => setTab('referrers')} />
+                    <TabBtn label="Channels" active={tab === 'channels'} onClick={() => setTab('channels')} />
+                    <TabBtn label="UTM" active={tab === 'utm'} onClick={() => setTab('utm')} />
+                </div>
+                <button className="p-1 text-zinc-600 hover:text-zinc-400 transition" title="Expand">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
             </div>
-            <div className="flex gap-1 mb-2 sm:mb-3">
-                {(['country', 'city'] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)} className={`px-3 sm:px-2.5 py-1.5 sm:py-1 text-xs sm:text-[11px] rounded-md font-medium transition min-h-[36px] sm:min-h-0 ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                        {t === 'country' ? 'Country' : 'City'}
-                    </button>
-                ))}
-            </div>
-            <AnalyticsTable
-                data={tab === 'country'
-                    ? countries.map((c: any) => ({ name: c.country, events: c.users, sessions: c.sessions || 0 }))
-                    : cities.map((c: any) => ({ name: `${c.city}, ${c.country}`, events: c.users, sessions: 0 }))
-                }
-                searchKey={(item: any) => item.name} searchPlaceholder="Search..." maxRows={15}
-                onRowClick={(item: any) => { if (tab === 'country') toggleFilter('country', item.name); }}
-                activeRow={(item: any) => tab === 'country' && filters.country.includes(item.name)}
-                columns={[
-                    { key: 'name', label: tab === 'country' ? 'Country' : 'City', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2"><CountryFlag country={item.name.split(',')[0]} /><span className="text-zinc-300 text-xs truncate max-w-[130px]">{item.name}</span></div>) },
-                    { key: 'events', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.events, render: (item: any) => <Bar value={item.events} max={maxUsers} color="bg-violet-500/40" /> },
-                    {
-                        key: 'actions',
-                        label: 'Actions',
-                        align: 'right' as const,
-                        width: '60px',
-                        render: (item: any) => (
-                            <TableActionMenu size="sm" actions={[
-                                analyzeWithAI(`Analyze traffic from ${item.country || item.region || item.name}: ${item.users || item.activeUsers || item.events} users. What opportunities exist for this market?`, ''),
-                                copyToClipboard(item.country || item.region || item.name || ''),
-                            ]} />
-                        ),
-                    },
-                ]}
-                defaultSort={{ key: 'events', dir: 'desc' }}
-            />
-        </div>
+
+            {tab === 'referrers' && (
+                <AnalyticsTable
+                    data={referrers}
+                    searchKey={(item: any) => item.name}
+                    searchPlaceholder="Search referrers..."
+                    maxRows={10}
+                    onRowClick={(item: any) => toggleFilter('referrer', item.name)}
+                    activeRow={(item: any) => filters.referrer.includes(item.name)}
+                    columns={[
+                        {
+                            key: 'referrer', label: 'Referrer', sortable: true,
+                            getValue: (item: any) => item.name,
+                            render: (item: any) => (
+                                <div className="flex items-center gap-2">
+                                    <ReferrerIcon referrer={item.name} />
+                                    <span className="text-zinc-300 text-xs truncate max-w-[140px]">{item.name}</span>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'events', label: 'Sessions', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.value,
+                            render: (item: any) => <Bar value={item.value} max={maxRef} />,
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze traffic from referrer "${item.name}": how can we get more traffic from this source?`, ''),
+                                    openExternal(item.name || ''),
+                                    copyToClipboard(item.name || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'events', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'channels' && (
+                <AnalyticsTable
+                    data={channels}
+                    showSearch={false}
+                    maxRows={10}
+                    onRowClick={(item: any) => toggleFilter('channel', item.name)}
+                    activeRow={(item: any) => filters.channel.includes(item.name)}
+                    columns={[
+                        {
+                            key: 'name', label: 'Channel', sortable: true,
+                            getValue: (item: any) => item.name,
+                            render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span>,
+                        },
+                        {
+                            key: 'value', label: 'Visitors', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.value,
+                            render: (item: any) => {
+                                const total = allChannels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+                                const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                                return (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-zinc-300 text-xs tabular-nums min-w-[36px] text-right">{item.value?.toLocaleString()}</span>
+                                        <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[40px]">
+                                            <div className="h-full rounded-full bg-emerald-500/40" style={{ width: `${pct}%`, transition: 'width 0.4s' }} />
+                                        </div>
+                                        <span className="text-zinc-500 text-[10px] tabular-nums min-w-[28px] text-right">{pct}%</span>
+                                    </div>
+                                );
+                            },
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze traffic from channel "${item.name}": how can we grow this channel?`, ''),
+                                    copyToClipboard(item.name || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'value', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'utm' && (
+                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                    UTM tracking coming soon
+                </div>
+            )}
+        </motion.div>
     );
 }
 
-function TechPanel({ devices, browsers, operatingSystems, allDevices, allBrowsers, allOS }: { devices: any[]; browsers: any[]; operatingSystems: any[]; allDevices: any[]; allBrowsers: any[]; allOS: any[] }) {
-    const [tab, setTab] = useState<'device' | 'browser' | 'os'>('device');
-    const { filters, toggleFilter } = useFilterStore();
-    const { analyzeWithAI, copyToClipboard } = useTableActions();
-    const data = tab === 'device' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, pct: d.percentage }))
-        : tab === 'browser' ? browsers.map((b: any) => ({ name: b.name, value: b.value, pct: b.percentage }))
-            : operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }));
-    const dim = tab === 'device' ? 'device' : tab === 'browser' ? 'browser' : 'os';
+// ─── Pages Tabbed Panel ───
+function PagesPanel({
+    pages, entryPages, maxPageViews, maxEntryPageSessions, filters, toggleFilter,
+    auditPage, optimizePage, analyzeWithAI, openExternal, copyToClipboard,
+}: {
+    pages: any[]; entryPages: any[]; maxPageViews: number; maxEntryPageSessions: number;
+    filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
+    auditPage: any; optimizePage: any; analyzeWithAI: any; openExternal: any; copyToClipboard: any;
+}) {
+    const [tab, setTab] = useState<'pages' | 'entries' | 'exits'>('pages');
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.14 }}
+            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+        >
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center gap-1">
+                    <TabBtn label="Pages" active={tab === 'pages'} onClick={() => setTab('pages')} />
+                    <TabBtn label="Entry Pages" active={tab === 'entries'} onClick={() => setTab('entries')} />
+                    <TabBtn label="Exit Pages" active={tab === 'exits'} onClick={() => setTab('exits')} />
+                </div>
+                <button className="p-1 text-zinc-600 hover:text-zinc-400 transition" title="Expand">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {tab === 'pages' && (
+                <AnalyticsTable
+                    data={pages}
+                    searchKey={(item: any) => item.page}
+                    searchPlaceholder="Search pages..."
+                    maxRows={10}
+                    onRowClick={(item: any) => toggleFilter('page', item.page)}
+                    activeRow={(item: any) => filters.page.includes(item.page)}
+                    columns={[
+                        {
+                            key: 'page', label: 'Path', sortable: true,
+                            getValue: (item: any) => item.page,
+                            render: (item: any) => (
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-zinc-300 text-xs truncate max-w-[160px] block">{item.page}</span>
+                                    {getAnnotations({ clicks: item.views, impressions: item.views }).map(type => (
+                                        <AnnotationBadge key={type} type={type} />
+                                    ))}
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'views', label: 'Views', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.views,
+                            render: (item: any) => <Bar value={item.views} max={maxPageViews} color="bg-indigo-500/40" />,
+                        },
+                        {
+                            key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.bounceRate || 0,
+                            render: (item: any) => (
+                                <span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                    {item.bounceRate}%
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    auditPage(item.page || ''),
+                                    optimizePage(item.page || ''),
+                                    analyzeWithAI(`Analyze page performance: ${item.page}`, ''),
+                                    openExternal(item.page || ''),
+                                    copyToClipboard(item.page || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'views', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'entries' && (
+                <AnalyticsTable
+                    data={entryPages}
+                    searchKey={(item: any) => item.page}
+                    searchPlaceholder="Search entry pages..."
+                    maxRows={10}
+                    columns={[
+                        {
+                            key: 'page', label: 'Path', sortable: true,
+                            getValue: (item: any) => item.page,
+                            render: (item: any) => (
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-zinc-300 text-xs truncate max-w-[160px] block">{item.page}</span>
+                                    {getAnnotations({ clicks: item.sessions, impressions: item.views }).map(type => (
+                                        <AnnotationBadge key={type} type={type} />
+                                    ))}
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.sessions,
+                            render: (item: any) => <Bar value={item.sessions} max={maxEntryPageSessions} color="bg-cyan-500/40" />,
+                        },
+                        {
+                            key: 'users', label: 'Users', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.users || 0,
+                            render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '--'}</span>,
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    auditPage(item.page || ''),
+                                    analyzeWithAI(`Analyze entry page: ${item.page}`, ''),
+                                    openExternal(item.page || ''),
+                                    copyToClipboard(item.page || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'sessions', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'exits' && (
+                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                    Exit pages coming soon
+                </div>
+            )}
+        </motion.div>
+    );
+}
+
+// ─── Technology Tabbed Panel ───
+function TechPanel({
+    devices, browsers, operatingSystems, filters, toggleFilter,
+    analyzeWithAI, copyToClipboard,
+}: {
+    devices: any[]; browsers: any[]; operatingSystems: any[];
+    allDevices?: any[]; allBrowsers?: any[]; allOS?: any[];
+    filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
+    analyzeWithAI: any; copyToClipboard: any;
+}) {
+    const [tab, setTab] = useState<'browsers' | 'devices' | 'os' | 'screen'>('browsers');
+
+    const data = tab === 'devices' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, pct: d.percentage }))
+        : tab === 'browsers' ? browsers.map((b: any) => ({ name: b.name, value: b.value, pct: b.percentage }))
+        : tab === 'os' ? operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }))
+        : [];
+
+    const dim = tab === 'devices' ? 'device' : tab === 'browsers' ? 'browser' : 'os';
     const maxVal = Math.max(...data.map((d: any) => d.value || 0), 1);
 
     return (
-        <div>
-            <SectionHead title="Technology" filterDim={dim} filterValues={filters[dim]} />
-            <div className="flex gap-1 mb-2 sm:mb-3">
-                {(['device', 'browser', 'os'] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)} className={`px-3 sm:px-2.5 py-1.5 sm:py-1 text-xs sm:text-[11px] rounded-md font-medium transition min-h-[36px] sm:min-h-0 ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                        {t === 'device' ? 'Device' : t === 'browser' ? 'Browser' : 'OS'}
-                    </button>
-                ))}
+        <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.16 }}
+            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+        >
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center gap-1">
+                    <TabBtn label="Browsers" active={tab === 'browsers'} onClick={() => setTab('browsers')} />
+                    <TabBtn label="Devices" active={tab === 'devices'} onClick={() => setTab('devices')} />
+                    <TabBtn label="OS" active={tab === 'os'} onClick={() => setTab('os')} />
+                    <TabBtn label="Screen" active={tab === 'screen'} onClick={() => setTab('screen')} />
+                </div>
+                <button className="p-1 text-zinc-600 hover:text-zinc-400 transition" title="Expand">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
             </div>
-            <AnalyticsTable
-                data={data} showSearch={false}
-                onRowClick={(item: any) => toggleFilter(dim, item.name)}
-                activeRow={(item: any) => filters[dim].includes(item.name)}
-                columns={[
-                    { key: 'name', label: 'Name', sortable: true, getValue: (item: any) => item.name, render: (item: any) => (<div className="flex items-center gap-2">{tab === 'device' ? <DeviceIcon device={item.name} /> : tab === 'browser' ? <BrowserIcon browser={item.name} /> : <OSIcon os={item.name} />}<span className="text-zinc-300 text-xs">{item.name}</span></div>) },
-                    { key: 'value', label: 'Sessions', align: 'right' as const, sortable: true, getValue: (item: any) => item.value, render: (item: any) => <Bar value={item.value} max={maxVal} color="bg-cyan-500/40" /> },
-                    { key: 'pct', label: '%', align: 'right' as const, render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.pct}%</span> },
-                    {
-                        key: 'actions',
-                        label: 'Actions',
-                        align: 'right' as const,
-                        width: '60px',
-                        render: (item: any) => (
-                            <TableActionMenu size="sm" actions={[
-                                analyzeWithAI(`Analyze ${item.device || item.browser || item.os || item.name} traffic: ${item.users || item.activeUsers || item.value} users, ${item.bounceRate || item.pct}% bounce rate. Are there optimization opportunities?`, ''),
-                                copyToClipboard(item.device || item.browser || item.os || item.name || ''),
-                            ]} />
-                        ),
-                    },
-                ]}
-                defaultSort={{ key: 'value', dir: 'desc' }}
-            />
-        </div>
+
+            {tab === 'screen' ? (
+                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                    Screen dimensions coming soon
+                </div>
+            ) : (
+                <AnalyticsTable
+                    data={data}
+                    showSearch={false}
+                    maxRows={10}
+                    onRowClick={(item: any) => toggleFilter(dim, item.name)}
+                    activeRow={(item: any) => filters[dim].includes(item.name)}
+                    columns={[
+                        {
+                            key: 'name', label: 'Name', sortable: true,
+                            getValue: (item: any) => item.name,
+                            render: (item: any) => (
+                                <div className="flex items-center gap-2">
+                                    {tab === 'devices' ? <DeviceIcon device={item.name} /> : tab === 'browsers' ? <BrowserIcon browser={item.name} /> : <OSIcon os={item.name} />}
+                                    <span className="text-zinc-300 text-xs">{item.name}</span>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'value', label: 'Sessions', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.value,
+                            render: (item: any) => <Bar value={item.value} max={maxVal} color="bg-cyan-500/40" />,
+                        },
+                        {
+                            key: 'pct', label: '%', align: 'right' as const,
+                            render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.pct}%</span>,
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze ${item.name} traffic: ${item.value} sessions. Are there optimization opportunities?`, ''),
+                                    copyToClipboard(item.name || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'value', dir: 'desc' }}
+                />
+            )}
+        </motion.div>
     );
 }
 
+// ─── Geography Tabbed Panel ───
+function GeoPanel({
+    countries, cities, languages, allCountries, maxUsers, filters, toggleFilter,
+    analyzeWithAI, copyToClipboard,
+}: {
+    countries: any[]; cities: any[]; languages: any[]; allCountries: any[];
+    maxUsers: number; filters: DashboardFilters;
+    toggleFilter: (dim: any, val: string) => void;
+    analyzeWithAI: any; copyToClipboard: any;
+}) {
+    const [tab, setTab] = useState<'countries' | 'regions' | 'cities' | 'languages' | 'map'>('countries');
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+        >
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+                    <TabBtn label="Countries" active={tab === 'countries'} onClick={() => setTab('countries')} />
+                    <TabBtn label="Regions" active={tab === 'regions'} onClick={() => setTab('regions')} />
+                    <TabBtn label="Cities" active={tab === 'cities'} onClick={() => setTab('cities')} />
+                    <TabBtn label="Languages" active={tab === 'languages'} onClick={() => setTab('languages')} />
+                    <TabBtn label="Map" active={tab === 'map'} onClick={() => setTab('map')} />
+                </div>
+                <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    {allCountries.slice(0, 4).map((c: any, i: number) => (
+                        <CountryFlag key={i} country={c.country} />
+                    ))}
+                </div>
+            </div>
+
+            {tab === 'countries' && (
+                <AnalyticsTable
+                    data={countries.map((c: any) => ({ name: c.country, events: c.users, sessions: c.sessions || 0 }))}
+                    searchKey={(item: any) => item.name}
+                    searchPlaceholder="Search countries..."
+                    maxRows={10}
+                    onRowClick={(item: any) => toggleFilter('country', item.name)}
+                    activeRow={(item: any) => filters.country.includes(item.name)}
+                    columns={[
+                        {
+                            key: 'name', label: 'Country', sortable: true,
+                            getValue: (item: any) => item.name,
+                            render: (item: any) => (
+                                <div className="flex items-center gap-2">
+                                    <CountryFlag country={item.name} />
+                                    <span className="text-zinc-300 text-xs truncate max-w-[120px]">{item.name}</span>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'events', label: 'Users', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.events,
+                            render: (item: any) => <Bar value={item.events} max={maxUsers} color="bg-violet-500/40" />,
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze traffic from ${item.name}: ${item.events} users. What opportunities exist for this market?`, ''),
+                                    copyToClipboard(item.name || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'events', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'regions' && (
+                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                    Regional breakdown coming soon
+                </div>
+            )}
+
+            {tab === 'cities' && (
+                <AnalyticsTable
+                    data={cities.map((c: any) => ({ name: `${c.city}, ${c.country}`, events: c.users }))}
+                    searchKey={(item: any) => item.name}
+                    searchPlaceholder="Search cities..."
+                    maxRows={10}
+                    columns={[
+                        {
+                            key: 'name', label: 'City', sortable: true,
+                            getValue: (item: any) => item.name,
+                            render: (item: any) => (
+                                <div className="flex items-center gap-2">
+                                    <CountryFlag country={item.name.split(', ').pop() || ''} />
+                                    <span className="text-zinc-300 text-xs truncate max-w-[140px]">{item.name}</span>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'events', label: 'Users', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.events,
+                            render: (item: any) => <Bar value={item.events} max={maxUsers} color="bg-violet-500/40" />,
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze traffic from city ${item.name}: ${item.events} users.`, ''),
+                                    copyToClipboard(item.name || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'events', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'languages' && (
+                <AnalyticsTable
+                    data={languages}
+                    showSearch={false}
+                    maxRows={10}
+                    columns={[
+                        {
+                            key: 'name', label: 'Language', sortable: true,
+                            getValue: (item: any) => item.name,
+                            render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span>,
+                        },
+                        {
+                            key: 'value', label: 'Visitors', align: 'right' as const, sortable: true,
+                            getValue: (item: any) => item.value,
+                            render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span>,
+                        },
+                        {
+                            key: 'pct', label: '%', align: 'right' as const,
+                            render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span>,
+                        },
+                        {
+                            key: 'actions', label: '', align: 'right' as const, width: '40px',
+                            render: (item: any) => (
+                                <TableActionMenu size="sm" actions={[
+                                    analyzeWithAI(`Analyze traffic from ${item.name} language: ${item.value} users. What opportunities exist?`, ''),
+                                    copyToClipboard(item.name || ''),
+                                ]} />
+                            ),
+                        },
+                    ]}
+                    defaultSort={{ key: 'value', dir: 'desc' }}
+                />
+            )}
+
+            {tab === 'map' && (
+                <div className="h-[260px] sm:h-[300px] -mx-3 -mb-3 sm:-mx-5 sm:-mb-5">
+                    <WorldMap
+                        byCountry={allCountries.map((c: any) => ({ country: c.country, users: c.users }))}
+                        byCity={cities.map((c: any) => ({ city: c.city, country: c.country, users: c.users }))}
+                        onBubbleClick={(name: string) => toggleFilter('country', name)}
+                        activeCountry={filters.country[0] || null}
+                    />
+                </div>
+            )}
+        </motion.div>
+    );
+}
+
+// ─── Intelligence: Engagement Card ───
 function EngagementCard({ kpis }: { kpis: any }) {
     if (!kpis) return null;
     const score = Math.min(100, Math.round(
@@ -750,7 +1069,10 @@ function EngagementCard({ kpis }: { kpis: any }) {
     const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0"><Target className="w-4 h-4 text-violet-400 flex-shrink-0" /><h4 className="text-sm sm:text-base font-semibold text-white truncate">Engagement Score</h4></div>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
+                <Target className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                <h4 className="text-sm sm:text-base font-semibold text-white truncate">Engagement Score</h4>
+            </div>
             <div className="flex items-end gap-2 mb-1.5 sm:mb-2">
                 <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
                 <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>
@@ -762,6 +1084,7 @@ function EngagementCard({ kpis }: { kpis: any }) {
     );
 }
 
+// ─── Intelligence: Loyalty Card ───
 function LoyaltyCard({ kpis }: { kpis: any }) {
     if (!kpis) return null;
     const returning = kpis.returningUsers || 0;
@@ -769,8 +1092,14 @@ function LoyaltyCard({ kpis }: { kpis: any }) {
     const loyaltyPct = Math.round((returning / total) * 100);
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0"><Users className="w-4 h-4 text-pink-400 flex-shrink-0" /><h4 className="text-sm sm:text-base font-semibold text-white truncate">Audience Loyalty</h4></div>
-            <div className="flex justify-between text-[10px] sm:text-xs mb-1"><span className="text-zinc-600">New</span><span className="text-zinc-600">Returning</span></div>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
+                <Users className="w-4 h-4 text-pink-400 flex-shrink-0" />
+                <h4 className="text-sm sm:text-base font-semibold text-white truncate">Audience Loyalty</h4>
+            </div>
+            <div className="flex justify-between text-[10px] sm:text-xs mb-1">
+                <span className="text-zinc-600">New</span>
+                <span className="text-zinc-600">Returning</span>
+            </div>
             <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${100 - loyaltyPct}%` }} transition={{ duration: 0.6 }} className="h-full bg-violet-500/50" />
                 <motion.div initial={{ width: 0 }} animate={{ width: `${loyaltyPct}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full bg-emerald-500/50" />
@@ -783,6 +1112,7 @@ function LoyaltyCard({ kpis }: { kpis: any }) {
     );
 }
 
+// ─── Intelligence: Source Diversity Card ───
 function DiversityCard({ channels }: { channels: any[] }) {
     if (!channels.length) return null;
     const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
@@ -793,7 +1123,10 @@ function DiversityCard({ channels }: { channels: any[] }) {
     const color = score >= 60 ? 'text-emerald-400' : score >= 35 ? 'text-amber-400' : 'text-red-400';
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0"><Globe className="w-4 h-4 text-blue-400 flex-shrink-0" /><h4 className="text-sm sm:text-base font-semibold text-white truncate">Source Diversity</h4></div>
+            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
+                <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <h4 className="text-sm sm:text-base font-semibold text-white truncate">Source Diversity</h4>
+            </div>
             <div className="flex items-end gap-1 mb-2 sm:mb-3">
                 <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
                 <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>

@@ -6,19 +6,27 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     BarChart3, FileText, Radio, Zap, Users, ChevronDown,
-    X, Filter, GitCompare, Loader2
+    X, Filter, GitCompare, Loader2, Gauge, Target, GitBranch,
+    Download, Share2, Activity, Route
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { exportAnalyticsData } from '@/lib/exportUtils';
 import { useRegistration } from '../layout';
 import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
 import { ConnectGoogleState } from '@/components/EmptyState';
 
 const TABS = [
-    { key: '', label: 'Overview', icon: BarChart3 },
+    { key: '', label: 'Main', icon: BarChart3 },
+    { key: '/realtime', label: 'Realtime', icon: Radio, pulse: true },
+    { key: '/performance', label: 'Performance', icon: Gauge },
+    { key: '/goals', label: 'Goals', icon: Target },
+    { key: '/funnels', label: 'Funnels', icon: GitBranch },
+    { key: '/retention', label: 'Retention', icon: Activity },
+    { key: '/journeys', label: 'Journeys', icon: Route },
     { key: '/pages', label: 'Pages', icon: FileText },
-    { key: '/realtime', label: 'Realtime', icon: Radio },
-    { key: '/events', label: 'Events', icon: Zap },
     { key: '/sessions', label: 'Sessions', icon: Users },
+    { key: '/events', label: 'Events', icon: Zap },
 ];
 
 // Shared analytics context for sub-pages
@@ -87,12 +95,15 @@ function PropertyDropdown({ properties, value, onChange }: { properties: any[]; 
     );
 }
 
+const ShareDashboardModal = dynamic(() => import('@/components/ShareDashboardModal'), { ssr: false });
+
 export default function AnalyticsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
     const { filters, clearFilter, clearAll, compareMode, setCompareMode } = useFilterStore();
+    const [shareOpen, setShareOpen] = useState(false);
 
     useEffect(() => {
         if (properties.length > 0 && !selectedProperty) {
@@ -128,7 +139,25 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Download */}
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('trafficclaw:export-analytics'))}
+                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                title="Export data"
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Share */}
+                            <button
+                                onClick={() => setShareOpen(true)}
+                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                title="Share dashboard"
+                            >
+                                <Share2 className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* Compare mode */}
                             <button
                                 onClick={() => setCompareMode(!compareMode)}
@@ -142,7 +171,6 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                 <GitCompare className="w-3 h-3" />
                                 <span className="hidden sm:inline">Compare</span>
                             </button>
-
                         </div>
                     </div>
 
@@ -158,7 +186,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     <Link
                                         key={tab.key}
                                         href={href}
-                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-1 sm:flex-none px-2 sm:px-4 py-3 sm:py-2.5 min-h-[44px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-none px-2.5 sm:px-3.5 py-3 sm:py-2.5 min-h-[44px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
                                             isActive
                                                 ? 'text-emerald-400 border-emerald-400 sm:text-blue-400 sm:border-blue-400'
                                                 : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-white/[0.1]'
@@ -166,7 +194,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     >
                                         <tab.icon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                         {tab.label}
-                                        {tab.key === '/realtime' && (
+                                        {'pulse' in tab && tab.pulse && (
                                             <span className="relative flex h-1.5 w-1.5 ml-0.5">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
@@ -227,6 +255,13 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                         </div>
                     ) : children}
                 </div>
+
+                {/* Share Modal */}
+                <ShareDashboardModal
+                    open={shareOpen}
+                    onClose={() => setShareOpen(false)}
+                    propertyId={selectedProperty}
+                />
             </div>
         </AnalyticsContext.Provider>
     );
