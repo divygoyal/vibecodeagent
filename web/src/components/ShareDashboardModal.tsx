@@ -101,12 +101,10 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
         setError(null);
 
         try {
-            const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
             const res = await fetch('/api/share', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    token,
                     propertyId,
                     siteUrl: siteUrl || '',
                     config,
@@ -118,7 +116,8 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                 throw new Error(err.error || 'Failed to create share link');
             }
 
-            setLatestToken(token);
+            const data = await res.json();
+            setLatestToken(data.share?.token || null);
             await fetchShares();
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Failed to generate link';

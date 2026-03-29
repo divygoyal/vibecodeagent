@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import { randomBytes } from 'crypto';
 import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -83,14 +84,14 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { token, propertyId, siteUrl, config } = body;
+        const { propertyId, siteUrl, config } = body;
 
-        if (!token || typeof token !== 'string') {
-            return NextResponse.json({ error: 'token is required' }, { status: 400 });
-        }
         if (!propertyId || typeof propertyId !== 'string') {
             return NextResponse.json({ error: 'propertyId is required' }, { status: 400 });
         }
+
+        // Generate token server-side (cryptographically secure)
+        const token = randomBytes(16).toString('hex');
 
         // Limit shares per user to 10
         const userId = session.user.id;
