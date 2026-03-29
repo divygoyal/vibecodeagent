@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search, LayoutDashboard, Bot, BarChart3, MessageSquare,
   ScanSearch, Settings, Book, Newspaper, Command, ArrowRight,
-  Moon, Sparkles
+  Sparkles
 } from 'lucide-react';
 
 interface CommandItem {
@@ -41,13 +41,6 @@ export default function CommandPalette() {
     { id: 'settings', label: 'Settings', description: 'Account settings', icon: Settings, action: () => navigate('/dashboard/settings'), section: 'Navigation', keywords: ['account', 'profile', 'preferences'] },
     { id: 'docs', label: 'Docs', description: 'Documentation', icon: Book, action: () => navigate('/dashboard/docs'), section: 'Resources', keywords: ['help', 'documentation', 'guide'] },
     { id: 'blog', label: 'Blog', description: 'Latest updates', icon: Newspaper, action: () => navigate('/dashboard/blog'), section: 'Resources', keywords: ['news', 'updates', 'articles'] },
-    { id: 'theme-toggle', label: 'Toggle Theme', description: 'Switch dark/light mode', icon: Moon, action: () => {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'light' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('gc-theme', next);
-      setOpen(false);
-    }, section: 'Actions', keywords: ['dark', 'light', 'theme', 'mode'] },
     { id: 'ask-ai', label: 'Ask AI: What should I do today?', description: 'Get AI recommendation', icon: Sparkles, action: () => {
       window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
         detail: { question: 'What is the ONE thing I should do today to grow?' }

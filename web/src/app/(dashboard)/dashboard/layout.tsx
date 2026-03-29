@@ -116,7 +116,6 @@ export default function DashboardLayout({
 
     const [selectedProperty, setSelectedProperty] = useState('');
     const [selectedSite, setSelectedSite] = useState('');
-    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [showWelcome, setShowWelcome] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [range, setRange] = useState('30d');
@@ -209,10 +208,10 @@ export default function DashboardLayout({
         prevAlertCountRef.current = criticalAlertCount;
     }, [criticalAlertCount, alerts]);
 
-    // Persist theme to localStorage and apply to <html>
+    // Enforce dark mode — clear any stale light-mode preference
     useEffect(() => {
-        const saved = localStorage.getItem('gc-theme') as 'dark' | 'light' | null;
-        if (saved) { setTheme(saved); document.documentElement.setAttribute('data-theme', saved); }
+        localStorage.removeItem('gc-theme');
+        document.documentElement.setAttribute('data-theme', 'dark');
     }, []);
 
     // Persist selected property/site to user-scoped localStorage
