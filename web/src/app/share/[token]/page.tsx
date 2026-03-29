@@ -58,7 +58,7 @@ export default async function SharedDashboardPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    const share = getShareData(token);
+    const share = await getShareData(token);
 
     /* ─── Invalid / revoked token ─── */
     if (!share) {

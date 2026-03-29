@@ -21,7 +21,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, LeaderboardEntry
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SharedDashboard, LeaderboardEntry
 from docker_manager import docker_manager
 
 
@@ -1619,6 +1619,165 @@ async def get_embed_token_google_creds(
         "allowed_origins": json.loads(embed_token.allowed_origins) if embed_token.allowed_origins else None,
         "plan": user.plan if user else "free",
     }
+
+
+# ============= Shared Dashboards =============
+
+class SharedDashboardCreate(BaseModel):
+    user_identifier: str
+    property_id: str
+    site_url: Optional[str] = None
+    config: Optional[dict] = None
+
+
+@app.post("/api/shared-dashboards")
+async def create_shared_dashboard(
+    data: SharedDashboardCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Create a new shared dashboard link."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    token = secrets.token_hex(16)
+    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"seo":false}'
+
+    shared = SharedDashboard(
+        token=token,
+        user_id=user.id,
+        property_id=data.property_id,
+        site_url=data.site_url or "",
+        config=config_json,
+    )
+    db.add(shared)
+    await db.commit()
+    await db.refresh(shared)
+
+    return {
+        "token": shared.token,
+        "property_id": shared.property_id,
+        "site_url": shared.site_url,
+        "config": json.loads(shared.config) if shared.config else {},
+        "views": shared.views,
+        "created_at": shared.created_at.isoformat() if shared.created_at else None,
+    }
+
+
+@app.get("/api/shared-dashboards")
+async def list_shared_dashboards(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """List shared dashboards for a user."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return []
+
+    result = await db.execute(
+        select(SharedDashboard)
+        .where(SharedDashboard.user_id == user.id, SharedDashboard.is_active == True)
+        .order_by(SharedDashboard.created_at.desc())
+    )
+    shares = result.scalars().all()
+
+    return [
+        {
+            "token": s.token,
+            "property_id": s.property_id,
+            "site_url": s.site_url,
+            "config": json.loads(s.config) if s.config else {},
+            "views": s.views,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "last_viewed_at": s.last_viewed_at.isoformat() if s.last_viewed_at else None,
+        }
+        for s in shares
+    ]
+
+
+@app.delete("/api/shared-dashboards/{token}")
+async def revoke_shared_dashboard(
+    token: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Revoke a shared dashboard."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(SharedDashboard).where(
+            SharedDashboard.token == token,
+            SharedDashboard.user_id == user.id
+        )
+    )
+    shared = result.scalar_one_or_none()
+    if not shared:
+        raise HTTPException(status_code=404, detail="Shared dashboard not found")
+
+    shared.is_active = False
+    await db.commit()
+    return {"revoked": True}
+
+
+@app.get("/api/shared-dashboards/{token}/view")
+async def view_shared_dashboard(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint: get shared dashboard data and increment views. NO auth required."""
+    result = await db.execute(
+        select(SharedDashboard).where(
+            SharedDashboard.token == token,
+            SharedDashboard.is_active == True
+        )
+    )
+    shared = result.scalar_one_or_none()
+    if not shared:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    shared.views += 1
+    shared.last_viewed_at = datetime.utcnow()
+    await db.commit()
+
+    return {
+        "token": shared.token,
+        "property_id": shared.property_id,
+        "site_url": shared.site_url,
+        "config": json.loads(shared.config) if shared.config else {},
+        "views": shared.views,
+        "created_at": shared.created_at.isoformat() if shared.created_at else None,
+    }
+
+
+@app.delete("/api/shared-dashboards/user/{user_identifier}")
+async def revoke_all_shared_dashboards(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Revoke all shared dashboards for a user."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(SharedDashboard).where(
+            SharedDashboard.user_id == user.id,
+            SharedDashboard.is_active == True
+        )
+    )
+    shares = result.scalars().all()
+    count = 0
+    for s in shares:
+        s.is_active = False
+        count += 1
+    await db.commit()
+    return {"revoked": count}
 
 
 # ============= Leaderboard =============

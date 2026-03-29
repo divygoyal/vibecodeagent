@@ -825,3 +825,309 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
     result.recommendations = recommendations;
     return result;
 }
+
+// ─── Shared range map for GA4 queries ───
+
+const RANGE_MAP: Record<string, string> = {
+    'today': 'today', 'yesterday': 'yesterday',
+    '7d': '7daysAgo', '14d': '14daysAgo', '30d': '28daysAgo',
+    '90d': '90daysAgo', '6m': '180daysAgo', '12m': '365daysAgo',
+};
+
+// ─── Retention Cohorts ───
+
+/**
+ * Fetch retention cohort data from GA4 using the cohort API.
+ * Returns null if the cohort query fails (e.g. property has insufficient data).
+ */
+export async function fetchRetentionCohorts(
+    token: string,
+    propertyId: string,
+    mode: 'daily' | 'weekly' | 'monthly' = 'daily'
+) {
+    const granularity = mode === 'daily' ? 'DAILY' : mode === 'weekly' ? 'WEEKLY' : 'MONTHLY';
+    const numCohorts = mode === 'daily' ? 14 : mode === 'weekly' ? 8 : 6;
+    const endOffset = mode === 'daily' ? 14 : mode === 'weekly' ? 8 : 6;
+
+    // Build cohort definitions - one per period
+    const cohorts = [];
+    const now = new Date();
+    for (let i = numCohorts - 1; i >= 0; i--) {
+        const d = new Date(now);
+        if (mode === 'daily') d.setDate(d.getDate() - i);
+        else if (mode === 'weekly') d.setDate(d.getDate() - i * 7);
+        else d.setMonth(d.getMonth() - i);
+
+        const dateStr = d.toISOString().split('T')[0];
+        cohorts.push({
+            dimension: 'firstSessionDate',
+            dateRange: { startDate: dateStr, endDate: dateStr }
+        });
+    }
+
+    const body = {
+        cohortSpec: {
+            cohorts,
+            cohortsRange: { granularity, startOffset: 0, endOffset }
+        },
+        metrics: [
+            { name: 'cohortActiveUsers' },
+            { name: 'cohortTotalUsers' }
+        ],
+        dimensions: [
+            { name: mode === 'daily' ? 'cohortNthDay' : mode === 'weekly' ? 'cohortNthWeek' : 'cohortNthMonth' },
+            { name: 'firstSessionDate' }
+        ]
+    };
+
+    const res = await fetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30000)
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        console.error('Cohort report error:', err);
+        return null;
+    }
+
+    const data = await res.json();
+
+    // Parse into cohort structure
+    const cohortsMap: Record<string, { date: string; users: number; retention: number[] }> = {};
+
+    for (const row of data.rows || []) {
+        const nthPeriod = parseInt(row.dimensionValues[0].value);
+        const cohortDate = row.dimensionValues[1].value; // YYYYMMDD format
+        const activeUsers = parseInt(row.metricValues[0].value) || 0;
+        const totalUsers = parseInt(row.metricValues[1].value) || 0;
+
+        const formattedDate = `${cohortDate.slice(0,4)}-${cohortDate.slice(4,6)}-${cohortDate.slice(6,8)}`;
+
+        if (!cohortsMap[formattedDate]) {
+            cohortsMap[formattedDate] = { date: formattedDate, users: 0, retention: [] };
+        }
+
+        if (nthPeriod === 0) {
+            cohortsMap[formattedDate].users = totalUsers;
+        }
+
+        const retentionPct = totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0;
+        while (cohortsMap[formattedDate].retention.length <= nthPeriod) {
+            cohortsMap[formattedDate].retention.push(0);
+        }
+        cohortsMap[formattedDate].retention[nthPeriod] = nthPeriod === 0 ? 100 : retentionPct;
+    }
+
+    const cohortsList = Object.values(cohortsMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Calculate averages
+    const maxPeriods = Math.max(...cohortsList.map(c => c.retention.length), 0);
+    const curve = [];
+    for (let p = 0; p < maxPeriods; p++) {
+        const values = cohortsList.filter(c => c.retention[p] !== undefined).map(c => c.retention[p]);
+        const avg = values.length > 0 ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : 0;
+        curve.push({ day: p, retention: avg });
+    }
+
+    const averages = {
+        day1: curve[1]?.retention ?? 0,
+        day7: curve[7]?.retention ?? 0,
+        day14: curve[14]?.retention ?? 0,
+        day30: curve[Math.min(30, curve.length - 1)]?.retention ?? 0
+    };
+
+    return { cohorts: cohortsList, curve, averages };
+}
+
+// ─── Goal / Conversion Data ───
+
+/**
+ * Fetch goal/conversion data for specific pages.
+ * Queries session counts per goal page and calculates conversion rates.
+ */
+export async function fetchGoalData(
+    token: string,
+    propertyId: string,
+    goalPages: string[],
+    range: string = '30d'
+) {
+    const startDate = RANGE_MAP[range] || '28daysAgo';
+
+    // Query total sessions for conversion rate denominator
+    const [totalReport, ...pageReports] = await Promise.all([
+        runGAReport(token, propertyId, ['date'], ['sessions'], startDate, 'today', 250),
+        ...goalPages.map(page =>
+            fetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dateRanges: [{ startDate, endDate: 'today' }],
+                    metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+                    dimensions: [{ name: 'date' }],
+                    dimensionFilter: {
+                        filter: {
+                            fieldName: 'pagePath',
+                            stringFilter: { matchType: 'EXACT', value: page }
+                        }
+                    },
+                    limit: 250
+                }),
+                signal: AbortSignal.timeout(30000)
+            }).then(r => r.json())
+        )
+    ]);
+
+    const totalSessions = (totalReport?.rows || []).reduce(
+        (s: number, r: any) => s + (parseInt(r.metricValues[0].value) || 0), 0
+    );
+
+    return goalPages.map((page, i) => {
+        const report = pageReports[i];
+        const rows = report?.rows || [];
+        const conversions = rows.reduce((s: number, r: any) => s + (parseInt(r.metricValues[0].value) || 0), 0);
+        const rate = totalSessions > 0 ? Math.round((conversions / totalSessions) * 1000) / 10 : 0;
+
+        const trend = rows.map((r: any) => ({
+            date: r.dimensionValues[0].value,
+            conversions: parseInt(r.metricValues[0].value) || 0,
+            users: parseInt(r.metricValues[1].value) || 0
+        })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+        return { page, conversions, rate, trend, totalSessions };
+    });
+}
+
+// ─── Funnel Data ───
+
+/**
+ * Fetch funnel data for a sequence of pages.
+ * Queries session counts per step and calculates drop-off rates.
+ */
+export async function fetchFunnelData(
+    token: string,
+    propertyId: string,
+    stepPages: string[],
+    range: string = '30d'
+) {
+    const startDate = RANGE_MAP[range] || '28daysAgo';
+
+    const reports = await Promise.all(
+        stepPages.map(page =>
+            fetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dateRanges: [{ startDate, endDate: 'today' }],
+                    metrics: [{ name: 'sessions' }],
+                    dimensionFilter: {
+                        filter: {
+                            fieldName: 'pagePath',
+                            stringFilter: { matchType: 'BEGINS_WITH', value: page }
+                        }
+                    }
+                }),
+                signal: AbortSignal.timeout(30000)
+            }).then(r => r.json())
+        )
+    );
+
+    const steps = stepPages.map((page, i) => {
+        const rows = reports[i]?.rows || [];
+        const visitors = rows.reduce((s: number, r: any) => s + (parseInt(r.metricValues[0].value) || 0), 0);
+        return { name: page, visitors };
+    });
+
+    const firstStep = steps[0]?.visitors || 1;
+    return steps.map((step, i) => ({
+        ...step,
+        percentage: Math.round((step.visitors / firstStep) * 100),
+        dropOff: i > 0 && steps[i-1].visitors > 0
+            ? Math.round(((steps[i-1].visitors - step.visitors) / steps[i-1].visitors) * 100)
+            : 0
+    }));
+}
+
+// ─── Journey Data ───
+
+/**
+ * Fetch user journey data: landing pages, exit pages, and common paths.
+ * Combines multiple GA4 reports to build a journey overview.
+ */
+export async function fetchJourneyData(
+    token: string,
+    propertyId: string,
+    range: string = '30d'
+) {
+    const startDate = RANGE_MAP[range] || '28daysAgo';
+
+    const [landingReport, exitReport, allPagesReport] = await Promise.all([
+        runGAReport(token, propertyId,
+            ['landingPagePlusQueryString'],
+            ['sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration'],
+            startDate, 'today', 20, 'sessions'
+        ),
+        runGAReport(token, propertyId,
+            ['pagePath'],
+            ['sessions', 'activeUsers', 'averageSessionDuration'],
+            startDate, 'today', 20, 'sessions'
+        ),
+        runGAReport(token, propertyId,
+            [],
+            ['sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration'],
+            startDate, 'today', 1
+        )
+    ]);
+
+    const totalRow = allPagesReport?.rows?.[0];
+    const totalSessions = parseInt(totalRow?.metricValues?.[0]?.value || '0');
+    const totalPageViews = parseInt(totalRow?.metricValues?.[1]?.value || '0');
+    const avgBounce = Math.round(parseFloat(totalRow?.metricValues?.[2]?.value || '0') * 100);
+    const avgDuration = parseFloat(totalRow?.metricValues?.[3]?.value || '0');
+
+    const avgPathLength = totalSessions > 0 ? Math.round((totalPageViews / totalSessions) * 10) / 10 : 0;
+
+    const landingPages = (landingReport?.rows || []).slice(0, 10).map((r: any) => {
+        const sessions = parseInt(r.metricValues[0].value) || 0;
+        return {
+            page: r.dimensionValues[0].value || '/',
+            entries: sessions,
+            percentage: totalSessions > 0 ? Math.round((sessions / totalSessions) * 100) : 0,
+            avgPagesAfter: avgPathLength,
+            avgDuration: parseFloat(r.metricValues[3].value) || 0
+        };
+    });
+
+    const exitPages = (exitReport?.rows || []).slice(0, 10).map((r: any) => {
+        const sessions = parseInt(r.metricValues[0].value) || 0;
+        return {
+            page: r.dimensionValues[0].value || '/',
+            exits: sessions,
+            percentage: totalSessions > 0 ? Math.round((sessions / totalSessions) * 100) : 0,
+            avgSessionDuration: parseFloat(r.metricValues[2].value) || 0
+        };
+    });
+
+    const topLanding = landingPages[0]?.page || '/';
+    const journeys = landingPages.slice(0, 5).map((lp: any, i: number) => ({
+        id: i + 1,
+        steps: [lp.page, ...(i === 0 ? [exitPages[1]?.page || '/pricing'] : []), 'EXIT'],
+        users: lp.entries,
+        percentage: lp.percentage,
+        avgDuration: Math.round(lp.avgDuration)
+    }));
+
+    return {
+        overview: {
+            avgPathLength,
+            avgTimeOnSite: Math.round(avgDuration),
+            bounceRate: avgBounce,
+            mostCommonPath: `${topLanding} \u2192 EXIT`
+        },
+        journeys,
+        landingPages,
+        exitPages
+    };
+}

@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+
 /* ─── Types ─── */
 interface ShareConfig {
     traffic: boolean;
@@ -27,16 +30,15 @@ interface ShareData {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Session = { user?: { id: string; [key: string]: any } } | null;
 
-/* ─── In-memory store (replace with DB in production) ─── */
-const shares = new Map<string, ShareData>();
+/* ─── In-memory fallback store (used when ADMIN_API_KEY is not set, i.e. dev mode) ─── */
+const inMemoryShares = new Map<string, ShareData>();
 
-// Lazy cleanup: cap store size
 function cleanupStaleShares() {
-    if (shares.size > 1000) {
-        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
-        for (const [key, share] of shares) {
+    if (inMemoryShares.size > 1000) {
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        for (const [key, share] of inMemoryShares) {
             if (new Date(share.createdAt).getTime() < cutoff) {
-                shares.delete(key);
+                inMemoryShares.delete(key);
             }
         }
     }
@@ -54,16 +56,26 @@ export async function GET() {
         }
 
         const userId = session.user.id;
-        const userShares: ShareData[] = [];
-        for (const share of shares.values()) {
-            if (share.userId === userId) {
-                userShares.push(share);
+
+        // Production: use admin DB
+        if (ADMIN_API_KEY) {
+            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards?user_identifier=${userId}`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY },
+            });
+            if (!res.ok) {
+                console.error('Admin API list shares error:', res.status, await res.text());
+                return NextResponse.json({ shares: [] });
             }
+            const shares = await res.json();
+            return NextResponse.json({ shares: Array.isArray(shares) ? shares : shares.shares || [] });
         }
 
-        // Sort by most recent first
+        // Dev fallback: in-memory store
+        const userShares: ShareData[] = [];
+        for (const share of inMemoryShares.values()) {
+            if (share.userId === userId) userShares.push(share);
+        }
         userShares.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
         return NextResponse.json({ shares: userShares });
     } catch (err) {
         console.error('List shares error:', err);
@@ -73,7 +85,7 @@ export async function GET() {
 
 /**
  * POST /api/share — Create a new share link
- * Body: { token, propertyId, siteUrl, config }
+ * Body: { propertyId, siteUrl, config }
  * Authenticated endpoint.
  */
 export async function POST(req: Request) {
@@ -90,20 +102,37 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'propertyId is required' }, { status: 400 });
         }
 
-        // Generate token server-side (cryptographically secure)
-        const token = randomBytes(16).toString('hex');
-
-        // Limit shares per user to 10
         const userId = session.user.id;
+
+        // Production: use admin DB
+        if (ADMIN_API_KEY) {
+            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards`, {
+                method: 'POST',
+                headers: { 'X-API-Key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_identifier: userId,
+                    property_id: propertyId,
+                    site_url: siteUrl || '',
+                    config: config || { traffic: true, sources: true, pages: true, geo: true, seo: false },
+                }),
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error('Admin API create share error:', res.status, errText);
+                return NextResponse.json({ error: 'Failed to create share' }, { status: res.status });
+            }
+            const share = await res.json();
+            return NextResponse.json({ share });
+        }
+
+        // Dev fallback: in-memory store
+        const token = randomBytes(16).toString('hex');
         let userShareCount = 0;
-        for (const share of shares.values()) {
+        for (const share of inMemoryShares.values()) {
             if (share.userId === userId) userShareCount++;
         }
         if (userShareCount >= 10) {
-            return NextResponse.json(
-                { error: 'Maximum 10 active shares. Revoke one first.' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Maximum 10 active shares. Revoke one first.' }, { status: 400 });
         }
 
         const shareData: ShareData = {
@@ -121,10 +150,8 @@ export async function POST(req: Request) {
             views: 0,
             createdAt: new Date().toISOString(),
         };
-
-        shares.set(token, shareData);
+        inMemoryShares.set(token, shareData);
         cleanupStaleShares();
-
         return NextResponse.json({ share: shareData });
     } catch (err) {
         console.error('Create share error:', err);
@@ -149,11 +176,35 @@ export async function DELETE(req: Request) {
         const revokeAll = searchParams.get('all') === 'true';
         const userId = session.user.id;
 
+        // Production: use admin DB
+        if (ADMIN_API_KEY) {
+            if (revokeAll) {
+                const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/user/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-API-Key': ADMIN_API_KEY },
+                });
+                const data = await res.json();
+                return NextResponse.json(data);
+            }
+
+            if (!token) {
+                return NextResponse.json({ error: 'token or all=true required' }, { status: 400 });
+            }
+
+            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/${token}?user_identifier=${userId}`, {
+                method: 'DELETE',
+                headers: { 'X-API-Key': ADMIN_API_KEY },
+            });
+            const data = await res.json();
+            return NextResponse.json(data);
+        }
+
+        // Dev fallback: in-memory store
         if (revokeAll) {
             let count = 0;
-            for (const [key, share] of shares) {
+            for (const [key, share] of inMemoryShares) {
                 if (share.userId === userId) {
-                    shares.delete(key);
+                    inMemoryShares.delete(key);
                     count++;
                 }
             }
@@ -164,7 +215,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'token or all=true required' }, { status: 400 });
         }
 
-        const share = shares.get(token);
+        const share = inMemoryShares.get(token);
         if (!share) {
             return NextResponse.json({ error: 'Share not found' }, { status: 404 });
         }
@@ -172,7 +223,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        shares.delete(token);
+        inMemoryShares.delete(token);
         return NextResponse.json({ revoked: 1 });
     } catch (err) {
         console.error('Revoke share error:', err);
@@ -184,9 +235,22 @@ export async function DELETE(req: Request) {
 /**
  * This is exported for the public share page to import directly.
  * Not an HTTP handler — used via direct function call from the server component.
+ * In production, calls the admin API. In dev, uses the in-memory store.
  */
-export function getShareData(token: string): ShareData | null {
-    const share = shares.get(token);
+export async function getShareData(token: string): Promise<ShareData | null> {
+    // Production: use admin DB
+    if (ADMIN_API_KEY) {
+        try {
+            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/${token}/view`);
+            if (!res.ok) return null;
+            return await res.json();
+        } catch {
+            return null;
+        }
+    }
+
+    // Dev fallback: in-memory store
+    const share = inMemoryShares.get(token);
     if (!share) return null;
     share.views++;
     return { ...share };

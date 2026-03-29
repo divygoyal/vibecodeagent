@@ -133,6 +133,22 @@ class EmbedToken(Base):
     last_used_at = Column(DateTime)
 
 
+class SharedDashboard(Base):
+    """Shared public dashboard links"""
+    __tablename__ = "shared_dashboards"
+
+    id = Column(Integer, primary_key=True)
+    token = Column(String(64), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, nullable=False, index=True)
+    property_id = Column(String(100), nullable=False)
+    site_url = Column(String(500))
+    config = Column(Text, default='{"traffic":true,"sources":true,"pages":true,"geo":true,"seo":false}')
+    views = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_viewed_at = Column(DateTime)
+
+
 class ContactQuery(Base):
     """Contact form submissions from users"""
     __tablename__ = "contact_queries"

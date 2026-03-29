@@ -88,6 +88,9 @@ function rateTTFB(v: number): MetricSnapshot['rating'] {
     return 'poor';
 }
 
+// Performance data requires CrUX API key (separate from GA4 OAuth).
+// For now, return mock data. TODO: integrate CrUX API when key is configured.
+
 // ─── Mock data generators ───
 
 function jitter(base: number, range: number): number {
