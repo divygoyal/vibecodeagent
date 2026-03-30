@@ -8,6 +8,7 @@ import {
     Loader2, ChevronDown,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -461,7 +462,11 @@ function FilterTabs({ active, onChange }: { active: FilterOption; onChange: (f: 
 // ─── Main Page ───
 
 export default function JourneysPage() {
-    const { data, isLoading, error } = useSWR('/api/analytics/journeys', fetcher);
+    const { selectedProperty, range } = useAnalyticsContext();
+    const { data, isLoading, error } = useSWR(
+        selectedProperty ? `/api/analytics/journeys?propertyId=${selectedProperty}&range=${range}` : null,
+        fetcher
+    );
     const [filter, setFilter] = useState<FilterOption>('top10');
 
     if (isLoading && !data) {

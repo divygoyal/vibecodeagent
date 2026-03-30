@@ -8,6 +8,7 @@ import {
     CheckCircle2, Users,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -422,7 +423,11 @@ function CreateFunnelForm({ onClose }: { onClose: () => void }) {
 // ─── Main Page ───
 
 export default function FunnelsPage() {
-    const { data, isLoading, error } = useSWR('/api/analytics/funnels', fetcher);
+    const { selectedProperty, range } = useAnalyticsContext();
+    const { data, isLoading, error } = useSWR(
+        selectedProperty ? `/api/analytics/funnels?propertyId=${selectedProperty}&range=${range}` : null,
+        fetcher
+    );
     const [showCreateForm, setShowCreateForm] = useState(false);
 
     if (isLoading && !data) {

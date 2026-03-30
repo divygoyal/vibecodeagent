@@ -11,6 +11,7 @@ import {
     Activity, Loader2,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -396,9 +397,10 @@ function RetentionCurve({
 // ─── Main Page ───
 
 export default function RetentionPage() {
+    const { selectedProperty } = useAnalyticsContext();
     const [mode, setMode] = useState<RetentionMode>('daily');
     const { data, isLoading, error } = useSWR<RetentionResponse>(
-        `/api/analytics/retention?mode=${mode}`,
+        selectedProperty ? `/api/analytics/retention?propertyId=${selectedProperty}&mode=${mode}` : null,
         fetcher,
         { keepPreviousData: true }
     );

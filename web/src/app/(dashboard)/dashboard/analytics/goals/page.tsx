@@ -10,6 +10,7 @@ import {
     BarChart3, Globe, Zap, Loader2, X,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -262,7 +263,11 @@ function SourceBar({ source, maxConversions }: { source: any; maxConversions: nu
 // ─── Main Page ───
 
 export default function GoalsPage() {
-    const { data, isLoading, error } = useSWR('/api/analytics/goals', fetcher);
+    const { selectedProperty, range } = useAnalyticsContext();
+    const { data, isLoading, error } = useSWR(
+        selectedProperty ? `/api/analytics/goals?propertyId=${selectedProperty}&range=${range}` : null,
+        fetcher
+    );
     const [selectedGoal, setSelectedGoal] = useState<string>('all');
     const [showCreateForm, setShowCreateForm] = useState(false);
 

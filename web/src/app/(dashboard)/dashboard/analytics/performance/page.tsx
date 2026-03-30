@@ -11,6 +11,7 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { useAnalyticsContext } from '../layout';
 
 // ─── Types ───
 
@@ -202,6 +203,7 @@ function ChartTooltip({ active, payload, label }: any) {
 // ─── Main Page Component ───
 
 export default function PerformancePage() {
+    const { selectedProperty } = useAnalyticsContext();
     const [data, setData] = useState<PerformanceData | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeMetrics, setActiveMetrics] = useState<MetricKey[]>(['lcp', 'inp', 'cls']);
@@ -209,9 +211,10 @@ export default function PerformancePage() {
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
     useEffect(() => {
+        if (!selectedProperty) return;
         async function fetchData() {
             try {
-                const res = await fetch('/api/analytics/performance');
+                const res = await fetch(`/api/analytics/performance?propertyId=${selectedProperty}`);
                 if (res.ok) {
                     const json = await res.json();
                     setData(json);
@@ -222,8 +225,10 @@ export default function PerformancePage() {
                 setLoading(false);
             }
         }
+        setLoading(true);
+        setData(null);
         fetchData();
-    }, []);
+    }, [selectedProperty]);
 
     const sortedPages = useMemo(() => {
         if (!data) return [];
