@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
-import { getValidAccessToken, fetchGoogleTokensFromDb, fetchGoalData } from '@/lib/googleApi';
+import { getValidAccessToken, fetchGoogleTokensFromDb, fetchGoalData, runGAReport } from '@/lib/googleApi';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
@@ -103,10 +103,28 @@ export async function GET(req: Request) {
         }
 
         const goalPagesParam = searchParams.get('pages');
-        const goalPages = goalPagesParam
-            ? goalPagesParam.split(',')
-            : ['/signup', '/pricing', '/contact', '/blog'];
         const range = searchParams.get('range') || '30d';
+
+        // If no pages specified, auto-detect top pages from GA4
+        let goalPages: string[];
+        if (goalPagesParam) {
+            goalPages = goalPagesParam.split(',');
+        } else {
+            try {
+                const topPagesReport = await runGAReport(
+                    token, propertyId,
+                    ['pagePath'], ['sessions'],
+                    '28daysAgo', 'today', 10, 'sessions'
+                );
+                goalPages = (topPagesReport?.rows || [])
+                    .map((r: any) => r.dimensionValues[0].value)
+                    .filter((p: string) => p && p !== '(not set)')
+                    .slice(0, 4);
+                if (goalPages.length === 0) goalPages = ['/'];
+            } catch {
+                goalPages = ['/signup', '/pricing', '/contact', '/blog'];
+            }
+        }
 
         try {
             const goalData = await fetchGoalData(token, propertyId, goalPages, range);

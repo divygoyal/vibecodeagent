@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
-import { getValidAccessToken, fetchGoogleTokensFromDb, fetchFunnelData } from '@/lib/googleApi';
+import { getValidAccessToken, fetchGoogleTokensFromDb, fetchFunnelData, runGAReport } from '@/lib/googleApi';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
@@ -108,10 +108,28 @@ export async function GET(req: Request) {
         }
 
         const stepsParam = searchParams.get('steps');
-        const steps = stepsParam
-            ? stepsParam.split(',')
-            : ['/', '/pricing', '/signup', '/dashboard'];
         const range = searchParams.get('range') || '30d';
+
+        // If no steps specified, auto-detect top pages from GA4
+        let steps: string[];
+        if (stepsParam) {
+            steps = stepsParam.split(',');
+        } else {
+            try {
+                const topPagesReport = await runGAReport(
+                    token, propertyId,
+                    ['pagePath'], ['sessions'],
+                    '28daysAgo', 'today', 10, 'sessions'
+                );
+                const topPaths = (topPagesReport?.rows || [])
+                    .map((r: any) => r.dimensionValues[0].value)
+                    .filter((p: string) => p && p !== '/' && p !== '(not set)')
+                    .slice(0, 4);
+                steps = ['/', ...topPaths.slice(0, 3)];
+            } catch {
+                steps = ['/', '/pricing', '/signup', '/dashboard'];
+            }
+        }
 
         try {
             const funnelSteps = await fetchFunnelData(token, propertyId, steps, range);

@@ -202,7 +202,7 @@ function cleanPropertyId(id: string): string {
     return id;
 }
 
-async function runGAReport(
+export async function runGAReport(
     token: string,
     propertyId: string,
     dims: string[],
@@ -1025,7 +1025,7 @@ export async function fetchFunnelData(
                     dimensionFilter: {
                         filter: {
                             fieldName: 'pagePath',
-                            stringFilter: { matchType: 'BEGINS_WITH', value: page }
+                            stringFilter: { matchType: 'EXACT', value: page }
                         }
                     }
                 }),
