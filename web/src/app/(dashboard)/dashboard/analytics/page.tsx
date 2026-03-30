@@ -102,9 +102,9 @@ const CHART_STATS: { key: ChartStat; label: string; color: string }[] = [
 ];
 
 // ─── Time Bucket ───
-type TimeBucket = 'hour' | 'day' | 'week' | 'month';
-const BUCKET_LABELS: Record<TimeBucket, string> = { hour: 'Hour', day: 'Day', week: 'Week', month: 'Month' };
-const BUCKET_OPTIONS: TimeBucket[] = ['hour', 'day', 'week', 'month'];
+type TimeBucket = 'day' | 'week' | 'month';
+const BUCKET_LABELS: Record<TimeBucket, string> = { day: 'Day', week: 'Week', month: 'Month' };
+const BUCKET_OPTIONS: TimeBucket[] = ['day', 'week', 'month'];
 
 function getISOWeek(d: Date): number {
     const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -117,25 +117,6 @@ function aggregateByBucket(data: any[], bucket: TimeBucket): any[] {
     if (!data.length) return data;
 
     if (bucket === 'day') return data;
-
-    if (bucket === 'hour') {
-        // Simulate hourly from the last day: split into 24 points with a rough traffic curve
-        const last = data[data.length - 1];
-        if (!last) return data;
-        const hours: any[] = [];
-        for (let h = 0; h < 24; h++) {
-            const factor = h >= 8 && h <= 22 ? 1.4 : 0.4;
-            const norm = factor / (14 * 1.4 + 10 * 0.4);
-            hours.push({
-                date: `${String(h).padStart(2, '0')}:00`,
-                activeUsers: Math.round((last.activeUsers || 0) * norm),
-                sessions: Math.round((last.sessions || 0) * norm),
-                pageViews: Math.round((last.pageViews || 0) * norm),
-                bounceRate: last.bounceRate || 0,
-            });
-        }
-        return hours;
-    }
 
     const groups: Record<string, any[]> = {};
     for (const item of data) {
@@ -462,8 +443,8 @@ export default function AnalyticsPage() {
                                 dataKey="date"
                                 tick={{ fontSize: 10, fill: '#3f3f46' }}
                                 tickFormatter={(v: string) => {
-                                    // Hour and aggregated buckets already have pre-formatted labels
-                                    if (bucket === 'hour' || bucket === 'week' || bucket === 'month') return v;
+                                    // Aggregated buckets already have pre-formatted labels
+                                    if (bucket === 'week' || bucket === 'month') return v;
                                     const d = new Date(v);
                                     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                                 }}

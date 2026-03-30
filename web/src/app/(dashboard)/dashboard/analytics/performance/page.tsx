@@ -63,6 +63,12 @@ interface PerformanceData {
     byPage: PageMetrics[];
     byDevice: DeviceMetrics[];
     score: number;
+    source?: 'crux';
+    origin?: string;
+    collectionPeriod?: {
+        firstDate: { year: number; month: number; day: number };
+        lastDate: { year: number; month: number; day: number };
+    };
 }
 
 // ─── Constants ───
@@ -280,17 +286,37 @@ export default function PerformancePage() {
     return (
         <div className="space-y-6">
             {/* ─── Info Banner ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/[0.12]"
-            >
-                <Info className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                <p className="text-xs text-blue-300/80">
-                    Showing mock data. Connect to the <span className="font-medium text-blue-300">CrUX API</span> for real Core Web Vitals from Chrome user experience reports.
-                </p>
-            </motion.div>
+            {data.source === 'crux' ? (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/[0.12]"
+                >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <p className="text-xs text-emerald-300/80">
+                        Powered by <span className="font-medium text-emerald-300">Chrome UX Report (CrUX)</span>
+                        {data.origin && <span className="text-emerald-400/60"> for {data.origin}</span>}
+                        {data.collectionPeriod && (
+                            <span className="text-emerald-400/50">
+                                {' '}({data.collectionPeriod.firstDate.year}-{String(data.collectionPeriod.firstDate.month).padStart(2, '0')}-{String(data.collectionPeriod.firstDate.day).padStart(2, '0')} to {data.collectionPeriod.lastDate.year}-{String(data.collectionPeriod.lastDate.month).padStart(2, '0')}-{String(data.collectionPeriod.lastDate.day).padStart(2, '0')})
+                            </span>
+                        )}
+                    </p>
+                </motion.div>
+            ) : (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/[0.12]"
+                >
+                    <Info className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                    <p className="text-xs text-blue-300/80">
+                        Showing mock data. Connect to the <span className="font-medium text-blue-300">CrUX API</span> for real Core Web Vitals from Chrome user experience reports.
+                    </p>
+                </motion.div>
+            )}
 
             {/* ─── Score + Overview Cards ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-5">

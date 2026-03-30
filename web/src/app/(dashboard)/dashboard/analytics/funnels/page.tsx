@@ -1,16 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     GitBranch, Plus, ArrowRight, TrendingDown, Percent,
     ChevronDown, Loader2, Clock, Zap, X, AlertTriangle,
-    CheckCircle2, Users,
+    CheckCircle2, Users, Trash2,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+// ─── Custom Funnel Storage (localStorage) ───
+
+const FUNNELS_STORAGE_KEY = 'tc-custom-funnels';
+
+interface CustomFunnel {
+    id: string;
+    name: string;
+    steps: string[]; // page paths like ['/', '/pricing', '/signup']
+}
+
+function loadFunnels(): CustomFunnel[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const saved = localStorage.getItem(FUNNELS_STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+}
+
+function saveFunnels(funnels: CustomFunnel[]) {
+    localStorage.setItem(FUNNELS_STORAGE_KEY, JSON.stringify(funnels));
+}
 
 // ─── Step Color Gradient ───
 

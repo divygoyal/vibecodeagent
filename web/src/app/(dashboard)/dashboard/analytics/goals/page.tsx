@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,6 +13,30 @@ import useSWR from 'swr';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+// ─── Custom Goal Storage (localStorage) ───
+
+const GOALS_STORAGE_KEY = 'tc-custom-goals';
+
+interface CustomGoal {
+    id: string;
+    name: string;
+    type: 'page_visit' | 'custom_event';
+    target: string; // page path like '/pricing'
+    description?: string;
+}
+
+function loadGoals(): CustomGoal[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const saved = localStorage.getItem(GOALS_STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+}
+
+function saveGoals(goals: CustomGoal[]) {
+    localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+}
 
 // ─── Helpers ───
 
@@ -92,8 +116,8 @@ function ConversionRing({ rate, size = 48 }: { rate: number; size?: number }) {
 
 // ─── Goal Card ───
 
-function GoalCard({ goal, index, isSelected, onSelect }: {
-    goal: any; index: number; isSelected: boolean; onSelect: () => void;
+function GoalCard({ goal, index, isSelected, onSelect, onDelete }: {
+    goal: any; index: number; isSelected: boolean; onSelect: () => void; onDelete?: () => void;
 }) {
     const up = goal.change > 0;
     return (
@@ -102,12 +126,21 @@ function GoalCard({ goal, index, isSelected, onSelect }: {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.08, duration: 0.4 }}
             onClick={onSelect}
-            className={`premium-card p-4 sm:p-5 text-left w-full transition-all duration-300 ${
+            className={`premium-card p-4 sm:p-5 text-left w-full transition-all duration-300 relative group/card ${
                 isSelected
                     ? 'ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-500/5'
                     : 'hover:ring-1 hover:ring-white/10'
             }`}
         >
+            {onDelete && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="absolute top-2 right-2 p-1 rounded-md bg-red-500/10 text-red-400 opacity-0 group-hover/card:opacity-100 hover:bg-red-500/20 transition-all z-10"
+                    title="Delete goal"
+                >
+                    <X className="w-3 h-3" />
+                </button>
+            )}
             <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2.5">
                     <div
