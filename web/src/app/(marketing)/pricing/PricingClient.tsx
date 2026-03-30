@@ -291,7 +291,7 @@ export default function PricingClient() {
 
                                 <ul className="space-y-3 flex-1">
                                     {plan.features.map((f, i) => (
-                                        <li key={i} className={`flex items-center gap-2.5 text-sm ${f.included ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                                        <li key={i} className={`flex items-center gap-2.5 text-sm ${f.included ? 'text-zinc-300' : 'text-zinc-500'}`}>
                                             {f.included ? (
                                                 <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${
                                                     plan.color === 'emerald' ? 'text-emerald-400' :
@@ -418,7 +418,7 @@ export default function PricingClient() {
 
             {/* Guarantee */}
             <div className="text-center pb-16 px-6">
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-zinc-500">
                     Secure payments by Dodo Payments • Cancel anytime • No long-term contracts
                 </p>
             </div>

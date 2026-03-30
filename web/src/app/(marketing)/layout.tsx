@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, startTransition, createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
-import { Menu, X, Tag, Copy, Check } from 'lucide-react';
+import { Menu, X, Copy, Check } from 'lucide-react';
 
 const BannerContext = createContext(false);
 export const useBannerVisible = () => useContext(BannerContext);
@@ -38,7 +38,7 @@ function DiscountBanner({ onDismiss }: { onDismiss: () => void }) {
                 </Link>
                 <button
                     onClick={onDismiss}
-                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-1 rounded-md text-zinc-600 hover:text-white transition-colors cursor-pointer"
+                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-1 rounded-md text-zinc-500 hover:text-white transition-colors cursor-pointer"
                     aria-label="Dismiss banner"
                 >
                     <X className="w-3.5 h-3.5" />
@@ -68,12 +68,9 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
     ];
 
     return (
-        <motion.nav
+        <nav
             role="navigation"
             aria-label="Main navigation"
-            initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={`fixed left-0 right-0 z-50 transition-all duration-300 ${scrolled
                 ? 'bg-black/90 backdrop-blur-xl border-b border-white/[0.06]'
                 : 'bg-black/60 backdrop-blur-md sm:bg-transparent'
@@ -170,7 +167,7 @@ function Navbar({ bannerVisible }: { bannerVisible: boolean }) {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </motion.nav>
+        </nav>
     );
 }
 
@@ -179,11 +176,11 @@ export default function MarketingLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const [bannerVisible, setBannerVisible] = useState(false);
+    const [bannerVisible, setBannerVisible] = useState(true);
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && !sessionStorage.getItem('discount-banner-dismissed')) {
-            setBannerVisible(true);
+        if (sessionStorage.getItem('discount-banner-dismissed')) {
+            startTransition(() => setBannerVisible(false));
         }
     }, []);
 

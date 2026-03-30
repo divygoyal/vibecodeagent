@@ -15,8 +15,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Security headers
+  // Security + cache headers
   headers: async () => [
+    {
+      // Cache static assets (videos, images, fonts) for 1 year
+      source: '/:path*.(mp4|webm|jpg|jpeg|png|gif|svg|ico|woff|woff2)',
+      headers: [
+        { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+      ],
+    },
     {
       // All routes EXCEPT /embed/ — block iframing
       source: '/((?!embed/).*)',

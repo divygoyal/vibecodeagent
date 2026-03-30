@@ -127,7 +127,7 @@ export default function ContactClient() {
                                         placeholder="Your name"
                                         value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-600 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors"
+                                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -142,7 +142,7 @@ export default function ContactClient() {
                                         placeholder="you@example.com"
                                         value={form.email}
                                         onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-600 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors"
+                                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors"
                                     />
                                 </div>
                             </div>
@@ -159,10 +159,10 @@ export default function ContactClient() {
                                     placeholder="How can we help you?"
                                     value={form.message}
                                     onChange={(e) => setForm({ ...form, message: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-600 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors resize-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-colors resize-none"
                                 />
                                 <div className="text-right mt-1">
-                                    <span className="text-xs text-zinc-600">{form.message.length}/2000</span>
+                                    <span className="text-xs text-zinc-500">{form.message.length}/2000</span>
                                 </div>
                             </div>
 

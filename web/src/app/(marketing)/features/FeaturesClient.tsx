@@ -201,7 +201,7 @@ export default function FeaturesClient() {
                                 >
                                     Get Pro <ArrowRight className="w-3.5 h-3.5" />
                                 </Link>
-                                <span className="text-[11px] text-zinc-600">Available on Pro plan</span>
+                                <span className="text-[11px] text-zinc-500">Available on Pro plan</span>
                             </div>
                         </div>
                     </motion.div>

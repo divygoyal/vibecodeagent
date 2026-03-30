@@ -350,8 +350,24 @@ function FunnelSection({ funnel, index }: { funnel: any; index: number }) {
 
 // ─── Create Funnel Form (collapsed) ───
 
-function CreateFunnelForm({ onClose }: { onClose: () => void }) {
+function CreateFunnelForm({ onClose, onCreated }: { onClose: () => void; onCreated: (funnel: CustomFunnel) => void }) {
+    const [name, setName] = useState('');
     const [steps, setSteps] = useState(['', '']);
+
+    const canSubmit = name.trim().length > 0 && steps.filter(s => s.trim()).length >= 2;
+
+    function handleSubmit() {
+        if (!canSubmit) return;
+        const funnel: CustomFunnel = {
+            id: `funnel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            name: name.trim(),
+            steps: steps.map(s => s.trim()).filter(Boolean),
+        };
+        const existing = loadFunnels();
+        saveFunnels([...existing, funnel]);
+        onCreated(funnel);
+        onClose();
+    }
 
     return (
         <motion.div
@@ -379,6 +395,8 @@ function CreateFunnelForm({ onClose }: { onClose: () => void }) {
                         <input
                             type="text"
                             placeholder="e.g., Purchase Funnel"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
                         />
                     </div>
@@ -393,7 +411,7 @@ function CreateFunnelForm({ onClose }: { onClose: () => void }) {
                                     </div>
                                     <input
                                         type="text"
-                                        placeholder={`Step ${i + 1} (URL or event name)`}
+                                        placeholder={`Step ${i + 1} — page path (e.g. /pricing)`}
                                         value={step}
                                         onChange={(e) => {
                                             const newSteps = [...steps];
@@ -433,7 +451,15 @@ function CreateFunnelForm({ onClose }: { onClose: () => void }) {
                     >
                         Cancel
                     </button>
-                    <button className="px-5 py-2 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!canSubmit}
+                        className={`px-5 py-2 text-xs font-semibold text-white rounded-lg transition shadow-lg ${
+                            canSubmit
+                                ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20'
+                                : 'bg-zinc-700 cursor-not-allowed shadow-none'
+                        }`}
+                    >
                         Create Funnel
                     </button>
                 </div>
@@ -446,11 +472,49 @@ function CreateFunnelForm({ onClose }: { onClose: () => void }) {
 
 export default function FunnelsPage() {
     const { selectedProperty, range } = useAnalyticsContext();
-    const { data, isLoading, error } = useSWR(
-        selectedProperty ? `/api/analytics/funnels?propertyId=${selectedProperty}&range=${range}` : null,
-        fetcher
-    );
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [customFunnels, setCustomFunnels] = useState<CustomFunnel[]>([]);
+    const [selectedFunnelId, setSelectedFunnelId] = useState<string | null>(null);
+
+    // Load saved funnels from localStorage on mount
+    useEffect(() => {
+        const saved = loadFunnels();
+        setCustomFunnels(saved);
+        if (saved.length > 0 && !selectedFunnelId) {
+            setSelectedFunnelId(saved[0].id);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const selectedFunnel = customFunnels.find(f => f.id === selectedFunnelId);
+
+    // Build the SWR key: if a custom funnel is selected, pass its steps; otherwise auto-detect
+    const stepsParam = selectedFunnel ? selectedFunnel.steps.join(',') : '';
+    const swrKey = selectedProperty
+        ? `/api/analytics/funnels?propertyId=${selectedProperty}&range=${range}${stepsParam ? `&steps=${stepsParam}` : ''}`
+        : null;
+
+    const { data, isLoading, error, mutate } = useSWR(swrKey, fetcher);
+
+    const handleFunnelCreated = useCallback((funnel: CustomFunnel) => {
+        const updated = loadFunnels(); // re-read to include the just-saved one
+        setCustomFunnels(updated);
+        setSelectedFunnelId(funnel.id);
+        mutate();
+    }, [mutate]);
+
+    const handleDeleteFunnel = useCallback((funnelId: string) => {
+        const updated = customFunnels.filter(f => f.id !== funnelId);
+        saveFunnels(updated);
+        setCustomFunnels(updated);
+        if (selectedFunnelId === funnelId) {
+            setSelectedFunnelId(updated.length > 0 ? updated[0].id : null);
+        }
+        mutate();
+    }, [customFunnels, selectedFunnelId, mutate]);
+
+    const handleSelectFunnel = useCallback((funnelId: string) => {
+        setSelectedFunnelId(funnelId);
+    }, []);
 
     if (isLoading && !data) {
         return (
@@ -471,7 +535,16 @@ export default function FunnelsPage() {
         );
     }
 
-    const funnels = data?.funnels || [];
+    // Merge API response funnels with selected funnel name
+    const apiFunnels = (data?.funnels || []).map((f: any) => ({
+        ...f,
+        name: selectedFunnel ? selectedFunnel.name : f.name,
+        description: selectedFunnel
+            ? `Steps: ${selectedFunnel.steps.join(' → ')}`
+            : f.description,
+    }));
+
+    const funnels = apiFunnels;
     const totalCompletions = funnels.reduce((s: number, f: any) => s + f.completions, 0);
     const totalEntries = funnels.reduce((s: number, f: any) => s + f.totalEntries, 0);
     const avgConversion = totalEntries > 0 ? ((totalCompletions / totalEntries) * 100).toFixed(1) : '0';
@@ -504,8 +577,67 @@ export default function FunnelsPage() {
 
             {/* ─── Create Funnel Form (collapsed) ─── */}
             <AnimatePresence>
-                {showCreateForm && <CreateFunnelForm onClose={() => setShowCreateForm(false)} />}
+                {showCreateForm && (
+                    <CreateFunnelForm
+                        onClose={() => setShowCreateForm(false)}
+                        onCreated={handleFunnelCreated}
+                    />
+                )}
             </AnimatePresence>
+
+            {/* ─── Saved Funnels Selector ─── */}
+            {customFunnels.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.03 }}
+                >
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Saved Funnels</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {/* Auto-detect option (no custom steps) */}
+                        <button
+                            onClick={() => setSelectedFunnelId(null)}
+                            className={`group flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition ${
+                                !selectedFunnelId
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                    : 'bg-white/[0.03] border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15]'
+                            }`}
+                        >
+                            <Zap className="w-3 h-3" />
+                            Auto-detect
+                        </button>
+                        {customFunnels.map(cf => (
+                            <div key={cf.id} className="flex items-center gap-0">
+                                <button
+                                    onClick={() => handleSelectFunnel(cf.id)}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-l-lg border border-r-0 text-xs font-medium transition ${
+                                        selectedFunnelId === cf.id
+                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                            : 'bg-white/[0.03] border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15]'
+                                    }`}
+                                >
+                                    <GitBranch className="w-3 h-3" />
+                                    {cf.name}
+                                    <span className="text-[10px] text-zinc-600 font-normal">{cf.steps.length} steps</span>
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteFunnel(cf.id)}
+                                    className={`px-2 py-2 rounded-r-lg border text-xs transition ${
+                                        selectedFunnelId === cf.id
+                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-red-400/60 hover:text-red-400 hover:bg-red-500/10'
+                                            : 'bg-white/[0.03] border-white/[0.08] text-zinc-600 hover:text-red-400 hover:bg-red-500/10'
+                                    }`}
+                                    title="Delete funnel"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
 
             {/* ─── Summary Stats ─── */}
             <motion.div
@@ -515,7 +647,7 @@ export default function FunnelsPage() {
                 className="grid grid-cols-2 sm:grid-cols-4 gap-3"
             >
                 {[
-                    { label: 'Active Funnels', value: funnels.length, icon: GitBranch, color: 'emerald' },
+                    { label: 'Saved Funnels', value: customFunnels.length || funnels.length, icon: GitBranch, color: 'emerald' },
                     { label: 'Total Entries', value: totalEntries.toLocaleString(), icon: Users, color: 'blue' },
                     { label: 'Completions', value: totalCompletions.toLocaleString(), icon: CheckCircle2, color: 'violet' },
                     { label: 'Avg. Conversion', value: `${avgConversion}%`, icon: Percent, color: 'pink' },
@@ -541,7 +673,7 @@ export default function FunnelsPage() {
             {/* ─── Funnel Sections ─── */}
             <div className="space-y-4">
                 {funnels.map((funnel: any, i: number) => (
-                    <FunnelSection key={funnel.id} funnel={funnel} index={i} />
+                    <FunnelSection key={funnel.id || i} funnel={funnel} index={i} />
                 ))}
             </div>
 

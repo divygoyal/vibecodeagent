@@ -197,7 +197,28 @@ function GoalCard({ goal, index, isSelected, onSelect, onDelete }: {
 
 // ─── Create Goal Form (collapsed by default) ───
 
-function CreateGoalForm({ onClose }: { onClose: () => void }) {
+function CreateGoalForm({ onClose, onSave }: { onClose: () => void; onSave: (goal: CustomGoal) => void }) {
+    const [name, setName] = useState('');
+    const [type, setType] = useState<'page_visit' | 'custom_event'>('page_visit');
+    const [target, setTarget] = useState('');
+    const [description, setDescription] = useState('');
+
+    const handleSubmit = () => {
+        if (!name.trim() || !target.trim()) return;
+        const newGoal: CustomGoal = {
+            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: name.trim(),
+            type,
+            target: target.trim(),
+            description: description.trim() || undefined,
+        };
+        onSave(newGoal);
+        setName('');
+        setType('page_visit');
+        setTarget('');
+        setDescription('');
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -223,23 +244,29 @@ function CreateGoalForm({ onClose }: { onClose: () => void }) {
                         <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Goal Name</label>
                         <input
                             type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             placeholder="e.g., Newsletter Signup"
                             className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
                         />
                     </div>
                     <div>
                         <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Goal Type</label>
-                        <select className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition appearance-none">
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value as 'page_visit' | 'custom_event')}
+                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition appearance-none"
+                        >
                             <option value="page_visit">Page Visit</option>
-                            <option value="event">Custom Event</option>
-                            <option value="scroll_depth">Scroll Depth</option>
-                            <option value="time_on_page">Time on Page</option>
+                            <option value="custom_event">Custom Event</option>
                         </select>
                     </div>
                     <div>
                         <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Target URL / Event</label>
                         <input
                             type="text"
+                            value={target}
+                            onChange={(e) => setTarget(e.target.value)}
                             placeholder="e.g., /thank-you or form_submit"
                             className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
                         />
@@ -248,6 +275,8 @@ function CreateGoalForm({ onClose }: { onClose: () => void }) {
                         <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Description</label>
                         <input
                             type="text"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
                             placeholder="What does this goal track?"
                             className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
                         />
@@ -261,7 +290,11 @@ function CreateGoalForm({ onClose }: { onClose: () => void }) {
                     >
                         Cancel
                     </button>
-                    <button className="px-5 py-2 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!name.trim() || !target.trim()}
+                        className="px-5 py-2 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-emerald-500"
+                    >
                         Create Goal
                     </button>
                 </div>
@@ -297,12 +330,40 @@ function SourceBar({ source, maxConversions }: { source: any; maxConversions: nu
 
 export default function GoalsPage() {
     const { selectedProperty, range } = useAnalyticsContext();
-    const { data, isLoading, error } = useSWR(
-        selectedProperty ? `/api/analytics/goals?propertyId=${selectedProperty}&range=${range}` : null,
-        fetcher
-    );
+    const [customGoals, setCustomGoals] = useState<CustomGoal[]>([]);
     const [selectedGoal, setSelectedGoal] = useState<string>('all');
     const [showCreateForm, setShowCreateForm] = useState(false);
+
+    // Load custom goals from localStorage on mount
+    useEffect(() => {
+        setCustomGoals(loadGoals());
+    }, []);
+
+    const customPages = customGoals.map(g => g.target).join(',');
+    const swrKey = selectedProperty
+        ? `/api/analytics/goals?propertyId=${selectedProperty}&range=${range}${customPages ? `&pages=${customPages}` : ''}`
+        : null;
+
+    const { data, isLoading, error, mutate } = useSWR(swrKey, fetcher);
+
+    const handleSaveGoal = useCallback((goal: CustomGoal) => {
+        setCustomGoals(prev => {
+            const updated = [...prev, goal];
+            saveGoals(updated);
+            return updated;
+        });
+        setShowCreateForm(false);
+        // mutate will auto-trigger because swrKey changes via customPages
+    }, []);
+
+    const handleDeleteGoal = useCallback((goalId: string) => {
+        setCustomGoals(prev => {
+            const updated = prev.filter(g => g.id !== goalId);
+            saveGoals(updated);
+            return updated;
+        });
+        // mutate will auto-trigger because swrKey changes via customPages
+    }, []);
 
     // Build merged trend data for the chart
     const chartData = useMemo(() => {
@@ -381,7 +442,7 @@ export default function GoalsPage() {
 
             {/* ─── Create Goal Form (collapsed) ─── */}
             <AnimatePresence>
-                {showCreateForm && <CreateGoalForm onClose={() => setShowCreateForm(false)} />}
+                {showCreateForm && <CreateGoalForm onClose={() => setShowCreateForm(false)} onSave={handleSaveGoal} />}
             </AnimatePresence>
 
             {/* ─── Summary Stats ─── */}
@@ -413,15 +474,20 @@ export default function GoalsPage() {
 
             {/* ─── Goal Cards Grid ─── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                {goals.map((goal: any, i: number) => (
-                    <GoalCard
-                        key={goal.id}
-                        goal={goal}
-                        index={i}
-                        isSelected={selectedGoal === goal.name}
-                        onSelect={() => setSelectedGoal(selectedGoal === goal.name ? 'all' : goal.name)}
-                    />
-                ))}
+                {goals.map((goal: any, i: number) => {
+                    // Check if this goal corresponds to a custom goal (by matching target page)
+                    const matchingCustomGoal = customGoals.find(cg => cg.target === goal.target);
+                    return (
+                        <GoalCard
+                            key={goal.id}
+                            goal={goal}
+                            index={i}
+                            isSelected={selectedGoal === goal.name}
+                            onSelect={() => setSelectedGoal(selectedGoal === goal.name ? 'all' : goal.name)}
+                            onDelete={matchingCustomGoal ? () => handleDeleteGoal(matchingCustomGoal.id) : undefined}
+                        />
+                    );
+                })}
             </div>
 
             {/* ─── Conversion Trend Chart ─── */}

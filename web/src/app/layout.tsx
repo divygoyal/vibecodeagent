@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -67,8 +68,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({
@@ -119,30 +120,25 @@ export default function RootLayout({
             }),
           }}
         />
-        {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-CHVVXR3HD2" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-CHVVXR3HD2');
-            `,
-          }}
+        {/* Google tag (gtag.js) — deferred to reduce TBT */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-CHVVXR3HD2"
+          strategy="afterInteractive"
         />
-        {/* Microsoft Clarity */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function(c,l,a,r,i,t,y){
-                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-              })(window, document, "clarity", "script", "w0bverna26");
-            `,
-          }}
-        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-CHVVXR3HD2');`}
+        </Script>
+        {/* Microsoft Clarity — deferred to reduce TBT */}
+        <Script id="clarity-init" strategy="afterInteractive">
+          {`(function(c,l,a,r,i,t,y){
+              c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+              t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+              y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "w0bverna26");`}
+        </Script>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
