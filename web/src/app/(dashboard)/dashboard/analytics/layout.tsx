@@ -123,7 +123,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
     return (
         <AnalyticsContext.Provider value={{ selectedProperty, range, setRange, hasGoogleConnection }}>
-            <div className="space-y-0 overflow-hidden">
+            <div className="space-y-0">
                 {/* ─── Sticky Top Bar ─── */}
                 <div className="sticky top-0 z-20 -mx-6 px-6 pb-0 overflow-hidden" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
                     {/* Row 1: Property & Date Range & Controls */}
