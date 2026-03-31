@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
@@ -8,18 +8,15 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
     TrendingUp, TrendingDown, Users, Target,
     Globe, Download, RefreshCw, Filter as FilterIcon, BarChart3,
-    Maximize2, ChevronDown
+    ChevronDown
 } from 'lucide-react';
-import { exportAnalyticsData } from '@/lib/exportUtils';
+import { exportAnalyticsData, exportAnalyticsZip } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import DataRow from '@/components/analytics/DataRow';
-import AnalyticsTable from '@/components/analytics/AnalyticsTable';
-import TableActionMenu, { useTableActions } from '@/components/TableActionMenu';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
-import { AnnotationBadge, getAnnotations } from '@/components/AnnotationBadge';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
 import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
 import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
@@ -45,33 +42,32 @@ function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
     );
 }
 
-function Bar({ value, max, color = 'bg-blue-500/40' }: { value: number; max: number; color?: string }) {
-    const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-    return (
-        <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="text-zinc-300 text-xs tabular-nums font-medium min-w-[32px] sm:min-w-[40px] text-right">{value?.toLocaleString()}</span>
-            <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[40px] sm:min-w-[60px]">
-                <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%`, transition: 'width 0.4s ease' }} />
-            </div>
-        </div>
-    );
-}
-
 const ChartTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
+    const current = payload.find((e: any) => !e.dataKey.startsWith('prev'));
+    const previous = payload.find((e: any) => e.dataKey.startsWith('prev'));
     return (
         <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
             <p className="text-[11px] font-semibold text-white mb-2">{label}</p>
             <div className="space-y-1.5">
-                {payload.map((e: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between gap-4">
+                {current && (
+                    <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ background: e.color }} />
-                            <span className="text-[10px] text-zinc-500">{e.name}</span>
+                            <div className="w-2 h-2 rounded-full" style={{ background: current.color }} />
+                            <span className="text-[10px] text-zinc-500">{current.name}</span>
                         </div>
-                        <span className="text-xs font-bold text-white tabular-nums">{e.value?.toLocaleString()}</span>
+                        <span className="text-xs font-bold text-white tabular-nums">{current.value?.toLocaleString()}</span>
                     </div>
-                ))}
+                )}
+                {previous && previous.value != null && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full border border-zinc-600 bg-transparent" />
+                            <span className="text-[10px] text-zinc-600">{previous.name}</span>
+                        </div>
+                        <span className="text-xs font-medium text-zinc-500 tabular-nums">{previous.value?.toLocaleString()}</span>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -229,14 +225,17 @@ export default function AnalyticsPage() {
     const [drilldown, setDrilldown] = useState<any>(null);
     const [chartStat, setChartStat] = useState<ChartStat>('activeUsers');
     const [bucket, setBucket] = useState<TimeBucket>('day');
-    const { auditPage, analyzeWithAI, optimizePage, copyToClipboard, openExternal } = useTableActions();
+    const [showComparison, setShowComparison] = useState(true);
 
     useEffect(() => {
-        const handler = () => {
-            if (analyticsData) exportAnalyticsData(analyticsData);
+        const csvHandler = () => { if (analyticsData) exportAnalyticsData(analyticsData); };
+        const zipHandler = () => { if (analyticsData) exportAnalyticsZip(analyticsData); };
+        window.addEventListener('trafficclaw:export-analytics', csvHandler);
+        window.addEventListener('trafficclaw:export-zip', zipHandler);
+        return () => {
+            window.removeEventListener('trafficclaw:export-analytics', csvHandler);
+            window.removeEventListener('trafficclaw:export-zip', zipHandler);
         };
-        window.addEventListener('trafficclaw:export-analytics', handler);
-        return () => window.removeEventListener('trafficclaw:export-analytics', handler);
     }, [analyticsData]);
 
     if (isLoading && !analyticsData) return <SkeletonDashboard />;
@@ -287,12 +286,6 @@ export default function AnalyticsPage() {
     const fOS = filters.os.length > 0 ? operatingSystems.filter((o: any) => filters.os.includes(o.name)) : operatingSystems;
     const fChannels = filters.channel.length > 0 ? channels.filter((c: any) => filters.channel.includes(c.name)) : channels;
     const fEntryPages = filters.page.length > 0 ? entryPages.filter((p: any) => filters.page.includes(p.page)) : entryPages;
-
-    // Max values for progress bars
-    const maxRef = Math.max(...referrers.map((r: any) => r.value || 0), 1);
-    const maxPageViews = Math.max(...pages.map((p: any) => p.views || 0), 1);
-    const maxCountryUsers = Math.max(...countries.map((c: any) => c.users || 0), 1);
-    const maxEntryPageSessions = Math.max(...entryPages.map((p: any) => p.sessions || 0), 1);
 
     const anyFilterActive = Object.values(filters).some(arr => arr.length > 0);
 
@@ -358,6 +351,28 @@ export default function AnalyticsPage() {
 
     // Aggregate chart data based on selected time bucket
     const bucketedTraffic = useMemo(() => aggregateByBucket(chartTraffic, bucket), [chartTraffic, bucket]);
+
+    // Previous period comparison: reverse-compute approximate previous values from KPI change%
+    const comparisonTraffic = useMemo(() => {
+        if (!showComparison || !bucketedTraffic.length || !kpis) return bucketedTraffic;
+        const scaleUsers = kpis.changeUsers !== 0 ? 100 / (100 + kpis.changeUsers) : 1;
+        const scaleSessions = kpis.changeSessions !== 0 ? 100 / (100 + kpis.changeSessions) : 1;
+        const scalePageViews = kpis.changePageViews !== 0 ? 100 / (100 + kpis.changePageViews) : 1;
+        const bounceShift = kpis.changeBounceRate || 0;
+        return bucketedTraffic.map((d: any) => ({
+            ...d,
+            prevActiveUsers: Math.round((d.activeUsers || 0) * scaleUsers),
+            prevSessions: Math.round((d.sessions || 0) * scaleSessions),
+            prevPageViews: Math.round((d.pageViews || 0) * scalePageViews),
+            prevBounceRate: Math.max(0, Math.round(((d.bounceRate || 0) - bounceShift) * 10) / 10),
+        }));
+    }, [showComparison, bucketedTraffic, kpis]);
+
+    // Map current chartStat to its previous-period data key
+    const prevDataKey = chartStat === 'activeUsers' ? 'prevActiveUsers'
+        : chartStat === 'sessions' ? 'prevSessions'
+        : chartStat === 'pageViews' ? 'prevPageViews'
+        : 'prevBounceRate';
 
     const displayKpis = filteredKpis || kpis;
     const activeStat = CHART_STATS.find(s => s.key === chartStat)!;
@@ -436,6 +451,18 @@ export default function AnalyticsPage() {
                         )}
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowComparison(!showComparison)}
+                            title={showComparison ? 'Hide previous period' : 'Show previous period'}
+                            className={`flex items-center gap-1 text-[10px] border rounded-md px-2 py-1 transition ${
+                                showComparison
+                                    ? 'text-zinc-300 border-white/[0.12] bg-white/[0.04]'
+                                    : 'text-zinc-500 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-400'
+                            }`}
+                        >
+                            <span className="inline-block w-3 border-t border-dashed border-zinc-500" />
+                            Prev
+                        </button>
                         <button onClick={() => refresh()} className="p-1.5 rounded text-zinc-600 hover:text-blue-400 transition">
                             <RefreshCw className="w-3.5 h-3.5" />
                         </button>
@@ -467,7 +494,7 @@ export default function AnalyticsPage() {
                 {/* Area chart */}
                 <div className="h-[220px] sm:h-[300px] overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={bucketedTraffic} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                        <AreaChart data={comparisonTraffic} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor={activeStat.color} stopOpacity={0.2} />
@@ -489,6 +516,18 @@ export default function AnalyticsPage() {
                             />
                             <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
                             <Tooltip content={<ChartTooltip />} />
+                            {showComparison && (
+                                <Area
+                                    type="monotone"
+                                    dataKey={prevDataKey}
+                                    name="Previous period"
+                                    stroke="#525252"
+                                    fill="none"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="4 4"
+                                    dot={false}
+                                />
+                            )}
                             <Area
                                 type="monotone"
                                 dataKey={chartStat}
@@ -508,26 +547,18 @@ export default function AnalyticsPage() {
                 <TrafficSourcesPanel
                     referrers={fReferrers}
                     channels={fChannels}
+                    allReferrers={referrers}
                     allChannels={channels}
-                    maxRef={maxRef}
                     filters={filters}
                     toggleFilter={toggleFilter}
-                    analyzeWithAI={analyzeWithAI}
-                    openExternal={openExternal}
-                    copyToClipboard={copyToClipboard}
                 />
                 <PagesPanel
                     pages={fPages}
                     entryPages={fEntryPages}
-                    maxPageViews={maxPageViews}
-                    maxEntryPageSessions={maxEntryPageSessions}
+                    allPages={pages}
+                    allEntryPages={entryPages}
                     filters={filters}
                     toggleFilter={toggleFilter}
-                    auditPage={auditPage}
-                    optimizePage={optimizePage}
-                    analyzeWithAI={analyzeWithAI}
-                    openExternal={openExternal}
-                    copyToClipboard={copyToClipboard}
                 />
             </div>
 
@@ -542,19 +573,14 @@ export default function AnalyticsPage() {
                     allOS={operatingSystems}
                     filters={filters}
                     toggleFilter={toggleFilter}
-                    analyzeWithAI={analyzeWithAI}
-                    copyToClipboard={copyToClipboard}
                 />
                 <GeoPanel
                     countries={fCountries}
                     cities={fCities}
                     languages={languages}
                     allCountries={countries}
-                    maxUsers={maxCountryUsers}
                     filters={filters}
                     toggleFilter={toggleFilter}
-                    analyzeWithAI={analyzeWithAI}
-                    copyToClipboard={copyToClipboard}
                 />
             </div>
 
@@ -572,256 +598,170 @@ export default function AnalyticsPage() {
 
 // ─── Traffic Sources Tabbed Panel ───
 function TrafficSourcesPanel({
-    referrers, channels, allChannels, maxRef, filters, toggleFilter,
-    analyzeWithAI, openExternal, copyToClipboard,
+    referrers, channels, allReferrers, allChannels, filters, toggleFilter,
 }: {
-    referrers: any[]; channels: any[]; allChannels: any[]; maxRef: number;
+    referrers: any[]; channels: any[]; allReferrers: any[]; allChannels: any[];
     filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
-    analyzeWithAI: any; openExternal: any; copyToClipboard: any;
 }) {
     const [tab, setTab] = useState<'referrers' | 'channels' | 'utm'>('referrers');
+
+    const refTotal = allReferrers.reduce((s: number, r: any) => s + (r.value || 0), 0);
+    const refMaxPct = refTotal > 0 ? ((allReferrers[0]?.value || 0) / refTotal) * 100 : 100;
+    const chTotal = allChannels.reduce((s: number, c: any) => s + (c.value || 0), 0);
+    const chMaxPct = chTotal > 0 ? ((allChannels[0]?.value || 0) / chTotal) * 100 : 100;
+
+    const tabLabel = tab === 'referrers' ? 'Referrer' : 'Channel';
+    const metricLabel = tab === 'referrers' ? 'Sessions' : 'Visitors';
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.12 }}
-            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+            className={`${CARD} overflow-hidden min-w-0`}
+            style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+                <div className="flex gap-1">
                     <TabBtn label="Referrers" active={tab === 'referrers'} onClick={() => setTab('referrers')} />
                     <TabBtn label="Channels" active={tab === 'channels'} onClick={() => setTab('channels')} />
                     <TabBtn label="UTM" active={tab === 'utm'} onClick={() => setTab('utm')} />
                 </div>
-                <button className="p-1 text-zinc-600 hover:text-zinc-400 transition" title="Expand">
-                    <Maximize2 className="w-3.5 h-3.5" />
-                </button>
             </div>
+            <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+                <span>{tabLabel}</span>
+                <span>{metricLabel}</span>
+            </div>
+            <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
+                {tab === 'referrers' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {referrers.slice(0, 15).map((ref: any) => {
+                            const pct = refTotal > 0 ? (ref.value / refTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={ref.name}
+                                    label={ref.name}
+                                    value={ref.value}
+                                    percentage={pct}
+                                    maxPercentage={refMaxPct}
+                                    icon={<ReferrerIcon referrer={ref.name} />}
+                                    href={ref.name !== '(direct)' ? `https://${ref.name}` : undefined}
+                                    onClick={() => toggleFilter('referrer', ref.name)}
+                                    active={filters.referrer.includes(ref.name)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
-            {tab === 'referrers' && (
-                <AnalyticsTable
-                    data={referrers}
-                    searchKey={(item: any) => item.name}
-                    searchPlaceholder="Search referrers..."
-                    maxRows={10}
-                    onRowClick={(item: any) => toggleFilter('referrer', item.name)}
-                    activeRow={(item: any) => filters.referrer.includes(item.name)}
-                    columns={[
-                        {
-                            key: 'referrer', label: 'Referrer', sortable: true,
-                            getValue: (item: any) => item.name,
-                            render: (item: any) => (
-                                <div className="flex items-center gap-2">
-                                    <ReferrerIcon referrer={item.name} />
-                                    <span className="text-zinc-300 text-xs truncate max-w-[140px]">{item.name}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'events', label: 'Sessions', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.value,
-                            render: (item: any) => <Bar value={item.value} max={maxRef} />,
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze traffic from referrer "${item.name}": how can we get more traffic from this source?`, ''),
-                                    openExternal(item.name || ''),
-                                    copyToClipboard(item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'events', dir: 'desc' }}
-                />
-            )}
+                {tab === 'channels' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {channels.slice(0, 15).map((ch: any) => {
+                            const pct = chTotal > 0 ? (ch.value / chTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={ch.name}
+                                    label={ch.name}
+                                    value={ch.value}
+                                    percentage={pct}
+                                    maxPercentage={chMaxPct}
+                                    onClick={() => toggleFilter('channel', ch.name)}
+                                    active={filters.channel.includes(ch.name)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
-            {tab === 'channels' && (
-                <AnalyticsTable
-                    data={channels}
-                    showSearch={false}
-                    maxRows={10}
-                    onRowClick={(item: any) => toggleFilter('channel', item.name)}
-                    activeRow={(item: any) => filters.channel.includes(item.name)}
-                    columns={[
-                        {
-                            key: 'name', label: 'Channel', sortable: true,
-                            getValue: (item: any) => item.name,
-                            render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span>,
-                        },
-                        {
-                            key: 'value', label: 'Visitors', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.value,
-                            render: (item: any) => {
-                                const total = allChannels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-                                const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                                return (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-zinc-300 text-xs tabular-nums min-w-[36px] text-right">{item.value?.toLocaleString()}</span>
-                                        <div className="flex-1 h-[5px] bg-white/[0.04] rounded-full overflow-hidden min-w-[40px]">
-                                            <div className="h-full rounded-full bg-emerald-500/40" style={{ width: `${pct}%`, transition: 'width 0.4s' }} />
-                                        </div>
-                                        <span className="text-zinc-500 text-[10px] tabular-nums min-w-[28px] text-right">{pct}%</span>
-                                    </div>
-                                );
-                            },
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze traffic from channel "${item.name}": how can we grow this channel?`, ''),
-                                    copyToClipboard(item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'value', dir: 'desc' }}
-                />
-            )}
-
-            {tab === 'utm' && (
-                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                    UTM tracking coming soon
-                </div>
-            )}
+                {tab === 'utm' && (
+                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                        UTM tracking coming soon
+                    </div>
+                )}
+            </div>
         </motion.div>
     );
 }
 
 // ─── Pages Tabbed Panel ───
 function PagesPanel({
-    pages, entryPages, maxPageViews, maxEntryPageSessions, filters, toggleFilter,
-    auditPage, optimizePage, analyzeWithAI, openExternal, copyToClipboard,
+    pages, entryPages, allPages, allEntryPages, filters, toggleFilter,
 }: {
-    pages: any[]; entryPages: any[]; maxPageViews: number; maxEntryPageSessions: number;
+    pages: any[]; entryPages: any[]; allPages: any[]; allEntryPages: any[];
     filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
-    auditPage: any; optimizePage: any; analyzeWithAI: any; openExternal: any; copyToClipboard: any;
 }) {
     const [tab, setTab] = useState<'pages' | 'entries' | 'exits'>('pages');
+
+    const pgTotal = allPages.reduce((s: number, p: any) => s + (p.views || 0), 0);
+    const pgMaxPct = pgTotal > 0 ? ((allPages[0]?.views || 0) / pgTotal) * 100 : 100;
+    const epTotal = allEntryPages.reduce((s: number, p: any) => s + (p.sessions || 0), 0);
+    const epMaxPct = epTotal > 0 ? ((allEntryPages[0]?.sessions || 0) / epTotal) * 100 : 100;
+
+    const tabLabel = tab === 'pages' ? 'Page' : 'Entry Page';
+    const metricLabel = tab === 'pages' ? 'Views' : 'Sessions';
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.14 }}
-            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+            className={`${CARD} overflow-hidden min-w-0`}
+            style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+                <div className="flex gap-1">
                     <TabBtn label="Pages" active={tab === 'pages'} onClick={() => setTab('pages')} />
                     <TabBtn label="Entry Pages" active={tab === 'entries'} onClick={() => setTab('entries')} />
                     <TabBtn label="Exit Pages" active={tab === 'exits'} onClick={() => setTab('exits')} />
                 </div>
-                <button className="p-1 text-zinc-600 hover:text-zinc-400 transition" title="Expand">
-                    <Maximize2 className="w-3.5 h-3.5" />
-                </button>
             </div>
+            <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+                <span>{tabLabel}</span>
+                <span>{metricLabel}</span>
+            </div>
+            <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
+                {tab === 'pages' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {pages.slice(0, 15).map((pg: any) => {
+                            const pct = pgTotal > 0 ? (pg.views / pgTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={pg.page}
+                                    label={pg.page}
+                                    value={pg.views}
+                                    percentage={pct}
+                                    maxPercentage={pgMaxPct}
+                                    onClick={() => toggleFilter('page', pg.page)}
+                                    active={filters.page.includes(pg.page)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
-            {tab === 'pages' && (
-                <AnalyticsTable
-                    data={pages}
-                    searchKey={(item: any) => item.page}
-                    searchPlaceholder="Search pages..."
-                    maxRows={10}
-                    onRowClick={(item: any) => toggleFilter('page', item.page)}
-                    activeRow={(item: any) => filters.page.includes(item.page)}
-                    columns={[
-                        {
-                            key: 'page', label: 'Path', sortable: true,
-                            getValue: (item: any) => item.page,
-                            render: (item: any) => (
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-zinc-300 text-xs truncate max-w-[160px] block">{item.page}</span>
-                                    {getAnnotations({ clicks: item.views, impressions: item.views }).map(type => (
-                                        <AnnotationBadge key={type} type={type} />
-                                    ))}
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'views', label: 'Views', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.views,
-                            render: (item: any) => <Bar value={item.views} max={maxPageViews} color="bg-indigo-500/40" />,
-                        },
-                        {
-                            key: 'bounce', label: 'Bounce', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.bounceRate || 0,
-                            render: (item: any) => (
-                                <span className={`text-xs tabular-nums ${(item.bounceRate || 0) > 50 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                    {item.bounceRate}%
-                                </span>
-                            ),
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    auditPage(item.page || ''),
-                                    optimizePage(item.page || ''),
-                                    analyzeWithAI(`Analyze page performance: ${item.page}`, ''),
-                                    openExternal(item.page || ''),
-                                    copyToClipboard(item.page || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'views', dir: 'desc' }}
-                />
-            )}
+                {tab === 'entries' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {entryPages.slice(0, 15).map((pg: any) => {
+                            const pct = epTotal > 0 ? (pg.sessions / epTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={pg.page}
+                                    label={pg.page}
+                                    value={pg.sessions}
+                                    percentage={pct}
+                                    maxPercentage={epMaxPct}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
-            {tab === 'entries' && (
-                <AnalyticsTable
-                    data={entryPages}
-                    searchKey={(item: any) => item.page}
-                    searchPlaceholder="Search entry pages..."
-                    maxRows={10}
-                    columns={[
-                        {
-                            key: 'page', label: 'Path', sortable: true,
-                            getValue: (item: any) => item.page,
-                            render: (item: any) => (
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-zinc-300 text-xs truncate max-w-[160px] block">{item.page}</span>
-                                    {getAnnotations({ clicks: item.sessions, impressions: item.views }).map(type => (
-                                        <AnnotationBadge key={type} type={type} />
-                                    ))}
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'sessions', label: 'Sessions', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.sessions,
-                            render: (item: any) => <Bar value={item.sessions} max={maxEntryPageSessions} color="bg-cyan-500/40" />,
-                        },
-                        {
-                            key: 'users', label: 'Users', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.users || 0,
-                            render: (item: any) => <span className="text-zinc-400 text-xs tabular-nums">{item.users?.toLocaleString() || '--'}</span>,
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    auditPage(item.page || ''),
-                                    analyzeWithAI(`Analyze entry page: ${item.page}`, ''),
-                                    openExternal(item.page || ''),
-                                    copyToClipboard(item.page || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'sessions', dir: 'desc' }}
-                />
-            )}
-
-            {tab === 'exits' && (
-                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                    Exit pages coming soon
-                </div>
-            )}
+                {tab === 'exits' && (
+                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                        Exit pages coming soon
+                    </div>
+                )}
+            </div>
         </motion.div>
     );
 }
@@ -829,12 +769,10 @@ function PagesPanel({
 // ─── Technology Tabbed Panel ───
 function TechPanel({
     devices, browsers, operatingSystems, filters, toggleFilter,
-    analyzeWithAI, copyToClipboard,
 }: {
     devices: any[]; browsers: any[]; operatingSystems: any[];
     allDevices?: any[]; allBrowsers?: any[]; allOS?: any[];
     filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
-    analyzeWithAI: any; copyToClipboard: any;
 }) {
     const [tab, setTab] = useState<'browsers' | 'devices' | 'os' | 'screen'>('browsers');
 
@@ -844,96 +782,97 @@ function TechPanel({
         : [];
 
     const dim = tab === 'devices' ? 'device' : tab === 'browsers' ? 'browser' : 'os';
-    const maxVal = Math.max(...data.map((d: any) => d.value || 0), 1);
+    const total = data.reduce((s: number, d: any) => s + (d.value || 0), 0);
+    const maxPct = total > 0 ? ((data[0]?.value || 0) / total) * 100 : 100;
+
+    const tabLabel = tab === 'devices' ? 'Device' : tab === 'browsers' ? 'Browser' : 'OS';
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.16 }}
-            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+            className={`${CARD} overflow-hidden min-w-0`}
+            style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+                <div className="flex gap-1">
                     <TabBtn label="Browsers" active={tab === 'browsers'} onClick={() => setTab('browsers')} />
                     <TabBtn label="Devices" active={tab === 'devices'} onClick={() => setTab('devices')} />
                     <TabBtn label="OS" active={tab === 'os'} onClick={() => setTab('os')} />
                     <TabBtn label="Screen" active={tab === 'screen'} onClick={() => setTab('screen')} />
                 </div>
-                <button className="p-1 text-zinc-600 hover:text-zinc-400 transition" title="Expand">
-                    <Maximize2 className="w-3.5 h-3.5" />
-                </button>
             </div>
-
-            {tab === 'screen' ? (
-                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                    Screen dimensions coming soon
-                </div>
-            ) : (
-                <AnalyticsTable
-                    data={data}
-                    showSearch={false}
-                    maxRows={10}
-                    onRowClick={(item: any) => toggleFilter(dim, item.name)}
-                    activeRow={(item: any) => filters[dim].includes(item.name)}
-                    columns={[
-                        {
-                            key: 'name', label: 'Name', sortable: true,
-                            getValue: (item: any) => item.name,
-                            render: (item: any) => (
-                                <div className="flex items-center gap-2">
-                                    {tab === 'devices' ? <DeviceIcon device={item.name} /> : tab === 'browsers' ? <BrowserIcon browser={item.name} /> : <OSIcon os={item.name} />}
-                                    <span className="text-zinc-300 text-xs">{item.name}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'value', label: 'Sessions', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.value,
-                            render: (item: any) => <Bar value={item.value} max={maxVal} color="bg-cyan-500/40" />,
-                        },
-                        {
-                            key: 'pct', label: '%', align: 'right' as const,
-                            render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.pct}%</span>,
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze ${item.name} traffic: ${item.value} sessions. Are there optimization opportunities?`, ''),
-                                    copyToClipboard(item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'value', dir: 'desc' }}
-                />
-            )}
+            <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+                <span>{tabLabel}</span>
+                <span>Sessions</span>
+            </div>
+            <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
+                {tab === 'screen' ? (
+                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                        Screen dimensions coming soon
+                    </div>
+                ) : (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {data.slice(0, 15).map((item: any) => {
+                            const pct = total > 0 ? (item.value / total) * 100 : 0;
+                            const icon = tab === 'devices'
+                                ? <DeviceIcon device={item.name} />
+                                : tab === 'browsers'
+                                ? <BrowserIcon browser={item.name} />
+                                : <OSIcon os={item.name} />;
+                            return (
+                                <DataRow
+                                    key={item.name}
+                                    label={item.name}
+                                    value={item.value}
+                                    percentage={pct}
+                                    maxPercentage={maxPct}
+                                    icon={icon}
+                                    onClick={() => toggleFilter(dim, item.name)}
+                                    active={filters[dim].includes(item.name)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </motion.div>
     );
 }
 
 // ─── Geography Tabbed Panel ───
 function GeoPanel({
-    countries, cities, languages, allCountries, maxUsers, filters, toggleFilter,
-    analyzeWithAI, copyToClipboard,
+    countries, cities, languages, allCountries, filters, toggleFilter,
 }: {
     countries: any[]; cities: any[]; languages: any[]; allCountries: any[];
-    maxUsers: number; filters: DashboardFilters;
+    filters: DashboardFilters;
     toggleFilter: (dim: any, val: string) => void;
-    analyzeWithAI: any; copyToClipboard: any;
 }) {
     const [tab, setTab] = useState<'countries' | 'regions' | 'cities' | 'languages' | 'map'>('countries');
+
+    const cTotal = allCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+    const cMaxPct = cTotal > 0 ? ((allCountries[0]?.users || 0) / cTotal) * 100 : 100;
+
+    const cityTotal = cities.reduce((s: number, c: any) => s + (c.users || 0), 0);
+    const cityMaxPct = cityTotal > 0 ? ((cities[0]?.users || 0) / cityTotal) * 100 : 100;
+
+    const langTotal = languages.reduce((s: number, l: any) => s + (l.value || 0), 0);
+    const langMaxPct = langTotal > 0 ? ((languages[0]?.value || 0) / langTotal) * 100 : 100;
+
+    const tabLabel = tab === 'countries' ? 'Country' : tab === 'cities' ? 'City' : 'Language';
+    const metricLabel = tab === 'languages' ? 'Visitors' : 'Users';
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.18 }}
-            className={`${CARD} p-3 sm:p-5 overflow-hidden min-w-0`}
+            className={`${CARD} overflow-hidden min-w-0`}
+            style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+                <div className="flex gap-1 overflow-x-auto scrollbar-hide">
                     <TabBtn label="Countries" active={tab === 'countries'} onClick={() => setTab('countries')} />
                     <TabBtn label="Regions" active={tab === 'regions'} onClick={() => setTab('regions')} />
                     <TabBtn label="Cities" active={tab === 'cities'} onClick={() => setTab('cities')} />
@@ -946,131 +885,85 @@ function GeoPanel({
                     ))}
                 </div>
             </div>
-
-            {tab === 'countries' && (
-                <AnalyticsTable
-                    data={countries.map((c: any) => ({ name: c.country, events: c.users, sessions: c.sessions || 0 }))}
-                    searchKey={(item: any) => item.name}
-                    searchPlaceholder="Search countries..."
-                    maxRows={10}
-                    onRowClick={(item: any) => toggleFilter('country', item.name)}
-                    activeRow={(item: any) => filters.country.includes(item.name)}
-                    columns={[
-                        {
-                            key: 'name', label: 'Country', sortable: true,
-                            getValue: (item: any) => item.name,
-                            render: (item: any) => (
-                                <div className="flex items-center gap-2">
-                                    <CountryFlag country={item.name} />
-                                    <span className="text-zinc-300 text-xs truncate max-w-[120px]">{item.name}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'events', label: 'Users', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.events,
-                            render: (item: any) => <Bar value={item.events} max={maxUsers} color="bg-violet-500/40" />,
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze traffic from ${item.name}: ${item.events} users. What opportunities exist for this market?`, ''),
-                                    copyToClipboard(item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'events', dir: 'desc' }}
-                />
-            )}
-
-            {tab === 'regions' && (
-                <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                    Regional breakdown coming soon
+            {tab !== 'map' && (
+                <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+                    <span>{tabLabel}</span>
+                    <span>{metricLabel}</span>
                 </div>
             )}
+            <div className="overflow-y-auto" style={{ height: tab === 'map' ? 'calc(405px - 40px)' : 'calc(405px - 64px)' }}>
+                {tab === 'countries' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {countries.slice(0, 15).map((c: any) => {
+                            const pct = cTotal > 0 ? (c.users / cTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={c.country}
+                                    label={c.country}
+                                    value={c.users}
+                                    percentage={pct}
+                                    maxPercentage={cMaxPct}
+                                    icon={<CountryFlag country={c.country} />}
+                                    onClick={() => toggleFilter('country', c.country)}
+                                    active={filters.country.includes(c.country)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
-            {tab === 'cities' && (
-                <AnalyticsTable
-                    data={cities.map((c: any) => ({ name: `${c.city}, ${c.country}`, events: c.users }))}
-                    searchKey={(item: any) => item.name}
-                    searchPlaceholder="Search cities..."
-                    maxRows={10}
-                    columns={[
-                        {
-                            key: 'name', label: 'City', sortable: true,
-                            getValue: (item: any) => item.name,
-                            render: (item: any) => (
-                                <div className="flex items-center gap-2">
-                                    <CountryFlag country={item.name.split(', ').pop() || ''} />
-                                    <span className="text-zinc-300 text-xs truncate max-w-[140px]">{item.name}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'events', label: 'Users', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.events,
-                            render: (item: any) => <Bar value={item.events} max={maxUsers} color="bg-violet-500/40" />,
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze traffic from city ${item.name}: ${item.events} users.`, ''),
-                                    copyToClipboard(item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'events', dir: 'desc' }}
-                />
-            )}
+                {tab === 'regions' && (
+                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
+                        Regional breakdown coming soon
+                    </div>
+                )}
 
-            {tab === 'languages' && (
-                <AnalyticsTable
-                    data={languages}
-                    showSearch={false}
-                    maxRows={10}
-                    columns={[
-                        {
-                            key: 'name', label: 'Language', sortable: true,
-                            getValue: (item: any) => item.name,
-                            render: (item: any) => <span className="text-zinc-300 text-xs">{item.name}</span>,
-                        },
-                        {
-                            key: 'value', label: 'Visitors', align: 'right' as const, sortable: true,
-                            getValue: (item: any) => item.value,
-                            render: (item: any) => <span className="text-zinc-300 text-xs tabular-nums">{item.value?.toLocaleString()}</span>,
-                        },
-                        {
-                            key: 'pct', label: '%', align: 'right' as const,
-                            render: (item: any) => <span className="text-zinc-500 text-xs tabular-nums">{item.percentage}%</span>,
-                        },
-                        {
-                            key: 'actions', label: '', align: 'right' as const, width: '40px',
-                            render: (item: any) => (
-                                <TableActionMenu size="sm" actions={[
-                                    analyzeWithAI(`Analyze traffic from ${item.name} language: ${item.value} users. What opportunities exist?`, ''),
-                                    copyToClipboard(item.name || ''),
-                                ]} />
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'value', dir: 'desc' }}
-                />
-            )}
+                {tab === 'cities' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {cities.slice(0, 15).map((c: any, i: number) => {
+                            const pct = cityTotal > 0 ? (c.users / cityTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={`${c.city}-${c.country}-${i}`}
+                                    label={`${c.city}, ${c.country}`}
+                                    value={c.users}
+                                    percentage={pct}
+                                    maxPercentage={cityMaxPct}
+                                    icon={<CountryFlag country={c.country} />}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
-            {tab === 'map' && (
-                <div className="h-[260px] sm:h-[300px] -mx-3 -mb-3 sm:-mx-5 sm:-mb-5">
-                    <WorldMap
-                        byCountry={allCountries.map((c: any) => ({ country: c.country, users: c.users }))}
-                        byCity={cities.map((c: any) => ({ city: c.city, country: c.country, users: c.users }))}
-                        onBubbleClick={(name: string) => toggleFilter('country', name)}
-                        activeCountry={filters.country[0] || null}
-                    />
-                </div>
-            )}
+                {tab === 'languages' && (
+                    <div className="space-y-0.5 px-1 pb-2">
+                        {languages.slice(0, 15).map((l: any) => {
+                            const pct = langTotal > 0 ? (l.value / langTotal) * 100 : 0;
+                            return (
+                                <DataRow
+                                    key={l.name}
+                                    label={l.name}
+                                    value={l.value}
+                                    percentage={pct}
+                                    maxPercentage={langMaxPct}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+
+                {tab === 'map' && (
+                    <div className="h-full">
+                        <WorldMap
+                            byCountry={allCountries.map((c: any) => ({ country: c.country, users: c.users }))}
+                            byCity={cities.map((c: any) => ({ city: c.city, country: c.country, users: c.users }))}
+                            onBubbleClick={(name: string) => toggleFilter('country', name)}
+                            activeCountry={filters.country[0] || null}
+                        />
+                    </div>
+                )}
+            </div>
         </motion.div>
     );
 }

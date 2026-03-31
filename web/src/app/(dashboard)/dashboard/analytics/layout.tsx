@@ -10,7 +10,7 @@ import {
     Download, Share2, Activity, Route
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { exportAnalyticsData } from '@/lib/exportUtils';
+
 import { useRegistration } from '../layout';
 import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
@@ -104,6 +104,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
     const { filters, clearFilter, clearAll, compareMode, setCompareMode } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
+    const [exportOpen, setExportOpen] = useState(false);
 
     useEffect(() => {
         if (properties.length > 0 && !selectedProperty) {
@@ -140,14 +141,35 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Download */}
-                            <button
-                                onClick={() => window.dispatchEvent(new CustomEvent('trafficclaw:export-analytics'))}
-                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
-                                title="Export data"
-                            >
-                                <Download className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Export dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setExportOpen(!exportOpen)}
+                                    className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                    title="Export data"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                </button>
+                                {exportOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
+                                        <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-lg shadow-2xl py-1 min-w-[160px]">
+                                            <button
+                                                onClick={() => { window.dispatchEvent(new CustomEvent('trafficclaw:export-analytics')); setExportOpen(false); }}
+                                                className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.04] transition"
+                                            >
+                                                Export CSV
+                                            </button>
+                                            <button
+                                                onClick={() => { window.dispatchEvent(new CustomEvent('trafficclaw:export-zip')); setExportOpen(false); }}
+                                                className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.04] transition"
+                                            >
+                                                Export ZIP (all data)
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
 
                             {/* Share */}
                             <button
