@@ -10,6 +10,7 @@ const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false }
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
 const FloatingAuditBanner = dynamic(() => import('@/components/FloatingAuditBanner'), { ssr: false });
+import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
@@ -66,16 +67,7 @@ const sidebarItems = [
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
 
-const RANGES = [
-    { value: 'today', label: 'Today' },
-    { value: 'yesterday', label: 'Yesterday' },
-    { value: '7d', label: '7 days' },
-    { value: '14d', label: '14 days' },
-    { value: '30d', label: '30 days' },
-    { value: '90d', label: '90 days' },
-    { value: '6m', label: '6 months' },
-    { value: '12m', label: '12 months' },
-];
+// Date range presets moved to DatePicker component
 
 const resourceItems = [
     { icon: Book, label: 'Docs', href: '/dashboard/docs' },
@@ -137,7 +129,6 @@ export default function DashboardLayout({
         if (savedSite) setSelectedSite(savedSite);
         if (savedRange) setRange(savedRange);
     }, [user, getUserKey]);
-    const [rangeDropdownOpen, setRangeDropdownOpen] = useState(false);
     const [bellOpen, setBellOpen] = useState(false);
     const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
 
@@ -584,33 +575,8 @@ export default function DashboardLayout({
                             </div>
                         )}
                         {/* Global Date Range Picker — hidden on mobile, shown in mobile sidebar instead */}
-                        <div className="relative hidden md:block">
-                            <button
-                                onClick={() => setRangeDropdownOpen(!rangeDropdownOpen)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition flex-shrink-0"
-                            >
-                                <CalendarDays className="w-3.5 h-3.5" />
-                                <span>{RANGES.find(r => r.value === range)?.label || '30 days'}</span>
-                                <ChevronDown className={`w-3 h-3 transition-transform ${rangeDropdownOpen ? 'rotate-180' : ''}`} />
-                            </button>
-                            {rangeDropdownOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setRangeDropdownOpen(false)} />
-                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[140px] max-w-[calc(100vw-2rem)]">
-                                        {RANGES.map(r => (
-                                            <button
-                                                key={r.value}
-                                                onClick={() => { setRange(r.value); setRangeDropdownOpen(false); }}
-                                                className={`w-full text-left px-3 py-2 text-[11px] transition ${
-                                                    range === r.value ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                                }`}
-                                            >
-                                                {r.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
+                        <div className="hidden md:block">
+                            <DatePicker range={range} setRange={setRange} />
                         </div>
                         {/* Notification Bell */}
                         <div className="relative" ref={bellRef}>
@@ -807,24 +773,7 @@ export default function DashboardLayout({
                         )}
 
                         {/* Mobile date range picker */}
-                        <div className="px-3 pt-2 pb-1">
-                            <label className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-1 mb-1.5 block">Date Range</label>
-                            <div className="flex flex-wrap gap-1.5">
-                                {RANGES.map(r => (
-                                    <button
-                                        key={r.value}
-                                        onClick={() => setRange(r.value)}
-                                        className={`px-2.5 py-1.5 text-[11px] rounded-lg border transition min-h-[32px] ${
-                                            range === r.value
-                                                ? 'text-emerald-400 bg-emerald-500/[0.1] border-emerald-500/[0.15]'
-                                                : 'text-zinc-400 bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]'
-                                        }`}
-                                    >
-                                        {r.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <MobileDatePicker range={range} setRange={setRange} />
 
                         {/* Divider before nav */}
                         <div className="mx-3 mt-2 border-t border-[var(--divider)]" />

@@ -15,6 +15,145 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const TOKEN_CACHE_MAX = 1000;
 const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
 
+// ─── Date Range Resolution ───
+// GA4 accepts relative dates ("NdaysAgo", "today", "yesterday") or YYYY-MM-DD strings.
+// This helper resolves all supported range values to { startDate, endDate } strings.
+
+function fmtDate(d: Date): string {
+    return d.toISOString().split('T')[0];
+}
+
+/** Resolve a range key to GA4-compatible { startDate, endDate } */
+export function resolveRange(range: string): { startDate: string; endDate: string } {
+    const now = new Date();
+    switch (range) {
+        case 'today':
+            return { startDate: 'today', endDate: 'today' };
+        case 'yesterday':
+            return { startDate: 'yesterday', endDate: 'yesterday' };
+        case '7d':
+            return { startDate: '7daysAgo', endDate: 'today' };
+        case '14d':
+            return { startDate: '14daysAgo', endDate: 'today' };
+        case '30d':
+            return { startDate: '28daysAgo', endDate: 'today' };
+        case '60d':
+            return { startDate: '60daysAgo', endDate: 'today' };
+        case '90d':
+            return { startDate: '90daysAgo', endDate: 'today' };
+        case '6m':
+            return { startDate: '180daysAgo', endDate: 'today' };
+        case '12m':
+            return { startDate: '365daysAgo', endDate: 'today' };
+        case 'this_week': {
+            const start = new Date(now);
+            start.setDate(start.getDate() - start.getDay()); // Sunday
+            return { startDate: fmtDate(start), endDate: 'today' };
+        }
+        case 'last_week': {
+            const end = new Date(now);
+            end.setDate(end.getDate() - end.getDay() - 1); // Last Saturday
+            const start = new Date(end);
+            start.setDate(start.getDate() - 6); // Last Sunday
+            return { startDate: fmtDate(start), endDate: fmtDate(end) };
+        }
+        case 'this_month': {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            return { startDate: fmtDate(start), endDate: 'today' };
+        }
+        case 'last_month': {
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0);
+            return { startDate: fmtDate(start), endDate: fmtDate(end) };
+        }
+        case 'this_year': {
+            const start = new Date(now.getFullYear(), 0, 1);
+            return { startDate: fmtDate(start), endDate: 'today' };
+        }
+        case 'last_year': {
+            const start = new Date(now.getFullYear() - 1, 0, 1);
+            const end = new Date(now.getFullYear() - 1, 11, 31);
+            return { startDate: fmtDate(start), endDate: fmtDate(end) };
+        }
+        case 'all':
+            return { startDate: '365daysAgo', endDate: 'today' };
+        default:
+            return { startDate: '28daysAgo', endDate: 'today' };
+    }
+}
+
+/** Resolve the *previous* comparison period for a range (same duration, shifted back) */
+export function resolvePrevRange(range: string): { startDate: string; endDate: string } {
+    const now = new Date();
+    switch (range) {
+        case 'today':
+            return { startDate: 'yesterday', endDate: 'yesterday' };
+        case 'yesterday':
+            return { startDate: '2daysAgo', endDate: '2daysAgo' };
+        case '7d':
+            return { startDate: '14daysAgo', endDate: '8daysAgo' };
+        case '14d':
+            return { startDate: '28daysAgo', endDate: '15daysAgo' };
+        case '30d':
+            return { startDate: '56daysAgo', endDate: '29daysAgo' };
+        case '60d':
+            return { startDate: '120daysAgo', endDate: '61daysAgo' };
+        case '90d':
+            return { startDate: '180daysAgo', endDate: '91daysAgo' };
+        case '6m':
+            return { startDate: '365daysAgo', endDate: '181daysAgo' };
+        case '12m':
+            return { startDate: '730daysAgo', endDate: '366daysAgo' };
+        case 'this_week': {
+            const thisStart = new Date(now);
+            thisStart.setDate(thisStart.getDate() - thisStart.getDay());
+            const daysSoFar = Math.ceil((now.getTime() - thisStart.getTime()) / 86400000) + 1;
+            const prevEnd = new Date(thisStart);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevStart.getDate() - daysSoFar + 1);
+            return { startDate: fmtDate(prevStart), endDate: fmtDate(prevEnd) };
+        }
+        case 'last_week': {
+            const end = new Date(now);
+            end.setDate(end.getDate() - end.getDay() - 1);
+            const prevEnd = new Date(end);
+            prevEnd.setDate(prevEnd.getDate() - 7);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevStart.getDate() - 6);
+            return { startDate: fmtDate(prevStart), endDate: fmtDate(prevEnd) };
+        }
+        case 'this_month': {
+            const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const daysSoFar = now.getDate();
+            const prevEnd = new Date(thisMonthStart);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevStart.getDate() - daysSoFar + 1);
+            return { startDate: fmtDate(prevStart), endDate: fmtDate(prevEnd) };
+        }
+        case 'last_month': {
+            const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+            return { startDate: fmtDate(prevMonthStart), endDate: fmtDate(prevMonthEnd) };
+        }
+        case 'this_year': {
+            const start = new Date(now.getFullYear() - 1, 0, 1);
+            const end = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            return { startDate: fmtDate(start), endDate: fmtDate(end) };
+        }
+        case 'last_year': {
+            const start = new Date(now.getFullYear() - 2, 0, 1);
+            const end = new Date(now.getFullYear() - 2, 11, 31);
+            return { startDate: fmtDate(start), endDate: fmtDate(end) };
+        }
+        case 'all':
+            return { startDate: '730daysAgo', endDate: '366daysAgo' };
+        default:
+            return { startDate: '56daysAgo', endDate: '29daysAgo' };
+    }
+}
+
 /**
  * Fetch stored Google OAuth tokens from admin DB.
  * Used as fallback when JWT doesn't have Google tokens
@@ -236,26 +375,8 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
     };
     const pid = cleanPropertyId(propertyId);
 
-    const rangeMap: Record<string, string> = {
-        'today': 'today', 'yesterday': 'yesterday',
-        '7d': '7daysAgo', '14d': '14daysAgo', '30d': '28daysAgo',
-        '90d': '90daysAgo', '6m': '180daysAgo', '12m': '365daysAgo',
-    };
-    const startDate = rangeMap[range] || '28daysAgo';
-    const endDate = (range === 'yesterday') ? 'yesterday' : 'today';
-
-    const prevRangeMap: Record<string, string> = {
-        'today': 'yesterday', 'yesterday': '2daysAgo',
-        '7d': '14daysAgo', '14d': '28daysAgo', '30d': '56daysAgo',
-        '90d': '180daysAgo', '6m': '365daysAgo', '12m': '730daysAgo',
-    };
-    const prevStartDate = prevRangeMap[range] || '56daysAgo';
-    const prevEndDateMap: Record<string, string> = {
-        'today': 'yesterday', 'yesterday': '2daysAgo',
-        '7d': '8daysAgo', '14d': '15daysAgo', '30d': '29daysAgo',
-        '90d': '91daysAgo', '6m': '181daysAgo', '12m': '366daysAgo',
-    };
-    const prevEndDate = prevEndDateMap[range] || '29daysAgo';
+    const { startDate, endDate } = resolveRange(range);
+    const { startDate: prevStartDate, endDate: prevEndDate } = resolvePrevRange(range);
 
     // Run all queries in parallel for speed
     const [

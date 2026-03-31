@@ -15,6 +15,7 @@ import { useRegistration } from '../layout';
 import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
 import { ConnectGoogleState } from '@/components/EmptyState';
+import FilterBuilder from '@/components/analytics/FilterBuilder';
 
 const TABS = [
     { key: '', label: 'Main', icon: BarChart3 },
@@ -102,7 +103,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
-    const { filters, clearFilter, clearAll, compareMode, setCompareMode } = useFilterStore();
+    const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter, clearAdvancedFilters } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
 
@@ -117,7 +118,8 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
         return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="real traffic data, visitor insights, and performance metrics" /></div>;
     }
 
-    const activeFilterCount = Object.values(filters).filter(arr => arr.length > 0).length;
+    const simpleFilterCount = Object.values(filters).filter(arr => arr.length > 0).length;
+    const activeFilterCount = simpleFilterCount + advancedFilters.length;
 
     return (
         <AnalyticsContext.Provider value={{ selectedProperty, range, setRange, hasGoogleConnection }}>
@@ -141,6 +143,9 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Advanced Filter Builder */}
+                            <FilterBuilder />
+
                             {/* Export dropdown */}
                             <div className="relative">
                                 <button
@@ -243,6 +248,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     <Filter className="w-3 h-3" />
                                     Filters
                                 </div>
+                                {/* Simple dimension filter pills */}
                                 {Object.entries(filters).map(([dim, values]) =>
                                     values.map((val: string) => (
                                         <motion.button
@@ -258,6 +264,34 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                         </motion.button>
                                     ))
                                 )}
+                                {/* Advanced filter pills */}
+                                {advancedFilters.map((filter, i) => {
+                                    const negative = filter.type === 'not_equals' || filter.type === 'not_contains';
+                                    const typeLabel = filter.type === 'equals' ? '=' : filter.type === 'not_equals' ? '!=' : filter.type === 'contains' ? '~' : '!~';
+                                    return (
+                                        <motion.button
+                                            key={`adv-${filter.parameter}-${filter.type}-${filter.value}-${i}`}
+                                            initial={{ scale: 0.9, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            exit={{ scale: 0.9, opacity: 0 }}
+                                            onClick={() => removeAdvancedFilter(i)}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition group border ${
+                                                negative
+                                                    ? 'bg-red-500/[0.08] border-red-500/20 text-red-400 hover:bg-red-500/[0.12]'
+                                                    : 'bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/[0.12]'
+                                            }`}
+                                        >
+                                            <span className="opacity-70 capitalize">{filter.parameter.replace('_', ' ')}</span>
+                                            <span className="opacity-50">{typeLabel}</span>
+                                            <span>&quot;{filter.value}&quot;</span>
+                                            <X className={`w-3 h-3 transition ${
+                                                negative
+                                                    ? 'text-red-500/50 group-hover:text-red-300'
+                                                    : 'text-emerald-500/50 group-hover:text-emerald-300'
+                                            }`} />
+                                        </motion.button>
+                                    );
+                                })}
                                 <button
                                     onClick={clearAll}
                                     className="text-[10px] text-zinc-600 hover:text-zinc-300 transition ml-1"

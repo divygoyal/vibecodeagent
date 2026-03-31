@@ -10,8 +10,15 @@ export interface DashboardFilters {
     os: string[];
 }
 
+export interface FilterRule {
+    parameter: string;
+    type: 'equals' | 'not_equals' | 'contains' | 'not_contains';
+    value: string;
+}
+
 interface FilterState {
     filters: DashboardFilters;
+    advancedFilters: FilterRule[];
     compareMode: boolean;
     setFilter: (dimension: keyof DashboardFilters, values: string[]) => void;
     toggleFilter: (dimension: keyof DashboardFilters, value: string, multi?: boolean) => void;
@@ -20,6 +27,10 @@ interface FilterState {
     setCompareMode: (on: boolean) => void;
     activeFilterCount: () => number;
     hasFilter: (dimension: keyof DashboardFilters, value: string) => boolean;
+    addAdvancedFilter: (filter: FilterRule) => void;
+    removeAdvancedFilter: (index: number) => void;
+    updateAdvancedFilter: (index: number, filter: FilterRule) => void;
+    clearAdvancedFilters: () => void;
 }
 
 const EMPTY_FILTERS: DashboardFilters = {
@@ -34,6 +45,7 @@ const EMPTY_FILTERS: DashboardFilters = {
 
 export const useFilterStore = create<FilterState>((set, get) => ({
     filters: { ...EMPTY_FILTERS },
+    advancedFilters: [],
     compareMode: false,
 
     setFilter: (dimension, values) =>
@@ -63,25 +75,45 @@ export const useFilterStore = create<FilterState>((set, get) => ({
             filters: { ...state.filters, [dimension]: [] },
         })),
 
-    clearAll: () => set({ filters: { ...EMPTY_FILTERS } }),
+    clearAll: () => set({ filters: { ...EMPTY_FILTERS }, advancedFilters: [] }),
 
     setCompareMode: (on) => set({ compareMode: on }),
 
     activeFilterCount: () => {
         const f = get().filters;
-        return Object.values(f).reduce((sum, arr) => sum + (arr.length > 0 ? 1 : 0), 0);
+        const simpleCount = Object.values(f).reduce((sum, arr) => sum + (arr.length > 0 ? 1 : 0), 0);
+        return simpleCount + get().advancedFilters.length;
     },
 
     hasFilter: (dimension, value) => {
         return get().filters[dimension].includes(value);
     },
+
+    addAdvancedFilter: (filter) =>
+        set(state => ({
+            advancedFilters: [...state.advancedFilters, filter],
+        })),
+
+    removeAdvancedFilter: (index) =>
+        set(state => ({
+            advancedFilters: state.advancedFilters.filter((_, i) => i !== index),
+        })),
+
+    updateAdvancedFilter: (index, filter) =>
+        set(state => ({
+            advancedFilters: state.advancedFilters.map((f, i) => (i === index ? filter : f)),
+        })),
+
+    clearAdvancedFilters: () => set({ advancedFilters: [] }),
 }));
 
-// Helper: check if a data row passes current filters
+// Helper: check if a data row passes current filters (simple + advanced)
 export function passesFilters(
     filters: DashboardFilters,
-    row: { country?: string; device?: string; channel?: string; page?: string; referrer?: string; browser?: string; os?: string }
+    row: Record<string, string | undefined>,
+    advancedFilters: FilterRule[] = []
 ): boolean {
+    // Simple dimension filters (backward compatible)
     if (filters.country.length > 0 && row.country && !filters.country.includes(row.country)) return false;
     if (filters.device.length > 0 && row.device && !filters.device.includes(row.device)) return false;
     if (filters.channel.length > 0 && row.channel && !filters.channel.includes(row.channel)) return false;
@@ -89,5 +121,29 @@ export function passesFilters(
     if (filters.referrer.length > 0 && row.referrer && !filters.referrer.includes(row.referrer)) return false;
     if (filters.browser.length > 0 && row.browser && !filters.browser.includes(row.browser)) return false;
     if (filters.os.length > 0 && row.os && !filters.os.includes(row.os)) return false;
+
+    // Advanced filters
+    for (const rule of advancedFilters) {
+        const fieldValue = row[rule.parameter];
+        if (fieldValue === undefined) continue;
+        const val = fieldValue.toLowerCase();
+        const ruleVal = rule.value.toLowerCase();
+
+        switch (rule.type) {
+            case 'equals':
+                if (val !== ruleVal) return false;
+                break;
+            case 'not_equals':
+                if (val === ruleVal) return false;
+                break;
+            case 'contains':
+                if (!val.includes(ruleVal)) return false;
+                break;
+            case 'not_contains':
+                if (val.includes(ruleVal)) return false;
+                break;
+        }
+    }
+
     return true;
 }
