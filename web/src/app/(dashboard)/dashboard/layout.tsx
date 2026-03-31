@@ -16,7 +16,7 @@ import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Coins, MessageSquare,
-    ChevronDown, Bell, Globe, CreditCard, Sparkles, Target
+    ChevronDown, Bell, Globe, Sparkles, Target
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
@@ -54,24 +54,30 @@ const RegistrationContext = createContext<RegistrationContextType>({
 
 export const useRegistration = () => useContext(RegistrationContext);
 
-const sidebarItems = [
-    { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-    { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
-    { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
-    { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
-    { icon: Search, label: 'SEO', href: '/dashboard/seo' },
-    { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
-    { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
-    { icon: CreditCard, label: 'Plan', href: '/dashboard/plan' },
-    { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
-    { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
-];
+type SidebarItem = { icon: any; label: string; href: string };
+type SidebarGroup = { label: string | null; items: SidebarItem[] };
 
-// Date range presets moved to DatePicker component
-
-const resourceItems = [
-    { icon: Book, label: 'Docs', href: '/dashboard/docs' },
-    { icon: Newspaper, label: 'Blog', href: '/dashboard/blog' },
+const sidebarGroups: SidebarGroup[] = [
+    { label: null, items: [
+        { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
+    ]},
+    { label: 'Intelligence', items: [
+        { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
+        { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
+    ]},
+    { label: 'Analytics', items: [
+        { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
+        { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
+    ]},
+    { label: 'SEO & Growth', items: [
+        { icon: Search, label: 'SEO', href: '/dashboard/seo' },
+        { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
+        { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
+    ]},
+    { label: 'Resources', items: [
+        { icon: Book, label: 'Docs', href: '/dashboard/docs' },
+        { icon: Newspaper, label: 'Blog', href: '/dashboard/blog' },
+    ]},
 ];
 
 export default function DashboardLayout({
@@ -344,72 +350,125 @@ export default function DashboardLayout({
                     </Link>
                 </div>
 
-                {/* Nav items */}
-                <nav className="flex-1 py-3 px-2 space-y-1" aria-label="Main navigation">
-                    {sidebarItems.map((item) => {
-                        const isActive = pathname === item.href ||
-                            (item.href !== '/dashboard' && pathname.startsWith(item.href));
-
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${isActive
-                                    ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                    }`}
+                {/* Site selector */}
+                {gscSites.length > 0 && (
+                    <div className="px-2 pt-3 pb-1">
+                        <div className="relative">
+                            <button
+                                onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] hover:border-white/[0.12] transition ${collapsed ? 'justify-center' : ''}`}
+                                aria-label="Switch site"
                             >
-                                <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'
-                                    }`} />
-                                {!collapsed && <span className="truncate">{item.label}</span>}
-                            </Link>
-                        );
-                    })}
-
-                    {/* Resources divider */}
-                    {!collapsed && (
-                        <div className="pt-3 mt-2 border-t border-[var(--divider)]">
-                            <span className="px-3 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Resources</span>
-                        </div>
-                    )}
-                    {collapsed && <div className="mt-2 border-t border-[var(--divider)]" />}
-                    {resourceItems.map((item) => {
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${isActive
-                                    ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                    }`}
-                            >
-                                <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
-                                {!collapsed && <span className="truncate">{item.label}</span>}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                {/* Keyboard shortcuts hint */}
-                {!collapsed && (
-                    <div className="mx-3 mt-1 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-[var(--divider)]">
-                        <p className="text-[10px] text-zinc-600 mb-1.5">Shortcuts</p>
-                        <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-zinc-500">Search</span>
-                                <kbd className="kbd-hint">⌘K</kbd>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-zinc-500">Help</span>
-                                <kbd className="kbd-hint">?</kbd>
-                            </div>
+                                <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                    <Globe className="w-2.5 h-2.5 text-emerald-400" />
+                                </div>
+                                {!collapsed && (
+                                    <>
+                                        <span className="flex-1 text-left truncate font-medium">{selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Select site'}</span>
+                                        <ChevronDown className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </>
+                                )}
+                            </button>
+                            {siteDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
+                                    <div className={`absolute ${collapsed ? 'left-full ml-1 top-0' : 'left-0 right-0 mt-1'} z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/40 py-1.5 min-w-[200px] max-h-[260px] overflow-y-auto`}>
+                                        <div className="px-3 pb-1.5 pt-0.5">
+                                            <span className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">Sites</span>
+                                        </div>
+                                        {gscSites.map((site: any) => {
+                                            const url = site.siteUrl || site;
+                                            const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+                                            const isSelected = url === selectedSite;
+                                            return (
+                                                <button
+                                                    key={url}
+                                                    onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
+                                                    className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2.5 transition ${
+                                                        isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                                    }`}
+                                                >
+                                                    <Globe className="w-3 h-3 flex-shrink-0" />
+                                                    <span className="truncate">{label}</span>
+                                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto flex-shrink-0" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* User section + collapse toggle */}
-                <div className="border-t border-[var(--divider)] p-3 space-y-2">
+                {/* Grouped nav items */}
+                <nav className="flex-1 py-2 px-2 overflow-y-auto" aria-label="Main navigation">
+                    {sidebarGroups.map((group, gi) => (
+                        <div key={gi} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--divider)]' : ''}>
+                            {group.label && !collapsed && (
+                                <div className="px-3 pb-1 pt-0.5">
+                                    <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">{group.label}</span>
+                                </div>
+                            )}
+                            <div className="space-y-0.5">
+                                {group.items.map((item) => {
+                                    const isActive = pathname === item.href ||
+                                        (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${isActive
+                                                ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
+                                                : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                            }`}
+                                        >
+                                            <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                                            {!collapsed && <span className="truncate">{item.label}</span>}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </nav>
+
+                {/* Bottom section: Settings + Credits + User + Collapse */}
+                <div className="border-t border-[var(--divider)] p-2 space-y-1">
+                    {/* Settings link */}
+                    {(() => {
+                        const isSettingsActive = pathname.startsWith('/dashboard/settings');
+                        return (
+                            <Link
+                                href="/dashboard/settings"
+                                className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${isSettingsActive
+                                    ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
+                                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                }`}
+                            >
+                                <Settings className={`w-[18px] h-[18px] flex-shrink-0 ${isSettingsActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                                {!collapsed && <span className="truncate">Settings</span>}
+                            </Link>
+                        );
+                    })()}
+
+                    {/* Credits badge */}
+                    {credits !== null && !collapsed && (
+                        <Link
+                            href="/dashboard/plan"
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:opacity-80 ${credits < 20
+                                ? 'bg-red-500/[0.08] border-red-500/[0.15]'
+                                : credits < 50
+                                    ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
+                                    : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
+                            }`}
+                        >
+                            <Coins className={`w-3.5 h-3.5 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`} />
+                            <span className={`text-[11px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{credits} msgs</span>
+                        </Link>
+                    )}
+
+                    {/* User profile */}
                     {session?.user && !collapsed && (
                         <div className="flex items-center gap-3 px-2 py-2">
                             <Link href="/dashboard/plan" className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer">
@@ -450,18 +509,6 @@ export default function DashboardLayout({
                             </button>
                         </div>
                     )}
-                    {/* Subtle upgrade hint for non-pro users */}
-                    {session?.user && !collapsed && userPlan !== 'pro' && (
-                        <Link
-                            href="/dashboard/plan"
-                            className="mx-2 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500/[0.06] to-purple-500/[0.06] border border-violet-500/[0.1] hover:border-violet-500/[0.2] transition-all group"
-                        >
-                            <Sparkles className="w-3 h-3 text-violet-400 group-hover:text-violet-300 transition-colors" />
-                            <span className="text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors">
-                                {userPlan === 'free' ? 'Upgrade to Pro' : 'Upgrade plan'}
-                            </span>
-                        </Link>
-                    )}
 
                     <button
                         onClick={() => setCollapsed(!collapsed)}
@@ -478,11 +525,11 @@ export default function DashboardLayout({
 
             {/* ─── Main content area ─── */}
             <div className="flex-1 flex flex-col min-h-screen w-full min-w-0">
-                {/* Top bar */}
-                <header className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
+                {/* Top bar — minimal: just date picker + bell */}
+                <header className="h-12 flex items-center px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
                     {/* Mobile menu button */}
                     <button
-                        className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0"
+                        className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0 mr-auto"
                         onClick={() => setMobileOpen(!mobileOpen)}
                         aria-label="Open navigation menu"
                         aria-expanded={mobileOpen}
@@ -490,90 +537,8 @@ export default function DashboardLayout({
                         <Menu className="w-5 h-5" />
                     </button>
 
-                    {/* Breadcrumb navigation */}
-                    <nav className="flex items-center gap-1.5 text-sm flex-wrap overflow-hidden" aria-label="Breadcrumb">
-                        {/* Mobile: just the page name */}
-                        {(() => {
-                            const currentItem = [...sidebarItems, ...resourceItems].find(i =>
-                                pathname === i.href || (i.href !== '/dashboard' && pathname.startsWith(i.href))
-                            );
-                            const segments = pathname.replace('/dashboard/', '').split('/');
-                            const pageName = currentItem?.label || segments[segments.length - 1]?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Dashboard';
-                            return (
-                                <span className="sm:hidden text-sm font-semibold text-[var(--text-primary)]">
-                                    {pathname === '/dashboard' ? 'Dashboard' : pageName}
-                                </span>
-                            );
-                        })()}
-                        {/* Desktop: full breadcrumb */}
-                        <Link href="/dashboard" className="hidden sm:inline text-zinc-500 hover:text-zinc-300 transition-colors font-medium">
-                            Dashboard
-                        </Link>
-                        {pathname !== '/dashboard' && (() => {
-                            const segments = pathname.replace('/dashboard/', '').split('/');
-                            const currentItem = [...sidebarItems, ...resourceItems].find(i =>
-                                pathname === i.href || (i.href !== '/dashboard' && pathname.startsWith(i.href))
-                            );
-                            return (
-                                <>
-                                    <ChevronRight className="hidden sm:block w-3 h-3 text-zinc-600" />
-                                    <span className={`hidden sm:inline text-zinc-300 font-semibold`}>
-                                        {currentItem?.label || segments[segments.length - 1]?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                    </span>
-                                    {segments.length > 1 && currentItem && (
-                                        <>
-                                            <ChevronRight className="hidden sm:block w-3 h-3 text-zinc-600" />
-                                            <span className="hidden sm:inline text-zinc-300 font-semibold">
-                                                {segments[segments.length - 1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                            </span>
-                                        </>
-                                    )}
-                                </>
-                            );
-                        })()}
-                    </nav>
-
-                    {/* Right side */}
-                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                        {/* Global Site Switcher */}
-                        {gscSites.length > 1 && (
-                            <div className="relative">
-                                <button
-                                    onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                    className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition max-w-[160px] md:max-w-[200px]"
-                                    aria-label="Switch site"
-                                >
-                                    <Globe className="w-3.5 h-3.5 flex-shrink-0" />
-                                    <span className="truncate">{selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Site'}</span>
-                                    <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {siteDropdownOpen && (
-                                    <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
-                                        <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[200px] max-w-[calc(100vw-2rem)] max-h-[260px] overflow-y-auto">
-                                            {gscSites.map((site: any) => {
-                                                const url = site.siteUrl || site;
-                                                const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                                const isSelected = url === selectedSite;
-                                                return (
-                                                    <button
-                                                        key={url}
-                                                        onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
-                                                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 transition ${
-                                                            isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                                        }`}
-                                                    >
-                                                        <Globe className="w-3 h-3 flex-shrink-0" />
-                                                        <span className="truncate">{label}</span>
-                                                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto flex-shrink-0" />}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
+                    {/* Right side controls */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
                         {/* Global Date Range Picker — hidden on mobile, shown in mobile sidebar instead */}
                         <div className="hidden md:block">
                             <DatePicker range={range} setRange={setRange} />
@@ -596,81 +561,53 @@ export default function DashboardLayout({
                                 )}
                             </button>
                             {bellOpen && (
-                                <>
-                                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden">
-                                        <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
-                                            <span className="text-xs font-semibold text-white">Alerts</span>
-                                            {alertCount > 0 && (
-                                                <span className="text-[10px] text-zinc-500">{alertCount} active</span>
-                                            )}
-                                        </div>
-                                        <div className="overflow-y-auto max-h-[300px]">
-                                            {alerts.length === 0 ? (
-                                                <div className="px-4 py-6 text-center">
-                                                    <Bell className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
-                                                    <p className="text-[11px] text-zinc-600">No alerts right now</p>
-                                                </div>
-                                            ) : (
-                                                alerts.slice(0, 10).map((alert: any) => (
-                                                    <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
-                                                        <div className="flex items-start gap-2.5">
-                                                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                                                alert.severity === 'critical' ? 'bg-red-400' :
-                                                                alert.severity === 'warning' ? 'bg-amber-400' :
-                                                                alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
-                                                            }`} />
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-[11px] font-medium text-zinc-200 leading-snug">{alert.title}</p>
-                                                                {alert.metric && (
-                                                                    <p className="text-[10px] text-zinc-500 mt-0.5">{alert.metric}</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                        {alerts.length > 0 && (
-                                            <div className="px-4 py-2 border-t border-[var(--divider)]">
-                                                <Link
-                                                    href="/dashboard"
-                                                    onClick={() => setBellOpen(false)}
-                                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
-                                                >
-                                                    View all alerts →
-                                                </Link>
-                                            </div>
+                                <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden">
+                                    <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-white">Alerts</span>
+                                        {alertCount > 0 && (
+                                            <span className="text-[10px] text-zinc-500">{alertCount} active</span>
                                         )}
                                     </div>
-                                </>
+                                    <div className="overflow-y-auto max-h-[300px]">
+                                        {alerts.length === 0 ? (
+                                            <div className="px-4 py-6 text-center">
+                                                <Bell className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
+                                                <p className="text-[11px] text-zinc-600">No alerts right now</p>
+                                            </div>
+                                        ) : (
+                                            alerts.slice(0, 10).map((alert: any) => (
+                                                <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
+                                                    <div className="flex items-start gap-2.5">
+                                                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                                            alert.severity === 'critical' ? 'bg-red-400' :
+                                                            alert.severity === 'warning' ? 'bg-amber-400' :
+                                                            alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
+                                                        }`} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] font-medium text-zinc-200 leading-snug">{alert.title}</p>
+                                                            {alert.metric && (
+                                                                <p className="text-[10px] text-zinc-500 mt-0.5">{alert.metric}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                    {alerts.length > 0 && (
+                                        <div className="px-4 py-2 border-t border-[var(--divider)]">
+                                            <Link
+                                                href="/dashboard"
+                                                onClick={() => setBellOpen(false)}
+                                                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
+                                            >
+                                                View all alerts →
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
-                        {/* Theme toggle removed — dark mode only */}
-                        {/* Credits badge — hidden on mobile, shown in mobile sidebar */}
-                        {credits !== null && (
-                            <Link href="/dashboard/plan" className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${credits < 20
-                                ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                                : credits < 50
-                                    ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
-                                    : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
-                                }`}>
-                                <Coins className={`w-3 h-3 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
-                                    }`} />
-                                <span className={`text-[10px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'
-                                    }`}>{credits} msgs</span>
-                                {userPlan === 'free' && (
-                                    <Sparkles className="w-2.5 h-2.5 text-amber-400/70" />
-                                )}
-                            </Link>
-                        )}
-                        {/* User avatar — hidden on mobile for cleaner header, visible on tablets without sidebar */}
-                        {session?.user?.image && (
-                            <img
-                                src={session.user.image}
-                                alt=""
-                                className="w-7 h-7 rounded-full ring-1 ring-white/[0.1] hidden md:block lg:hidden"
-                            />
-                        )}
                     </div>
                 </header>
 
@@ -778,50 +715,51 @@ export default function DashboardLayout({
                         {/* Divider before nav */}
                         <div className="mx-3 mt-2 border-t border-[var(--divider)]" />
 
-                        {/* Navigation items */}
-                        <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
-                            {sidebarItems.map((item) => {
-                                const isActive = pathname === item.href ||
-                                    (item.href !== '/dashboard' && pathname.startsWith(item.href));
-
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={() => setMobileOpen(false)}
-                                        className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${isActive
-                                            ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08]'
-                                            }`}
-                                    >
-                                        <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : 'text-zinc-500'
-                                            }`} />
-                                        <span>{item.label}</span>
-                                    </Link>
-                                );
-                            })}
-
-                            {/* Resources divider */}
-                            <div className="pt-3 mt-2 border-t border-[var(--divider)]">
-                                <span className="px-3 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Resources</span>
+                        {/* Grouped navigation items */}
+                        <nav className="flex-1 py-2 px-2 overflow-y-auto">
+                            {sidebarGroups.map((group, gi) => (
+                                <div key={gi} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--divider)]' : ''}>
+                                    {group.label && (
+                                        <div className="px-3 pb-1 pt-0.5">
+                                            <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">{group.label}</span>
+                                        </div>
+                                    )}
+                                    <div className="space-y-0.5">
+                                        {group.items.map((item) => {
+                                            const isActive = pathname === item.href ||
+                                                (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                                            return (
+                                                <Link
+                                                    key={item.href}
+                                                    href={item.href}
+                                                    onClick={() => setMobileOpen(false)}
+                                                    className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${isActive
+                                                        ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
+                                                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08]'
+                                                    }`}
+                                                >
+                                                    <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                                                    <span>{item.label}</span>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                            {/* Settings in mobile nav */}
+                            <div className="mt-2 pt-2 border-t border-[var(--divider)]">
+                                <Link
+                                    href="/dashboard/settings"
+                                    onClick={() => setMobileOpen(false)}
+                                    className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${pathname.startsWith('/dashboard/settings')
+                                        ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
+                                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08]'
+                                    }`}
+                                >
+                                    <Settings className={`w-5 h-5 ${pathname.startsWith('/dashboard/settings') ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                                    <span>Settings</span>
+                                </Link>
                             </div>
-                            {resourceItems.map((item) => {
-                                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={() => setMobileOpen(false)}
-                                        className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${isActive
-                                            ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08]'
-                                            }`}
-                                    >
-                                        <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : 'text-zinc-500'}`} />
-                                        <span>{item.label}</span>
-                                    </Link>
-                                );
-                            })}
                         </nav>
 
                         {/* Credits display in mobile sidebar */}

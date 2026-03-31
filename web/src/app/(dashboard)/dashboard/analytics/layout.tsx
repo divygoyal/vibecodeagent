@@ -75,12 +75,8 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
             <div className="space-y-0">
                 {/* ─── Sticky Top Bar ─── */}
                 <div className="sticky top-0 z-20 -mx-6 px-6 pb-0 overflow-hidden" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
-                    {/* Row 1: Property & Date Range & Controls */}
-                    <div className="flex items-center justify-between py-1.5 sm:py-2 overflow-hidden">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight shrink-0 truncate">Analytics</h1>
-                        </div>
-
+                    {/* Row 1: Controls */}
+                    <div className="flex items-center justify-end py-1.5 sm:py-2 overflow-hidden">
                         <div className="flex items-center gap-1.5 shrink-0">
                             {/* Advanced Filter Builder */}
                             <FilterBuilder />
