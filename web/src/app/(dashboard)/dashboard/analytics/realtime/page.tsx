@@ -12,7 +12,7 @@ import {
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { COUNTRY_COORDS, CITY_COORDS, type GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
-import type { RealtimeMapboxHandle } from '@/components/analytics/RealtimeMapbox';
+import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 
 // ─── DiceBear avatar URL (matching globe markers) ───
 function getAvatarUrl(seed: string): string {
@@ -47,9 +47,7 @@ class RealtimeErrorBoundary extends Component<{ children: ReactNode }, { hasErro
     }
 }
 
-const RealtimeMapbox = dynamic(() => import('@/components/analytics/RealtimeMapbox'), { ssr: false });
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGl2eWdveWFsIiwiYSI6ImNtbWc3OXY3OTBkeG8yb3NjZXhtdnphMzUifQ.hKvgr-e2sYAMbMq1PvgrAA';
+const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
 // ─── Anonymous names (DataFast style: adjective + animal) ───
 const ADJECTIVES = ['amaranth', 'bronze', 'blue', 'orange', 'crimson', 'golden', 'silver', 'jade', 'coral', 'violet',
@@ -345,10 +343,9 @@ export default function RealtimePage() {
         <div className="relative -mx-6 -mt-6 overflow-hidden select-none" style={{ minHeight: 'calc(100vh - 120px)' }}>
             {/* ─── Mapbox GL Globe (replaces cobe globe + SVG map) ─── */}
             <div className="absolute inset-0">
-                <RealtimeMapbox
+                <RealtimeGlobeMaplibre
                     ref={mapRef}
                     visitors={globeVisitors}
-                    mapboxToken={MAPBOX_TOKEN}
                     byCountry={byCountry}
                     byCity={byCity}
                     autoPan={isAutoPanning}
