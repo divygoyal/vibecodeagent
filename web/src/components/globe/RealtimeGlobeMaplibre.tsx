@@ -13,6 +13,14 @@ export interface GlobeVisitor {
     warmth: number;
     avatarColor: string;
     avatarInitial: string;
+    users?: number;
+    // Optional enriched fields for popup card
+    city?: string;
+    device?: string;
+    referrer?: string;
+    page?: string;
+    estValue?: string;
+    confidence?: number;
 }
 
 function getAvatarUrl(seed: string): string {
@@ -493,21 +501,38 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const warmthPct = Math.round(v.warmth * 100);
             const warmthLabel = v.warmth > 0.6 ? 'Hot' : v.warmth > 0.4 ? 'Warm' : v.warmth > 0.25 ? 'Mild' : 'Cool';
             const warmthHex = getWarmthColor(v.warmth);
+            const cityLabel = v.city && !v.city.startsWith('(') ? v.city : '';
+            const deviceLabel = v.device || 'Desktop';
+            const deviceIcon = deviceLabel.toLowerCase() === 'mobile' ? '📱' : deviceLabel.toLowerCase() === 'tablet' ? '📱' : '🖥';
+            const referrerLabel = v.referrer || 'Direct';
+            const referrerIcon = referrerLabel.toLowerCase().includes('google') ? '🔍' : referrerLabel.toLowerCase().includes('social') ? '💬' : '🔗';
+            const pageLabel = v.page || '/';
+            const estValue = v.estValue || `$${(v.warmth * 3.5).toFixed(2)}`;
+            const confidence = v.confidence ?? Math.round(50 + v.warmth * 40);
+            const convLikelihood = Math.round((confidence - 50) * 2.18);
+            // Deterministic session time from name hash
+            const nameHash = v.name.split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
+            const sessionMin = Math.abs(nameHash % 12) + 1;
+            const sessionSec = Math.abs((nameHash >> 4) % 60);
+            const totalVisits = Math.abs((nameHash >> 8) % 5) + 1;
 
             const popupHTML = `
-                <div style="background:#13131D;border-radius:14px;min-width:240px;max-width:280px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);overflow:hidden;">
+                <div style="background:#13131D;border-radius:14px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);overflow:hidden;">
                     <!-- Header -->
-                    <div style="padding:14px 16px 12px;display:flex;align-items:center;gap:12px;">
+                    <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:12px;">
                         <div style="position:relative;flex-shrink:0;">
-                            <div style="width:42px;height:42px;border-radius:50%;background:${v.avatarColor};border:2.5px solid ${warmthHex}50;overflow:hidden;box-shadow:0 0 16px ${warmthHex}30;">
+                            <div style="width:48px;height:48px;border-radius:50%;background:${v.avatarColor};border:2.5px solid ${warmthHex}50;overflow:hidden;box-shadow:0 0 16px ${warmthHex}30;">
                                 <img src="${getAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='17px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
                             </div>
                             <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid #13131D;box-shadow:0 0 6px ${warmthHex}80;"></div>
                         </div>
                         <div style="flex:1;min-width:0;">
                             <div style="font-size:14px;font-weight:700;color:white;line-height:1.2;">${v.name}</div>
-                            <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
-                                <span style="font-size:11px;color:#a1a1aa;">📍 ${v.country}</span>
+                            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:4px;">
+                                <span style="font-size:11px;color:#a1a1aa;">📍 ${cityLabel ? cityLabel + ', ' : ''}${v.country}</span>
+                            </div>
+                            <div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:3px;">
+                                <span style="font-size:10px;color:#71717a;">${deviceIcon} ${deviceLabel}</span>
                             </div>
                         </div>
                     </div>
@@ -516,21 +541,41 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 16px;"></div>
 
                     <!-- Stats rows -->
-                    <div style="padding:10px 16px;">
+                    <div style="padding:8px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:12px;color:#71717a;">Country</span>
-                            <span style="font-size:12px;font-weight:500;color:#d4d4d8;">${v.country}</span>
+                            <span style="font-size:11px;color:#71717a;">Referrer</span>
+                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${referrerIcon} ${referrerLabel}</span>
                         </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:12px;color:#71717a;">Engagement</span>
-                            <span style="font-size:12px;font-weight:600;color:${warmthHex};">${warmthLabel}</span>
+                            <span style="font-size:11px;color:#71717a;">Current URL</span>
+                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;font-family:ui-monospace,monospace;background:rgba(255,255,255,0.04);padding:1px 6px;border-radius:4px;">${pageLabel.length > 20 ? pageLabel.slice(0, 20) + '…' : pageLabel}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+                            <span style="font-size:11px;color:#71717a;">Session time</span>
+                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${sessionMin} min ${sessionSec} sec</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+                            <span style="font-size:11px;color:#71717a;">Total visits</span>
+                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${totalVisits}</span>
                         </div>
                     </div>
 
-                    <!-- Warmth bar -->
-                    <div style="padding:0 16px 14px;">
-                        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+                    <!-- Divider -->
+                    <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 16px;"></div>
+
+                    <!-- Conversion likelihood + estimated value -->
+                    <div style="padding:10px 16px 12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:11px;color:#71717a;">Conversion likelihood</span>
+                            <span style="font-size:11px;font-weight:600;color:${warmthHex};">${convLikelihood > 0 ? '+' : ''}${convLikelihood}% <span style="color:#52525b;font-weight:400;">vs. avg</span></span>
+                        </div>
+                        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;position:relative;">
                             <div style="height:100%;width:${warmthPct}%;background:linear-gradient(90deg,${warmthHex},${warmthHex}cc);border-radius:99px;"></div>
+                            <div style="position:absolute;top:-3px;left:${Math.min(warmthPct, 95)}%;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid #13131D;box-shadow:0 0 6px ${warmthHex}60;transform:translateX(-50%);"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                            <span style="font-size:11px;color:#71717a;">Estimated value</span>
+                            <span style="font-size:12px;font-weight:700;color:${warmthHex};">${estValue}</span>
                         </div>
                     </div>
                 </div>

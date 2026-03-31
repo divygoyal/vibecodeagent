@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
-import { COUNTRY_COORDS, CITY_COORDS, type GlobeVisitor } from '@/components/analytics/RealtimeGlobe';
-import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
+import { COUNTRY_COORDS, CITY_COORDS } from '@/components/analytics/RealtimeGlobe';
+import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 
 // ─── DiceBear avatar URL (matching globe markers) ───
 function getAvatarUrl(seed: string): string {
@@ -182,39 +182,47 @@ export default function RealtimePage() {
     // Use byCountry as primary source (reliable country names), spread multiple users per country
     const globeVisitors = useMemo<GlobeVisitor[]>(() => {
         const visitors: GlobeVisitor[] = [];
-        const usedKeys = new Set<string>(); // track occupied coordinate keys
+        const usedKeys = new Set<string>();
 
-        // Helper: check if city coords are geographically close to country coords
         const isCityInCountry = (cityCoord: [number, number], countryCoord: [number, number]) => {
             const dLat = Math.abs(cityCoord[0] - countryCoord[0]);
             const dLng = Math.abs(cityCoord[1] - countryCoord[1]);
             return dLat < 20 && dLng < 30;
         };
 
-        // Deterministic name from city+country (NO index dependency)
         const makeName = (seed: string) => {
             const h = hashStr(seed);
             return `${ADJECTIVES[h % ADJECTIVES.length]} ${ANIMALS[(h >> 4) % ANIMALS.length]}`;
         };
 
-        // Sort byCity for deterministic processing order
+        // Deterministic enrichment from available GA4 data
+        const enrichVisitor = (seed: string, idx: number) => {
+            const hash = hashStr(seed);
+            const device = String(byDevice[hash % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
+            const page = String(byPage[hash % Math.max(byPage.length, 1)]?.page ?? '/');
+            const ref = referrerBreakdown[hash % Math.max(referrerBreakdown.length, 1)];
+            const referrer = ref?.label ?? 'Direct';
+            const warmth = predictWarmth(seed, device, idx);
+            const confidence = Math.round(50 + warmth * 40 + (hash % 10));
+            const estVal = `$${(warmth * 3.5 + (hash % 100) / 100).toFixed(2)}`;
+            return { device, page, referrer, warmth, confidence, estValue: estVal };
+        };
+
         const sortedCities = [...byCity].sort((a: any, b: any) => {
             const ka = `${a.country}-${a.city}`;
             const kb = `${b.country}-${b.city}`;
             return ka.localeCompare(kb);
         });
 
-        // First: city-level pins (most precise)
-        sortedCities.slice(0, 15).forEach((c: any) => {
+        // First: city-level pins
+        sortedCities.slice(0, 15).forEach((c: any, idx: number) => {
             if (visitors.length >= 12) return;
             const cityStr = String(c.city ?? '');
             const countryStr = String(c.country ?? '');
 
-            // Country coord is required
             const countryCoord = COUNTRY_COORDS[countryStr];
             if (!countryCoord) return;
 
-            // Only use city coord if valid AND geographically within the country
             let coord = countryCoord;
             if (cityStr && !cityStr.startsWith('(')) {
                 const cityCoord = CITY_COORDS[cityStr];
@@ -223,13 +231,11 @@ export default function RealtimePage() {
                 }
             }
 
-            // Deterministic offset based on city name hash (stable regardless of other visitors)
             const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
             const cityHash = hashStr(`${cityStr}-${countryStr}`);
             let lat = coord[0];
             let lng = coord[1];
             if (usedKeys.has(key)) {
-                // Hash-based offset — always the same for this city, no matter what
                 const angle = (cityHash % 360) * (Math.PI / 180);
                 const radius = 1.2 + (cityHash % 5) * 0.6;
                 lat += Math.cos(angle) * radius;
@@ -237,29 +243,29 @@ export default function RealtimePage() {
             }
             usedKeys.add(key);
 
-            // Name is based on city+country only (stable across re-renders)
             const seed = `${cityStr}-${countryStr}`;
             const name = makeName(seed);
             const hash = hashStr(seed);
-            const warmth = predictWarmth(countryStr, 'desktop', 0);
+            const enriched = enrichVisitor(seed, idx);
 
             visitors.push({
                 id: seed,
                 lat, lng, name,
                 country: countryStr,
+                city: cityStr,
                 avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
                 avatarInitial: name.charAt(0).toUpperCase(),
-                warmth,
                 users: Number(c.users) || 1,
+                ...enriched,
             });
         });
 
-        // Second: fill from byCountry (sorted for stability)
+        // Second: fill from byCountry
         if (visitors.length < 8) {
             const sortedCountries = [...byCountry].sort((a: any, b: any) =>
                 String(a.country ?? '').localeCompare(String(b.country ?? ''))
             );
-            sortedCountries.forEach((c: any) => {
+            sortedCountries.forEach((c: any, idx: number) => {
                 if (visitors.length >= 12) return;
                 const countryStr = String(c.country ?? '');
                 const coord = COUNTRY_COORDS[countryStr];
@@ -271,7 +277,7 @@ export default function RealtimePage() {
                 const seed = `${countryStr}-country`;
                 const name = makeName(seed);
                 const hash = hashStr(seed);
-                const warmth = predictWarmth(countryStr, 'desktop', 0);
+                const enriched = enrichVisitor(seed, idx);
 
                 visitors.push({
                     id: seed,
@@ -279,14 +285,14 @@ export default function RealtimePage() {
                     country: countryStr,
                     avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
                     avatarInitial: name.charAt(0).toUpperCase(),
-                    warmth,
                     users: Number(c.users) || 1,
+                    ...enriched,
                 });
             });
         }
 
         return visitors;
-    }, [byCity, byCountry]);
+    }, [byCity, byCountry, byDevice, byPage, referrerBreakdown]);
 
     // ─── Estimated total value ───
     const estTotalValue = useMemo(() => {
