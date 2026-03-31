@@ -8,7 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
     TrendingUp, TrendingDown, Users, Target,
     Globe, Download, RefreshCw, Filter as FilterIcon, BarChart3,
-    ChevronDown
+    ChevronDown, Maximize2
 } from 'lucide-react';
 import { exportAnalyticsData, exportAnalyticsZip } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
@@ -101,8 +101,8 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
     return (
         <button
             onClick={onClick}
-            className={`px-2.5 py-1 text-[11px] rounded-md font-medium transition whitespace-nowrap ${
-                active ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-300'
+            className={`px-2.5 py-1 text-[12px] rounded-md transition whitespace-nowrap ${
+                active ? 'text-white font-semibold' : 'text-zinc-500 hover:text-zinc-300 font-medium'
             }`}
         >
             {label}
@@ -622,20 +622,23 @@ function TrafficSourcesPanel({
             style={{ height: 405 }}
         >
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                     <TabBtn label="Referrers" active={tab === 'referrers'} onClick={() => setTab('referrers')} />
                     <TabBtn label="Channels" active={tab === 'channels'} onClick={() => setTab('channels')} />
                     <TabBtn label="UTM" active={tab === 'utm'} onClick={() => setTab('utm')} />
                 </div>
+                <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
+                    <Maximize2 className="w-3 h-3" />
+                </button>
             </div>
-            <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+            <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                 <span>{tabLabel}</span>
                 <span>{metricLabel}</span>
             </div>
             <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
                 {tab === 'referrers' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {referrers.slice(0, 15).map((ref: any) => {
+                        {referrers.slice(0, 25).map((ref: any) => {
                             const pct = refTotal > 0 ? (ref.value / refTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -656,7 +659,7 @@ function TrafficSourcesPanel({
 
                 {tab === 'channels' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {channels.slice(0, 15).map((ch: any) => {
+                        {channels.slice(0, 25).map((ch: any) => {
                             const pct = chTotal > 0 ? (ch.value / chTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -709,20 +712,23 @@ function PagesPanel({
             style={{ height: 405 }}
         >
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                     <TabBtn label="Pages" active={tab === 'pages'} onClick={() => setTab('pages')} />
                     <TabBtn label="Entry Pages" active={tab === 'entries'} onClick={() => setTab('entries')} />
                     <TabBtn label="Exit Pages" active={tab === 'exits'} onClick={() => setTab('exits')} />
                 </div>
+                <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
+                    <Maximize2 className="w-3 h-3" />
+                </button>
             </div>
-            <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+            <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                 <span>{tabLabel}</span>
                 <span>{metricLabel}</span>
             </div>
             <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
                 {tab === 'pages' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {pages.slice(0, 15).map((pg: any) => {
+                        {pages.slice(0, 25).map((pg: any) => {
                             const pct = pgTotal > 0 ? (pg.views / pgTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -741,7 +747,7 @@ function PagesPanel({
 
                 {tab === 'entries' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {entryPages.slice(0, 15).map((pg: any) => {
+                        {entryPages.slice(0, 25).map((pg: any) => {
                             const pct = epTotal > 0 ? (pg.sessions / epTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -796,14 +802,17 @@ function TechPanel({
             style={{ height: 405 }}
         >
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                     <TabBtn label="Browsers" active={tab === 'browsers'} onClick={() => setTab('browsers')} />
                     <TabBtn label="Devices" active={tab === 'devices'} onClick={() => setTab('devices')} />
                     <TabBtn label="OS" active={tab === 'os'} onClick={() => setTab('os')} />
                     <TabBtn label="Screen" active={tab === 'screen'} onClick={() => setTab('screen')} />
                 </div>
+                <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
+                    <Maximize2 className="w-3 h-3" />
+                </button>
             </div>
-            <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+            <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                 <span>{tabLabel}</span>
                 <span>Sessions</span>
             </div>
@@ -814,7 +823,7 @@ function TechPanel({
                     </div>
                 ) : (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {data.slice(0, 15).map((item: any) => {
+                        {data.slice(0, 25).map((item: any) => {
                             const pct = total > 0 ? (item.value / total) * 100 : 0;
                             const icon = tab === 'devices'
                                 ? <DeviceIcon device={item.name} />
@@ -872,7 +881,7 @@ function GeoPanel({
             style={{ height: 405 }}
         >
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+                <div className="flex gap-0.5 overflow-x-auto scrollbar-hide">
                     <TabBtn label="Countries" active={tab === 'countries'} onClick={() => setTab('countries')} />
                     <TabBtn label="Regions" active={tab === 'regions'} onClick={() => setTab('regions')} />
                     <TabBtn label="Cities" active={tab === 'cities'} onClick={() => setTab('cities')} />
@@ -883,10 +892,13 @@ function GeoPanel({
                     {allCountries.slice(0, 4).map((c: any, i: number) => (
                         <CountryFlag key={i} country={c.country} />
                     ))}
+                    <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition ml-1" title="Expand">
+                        <Maximize2 className="w-3 h-3" />
+                    </button>
                 </div>
             </div>
             {tab !== 'map' && (
-                <div className="flex justify-between px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
+                <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                     <span>{tabLabel}</span>
                     <span>{metricLabel}</span>
                 </div>
@@ -894,7 +906,7 @@ function GeoPanel({
             <div className="overflow-y-auto" style={{ height: tab === 'map' ? 'calc(405px - 40px)' : 'calc(405px - 64px)' }}>
                 {tab === 'countries' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {countries.slice(0, 15).map((c: any) => {
+                        {countries.slice(0, 25).map((c: any) => {
                             const pct = cTotal > 0 ? (c.users / cTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -920,7 +932,7 @@ function GeoPanel({
 
                 {tab === 'cities' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {cities.slice(0, 15).map((c: any, i: number) => {
+                        {cities.slice(0, 25).map((c: any, i: number) => {
                             const pct = cityTotal > 0 ? (c.users / cityTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -938,7 +950,7 @@ function GeoPanel({
 
                 {tab === 'languages' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {languages.slice(0, 15).map((l: any) => {
+                        {languages.slice(0, 25).map((l: any) => {
                             const pct = langTotal > 0 ? (l.value / langTotal) * 100 : 0;
                             return (
                                 <DataRow
