@@ -130,12 +130,7 @@ function generateMockData(mode: string) {
     const mockData = mode === 'weekly' ? generateMockWeeklyCohorts()
         : mode === 'monthly' ? generateMockMonthlyCohorts()
         : generateMockDailyCohorts();
-    const trends = {
-        day1: randomBetween(-3, 3),
-        day7: randomBetween(-2, 2),
-        day14: randomBetween(-2, 2),
-        day30: randomBetween(-1.5, 1.5),
-    };
+    const trends = { day1: 0, day7: 0, day14: 0, day30: 0 };
     return { mode, cohorts: mockData.cohorts, averages: mockData.averages, curve: mockData.curve, trends };
 }
 
@@ -189,13 +184,8 @@ export async function GET(req: Request) {
                 // Fallback to mock data if cohort query fails (e.g. property has insufficient data)
                 return NextResponse.json(generateMockData(mode));
             }
-            // Add simulated trends (GA4 cohort API doesn't provide period-over-period comparison)
-            const trends = {
-                day1: randomBetween(-3, 3),
-                day7: randomBetween(-2, 2),
-                day14: randomBetween(-2, 2),
-                day30: randomBetween(-1.5, 1.5),
-            };
+            // Trends set to 0: GA4 cohort API doesn't provide period-over-period comparison
+            const trends = { day1: 0, day7: 0, day14: 0, day30: 0 };
             return NextResponse.json({ mode, cohorts: data.cohorts, averages: data.averages, curve: data.curve, trends });
         } catch (e) {
             console.error('Retention API error:', e);
