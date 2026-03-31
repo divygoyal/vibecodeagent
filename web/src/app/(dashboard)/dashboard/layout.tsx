@@ -18,7 +18,7 @@ import {
     Book, Newspaper, Coins, MessageSquare,
     ChevronDown, Bell, Globe, Sparkles, Target
 } from 'lucide-react';
-import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
+import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
 import { useChatStore } from '@/stores/chatStore';
 
@@ -185,9 +185,25 @@ export default function DashboardLayout({
     // Alerts for notification bell
     const { hasGoogleConnection } = useContainerStatus();
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
+    const { properties } = usePropertyList(hasGoogleConnection);
     const alertSiteUrl = selectedSite || (gscSites.length > 0 ? gscSites[0].siteUrl : '');
     const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
     const criticalAlertCount = alerts.filter((a: any) => a.severity === 'critical' || a.severity === 'warning').length;
+
+    // Auto-sync: when selectedSite changes, find and set the matching GA4 property
+    useEffect(() => {
+        if (!selectedSite || properties.length === 0) return;
+        const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+        const domainRoot = domain.split('.')[0];
+        const matched =
+            properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
+            properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
+            properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
+            properties[0];
+        if (matched?.property && matched.property !== selectedProperty) {
+            setSelectedProperty(matched.property);
+        }
+    }, [selectedSite, properties, selectedProperty, setSelectedProperty]);
 
     // Send browser push notifications for new critical alerts
     const prevAlertCountRef = useRef(criticalAlertCount);

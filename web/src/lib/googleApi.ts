@@ -599,12 +599,12 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
         gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
             dimensions: [{ name: 'country' }],
             metrics: [{ name: 'activeUsers' }],
-            limit: 20,
+            limit: 50,
         }).catch(() => null),
         gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
             dimensions: [{ name: 'city' }, { name: 'country' }],
             metrics: [{ name: 'activeUsers' }],
-            limit: 20,
+            limit: 50,
         }).catch(() => null),
         gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
             dimensions: [{ name: 'deviceCategory' }],

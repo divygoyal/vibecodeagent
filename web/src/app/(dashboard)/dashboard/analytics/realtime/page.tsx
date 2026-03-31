@@ -214,82 +214,104 @@ export default function RealtimePage() {
             return ka.localeCompare(kb);
         });
 
-        // First: city-level pins
-        sortedCities.slice(0, 15).forEach((c: any, idx: number) => {
-            if (visitors.length >= 12) return;
+        // Expand each city into individual user pins
+        let visitorIdx = 0;
+        sortedCities.forEach((c: any) => {
             const cityStr = String(c.city ?? '');
             const countryStr = String(c.country ?? '');
+            const userCount = Number(c.users) || 1;
 
             const countryCoord = COUNTRY_COORDS[countryStr];
             if (!countryCoord) return;
 
-            let coord = countryCoord;
+            let baseCoord = countryCoord;
             if (cityStr && !cityStr.startsWith('(')) {
                 const cityCoord = CITY_COORDS[cityStr];
                 if (cityCoord && isCityInCountry(cityCoord, countryCoord)) {
-                    coord = cityCoord;
+                    baseCoord = cityCoord;
                 }
             }
 
-            const key = `${coord[0].toFixed(1)},${coord[1].toFixed(1)}`;
-            const cityHash = hashStr(`${cityStr}-${countryStr}`);
-            let lat = coord[0];
-            let lng = coord[1];
-            if (usedKeys.has(key)) {
-                const angle = (cityHash % 360) * (Math.PI / 180);
-                const radius = 1.2 + (cityHash % 5) * 0.6;
-                lat += Math.cos(angle) * radius;
-                lng += Math.sin(angle) * radius;
-            }
-            usedKeys.add(key);
-
-            const seed = `${cityStr}-${countryStr}`;
-            const name = makeName(seed);
-            const hash = hashStr(seed);
-            const enriched = enrichVisitor(seed, idx);
-
-            visitors.push({
-                id: seed,
-                lat, lng, name,
-                country: countryStr,
-                city: cityStr,
-                avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
-                avatarInitial: name.charAt(0).toUpperCase(),
-                users: Number(c.users) || 1,
-                ...enriched,
-            });
-        });
-
-        // Second: fill from byCountry
-        if (visitors.length < 8) {
-            const sortedCountries = [...byCountry].sort((a: any, b: any) =>
-                String(a.country ?? '').localeCompare(String(b.country ?? ''))
-            );
-            sortedCountries.forEach((c: any, idx: number) => {
-                if (visitors.length >= 12) return;
-                const countryStr = String(c.country ?? '');
-                const coord = COUNTRY_COORDS[countryStr];
-                if (!coord) return;
-
-                const alreadyHas = visitors.some(v => v.country === countryStr);
-                if (alreadyHas) return;
-
-                const seed = `${countryStr}-country`;
+            // Create one pin per user in this city
+            for (let u = 0; u < userCount; u++) {
+                const seed = `${cityStr}-${countryStr}-${u}`;
                 const name = makeName(seed);
                 const hash = hashStr(seed);
-                const enriched = enrichVisitor(seed, idx);
+                const enriched = enrichVisitor(seed, visitorIdx);
+
+                // Spread multiple users around the city center
+                let lat = baseCoord[0];
+                let lng = baseCoord[1];
+                if (u > 0 || usedKeys.has(`${baseCoord[0].toFixed(1)},${baseCoord[1].toFixed(1)}`)) {
+                    const angle = ((hash % 360) * Math.PI) / 180;
+                    const radius = 1.0 + (hash % 5) * 0.5;
+                    lat += Math.cos(angle) * radius;
+                    lng += Math.sin(angle) * radius;
+                }
+                usedKeys.add(`${baseCoord[0].toFixed(1)},${baseCoord[1].toFixed(1)}`);
 
                 visitors.push({
                     id: seed,
-                    lat: coord[0], lng: coord[1], name,
+                    lat, lng, name,
+                    country: countryStr,
+                    city: cityStr,
+                    avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
+                    avatarInitial: name.charAt(0).toUpperCase(),
+                    users: 1,
+                    ...enriched,
+                });
+                visitorIdx++;
+            }
+        });
+
+        // Fill countries that had no city-level data (country-only rows)
+        // Count users already placed per country
+        const placedByCountry = new Map<string, number>();
+        visitors.forEach(v => {
+            placedByCountry.set(v.country, (placedByCountry.get(v.country) || 0) + 1);
+        });
+
+        const sortedCountries = [...byCountry].sort((a: any, b: any) =>
+            String(a.country ?? '').localeCompare(String(b.country ?? ''))
+        );
+        sortedCountries.forEach((c: any) => {
+            const countryStr = String(c.country ?? '');
+            const totalUsers = Number(c.users) || 1;
+            const alreadyPlaced = placedByCountry.get(countryStr) || 0;
+            const remaining = totalUsers - alreadyPlaced;
+            if (remaining <= 0) return;
+
+            const coord = COUNTRY_COORDS[countryStr];
+            if (!coord) return;
+
+            for (let u = 0; u < remaining; u++) {
+                const seed = `${countryStr}-country-${u}`;
+                const name = makeName(seed);
+                const hash = hashStr(seed);
+                const enriched = enrichVisitor(seed, visitorIdx);
+
+                let lat = coord[0];
+                let lng = coord[1];
+                if (u > 0 || usedKeys.has(`${coord[0].toFixed(1)},${coord[1].toFixed(1)}`)) {
+                    const angle = ((hash % 360) * Math.PI) / 180;
+                    const radius = 1.0 + (hash % 5) * 0.5;
+                    lat += Math.cos(angle) * radius;
+                    lng += Math.sin(angle) * radius;
+                }
+                usedKeys.add(`${coord[0].toFixed(1)},${coord[1].toFixed(1)}`);
+
+                visitors.push({
+                    id: seed,
+                    lat, lng, name,
                     country: countryStr,
                     avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
                     avatarInitial: name.charAt(0).toUpperCase(),
-                    users: Number(c.users) || 1,
+                    users: 1,
                     ...enriched,
                 });
-            });
-        }
+                visitorIdx++;
+            }
+        });
 
         return visitors;
     }, [byCity, byCountry, byDevice, byPage, referrerBreakdown]);
