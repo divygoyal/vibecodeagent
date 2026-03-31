@@ -30,14 +30,19 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-// Cache the mapboxgl module — use CSP build to avoid WebWorker transpilation issues
+// Cache the mapboxgl module
+// The default mapbox-gl bundle includes an inline worker that Turbopack transpiles
+// incorrectly ("w is not defined"). We override workerUrl BEFORE creating any Map
+// to load a pre-built worker from /public instead.
 let _mapboxgl: any = null;
 async function loadMapboxGL() {
     if (_mapboxgl) return _mapboxgl;
-    const mod = await import('mapbox-gl/dist/mapbox-gl-csp');
-    _mapboxgl = mod.default || mod;
-    // Point to the pre-built worker served from /public — avoids webpack/SWC transpiling it
-    _mapboxgl.workerUrl = '/mapbox-gl-csp-worker.js';
+    const mod = await import('mapbox-gl');
+    const mapboxgl = mod.default ?? mod;
+    // Override worker URL before any Map is created.
+    // The inline worker blob URL (set at import time) is never used.
+    mapboxgl.workerUrl = '/mapbox-gl-csp-worker.js';
+    _mapboxgl = mapboxgl;
     return _mapboxgl;
 }
 
