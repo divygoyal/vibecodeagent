@@ -41,10 +41,15 @@ setInterval(() => {
  * for a valid share token. Only returns sections enabled in the share config.
  */
 export async function GET(
-    _req: Request,
+    req: Request,
     { params }: { params: Promise<{ token: string }> }
 ) {
     const { token } = await params;
+
+    /* ─── Read optional range parameter ─── */
+    const allowedRanges = ['7d', '14d', '30d', '90d'];
+    const rangeParam = new URL(req.url).searchParams.get('range') || '30d';
+    const range = allowedRanges.includes(rangeParam) ? rangeParam : '30d';
 
     /* ─── Rate limiting ─── */
     if (isRateLimited(token)) {
@@ -88,7 +93,7 @@ export async function GET(
 
     if (share.config.traffic || share.config.sources || share.config.pages || share.config.geo) {
         try {
-            const dashboard = await fetchAnalyticsDashboard(accessToken, share.propertyId, '30d');
+            const dashboard = await fetchAnalyticsDashboard(accessToken, share.propertyId, range);
 
             if (share.config.traffic) {
                 result.kpis = dashboard.kpis;
@@ -96,15 +101,15 @@ export async function GET(
             }
 
             if (share.config.sources) {
-                result.sources = dashboard.sources;
+                result.sources = (dashboard.sources || []).slice(0, 15);
             }
 
             if (share.config.pages) {
-                result.pages = dashboard.pages;
+                result.pages = (dashboard.pages || []).slice(0, 15);
             }
 
             if (share.config.geo) {
-                result.countries = dashboard.countries;
+                result.countries = (dashboard.countries || []).slice(0, 15);
             }
         } catch (err) {
             console.error('Share data — GA4 fetch error:', err);
