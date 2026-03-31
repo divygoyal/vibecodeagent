@@ -1,16 +1,25 @@
 'use client';
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink } from 'd3-sankey';
+import { motion } from 'framer-motion';
 import {
-    Route, ArrowRight, LogIn, LogOut, TrendingUp, Clock,
-    MousePointer, BarChart3, ChevronRight, Footprints,
-    Loader2, ChevronDown,
+    Route, LogIn, LogOut, TrendingUp, Clock,
+    Footprints, Loader2, BarChart3, SlidersHorizontal,
+    Filter, X,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+// ─── Color Palette ───
+
+const COLORS = ['#34d399', '#3b82f6', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#22d3ee', '#ef4444'];
+
+function getColor(index: number) {
+    return COLORS[index % COLORS.length];
+}
 
 // ─── Helpers ───
 
@@ -20,257 +29,237 @@ function formatDuration(seconds: number): string {
     return `${m}m ${s.toString().padStart(2, '0')}s`;
 }
 
-function stepGradient(index: number, total: number): string {
-    if (index === total - 1) return 'from-red-500/20 to-red-400/10';
-    const gradients = [
-        'from-emerald-500/20 to-emerald-400/10',
-        'from-emerald-400/15 to-teal-400/10',
-        'from-teal-400/12 to-cyan-400/8',
-        'from-cyan-400/10 to-zinc-400/8',
-        'from-zinc-400/8 to-zinc-500/5',
-    ];
-    return gradients[Math.min(index, gradients.length - 1)];
-}
-
-function stepBorder(index: number, total: number): string {
-    if (index === total - 1) return 'border-red-500/20';
-    const borders = [
-        'border-emerald-500/25',
-        'border-emerald-400/20',
-        'border-teal-400/15',
-        'border-cyan-400/12',
-        'border-zinc-500/10',
-    ];
-    return borders[Math.min(index, borders.length - 1)];
-}
-
-function stepTextAccent(index: number, total: number): string {
-    if (index === total - 1) return 'text-red-400';
-    const colors = [
-        'text-emerald-400',
-        'text-emerald-300',
-        'text-teal-300',
-        'text-cyan-300/80',
-        'text-zinc-400',
-    ];
-    return colors[Math.min(index, colors.length - 1)];
-}
-
-function connectorColor(index: number, total: number): string {
-    if (index >= total - 2) return 'text-zinc-700';
-    const colors = [
-        'text-emerald-500/40',
-        'text-emerald-400/30',
-        'text-teal-400/25',
-        'text-cyan-400/20',
-    ];
-    return colors[Math.min(index, colors.length - 1)];
-}
-
-function truncatePath(path: string, maxLen: number = 18): string {
+function truncatePath(path: string, maxLen: number = 25): string {
     if (path === 'EXIT') return 'EXIT';
     if (path.length <= maxLen) return path;
     return path.slice(0, maxLen - 1) + '\u2026';
 }
 
-// ─── Flow Line (connecting bar between steps) ───
+// ─── Types ───
 
-function FlowLine({ percentage, index, total }: { percentage: number; index: number; total: number }) {
-    const width = Math.max(24, Math.min(64, percentage * 2));
-    const opacity = Math.max(0.15, Math.min(0.6, percentage / 30));
-
-    return (
-        <div className="flex items-center mx-0.5 sm:mx-1 flex-shrink-0" style={{ width: `${width}px` }}>
-            <div className="relative w-full h-[2px] rounded-full overflow-hidden">
-                <div className="absolute inset-0 bg-white/[0.06]" />
-                <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
-                    className={`absolute inset-y-0 left-0 rounded-full ${
-                        index >= total - 2
-                            ? 'bg-zinc-600'
-                            : 'bg-gradient-to-r from-emerald-500/60 to-teal-400/40'
-                    }`}
-                    style={{ opacity }}
-                />
-            </div>
-            <ArrowRight className={`w-3 h-3 flex-shrink-0 -ml-0.5 ${connectorColor(index, total)}`} />
-        </div>
-    );
+interface Journey {
+    id: number;
+    steps: string[];
+    users: number;
+    percentage: number;
+    avgDuration: number;
 }
 
-// ─── Journey Step Box ───
+interface SankeyNodeExtra {
+    name: string;
+    step: number;
+}
 
-function JourneyStep({ path, percentage, index, total }: {
-    path: string; percentage: number; index: number; total: number;
-}) {
-    const isExit = path === 'EXIT';
+interface SankeyLinkExtra {
+    source: number;
+    target: number;
+    value: number;
+}
+
+// ─── Sankey Diagram Component ───
+
+function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width: number; height: number }) {
+    const [hoveredLink, setHoveredLink] = useState<number | null>(null);
+    const [hoveredNode, setHoveredNode] = useState<number | null>(null);
+    const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
+
+    const { nodes, links } = useMemo(() => {
+        const nodeMap = new Map<string, number>();
+        const nodeList: SankeyNodeExtra[] = [];
+        const linkList: SankeyLinkExtra[] = [];
+
+        journeys.forEach(journey => {
+            journey.steps.forEach((step, i) => {
+                const key = `${i}:${step}`;
+                if (!nodeMap.has(key)) {
+                    nodeMap.set(key, nodeList.length);
+                    nodeList.push({ name: step, step: i });
+                }
+
+                if (i > 0) {
+                    const prevKey = `${i - 1}:${journey.steps[i - 1]}`;
+                    const source = nodeMap.get(prevKey)!;
+                    const target = nodeMap.get(key)!;
+                    const existing = linkList.find(l => l.source === source && l.target === target);
+                    if (existing) {
+                        existing.value += journey.users;
+                    } else {
+                        linkList.push({ source, target, value: journey.users });
+                    }
+                }
+            });
+        });
+
+        return { nodes: nodeList, links: linkList };
+    }, [journeys]);
+
+    const sankeyData = useMemo(() => {
+        if (nodes.length === 0 || links.length === 0) return null;
+
+        const padding = 140; // space for labels on right side
+        const s = sankey<SankeyNodeExtra, SankeyLinkExtra>()
+            .nodeWidth(18)
+            .nodePadding(14)
+            .extent([[0, 8], [width - padding, height - 8]]);
+
+        try {
+            return s({
+                nodes: nodes.map(d => ({ ...d })),
+                links: links.map(d => ({ ...d })),
+            });
+        } catch {
+            return null;
+        }
+    }, [nodes, links, width, height]);
+
+    if (!sankeyData) {
+        return (
+            <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+                Not enough data to render flow diagram
+            </div>
+        );
+    }
+
+    // Determine max step for column headers
+    const maxStep = Math.max(...sankeyData.nodes.map((n: any) => n.step ?? 0));
+
+    // Compute column x positions for step headers
+    const stepPositions: { step: number; x: number }[] = [];
+    for (let s = 0; s <= maxStep; s++) {
+        const nodesInStep = sankeyData.nodes.filter((n: any) => n.step === s);
+        if (nodesInStep.length > 0) {
+            const x0 = (nodesInStep[0] as any).x0 ?? 0;
+            const x1 = (nodesInStep[0] as any).x1 ?? 0;
+            stepPositions.push({ step: s, x: (x0 + x1) / 2 });
+        }
+    }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 + index * 0.08, duration: 0.35 }}
-            className={`flex-shrink-0 relative group rounded-lg border ${stepBorder(index, total)} bg-gradient-to-br ${stepGradient(index, total)} px-3 py-2 min-w-[90px] sm:min-w-[110px] transition hover:bg-white/[0.04]`}
-        >
-            {/* Step number badge */}
-            {!isExit && (
-                <div className={`absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white ${
-                    index === 0 ? 'bg-emerald-500' : 'bg-zinc-700'
-                }`}>
-                    {index + 1}
+        <div className="relative">
+            {/* Step column headers */}
+            <div className="flex mb-3" style={{ paddingRight: 140 }}>
+                {stepPositions.map(({ step, x }) => (
+                    <div
+                        key={step}
+                        className="absolute text-[10px] font-semibold text-zinc-500 uppercase tracking-wider"
+                        style={{ left: x, transform: 'translateX(-50%)' }}
+                    >
+                        Step {step + 1}
+                    </div>
+                ))}
+            </div>
+
+            <svg width={width} height={height} className="overflow-visible">
+                {/* Links */}
+                <g>
+                    {sankeyData.links.map((link: any, i: number) => {
+                        const sourceNode = link.source as any;
+                        const isHighlighted = hoveredLink === i ||
+                            hoveredNode === sourceNode.index ||
+                            hoveredNode === (link.target as any).index;
+                        const isExit = (link.target as any).name === 'EXIT';
+
+                        return (
+                            <motion.path
+                                key={i}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.1 + i * 0.02, duration: 0.4 }}
+                                d={sankeyLinkHorizontal()(link) || ''}
+                                fill="none"
+                                stroke={isExit ? '#ef4444' : getColor(sourceNode.step ?? 0)}
+                                strokeOpacity={isHighlighted ? 0.6 : 0.2}
+                                strokeWidth={Math.max(1, link.width)}
+                                onMouseEnter={(e) => {
+                                    setHoveredLink(i);
+                                    setTooltip({
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        content: `${sourceNode.name} → ${(link.target as any).name}: ${link.value.toLocaleString()} users`,
+                                    });
+                                }}
+                                onMouseMove={(e) => {
+                                    setTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredLink(null);
+                                    setTooltip(null);
+                                }}
+                                style={{ cursor: 'pointer', transition: 'stroke-opacity 200ms' }}
+                            />
+                        );
+                    })}
+                </g>
+
+                {/* Nodes */}
+                <g>
+                    {sankeyData.nodes.map((node: any, i: number) => {
+                        const nodeHeight = Math.max(2, (node.y1 ?? 0) - (node.y0 ?? 0));
+                        const isExit = node.name === 'EXIT';
+                        const isHovered = hoveredNode === i;
+                        const nodeValue = (node.value ?? 0) as number;
+                        const color = isExit ? '#ef4444' : getColor(node.step ?? i);
+
+                        return (
+                            <motion.g
+                                key={i}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.05 + i * 0.03, duration: 0.4 }}
+                            >
+                                <rect
+                                    x={node.x0}
+                                    y={node.y0}
+                                    width={(node.x1 ?? 0) - (node.x0 ?? 0)}
+                                    height={nodeHeight}
+                                    fill={color}
+                                    fillOpacity={isHovered ? 1 : 0.85}
+                                    rx={3}
+                                    onMouseEnter={() => setHoveredNode(i)}
+                                    onMouseLeave={() => setHoveredNode(null)}
+                                    style={{ cursor: 'pointer', transition: 'fill-opacity 200ms' }}
+                                />
+                                {/* Node label */}
+                                <text
+                                    x={(node.x1 ?? 0) + 6}
+                                    y={((node.y0 ?? 0) + (node.y1 ?? 0)) / 2}
+                                    dy="0.35em"
+                                    className="text-[10px] fill-zinc-400 select-none pointer-events-none"
+                                    style={{ fontFamily: 'inherit' }}
+                                >
+                                    {truncatePath(node.name ?? '', 22)}
+                                </text>
+                                {/* Value label */}
+                                {nodeHeight > 14 && (
+                                    <text
+                                        x={(node.x1 ?? 0) + 6}
+                                        y={((node.y0 ?? 0) + (node.y1 ?? 0)) / 2 + 12}
+                                        dy="0.35em"
+                                        className="text-[9px] fill-zinc-600 select-none pointer-events-none"
+                                        style={{ fontFamily: 'inherit' }}
+                                    >
+                                        {nodeValue.toLocaleString()} users
+                                    </text>
+                                )}
+                            </motion.g>
+                        );
+                    })}
+                </g>
+            </svg>
+
+            {/* Tooltip */}
+            {tooltip && (
+                <div
+                    className="fixed z-50 px-3 py-2 rounded-lg bg-zinc-900 border border-white/10 shadow-xl text-xs text-white pointer-events-none"
+                    style={{
+                        left: tooltip.x + 12,
+                        top: tooltip.y - 10,
+                    }}
+                >
+                    {tooltip.content}
                 </div>
             )}
-
-            <div className="flex items-center gap-1.5 mb-1">
-                {isExit ? (
-                    <LogOut className="w-3 h-3 text-red-400" />
-                ) : index === 0 ? (
-                    <LogIn className="w-3 h-3 text-emerald-400" />
-                ) : (
-                    <ChevronRight className="w-3 h-3 text-zinc-600" />
-                )}
-                <span className={`text-xs font-semibold truncate ${isExit ? 'text-red-400' : 'text-white'}`} title={path}>
-                    {truncatePath(path)}
-                </span>
-            </div>
-
-            <span className={`text-[10px] font-medium tabular-nums ${stepTextAccent(index, total)}`}>
-                {percentage}% of users
-            </span>
-        </motion.div>
-    );
-}
-
-// ─── Single Journey Row ───
-
-function JourneyRow({ journey, index }: {
-    journey: { id: number; steps: string[]; users: number; percentage: number; avgDuration: number };
-    index: number;
-}) {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const total = journey.steps.length;
-
-    // Calculate rough step percentages (diminishing)
-    const stepPercentages = journey.steps.map((_, i) => {
-        if (i === total - 1) return journey.percentage;
-        const factor = 1 - (i / (total - 1)) * 0.6;
-        return Math.round(journey.percentage * factor * 10) / 10;
-    });
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.06, duration: 0.35 }}
-            className="premium-card overflow-hidden"
-        >
-            {/* Clickable header */}
-            <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center gap-3 sm:gap-4 p-4 sm:p-5 text-left hover:bg-white/[0.02] transition"
-            >
-                {/* Rank badge */}
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/15 to-cyan-500/8 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-emerald-400">#{index + 1}</span>
-                </div>
-
-                {/* Path preview (inline) */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1 flex-wrap">
-                        {journey.steps.map((step, i) => (
-                            <span key={i} className="flex items-center gap-1">
-                                <span className={`text-xs font-medium truncate ${
-                                    step === 'EXIT' ? 'text-red-400' : i === 0 ? 'text-emerald-400' : 'text-zinc-300'
-                                }`}>
-                                    {truncatePath(step, 14)}
-                                </span>
-                                {i < journey.steps.length - 1 && (
-                                    <ArrowRight className="w-3 h-3 text-zinc-700 flex-shrink-0" />
-                                )}
-                            </span>
-                        ))}
-                    </div>
-                    <p className="text-[10px] text-zinc-600 mt-0.5">
-                        {journey.users.toLocaleString()} users &middot; {formatDuration(journey.avgDuration)} avg
-                    </p>
-                </div>
-
-                {/* Quick stats */}
-                <div className="hidden sm:flex items-center gap-5">
-                    <div className="text-right">
-                        <p className="text-xs text-zinc-500">Users</p>
-                        <p className="text-sm font-bold text-white tabular-nums">{journey.users.toLocaleString()}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xs text-zinc-500">Share</p>
-                        <p className="text-sm font-bold text-emerald-400 tabular-nums">{journey.percentage}%</p>
-                    </div>
-                </div>
-
-                <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform duration-300 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Expanded flow visualization */}
-            <AnimatePresence>
-                {isExpanded && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                    >
-                        <div className="px-4 sm:px-5 pb-4 sm:pb-5">
-                            <div className="border-t border-white/[0.06] pt-4" />
-
-                            {/* Flow visualization */}
-                            <div className="overflow-x-auto scrollbar-hide -mx-2 px-2">
-                                <div className="flex items-center py-3 min-w-max">
-                                    {journey.steps.map((step, i) => (
-                                        <div key={i} className="flex items-center">
-                                            <JourneyStep
-                                                path={step}
-                                                percentage={stepPercentages[i]}
-                                                index={i}
-                                                total={total}
-                                            />
-                                            {i < total - 1 && (
-                                                <FlowLine
-                                                    percentage={stepPercentages[i]}
-                                                    index={i}
-                                                    total={total}
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Stats row */}
-                            <div className="grid grid-cols-3 gap-3 mt-3">
-                                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 text-center">
-                                    <Footprints className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
-                                    <p className="text-xs font-bold text-white tabular-nums">{journey.steps.length - 1}</p>
-                                    <p className="text-[9px] text-zinc-600">Steps</p>
-                                </div>
-                                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 text-center">
-                                    <Clock className="w-3.5 h-3.5 text-blue-400 mx-auto mb-1" />
-                                    <p className="text-xs font-bold text-white tabular-nums">{formatDuration(journey.avgDuration)}</p>
-                                    <p className="text-[9px] text-zinc-600">Avg Duration</p>
-                                </div>
-                                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 text-center">
-                                    <MousePointer className="w-3.5 h-3.5 text-violet-400 mx-auto mb-1" />
-                                    <p className="text-xs font-bold text-white tabular-nums">{journey.users.toLocaleString()}</p>
-                                    <p className="text-[9px] text-zinc-600">Users</p>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
+        </div>
     );
 }
 
@@ -294,6 +283,64 @@ function OverviewCard({ label, value, icon: Icon, color, delay }: {
             </div>
             <p className="text-lg sm:text-xl font-bold text-white tabular-nums">{value}</p>
         </motion.div>
+    );
+}
+
+// ─── Slider Control ───
+
+function SliderControl({ label, value, onChange, min, max, step = 1 }: {
+    label: string; value: number; onChange: (v: number) => void; min: number; max: number; step?: number;
+}) {
+    return (
+        <div className="flex items-center gap-3">
+            <label className="text-[11px] text-zinc-400 font-medium whitespace-nowrap min-w-[100px]">
+                {label}: <span className="text-white font-bold">{value}</span>
+            </label>
+            <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={e => onChange(Number(e.target.value))}
+                className="flex-1 h-1.5 bg-white/[0.06] rounded-full appearance-none cursor-pointer
+                    [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:w-3.5
+                    [&::-webkit-slider-thumb]:h-3.5
+                    [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-emerald-400
+                    [&::-webkit-slider-thumb]:border-2
+                    [&::-webkit-slider-thumb]:border-[#0a0a0a]
+                    [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-webkit-slider-thumb]:shadow-lg"
+            />
+        </div>
+    );
+}
+
+// ─── Step Filter Input ───
+
+function StepFilterInput({ step, value, onChange, onClear }: {
+    step: number; value: string; onChange: (v: string) => void; onClear: () => void;
+}) {
+    return (
+        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
+                Step {step}
+            </span>
+            <input
+                type="text"
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                placeholder="Filter path..."
+                className="flex-1 bg-transparent text-[11px] text-white placeholder-zinc-600 outline-none min-w-[80px]"
+            />
+            {value && (
+                <button onClick={onClear} className="text-zinc-600 hover:text-zinc-300 transition">
+                    <X className="w-3 h-3" />
+                </button>
+            )}
+        </div>
     );
 }
 
@@ -429,36 +476,6 @@ function ExitPagesSection({ pages }: { pages: any[] }) {
     );
 }
 
-// ─── Filter Tabs ───
-
-type FilterOption = 'top10' | 'top20' | 'all';
-
-function FilterTabs({ active, onChange }: { active: FilterOption; onChange: (f: FilterOption) => void }) {
-    const options: { key: FilterOption; label: string }[] = [
-        { key: 'top10', label: 'Top 10' },
-        { key: 'top20', label: 'Top 20' },
-        { key: 'all', label: 'All' },
-    ];
-
-    return (
-        <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5">
-            {options.map(opt => (
-                <button
-                    key={opt.key}
-                    onClick={() => onChange(opt.key)}
-                    className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition ${
-                        active === opt.key
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                            : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
-                    }`}
-                >
-                    {opt.label}
-                </button>
-            ))}
-        </div>
-    );
-}
-
 // ─── Main Page ───
 
 export default function JourneysPage() {
@@ -467,7 +484,76 @@ export default function JourneysPage() {
         selectedProperty ? `/api/analytics/journeys?propertyId=${selectedProperty}&range=${range}` : null,
         fetcher
     );
-    const [filter, setFilter] = useState<FilterOption>('top10');
+
+    // Controls
+    const [stepCount, setStepCount] = useState(4);
+    const [maxJourneys, setMaxJourneys] = useState(50);
+    const [stepFilters, setStepFilters] = useState<Record<number, string>>({});
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Responsive container
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState(800);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
+    // Filter and limit journeys
+    const filteredJourneys = useMemo(() => {
+        const journeys: Journey[] = data?.journeys || [];
+
+        return journeys
+            .filter(j => {
+                // Filter by step count: only include journeys with exactly stepCount steps
+                // (counting EXIT as a step)
+                if (j.steps.length > stepCount) return false;
+
+                // Apply step path filters
+                for (const [stepIdx, filterVal] of Object.entries(stepFilters)) {
+                    if (!filterVal) continue;
+                    const idx = Number(stepIdx);
+                    const step = j.steps[idx];
+                    if (!step) return false;
+                    if (!step.toLowerCase().includes(filterVal.toLowerCase())) return false;
+                }
+
+                return true;
+            })
+            .slice(0, maxJourneys);
+    }, [data?.journeys, stepCount, maxJourneys, stepFilters]);
+
+    const updateStepFilter = useCallback((step: number, value: string) => {
+        setStepFilters(prev => ({ ...prev, [step]: value }));
+    }, []);
+
+    const clearStepFilter = useCallback((step: number) => {
+        setStepFilters(prev => {
+            const next = { ...prev };
+            delete next[step];
+            return next;
+        });
+    }, []);
+
+    const activeFilterCount = Object.values(stepFilters).filter(v => v).length;
+
+    // Compute diagram height based on unique nodes
+    const diagramHeight = useMemo(() => {
+        const uniqueNodes = new Set<string>();
+        filteredJourneys.forEach(j => {
+            j.steps.forEach((s, i) => uniqueNodes.add(`${i}:${s}`));
+        });
+        return Math.max(300, Math.min(600, uniqueNodes.size * 28));
+    }, [filteredJourneys]);
+
+    // ─── Loading ───
 
     if (isLoading && !data) {
         return (
@@ -476,6 +562,8 @@ export default function JourneysPage() {
             </div>
         );
     }
+
+    // ─── Error ───
 
     if (error) {
         return (
@@ -489,16 +577,9 @@ export default function JourneysPage() {
     }
 
     const overview = data?.overview;
-    const journeys = data?.journeys || [];
     const landingPages = data?.landingPages || [];
     const exitPages = data?.exitPages || [];
-
-    // Apply filter
-    const filteredJourneys = filter === 'top10'
-        ? journeys.slice(0, 10)
-        : filter === 'top20'
-            ? journeys.slice(0, 20)
-            : journeys;
+    const journeys: Journey[] = data?.journeys || [];
 
     return (
         <div className="space-y-6">
@@ -514,10 +595,25 @@ export default function JourneysPage() {
                         User Journeys
                     </h2>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                        How users navigate through your site from entry to exit
+                        Sankey flow of how users navigate through your site
                     </p>
                 </div>
-                <FilterTabs active={filter} onChange={setFilter} />
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border transition ${
+                        showFilters || activeFilterCount > 0
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                            : 'bg-white/[0.03] border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.12]'
+                    }`}
+                >
+                    <Filter className="w-3 h-3" />
+                    Filters
+                    {activeFilterCount > 0 && (
+                        <span className="ml-1 w-4 h-4 rounded-full bg-emerald-500/20 text-[9px] font-bold flex items-center justify-center">
+                            {activeFilterCount}
+                        </span>
+                    )}
+                </button>
             </motion.div>
 
             {/* ─── Overview Cards ─── */}
@@ -552,34 +648,131 @@ export default function JourneysPage() {
                 />
             </div>
 
-            {/* ─── Top Entry → Exit Flows ─── */}
+            {/* ─── Controls Panel ─── */}
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
+                className="premium-card p-4 sm:p-5"
             >
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-md bg-emerald-500/10 flex items-center justify-center">
-                        <ArrowRight className="w-3 h-3 text-emerald-400" />
-                    </div>
-                    <h3 className="text-sm font-bold text-white">Top Entry &rarr; Exit Flows</h3>
-                    <span className="text-[10px] text-zinc-600 ml-1">{filteredJourneys.length} journeys</span>
+                <div className="flex items-center gap-2 mb-4">
+                    <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+                    <h3 className="text-sm font-bold text-white">Flow Controls</h3>
                 </div>
 
-                <div className="space-y-3">
-                    {filteredJourneys.map((journey: any, i: number) => (
-                        <JourneyRow key={journey.id} journey={journey} index={i} />
-                    ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <SliderControl
+                        label="Max Steps"
+                        value={stepCount}
+                        onChange={setStepCount}
+                        min={2}
+                        max={6}
+                    />
+                    <SliderControl
+                        label="Max Journeys"
+                        value={maxJourneys}
+                        onChange={setMaxJourneys}
+                        min={10}
+                        max={200}
+                        step={10}
+                    />
                 </div>
+
+                {/* Step Filters (collapsible) */}
+                {showFilters && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="border-t border-white/[0.06] pt-4">
+                            <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-3">
+                                Path Filters
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                                {Array.from({ length: stepCount }, (_, i) => (
+                                    <StepFilterInput
+                                        key={i}
+                                        step={i + 1}
+                                        value={stepFilters[i] || ''}
+                                        onChange={v => updateStepFilter(i, v)}
+                                        onClear={() => clearStepFilter(i)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
             </motion.div>
 
-            {/* ─── Landing & Exit Pages (side by side on desktop) ─── */}
+            {/* ─── Sankey Diagram ─── */}
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="premium-card p-4 sm:p-5"
+                ref={containerRef}
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-emerald-500/10 flex items-center justify-center">
+                            <Route className="w-3 h-3 text-emerald-400" />
+                        </div>
+                        <h3 className="text-sm font-bold text-white">Flow Visualization</h3>
+                        <span className="text-[10px] text-zinc-600 ml-1">
+                            {filteredJourneys.length} journey{filteredJourneys.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="hidden sm:flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-8 h-1.5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-400/40" />
+                            <span className="text-[10px] text-zinc-500">High traffic</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-8 h-1.5 rounded-full bg-gradient-to-r from-red-400 to-red-400/40" />
+                            <span className="text-[10px] text-zinc-500">Exit flow</span>
+                        </div>
+                    </div>
+                </div>
+
+                {filteredJourneys.length > 0 ? (
+                    <div className="overflow-x-auto -mx-2 px-2">
+                        <SankeyDiagram
+                            journeys={filteredJourneys}
+                            width={Math.max(600, containerWidth - 40)}
+                            height={diagramHeight}
+                        />
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-white/[0.04] flex items-center justify-center">
+                            <Route className="w-6 h-6 text-zinc-600" />
+                        </div>
+                        <p className="text-sm text-zinc-500">No journeys match the current filters</p>
+                        <button
+                            onClick={() => {
+                                setStepFilters({});
+                                setStepCount(4);
+                                setMaxJourneys(50);
+                            }}
+                            className="text-[11px] text-emerald-400 hover:text-emerald-300 transition"
+                        >
+                            Reset filters
+                        </button>
+                    </div>
+                )}
+            </motion.div>
+
+            {/* ─── Landing & Exit Pages ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <LandingPagesSection pages={landingPages} />
                 <ExitPagesSection pages={exitPages} />
             </div>
 
-            {/* ─── Empty state ─── */}
+            {/* ─── Empty state (no data at all) ─── */}
             {journeys.length === 0 && (
                 <div className="premium-card p-12 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">

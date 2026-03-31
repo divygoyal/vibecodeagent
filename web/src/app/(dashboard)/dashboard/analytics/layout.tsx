@@ -124,7 +124,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 {/* ─── Sticky Top Bar ─── */}
                 <div className="sticky top-0 z-20 -mx-6 px-6 pb-0 overflow-hidden" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
                     {/* Row 1: Property & Date Range & Controls */}
-                    <div className="flex items-center justify-between py-2 sm:py-3 overflow-hidden">
+                    <div className="flex items-center justify-between py-1.5 sm:py-2 overflow-hidden">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                             <h1 className="text-base sm:text-lg font-bold text-white tracking-tight shrink-0 truncate">Analytics</h1>
                             {/* Property selector (custom dropdown) */}
@@ -186,10 +186,10 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     <Link
                                         key={tab.key}
                                         href={href}
-                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-none px-2.5 sm:px-3.5 py-3 sm:py-2.5 min-h-[44px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-none px-2 sm:px-3 py-2 sm:py-2 min-h-[36px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
                                             isActive
-                                                ? 'text-emerald-400 border-emerald-400 sm:text-blue-400 sm:border-blue-400'
-                                                : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-white/[0.1]'
+                                                ? 'text-white border-white'
+                                                : 'text-zinc-500 border-transparent hover:text-zinc-300'
                                         }`}
                                     >
                                         <tab.icon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
@@ -216,7 +216,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="flex items-center gap-2 pt-4 pb-1 flex-wrap">
+                            <div className="flex items-center gap-2 pt-2 pb-1 flex-wrap">
                                 <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider font-medium">
                                     <Filter className="w-3 h-3" />
                                     Filters
@@ -248,7 +248,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 </AnimatePresence>
 
                 {/* ─── Page content ─── */}
-                <div className="pt-3 sm:pt-5">
+                <div className="pt-2 sm:pt-3">
                     {(propsLoading || containerLoading) ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />

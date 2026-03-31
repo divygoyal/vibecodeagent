@@ -15,6 +15,7 @@ import { useAnalyticsData } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
 import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
+import DataRow from '@/components/analytics/DataRow';
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
 import TableActionMenu, { useTableActions } from '@/components/TableActionMenu';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
@@ -75,6 +76,27 @@ const ChartTooltip = ({ active, payload, label }: any) => {
         </div>
     );
 };
+
+// ─── Sparkline ───
+function Sparkline({ data, dataKey, color = '#34d399' }: { data: any[]; dataKey: string; color?: string }) {
+    if (!data.length) return null;
+    return (
+        <div className="h-[40px] w-full -mt-1">
+            <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                        <linearGradient id={`spark-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.2} />
+                            <stop offset="100%" stopColor={color} stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#spark-${dataKey})`}
+                          strokeWidth={1.5} dot={false} />
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
 
 const CARD = 'premium-card stat-card-hover';
 
@@ -340,8 +362,17 @@ export default function AnalyticsPage() {
     const displayKpis = filteredKpis || kpis;
     const activeStat = CHART_STATS.find(s => s.key === chartStat)!;
 
+    // Sparkline data: last 14 days with computed fields
+    const sparklineData = useMemo(() => {
+        const recent = chartTraffic.slice(-14);
+        return recent.map((d: any) => ({
+            ...d,
+            pagesPerSession: d.sessions > 0 ? d.pageViews / d.sessions : 0,
+        }));
+    }, [chartTraffic]);
+
     return (
-        <div className="space-y-3 sm:space-y-4 overflow-hidden">
+        <div className="space-y-2 sm:space-y-3 overflow-hidden">
             {/* Data freshness */}
             {analyticsData && (
                 <div className="flex justify-end">
@@ -349,7 +380,7 @@ export default function AnalyticsPage() {
                 </div>
             )}
 
-            {/* ─── 1. Compact KPI Strip ─── */}
+            {/* ─── 1. Compact KPI Strip with Sparklines ─── */}
             {kpis && (
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
@@ -358,16 +389,20 @@ export default function AnalyticsPage() {
                 >
                     <div className="grid grid-cols-3 sm:grid-cols-6 divide-x divide-white/[0.04]">
                         {[
-                            { label: 'Unique Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, format: 'number' },
-                            { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, format: 'number' },
-                            { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, format: 'number' },
-                            { label: 'Pages / Session', value: kpis.pagesPerSession || 0, change: 0, format: 'decimal' },
-                            { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, format: 'percent' },
-                            { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, format: 'duration' },
+                            { label: 'Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, format: 'number', sparkKey: 'activeUsers', statKey: 'activeUsers' as ChartStat, color: '#34d399' },
+                            { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, format: 'number', sparkKey: 'sessions', statKey: 'sessions' as ChartStat, color: '#22d3ee' },
+                            { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, format: 'number', sparkKey: 'pageViews', statKey: 'pageViews' as ChartStat, color: '#a78bfa' },
+                            { label: 'Pages / Session', value: kpis.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', statKey: 'pageViews' as ChartStat, color: '#fbbf24' },
+                            { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, format: 'percent', sparkKey: 'bounceRate', statKey: 'bounceRate' as ChartStat, color: '#f472b6' },
+                            { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', statKey: 'sessions' as ChartStat, color: '#60a5fa' },
                         ].map((k, i) => (
-                            <div key={i} className="px-3 py-3 sm:px-4 sm:py-4 text-center">
-                                <p className="text-[10px] text-zinc-500 mb-1 truncate">{k.label}</p>
-                                <p className="text-base sm:text-lg md:text-xl font-bold text-white tabular-nums leading-tight mb-0.5">
+                            <div
+                                key={i}
+                                className={`px-3 py-2 text-center cursor-pointer transition-colors ${chartStat === k.statKey ? 'bg-white/[0.03]' : 'hover:bg-white/[0.02]'}`}
+                                onClick={() => setChartStat(k.statKey)}
+                            >
+                                <p className="text-[10px] font-medium text-zinc-500 mb-0.5 truncate">{k.label}</p>
+                                <p className="text-lg sm:text-xl md:text-2xl font-medium text-white tabular-nums leading-tight">
                                     {k.format === 'duration' ? fmtDur(k.value)
                                         : k.format === 'percent' ? `${k.value}%`
                                         : k.format === 'decimal' ? (typeof k.value === 'number' ? k.value.toFixed(1) : k.value)
@@ -375,6 +410,7 @@ export default function AnalyticsPage() {
                                     }
                                 </p>
                                 <Change value={k.change} />
+                                <Sparkline data={sparklineData} dataKey={k.sparkKey} color={k.color} />
                             </div>
                         ))}
                     </div>
@@ -468,7 +504,7 @@ export default function AnalyticsPage() {
             </motion.div>
 
             {/* ─── 3. Traffic Sources + Pages (tabbed panels, two-column) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
                 <TrafficSourcesPanel
                     referrers={fReferrers}
                     channels={fChannels}
@@ -496,7 +532,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── 4. Technology + Geography (tabbed panels, two-column) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
                 <TechPanel
                     devices={fDevices}
                     browsers={fBrowsers}
@@ -523,7 +559,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ─── 5. Intelligence Cards ─── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 overflow-hidden">
                 <EngagementCard kpis={kpis} />
                 <LoyaltyCard kpis={kpis} />
                 <DiversityCard channels={channels} />
