@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   trailingSlash: false,
+  // Prevent mapbox-gl worker from being transpiled (causes "w is not defined" error)
+  webpack: (config) => {
+    config.module?.rules?.push({
+      test: /\.js$/,
+      include: /node_modules\/mapbox-gl/,
+      type: 'javascript/auto',
+    });
+    return config;
+  },
   // Allow external images (user avatars)
   images: {
     remotePatterns: [
