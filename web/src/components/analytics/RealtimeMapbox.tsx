@@ -30,12 +30,14 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-// Cache the mapboxgl module
+// Cache the mapboxgl module — use CSP build to avoid WebWorker transpilation issues
 let _mapboxgl: any = null;
 async function loadMapboxGL() {
     if (_mapboxgl) return _mapboxgl;
-    const mod = await import('mapbox-gl');
-    _mapboxgl = mod.default;
+    const mod = await import('mapbox-gl/dist/mapbox-gl-csp');
+    _mapboxgl = mod.default || mod;
+    // Point to the pre-built worker served from /public — avoids webpack/SWC transpiling it
+    _mapboxgl.workerUrl = '/mapbox-gl-csp-worker.js';
     return _mapboxgl;
 }
 
