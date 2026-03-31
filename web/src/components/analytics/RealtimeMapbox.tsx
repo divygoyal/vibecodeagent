@@ -30,20 +30,36 @@ function getWarmthColor(warmth: number): string {
     return '#3b82f6';
 }
 
-// Cache the mapboxgl module
-// The default mapbox-gl bundle includes an inline worker that Turbopack transpiles
-// incorrectly ("w is not defined"). We override workerUrl BEFORE creating any Map
-// to load a pre-built worker from /public instead.
+// Load mapbox-gl via <script> tag from /public to completely bypass Turbopack.
+// Turbopack transpiles the inline WebWorker bundle incorrectly ("w is not defined"),
+// and the module namespace object is frozen so workerUrl can't be overridden.
+// Loading as a plain script avoids both problems.
 let _mapboxgl: any = null;
-async function loadMapboxGL() {
-    if (_mapboxgl) return _mapboxgl;
-    const mod = await import('mapbox-gl');
-    const mapboxgl = mod.default ?? mod;
-    // Override worker URL before any Map is created.
-    // The inline worker blob URL (set at import time) is never used.
-    mapboxgl.workerUrl = '/mapbox-gl-csp-worker.js';
-    _mapboxgl = mapboxgl;
-    return _mapboxgl;
+function loadMapboxGL(): Promise<any> {
+    if (_mapboxgl) return Promise.resolve(_mapboxgl);
+    // Already loaded by a previous script tag
+    if (typeof window !== 'undefined' && (window as any).mapboxgl) {
+        const m = (window as any).mapboxgl;
+        m.workerUrl = '/mapbox-gl-csp-worker.js';
+        _mapboxgl = m;
+        return Promise.resolve(_mapboxgl);
+    }
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/mapbox-gl-csp.js';
+        script.onload = () => {
+            const m = (window as any).mapboxgl;
+            if (!m || typeof m.Map !== 'function') {
+                reject(new Error('mapbox-gl failed to load'));
+                return;
+            }
+            m.workerUrl = '/mapbox-gl-csp-worker.js';
+            _mapboxgl = m;
+            resolve(_mapboxgl);
+        };
+        script.onerror = () => reject(new Error('Failed to load mapbox-gl script'));
+        document.head.appendChild(script);
+    });
 }
 
 const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapboxProps>(function RealtimeMapboxInner({ visitors, mapboxToken, autoPan: autoPanProp = false, onAutoPanChange }, ref) {
