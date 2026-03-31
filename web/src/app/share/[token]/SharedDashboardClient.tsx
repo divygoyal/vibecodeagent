@@ -29,11 +29,17 @@ interface PageItem {
     views: number;
 }
 
+interface CountryItem {
+    country: string;
+    users: number;
+}
+
 interface SharedDashboardClientProps {
     kpis: KPI[];
     trafficTrend: TrafficPoint[];
     sources: SourceItem[];
     topPages: PageItem[];
+    countries: CountryItem[];
     showSources: boolean;
     showPages: boolean;
     showGeo: boolean;
@@ -67,8 +73,10 @@ export default function SharedDashboardClient({
     trafficTrend,
     sources,
     topPages,
+    countries,
     showSources,
     showPages,
+    showGeo,
 }: SharedDashboardClientProps) {
     return (
         <div className="space-y-6">
@@ -205,6 +213,33 @@ export default function SharedDashboardClient({
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Countries / Geo */}
+            {showGeo && countries.length > 0 && (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+                    <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Countries</h3>
+                    <div className="space-y-2">
+                        {countries.map((c, i) => {
+                            const maxUsers = Math.max(...countries.map((x) => x.users));
+                            const pct = maxUsers > 0 ? (c.users / maxUsers) * 100 : 0;
+                            return (
+                                <div key={i} className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-zinc-300 truncate">{c.country}</span>
+                                        <span className="text-xs text-zinc-500 font-mono">{fmtNum(c.users)} users</span>
+                                    </div>
+                                    <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-violet-400/40"
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>
