@@ -16,7 +16,7 @@ import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Coins, MessageSquare,
-    CalendarDays, ChevronDown, Bell, Globe, CreditCard, Sparkles, Target
+    ChevronDown, Bell, Globe, CreditCard, Sparkles, Target
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';

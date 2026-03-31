@@ -947,13 +947,8 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
     return result;
 }
 
-// ─── Shared range map for GA4 queries ───
-
-const RANGE_MAP: Record<string, string> = {
-    'today': 'today', 'yesterday': 'yesterday',
-    '7d': '7daysAgo', '14d': '14daysAgo', '30d': '28daysAgo',
-    '90d': '90daysAgo', '6m': '180daysAgo', '12m': '365daysAgo',
-};
+// ─── Shared range resolution for GA4 queries ───
+// Uses resolveRange() defined at the top of this file.
 
 // ─── Retention Cohorts ───
 
@@ -1075,17 +1070,17 @@ export async function fetchGoalData(
     goalPages: string[],
     range: string = '30d'
 ) {
-    const startDate = RANGE_MAP[range] || '28daysAgo';
+    const { startDate, endDate } = resolveRange(range);
 
     // Query total sessions for conversion rate denominator
     const [totalReport, ...pageReports] = await Promise.all([
-        runGAReport(token, propertyId, ['date'], ['sessions'], startDate, 'today', 250),
+        runGAReport(token, propertyId, ['date'], ['sessions'], startDate, endDate, 250),
         ...goalPages.map(page =>
             fetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    dateRanges: [{ startDate, endDate: 'today' }],
+                    dateRanges: [{ startDate, endDate }],
                     metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
                     dimensions: [{ name: 'date' }],
                     dimensionFilter: {
@@ -1133,7 +1128,7 @@ export async function fetchFunnelData(
     stepPages: string[],
     range: string = '30d'
 ) {
-    const startDate = RANGE_MAP[range] || '28daysAgo';
+    const { startDate, endDate } = resolveRange(range);
 
     const reports = await Promise.all(
         stepPages.map(page =>
@@ -1141,7 +1136,7 @@ export async function fetchFunnelData(
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    dateRanges: [{ startDate, endDate: 'today' }],
+                    dateRanges: [{ startDate, endDate }],
                     metrics: [{ name: 'sessions' }],
                     dimensionFilter: {
                         filter: {
@@ -1182,23 +1177,23 @@ export async function fetchJourneyData(
     propertyId: string,
     range: string = '30d'
 ) {
-    const startDate = RANGE_MAP[range] || '28daysAgo';
+    const { startDate, endDate } = resolveRange(range);
 
     const [landingReport, exitReport, allPagesReport] = await Promise.all([
         runGAReport(token, propertyId,
             ['landingPagePlusQueryString'],
             ['sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration'],
-            startDate, 'today', 20, 'sessions'
+            startDate, endDate, 20, 'sessions'
         ),
         runGAReport(token, propertyId,
             ['pagePath'],
             ['sessions', 'activeUsers', 'averageSessionDuration'],
-            startDate, 'today', 20, 'sessions'
+            startDate, endDate, 20, 'sessions'
         ),
         runGAReport(token, propertyId,
             [],
             ['sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration'],
-            startDate, 'today', 1
+            startDate, endDate, 1
         )
     ]);
 

@@ -232,7 +232,7 @@ export function MobileDatePicker({ range, setRange }: DatePickerProps) {
         <div className="px-3 pt-2 pb-1">
             <label className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-1 mb-1.5 block">Date Range</label>
             <div className="flex flex-wrap gap-1.5">
-                {PRESETS.map((item, i) => {
+                {PRESETS.map((item) => {
                     if ('separator' in item) return null;
                     return (
                         <button
