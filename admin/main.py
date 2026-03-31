@@ -1657,11 +1657,12 @@ async def create_shared_dashboard(
 
     return {
         "token": shared.token,
-        "property_id": shared.property_id,
-        "site_url": shared.site_url,
+        "userId": data.user_identifier,
+        "propertyId": shared.property_id,
+        "siteUrl": shared.site_url,
         "config": json.loads(shared.config) if shared.config else {},
         "views": shared.views,
-        "created_at": shared.created_at.isoformat() if shared.created_at else None,
+        "createdAt": shared.created_at.isoformat() if shared.created_at else None,
     }
 
 
@@ -1683,18 +1684,20 @@ async def list_shared_dashboards(
     )
     shares = result.scalars().all()
 
-    return [
-        {
-            "token": s.token,
-            "property_id": s.property_id,
-            "site_url": s.site_url,
-            "config": json.loads(s.config) if s.config else {},
-            "views": s.views,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-            "last_viewed_at": s.last_viewed_at.isoformat() if s.last_viewed_at else None,
-        }
-        for s in shares
-    ]
+    return {
+        "shares": [
+            {
+                "token": s.token,
+                "userId": user_identifier,
+                "propertyId": s.property_id,
+                "siteUrl": s.site_url,
+                "config": json.loads(s.config) if s.config else {},
+                "views": s.views,
+                "createdAt": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in shares
+        ]
+    }
 
 
 @app.delete("/api/shared-dashboards/{token}")
@@ -1744,13 +1747,21 @@ async def view_shared_dashboard(
     shared.last_viewed_at = datetime.utcnow()
     await db.commit()
 
+    # Look up the owner's GitHub ID so the web app can fetch their Google tokens
+    user_identifier = None
+    user_result = await db.execute(select(User).where(User.id == shared.user_id))
+    owner = user_result.scalar_one_or_none()
+    if owner:
+        user_identifier = owner.github_id or owner.email
+
     return {
         "token": shared.token,
-        "property_id": shared.property_id,
-        "site_url": shared.site_url,
+        "userId": user_identifier,
+        "propertyId": shared.property_id,
+        "siteUrl": shared.site_url,
         "config": json.loads(shared.config) if shared.config else {},
         "views": shared.views,
-        "created_at": shared.created_at.isoformat() if shared.created_at else None,
+        "createdAt": shared.created_at.isoformat() if shared.created_at else None,
     }
 
 
