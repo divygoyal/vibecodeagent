@@ -105,7 +105,27 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
         let map: any;
         let destroyed = false;
+        let readyFired = false;
         setStatus('loading');
+
+        // Helper: mark map as ready (deduplicated — style.load and load both call this)
+        const markReady = () => {
+            if (readyFired || destroyed) return;
+            readyFired = true;
+            mapRef.current = map;
+            setStatus('ready');
+            retryCountRef.current = 0;
+
+            // Hide branding
+            const logo = containerRef.current?.querySelector('.mapboxgl-ctrl-logo');
+            if (logo) (logo as HTMLElement).style.display = 'none';
+            const attrib = containerRef.current?.querySelector('.mapboxgl-ctrl-attrib');
+            if (attrib) (attrib as HTMLElement).style.display = 'none';
+
+            if (autoPanRef.current) {
+                startAutoPan();
+            }
+        };
 
         (async () => {
             try {
@@ -131,31 +151,20 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                 });
 
                 map.on('error', (e: any) => {
-                    const msg = e?.error?.message || 'Unknown map error';
+                    const msg = e?.error?.message || e?.message || 'Unknown map error';
                     console.warn('Mapbox error:', msg);
                     if (e?.error?.status === 401 || e?.error?.status === 403) {
                         setStatus('error');
                         setErrorMsg('Invalid Mapbox token');
+                    } else if (msg.includes('WebGL') || msg.includes('Failed to initialize')) {
+                        setStatus('error');
+                        setErrorMsg('WebGL not available — try a different browser or enable hardware acceleration');
                     }
                 });
 
-                map.on('load', () => {
-                    if (destroyed) return;
-                    mapRef.current = map;
-                    setStatus('ready');
-                    retryCountRef.current = 0;
-
-                    // Hide branding
-                    const logo = containerRef.current?.querySelector('.mapboxgl-ctrl-logo');
-                    if (logo) (logo as HTMLElement).style.display = 'none';
-                    const attrib = containerRef.current?.querySelector('.mapboxgl-ctrl-attrib');
-                    if (attrib) (attrib as HTMLElement).style.display = 'none';
-
-                    if (autoPanRef.current) {
-                        startAutoPan();
-                    }
-                });
-
+                // Use style.load as the primary ready signal — it fires earlier and more
+                // reliably than 'load' (which waits for ALL tiles/sprites to finish).
+                // The 'load' event may never fire if any tile request stalls or fails.
                 map.on('style.load', () => {
                     if (destroyed) return;
                     map.setFog({
@@ -165,7 +174,21 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                         'space-color': 'rgb(6, 6, 14)',
                         'star-intensity': 0.7,
                     });
+                    markReady();
                 });
+
+                // Also listen to 'load' as a fallback in case style.load somehow missed
+                map.on('load', () => markReady());
+
+                // Timeout fallback: if neither event fires within 8 seconds, force ready
+                // (the map canvas is usually visible even if tiles are still loading)
+                setTimeout(() => {
+                    if (!readyFired && !destroyed && map) {
+                        console.warn('Mapbox: load/style.load did not fire within 8s, forcing ready');
+                        mapRef.current = map;
+                        markReady();
+                    }
+                }, 8000);
 
                 // On user interaction: stop auto-pan permanently
                 const disableAutoPan = () => {
@@ -322,13 +345,13 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     }, [initMap]);
 
     return (
-        <>
+        <div className="relative w-full h-full" style={{ minHeight: '100%' }}>
             <style>{`
                 .mapboxgl-ctrl-logo { display: none !important; }
                 .mapboxgl-ctrl-attrib { display: none !important; }
             `}</style>
 
-            <div ref={containerRef} className="w-full h-full" style={{ background: '#080c18' }} />
+            <div ref={containerRef} className="absolute inset-0" style={{ background: '#080c18' }} />
 
             {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: '#080c18' }}>
@@ -352,7 +375,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 }));
 
