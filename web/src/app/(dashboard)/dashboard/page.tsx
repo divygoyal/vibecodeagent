@@ -43,6 +43,7 @@ const OverviewInsights = dynamic(() => import('@/components/OverviewInsights'), 
 const OverviewDetailDrawer = dynamic(() => import('@/components/OverviewDetailDrawer'), { ssr: false });
 const DomainOverview = dynamic(() => import('@/components/DomainOverview'), { ssr: false });
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
+const LiveVisitorDrawer = dynamic(() => import('@/components/analytics/LiveVisitorDrawer'), { ssr: false });
 
 /* ─── Animation variants ─── */
 const fadeInUp = {
@@ -166,6 +167,7 @@ export default function DashboardOverview() {
 
   // Track data freshness timestamp
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [liveDrawerOpen, setLiveDrawerOpen] = useState(false);
 
   // 1. Container status + Google connection check
   const { botStatus, hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
@@ -577,14 +579,17 @@ export default function DashboardOverview() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Real-time Active Users */}
             {activeUsers !== null && (
-              <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-500/[0.06] border border-emerald-500/[0.12] rounded-xl backdrop-blur-sm">
+              <button
+                onClick={() => setLiveDrawerOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-500/[0.06] border border-emerald-500/[0.12] rounded-xl backdrop-blur-sm hover:bg-emerald-500/[0.1] hover:border-emerald-500/[0.2] transition-colors cursor-pointer"
+              >
                 <div className="relative">
                   <div className="w-2 h-2 rounded-full bg-emerald-400" />
                   <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 </div>
                 <span className="text-sm font-bold text-emerald-400 font-mono">{activeUsers}</span>
                 <span className="text-[10px] text-zinc-500">live</span>
-              </div>
+              </button>
             )}
 
           {/* Custom Site Selector Dropdown */}
@@ -2088,6 +2093,14 @@ export default function DashboardOverview() {
         open={!!drawerContent}
         onClose={() => setDrawerContent(null)}
         content={drawerContent}
+      />
+
+      {/* Live Visitor Drawer */}
+      <LiveVisitorDrawer
+        open={liveDrawerOpen}
+        onClose={() => setLiveDrawerOpen(false)}
+        data={realtimeData}
+        isLoading={!realtimeData && activeUsers === null}
       />
     </motion.div>
   );
