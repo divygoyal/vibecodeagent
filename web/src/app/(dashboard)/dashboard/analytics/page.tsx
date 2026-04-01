@@ -1,5 +1,5 @@
 'use client';
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
@@ -19,25 +19,38 @@ import {
     Maximize2,
     Sparkles,
     Layers3,
+    BookmarkPlus,
+    Copy,
+    RotateCcw,
+    Shield,
+    SlidersHorizontal,
+    Trash2,
 } from 'lucide-react';
 import { exportAnalyticsData, exportAnalyticsZip } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
-import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
 import { BrowserIcon, ChannelIcon, CountryFlag, DeviceIcon, OSIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import DataRow from '@/components/analytics/DataRow';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
-import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
+import HeroAnalyticsReport from '@/components/analytics/HeroAnalyticsReport';
 import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
+import type {
+    AnalyticsChartMode,
+    AnalyticsChartMetric,
+    AnalyticsQueryMetric,
+    AnalyticsSecondaryMetric,
+    AnalyticsTimeBucket,
+    AnalyticsViewConfig,
+} from '@/types/analyticsWorkspace';
 
 const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr: false });
 
 type AccentTone = 'mint' | 'cyan' | 'violet' | 'amber' | 'rose' | 'blue';
-type ChartStat = 'activeUsers' | 'sessions' | 'pageViews' | 'bounceRate';
-type TimeBucket = 'day' | 'week' | 'month';
+type ChartStat = AnalyticsChartMetric;
+type TimeBucket = AnalyticsTimeBucket;
 type KpiFormat = 'number' | 'percent' | 'decimal' | 'duration';
-type SupportMetric = 'sessions' | 'pageViews';
+type SupportMetric = Exclude<AnalyticsSecondaryMetric, 'none'>;
 
 const ACCENT_COLORS: Record<AccentTone, string> = {
     mint: '#49e0b7',
@@ -68,6 +81,16 @@ const CHART_STATS: {
 
 const BUCKET_LABELS: Record<TimeBucket, string> = { day: 'Day', week: 'Week', month: 'Month' };
 const BUCKET_OPTIONS: TimeBucket[] = ['day', 'week', 'month'];
+const CHART_MODE_OPTIONS: { value: AnalyticsChartMode; label: string }[] = [
+    { value: 'combo', label: 'Combo' },
+    { value: 'line', label: 'Line' },
+    { value: 'area', label: 'Area' },
+];
+const SECONDARY_OPTIONS: { value: AnalyticsSecondaryMetric; label: string }[] = [
+    { value: 'none', label: 'No bars' },
+    { value: 'sessions', label: 'Sessions' },
+    { value: 'pageViews', label: 'Page Views' },
+];
 const CARD = 'premium-card analytics-surface-card analytics-card-hover';
 const EMPTY_LIST: any[] = [];
 
@@ -128,6 +151,14 @@ function getPointStatus(current: number, rolling: number, previous?: number | nu
     if (rolling > 0 && current <= rolling * 0.82) return 'Cooling off';
     if (previous != null && previous > 0 && current >= previous * 1.18) return 'Building';
     return 'Steady';
+}
+
+function getMetricLabel(metric: ChartStat | AnalyticsSecondaryMetric) {
+    if (metric === 'activeUsers') return 'Users';
+    if (metric === 'sessions') return 'Sessions';
+    if (metric === 'pageViews') return 'Page Views';
+    if (metric === 'bounceRate') return 'Bounce Rate';
+    return 'No bars';
 }
 
 function getStrongestClimb(data: any[], stat: ChartStat, bucket: TimeBucket) {
@@ -406,6 +437,30 @@ function TimeBucketDropdown({ bucket, setBucket }: { bucket: TimeBucket; setBuck
     );
 }
 
+function ToolbarSelect({
+    value,
+    onChange,
+    options,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    options: { value: string; label: string }[];
+}) {
+    return (
+        <select
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className="analytics-control-select"
+        >
+            {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                    {option.label}
+                </option>
+            ))}
+        </select>
+    );
+}
+
 function PanelEmptyState({ title, copy }: { title: string; copy: string }) {
     return (
         <div className="analytics-empty-state">
@@ -506,10 +561,9 @@ function PanelShell({
 export default function AnalyticsPage() {
     const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
-    const { filters, toggleFilter, compareMode, setCompareMode } = useFilterStore();
-    const [drilldown, setDrilldown] = useState<any>(null);
-    const [chartStat, setChartStat] = useState<ChartStat>('activeUsers');
-    const [bucket, setBucket] = useState<TimeBucket>('day');
+    const { filters, advancedFilters, toggleFilter } = useFilterStore();
+    const [heroMetric, setHeroMetric] = useState<AnalyticsQueryMetric>('activeUsers');
+    const [activeKpiCardId, setActiveKpiCardId] = useState('users');
 
     useEffect(() => {
         const csvHandler = () => {
@@ -550,7 +604,6 @@ export default function AnalyticsPage() {
     const fEntryPages = filters.page.length > 0 ? entryPages.filter((page: any) => filters.page.includes(page.page)) : entryPages;
 
     const anyFilterActive = Object.values(filters).some((values) => values.length > 0);
-    const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0);
 
     const filteredKpis = useMemo(() => {
         if (!kpis || !anyFilterActive) return null;
@@ -595,7 +648,6 @@ export default function AnalyticsPage() {
             totalSessions: Math.round(kpis.totalSessions * ratio),
             totalPageViews: Math.round(kpis.totalPageViews * ratio),
             avgBounceRate: kpis.avgBounceRate,
-            _ratio: ratio,
         };
     }, [
         anyFilterActive,
@@ -617,126 +669,47 @@ export default function AnalyticsPage() {
         referrers,
     ]);
 
-    const chartTraffic = useMemo(() => {
-        if (!anyFilterActive || !filteredKpis) return traffic;
-        const ratio = filteredKpis._ratio;
-        return traffic.map((item: any) => ({
-            ...item,
-            activeUsers: Math.round((item.activeUsers || 0) * ratio),
-            sessions: Math.round((item.sessions || 0) * ratio),
-            pageViews: Math.round((item.pageViews || 0) * ratio),
-        }));
-    }, [anyFilterActive, filteredKpis, traffic]);
-
-    const bucketedTraffic = useMemo(() => aggregateByBucket(chartTraffic, bucket), [bucket, chartTraffic]);
-
-    const comparisonTraffic = useMemo(() => {
-        if (!compareMode || !bucketedTraffic.length || !kpis) return bucketedTraffic;
-        const scaleUsers = kpis.changeUsers !== 0 ? 100 / (100 + kpis.changeUsers) : 1;
-        const scaleSessions = kpis.changeSessions !== 0 ? 100 / (100 + kpis.changeSessions) : 1;
-        const scalePageViews = kpis.changePageViews !== 0 ? 100 / (100 + kpis.changePageViews) : 1;
-        const bounceShift = kpis.changeBounceRate || 0;
-        return bucketedTraffic.map((item: any) => ({
-            ...item,
-            prevActiveUsers: Math.round((item.activeUsers || 0) * scaleUsers),
-            prevSessions: Math.round((item.sessions || 0) * scaleSessions),
-            prevPageViews: Math.round((item.pageViews || 0) * scalePageViews),
-            prevBounceRate: Math.max(0, Math.round(((item.bounceRate || 0) - bounceShift) * 10) / 10),
-        }));
-    }, [bucketedTraffic, compareMode, kpis]);
-
     const displayKpis = filteredKpis || kpis;
 
     const sparklineData = useMemo(() => {
-        const recent = chartTraffic.slice(-14);
+        const recent = traffic.slice(-14);
         return recent.map((item: any) => ({
             ...item,
             pagesPerSession: item.sessions > 0 ? item.pageViews / item.sessions : 0,
             avgSessionDuration: kpis?.avgSessionDuration || 0,
         }));
-    }, [chartTraffic, kpis?.avgSessionDuration]);
-
-    const activeChartStat = chartStat;
-    const activeStat = CHART_STATS.find((stat) => stat.key === activeChartStat) || CHART_STATS[0];
-    const peak = getSeriesPeak(bucketedTraffic, activeChartStat, bucket);
-    const average = getSeriesAverage(bucketedTraffic, activeChartStat);
-    const chartChange = getChangeForStat(kpis, activeChartStat);
-    const strongestClimb = getStrongestClimb(bucketedTraffic, activeChartStat, bucket);
-    const reduceChartMotion = comparisonTraffic.length > 36 || activeFilterCount > 2;
-
-    const chartDetails = useMemo(() => {
-        const previousKey = getPrevDataKey(activeChartStat);
-        const values = comparisonTraffic.map((item: any) => Number(item[activeChartStat] || 0));
-        const supportValues = comparisonTraffic.map((item: any) => Number(item[activeStat.supportKey] || 0));
-
-        const rows = comparisonTraffic.map((item: any, index: number) => {
-            const chartValue = Number(item[activeChartStat] || 0);
-            const compareValue = compareMode ? Number(item[previousKey] || 0) : null;
-            const rollingAverage = Number(getRollingAverage(values, index).toFixed(activeChartStat === 'bounceRate' ? 1 : 0));
-            const supportValue = supportValues[index] || 0;
-            const status = getPointStatus(chartValue, rollingAverage, compareValue);
-            return {
-                ...item,
-                chartValue,
-                compareValue,
-                rollingAverage,
-                supportValue,
-                status,
-            };
-        });
-
-        const annotationCandidates = rows
-            .map((row: any) => {
-                const rolling = Number(row.rollingAverage || 0);
-                const current = Number(row.chartValue || 0);
-                if (!rolling) return null;
-                const distance = Math.abs(current - rolling) / rolling;
-                if (distance < 0.18) return null;
-                return {
-                    date: row.date,
-                    chartValue: current,
-                    label: current >= rolling ? 'Spike' : 'Dip',
-                    score: distance,
-                };
-            })
-            .filter(Boolean)
-            .sort((left: any, right: any) => right.score - left.score)
-            .slice(0, 2);
-
-        const leadAnnotation = annotationCandidates[0];
-        let chartInsight = getSeriesInsight(bucketedTraffic, activeChartStat, bucket);
-
-        if (leadAnnotation) {
-            chartInsight = `${formatBucketLabel(leadAnnotation.date, bucket)} printed a ${leadAnnotation.label.toLowerCase()} while ${activeStat.supportLabel.toLowerCase()} support held at ${fmt(
-                rows.find((row: any) => row.date === leadAnnotation.date)?.supportValue || 0,
-            )}.`;
-        }
-
-        return {
-            rows,
-            annotations: annotationCandidates,
-            chartInsight,
-        };
-    }, [activeChartStat, activeStat.supportKey, activeStat.supportLabel, bucket, bucketedTraffic, compareMode, comparisonTraffic]);
+    }, [traffic, kpis?.avgSessionDuration]);
 
     const kpiCards: {
+        id: string;
         label: string;
         value: number;
         change: number;
         format: KpiFormat;
         sparkKey: string;
-        statKey: ChartStat;
         tone: AccentTone;
         caption: string;
+        reportMetric: AnalyticsQueryMetric;
         zeroLabel?: string;
     }[] = [
-        { label: 'Users', value: displayKpis?.totalUsers ?? kpis?.totalUsers ?? 0, change: kpis?.changeUsers ?? 0, format: 'number', sparkKey: 'activeUsers', statKey: 'activeUsers', tone: 'mint', caption: 'Audience' },
-        { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis?.totalSessions ?? 0, change: kpis?.changeSessions ?? 0, format: 'number', sparkKey: 'sessions', statKey: 'sessions', tone: 'cyan', caption: 'Visits' },
-        { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis?.totalPageViews ?? 0, change: kpis?.changePageViews ?? 0, format: 'number', sparkKey: 'pageViews', statKey: 'pageViews', tone: 'violet', caption: 'Consumption' },
-        { label: 'Pages / Session', value: kpis?.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', statKey: 'pageViews', tone: 'amber', caption: 'Depth', zeroLabel: 'No delta' },
-        { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis?.avgBounceRate ?? 0, change: kpis?.changeBounceRate ?? 0, format: 'percent', sparkKey: 'bounceRate', statKey: 'bounceRate', tone: 'rose', caption: 'Quality' },
-        { label: 'Avg Duration', value: kpis?.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', statKey: 'sessions', tone: 'blue', caption: 'Retention', zeroLabel: 'No delta' },
+        { id: 'users', label: 'Users', value: displayKpis?.totalUsers ?? kpis?.totalUsers ?? 0, change: kpis?.changeUsers ?? 0, format: 'number', sparkKey: 'activeUsers', tone: 'mint', caption: 'Audience', reportMetric: 'activeUsers' },
+        { id: 'sessions', label: 'Sessions', value: displayKpis?.totalSessions ?? kpis?.totalSessions ?? 0, change: kpis?.changeSessions ?? 0, format: 'number', sparkKey: 'sessions', tone: 'cyan', caption: 'Visits', reportMetric: 'sessions' },
+        { id: 'pageViews', label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis?.totalPageViews ?? 0, change: kpis?.changePageViews ?? 0, format: 'number', sparkKey: 'pageViews', tone: 'violet', caption: 'Consumption', reportMetric: 'screenPageViews' },
+        { id: 'pagesPerSession', label: 'Pages / Session', value: kpis?.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', tone: 'amber', caption: 'Depth', reportMetric: 'screenPageViews', zeroLabel: 'No delta' },
+        { id: 'bounceRate', label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis?.avgBounceRate ?? 0, change: kpis?.changeBounceRate ?? 0, format: 'percent', sparkKey: 'bounceRate', tone: 'rose', caption: 'Quality', reportMetric: 'bounceRate' },
+        { id: 'avgDuration', label: 'Avg Duration', value: kpis?.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', tone: 'blue', caption: 'Retention', reportMetric: 'averageSessionDuration', zeroLabel: 'No delta' },
     ];
+
+    const handleKpiSelect = (cardId: string, metric: AnalyticsQueryMetric) => {
+        setActiveKpiCardId(cardId);
+        setHeroMetric(metric);
+    };
+
+    const handleHeroMetricChange = (metric: AnalyticsQueryMetric) => {
+        setHeroMetric(metric);
+        const matchingCard = kpiCards.find((card) => card.reportMetric === metric);
+        setActiveKpiCardId(matchingCard?.id || '');
+    };
 
     if (isLoading && !analyticsData) return <SkeletonDashboard />;
 
@@ -777,39 +750,17 @@ export default function AnalyticsPage() {
 
     return (
         <div className="analytics-main-page space-y-4 overflow-hidden pb-5 sm:space-y-5">
-            {analyticsData && (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="analytics-note-pill subtle text-xs">
-                            <Sparkles className="h-3.5 w-3.5 text-[var(--analytics-mint)]" />
-                            Analytics main board
-                        </span>
-                        {anyFilterActive && (
-                            <span className="analytics-note-pill text-xs">
-                                <FilterIcon className="h-3.5 w-3.5 text-[var(--analytics-cyan)]" />
-                                {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'} active
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex justify-end">
-                        <div className="analytics-meta-pill text-xs">
-                            <LastUpdated timestamp={new Date()} onRefresh={() => refresh()} isRefreshing={isLoading} />
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {kpis && (
                 <div className={`${CARD} analytics-kpi-shell overflow-hidden`}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6">
                         {kpiCards.map((metric) => {
-                            const isActive = activeChartStat === metric.statKey;
+                            const isActive = activeKpiCardId === metric.id;
                             return (
                                 <button
-                                    key={metric.label}
+                                    key={metric.id}
                                     className={`analytics-kpi-tile text-left ${isActive ? 'is-active' : ''}`}
                                     data-tone={metric.tone}
-                                    onClick={() => setChartStat(metric.statKey)}
+                                    onClick={() => handleKpiSelect(metric.id, metric.reportMetric)}
                                     type="button"
                                 >
                                     <div className="relative z-10 flex items-start justify-between gap-3">
@@ -832,255 +783,22 @@ export default function AnalyticsPage() {
                 </div>
             )}
 
-            <div className={`${CARD} overflow-hidden p-4 sm:p-6`}>
-                <div className="border-b border-white/[0.05] pb-4">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="min-w-0 space-y-2">
-                            <div className="analytics-kicker">
-                                <span className="analytics-dot" style={{ color: activeStat.color, backgroundColor: activeStat.color }} />
-                                Traffic overview
-                            </div>
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-                                <div>
-                                    <h3 className="text-lg font-semibold tracking-tight text-white sm:text-xl">{activeStat.label} trend</h3>
-                                    <p className="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-400">{chartDetails.chartInsight}</p>
-                                </div>
-                                {anyFilterActive && (
-                                    <span className="analytics-note-pill text-xs">
-                                        <FilterIcon className="h-3.5 w-3.5 text-[var(--analytics-cyan)]" />
-                                        Filtered segment
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                onClick={() => setCompareMode(!compareMode)}
-                                className={`analytics-toolbar-btn text-[11px] ${compareMode ? 'is-active' : ''}`}
-                                type="button"
-                            >
-                                <span className="inline-block w-4 border-t border-dashed border-current" />
-                                Prev period
-                            </button>
-                            <button onClick={() => refresh()} className="analytics-toolbar-btn px-3" type="button">
-                                <RefreshCw className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                                onClick={() => analyticsData && exportAnalyticsData(analyticsData)}
-                                className="analytics-toolbar-btn px-3"
-                                type="button"
-                            >
-                                <Download className="h-3.5 w-3.5" />
-                            </button>
-                            <TimeBucketDropdown bucket={bucket} setBucket={setBucket} />
-                        </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                        {CHART_STATS.map((stat) => (
-                            <button
-                                key={stat.key}
-                                onClick={() => setChartStat(stat.key)}
-                                className={`analytics-segment-btn ${activeChartStat === stat.key ? 'is-active' : ''}`}
-                                type="button"
-                            >
-                                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stat.color }} />
-                                {stat.label}
-                            </button>
-                        ))}
-                        <span className="analytics-note-pill subtle text-[11px]">
-                            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SUPPORT_BAR_COLOR }} />
-                            {activeStat.supportLabel} bars
-                        </span>
-                        <span className="analytics-note-pill subtle text-[11px]">
-                            <span className="h-[2px] w-4 rounded-full" style={{ backgroundColor: ROLLING_AVERAGE_COLOR }} />
-                            Rolling average
-                        </span>
-                        {compareMode && (
-                            <span className="analytics-note-pill subtle text-[11px]">
-                                <span className="inline-block w-4 border-t border-dashed" style={{ borderColor: COMPARE_LINE_COLOR }} />
-                                Previous period
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                <div className="pt-4">
-                    <div className="analytics-chart-stage px-2 py-4 sm:px-3">
-                        <div className="mb-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                            <div className="analytics-chart-stat">
-                                <span className="analytics-chart-stat-label">Hero line</span>
-                                <div className="mt-1 flex items-end gap-2">
-                                    <span className="text-base font-semibold text-white">{activeStat.label}</span>
-                                    {peak && <span className="text-[11px] text-zinc-500">peaked at {peak.value}</span>}
-                                </div>
-                            </div>
-                            <div className="analytics-chart-stat">
-                                <span className="analytics-chart-stat-label">Support bars</span>
-                                <div className="mt-1 flex items-end gap-2">
-                                    <span className="text-base font-semibold text-white">{activeStat.supportLabel}</span>
-                                    <span className="text-[11px] text-zinc-500">secondary demand story</span>
-                                </div>
-                            </div>
-                            <div className="analytics-chart-stat">
-                                <span className="analytics-chart-stat-label">Rolling average</span>
-                                <div className="mt-1 flex items-end gap-2">
-                                    <span className="text-base font-semibold text-white">3-point trend</span>
-                                    <span className="text-[11px] text-zinc-500">signal smoothing</span>
-                                </div>
-                            </div>
-                            <div className="analytics-chart-stat">
-                                <span className="analytics-chart-stat-label">Period compare</span>
-                                <div className="mt-1 flex items-end gap-2">
-                                    <span className="text-base font-semibold text-white">{compareMode ? 'Enabled' : 'Optional'}</span>
-                                    <span className="text-[11px] text-zinc-500">previous-period overlay</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="h-[310px] sm:h-[360px] lg:h-[400px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={chartDetails.rows} margin={{ top: 8, right: 10, left: 0, bottom: 0 }} barCategoryGap="18%">
-                                    <defs>
-                                        <linearGradient id={`chart-grad-${activeChartStat}`} x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor={activeStat.color} stopOpacity={0.34} />
-                                            <stop offset="80%" stopColor={activeStat.color} stopOpacity={0.06} />
-                                            <stop offset="100%" stopColor={activeStat.color} stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="chart-support-grad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#d9976c" stopOpacity={0.9} />
-                                            <stop offset="100%" stopColor="#724932" stopOpacity={0.22} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid vertical={false} strokeDasharray="2 10" stroke="rgba(255,255,255,0.055)" />
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                                        tickFormatter={(value: string) => formatBucketLabel(value, bucket)}
-                                        axisLine={false}
-                                        tickLine={false}
-                                        minTickGap={18}
-                                    />
-                                    <YAxis
-                                        yAxisId="left"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                                        tickFormatter={(value: number) => activeChartStat === 'bounceRate' ? `${Math.round(value)}%` : fmt(Number(value))}
-                                        width={44}
-                                    />
-                                    <YAxis
-                                        yAxisId="right"
-                                        orientation="right"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 11, fill: '#546070' }}
-                                        tickFormatter={(value: number) => fmt(Number(value))}
-                                        width={40}
-                                    />
-                                    <Tooltip
-                                        cursor={{ stroke: 'rgba(255,255,255,0.14)', strokeDasharray: '4 6' }}
-                                        content={(props) => <ChartTooltip {...props} bucket={bucket} activeStat={activeStat} supportLabel={activeStat.supportLabel} />}
-                                    />
-                                    <Bar
-                                        yAxisId="right"
-                                        dataKey="supportValue"
-                                        name={activeStat.supportLabel}
-                                        fill="url(#chart-support-grad)"
-                                        barSize={reduceChartMotion ? 14 : 18}
-                                        radius={[8, 8, 0, 0]}
-                                        isAnimationActive={!reduceChartMotion}
-                                        animationDuration={reduceChartMotion ? 0 : 220}
-                                    />
-                                    {compareMode && (
-                                        <Line
-                                            yAxisId="left"
-                                            type="monotone"
-                                            dataKey="compareValue"
-                                            name="Previous period"
-                                            stroke={COMPARE_LINE_COLOR}
-                                            strokeWidth={1.7}
-                                            strokeDasharray="4 6"
-                                            dot={false}
-                                            activeDot={false}
-                                            isAnimationActive={false}
-                                        />
-                                    )}
-                                    <Line
-                                        yAxisId="left"
-                                        type="monotone"
-                                        dataKey="rollingAverage"
-                                        name="Rolling average"
-                                        stroke={ROLLING_AVERAGE_COLOR}
-                                        strokeWidth={1.7}
-                                        strokeDasharray="3 6"
-                                        dot={false}
-                                        activeDot={false}
-                                        isAnimationActive={false}
-                                    />
-                                    <Area
-                                        yAxisId="left"
-                                        type="monotone"
-                                        dataKey="chartValue"
-                                        name={activeStat.label}
-                                        stroke={activeStat.color}
-                                        fill={`url(#chart-grad-${activeChartStat})`}
-                                        strokeWidth={3}
-                                        dot={false}
-                                        activeDot={{ r: 4.5, stroke: '#ffffff', strokeWidth: 1.5, fill: activeStat.color }}
-                                        isAnimationActive={!reduceChartMotion}
-                                        animationDuration={reduceChartMotion ? 0 : 220}
-                                    />
-                                    {chartDetails.annotations.map((annotation: any) => (
-                                        <ReferenceDot
-                                            key={`${annotation.date}-${annotation.label}`}
-                                            yAxisId="left"
-                                            x={annotation.date}
-                                            y={annotation.chartValue}
-                                            r={4.5}
-                                            fill={annotation.label === 'Spike' ? activeStat.color : SUPPORT_BAR_COLOR}
-                                            stroke="#f8fafc"
-                                            strokeWidth={1.4}
-                                            label={{ value: annotation.label, position: 'top', fill: '#9ea8bb', fontSize: 10 }}
-                                        />
-                                    ))}
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div className="analytics-chart-insight-card">
-                            <span className="analytics-chart-stat-label">Peak day</span>
-                            <div className="mt-2 flex items-end justify-between gap-3">
-                                <span className="text-lg font-semibold text-white">{peak?.value || '--'}</span>
-                                <span className="text-xs text-zinc-500">{peak?.label || 'No signal'}</span>
-                            </div>
-                        </div>
-                        <div className="analytics-chart-insight-card">
-                            <span className="analytics-chart-stat-label">Period average</span>
-                            <div className="mt-2 flex items-end justify-between gap-3">
-                                <span className="text-lg font-semibold text-white">{average || '--'}</span>
-                                <span className="text-xs text-zinc-500">rolling line anchored</span>
-                            </div>
-                        </div>
-                        <div className="analytics-chart-insight-card">
-                            <span className="analytics-chart-stat-label">Strongest 3-step climb</span>
-                            <div className="mt-2 flex items-end justify-between gap-3">
-                                <span className="text-lg font-semibold text-white">{strongestClimb?.value || '--'}</span>
-                                <span className="text-right text-xs text-zinc-500">{strongestClimb?.label || 'Not enough history'}</span>
-                            </div>
-                        </div>
-                        <div className="analytics-chart-insight-card">
-                            <span className="analytics-chart-stat-label">Current vs previous</span>
-                            <div className="mt-2 flex items-center justify-between gap-3">
-                                <Change value={chartChange} zeroLabel="Flat period" />
-                                <span className="text-xs text-zinc-500">period-wide delta</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <HeroAnalyticsReport
+                propertyId={selectedProperty}
+                range={range}
+                filters={filters}
+                advancedFilters={advancedFilters}
+                externalMetric={heroMetric}
+                onMetricChange={handleHeroMetricChange}
+                onExport={() => {
+                    if (analyticsData) exportAnalyticsData(analyticsData);
+                }}
+            />
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TrafficSourcesPanel
+                    title="Traffic Sources"
+                    rowLimit={25}
                     referrers={fReferrers}
                     channels={fChannels}
                     allReferrers={referrers}
@@ -1089,6 +807,8 @@ export default function AnalyticsPage() {
                     toggleFilter={toggleFilter}
                 />
                 <PagesPanel
+                    title="Top Pages"
+                    rowLimit={25}
                     pages={fPages}
                     entryPages={fEntryPages}
                     allPages={pages}
@@ -1099,8 +819,25 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <TechPanel devices={fDevices} browsers={fBrowsers} operatingSystems={fOS} filters={filters} toggleFilter={toggleFilter} />
-                <GeoPanel countries={fCountries} cities={fCities} languages={languages} allCountries={countries} filters={filters} toggleFilter={toggleFilter} />
+                <TechPanel
+                    title="Technology Mix"
+                    rowLimit={25}
+                    devices={fDevices}
+                    browsers={fBrowsers}
+                    operatingSystems={fOS}
+                    filters={filters}
+                    toggleFilter={toggleFilter}
+                />
+                <GeoPanel
+                    title="Geo Reach"
+                    rowLimit={25}
+                    countries={fCountries}
+                    cities={fCities}
+                    languages={languages}
+                    allCountries={countries}
+                    filters={filters}
+                    toggleFilter={toggleFilter}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -1108,13 +845,13 @@ export default function AnalyticsPage() {
                 <LoyaltyCard kpis={kpis} />
                 <DiversityCard channels={channels} />
             </div>
-
-            <DrilldownDrawer open={!!drilldown} onClose={() => setDrilldown(null)} data={drilldown} />
         </div>
     );
 }
 
 function TrafficSourcesPanel({
+    title,
+    rowLimit,
     referrers,
     channels,
     allReferrers,
@@ -1122,6 +859,8 @@ function TrafficSourcesPanel({
     filters,
     toggleFilter,
 }: {
+    title: string;
+    rowLimit: number;
     referrers: any[];
     channels: any[];
     allReferrers: any[];
@@ -1138,7 +877,7 @@ function TrafficSourcesPanel({
 
     return (
         <PanelShell
-            title="Traffic Sources"
+            title={title}
             eyebrow="Acquisition"
             tone="mint"
             tabs={[
@@ -1149,7 +888,7 @@ function TrafficSourcesPanel({
             onTabChange={(key) => setTab(key as 'referrers' | 'channels')}
             leftLabel={tab === 'referrers' ? 'Referrer' : 'Channel'}
             rightLabel={tab === 'referrers' ? 'Sessions' : 'Visitors'}
-            meta={`${Math.min(tab === 'referrers' ? referrers.length : channels.length, 25)} rows`}
+            meta={`${Math.min(tab === 'referrers' ? referrers.length : channels.length, rowLimit)} rows`}
         >
             <div className="space-y-1 pb-1">
                 {tab === 'referrers' && referrers.length === 0 && (
@@ -1158,7 +897,7 @@ function TrafficSourcesPanel({
                 {tab === 'channels' && channels.length === 0 && (
                     <PanelEmptyState title="No channels yet" copy="Channel attribution will populate here once the selected period includes visitors." />
                 )}
-                {tab === 'referrers' && referrers.slice(0, 25).map((referrer: any) => {
+                {tab === 'referrers' && referrers.slice(0, rowLimit).map((referrer: any) => {
                     const pct = refTotal > 0 ? (referrer.value / refTotal) * 100 : 0;
                     return (
                         <DataRow
@@ -1175,7 +914,7 @@ function TrafficSourcesPanel({
                         />
                     );
                 })}
-                {tab === 'channels' && channels.slice(0, 25).map((channel: any) => {
+                {tab === 'channels' && channels.slice(0, rowLimit).map((channel: any) => {
                     const pct = channelTotal > 0 ? (channel.value / channelTotal) * 100 : 0;
                     return (
                         <DataRow
@@ -1197,6 +936,8 @@ function TrafficSourcesPanel({
 }
 
 function PagesPanel({
+    title,
+    rowLimit,
     pages,
     entryPages,
     allPages,
@@ -1204,6 +945,8 @@ function PagesPanel({
     filters,
     toggleFilter,
 }: {
+    title: string;
+    rowLimit: number;
     pages: any[];
     entryPages: any[];
     allPages: any[];
@@ -1220,7 +963,7 @@ function PagesPanel({
 
     return (
         <PanelShell
-            title="Top Pages"
+            title={title}
             eyebrow="Content"
             tone="amber"
             tabs={[
@@ -1231,7 +974,7 @@ function PagesPanel({
             onTabChange={(key) => setTab(key as 'pages' | 'entries')}
             leftLabel={tab === 'pages' ? 'Page' : 'Entry page'}
             rightLabel={tab === 'pages' ? 'Views' : 'Sessions'}
-            meta={`${Math.min(tab === 'pages' ? pages.length : entryPages.length, 25)} rows`}
+            meta={`${Math.min(tab === 'pages' ? pages.length : entryPages.length, rowLimit)} rows`}
         >
             <div className="space-y-1 pb-1">
                 {tab === 'pages' && pages.length === 0 && (
@@ -1240,7 +983,7 @@ function PagesPanel({
                 {tab === 'entries' && entryPages.length === 0 && (
                     <PanelEmptyState title="No entry page data yet" copy="Landing-page performance will appear once the connected property has enough sessions." />
                 )}
-                {tab === 'pages' && pages.slice(0, 25).map((page: any) => {
+                {tab === 'pages' && pages.slice(0, rowLimit).map((page: any) => {
                     const pct = pagesTotal > 0 ? (page.views / pagesTotal) * 100 : 0;
                     return (
                         <DataRow
@@ -1255,7 +998,7 @@ function PagesPanel({
                         />
                     );
                 })}
-                {tab === 'entries' && entryPages.slice(0, 25).map((page: any) => {
+                {tab === 'entries' && entryPages.slice(0, rowLimit).map((page: any) => {
                     const pct = entriesTotal > 0 ? (page.sessions / entriesTotal) * 100 : 0;
                     return (
                         <DataRow
@@ -1274,12 +1017,16 @@ function PagesPanel({
 }
 
 function TechPanel({
+    title,
+    rowLimit,
     devices,
     browsers,
     operatingSystems,
     filters,
     toggleFilter,
 }: {
+    title: string;
+    rowLimit: number;
     devices: any[];
     browsers: any[];
     operatingSystems: any[];
@@ -1301,7 +1048,7 @@ function TechPanel({
 
     return (
         <PanelShell
-            title="Technology Mix"
+            title={title}
             eyebrow="Platforms"
             tone="violet"
             tabs={[
@@ -1313,13 +1060,13 @@ function TechPanel({
             onTabChange={(key) => setTab(key as 'browsers' | 'devices' | 'os')}
             leftLabel={tab === 'devices' ? 'Device' : tab === 'browsers' ? 'Browser' : 'OS'}
             rightLabel="Sessions"
-            meta={`${Math.min(rows.length, 25)} rows`}
+            meta={`${Math.min(rows.length, rowLimit)} rows`}
         >
             <div className="space-y-1 pb-1">
                 {rows.length === 0 && (
                     <PanelEmptyState title="No device data yet" copy="Technology breakdowns will populate once the selected period includes tracked sessions." />
                 )}
-                {rows.slice(0, 25).map((item: any) => {
+                {rows.slice(0, rowLimit).map((item: any) => {
                     const pct = total > 0 ? (item.value / total) * 100 : 0;
                     const icon = tab === 'devices'
                         ? <DeviceIcon device={item.name} />
@@ -1346,6 +1093,8 @@ function TechPanel({
 }
 
 function GeoPanel({
+    title,
+    rowLimit,
     countries,
     cities,
     languages,
@@ -1353,6 +1102,8 @@ function GeoPanel({
     filters,
     toggleFilter,
 }: {
+    title: string;
+    rowLimit: number;
     countries: any[];
     cities: any[];
     languages: any[];
@@ -1371,7 +1122,7 @@ function GeoPanel({
 
     return (
         <PanelShell
-            title="Geo Reach"
+            title={title}
             eyebrow="Geography"
             tone="mint"
             tabs={[
@@ -1384,7 +1135,7 @@ function GeoPanel({
             onTabChange={(key) => setTab(key as 'countries' | 'cities' | 'languages' | 'map')}
             leftLabel={tab === 'countries' ? 'Country' : tab === 'cities' ? 'City' : tab === 'languages' ? 'Language' : ''}
             rightLabel={tab === 'languages' ? 'Visitors' : tab === 'map' ? '' : 'Users'}
-            meta={`${Math.min(tab === 'countries' ? countries.length : tab === 'cities' ? cities.length : languages.length, 25)} rows`}
+            meta={`${Math.min(tab === 'countries' ? countries.length : tab === 'cities' ? cities.length : languages.length, rowLimit)} rows`}
             rightSlot={
                 <div className="flex items-center gap-1">
                     {allCountries.slice(0, 3).map((country: any, index: number) => (
@@ -1409,7 +1160,7 @@ function GeoPanel({
                     {tab === 'countries' && countries.length === 0 && (
                         <PanelEmptyState title="No country data yet" copy="Geo breakdowns will appear when the selected period contains enough visitors." />
                     )}
-                    {tab === 'countries' && countries.slice(0, 25).map((country: any) => {
+                    {tab === 'countries' && countries.slice(0, rowLimit).map((country: any) => {
                         const pct = countriesTotal > 0 ? (country.users / countriesTotal) * 100 : 0;
                         return (
                             <DataRow
@@ -1425,7 +1176,7 @@ function GeoPanel({
                             />
                         );
                     })}
-                    {tab === 'cities' && cities.slice(0, 25).map((city: any, index: number) => {
+                    {tab === 'cities' && cities.slice(0, rowLimit).map((city: any, index: number) => {
                         const pct = citiesTotal > 0 ? (city.users / citiesTotal) * 100 : 0;
                         return (
                             <DataRow
@@ -1439,7 +1190,7 @@ function GeoPanel({
                             />
                         );
                     })}
-                    {tab === 'languages' && languages.slice(0, 25).map((language: any) => {
+                    {tab === 'languages' && languages.slice(0, rowLimit).map((language: any) => {
                         const pct = languagesTotal > 0 ? (language.value / languagesTotal) * 100 : 0;
                         return (
                             <DataRow

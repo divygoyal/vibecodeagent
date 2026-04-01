@@ -327,7 +327,7 @@ function IconCanvas({
 }) {
     return (
         <IconBadge title={title}>
-            <svg viewBox={viewBox} className="h-[13px] w-[13px]" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <svg viewBox={viewBox} className="h-[20px] w-[20px]" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 {children}
             </svg>
         </IconBadge>
@@ -603,10 +603,11 @@ export function DeviceIcon({ device }: { device: string }) {
 
 export function ChannelIcon({ channel }: { channel: string }) {
     const value = normalize(channel);
-    if (value.includes('search')) return <GoogleGlyph title={channel} />;
-    if (value.includes('social')) return <LinkedInGlyph title={channel} />;
+    if (value.includes('organic')) return <IconCanvas title={channel}><circle cx="11" cy="11" r="4.5" stroke="#53E1BA" strokeWidth="1.6" /><path d="M14.5 14.5L18 18" stroke="#53E1BA" strokeWidth="1.6" strokeLinecap="round" /><path d="M11 8.6v4.8M8.6 11h4.8" stroke="#53E1BA" strokeWidth="1.3" strokeLinecap="round" /></IconCanvas>;
+    if (value.includes('search')) return <IconCanvas title={channel}><circle cx="11" cy="11" r="4.5" stroke="#8CCBFF" strokeWidth="1.6" /><path d="M14.5 14.5L18 18" stroke="#8CCBFF" strokeWidth="1.6" strokeLinecap="round" /></IconCanvas>;
+    if (value.includes('social')) return <IconCanvas title={channel}><circle cx="7" cy="12" r="2" fill="#A98DFF" /><circle cx="17" cy="8" r="2" fill="#A98DFF" /><circle cx="17" cy="16" r="2" fill="#A98DFF" /><path d="M8.8 11l6.1-2.1M8.8 13l6.1 2.1" stroke="#A98DFF" strokeWidth="1.35" strokeLinecap="round" /></IconCanvas>;
     if (value.includes('direct')) return <DirectGlyph title={channel} />;
-    if (value.includes('referral')) return <GithubGlyph title={channel} />;
+    if (value.includes('referral')) return <IconCanvas title={channel}><path d="M8.6 8.3h3.3a2.3 2.3 0 1 1 0 4.6H8.6a2.3 2.3 0 1 1 0-4.6Zm3.5 2.3h3.3a2.3 2.3 0 1 1 0 4.6h-3.3" stroke="#8CCBFF" strokeWidth="1.5" strokeLinecap="round" /></IconCanvas>;
     if (value.includes('email')) return <IconCanvas title={channel}><path d="M4.5 7.2h15v9.6h-15V7.2Z" stroke="#8DBDFF" strokeWidth="1.5" /><path d="M5.3 8l6.7 5 6.7-5" stroke="#8DBDFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></IconCanvas>;
     if (value.includes('paid')) return <IconCanvas title={channel}><circle cx="12" cy="12" r="7" stroke="#F4B946" strokeWidth="1.5" /><path d="M8.8 9.4h4.2a1.7 1.7 0 1 1 0 3.4H11a1.7 1.7 0 1 0 0 3.4h4.3M12 8V6.4M12 17.6V16" stroke="#F4B946" strokeWidth="1.4" strokeLinecap="round" /></IconCanvas>;
     return <IconCanvas title={channel}><circle cx="12" cy="12" r="7.5" stroke="#A6B0C1" strokeWidth="1.4" /><path d="M12 6.5v11M6.5 12h11" stroke="#A6B0C1" strokeWidth="1.2" strokeLinecap="round" /></IconCanvas>;

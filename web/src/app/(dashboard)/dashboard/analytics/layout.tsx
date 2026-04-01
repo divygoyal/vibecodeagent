@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     BarChart3, FileText, Radio, Zap, Users,
-    X, Filter, GitCompare, Loader2, Gauge, Target, GitBranch,
-    Download, Share2, Activity, Route
+    X, Filter, Loader2, Gauge, Target, GitBranch,
+    Download, Share2, Activity, Route, Search
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -19,6 +19,7 @@ import FilterBuilder from '@/components/analytics/FilterBuilder';
 
 const TABS = [
     { key: '', label: 'Main', icon: BarChart3 },
+    { key: '/explore', label: 'Explore', icon: Search },
     { key: '/realtime', label: 'Realtime', icon: Radio, pulse: true },
     { key: '/performance', label: 'Performance', icon: Gauge },
     { key: '/goals', label: 'Goals', icon: Target },
@@ -52,7 +53,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
-    const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter } = useFilterStore();
+    const { filters, clearFilter, clearAll, advancedFilters, removeAdvancedFilter } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
 
@@ -144,15 +145,6 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                 title="Share dashboard"
                             >
                                 <Share2 className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
-                                onClick={() => setCompareMode(!compareMode)}
-                                className={`analytics-shell-action text-[11px] ${compareMode ? 'is-active' : ''}`}
-                                title="Compare with previous period"
-                            >
-                                <GitCompare className="w-3 h-3" />
-                                <span className="hidden sm:inline">Compare</span>
                             </button>
                         </div>
                     </div>
