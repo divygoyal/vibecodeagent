@@ -22,6 +22,7 @@ interface FilterState {
     compareMode: boolean;
     setFilter: (dimension: keyof DashboardFilters, values: string[]) => void;
     toggleFilter: (dimension: keyof DashboardFilters, value: string, multi?: boolean) => void;
+    removeFilterValue: (dimension: keyof DashboardFilters, value: string) => void;
     clearFilter: (dimension: keyof DashboardFilters) => void;
     clearAll: () => void;
     setCompareMode: (on: boolean) => void;
@@ -69,6 +70,14 @@ export const useFilterStore = create<FilterState>((set, get) => ({
 
             return { filters: { ...state.filters, [dimension]: next } };
         }),
+
+    removeFilterValue: (dimension, value) =>
+        set(state => ({
+            filters: {
+                ...state.filters,
+                [dimension]: state.filters[dimension].filter(v => v !== value),
+            },
+        })),
 
     clearFilter: (dimension) =>
         set(state => ({
