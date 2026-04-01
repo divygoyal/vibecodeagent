@@ -601,6 +601,7 @@ export async function POST(req: NextRequest) {
         const compareRows = comparisonRange && compareTrend && descriptor.compareMode !== 'segments'
             ? aggregateTrendRows(compareTrend?.rows || [], descriptor.bucket || 'day', trendMetricNames)
             : [];
+        const compareRowsByKey = new Map(compareRows.map((point) => [point.key, point]));
         const plotRows = plotRowsTrend?.rows
             ? aggregateTrendRows(plotRowsTrend.rows, descriptor.bucket || 'day', getMetricDependencies(selectedMetric), 1)
             : [];
@@ -624,10 +625,10 @@ export async function POST(req: NextRequest) {
             };
         }) || [];
 
-        const trend: AnalyticsQueryTrendPoint[] = trendRows.map((point, index) => {
+        const trend: AnalyticsQueryTrendPoint[] = trendRows.map((point) => {
             const total = metricFromMap(selectedMetric, point.metricTotals);
             const secondaryValue = secondaryMetric ? metricFromMap(secondaryMetric, point.metricTotals) : undefined;
-            const previousPoint = compareRows[index];
+            const previousPoint = compareRowsByKey.get(point.key);
             const comparisonTotals = comparisonSeriesMaps.reduce<Record<string, number>>((acc, comparison) => {
                 const value = comparison.map.get(point.key);
                 if (value != null) acc[comparison.key] = value;
