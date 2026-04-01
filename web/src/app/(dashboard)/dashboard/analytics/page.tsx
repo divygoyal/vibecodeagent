@@ -1,20 +1,30 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, Bar, CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
-    TrendingUp, TrendingDown, Users, Target,
-    Globe, Download, RefreshCw, Filter as FilterIcon, BarChart3,
-    ChevronDown, Maximize2, ChevronRight
+    TrendingUp,
+    TrendingDown,
+    Users,
+    Target,
+    Globe,
+    Download,
+    RefreshCw,
+    Filter as FilterIcon,
+    BarChart3,
+    ChevronDown,
+    Maximize2,
+    Sparkles,
+    Layers3,
 } from 'lucide-react';
 import { exportAnalyticsData, exportAnalyticsZip } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { useAnalyticsContext } from './layout';
-import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
+import { BrowserIcon, ChannelIcon, CountryFlag, DeviceIcon, OSIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
 import DataRow from '@/components/analytics/DataRow';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
@@ -23,182 +33,159 @@ import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterS
 
 const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr: false });
 
-// ─── Helpers ───
-function fmt(n: number): string {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-    return n.toLocaleString();
-}
-function fmtDur(s: number) { return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`; }
-
-function Change({ value, suffix = '%' }: { value: number; suffix?: string }) {
-    if (value === 0) return <span className="text-[9px] sm:text-[10px] text-zinc-600">--</span>;
-    const up = value > 0;
-    return (
-        <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold tabular-nums truncate max-w-full ${up ? 'text-emerald-400' : 'text-red-400'}`}>
-            {up ? <TrendingUp className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" /> : <TrendingDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />}
-            <span className="truncate">{up ? '+' : ''}{value}{suffix}</span>
-        </span>
-    );
-}
-
-const ChartTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    const current = payload.find((e: any) => !e.dataKey.startsWith('prev'));
-    const previous = payload.find((e: any) => e.dataKey.startsWith('prev'));
-    return (
-        <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[200px]">
-            <p className="text-[11px] font-semibold text-white mb-2">{label}</p>
-            <div className="space-y-1.5">
-                {current && (
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ background: current.color }} />
-                            <span className="text-[10px] text-zinc-500">{current.name}</span>
-                        </div>
-                        <span className="text-xs font-bold text-white tabular-nums">{current.value?.toLocaleString()}</span>
-                    </div>
-                )}
-                {previous && previous.value != null && (
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full border border-zinc-600 bg-transparent" />
-                            <span className="text-[10px] text-zinc-600">{previous.name}</span>
-                        </div>
-                        <span className="text-xs font-medium text-zinc-500 tabular-nums">{previous.value?.toLocaleString()}</span>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// ─── Sparkline ───
-function Sparkline({ data, dataKey, color = '#34d399' }: { data: any[]; dataKey: string; color?: string }) {
-    if (!data.length) return null;
-    return (
-        <div className="h-[40px] w-full -mt-1">
-            <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                    <defs>
-                        <linearGradient id={`spark-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={color} stopOpacity={0.2} />
-                            <stop offset="100%" stopColor={color} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#spark-${dataKey})`}
-                          strokeWidth={1.5} dot={false} />
-                </AreaChart>
-            </ResponsiveContainer>
-        </div>
-    );
-}
-
-const CARD = 'premium-card stat-card-hover';
-
-// ─── Color palette for data panels ───
-const PANEL_COLORS = [
-    '#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24',
-    '#60a5fa', '#fb923c', '#4ade80', '#e879f9', '#38bdf8',
-    '#f87171', '#a3e635', '#c084fc', '#2dd4bf', '#facc15',
-];
-
-const CHANNEL_COLORS: Record<string, string> = {
-    'Organic Search': '#34d399',
-    'Direct': '#22d3ee',
-    'Referral': '#fb923c',
-    'Social': '#a78bfa',
-    'Paid Search': '#f472b6',
-    'Email': '#fbbf24',
-    'Display': '#60a5fa',
-    'Affiliates': '#4ade80',
-    'Video': '#e879f9',
-    'Organic Social': '#2dd4bf',
-};
-
-const REFERRER_COLORS: Record<string, string> = {
-    'google': '#34d399',
-    '(direct)': '#22d3ee',
-    'bing': '#60a5fa',
-    'yahoo': '#a78bfa',
-    'duckduckgo': '#fb923c',
-    'facebook': '#3b82f6',
-    'twitter': '#38bdf8',
-    'linkedin': '#0ea5e9',
-    'reddit': '#f87171',
-    'youtube': '#f472b6',
-    'instagram': '#e879f9',
-    'pinterest': '#f472b6',
-    'baidu': '#fbbf24',
-};
-
-function getItemColor(name: string, index: number, colorMap?: Record<string, string>): string {
-    if (colorMap) {
-        const key = Object.keys(colorMap).find(k => name.toLowerCase().includes(k.toLowerCase()));
-        if (key) return colorMap[key];
-    }
-    return PANEL_COLORS[index % PANEL_COLORS.length];
-}
-
-// ─── Tab Button ───
-function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-    return (
-        <button
-            onClick={onClick}
-            className={`px-2.5 py-1 text-[12px] rounded-md transition whitespace-nowrap ${
-                active ? 'text-white font-semibold bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03] font-medium'
-            }`}
-        >
-            {label}
-        </button>
-    );
-}
-
-// ─── Metric Pill (for panel column headers) ───
-function MetricPill({ label, active, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
-    return (
-        <button
-            onClick={onClick}
-            className={`px-2 py-0.5 text-[10px] rounded-full transition whitespace-nowrap border ${
-                active
-                    ? 'text-zinc-200 border-white/[0.1] bg-white/[0.06] font-semibold'
-                    : 'text-zinc-500 border-white/[0.04] hover:border-white/[0.08] hover:text-zinc-400 font-medium'
-            }`}
-        >
-            {label}
-        </button>
-    );
-}
-
-// ─── See All Link ───
-function SeeAllBtn({ count, label }: { count: number; label: string }) {
-    if (count <= 8) return null;
-    return (
-        <div className="flex justify-center py-2 border-t border-white/[0.04]">
-            <button className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition font-medium">
-                See All {label}
-                <ChevronRight className="w-3 h-3" />
-            </button>
-        </div>
-    );
-}
-
-// ─── Chart Stat Switcher ───
+type AccentTone = 'mint' | 'cyan' | 'violet' | 'amber' | 'rose' | 'blue';
 type ChartStat = 'activeUsers' | 'sessions' | 'pageViews' | 'bounceRate';
-const CHART_STATS: { key: ChartStat; label: string; color: string }[] = [
-    { key: 'activeUsers', label: 'Users', color: '#34d399' },
-    { key: 'sessions', label: 'Sessions', color: '#22d3ee' },
-    { key: 'pageViews', label: 'Pageviews', color: '#a78bfa' },
-    { key: 'bounceRate', label: 'Bounce Rate', color: '#f472b6' },
+type TimeBucket = 'day' | 'week' | 'month';
+type KpiFormat = 'number' | 'percent' | 'decimal' | 'duration';
+type SupportMetric = 'sessions' | 'pageViews';
+
+const ACCENT_COLORS: Record<AccentTone, string> = {
+    mint: '#49e0b7',
+    cyan: '#4ad5ff',
+    violet: '#a98dff',
+    amber: '#ffb454',
+    rose: '#fb7396',
+    blue: '#68a9ff',
+};
+
+const SUPPORT_BAR_COLOR = '#c78b63';
+const ROLLING_AVERAGE_COLOR = 'rgba(236, 240, 248, 0.72)';
+const COMPARE_LINE_COLOR = 'rgba(143, 151, 167, 0.7)';
+
+const CHART_STATS: {
+    key: ChartStat;
+    label: string;
+    color: string;
+    tone: AccentTone;
+    supportKey: SupportMetric;
+    supportLabel: string;
+}[] = [
+    { key: 'activeUsers', label: 'Users', color: ACCENT_COLORS.mint, tone: 'mint', supportKey: 'sessions', supportLabel: 'Sessions' },
+    { key: 'sessions', label: 'Sessions', color: ACCENT_COLORS.cyan, tone: 'cyan', supportKey: 'pageViews', supportLabel: 'Pageviews' },
+    { key: 'pageViews', label: 'Pageviews', color: ACCENT_COLORS.violet, tone: 'violet', supportKey: 'sessions', supportLabel: 'Sessions' },
+    { key: 'bounceRate', label: 'Bounce Rate', color: ACCENT_COLORS.rose, tone: 'rose', supportKey: 'sessions', supportLabel: 'Sessions' },
 ];
 
-// ─── Time Bucket ───
-type TimeBucket = 'day' | 'week' | 'month';
 const BUCKET_LABELS: Record<TimeBucket, string> = { day: 'Day', week: 'Week', month: 'Month' };
 const BUCKET_OPTIONS: TimeBucket[] = ['day', 'week', 'month'];
+const CARD = 'premium-card analytics-surface-card analytics-card-hover';
+const EMPTY_LIST: any[] = [];
 
-function getISOWeek(d: Date): number {
-    const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+function fmt(n: number): string {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+    return Math.round(n).toLocaleString();
+}
+
+function fmtDur(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds <= 0) return '0m 0s';
+    return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
+function formatMetricValue(metric: ChartStat | 'pagesPerSession' | 'avgSessionDuration', value: number): string {
+    if (metric === 'bounceRate') return `${Number(value || 0).toFixed(1)}%`;
+    if (metric === 'avgSessionDuration') return fmtDur(value || 0);
+    if (metric === 'pagesPerSession') return Number(value || 0).toFixed(1);
+    return fmt(value || 0);
+}
+
+function formatBucketLabel(raw: string, bucket: TimeBucket): string {
+    if (bucket !== 'day') return raw;
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getPrevDataKey(stat: ChartStat): string {
+    if (stat === 'activeUsers') return 'prevActiveUsers';
+    if (stat === 'sessions') return 'prevSessions';
+    if (stat === 'pageViews') return 'prevPageViews';
+    return 'prevBounceRate';
+}
+
+function getChangeForStat(kpis: any, stat: ChartStat): number {
+    if (stat === 'activeUsers') return kpis?.changeUsers || 0;
+    if (stat === 'sessions') return kpis?.changeSessions || 0;
+    if (stat === 'pageViews') return kpis?.changePageViews || 0;
+    return kpis?.changeBounceRate || 0;
+}
+
+function getReferrerHref(referrer: string) {
+    const normalized = String(referrer ?? '').trim().replace(/^https?:\/\//, '').replace(/^www\./, '');
+    if (!normalized || normalized === '(direct)' || !normalized.includes('.')) return undefined;
+    return `https://${normalized}`;
+}
+
+function getRollingAverage(values: number[], index: number, windowSize = 3) {
+    const start = Math.max(0, index - windowSize + 1);
+    const sample = values.slice(start, index + 1);
+    return sample.reduce((sum, value) => sum + value, 0) / Math.max(sample.length, 1);
+}
+
+function getPointStatus(current: number, rolling: number, previous?: number | null) {
+    if (rolling > 0 && current >= rolling * 1.32) return 'Spike';
+    if (rolling > 0 && current >= rolling * 1.12) return 'Above average';
+    if (rolling > 0 && current <= rolling * 0.82) return 'Cooling off';
+    if (previous != null && previous > 0 && current >= previous * 1.18) return 'Building';
+    return 'Steady';
+}
+
+function getStrongestClimb(data: any[], stat: ChartStat, bucket: TimeBucket) {
+    if (data.length < 4) return null;
+
+    let winner: { label: string; value: string; delta: number } | null = null;
+
+    for (let index = 3; index < data.length; index += 1) {
+        const startValue = Number(data[index - 3]?.[stat] || 0);
+        const endValue = Number(data[index]?.[stat] || 0);
+        if (startValue <= 0 || endValue <= startValue) continue;
+
+        const delta = ((endValue - startValue) / startValue) * 100;
+        if (!winner || delta > winner.delta) {
+            winner = {
+                label: `${formatBucketLabel(data[index - 3]?.date ?? '', bucket)} to ${formatBucketLabel(data[index]?.date ?? '', bucket)}`,
+                value: `+${Math.round(delta)}%`,
+                delta,
+            };
+        }
+    }
+
+    return winner;
+}
+
+function getSeriesInsight(data: any[], stat: ChartStat, bucket: TimeBucket): string {
+    if (!data.length) return 'Waiting for enough signal to summarize this trend.';
+    const values = data.map((item: any) => Number(item[stat] || 0));
+    const average = values.reduce((sum: number, value: number) => sum + value, 0) / Math.max(values.length, 1);
+    const peakValue = Math.max(...values);
+    const peakIndex = values.indexOf(peakValue);
+    const peakLabel = formatBucketLabel(data[peakIndex]?.date ?? '', bucket);
+    if (average > 0 && peakValue / average >= 1.35) {
+        return `${peakLabel} rose ${Math.round((peakValue / average - 1) * 100)}% above the period average.`;
+    }
+    return 'Performance stayed inside a healthy band across this selected window.';
+}
+
+function getSeriesPeak(data: any[], stat: ChartStat, bucket: TimeBucket) {
+    if (!data.length) return null;
+    const values = data.map((item: any) => Number(item[stat] || 0));
+    const peakValue = Math.max(...values);
+    const peakIndex = values.indexOf(peakValue);
+    return {
+        label: formatBucketLabel(data[peakIndex]?.date ?? '', bucket),
+        value: formatMetricValue(stat, peakValue),
+    };
+}
+
+function getSeriesAverage(data: any[], stat: ChartStat) {
+    if (!data.length) return null;
+    const values = data.map((item: any) => Number(item[stat] || 0));
+    const average = values.reduce((sum: number, value: number) => sum + value, 0) / Math.max(values.length, 1);
+    return formatMetricValue(stat, average);
+}
+
+function getISOWeek(date: Date): number {
+    const tmp = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
     return Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
@@ -206,37 +193,30 @@ function getISOWeek(d: Date): number {
 
 function aggregateByBucket(data: any[], bucket: TimeBucket): any[] {
     if (!data.length) return data;
-
     if (bucket === 'day') return data;
 
     const groups: Record<string, any[]> = {};
     for (const item of data) {
-        const d = new Date(item.date);
+        const date = new Date(item.date);
         let key: string;
         if (bucket === 'week') {
-            const wk = getISOWeek(d);
-            key = `${d.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+            key = `${date.getFullYear()}-W${String(getISOWeek(date)).padStart(2, '0')}`;
         } else {
-            key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         }
         if (!groups[key]) groups[key] = [];
         groups[key].push(item);
     }
 
     return Object.entries(groups).map(([key, items]) => {
-        const sumUsers = items.reduce((s, d) => s + (d.activeUsers || 0), 0);
-        const sumSessions = items.reduce((s, d) => s + (d.sessions || 0), 0);
-        const sumPageViews = items.reduce((s, d) => s + (d.pageViews || 0), 0);
-        const avgBounce = items.reduce((s, d) => s + (d.bounceRate || 0), 0) / items.length;
-        let label: string;
-        if (bucket === 'week') {
-            const firstDate = new Date(items[0].date);
-            label = firstDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        } else {
-            const [y, m] = key.split('-');
-            const dt = new Date(Number(y), Number(m) - 1);
-            label = dt.toLocaleDateString('en-US', { month: 'short' }) + " \u2019" + String(y).slice(2);
-        }
+        const sumUsers = items.reduce((sum, item) => sum + (item.activeUsers || 0), 0);
+        const sumSessions = items.reduce((sum, item) => sum + (item.sessions || 0), 0);
+        const sumPageViews = items.reduce((sum, item) => sum + (item.pageViews || 0), 0);
+        const avgBounce = items.reduce((sum, item) => sum + (item.bounceRate || 0), 0) / Math.max(items.length, 1);
+        const label = bucket === 'week'
+            ? new Date(items[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : new Date(Number(key.split('-')[0]), Number(key.split('-')[1]) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+
         return {
             date: label,
             activeUsers: sumUsers,
@@ -247,14 +227,145 @@ function aggregateByBucket(data: any[], bucket: TimeBucket): any[] {
     });
 }
 
-function TimeBucketDropdown({ bucket, setBucket }: { bucket: TimeBucket; setBucket: (b: TimeBucket) => void }) {
+function Change({ value, suffix = '%', zeroLabel = 'Stable' }: { value: number; suffix?: string; zeroLabel?: string }) {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.1) {
+        return <span className="analytics-delta-pill neutral">{zeroLabel}</span>;
+    }
+    const up = value > 0;
+    const printable = Number.isInteger(value) ? value : Number(value).toFixed(1);
+    return (
+        <span className={`analytics-delta-pill ${up ? 'positive' : 'negative'}`}>
+            {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {up ? '+' : ''}{printable}{suffix}
+        </span>
+    );
+}
+
+function ChartTooltip({ active, payload, label, bucket, activeStat, supportLabel }: any) {
+    if (!active || !payload?.length) return null;
+    const row = payload[0]?.payload;
+    const current = payload.find((entry: any) => entry.dataKey === 'chartValue');
+    const previous = payload.find((entry: any) => entry.dataKey === 'compareValue');
+    const rolling = payload.find((entry: any) => entry.dataKey === 'rollingAverage');
+    const support = payload.find((entry: any) => entry.dataKey === 'supportValue');
+    const delta = previous?.value != null && Number(previous.value) !== 0
+        ? ((Number(current?.value || 0) - Number(previous.value || 0)) / Number(previous.value || 1)) * 100
+        : null;
+
+    return (
+        <div className="analytics-tooltip px-4 py-3.5">
+            <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                    <p className="text-sm font-semibold text-white">{formatBucketLabel(label, bucket)}</p>
+                    <p className="mt-1 text-[11px] text-zinc-500">High detail trend snapshot</p>
+                </div>
+                <span className="analytics-meta-pill h-7 px-2.5 text-[10px] uppercase tracking-[0.18em] text-zinc-300/90">
+                    {row?.status || 'Steady'}
+                </span>
+            </div>
+            <div className="space-y-2">
+                {current && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: current.color }} />
+                            <span className="text-xs text-zinc-300">{activeStat.label}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-white tabular-nums">
+                            {formatMetricValue(activeStat.key, Number(current.value || 0))}
+                        </span>
+                    </div>
+                )}
+                {support && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SUPPORT_BAR_COLOR }} />
+                            <span className="text-xs text-zinc-400">{supportLabel} bars</span>
+                        </div>
+                        <span className="text-xs font-medium text-zinc-400 tabular-nums">
+                            {fmt(Number(support.value || 0))}
+                        </span>
+                    </div>
+                )}
+                {rolling && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="h-[2px] w-4 rounded-full" style={{ backgroundColor: ROLLING_AVERAGE_COLOR }} />
+                            <span className="text-xs text-zinc-400">Rolling average</span>
+                        </div>
+                        <span className="text-xs font-medium text-zinc-400 tabular-nums">
+                            {formatMetricValue(activeStat.key, Number(rolling.value || 0))}
+                        </span>
+                    </div>
+                )}
+                {previous && previous.value != null && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="h-[2px] w-4 rounded-full border-t border-dashed" style={{ borderColor: COMPARE_LINE_COLOR }} />
+                            <span className="text-xs text-zinc-400">Previous period</span>
+                        </div>
+                        <span className="text-xs font-medium text-zinc-400 tabular-nums">
+                            {formatMetricValue(activeStat.key, Number(previous.value || 0))}
+                        </span>
+                    </div>
+                )}
+            </div>
+            {delta != null && Number.isFinite(delta) && (
+                <div className="mt-3 border-t border-white/[0.06] pt-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Vs previous</span>
+                        <Change value={delta} zeroLabel="Flat" />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function Sparkline({ data, dataKey, color }: { data: any[]; dataKey: string; color: string }) {
+    if (!data.length) return null;
+    const gradientId = `spark-${dataKey}-${color.replace('#', '')}`;
+    return (
+        <div className="h-[44px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.42} />
+                            <stop offset="90%" stopColor={color} stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
+                    <Area
+                        type="monotone"
+                        dataKey={dataKey}
+                        stroke={color}
+                        fill={`url(#${gradientId})`}
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                    />
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+function renderKpiValue(format: KpiFormat, value: number) {
+    if (format === 'duration') return fmtDur(value);
+    if (format === 'percent') return `${Number(value || 0).toFixed(1)}%`;
+    if (format === 'decimal') return Number(value || 0).toFixed(1);
+    return <AnimatedCounter value={value || 0} formatter={fmt} />;
+}
+
+function TimeBucketDropdown({ bucket, setBucket }: { bucket: TimeBucket; setBucket: (bucket: TimeBucket) => void }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!open) return;
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        const handler = (event: MouseEvent) => {
+            if (ref.current && !ref.current.contains(event.target as Node)) {
+                setOpen(false);
+            }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
@@ -264,24 +375,29 @@ function TimeBucketDropdown({ bucket, setBucket }: { bucket: TimeBucket; setBuck
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-1 text-[10px] text-zinc-400 border border-white/[0.06] rounded-md px-2 py-1 hover:border-white/[0.12] hover:text-zinc-300 transition"
+                className="analytics-toolbar-btn text-[11px]"
+                type="button"
             >
                 {BUCKET_LABELS[bucket]}
-                <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 z-50 bg-zinc-900 border border-white/[0.08] rounded-lg shadow-xl py-1 min-w-[90px]">
-                    {BUCKET_OPTIONS.map(opt => (
+                <div className="analytics-shell-menu absolute right-0 top-full z-50 mt-2 min-w-[120px] py-1.5">
+                    {BUCKET_OPTIONS.map((option) => (
                         <button
-                            key={opt}
-                            onClick={() => { setBucket(opt); setOpen(false); }}
-                            className={`w-full text-left px-3 py-1.5 text-[11px] transition ${
-                                bucket === opt
+                            key={option}
+                            onClick={() => {
+                                setBucket(option);
+                                setOpen(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-[11px] transition ${
+                                bucket === option
                                     ? 'text-white bg-white/[0.06]'
                                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                             }`}
+                            type="button"
                         >
-                            {BUCKET_LABELS[opt]}
+                            {BUCKET_LABELS[option]}
                         </button>
                     ))}
                 </div>
@@ -290,19 +406,118 @@ function TimeBucketDropdown({ bucket, setBucket }: { bucket: TimeBucket; setBuck
     );
 }
 
-// ─── Main Overview Page ───
+function PanelEmptyState({ title, copy }: { title: string; copy: string }) {
+    return (
+        <div className="analytics-empty-state">
+            <div className="space-y-3">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.04] text-zinc-300">
+                    <Layers3 className="h-5 w-5" />
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-zinc-200">{title}</p>
+                    <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-zinc-500">{copy}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function PanelShell({
+    title,
+    eyebrow,
+    tone,
+    tabs,
+    activeTab,
+    onTabChange,
+    leftLabel,
+    rightLabel,
+    meta = 'Top 25',
+    rightSlot,
+    children,
+}: {
+    title: string;
+    eyebrow: string;
+    tone: AccentTone;
+    tabs: { key: string; label: string; disabled?: boolean }[];
+    activeTab: string;
+    onTabChange: (key: string) => void;
+    leftLabel?: string;
+    rightLabel?: string;
+    meta?: string;
+    rightSlot?: any;
+    children: any;
+}) {
+    return (
+        <div className={`${CARD} analytics-panel-shell flex h-[430px] min-w-0 flex-col overflow-hidden`}>
+            <div
+                className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-80"
+                style={{ background: `radial-gradient(circle at 15% -20%, ${ACCENT_COLORS[tone]}44, transparent 48%)` }}
+            />
+            <div className="relative border-b border-white/[0.05] px-4 py-4 sm:px-5">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="analytics-kicker">
+                            <span className="analytics-dot" style={{ color: ACCENT_COLORS[tone], backgroundColor: ACCENT_COLORS[tone] }} />
+                            {eyebrow}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold tracking-tight text-white sm:text-[17px]">{title}</h3>
+                            <span className="analytics-panel-meta">{meta}</span>
+                        </div>
+                        <div className="mt-3 flex gap-1 overflow-x-auto scrollbar-hide">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => !tab.disabled && onTabChange(tab.key)}
+                                    className={`analytics-panel-tab ${activeTab === tab.key ? 'is-active' : ''} ${tab.disabled ? 'is-disabled' : ''}`}
+                                    disabled={tab.disabled}
+                                    type="button"
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        {rightSlot}
+                        <button
+                            className="analytics-toolbar-btn h-9 w-9 px-0"
+                            type="button"
+                            title="Expand panel"
+                        >
+                            <Maximize2 className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {(leftLabel || rightLabel) && (
+                <div className="relative flex items-center justify-between px-4 py-2 sm:px-5">
+                    <span className="analytics-column-head">{leftLabel}</span>
+                    <span className="analytics-column-head">{rightLabel}</span>
+                </div>
+            )}
+            <div className="analytics-ranked-scroll relative min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 sm:px-3">
+                {children}
+            </div>
+        </div>
+    );
+}
+
 export default function AnalyticsPage() {
     const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
     const { data: analyticsData, isLoading, isError, refresh } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
-    const { filters, toggleFilter } = useFilterStore();
+    const { filters, toggleFilter, compareMode, setCompareMode } = useFilterStore();
     const [drilldown, setDrilldown] = useState<any>(null);
     const [chartStat, setChartStat] = useState<ChartStat>('activeUsers');
     const [bucket, setBucket] = useState<TimeBucket>('day');
-    const [showComparison, setShowComparison] = useState(true);
 
     useEffect(() => {
-        const csvHandler = () => { if (analyticsData) exportAnalyticsData(analyticsData); };
-        const zipHandler = () => { if (analyticsData) exportAnalyticsZip(analyticsData); };
+        const csvHandler = () => {
+            if (analyticsData) exportAnalyticsData(analyticsData);
+        };
+        const zipHandler = () => {
+            if (analyticsData) exportAnalyticsZip(analyticsData);
+        };
         window.addEventListener('trafficclaw:export-analytics', csvHandler);
         window.addEventListener('trafficclaw:export-zip', zipHandler);
         return () => {
@@ -311,95 +526,69 @@ export default function AnalyticsPage() {
         };
     }, [analyticsData]);
 
-    if (isLoading && !analyticsData) return <SkeletonDashboard />;
-    if (isError && !analyticsData) {
-        const errorMsg = isError?.message || isError?.toString?.() || 'Failed to load analytics data';
-        const isTokenError = errorMsg.toLowerCase().includes('token') || errorMsg.toLowerCase().includes('auth') || errorMsg.toLowerCase().includes('401');
-        return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
-                    <BarChart3 className="w-6 h-6 text-red-400" />
-                </div>
-                <p className="text-red-400 text-sm font-medium">Analytics data unavailable</p>
-                <p className="text-zinc-500 text-xs max-w-md text-center">{errorMsg}</p>
-                <div className="flex items-center gap-3 mt-2">
-                    <button onClick={() => refresh()} className="px-4 py-2 text-xs text-blue-400 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 transition border border-blue-500/20">
-                        Retry
-                    </button>
-                    {isTokenError && (
-                        <button onClick={() => signIn('google')} className="px-4 py-2 text-xs text-emerald-400 bg-emerald-500/10 rounded-lg hover:bg-emerald-500/20 transition border border-emerald-500/20">
-                            Re-connect Google
-                        </button>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
     const kpis = analyticsData?.kpis;
-    const traffic: any[] = analyticsData?.traffic || [];
-    const pages: any[] = analyticsData?.pages || [];
-    const devices: any[] = analyticsData?.devices || [];
-    const countries: any[] = analyticsData?.countries || [];
-    const browsers: any[] = analyticsData?.browsers || [];
-    const operatingSystems: any[] = analyticsData?.operatingSystems || [];
-    const channels: any[] = analyticsData?.channels || [];
-    const referrers: any[] = analyticsData?.referrers || [];
-    const cities: any[] = analyticsData?.cities || [];
-    const entryPages: any[] = analyticsData?.entryPages || [];
-    const languages: any[] = analyticsData?.languages || [];
+    const traffic: any[] = analyticsData?.traffic ?? EMPTY_LIST;
+    const pages: any[] = analyticsData?.pages ?? EMPTY_LIST;
+    const devices: any[] = analyticsData?.devices ?? EMPTY_LIST;
+    const countries: any[] = analyticsData?.countries ?? EMPTY_LIST;
+    const browsers: any[] = analyticsData?.browsers ?? EMPTY_LIST;
+    const operatingSystems: any[] = analyticsData?.operatingSystems ?? EMPTY_LIST;
+    const channels: any[] = analyticsData?.channels ?? EMPTY_LIST;
+    const referrers: any[] = analyticsData?.referrers ?? EMPTY_LIST;
+    const cities: any[] = analyticsData?.cities ?? EMPTY_LIST;
+    const entryPages: any[] = analyticsData?.entryPages ?? EMPTY_LIST;
+    const languages: any[] = analyticsData?.languages ?? EMPTY_LIST;
 
-    // ─── Cross-filtering ───
-    const fCountries = filters.country.length > 0 ? countries.filter((c: any) => filters.country.includes(c.country)) : countries;
-    const fCities = filters.country.length > 0 ? cities.filter((c: any) => filters.country.includes(c.country)) : cities;
-    const fReferrers = filters.referrer.length > 0 ? referrers.filter((r: any) => filters.referrer.includes(r.name)) : referrers;
-    const fPages = filters.page.length > 0 ? pages.filter((p: any) => filters.page.includes(p.page)) : pages;
-    const fDevices = filters.device.length > 0 ? devices.filter((d: any) => filters.device.includes(d.device)) : devices;
-    const fBrowsers = filters.browser.length > 0 ? browsers.filter((b: any) => filters.browser.includes(b.name)) : browsers;
-    const fOS = filters.os.length > 0 ? operatingSystems.filter((o: any) => filters.os.includes(o.name)) : operatingSystems;
-    const fChannels = filters.channel.length > 0 ? channels.filter((c: any) => filters.channel.includes(c.name)) : channels;
-    const fEntryPages = filters.page.length > 0 ? entryPages.filter((p: any) => filters.page.includes(p.page)) : entryPages;
+    const fCountries = filters.country.length > 0 ? countries.filter((country: any) => filters.country.includes(country.country)) : countries;
+    const fCities = filters.country.length > 0 ? cities.filter((city: any) => filters.country.includes(city.country)) : cities;
+    const fReferrers = filters.referrer.length > 0 ? referrers.filter((referrer: any) => filters.referrer.includes(referrer.name)) : referrers;
+    const fPages = filters.page.length > 0 ? pages.filter((page: any) => filters.page.includes(page.page)) : pages;
+    const fDevices = filters.device.length > 0 ? devices.filter((device: any) => filters.device.includes(device.device)) : devices;
+    const fBrowsers = filters.browser.length > 0 ? browsers.filter((browser: any) => filters.browser.includes(browser.name)) : browsers;
+    const fOS = filters.os.length > 0 ? operatingSystems.filter((os: any) => filters.os.includes(os.name)) : operatingSystems;
+    const fChannels = filters.channel.length > 0 ? channels.filter((channel: any) => filters.channel.includes(channel.name)) : channels;
+    const fEntryPages = filters.page.length > 0 ? entryPages.filter((page: any) => filters.page.includes(page.page)) : entryPages;
 
-    const anyFilterActive = Object.values(filters).some(arr => arr.length > 0);
+    const anyFilterActive = Object.values(filters).some((values) => values.length > 0);
+    const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0);
 
-    // ─── Cross-filter: recalculate KPIs ───
     const filteredKpis = useMemo(() => {
         if (!kpis || !anyFilterActive) return null;
         let ratio = 1;
         if (filters.country.length > 0) {
-            const filteredUsers = fCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
-            const totalUsers = countries.reduce((s: number, c: any) => s + (c.users || 0), 0);
+            const filteredUsers = fCountries.reduce((sum: number, item: any) => sum + (item.users || 0), 0);
+            const totalUsers = countries.reduce((sum: number, item: any) => sum + (item.users || 0), 0);
             ratio = Math.min(ratio, totalUsers > 0 ? filteredUsers / totalUsers : 0);
         }
         if (filters.page.length > 0) {
-            const filteredViews = fPages.reduce((s: number, p: any) => s + (p.views || 0), 0);
-            const totalViews = pages.reduce((s: number, p: any) => s + (p.views || 0), 0);
+            const filteredViews = fPages.reduce((sum: number, item: any) => sum + (item.views || 0), 0);
+            const totalViews = pages.reduce((sum: number, item: any) => sum + (item.views || 0), 0);
             ratio = Math.min(ratio, totalViews > 0 ? filteredViews / totalViews : 0);
         }
         if (filters.device.length > 0) {
-            const filteredSessions = fDevices.reduce((s: number, d: any) => s + (d.sessions || 0), 0);
-            const totalSessions = devices.reduce((s: number, d: any) => s + (d.sessions || 0), 0);
+            const filteredSessions = fDevices.reduce((sum: number, item: any) => sum + (item.sessions || 0), 0);
+            const totalSessions = devices.reduce((sum: number, item: any) => sum + (item.sessions || 0), 0);
             ratio = Math.min(ratio, totalSessions > 0 ? filteredSessions / totalSessions : 0);
         }
         if (filters.browser.length > 0) {
-            const filteredVal = fBrowsers.reduce((s: number, b: any) => s + (b.value || 0), 0);
-            const totalVal = browsers.reduce((s: number, b: any) => s + (b.value || 0), 0);
-            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+            const filteredValue = fBrowsers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            const totalValue = browsers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
         }
         if (filters.channel.length > 0) {
-            const filteredVal = fChannels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-            const totalVal = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+            const filteredValue = fChannels.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            const totalValue = channels.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
         }
         if (filters.referrer.length > 0) {
-            const filteredVal = fReferrers.reduce((s: number, r: any) => s + (r.value || 0), 0);
-            const totalVal = referrers.reduce((s: number, r: any) => s + (r.value || 0), 0);
-            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+            const filteredValue = fReferrers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            const totalValue = referrers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
         }
         if (filters.os.length > 0) {
-            const filteredVal = fOS.reduce((s: number, o: any) => s + (o.value || 0), 0);
-            const totalVal = operatingSystems.reduce((s: number, o: any) => s + (o.value || 0), 0);
-            ratio = Math.min(ratio, totalVal > 0 ? filteredVal / totalVal : 0);
+            const filteredValue = fOS.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            const totalValue = operatingSystems.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
         }
         return {
             totalUsers: Math.round(kpis.totalUsers * ratio),
@@ -408,223 +597,489 @@ export default function AnalyticsPage() {
             avgBounceRate: kpis.avgBounceRate,
             _ratio: ratio,
         };
-    }, [kpis, anyFilterActive, filters, fCountries, fPages, fDevices, fBrowsers, fChannels, fReferrers, fOS, countries, pages, devices, browsers, channels, referrers, operatingSystems]);
+    }, [
+        anyFilterActive,
+        browsers,
+        channels,
+        countries,
+        devices,
+        fBrowsers,
+        fChannels,
+        fCountries,
+        fDevices,
+        fOS,
+        fPages,
+        fReferrers,
+        filters,
+        kpis,
+        operatingSystems,
+        pages,
+        referrers,
+    ]);
 
-    // Filtered traffic for chart
     const chartTraffic = useMemo(() => {
         if (!anyFilterActive || !filteredKpis) return traffic;
-        const r = filteredKpis._ratio;
-        return traffic.map((d: any) => ({
-            ...d,
-            activeUsers: Math.round((d.activeUsers || 0) * r),
-            sessions: Math.round((d.sessions || 0) * r),
-            pageViews: Math.round((d.pageViews || 0) * r),
+        const ratio = filteredKpis._ratio;
+        return traffic.map((item: any) => ({
+            ...item,
+            activeUsers: Math.round((item.activeUsers || 0) * ratio),
+            sessions: Math.round((item.sessions || 0) * ratio),
+            pageViews: Math.round((item.pageViews || 0) * ratio),
         }));
-    }, [traffic, anyFilterActive, filteredKpis]);
+    }, [anyFilterActive, filteredKpis, traffic]);
 
-    // Aggregate chart data based on selected time bucket
-    const bucketedTraffic = useMemo(() => aggregateByBucket(chartTraffic, bucket), [chartTraffic, bucket]);
+    const bucketedTraffic = useMemo(() => aggregateByBucket(chartTraffic, bucket), [bucket, chartTraffic]);
 
-    // Previous period comparison: reverse-compute approximate previous values from KPI change%
     const comparisonTraffic = useMemo(() => {
-        if (!showComparison || !bucketedTraffic.length || !kpis) return bucketedTraffic;
+        if (!compareMode || !bucketedTraffic.length || !kpis) return bucketedTraffic;
         const scaleUsers = kpis.changeUsers !== 0 ? 100 / (100 + kpis.changeUsers) : 1;
         const scaleSessions = kpis.changeSessions !== 0 ? 100 / (100 + kpis.changeSessions) : 1;
         const scalePageViews = kpis.changePageViews !== 0 ? 100 / (100 + kpis.changePageViews) : 1;
         const bounceShift = kpis.changeBounceRate || 0;
-        return bucketedTraffic.map((d: any) => ({
-            ...d,
-            prevActiveUsers: Math.round((d.activeUsers || 0) * scaleUsers),
-            prevSessions: Math.round((d.sessions || 0) * scaleSessions),
-            prevPageViews: Math.round((d.pageViews || 0) * scalePageViews),
-            prevBounceRate: Math.max(0, Math.round(((d.bounceRate || 0) - bounceShift) * 10) / 10),
+        return bucketedTraffic.map((item: any) => ({
+            ...item,
+            prevActiveUsers: Math.round((item.activeUsers || 0) * scaleUsers),
+            prevSessions: Math.round((item.sessions || 0) * scaleSessions),
+            prevPageViews: Math.round((item.pageViews || 0) * scalePageViews),
+            prevBounceRate: Math.max(0, Math.round(((item.bounceRate || 0) - bounceShift) * 10) / 10),
         }));
-    }, [showComparison, bucketedTraffic, kpis]);
-
-    // Map current chartStat to its previous-period data key
-    const prevDataKey = chartStat === 'activeUsers' ? 'prevActiveUsers'
-        : chartStat === 'sessions' ? 'prevSessions'
-        : chartStat === 'pageViews' ? 'prevPageViews'
-        : 'prevBounceRate';
+    }, [bucketedTraffic, compareMode, kpis]);
 
     const displayKpis = filteredKpis || kpis;
-    const activeStat = CHART_STATS.find(s => s.key === chartStat)!;
 
-    // Sparkline data: last 14 days with computed fields
     const sparklineData = useMemo(() => {
         const recent = chartTraffic.slice(-14);
-        return recent.map((d: any) => ({
-            ...d,
-            pagesPerSession: d.sessions > 0 ? d.pageViews / d.sessions : 0,
+        return recent.map((item: any) => ({
+            ...item,
+            pagesPerSession: item.sessions > 0 ? item.pageViews / item.sessions : 0,
+            avgSessionDuration: kpis?.avgSessionDuration || 0,
         }));
-    }, [chartTraffic]);
+    }, [chartTraffic, kpis?.avgSessionDuration]);
+
+    const activeChartStat = chartStat;
+    const activeStat = CHART_STATS.find((stat) => stat.key === activeChartStat) || CHART_STATS[0];
+    const peak = getSeriesPeak(bucketedTraffic, activeChartStat, bucket);
+    const average = getSeriesAverage(bucketedTraffic, activeChartStat);
+    const chartChange = getChangeForStat(kpis, activeChartStat);
+    const strongestClimb = getStrongestClimb(bucketedTraffic, activeChartStat, bucket);
+    const reduceChartMotion = comparisonTraffic.length > 36 || activeFilterCount > 2;
+
+    const chartDetails = useMemo(() => {
+        const previousKey = getPrevDataKey(activeChartStat);
+        const values = comparisonTraffic.map((item: any) => Number(item[activeChartStat] || 0));
+        const supportValues = comparisonTraffic.map((item: any) => Number(item[activeStat.supportKey] || 0));
+
+        const rows = comparisonTraffic.map((item: any, index: number) => {
+            const chartValue = Number(item[activeChartStat] || 0);
+            const compareValue = compareMode ? Number(item[previousKey] || 0) : null;
+            const rollingAverage = Number(getRollingAverage(values, index).toFixed(activeChartStat === 'bounceRate' ? 1 : 0));
+            const supportValue = supportValues[index] || 0;
+            const status = getPointStatus(chartValue, rollingAverage, compareValue);
+            return {
+                ...item,
+                chartValue,
+                compareValue,
+                rollingAverage,
+                supportValue,
+                status,
+            };
+        });
+
+        const annotationCandidates = rows
+            .map((row: any) => {
+                const rolling = Number(row.rollingAverage || 0);
+                const current = Number(row.chartValue || 0);
+                if (!rolling) return null;
+                const distance = Math.abs(current - rolling) / rolling;
+                if (distance < 0.18) return null;
+                return {
+                    date: row.date,
+                    chartValue: current,
+                    label: current >= rolling ? 'Spike' : 'Dip',
+                    score: distance,
+                };
+            })
+            .filter(Boolean)
+            .sort((left: any, right: any) => right.score - left.score)
+            .slice(0, 2);
+
+        const leadAnnotation = annotationCandidates[0];
+        let chartInsight = getSeriesInsight(bucketedTraffic, activeChartStat, bucket);
+
+        if (leadAnnotation) {
+            chartInsight = `${formatBucketLabel(leadAnnotation.date, bucket)} printed a ${leadAnnotation.label.toLowerCase()} while ${activeStat.supportLabel.toLowerCase()} support held at ${fmt(
+                rows.find((row: any) => row.date === leadAnnotation.date)?.supportValue || 0,
+            )}.`;
+        }
+
+        return {
+            rows,
+            annotations: annotationCandidates,
+            chartInsight,
+        };
+    }, [activeChartStat, activeStat.supportKey, activeStat.supportLabel, bucket, bucketedTraffic, compareMode, comparisonTraffic]);
+
+    const kpiCards: {
+        label: string;
+        value: number;
+        change: number;
+        format: KpiFormat;
+        sparkKey: string;
+        statKey: ChartStat;
+        tone: AccentTone;
+        caption: string;
+        zeroLabel?: string;
+    }[] = [
+        { label: 'Users', value: displayKpis?.totalUsers ?? kpis?.totalUsers ?? 0, change: kpis?.changeUsers ?? 0, format: 'number', sparkKey: 'activeUsers', statKey: 'activeUsers', tone: 'mint', caption: 'Audience' },
+        { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis?.totalSessions ?? 0, change: kpis?.changeSessions ?? 0, format: 'number', sparkKey: 'sessions', statKey: 'sessions', tone: 'cyan', caption: 'Visits' },
+        { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis?.totalPageViews ?? 0, change: kpis?.changePageViews ?? 0, format: 'number', sparkKey: 'pageViews', statKey: 'pageViews', tone: 'violet', caption: 'Consumption' },
+        { label: 'Pages / Session', value: kpis?.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', statKey: 'pageViews', tone: 'amber', caption: 'Depth', zeroLabel: 'No delta' },
+        { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis?.avgBounceRate ?? 0, change: kpis?.changeBounceRate ?? 0, format: 'percent', sparkKey: 'bounceRate', statKey: 'bounceRate', tone: 'rose', caption: 'Quality' },
+        { label: 'Avg Duration', value: kpis?.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', statKey: 'sessions', tone: 'blue', caption: 'Retention', zeroLabel: 'No delta' },
+    ];
+
+    if (isLoading && !analyticsData) return <SkeletonDashboard />;
+
+    if (isError && !analyticsData) {
+        const errorMsg = isError?.message || isError?.toString?.() || 'Failed to load analytics data';
+        const isTokenError = errorMsg.toLowerCase().includes('token') || errorMsg.toLowerCase().includes('auth') || errorMsg.toLowerCase().includes('401');
+        return (
+            <div className="analytics-main-page">
+                <div className={`${CARD} mx-auto mt-8 max-w-xl p-8 text-center`}>
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400">
+                        <BarChart3 className="h-6 w-6" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-white">Analytics data is temporarily unavailable</h2>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">{errorMsg}</p>
+                    <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                        <button
+                            onClick={() => refresh()}
+                            className="analytics-toolbar-btn is-active"
+                            type="button"
+                        >
+                            <RefreshCw className="h-4 w-4" />
+                            Retry
+                        </button>
+                        {isTokenError && (
+                            <button
+                                onClick={() => signIn('google')}
+                                className="analytics-toolbar-btn"
+                                type="button"
+                            >
+                                Re-connect Google
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="space-y-2 sm:space-y-3 overflow-hidden">
-            {/* Data freshness */}
+        <div className="analytics-main-page space-y-4 overflow-hidden pb-5 sm:space-y-5">
             {analyticsData && (
-                <div className="flex justify-end">
-                    <LastUpdated timestamp={new Date()} onRefresh={() => refresh()} isRefreshing={isLoading} />
-                </div>
-            )}
-
-            {/* ─── 1. KPI Cards ─── */}
-            {kpis && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-                    {[
-                        { label: 'Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, format: 'number', sparkKey: 'activeUsers', statKey: 'activeUsers' as ChartStat, color: '#34d399' },
-                        { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, format: 'number', sparkKey: 'sessions', statKey: 'sessions' as ChartStat, color: '#22d3ee' },
-                        { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, format: 'number', sparkKey: 'pageViews', statKey: 'pageViews' as ChartStat, color: '#a78bfa' },
-                        { label: 'Pages / Session', value: kpis.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', statKey: 'pageViews' as ChartStat, color: '#fbbf24' },
-                        { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, format: 'percent', sparkKey: 'bounceRate', statKey: 'bounceRate' as ChartStat, color: '#f472b6' },
-                        { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', statKey: 'sessions' as ChartStat, color: '#60a5fa' },
-                    ].map((k, i) => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.03 }}
-                            className={`${CARD} relative overflow-hidden cursor-pointer transition-all ${
-                                chartStat === k.statKey
-                                    ? 'ring-1 ring-white/[0.12] bg-white/[0.02]'
-                                    : 'hover:bg-white/[0.02]'
-                            }`}
-                            onClick={() => setChartStat(k.statKey)}
-                        >
-                            {/* Top accent line */}
-                            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ backgroundColor: k.color, opacity: chartStat === k.statKey ? 1 : 0.3 }} />
-                            <div className="px-3 pt-3 pb-1">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: k.color }} />
-                                    <p className="text-[10px] font-medium text-zinc-500 truncate">{k.label}</p>
-                                </div>
-                                <p className="text-xl sm:text-2xl font-semibold text-white tabular-nums leading-tight">
-                                    {k.format === 'duration' ? fmtDur(k.value)
-                                        : k.format === 'percent' ? `${k.value}%`
-                                        : k.format === 'decimal' ? (typeof k.value === 'number' ? k.value.toFixed(1) : k.value)
-                                        : <AnimatedCounter value={k.value} formatter={fmt} />
-                                    }
-                                </p>
-                                <Change value={k.change} />
-                            </div>
-                            <Sparkline data={sparklineData} dataKey={k.sparkKey} color={k.color} />
-                        </motion.div>
-                    ))}
-                </div>
-            )}
-
-            {/* ─── 2. Full-Width Chart with Stat Switcher ─── */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.08 }}
-                className={`${CARD} p-3 sm:p-5 overflow-hidden`}
-            >
-                {/* Chart header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-[11px] text-zinc-500 font-medium hidden sm:inline">TrafficClaw</span>
-                        <h3 className="text-sm sm:text-base font-semibold text-white">{activeStat.label}</h3>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="analytics-note-pill subtle text-xs">
+                            <Sparkles className="h-3.5 w-3.5 text-[var(--analytics-mint)]" />
+                            Analytics main board
+                        </span>
                         {anyFilterActive && (
-                            <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/[0.08] border border-blue-500/20 rounded-md px-2 py-0.5 flex-shrink-0">
-                                <FilterIcon className="w-2.5 h-2.5" /> Filtered
+                            <span className="analytics-note-pill text-xs">
+                                <FilterIcon className="h-3.5 w-3.5 text-[var(--analytics-cyan)]" />
+                                {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'} active
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowComparison(!showComparison)}
-                            title={showComparison ? 'Hide previous period' : 'Show previous period'}
-                            className={`flex items-center gap-1 text-[10px] border rounded-md px-2 py-1 transition ${
-                                showComparison
-                                    ? 'text-zinc-300 border-white/[0.12] bg-white/[0.04]'
-                                    : 'text-zinc-500 border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-400'
-                            }`}
-                        >
-                            <span className="inline-block w-3 border-t border-dashed border-zinc-500" />
-                            Prev
-                        </button>
-                        <button onClick={() => refresh()} className="p-1.5 rounded text-zinc-600 hover:text-blue-400 transition">
-                            <RefreshCw className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => analyticsData && exportAnalyticsData(analyticsData)} className="p-1.5 rounded text-zinc-600 hover:text-white transition">
-                            <Download className="w-3.5 h-3.5" />
-                        </button>
-                        <TimeBucketDropdown bucket={bucket} setBucket={setBucket} />
+                    <div className="flex justify-end">
+                        <div className="analytics-meta-pill text-xs">
+                            <LastUpdated timestamp={new Date()} onRefresh={() => refresh()} isRefreshing={isLoading} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {kpis && (
+                <div className={`${CARD} analytics-kpi-shell overflow-hidden`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6">
+                        {kpiCards.map((metric) => {
+                            const isActive = activeChartStat === metric.statKey;
+                            return (
+                                <button
+                                    key={metric.label}
+                                    className={`analytics-kpi-tile text-left ${isActive ? 'is-active' : ''}`}
+                                    data-tone={metric.tone}
+                                    onClick={() => setChartStat(metric.statKey)}
+                                    type="button"
+                                >
+                                    <div className="relative z-10 flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="analytics-kpi-label">{metric.label}</p>
+                                            <div className="mt-2 text-[clamp(1.65rem,2.5vw,2.45rem)] font-semibold leading-none tracking-tight text-white tabular-nums">
+                                                {renderKpiValue(metric.format, metric.value)}
+                                            </div>
+                                        </div>
+                                        <span className="analytics-kpi-caption">{metric.caption}</span>
+                                    </div>
+                                    <div className="relative z-10 mt-4 space-y-3">
+                                        <Change value={metric.change} zeroLabel={metric.zeroLabel || 'Stable'} />
+                                        <Sparkline data={sparklineData} dataKey={metric.sparkKey} color={ACCENT_COLORS[metric.tone]} />
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            <div className={`${CARD} overflow-hidden p-4 sm:p-6`}>
+                <div className="border-b border-white/[0.05] pb-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="min-w-0 space-y-2">
+                            <div className="analytics-kicker">
+                                <span className="analytics-dot" style={{ color: activeStat.color, backgroundColor: activeStat.color }} />
+                                Traffic overview
+                            </div>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                                <div>
+                                    <h3 className="text-lg font-semibold tracking-tight text-white sm:text-xl">{activeStat.label} trend</h3>
+                                    <p className="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-400">{chartDetails.chartInsight}</p>
+                                </div>
+                                {anyFilterActive && (
+                                    <span className="analytics-note-pill text-xs">
+                                        <FilterIcon className="h-3.5 w-3.5 text-[var(--analytics-cyan)]" />
+                                        Filtered segment
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={() => setCompareMode(!compareMode)}
+                                className={`analytics-toolbar-btn text-[11px] ${compareMode ? 'is-active' : ''}`}
+                                type="button"
+                            >
+                                <span className="inline-block w-4 border-t border-dashed border-current" />
+                                Prev period
+                            </button>
+                            <button onClick={() => refresh()} className="analytics-toolbar-btn px-3" type="button">
+                                <RefreshCw className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                onClick={() => analyticsData && exportAnalyticsData(analyticsData)}
+                                className="analytics-toolbar-btn px-3"
+                                type="button"
+                            >
+                                <Download className="h-3.5 w-3.5" />
+                            </button>
+                            <TimeBucketDropdown bucket={bucket} setBucket={setBucket} />
+                        </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {CHART_STATS.map((stat) => (
+                            <button
+                                key={stat.key}
+                                onClick={() => setChartStat(stat.key)}
+                                className={`analytics-segment-btn ${activeChartStat === stat.key ? 'is-active' : ''}`}
+                                type="button"
+                            >
+                                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stat.color }} />
+                                {stat.label}
+                            </button>
+                        ))}
+                        <span className="analytics-note-pill subtle text-[11px]">
+                            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SUPPORT_BAR_COLOR }} />
+                            {activeStat.supportLabel} bars
+                        </span>
+                        <span className="analytics-note-pill subtle text-[11px]">
+                            <span className="h-[2px] w-4 rounded-full" style={{ backgroundColor: ROLLING_AVERAGE_COLOR }} />
+                            Rolling average
+                        </span>
+                        {compareMode && (
+                            <span className="analytics-note-pill subtle text-[11px]">
+                                <span className="inline-block w-4 border-t border-dashed" style={{ borderColor: COMPARE_LINE_COLOR }} />
+                                Previous period
+                            </span>
+                        )}
                     </div>
                 </div>
 
-                {/* Stat switcher buttons */}
-                <div className="flex gap-1 mb-3 overflow-x-auto scrollbar-hide">
-                    {CHART_STATS.map(stat => (
-                        <button
-                            key={stat.key}
-                            onClick={() => setChartStat(stat.key)}
-                            className={`px-3 py-1.5 text-[11px] rounded-lg font-medium transition whitespace-nowrap border ${
-                                chartStat === stat.key
-                                    ? 'bg-white/[0.06] text-white border-white/[0.1]'
-                                    : 'text-zinc-500 hover:text-zinc-300 border-transparent hover:border-white/[0.06]'
-                            }`}
-                        >
-                            <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ backgroundColor: stat.color }} />
-                            {stat.label}
-                        </button>
-                    ))}
+                <div className="pt-4">
+                    <div className="analytics-chart-stage px-2 py-4 sm:px-3">
+                        <div className="mb-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                            <div className="analytics-chart-stat">
+                                <span className="analytics-chart-stat-label">Hero line</span>
+                                <div className="mt-1 flex items-end gap-2">
+                                    <span className="text-base font-semibold text-white">{activeStat.label}</span>
+                                    {peak && <span className="text-[11px] text-zinc-500">peaked at {peak.value}</span>}
+                                </div>
+                            </div>
+                            <div className="analytics-chart-stat">
+                                <span className="analytics-chart-stat-label">Support bars</span>
+                                <div className="mt-1 flex items-end gap-2">
+                                    <span className="text-base font-semibold text-white">{activeStat.supportLabel}</span>
+                                    <span className="text-[11px] text-zinc-500">secondary demand story</span>
+                                </div>
+                            </div>
+                            <div className="analytics-chart-stat">
+                                <span className="analytics-chart-stat-label">Rolling average</span>
+                                <div className="mt-1 flex items-end gap-2">
+                                    <span className="text-base font-semibold text-white">3-point trend</span>
+                                    <span className="text-[11px] text-zinc-500">signal smoothing</span>
+                                </div>
+                            </div>
+                            <div className="analytics-chart-stat">
+                                <span className="analytics-chart-stat-label">Period compare</span>
+                                <div className="mt-1 flex items-end gap-2">
+                                    <span className="text-base font-semibold text-white">{compareMode ? 'Enabled' : 'Optional'}</span>
+                                    <span className="text-[11px] text-zinc-500">previous-period overlay</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="h-[310px] sm:h-[360px] lg:h-[400px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={chartDetails.rows} margin={{ top: 8, right: 10, left: 0, bottom: 0 }} barCategoryGap="18%">
+                                    <defs>
+                                        <linearGradient id={`chart-grad-${activeChartStat}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor={activeStat.color} stopOpacity={0.34} />
+                                            <stop offset="80%" stopColor={activeStat.color} stopOpacity={0.06} />
+                                            <stop offset="100%" stopColor={activeStat.color} stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="chart-support-grad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#d9976c" stopOpacity={0.9} />
+                                            <stop offset="100%" stopColor="#724932" stopOpacity={0.22} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid vertical={false} strokeDasharray="2 10" stroke="rgba(255,255,255,0.055)" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                                        tickFormatter={(value: string) => formatBucketLabel(value, bucket)}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        minTickGap={18}
+                                    />
+                                    <YAxis
+                                        yAxisId="left"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                                        tickFormatter={(value: number) => activeChartStat === 'bounceRate' ? `${Math.round(value)}%` : fmt(Number(value))}
+                                        width={44}
+                                    />
+                                    <YAxis
+                                        yAxisId="right"
+                                        orientation="right"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 11, fill: '#546070' }}
+                                        tickFormatter={(value: number) => fmt(Number(value))}
+                                        width={40}
+                                    />
+                                    <Tooltip
+                                        cursor={{ stroke: 'rgba(255,255,255,0.14)', strokeDasharray: '4 6' }}
+                                        content={(props) => <ChartTooltip {...props} bucket={bucket} activeStat={activeStat} supportLabel={activeStat.supportLabel} />}
+                                    />
+                                    <Bar
+                                        yAxisId="right"
+                                        dataKey="supportValue"
+                                        name={activeStat.supportLabel}
+                                        fill="url(#chart-support-grad)"
+                                        barSize={reduceChartMotion ? 14 : 18}
+                                        radius={[8, 8, 0, 0]}
+                                        isAnimationActive={!reduceChartMotion}
+                                        animationDuration={reduceChartMotion ? 0 : 220}
+                                    />
+                                    {compareMode && (
+                                        <Line
+                                            yAxisId="left"
+                                            type="monotone"
+                                            dataKey="compareValue"
+                                            name="Previous period"
+                                            stroke={COMPARE_LINE_COLOR}
+                                            strokeWidth={1.7}
+                                            strokeDasharray="4 6"
+                                            dot={false}
+                                            activeDot={false}
+                                            isAnimationActive={false}
+                                        />
+                                    )}
+                                    <Line
+                                        yAxisId="left"
+                                        type="monotone"
+                                        dataKey="rollingAverage"
+                                        name="Rolling average"
+                                        stroke={ROLLING_AVERAGE_COLOR}
+                                        strokeWidth={1.7}
+                                        strokeDasharray="3 6"
+                                        dot={false}
+                                        activeDot={false}
+                                        isAnimationActive={false}
+                                    />
+                                    <Area
+                                        yAxisId="left"
+                                        type="monotone"
+                                        dataKey="chartValue"
+                                        name={activeStat.label}
+                                        stroke={activeStat.color}
+                                        fill={`url(#chart-grad-${activeChartStat})`}
+                                        strokeWidth={3}
+                                        dot={false}
+                                        activeDot={{ r: 4.5, stroke: '#ffffff', strokeWidth: 1.5, fill: activeStat.color }}
+                                        isAnimationActive={!reduceChartMotion}
+                                        animationDuration={reduceChartMotion ? 0 : 220}
+                                    />
+                                    {chartDetails.annotations.map((annotation: any) => (
+                                        <ReferenceDot
+                                            key={`${annotation.date}-${annotation.label}`}
+                                            yAxisId="left"
+                                            x={annotation.date}
+                                            y={annotation.chartValue}
+                                            r={4.5}
+                                            fill={annotation.label === 'Spike' ? activeStat.color : SUPPORT_BAR_COLOR}
+                                            stroke="#f8fafc"
+                                            strokeWidth={1.4}
+                                            label={{ value: annotation.label, position: 'top', fill: '#9ea8bb', fontSize: 10 }}
+                                        />
+                                    ))}
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="analytics-chart-insight-card">
+                            <span className="analytics-chart-stat-label">Peak day</span>
+                            <div className="mt-2 flex items-end justify-between gap-3">
+                                <span className="text-lg font-semibold text-white">{peak?.value || '--'}</span>
+                                <span className="text-xs text-zinc-500">{peak?.label || 'No signal'}</span>
+                            </div>
+                        </div>
+                        <div className="analytics-chart-insight-card">
+                            <span className="analytics-chart-stat-label">Period average</span>
+                            <div className="mt-2 flex items-end justify-between gap-3">
+                                <span className="text-lg font-semibold text-white">{average || '--'}</span>
+                                <span className="text-xs text-zinc-500">rolling line anchored</span>
+                            </div>
+                        </div>
+                        <div className="analytics-chart-insight-card">
+                            <span className="analytics-chart-stat-label">Strongest 3-step climb</span>
+                            <div className="mt-2 flex items-end justify-between gap-3">
+                                <span className="text-lg font-semibold text-white">{strongestClimb?.value || '--'}</span>
+                                <span className="text-right text-xs text-zinc-500">{strongestClimb?.label || 'Not enough history'}</span>
+                            </div>
+                        </div>
+                        <div className="analytics-chart-insight-card">
+                            <span className="analytics-chart-stat-label">Current vs previous</span>
+                            <div className="mt-2 flex items-center justify-between gap-3">
+                                <Change value={chartChange} zeroLabel="Flat period" />
+                                <span className="text-xs text-zinc-500">period-wide delta</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                {/* Area chart */}
-                <div className="h-[220px] sm:h-[300px] overflow-hidden">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={comparisonTraffic} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                            <defs>
-                                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor={activeStat.color} stopOpacity={0.2} />
-                                    <stop offset="95%" stopColor={activeStat.color} stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                            <XAxis
-                                dataKey="date"
-                                tick={{ fontSize: 10, fill: '#3f3f46' }}
-                                tickFormatter={(v: string) => {
-                                    // Aggregated buckets already have pre-formatted labels
-                                    if (bucket === 'week' || bucket === 'month') return v;
-                                    const d = new Date(v);
-                                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                }}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <YAxis tick={{ fontSize: 10, fill: '#3f3f46' }} axisLine={false} tickLine={false} />
-                            <Tooltip content={<ChartTooltip />} />
-                            {showComparison && (
-                                <Area
-                                    type="monotone"
-                                    dataKey={prevDataKey}
-                                    name="Previous period"
-                                    stroke="#525252"
-                                    fill="none"
-                                    strokeWidth={1.5}
-                                    strokeDasharray="4 4"
-                                    dot={false}
-                                />
-                            )}
-                            <Area
-                                type="monotone"
-                                dataKey={chartStat}
-                                name={activeStat.label}
-                                stroke={activeStat.color}
-                                fill="url(#chartGrad)"
-                                strokeWidth={2}
-                                dot={false}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </motion.div>
-
-            {/* ─── 3. Traffic Sources + Pages (tabbed panels, two-column) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TrafficSourcesPanel
                     referrers={fReferrers}
                     channels={fChannels}
@@ -643,32 +1098,14 @@ export default function AnalyticsPage() {
                 />
             </div>
 
-            {/* ─── 4. Technology + Geography (tabbed panels, two-column) ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
-                <TechPanel
-                    devices={fDevices}
-                    browsers={fBrowsers}
-                    operatingSystems={fOS}
-                    allDevices={devices}
-                    allBrowsers={browsers}
-                    allOS={operatingSystems}
-                    filters={filters}
-                    toggleFilter={toggleFilter}
-                />
-                <GeoPanel
-                    countries={fCountries}
-                    cities={fCities}
-                    languages={languages}
-                    allCountries={countries}
-                    filters={filters}
-                    toggleFilter={toggleFilter}
-                />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <TechPanel devices={fDevices} browsers={fBrowsers} operatingSystems={fOS} filters={filters} toggleFilter={toggleFilter} />
+                <GeoPanel countries={fCountries} cities={fCities} languages={languages} allCountries={countries} filters={filters} toggleFilter={toggleFilter} />
             </div>
 
-            {/* ─── 5. Intelligence Cards ─── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 overflow-hidden">
-                <EngagementCard kpis={kpis} traffic={traffic} />
-                <LoyaltyCard kpis={kpis} traffic={traffic} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <EngagementCard kpis={kpis} />
+                <LoyaltyCard kpis={kpis} />
                 <DiversityCard channels={channels} />
             </div>
 
@@ -677,586 +1114,485 @@ export default function AnalyticsPage() {
     );
 }
 
-// ─── Traffic Sources Tabbed Panel ───
 function TrafficSourcesPanel({
-    referrers, channels, allReferrers, allChannels, filters, toggleFilter,
+    referrers,
+    channels,
+    allReferrers,
+    allChannels,
+    filters,
+    toggleFilter,
 }: {
-    referrers: any[]; channels: any[]; allReferrers: any[]; allChannels: any[];
-    filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
-}) {
-    const [tab, setTab] = useState<'referrers' | 'channels' | 'utm'>('referrers');
-
-    const refTotal = allReferrers.reduce((s: number, r: any) => s + (r.value || 0), 0);
-    const refMaxPct = refTotal > 0 ? ((allReferrers[0]?.value || 0) / refTotal) * 100 : 100;
-    const chTotal = allChannels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-    const chMaxPct = chTotal > 0 ? ((allChannels[0]?.value || 0) / chTotal) * 100 : 100;
-
-    const tabLabel = tab === 'referrers' ? 'Referrer' : 'Channel';
-    const metricLabel = tab === 'referrers' ? 'Sessions' : 'Visitors';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className={`${CARD} overflow-hidden min-w-0`}
-            style={{ height: 405 }}
-        >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                    <h4 className="text-[13px] font-semibold text-white">Traffic Sources</h4>
-                    <div className="flex gap-0.5">
-                        <TabBtn label="Referrers" active={tab === 'referrers'} onClick={() => setTab('referrers')} />
-                        <TabBtn label="Channels" active={tab === 'channels'} onClick={() => setTab('channels')} />
-                        <TabBtn label="UTM" active={tab === 'utm'} onClick={() => setTab('utm')} />
-                    </div>
-                </div>
-                <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
-                    <Maximize2 className="w-3 h-3" />
-                </button>
-            </div>
-            <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
-                <span>{tabLabel}</span>
-                <div className="flex items-center gap-1.5">
-                    <span>{metricLabel}</span>
-                    <span className="text-zinc-700">Percents</span>
-                </div>
-            </div>
-            <div className="overflow-y-auto" style={{ height: 'calc(405px - 72px)' }}>
-                {tab === 'referrers' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {referrers.slice(0, 25).map((ref: any, i: number) => {
-                            const pct = refTotal > 0 ? (ref.value / refTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={ref.name}
-                                    label={ref.name}
-                                    value={ref.value}
-                                    percentage={pct}
-                                    maxPercentage={refMaxPct}
-                                    icon={<ReferrerIcon referrer={ref.name} />}
-                                    href={ref.name !== '(direct)' ? `https://${ref.name}` : undefined}
-                                    onClick={() => toggleFilter('referrer', ref.name)}
-                                    active={filters.referrer.includes(ref.name)}
-                                    barColor={getItemColor(ref.name, i, REFERRER_COLORS)}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'channels' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {channels.slice(0, 25).map((ch: any, i: number) => {
-                            const pct = chTotal > 0 ? (ch.value / chTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={ch.name}
-                                    label={ch.name}
-                                    value={ch.value}
-                                    percentage={pct}
-                                    maxPercentage={chMaxPct}
-                                    onClick={() => toggleFilter('channel', ch.name)}
-                                    active={filters.channel.includes(ch.name)}
-                                    barColor={getItemColor(ch.name, i, CHANNEL_COLORS)}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'utm' && (
-                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                        UTM tracking coming soon
-                    </div>
-                )}
-            </div>
-            {tab === 'referrers' && <SeeAllBtn count={referrers.length} label="Referrers" />}
-            {tab === 'channels' && <SeeAllBtn count={channels.length} label="Channels" />}
-        </motion.div>
-    );
-}
-
-// ─── Pages Tabbed Panel ───
-function PagesPanel({
-    pages, entryPages, allPages, allEntryPages, filters, toggleFilter,
-}: {
-    pages: any[]; entryPages: any[]; allPages: any[]; allEntryPages: any[];
-    filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
-}) {
-    const [tab, setTab] = useState<'pages' | 'entries' | 'exits'>('pages');
-
-    const pgTotal = allPages.reduce((s: number, p: any) => s + (p.views || 0), 0);
-    const pgMaxPct = pgTotal > 0 ? ((allPages[0]?.views || 0) / pgTotal) * 100 : 100;
-    const epTotal = allEntryPages.reduce((s: number, p: any) => s + (p.sessions || 0), 0);
-    const epMaxPct = epTotal > 0 ? ((allEntryPages[0]?.sessions || 0) / epTotal) * 100 : 100;
-
-    const tabLabel = tab === 'pages' ? 'Page' : 'Entry Page';
-    const metricLabel = tab === 'pages' ? 'Views' : 'Sessions';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.14 }}
-            className={`${CARD} overflow-hidden min-w-0`}
-            style={{ height: 405 }}
-        >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                    <h4 className="text-[13px] font-semibold text-white">Top Pages</h4>
-                    <div className="flex gap-0.5">
-                        <TabBtn label="Pages" active={tab === 'pages'} onClick={() => setTab('pages')} />
-                        <TabBtn label="Entry Pages" active={tab === 'entries'} onClick={() => setTab('entries')} />
-                        <TabBtn label="Exit Pages" active={tab === 'exits'} onClick={() => setTab('exits')} />
-                    </div>
-                </div>
-                <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
-                    <Maximize2 className="w-3 h-3" />
-                </button>
-            </div>
-            <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
-                <span>{tabLabel}</span>
-                <div className="flex items-center gap-1.5">
-                    <span>{metricLabel}</span>
-                    <span className="text-zinc-700">Percents</span>
-                </div>
-            </div>
-            <div className="overflow-y-auto" style={{ height: 'calc(405px - 72px)' }}>
-                {tab === 'pages' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {pages.slice(0, 25).map((pg: any, i: number) => {
-                            const pct = pgTotal > 0 ? (pg.views / pgTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={pg.page}
-                                    label={pg.page}
-                                    value={pg.views}
-                                    percentage={pct}
-                                    maxPercentage={pgMaxPct}
-                                    onClick={() => toggleFilter('page', pg.page)}
-                                    active={filters.page.includes(pg.page)}
-                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'entries' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {entryPages.slice(0, 25).map((pg: any, i: number) => {
-                            const pct = epTotal > 0 ? (pg.sessions / epTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={pg.page}
-                                    label={pg.page}
-                                    value={pg.sessions}
-                                    percentage={pct}
-                                    maxPercentage={epMaxPct}
-                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'exits' && (
-                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                        Exit pages coming soon
-                    </div>
-                )}
-            </div>
-            {tab === 'pages' && <SeeAllBtn count={pages.length} label="Pages" />}
-            {tab === 'entries' && <SeeAllBtn count={entryPages.length} label="Entry Pages" />}
-        </motion.div>
-    );
-}
-
-// ─── Technology Tabbed Panel ───
-function TechPanel({
-    devices, browsers, operatingSystems, filters, toggleFilter,
-}: {
-    devices: any[]; browsers: any[]; operatingSystems: any[];
-    allDevices?: any[]; allBrowsers?: any[]; allOS?: any[];
-    filters: DashboardFilters; toggleFilter: (dim: any, val: string) => void;
-}) {
-    const [tab, setTab] = useState<'browsers' | 'devices' | 'os' | 'screen'>('browsers');
-
-    const data = tab === 'devices' ? devices.map((d: any) => ({ name: d.device, value: d.sessions, pct: d.percentage }))
-        : tab === 'browsers' ? browsers.map((b: any) => ({ name: b.name, value: b.value, pct: b.percentage }))
-        : tab === 'os' ? operatingSystems.map((o: any) => ({ name: o.name, value: o.value, pct: o.percentage }))
-        : [];
-
-    const dim = tab === 'devices' ? 'device' : tab === 'browsers' ? 'browser' : 'os';
-    const total = data.reduce((s: number, d: any) => s + (d.value || 0), 0);
-    const maxPct = total > 0 ? ((data[0]?.value || 0) / total) * 100 : 100;
-
-    const tabLabel = tab === 'devices' ? 'Device' : tab === 'browsers' ? 'Browser' : 'OS';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.16 }}
-            className={`${CARD} overflow-hidden min-w-0`}
-            style={{ height: 405 }}
-        >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                    <h4 className="text-[13px] font-semibold text-white">Technology</h4>
-                    <div className="flex gap-0.5">
-                        <TabBtn label="Browsers" active={tab === 'browsers'} onClick={() => setTab('browsers')} />
-                        <TabBtn label="Devices" active={tab === 'devices'} onClick={() => setTab('devices')} />
-                        <TabBtn label="OS" active={tab === 'os'} onClick={() => setTab('os')} />
-                        <TabBtn label="Screen" active={tab === 'screen'} onClick={() => setTab('screen')} />
-                    </div>
-                </div>
-                <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
-                    <Maximize2 className="w-3 h-3" />
-                </button>
-            </div>
-            <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
-                <span>{tabLabel}</span>
-                <div className="flex items-center gap-1.5">
-                    <span>Sessions</span>
-                    <span className="text-zinc-700">Percents</span>
-                </div>
-            </div>
-            <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
-                {tab === 'screen' ? (
-                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                        Screen dimensions coming soon
-                    </div>
-                ) : (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {data.slice(0, 25).map((item: any, i: number) => {
-                            const pct = total > 0 ? (item.value / total) * 100 : 0;
-                            const icon = tab === 'devices'
-                                ? <DeviceIcon device={item.name} />
-                                : tab === 'browsers'
-                                ? <BrowserIcon browser={item.name} />
-                                : <OSIcon os={item.name} />;
-                            return (
-                                <DataRow
-                                    key={item.name}
-                                    label={item.name}
-                                    value={item.value}
-                                    percentage={pct}
-                                    maxPercentage={maxPct}
-                                    icon={icon}
-                                    onClick={() => toggleFilter(dim, item.name)}
-                                    active={filters[dim].includes(item.name)}
-                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-            <SeeAllBtn count={data.length} label={tabLabel + 's'} />
-        </motion.div>
-    );
-}
-
-// ─── Geography Tabbed Panel ───
-function GeoPanel({
-    countries, cities, languages, allCountries, filters, toggleFilter,
-}: {
-    countries: any[]; cities: any[]; languages: any[]; allCountries: any[];
+    referrers: any[];
+    channels: any[];
+    allReferrers: any[];
+    allChannels: any[];
     filters: DashboardFilters;
-    toggleFilter: (dim: any, val: string) => void;
+    toggleFilter: (dimension: any, value: string) => void;
 }) {
-    const [tab, setTab] = useState<'countries' | 'regions' | 'cities' | 'languages' | 'map'>('countries');
+    const [tab, setTab] = useState<'referrers' | 'channels'>('referrers');
 
-    const cTotal = allCountries.reduce((s: number, c: any) => s + (c.users || 0), 0);
-    const cMaxPct = cTotal > 0 ? ((allCountries[0]?.users || 0) / cTotal) * 100 : 100;
-
-    const cityTotal = cities.reduce((s: number, c: any) => s + (c.users || 0), 0);
-    const cityMaxPct = cityTotal > 0 ? ((cities[0]?.users || 0) / cityTotal) * 100 : 100;
-
-    const langTotal = languages.reduce((s: number, l: any) => s + (l.value || 0), 0);
-    const langMaxPct = langTotal > 0 ? ((languages[0]?.value || 0) / langTotal) * 100 : 100;
-
-    const tabLabel = tab === 'countries' ? 'Country' : tab === 'cities' ? 'City' : 'Language';
-    const metricLabel = tab === 'languages' ? 'Visitors' : 'Users';
+    const refTotal = allReferrers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+    const refMaxPct = refTotal > 0 ? ((allReferrers[0]?.value || 0) / refTotal) * 100 : 100;
+    const channelTotal = allChannels.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+    const channelMaxPct = channelTotal > 0 ? ((allChannels[0]?.value || 0) / channelTotal) * 100 : 100;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.18 }}
-            className={`${CARD} overflow-hidden min-w-0`}
-            style={{ height: 405 }}
+        <PanelShell
+            title="Traffic Sources"
+            eyebrow="Acquisition"
+            tone="mint"
+            tabs={[
+                { key: 'referrers', label: 'Referrers' },
+                { key: 'channels', label: 'Channels' },
+            ]}
+            activeTab={tab}
+            onTabChange={(key) => setTab(key as 'referrers' | 'channels')}
+            leftLabel={tab === 'referrers' ? 'Referrer' : 'Channel'}
+            rightLabel={tab === 'referrers' ? 'Sessions' : 'Visitors'}
+            meta={`${Math.min(tab === 'referrers' ? referrers.length : channels.length, 25)} rows`}
         >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2 min-w-0">
-                    <h4 className="text-[13px] font-semibold text-white flex-shrink-0">Geography</h4>
-                    <div className="flex gap-0.5 overflow-x-auto scrollbar-hide">
-                        <TabBtn label="Countries" active={tab === 'countries'} onClick={() => setTab('countries')} />
-                        <TabBtn label="Regions" active={tab === 'regions'} onClick={() => setTab('regions')} />
-                        <TabBtn label="Cities" active={tab === 'cities'} onClick={() => setTab('cities')} />
-                        <TabBtn label="Languages" active={tab === 'languages'} onClick={() => setTab('languages')} />
-                        <TabBtn label="Map" active={tab === 'map'} onClick={() => setTab('map')} />
-                    </div>
-                </div>
-                <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                    {allCountries.slice(0, 4).map((c: any, i: number) => (
-                        <CountryFlag key={i} country={c.country} />
-                    ))}
-                    <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition ml-1" title="Expand">
-                        <Maximize2 className="w-3 h-3" />
-                    </button>
-                </div>
+            <div className="space-y-1 pb-1">
+                {tab === 'referrers' && referrers.length === 0 && (
+                    <PanelEmptyState title="No referrers yet" copy="Traffic sources will appear here after the connected property starts sending visits." />
+                )}
+                {tab === 'channels' && channels.length === 0 && (
+                    <PanelEmptyState title="No channels yet" copy="Channel attribution will populate here once the selected period includes visitors." />
+                )}
+                {tab === 'referrers' && referrers.slice(0, 25).map((referrer: any) => {
+                    const pct = refTotal > 0 ? (referrer.value / refTotal) * 100 : 0;
+                    return (
+                        <DataRow
+                            key={referrer.name}
+                            label={referrer.name}
+                            value={referrer.value}
+                            percentage={pct}
+                            maxPercentage={refMaxPct}
+                            icon={<ReferrerIcon referrer={referrer.name} />}
+                            href={getReferrerHref(referrer.name)}
+                            onClick={() => toggleFilter('referrer', referrer.name)}
+                            active={filters.referrer.includes(referrer.name)}
+                            tone="mint"
+                        />
+                    );
+                })}
+                {tab === 'channels' && channels.slice(0, 25).map((channel: any) => {
+                    const pct = channelTotal > 0 ? (channel.value / channelTotal) * 100 : 0;
+                    return (
+                        <DataRow
+                            key={channel.name}
+                            label={channel.name}
+                            value={channel.value}
+                            percentage={pct}
+                            maxPercentage={channelMaxPct}
+                            icon={<ChannelIcon channel={channel.name} />}
+                            onClick={() => toggleFilter('channel', channel.name)}
+                            active={filters.channel.includes(channel.name)}
+                            tone="cyan"
+                        />
+                    );
+                })}
             </div>
-            {tab !== 'map' && (
-                <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
-                    <span>{tabLabel}</span>
-                    <div className="flex items-center gap-1.5">
-                        <span>{metricLabel}</span>
-                        <span className="text-zinc-700">Percents</span>
-                    </div>
+        </PanelShell>
+    );
+}
+
+function PagesPanel({
+    pages,
+    entryPages,
+    allPages,
+    allEntryPages,
+    filters,
+    toggleFilter,
+}: {
+    pages: any[];
+    entryPages: any[];
+    allPages: any[];
+    allEntryPages: any[];
+    filters: DashboardFilters;
+    toggleFilter: (dimension: any, value: string) => void;
+}) {
+    const [tab, setTab] = useState<'pages' | 'entries'>('pages');
+
+    const pagesTotal = allPages.reduce((sum: number, item: any) => sum + (item.views || 0), 0);
+    const pagesMaxPct = pagesTotal > 0 ? ((allPages[0]?.views || 0) / pagesTotal) * 100 : 100;
+    const entriesTotal = allEntryPages.reduce((sum: number, item: any) => sum + (item.sessions || 0), 0);
+    const entriesMaxPct = entriesTotal > 0 ? ((allEntryPages[0]?.sessions || 0) / entriesTotal) * 100 : 100;
+
+    return (
+        <PanelShell
+            title="Top Pages"
+            eyebrow="Content"
+            tone="amber"
+            tabs={[
+                { key: 'pages', label: 'Pages' },
+                { key: 'entries', label: 'Entry Pages' },
+            ]}
+            activeTab={tab}
+            onTabChange={(key) => setTab(key as 'pages' | 'entries')}
+            leftLabel={tab === 'pages' ? 'Page' : 'Entry page'}
+            rightLabel={tab === 'pages' ? 'Views' : 'Sessions'}
+            meta={`${Math.min(tab === 'pages' ? pages.length : entryPages.length, 25)} rows`}
+        >
+            <div className="space-y-1 pb-1">
+                {tab === 'pages' && pages.length === 0 && (
+                    <PanelEmptyState title="No page view data yet" copy="Page-level detail will appear here as soon as the selected range includes tracked visits." />
+                )}
+                {tab === 'entries' && entryPages.length === 0 && (
+                    <PanelEmptyState title="No entry page data yet" copy="Landing-page performance will appear once the connected property has enough sessions." />
+                )}
+                {tab === 'pages' && pages.slice(0, 25).map((page: any) => {
+                    const pct = pagesTotal > 0 ? (page.views / pagesTotal) * 100 : 0;
+                    return (
+                        <DataRow
+                            key={page.page}
+                            label={page.page}
+                            value={page.views}
+                            percentage={pct}
+                            maxPercentage={pagesMaxPct}
+                            onClick={() => toggleFilter('page', page.page)}
+                            active={filters.page.includes(page.page)}
+                            tone="amber"
+                        />
+                    );
+                })}
+                {tab === 'entries' && entryPages.slice(0, 25).map((page: any) => {
+                    const pct = entriesTotal > 0 ? (page.sessions / entriesTotal) * 100 : 0;
+                    return (
+                        <DataRow
+                            key={page.page}
+                            label={page.page}
+                            value={page.sessions}
+                            percentage={pct}
+                            maxPercentage={entriesMaxPct}
+                            tone="amber"
+                        />
+                    );
+                })}
+            </div>
+        </PanelShell>
+    );
+}
+
+function TechPanel({
+    devices,
+    browsers,
+    operatingSystems,
+    filters,
+    toggleFilter,
+}: {
+    devices: any[];
+    browsers: any[];
+    operatingSystems: any[];
+    filters: DashboardFilters;
+    toggleFilter: (dimension: any, value: string) => void;
+}) {
+    const [tab, setTab] = useState<'browsers' | 'devices' | 'os'>('browsers');
+
+    const rows = tab === 'devices'
+        ? devices.map((item: any) => ({ name: item.device, value: item.sessions }))
+        : tab === 'browsers'
+        ? browsers.map((item: any) => ({ name: item.name, value: item.value }))
+        : operatingSystems.map((item: any) => ({ name: item.name, value: item.value }));
+
+    const total = rows.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+    const maxPct = total > 0 ? ((rows[0]?.value || 0) / total) * 100 : 100;
+    const filterDimension = tab === 'devices' ? 'device' : tab === 'browsers' ? 'browser' : 'os';
+    const tone: AccentTone = tab === 'devices' ? 'blue' : tab === 'browsers' ? 'violet' : 'cyan';
+
+    return (
+        <PanelShell
+            title="Technology Mix"
+            eyebrow="Platforms"
+            tone="violet"
+            tabs={[
+                { key: 'browsers', label: 'Browsers' },
+                { key: 'devices', label: 'Devices' },
+                { key: 'os', label: 'OS' },
+            ]}
+            activeTab={tab}
+            onTabChange={(key) => setTab(key as 'browsers' | 'devices' | 'os')}
+            leftLabel={tab === 'devices' ? 'Device' : tab === 'browsers' ? 'Browser' : 'OS'}
+            rightLabel="Sessions"
+            meta={`${Math.min(rows.length, 25)} rows`}
+        >
+            <div className="space-y-1 pb-1">
+                {rows.length === 0 && (
+                    <PanelEmptyState title="No device data yet" copy="Technology breakdowns will populate once the selected period includes tracked sessions." />
+                )}
+                {rows.slice(0, 25).map((item: any) => {
+                    const pct = total > 0 ? (item.value / total) * 100 : 0;
+                    const icon = tab === 'devices'
+                        ? <DeviceIcon device={item.name} />
+                        : tab === 'browsers'
+                        ? <BrowserIcon browser={item.name} />
+                        : <OSIcon os={item.name} />;
+                    return (
+                        <DataRow
+                            key={item.name}
+                            label={item.name}
+                            value={item.value}
+                            percentage={pct}
+                            maxPercentage={maxPct}
+                            icon={icon}
+                            onClick={() => toggleFilter(filterDimension, item.name)}
+                            active={filters[filterDimension].includes(item.name)}
+                            tone={tone}
+                        />
+                    );
+                })}
+            </div>
+        </PanelShell>
+    );
+}
+
+function GeoPanel({
+    countries,
+    cities,
+    languages,
+    allCountries,
+    filters,
+    toggleFilter,
+}: {
+    countries: any[];
+    cities: any[];
+    languages: any[];
+    allCountries: any[];
+    filters: DashboardFilters;
+    toggleFilter: (dimension: any, value: string) => void;
+}) {
+    const [tab, setTab] = useState<'countries' | 'cities' | 'languages' | 'map'>('countries');
+
+    const countriesTotal = allCountries.reduce((sum: number, item: any) => sum + (item.users || 0), 0);
+    const countryMaxPct = countriesTotal > 0 ? ((allCountries[0]?.users || 0) / countriesTotal) * 100 : 100;
+    const citiesTotal = cities.reduce((sum: number, item: any) => sum + (item.users || 0), 0);
+    const citiesMaxPct = citiesTotal > 0 ? ((cities[0]?.users || 0) / citiesTotal) * 100 : 100;
+    const languagesTotal = languages.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+    const languagesMaxPct = languagesTotal > 0 ? ((languages[0]?.value || 0) / languagesTotal) * 100 : 100;
+
+    return (
+        <PanelShell
+            title="Geo Reach"
+            eyebrow="Geography"
+            tone="mint"
+            tabs={[
+                { key: 'countries', label: 'Countries' },
+                { key: 'cities', label: 'Cities' },
+                { key: 'languages', label: 'Languages' },
+                { key: 'map', label: 'Map' },
+            ]}
+            activeTab={tab}
+            onTabChange={(key) => setTab(key as 'countries' | 'cities' | 'languages' | 'map')}
+            leftLabel={tab === 'countries' ? 'Country' : tab === 'cities' ? 'City' : tab === 'languages' ? 'Language' : ''}
+            rightLabel={tab === 'languages' ? 'Visitors' : tab === 'map' ? '' : 'Users'}
+            meta={`${Math.min(tab === 'countries' ? countries.length : tab === 'cities' ? cities.length : languages.length, 25)} rows`}
+            rightSlot={
+                <div className="flex items-center gap-1">
+                    {allCountries.slice(0, 3).map((country: any, index: number) => (
+                        <CountryFlag key={`${country.country}-${index}`} country={country.country} />
+                    ))}
                 </div>
-            )}
-            <div className="overflow-y-auto" style={{ height: tab === 'map' ? 'calc(405px - 40px)' : 'calc(405px - 64px)' }}>
-                {tab === 'countries' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {countries.slice(0, 25).map((c: any, i: number) => {
-                            const pct = cTotal > 0 ? (c.users / cTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={c.country}
-                                    label={c.country}
-                                    value={c.users}
-                                    percentage={pct}
-                                    maxPercentage={cMaxPct}
-                                    icon={<CountryFlag country={c.country} />}
-                                    onClick={() => toggleFilter('country', c.country)}
-                                    active={filters.country.includes(c.country)}
-                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'regions' && (
-                    <div className="flex items-center justify-center h-[200px] text-zinc-600 text-sm">
-                        Regional breakdown coming soon
-                    </div>
-                )}
-
-                {tab === 'cities' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {cities.slice(0, 25).map((c: any, i: number) => {
-                            const pct = cityTotal > 0 ? (c.users / cityTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={`${c.city}-${c.country}-${i}`}
-                                    label={`${c.city}, ${c.country}`}
-                                    value={c.users}
-                                    percentage={pct}
-                                    maxPercentage={cityMaxPct}
-                                    icon={<CountryFlag country={c.country} />}
-                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'languages' && (
-                    <div className="space-y-0.5 px-1 pb-2">
-                        {languages.slice(0, 25).map((l: any, i: number) => {
-                            const pct = langTotal > 0 ? (l.value / langTotal) * 100 : 0;
-                            return (
-                                <DataRow
-                                    key={l.name}
-                                    label={l.name}
-                                    value={l.value}
-                                    percentage={pct}
-                                    maxPercentage={langMaxPct}
-                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {tab === 'map' && (
-                    <div className="h-full">
+            }
+        >
+            {tab === 'map' ? (
+                <div className="h-full min-h-[260px] p-2">
+                    <div className="h-full overflow-hidden rounded-[16px] border border-white/[0.05] bg-black/10">
                         <WorldMap
-                            byCountry={allCountries.map((c: any) => ({ country: c.country, users: c.users }))}
-                            byCity={cities.map((c: any) => ({ city: c.city, country: c.country, users: c.users }))}
+                            byCountry={allCountries.map((country: any) => ({ country: country.country, users: country.users }))}
+                            byCity={cities.map((city: any) => ({ city: city.city, country: city.country, users: city.users }))}
                             onBubbleClick={(name: string) => toggleFilter('country', name)}
                             activeCountry={filters.country[0] || null}
                         />
                     </div>
-                )}
-            </div>
-            {tab === 'countries' && <SeeAllBtn count={countries.length} label="Countries" />}
-            {tab === 'cities' && <SeeAllBtn count={cities.length} label="Cities" />}
-            {tab === 'languages' && <SeeAllBtn count={languages.length} label="Languages" />}
-        </motion.div>
+                </div>
+            ) : (
+                <div className="space-y-1 pb-1">
+                    {tab === 'countries' && countries.length === 0 && (
+                        <PanelEmptyState title="No country data yet" copy="Geo breakdowns will appear when the selected period contains enough visitors." />
+                    )}
+                    {tab === 'countries' && countries.slice(0, 25).map((country: any) => {
+                        const pct = countriesTotal > 0 ? (country.users / countriesTotal) * 100 : 0;
+                        return (
+                            <DataRow
+                                key={country.country}
+                                label={country.country}
+                                value={country.users}
+                                percentage={pct}
+                                maxPercentage={countryMaxPct}
+                                icon={<CountryFlag country={country.country} />}
+                                onClick={() => toggleFilter('country', country.country)}
+                                active={filters.country.includes(country.country)}
+                                tone="mint"
+                            />
+                        );
+                    })}
+                    {tab === 'cities' && cities.slice(0, 25).map((city: any, index: number) => {
+                        const pct = citiesTotal > 0 ? (city.users / citiesTotal) * 100 : 0;
+                        return (
+                            <DataRow
+                                key={`${city.city}-${city.country}-${index}`}
+                                label={`${city.city}, ${city.country}`}
+                                value={city.users}
+                                percentage={pct}
+                                maxPercentage={citiesMaxPct}
+                                icon={<CountryFlag country={city.country} />}
+                                tone="cyan"
+                            />
+                        );
+                    })}
+                    {tab === 'languages' && languages.slice(0, 25).map((language: any) => {
+                        const pct = languagesTotal > 0 ? (language.value / languagesTotal) * 100 : 0;
+                        return (
+                            <DataRow
+                                key={language.name}
+                                label={language.name}
+                                value={language.value}
+                                percentage={pct}
+                                maxPercentage={languagesMaxPct}
+                                tone="blue"
+                            />
+                        );
+                    })}
+                </div>
+            )}
+        </PanelShell>
     );
 }
 
-// ─── Intelligence: Engagement Card ───
-function EngagementCard({ kpis, traffic }: { kpis: any; traffic: any[] }) {
+function EngagementCard({ kpis }: { kpis: any }) {
     if (!kpis) return null;
     const score = Math.min(100, Math.round(
-        (Math.min(kpis.avgSessionDuration / 300, 1) * 30) + (Math.min(kpis.pagesPerSession / 5, 1) * 25) +
-        (Math.max(0, 1 - kpis.avgBounceRate / 100) * 25) + (Math.min((kpis.returningUsers || 0) / Math.max(kpis.totalUsers, 1), 1) * 20)
+        (Math.min(kpis.avgSessionDuration / 300, 1) * 30) +
+        (Math.min(kpis.pagesPerSession / 5, 1) * 25) +
+        (Math.max(0, 1 - kpis.avgBounceRate / 100) * 25) +
+        (Math.min((kpis.returningUsers || 0) / Math.max(kpis.totalUsers, 1), 1) * 20)
     ));
-    const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
-    const barHex = score >= 70 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171';
-
-    // Daily engagement mini bars from traffic data
-    const dailyScores = traffic.slice(-30).map((d: any) => {
-        const durScore = Math.min(d.avgSessionDuration || 0, 300) / 300;
-        const ppsScore = d.sessions > 0 ? Math.min(d.pageViews / d.sessions, 5) / 5 : 0;
-        const bounceScore = Math.max(0, 1 - (d.bounceRate || 0) / 100);
-        return Math.round((durScore * 0.33 + ppsScore * 0.33 + bounceScore * 0.34) * 100);
-    });
-    const maxDaily = Math.max(...dailyScores, 1);
-
-    const avgDuration = fmtDur(kpis.avgSessionDuration || 0);
-    const pps = (kpis.pagesPerSession || 0).toFixed(1);
+    const tier = score >= 70 ? 'High intent' : score >= 40 ? 'Healthy' : 'Needs work';
+    const activeSegments = Math.max(1, Math.round(score / 10));
 
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center justify-between mb-3 min-w-0">
-                <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-violet-400 flex-shrink-0" />
-                    <h4 className="text-sm font-semibold text-white truncate">Engagement Score</h4>
-                </div>
-                <span className="text-[10px] text-zinc-600 tabular-nums">{dailyScores.length}d</span>
+        <div className={`${CARD} analytics-insight-card p-4 sm:p-5`}>
+            <div className="analytics-kicker">
+                <span className="analytics-dot" style={{ color: ACCENT_COLORS.amber, backgroundColor: ACCENT_COLORS.amber }} />
+                Engagement
             </div>
-            <div className="flex items-end gap-3 mb-3">
-                <AnimatedCounter value={score} className={`text-4xl sm:text-5xl font-bold ${color} leading-none`} />
-                <div className="flex items-end gap-[2px] h-[32px] flex-1 min-w-0">
-                    {dailyScores.map((s, i) => (
-                        <div
-                            key={i}
-                            className="flex-1 rounded-sm min-w-[2px] transition-all"
-                            style={{
-                                height: `${Math.max((s / maxDaily) * 100, 8)}%`,
-                                backgroundColor: barHex,
-                                opacity: 0.3 + (s / maxDaily) * 0.7,
-                            }}
-                        />
-                    ))}
+            <div className="mt-3 flex items-start justify-between gap-3">
+                <div>
+                    <h4 className="text-lg font-semibold text-white">Engagement Score</h4>
+                    <p className="mt-1 text-sm text-zinc-400">Longer sessions, more depth, and lower bounce lift this score.</p>
                 </div>
+                <Target className="h-5 w-5 text-[var(--analytics-amber)]" />
             </div>
-            <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500">Avg Duration</span>
-                    <span className="text-zinc-300 font-medium tabular-nums">{avgDuration}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500">Pages / Session</span>
-                    <span className="text-zinc-300 font-medium tabular-nums">{pps}</span>
-                </div>
+            <div className="mt-6 flex items-end gap-2">
+                <AnimatedCounter value={score} className="text-4xl font-semibold leading-none text-[var(--analytics-amber)]" />
+                <span className="pb-1 text-sm text-zinc-500">/ 100</span>
             </div>
-        </motion.div>
+            <div className="mt-4 analytics-segment-meter">
+                {Array.from({ length: 10 }).map((_, index) => (
+                    <span key={index} style={index < activeSegments ? { background: 'linear-gradient(90deg, #ffb454, #ffd27f)' } : undefined} />
+                ))}
+            </div>
+            <div className="mt-4 flex items-center justify-between text-xs">
+                <span className="analytics-note-pill subtle">{tier}</span>
+                <span className="text-zinc-500">{fmtDur(kpis.avgSessionDuration || 0)} avg duration</span>
+            </div>
+        </div>
     );
 }
 
-// ─── Intelligence: Loyalty Card ───
-function LoyaltyCard({ kpis, traffic }: { kpis: any; traffic: any[] }) {
+function LoyaltyCard({ kpis }: { kpis: any }) {
     if (!kpis) return null;
     const returning = kpis.returningUsers || 0;
-    const newUsers = kpis.newUsers || (kpis.totalUsers - returning);
-    const total = kpis.totalUsers || 1;
+    const total = Math.max(kpis.totalUsers || 0, 1);
     const loyaltyPct = Math.round((returning / total) * 100);
     const newPct = 100 - loyaltyPct;
-
-    // Daily user mini bars
-    const dailyUsers = traffic.slice(-30).map((d: any) => d.activeUsers || 0);
-    const maxDaily = Math.max(...dailyUsers, 1);
+    const label = loyaltyPct >= 35 ? 'Returning audience is compounding well.' : loyaltyPct >= 20 ? 'Loyalty is growing, with room to deepen repeat visits.' : 'Traffic is mostly first-touch right now.';
 
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center justify-between mb-3 min-w-0">
-                <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-pink-400 flex-shrink-0" />
-                    <h4 className="text-sm font-semibold text-white truncate">Audience Loyalty</h4>
-                </div>
-                <span className="text-[10px] text-zinc-600 tabular-nums">{dailyUsers.length}d</span>
+        <div className={`${CARD} analytics-insight-card p-4 sm:p-5`}>
+            <div className="analytics-kicker">
+                <span className="analytics-dot" style={{ color: ACCENT_COLORS.violet, backgroundColor: ACCENT_COLORS.violet }} />
+                Loyalty
             </div>
-            <div className="flex items-end gap-3 mb-3">
-                <AnimatedCounter value={loyaltyPct} className="text-4xl sm:text-5xl font-bold text-pink-400 leading-none" />
-                <div className="flex items-end gap-[2px] h-[32px] flex-1 min-w-0">
-                    {dailyUsers.map((u: number, i: number) => (
-                        <div
-                            key={i}
-                            className="flex-1 rounded-sm min-w-[2px] transition-all"
-                            style={{
-                                height: `${Math.max((u / maxDaily) * 100, 8)}%`,
-                                backgroundColor: '#ec4899',
-                                opacity: 0.3 + (u / maxDaily) * 0.7,
-                            }}
-                        />
-                    ))}
+            <div className="mt-3 flex items-start justify-between gap-3">
+                <div>
+                    <h4 className="text-lg font-semibold text-white">Audience Loyalty</h4>
+                    <p className="mt-1 text-sm text-zinc-400">{label}</p>
                 </div>
+                <Users className="h-5 w-5 text-[var(--analytics-violet)]" />
             </div>
-            <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500">New Visitors</span>
-                    <div className="flex items-center gap-2">
-                        <span className="text-violet-400 font-medium tabular-nums">{newPct}%</span>
-                        <div className="w-16 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${newPct}%` }} className="h-full bg-violet-500/60 rounded-full" />
-                        </div>
-                    </div>
+            <div className="mt-6 flex items-end gap-2">
+                <AnimatedCounter value={loyaltyPct} className="text-4xl font-semibold leading-none text-[var(--analytics-violet)]" />
+                <span className="pb-1 text-sm text-zinc-500">% returning</span>
+            </div>
+            <div className="mt-4 space-y-2">
+                <div className="flex justify-between text-[11px] text-zinc-500">
+                    <span>New</span>
+                    <span>Returning</span>
                 </div>
-                <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500">Returning</span>
-                    <div className="flex items-center gap-2">
-                        <span className="text-emerald-400 font-medium tabular-nums">{loyaltyPct}%</span>
-                        <div className="w-16 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${loyaltyPct}%` }} className="h-full bg-emerald-500/60 rounded-full" />
-                        </div>
-                    </div>
+                <div className="analytics-progress-track flex h-3">
+                    <div className="h-full bg-violet-500/55" style={{ width: `${newPct}%` }} />
+                    <div className="h-full bg-emerald-400/70" style={{ width: `${loyaltyPct}%` }} />
+                </div>
+                <div className="flex justify-between text-xs">
+                    <span className="font-medium text-violet-300">{newPct}% new</span>
+                    <span className="font-medium text-emerald-300">{loyaltyPct}% returning</span>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 }
 
-// ─── Intelligence: Source Diversity Card ───
 function DiversityCard({ channels }: { channels: any[] }) {
     if (!channels.length) return null;
-    const total = channels.reduce((s: number, c: any) => s + (c.value || 0), 0);
-    const shares = channels.map((c: any) => (c.value || 0) / Math.max(total, 1));
-    const entropy = -shares.reduce((s: number, p: number) => s + (p > 0 ? p * Math.log2(p) : 0), 0);
+    const total = channels.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+    const shares = channels.map((item: any) => (item.value || 0) / Math.max(total, 1));
+    const entropy = -shares.reduce((sum: number, share: number) => sum + (share > 0 ? share * Math.log2(share) : 0), 0);
     const maxEntropy = Math.log2(Math.max(channels.length, 1));
     const score = Math.round((entropy / Math.max(maxEntropy, 0.01)) * 100);
-    const color = score >= 60 ? 'text-emerald-400' : score >= 35 ? 'text-amber-400' : 'text-red-400';
+    const label = score >= 60 ? 'Healthy spread' : score >= 35 ? 'Moderately concentrated' : 'Heavily concentrated';
+    const tones: AccentTone[] = ['mint', 'blue', 'violet', 'amber'];
+
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
-                <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                <h4 className="text-sm sm:text-base font-semibold text-white truncate">Source Diversity</h4>
+        <div className={`${CARD} analytics-insight-card p-4 sm:p-5`}>
+            <div className="analytics-kicker">
+                <span className="analytics-dot" style={{ color: ACCENT_COLORS.blue, backgroundColor: ACCENT_COLORS.blue }} />
+                Acquisition balance
             </div>
-            <div className="flex items-end gap-1 mb-2 sm:mb-3">
-                <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
-                <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>
+            <div className="mt-3 flex items-start justify-between gap-3">
+                <div>
+                    <h4 className="text-lg font-semibold text-white">Source Diversity</h4>
+                    <p className="mt-1 text-sm text-zinc-400">A broader mix reduces dependence on any single source.</p>
+                </div>
+                <Globe className="h-5 w-5 text-[var(--analytics-blue)]" />
             </div>
-            <div className="space-y-1.5">
-                {channels.slice(0, 4).map((c: any, i: number) => {
-                    const pct = Math.round(((c.value || 0) / Math.max(total, 1)) * 100);
+            <div className="mt-6 flex items-end gap-2">
+                <AnimatedCounter value={score} className="text-4xl font-semibold leading-none text-[var(--analytics-blue)]" />
+                <span className="pb-1 text-sm text-zinc-500">/ 100</span>
+            </div>
+            <div className="mt-3">
+                <span className="analytics-note-pill subtle text-xs">{label}</span>
+            </div>
+            <div className="mt-4 space-y-2.5">
+                {channels.slice(0, 4).map((channel: any, index: number) => {
+                    const pct = Math.round(((channel.value || 0) / Math.max(total, 1)) * 100);
+                    const tone = tones[index] || 'blue';
                     return (
-                        <div key={i} className="flex items-center gap-2 text-[11px]">
-                            <span className="text-zinc-400 min-w-[80px] truncate">{c.name}</span>
-                            <div className="flex-1 h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500/40 rounded-full" style={{ width: `${pct}%` }} />
+                        <div key={channel.name} className="flex items-center gap-3 text-xs">
+                            <div className="flex min-w-[116px] items-center gap-2">
+                                <ChannelIcon channel={channel.name} />
+                                <span className="truncate text-zinc-300">{channel.name}</span>
                             </div>
-                            <span className="text-zinc-600 tabular-nums min-w-[28px] text-right">{pct}%</span>
+                            <div className="analytics-progress-track h-2 flex-1">
+                                <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${ACCENT_COLORS[tone]}, ${ACCENT_COLORS[tone]}cc)` }}
+                                />
+                            </div>
+                            <span className="min-w-[30px] text-right tabular-nums text-zinc-500">{pct}%</span>
                         </div>
                     );
                 })}
             </div>
-        </motion.div>
+        </div>
     );
 }

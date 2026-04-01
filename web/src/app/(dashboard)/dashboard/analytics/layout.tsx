@@ -52,7 +52,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
-    const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter, clearAdvancedFilters } = useFilterStore();
+    const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
 
@@ -72,11 +72,11 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
     return (
         <AnalyticsContext.Provider value={{ selectedProperty, range, setRange, hasGoogleConnection }}>
-            <div className="space-y-0">
+            <div className="space-y-0 analytics-shell">
                 {/* ─── Sticky Top Bar ─── */}
-                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
+                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0 analytics-shell-header">
                     {/* Single row: Tabs left, Controls right */}
-                    <div className="flex items-center border-b border-white/[0.04]">
+                    <div className="analytics-shell-topbar flex items-center gap-2 px-3 sm:px-4">
                         {/* Tabs — scrollable */}
                         <div className="flex-1 overflow-x-auto scrollbar-hide min-w-0">
                             <div className="flex items-center gap-0 -mb-px min-w-0">
@@ -89,11 +89,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     <Link
                                         key={tab.key}
                                         href={href}
-                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-none px-2 sm:px-3 py-2 sm:py-2 min-h-[36px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
-                                            isActive
-                                                ? 'text-white border-white'
-                                                : 'text-zinc-500 border-transparent hover:text-zinc-300'
-                                        }`}
+                                        className={`analytics-shell-tab flex-none whitespace-nowrap ${isActive ? 'is-active' : ''}`}
                                     >
                                         <tab.icon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                         {tab.label}
@@ -110,13 +106,13 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                         </div>
 
                         {/* Controls — right side */}
-                        <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                        <div className="flex items-center gap-1.5 shrink-0 py-2 pl-2">
                             <FilterBuilder />
 
                             <div className="relative">
                                 <button
                                     onClick={() => setExportOpen(!exportOpen)}
-                                    className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                    className="analytics-shell-action w-9 h-9 px-0"
                                     title="Export data"
                                 >
                                     <Download className="w-3.5 h-3.5" />
@@ -124,16 +120,16 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                 {exportOpen && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
-                                        <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-lg shadow-2xl py-1 min-w-[160px]">
+                                        <div className="analytics-shell-menu absolute right-0 top-full mt-2 z-50 min-w-[180px] py-1.5">
                                             <button
                                                 onClick={() => { window.dispatchEvent(new CustomEvent('trafficclaw:export-analytics')); setExportOpen(false); }}
-                                                className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.04] transition"
+                                                className="w-full px-3 py-2 text-left text-xs text-zinc-300 transition hover:bg-white/[0.04]"
                                             >
                                                 Export CSV
                                             </button>
                                             <button
                                                 onClick={() => { window.dispatchEvent(new CustomEvent('trafficclaw:export-zip')); setExportOpen(false); }}
-                                                className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.04] transition"
+                                                className="w-full px-3 py-2 text-left text-xs text-zinc-300 transition hover:bg-white/[0.04]"
                                             >
                                                 Export ZIP (all data)
                                             </button>
@@ -144,7 +140,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                             <button
                                 onClick={() => setShareOpen(true)}
-                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                className="analytics-shell-action w-9 h-9 px-0"
                                 title="Share dashboard"
                             >
                                 <Share2 className="w-3.5 h-3.5" />
@@ -152,11 +148,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                             <button
                                 onClick={() => setCompareMode(!compareMode)}
-                                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] rounded-lg border transition ${
-                                    compareMode
-                                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                                        : 'bg-white/[0.03] border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1]'
-                                }`}
+                                className={`analytics-shell-action text-[11px] ${compareMode ? 'is-active' : ''}`}
                                 title="Compare with previous period"
                             >
                                 <GitCompare className="w-3 h-3" />
@@ -175,7 +167,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="flex items-center gap-2 pt-2 pb-1 flex-wrap">
+                            <div className="flex items-center gap-2 px-1 pt-3 pb-1.5 flex-wrap">
                                 <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider font-medium">
                                     <Filter className="w-3 h-3" />
                                     Filters
@@ -188,8 +180,8 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                             initial={{ scale: 0.9, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
                                             exit={{ scale: 0.9, opacity: 0 }}
-                                            onClick={() => clearFilter(dim as any)}
-                                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/[0.08] border border-blue-500/20 text-blue-400 text-[11px] font-medium hover:bg-blue-500/[0.12] transition group"
+                                            onClick={() => clearFilter(dim as keyof typeof filters)}
+                                            className="analytics-filter-pill group rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300 transition hover:bg-cyan-400/[0.14]"
                                         >
                                             <span className="capitalize">{dim}:</span> {val}
                                             <X className="w-3 h-3 text-blue-500/50 group-hover:text-blue-300 transition" />
@@ -207,10 +199,10 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                             animate={{ scale: 1, opacity: 1 }}
                                             exit={{ scale: 0.9, opacity: 0 }}
                                             onClick={() => removeAdvancedFilter(i)}
-                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition group border ${
+                                            className={`analytics-filter-pill group rounded-full transition ${
                                                 negative
-                                                    ? 'bg-red-500/[0.08] border-red-500/20 text-red-400 hover:bg-red-500/[0.12]'
-                                                    : 'bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/[0.12]'
+                                                    ? 'border-red-400/20 bg-red-500/[0.08] text-red-300 hover:bg-red-500/[0.12]'
+                                                    : 'border-emerald-400/20 bg-emerald-500/[0.08] text-emerald-300 hover:bg-emerald-500/[0.12]'
                                             }`}
                                         >
                                             <span className="opacity-70 capitalize">{filter.parameter.replace('_', ' ')}</span>
@@ -236,7 +228,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 </AnimatePresence>
 
                 {/* ─── Page content ─── */}
-                <div className="pt-2 sm:pt-3">
+                <div className="pt-3 sm:pt-4">
                     {(propsLoading || containerLoading) ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
