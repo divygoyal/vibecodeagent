@@ -525,6 +525,16 @@ export default function HeroAnalyticsReport({
     const resolvedSecondaryMetric = normalizeSecondaryMetric(state.selectedMetric, visibleMetrics, state.secondaryMetric);
     const secondaryAccent = resolvedSecondaryMetric === 'none' ? '#64748b' : metricAccent(resolvedSecondaryMetric);
     const secondaryLabel = resolvedSecondaryMetric === 'none' ? 'Support metric' : metricMeta(resolvedSecondaryMetric).label;
+    const rowPlotValueById = useMemo(() => {
+        if (!data) return new Map<string, string>();
+        return new Map(data.table.map((row) => [row.id, row.primaryValue]));
+    }, [data]);
+    const selectedPlotRows = useMemo(() => selectedRows
+        .map((rowId) => ({
+            rowId,
+            plotValue: rowPlotValueById.get(rowId),
+        }))
+        .filter((row): row is { rowId: string; plotValue: string } => Boolean(row.plotValue)), [rowPlotValueById, selectedRows]);
 
     const descriptor = useMemo<AnalyticsQueryDescriptor>(() => ({
         propertyId,
@@ -539,9 +549,9 @@ export default function HeroAnalyticsReport({
         limit: 12,
         orderBy: state.orderBy,
         visualization: state.chartType,
-        plotRows: selectedRows,
+        plotRows: selectedPlotRows.map((row) => row.plotValue),
         filters: queryFilters,
-    }), [propertyId, queryFilters, range, resolvedSecondaryMetric, selectedRows, state]);
+    }), [propertyId, queryFilters, range, resolvedSecondaryMetric, selectedPlotRows, state]);
 
     useEffect(() => {
         if (!propertyId) return;
@@ -594,8 +604,8 @@ export default function HeroAnalyticsReport({
                 ),
             };
 
-            selectedRows.forEach((entry, rowIndex) => {
-                row[`series_${rowIndex}`] = item.series?.[entry] || 0;
+            selectedPlotRows.forEach((entry, rowIndex) => {
+                row[`series_${rowIndex}`] = item.series?.[entry.plotValue] || 0;
             });
 
             Object.entries(item.comparisonTotals || {}).forEach(([name, value], comparisonIndex) => {
@@ -605,14 +615,14 @@ export default function HeroAnalyticsReport({
 
             return row;
         });
-    }, [data, selectedRows]);
+    }, [data, selectedPlotRows]);
 
     useEffect(() => {
         if (!data) return;
         const validIds = new Set(data.table.map((row) => row.id));
         setSelectedRows((current) => {
-            const next = current.filter((row) => validIds.has(row)).slice(0, 5);
-            if (next.length === current.length && next.every((row, index) => row === current[index])) {
+            const next = current.filter((rowId) => validIds.has(rowId)).slice(0, 5);
+            if (next.length === current.length && next.every((rowId, index) => rowId === current[index])) {
                 return current;
             }
             return next;
@@ -650,11 +660,11 @@ export default function HeroAnalyticsReport({
         onMetricChange?.(metric);
     }
 
-    function toggleRow(value: string) {
+    function toggleRow(rowId: string) {
         setSelectedRows((current) => {
-            if (current.includes(value)) return current.filter((entry) => entry !== value);
+            if (current.includes(rowId)) return current.filter((entry) => entry !== rowId);
             if (current.length >= 5) return current;
-            return [...current, value];
+            return [...current, rowId];
         });
     }
 
@@ -966,13 +976,13 @@ export default function HeroAnalyticsReport({
                                         />
                                     ))}
 
-                                    {selectedRows.map((row, index) => (
+                                    {selectedPlotRows.map((row, index) => (
                                         <Line
-                                            key={row}
+                                            key={row.rowId}
                                             yAxisId="left"
                                             type="monotone"
                                             dataKey={`series_${index}`}
-                                            name={row}
+                                            name={row.plotValue}
                                             stroke={SERIES_COLORS[index + 1]}
                                             strokeWidth={2}
                                             dot={false}
@@ -1095,13 +1105,13 @@ export default function HeroAnalyticsReport({
                                     </tr>
                                 )}
                                 {(data?.table || []).map((row) => {
-                                    const active = selectedRows.includes(row.primaryValue);
+                                    const active = selectedRows.includes(row.id);
                                     return (
                                         <tr key={row.id} className={active ? 'is-selected' : ''}>
                                             <td>
                                                 <button
                                                     type="button"
-                                                    onClick={() => toggleRow(row.primaryValue)}
+                                                    onClick={() => toggleRow(row.id)}
                                                     className={`analytics-row-toggle ${active ? 'is-active' : ''}`}
                                                 >
                                                     {active && <Check className="h-3.5 w-3.5" />}
