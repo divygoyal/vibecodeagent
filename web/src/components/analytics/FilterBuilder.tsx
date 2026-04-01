@@ -5,28 +5,34 @@ import { Filter, Plus, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFilterStore, type FilterRule } from '@/stores/analyticsFilterStore';
 
+type FilterParamOption = {
+    value: string;
+    label: string;
+    supported: boolean;
+};
+
 const FILTER_PARAMS = [
-    { value: 'country', label: 'Country' },
-    { value: 'city', label: 'City' },
-    { value: 'region', label: 'Region' },
-    { value: 'language', label: 'Language' },
-    { value: 'device', label: 'Device' },
-    { value: 'browser', label: 'Browser' },
-    { value: 'os', label: 'OS' },
-    { value: 'referrer', label: 'Referrer' },
-    { value: 'channel', label: 'Channel' },
-    { value: 'page', label: 'Page' },
-    { value: 'hostname', label: 'Hostname' },
-    { value: 'entry_page', label: 'Entry Page' },
-    { value: 'exit_page', label: 'Exit Page' },
-    { value: 'utm_source', label: 'UTM Source' },
-    { value: 'utm_medium', label: 'UTM Medium' },
-    { value: 'utm_campaign', label: 'UTM Campaign' },
-    { value: 'utm_term', label: 'UTM Term' },
-    { value: 'utm_content', label: 'UTM Content' },
-    { value: 'screen_resolution', label: 'Screen Resolution' },
-    { value: 'browser_version', label: 'Browser Version' },
-];
+    { value: 'country', label: 'Country', supported: true },
+    { value: 'city', label: 'City', supported: false },
+    { value: 'region', label: 'Region', supported: false },
+    { value: 'language', label: 'Language', supported: false },
+    { value: 'device', label: 'Device', supported: true },
+    { value: 'browser', label: 'Browser', supported: true },
+    { value: 'os', label: 'OS', supported: true },
+    { value: 'referrer', label: 'Referrer', supported: true },
+    { value: 'channel', label: 'Channel', supported: true },
+    { value: 'page', label: 'Page', supported: true },
+    { value: 'hostname', label: 'Hostname', supported: false },
+    { value: 'entry_page', label: 'Entry Page', supported: false },
+    { value: 'exit_page', label: 'Exit Page', supported: false },
+    { value: 'utm_source', label: 'UTM Source', supported: false },
+    { value: 'utm_medium', label: 'UTM Medium', supported: false },
+    { value: 'utm_campaign', label: 'UTM Campaign', supported: false },
+    { value: 'utm_term', label: 'UTM Term', supported: false },
+    { value: 'utm_content', label: 'UTM Content', supported: false },
+    { value: 'screen_resolution', label: 'Screen Resolution', supported: false },
+    { value: 'browser_version', label: 'Browser Version', supported: false },
+] as const satisfies ReadonlyArray<FilterParamOption>;
 
 const FILTER_TYPES: { value: FilterRule['type']; label: string }[] = [
     { value: 'equals', label: 'equals' },
@@ -54,7 +60,7 @@ function SelectDropdown({
     onChange,
     placeholder,
 }: {
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; disabled?: boolean }[];
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
@@ -99,11 +105,18 @@ function SelectDropdown({
                             <button
                                 key={opt.value}
                                 type="button"
-                                onClick={() => { onChange(opt.value); setOpen(false); }}
+                                onClick={() => {
+                                    if (opt.disabled) return;
+                                    onChange(opt.value);
+                                    setOpen(false);
+                                }}
+                                disabled={opt.disabled}
                                 className={`w-full text-left px-3 py-1.5 text-[11px] transition ${
                                     value === opt.value
                                         ? 'text-emerald-400 bg-emerald-500/[0.08]'
-                                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                        : opt.disabled
+                                            ? 'text-zinc-600 cursor-not-allowed'
+                                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                 }`}
                             >
                                 {opt.label}
@@ -160,6 +173,12 @@ export default function FilterBuilder() {
     }
 
     const filterCount = advancedFilters.length;
+    const unsupportedParamCount = FILTER_PARAMS.filter((option) => !option.supported).length;
+    const filterParamOptions = FILTER_PARAMS.map((option) => ({
+        value: option.value,
+        label: option.supported ? option.label : `${option.label} (unsupported)`,
+        disabled: !option.supported,
+    }));
 
     return (
         <div ref={dropdownRef} className="relative">
@@ -207,7 +226,7 @@ export default function FilterBuilder() {
                         {/* Filter Builder Row */}
                         <div className="flex items-center gap-2 mb-3">
                             <SelectDropdown
-                                options={FILTER_PARAMS}
+                                options={filterParamOptions}
                                 value={param}
                                 onChange={setParam}
                                 placeholder="Parameter..."
@@ -235,6 +254,11 @@ export default function FilterBuilder() {
                                 <Plus className="w-3.5 h-3.5" />
                             </button>
                         </div>
+                        {unsupportedParamCount > 0 && (
+                            <p className="mb-3 text-[10px] text-amber-400/90">
+                                Some filter parameters are shown but disabled because they are not supported yet.
+                            </p>
+                        )}
 
                         {/* Active Advanced Filters */}
                         {filterCount > 0 && (
