@@ -35,10 +35,13 @@ import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
 import HeroAnalyticsReport from '@/components/analytics/HeroAnalyticsReport';
 import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
+import { mapAdvancedFilters, mapSimpleFilters } from '@/lib/analyticsQueryFilters';
 import type {
     AnalyticsChartMode,
     AnalyticsChartMetric,
+    AnalyticsQueryDescriptor,
     AnalyticsQueryMetric,
+    AnalyticsQueryResponse,
     AnalyticsSecondaryMetric,
     AnalyticsTimeBucket,
     AnalyticsViewConfig,
@@ -564,6 +567,8 @@ export default function AnalyticsPage() {
     const { filters, advancedFilters, toggleFilter } = useFilterStore();
     const [heroMetric, setHeroMetric] = useState<AnalyticsQueryMetric>('activeUsers');
     const [activeKpiCardId, setActiveKpiCardId] = useState('users');
+    const [filteredReport, setFilteredReport] = useState<AnalyticsQueryResponse | null>(null);
+    const [isFilteredReportLoading, setIsFilteredReportLoading] = useState(false);
 
     useEffect(() => {
         const csvHandler = () => {
@@ -603,82 +608,91 @@ export default function AnalyticsPage() {
     const fChannels = filters.channel.length > 0 ? channels.filter((channel: any) => filters.channel.includes(channel.name)) : channels;
     const fEntryPages = filters.page.length > 0 ? entryPages.filter((page: any) => filters.page.includes(page.page)) : entryPages;
 
-    const anyFilterActive = Object.values(filters).some((values) => values.length > 0);
+    const queryFilters = useMemo(
+        () => [...mapSimpleFilters(filters), ...mapAdvancedFilters(advancedFilters)],
+        [advancedFilters, filters],
+    );
+    const anyFilterActive = queryFilters.length > 0;
 
-    const filteredKpis = useMemo(() => {
-        if (!kpis || !anyFilterActive) return null;
-        let ratio = 1;
-        if (filters.country.length > 0) {
-            const filteredUsers = fCountries.reduce((sum: number, item: any) => sum + (item.users || 0), 0);
-            const totalUsers = countries.reduce((sum: number, item: any) => sum + (item.users || 0), 0);
-            ratio = Math.min(ratio, totalUsers > 0 ? filteredUsers / totalUsers : 0);
+    useEffect(() => {
+        if (!selectedProperty || !anyFilterActive) {
+            setFilteredReport(null);
+            setIsFilteredReportLoading(false);
+            return;
         }
-        if (filters.page.length > 0) {
-            const filteredViews = fPages.reduce((sum: number, item: any) => sum + (item.views || 0), 0);
-            const totalViews = pages.reduce((sum: number, item: any) => sum + (item.views || 0), 0);
-            ratio = Math.min(ratio, totalViews > 0 ? filteredViews / totalViews : 0);
+
+        const controller = new AbortController();
+
+        async function loadFilteredReport() {
+            setIsFilteredReportLoading(true);
+            try {
+                const descriptor: AnalyticsQueryDescriptor = {
+                    propertyId: selectedProperty,
+                    primaryDimension: 'sessionDefaultChannelGroup',
+                    metrics: ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration'],
+                    visibleMetrics: ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate'],
+                    selectedMetric: 'activeUsers',
+                    secondaryMetric: null,
+                    range,
+                    bucket: 'day',
+                    compareMode: 'previousPeriod',
+                    limit: 14,
+                    orderBy: 'activeUsers',
+                    visualization: 'line',
+                    filters: queryFilters,
+                };
+                const response = await fetch('/api/analytics/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(descriptor),
+                    signal: controller.signal,
+                });
+                const json = await response.json();
+                if (!response.ok) throw new Error(json.error || 'Failed to load filtered KPIs');
+                if (!controller.signal.aborted) setFilteredReport(json as AnalyticsQueryResponse);
+            } catch {
+                if (!controller.signal.aborted) setFilteredReport(null);
+            } finally {
+                if (!controller.signal.aborted) setIsFilteredReportLoading(false);
+            }
         }
-        if (filters.device.length > 0) {
-            const filteredSessions = fDevices.reduce((sum: number, item: any) => sum + (item.sessions || 0), 0);
-            const totalSessions = devices.reduce((sum: number, item: any) => sum + (item.sessions || 0), 0);
-            ratio = Math.min(ratio, totalSessions > 0 ? filteredSessions / totalSessions : 0);
-        }
-        if (filters.browser.length > 0) {
-            const filteredValue = fBrowsers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            const totalValue = browsers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
-        }
-        if (filters.channel.length > 0) {
-            const filteredValue = fChannels.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            const totalValue = channels.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
-        }
-        if (filters.referrer.length > 0) {
-            const filteredValue = fReferrers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            const totalValue = referrers.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
-        }
-        if (filters.os.length > 0) {
-            const filteredValue = fOS.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            const totalValue = operatingSystems.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
-            ratio = Math.min(ratio, totalValue > 0 ? filteredValue / totalValue : 0);
-        }
+
+        void loadFilteredReport();
+        return () => controller.abort();
+    }, [anyFilterActive, queryFilters, range, selectedProperty]);
+
+    const displayKpis = useMemo(() => {
+        if (!anyFilterActive || !filteredReport?.summary) return kpis;
         return {
-            totalUsers: Math.round(kpis.totalUsers * ratio),
-            totalSessions: Math.round(kpis.totalSessions * ratio),
-            totalPageViews: Math.round(kpis.totalPageViews * ratio),
-            avgBounceRate: kpis.avgBounceRate,
+            ...kpis,
+            totalUsers: filteredReport.summary.activeUsers ?? 0,
+            totalSessions: filteredReport.summary.sessions ?? 0,
+            totalPageViews: filteredReport.summary.screenPageViews ?? 0,
+            avgBounceRate: filteredReport.summary.bounceRate ?? 0,
+            avgSessionDuration: filteredReport.summary.averageSessionDuration ?? 0,
+            changeUsers: filteredReport.summary.prev_activeUsers
+                ? ((filteredReport.summary.activeUsers - filteredReport.summary.prev_activeUsers) / filteredReport.summary.prev_activeUsers) * 100
+                : 0,
+            changeSessions: filteredReport.summary.prev_sessions
+                ? ((filteredReport.summary.sessions - filteredReport.summary.prev_sessions) / filteredReport.summary.prev_sessions) * 100
+                : 0,
+            changePageViews: filteredReport.summary.prev_screenPageViews
+                ? ((filteredReport.summary.screenPageViews - filteredReport.summary.prev_screenPageViews) / filteredReport.summary.prev_screenPageViews) * 100
+                : 0,
+            changeBounceRate: filteredReport.summary.prev_bounceRate
+                ? filteredReport.summary.bounceRate - filteredReport.summary.prev_bounceRate
+                : 0,
         };
-    }, [
-        anyFilterActive,
-        browsers,
-        channels,
-        countries,
-        devices,
-        fBrowsers,
-        fChannels,
-        fCountries,
-        fDevices,
-        fOS,
-        fPages,
-        fReferrers,
-        filters,
-        kpis,
-        operatingSystems,
-        pages,
-        referrers,
-    ]);
-
-    const displayKpis = filteredKpis || kpis;
+    }, [anyFilterActive, filteredReport, kpis]);
 
     const sparklineData = useMemo(() => {
         const recent = traffic.slice(-14);
         return recent.map((item: any) => ({
             ...item,
             pagesPerSession: item.sessions > 0 ? item.pageViews / item.sessions : 0,
-            avgSessionDuration: kpis?.avgSessionDuration || 0,
+            avgSessionDuration: displayKpis?.avgSessionDuration || 0,
         }));
-    }, [traffic, kpis?.avgSessionDuration]);
+    }, [displayKpis?.avgSessionDuration, traffic]);
 
     const kpiCards: {
         id: string;
@@ -773,7 +787,14 @@ export default function AnalyticsPage() {
                                         <span className="analytics-kpi-caption">{metric.caption}</span>
                                     </div>
                                     <div className="relative z-10 mt-4 space-y-3">
-                                        <Change value={metric.change} zeroLabel={metric.zeroLabel || 'Stable'} />
+                                        {isFilteredReportLoading && anyFilterActive ? (
+                                            <span className="analytics-delta-pill neutral">
+                                                <RefreshCw className="h-3 w-3 animate-spin" />
+                                                Refreshing…
+                                            </span>
+                                        ) : (
+                                            <Change value={metric.change} zeroLabel={metric.zeroLabel || 'Stable'} />
+                                        )}
                                         <Sparkline data={sparklineData} dataKey={metric.sparkKey} color={ACCENT_COLORS[metric.tone]} />
                                     </div>
                                 </button>

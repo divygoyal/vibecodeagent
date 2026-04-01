@@ -32,14 +32,14 @@ import type {
     AnalyticsCompareMode,
     AnalyticsQueryDescriptor,
     AnalyticsQueryDimension,
-    AnalyticsQueryFilter,
     AnalyticsQueryMetaResponse,
     AnalyticsQueryMetric,
     AnalyticsQueryResponse,
     AnalyticsQueryVisualization,
     AnalyticsTimeBucket,
 } from '@/types/analyticsWorkspace';
-import type { DashboardFilters, FilterRule } from '@/stores/analyticsFilterStore';
+import type { DashboardFilters } from '@/stores/analyticsFilterStore';
+import { mapAdvancedFilters, mapSimpleFilters } from '@/lib/analyticsQueryFilters';
 
 const STORAGE_KEY = 'trafficclaw.analytics.hero.v3';
 const CHART_TYPES: { value: AnalyticsQueryVisualization; label: string; icon: typeof LineChart }[] = [
@@ -154,57 +154,6 @@ function normalizeSecondaryMetric(
     }
 
     return visibleMetrics.find((metric) => metric !== selectedMetric) || 'none';
-}
-
-function mapSimpleFilters(filters: DashboardFilters): AnalyticsQueryFilter[] {
-    const entries: Array<[keyof DashboardFilters, AnalyticsQueryDimension]> = [
-        ['country', 'country'],
-        ['device', 'deviceCategory'],
-        ['channel', 'sessionDefaultChannelGroup'],
-        ['page', 'pagePath'],
-        ['referrer', 'sessionSource'],
-        ['browser', 'browser'],
-        ['os', 'operatingSystem'],
-    ];
-
-    return entries.flatMap(([key, fieldName]) => {
-        const values = filters[key];
-        if (!values.length) return [];
-        return [{
-            fieldName,
-            operator: 'inList' as const,
-            value: values,
-        }];
-    });
-}
-
-function mapAdvancedFilters(filters: FilterRule[]): AnalyticsQueryFilter[] {
-    const fieldMap: Record<string, AnalyticsQueryDimension> = {
-        country: 'country',
-        device: 'deviceCategory',
-        channel: 'sessionDefaultChannelGroup',
-        page: 'pagePath',
-        referrer: 'sessionSource',
-        browser: 'browser',
-        os: 'operatingSystem',
-    };
-
-    return filters.flatMap((filter) => {
-        const fieldName = fieldMap[filter.parameter];
-        if (!fieldName) return [];
-        return [{
-            fieldName,
-            operator:
-                filter.type === 'equals'
-                    ? 'equals'
-                    : filter.type === 'contains'
-                        ? 'contains'
-                        : filter.type === 'not_equals'
-                            ? 'notEquals'
-                            : 'notContains',
-            value: filter.value,
-        } as AnalyticsQueryFilter];
-    });
 }
 
 function useOutsideClose<T extends HTMLElement>(open: boolean, onClose: () => void) {
