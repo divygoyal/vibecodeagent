@@ -318,7 +318,9 @@ function aggregateTrendRows(rows: any[], bucket: AnalyticsTimeBucket, metricName
 }
 
 function makeComparisonKey(comparison: AnalyticsQueryComparison, index: number) {
-    const rawValue = Array.isArray(comparison.value) ? comparison.value.join(', ') : comparison.value;
+    const rawValue = Array.isArray(comparison.value)
+        ? comparison.value.join(', ')
+        : comparison.value;
     return comparison.label || `${comparison.fieldName}:${rawValue || `comparison-${index + 1}`}`;
 }
 
