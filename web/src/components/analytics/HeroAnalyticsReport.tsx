@@ -261,7 +261,7 @@ function MetricPicker({
     const groupEntries = Object.entries(grouped);
 
     return (
-        <div ref={ref} className="analytics-picker-menu absolute left-0 top-full z-40 mt-2 w-[320px] overflow-hidden">
+        <div ref={ref} className="analytics-picker-menu absolute left-0 top-full z-40 w-[320px] overflow-hidden">
             <div className="analytics-picker-search">
                 <Search className="h-4 w-4 text-zinc-400" />
                 <input
