@@ -306,17 +306,7 @@ function MetricPicker({
     );
 }
 
-function ReportTooltip({
-    active,
-    payload,
-    label,
-    metric,
-    compareMode,
-    bucket,
-    secondaryMetric,
-    secondaryLabel,
-    showRolling,
-}: {
+type ReportTooltipProps = {
     active?: boolean;
     payload?: Array<{
         dataKey?: string;
@@ -332,7 +322,19 @@ function ReportTooltip({
     secondaryMetric?: AnalyticsQueryMetric | 'none';
     secondaryLabel?: string;
     showRolling?: boolean;
-}) {
+};
+
+function ReportTooltip({
+    active,
+    payload,
+    label,
+    metric,
+    compareMode,
+    bucket,
+    secondaryMetric,
+    secondaryLabel,
+    showRolling,
+}: ReportTooltipProps) {
     if (!active || !payload?.length) return null;
     const row = payload[0]?.payload;
     const total = payload.find((item) => item.dataKey === 'total');
