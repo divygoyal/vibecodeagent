@@ -28,6 +28,8 @@ import {
 } from 'recharts';
 
 import { useAnalyticsContext } from '../layout';
+import { useFilterStore } from '@/stores/analyticsFilterStore';
+import { useAnalyticsViewModel, buildViewState } from '@/lib/useAnalyticsViewModel';
 import {
     BrowserIcon,
     ChannelIcon,
@@ -158,12 +160,45 @@ function getDimensionIcon(
 
 export default function AnalyticsExplorePage() {
     const { selectedProperty, range } = useAnalyticsContext();
+    const { filters, advancedFilters, clearAll } = useFilterStore();
     const [descriptor, setDescriptor] = useState<AnalyticsQueryDescriptor>({ ...DEFAULT_DESCRIPTOR, range });
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [viewName, setViewName] = useState('');
     const [data, setData] = useState<AnalyticsQueryResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const queryDescriptor = useMemo(() => ({ ...descriptor, range }), [descriptor, range]);
+    const currentViewState = useMemo(() => buildViewState({
+        descriptor: queryDescriptor,
+        selectedRows,
+        filters,
+        advancedFilters,
+    }), [queryDescriptor, selectedRows, filters, advancedFilters]);
+
+    const {
+        views,
+        activeViewId,
+        hydratedState,
+        setActiveViewId,
+        setUrl,
+        persistFallback,
+        createView,
+        updateView,
+        deleteView,
+    } = useAnalyticsViewModel({
+        propertyId: selectedProperty,
+        fallbackDescriptor: { ...DEFAULT_DESCRIPTOR, range },
+    });
+
+    useEffect(() => {
+        if (!hydratedState) return;
+        setDescriptor((current) => ({ ...current, ...hydratedState.descriptor, range }));
+        setSelectedRows(hydratedState.selectedRows || []);
+    }, [hydratedState, range]);
+
+    useEffect(() => {
+        persistFallback(currentViewState);
+    }, [currentViewState, persistFallback]);
 
     useEffect(() => {
         if (!selectedProperty) return;
@@ -252,6 +287,19 @@ export default function AnalyticsExplorePage() {
         });
     }
 
+    async function saveAsView() {
+        const trimmed = viewName.trim();
+        if (!trimmed) return;
+        await createView(trimmed, currentViewState);
+        setViewName('');
+    }
+
+    async function saveActiveView() {
+        if (!activeViewId) return;
+        await updateView(activeViewId, { state: currentViewState });
+        setUrl({ viewId: activeViewId });
+    }
+
     return (
         <div className="analytics-main-page space-y-4 overflow-hidden pb-5 sm:space-y-5">
             <div className="grid gap-4 xl:grid-cols-[1.45fr_0.9fr]">
@@ -266,6 +314,61 @@ export default function AnalyticsExplorePage() {
                             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">
                                 This is the first step toward a GA-style exploration workspace: change dimensions, switch metrics, plot rows, and compare signals without leaving TrafficClaw.
                             </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <select
+                                    className="analytics-control-select min-w-[220px]"
+                                    value={activeViewId || ''}
+                                    onChange={(event) => {
+                                        const id = event.target.value;
+                                        setActiveViewId(id || null);
+                                        const selected = views.find((view) => view.id === id);
+                                        if (selected?.state) {
+                                            setDescriptor({ ...selected.state.descriptor, range });
+                                            setSelectedRows(selected.state.selectedRows || []);
+                                            setUrl({ viewId: id, state: null });
+                                        } else {
+                                            setUrl({ viewId: null, state: currentViewState });
+                                        }
+                                    }}
+                                >
+                                    <option value="">Scratch view</option>
+                                    {views.map((view) => (
+                                        <option key={view.id} value={view.id}>
+                                            {view.name}{view.isDefault ? ' (Default)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <input
+                                    value={viewName}
+                                    onChange={(event) => setViewName(event.target.value)}
+                                    placeholder="New named view"
+                                    className="analytics-control-select min-w-[180px]"
+                                />
+                                <button type="button" className="analytics-shell-action px-3" onClick={() => void saveAsView()}>
+                                    Save new
+                                </button>
+                                <button type="button" className="analytics-shell-action px-3" onClick={() => void saveActiveView()} disabled={!activeViewId}>
+                                    Update active
+                                </button>
+                                <button type="button" className="analytics-shell-action px-3" onClick={() => activeViewId && void deleteView(activeViewId)} disabled={!activeViewId}>
+                                    Delete
+                                </button>
+                                <button
+                                    type="button"
+                                    className="analytics-shell-action px-3"
+                                    onClick={() => {
+                                        setUrl({ viewId: null, state: currentViewState });
+                                        if (typeof window !== 'undefined' && navigator.clipboard) {
+                                            void navigator.clipboard.writeText(window.location.href);
+                                        }
+                                    }}
+                                >
+                                    Copy share URL
+                                </button>
+                                <button type="button" className="analytics-shell-action px-3" onClick={clearAll}>
+                                    Clear filters
+                                </button>
+                            </div>
                         </div>
                         <Compass className="mt-1 h-5 w-5 text-[var(--analytics-cyan)]" />
                     </div>

@@ -46,16 +46,6 @@ export interface AnalyticsLayoutConfig {
     compactHeader: boolean;
 }
 
-export interface AnalyticsViewConfig {
-    id: string;
-    name: string;
-    isDefault?: boolean;
-    chart: AnalyticsChartConfig;
-    panels: Record<AnalyticsPanelId, AnalyticsPanelConfig>;
-    layout: AnalyticsLayoutConfig;
-    updatedAt: string;
-}
-
 export type AnalyticsQueryDimension =
     | 'sessionDefaultChannelGroup'
     | 'sessionSource'
@@ -123,6 +113,40 @@ export interface AnalyticsQueryDescriptor {
     visualization?: AnalyticsQueryVisualization;
     plotRows?: string[];
     filters?: AnalyticsQueryFilter[];
+}
+
+export interface AnalyticsFilterSet {
+    simple: Record<string, string[]>;
+    advanced: Array<{
+        parameter: string;
+        type: 'equals' | 'not_equals' | 'contains' | 'not_contains';
+        value: string;
+    }>;
+}
+
+export interface AnalyticsViewState {
+    descriptor: AnalyticsQueryDescriptor;
+    metricSlots: AnalyticsQueryMetric[];
+    compareMode: AnalyticsCompareMode;
+    bucket: AnalyticsTimeBucket;
+    chartType: AnalyticsQueryVisualization;
+    secondaryMetric?: AnalyticsQueryMetric | null;
+    selectedRows: string[];
+    filterSet: AnalyticsFilterSet;
+}
+
+export interface AnalyticsViewConfig {
+    id: string;
+    userId?: string;
+    propertyId?: string;
+    name: string;
+    isDefault?: boolean;
+    chart: AnalyticsChartConfig;
+    panels: Record<AnalyticsPanelId, AnalyticsPanelConfig>;
+    layout: AnalyticsLayoutConfig;
+    state?: AnalyticsViewState;
+    updatedAt: string;
+    createdAt?: string;
 }
 
 export interface AnalyticsQueryTableRow {
