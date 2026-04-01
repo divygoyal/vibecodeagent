@@ -179,7 +179,7 @@ function mapSimpleFilters(filters: DashboardFilters): AnalyticsQueryFilter[] {
 }
 
 function mapAdvancedFilters(filters: FilterRule[]): AnalyticsQueryFilter[] {
-    const fieldMap: Record<string, AnalyticsQueryDimension> = {
+    const fieldMap = {
         country: 'country',
         device: 'deviceCategory',
         channel: 'sessionDefaultChannelGroup',
@@ -187,10 +187,10 @@ function mapAdvancedFilters(filters: FilterRule[]): AnalyticsQueryFilter[] {
         referrer: 'sessionSource',
         browser: 'browser',
         os: 'operatingSystem',
-    };
+    } as const satisfies Partial<Record<FilterRule['parameter'], AnalyticsQueryDimension>>;
 
     return filters.flatMap((filter) => {
-        const fieldName = fieldMap[filter.parameter];
+        const fieldName = fieldMap[filter.parameter as keyof typeof fieldMap];
         if (!fieldName) return [];
         return [{
             fieldName,
