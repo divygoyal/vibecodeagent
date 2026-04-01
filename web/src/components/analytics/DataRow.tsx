@@ -12,6 +12,7 @@ interface DataRowProps {
   href?: string;         // external link
   onClick?: () => void;
   active?: boolean;
+  barColor?: string;     // custom bar color (hex/rgb), overrides default emerald
 }
 
 export default function DataRow({
@@ -23,6 +24,7 @@ export default function DataRow({
   href,
   onClick,
   active,
+  barColor,
 }: DataRowProps) {
   const ratio = maxPercentage > 0 ? 100 / maxPercentage : 1;
 
@@ -34,12 +36,18 @@ export default function DataRow({
       {/* Percentage bar behind text */}
       <div
         className="data-bar"
-        style={{ width: `${percentage * ratio}%` }}
+        style={{
+          width: `${percentage * ratio}%`,
+          ...(barColor ? { background: `${barColor}20` } : {}),
+        }}
       />
 
       {/* Content on top */}
       <div className="relative z-10 flex justify-between items-center text-xs w-full gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {barColor && !icon && (
+            <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ backgroundColor: barColor }} />
+          )}
           {icon}
           <span className="truncate text-zinc-200">{label}</span>
           {href && (

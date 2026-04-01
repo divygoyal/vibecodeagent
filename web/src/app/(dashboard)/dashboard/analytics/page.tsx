@@ -8,7 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
     TrendingUp, TrendingDown, Users, Target,
     Globe, Download, RefreshCw, Filter as FilterIcon, BarChart3,
-    ChevronDown, Maximize2
+    ChevronDown, Maximize2, ChevronRight
 } from 'lucide-react';
 import { exportAnalyticsData, exportAnalyticsZip } from '@/lib/exportUtils';
 import { useAnalyticsData } from '@/lib/useDashboardData';
@@ -96,17 +96,90 @@ function Sparkline({ data, dataKey, color = '#34d399' }: { data: any[]; dataKey:
 
 const CARD = 'premium-card stat-card-hover';
 
+// ─── Color palette for data panels ───
+const PANEL_COLORS = [
+    '#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24',
+    '#60a5fa', '#fb923c', '#4ade80', '#e879f9', '#38bdf8',
+    '#f87171', '#a3e635', '#c084fc', '#2dd4bf', '#facc15',
+];
+
+const CHANNEL_COLORS: Record<string, string> = {
+    'Organic Search': '#34d399',
+    'Direct': '#22d3ee',
+    'Referral': '#fb923c',
+    'Social': '#a78bfa',
+    'Paid Search': '#f472b6',
+    'Email': '#fbbf24',
+    'Display': '#60a5fa',
+    'Affiliates': '#4ade80',
+    'Video': '#e879f9',
+    'Organic Social': '#2dd4bf',
+};
+
+const REFERRER_COLORS: Record<string, string> = {
+    'google': '#34d399',
+    '(direct)': '#22d3ee',
+    'bing': '#60a5fa',
+    'yahoo': '#a78bfa',
+    'duckduckgo': '#fb923c',
+    'facebook': '#3b82f6',
+    'twitter': '#38bdf8',
+    'linkedin': '#0ea5e9',
+    'reddit': '#f87171',
+    'youtube': '#f472b6',
+    'instagram': '#e879f9',
+    'pinterest': '#f472b6',
+    'baidu': '#fbbf24',
+};
+
+function getItemColor(name: string, index: number, colorMap?: Record<string, string>): string {
+    if (colorMap) {
+        const key = Object.keys(colorMap).find(k => name.toLowerCase().includes(k.toLowerCase()));
+        if (key) return colorMap[key];
+    }
+    return PANEL_COLORS[index % PANEL_COLORS.length];
+}
+
 // ─── Tab Button ───
 function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
     return (
         <button
             onClick={onClick}
             className={`px-2.5 py-1 text-[12px] rounded-md transition whitespace-nowrap ${
-                active ? 'text-white font-semibold' : 'text-zinc-500 hover:text-zinc-300 font-medium'
+                active ? 'text-white font-semibold bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03] font-medium'
             }`}
         >
             {label}
         </button>
+    );
+}
+
+// ─── Metric Pill (for panel column headers) ───
+function MetricPill({ label, active, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-2 py-0.5 text-[10px] rounded-full transition whitespace-nowrap border ${
+                active
+                    ? 'text-zinc-200 border-white/[0.1] bg-white/[0.06] font-semibold'
+                    : 'text-zinc-500 border-white/[0.04] hover:border-white/[0.08] hover:text-zinc-400 font-medium'
+            }`}
+        >
+            {label}
+        </button>
+    );
+}
+
+// ─── See All Link ───
+function SeeAllBtn({ count, label }: { count: number; label: string }) {
+    if (count <= 8) return null;
+    return (
+        <div className="flex justify-center py-2 border-t border-white/[0.04]">
+            <button className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition font-medium">
+                See All {label}
+                <ChevronRight className="w-3 h-3" />
+            </button>
+        </div>
     );
 }
 
@@ -395,29 +468,37 @@ export default function AnalyticsPage() {
                 </div>
             )}
 
-            {/* ─── 1. Compact KPI Strip with Sparklines ─── */}
+            {/* ─── 1. KPI Cards ─── */}
             {kpis && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`${CARD} overflow-hidden`}
-                >
-                    <div className="grid grid-cols-3 sm:grid-cols-6 divide-x divide-white/[0.04]">
-                        {[
-                            { label: 'Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, format: 'number', sparkKey: 'activeUsers', statKey: 'activeUsers' as ChartStat, color: '#34d399' },
-                            { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, format: 'number', sparkKey: 'sessions', statKey: 'sessions' as ChartStat, color: '#22d3ee' },
-                            { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, format: 'number', sparkKey: 'pageViews', statKey: 'pageViews' as ChartStat, color: '#a78bfa' },
-                            { label: 'Pages / Session', value: kpis.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', statKey: 'pageViews' as ChartStat, color: '#fbbf24' },
-                            { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, format: 'percent', sparkKey: 'bounceRate', statKey: 'bounceRate' as ChartStat, color: '#f472b6' },
-                            { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', statKey: 'sessions' as ChartStat, color: '#60a5fa' },
-                        ].map((k, i) => (
-                            <div
-                                key={i}
-                                className={`px-3 py-2 text-center cursor-pointer transition-colors ${chartStat === k.statKey ? 'bg-white/[0.03]' : 'hover:bg-white/[0.02]'}`}
-                                onClick={() => setChartStat(k.statKey)}
-                            >
-                                <p className="text-[10px] font-medium text-zinc-500 mb-0.5 truncate">{k.label}</p>
-                                <p className="text-lg sm:text-xl md:text-2xl font-medium text-white tabular-nums leading-tight">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                    {[
+                        { label: 'Users', value: displayKpis?.totalUsers ?? kpis.totalUsers, change: kpis.changeUsers, format: 'number', sparkKey: 'activeUsers', statKey: 'activeUsers' as ChartStat, color: '#34d399' },
+                        { label: 'Sessions', value: displayKpis?.totalSessions ?? kpis.totalSessions, change: kpis.changeSessions, format: 'number', sparkKey: 'sessions', statKey: 'sessions' as ChartStat, color: '#22d3ee' },
+                        { label: 'Page Views', value: displayKpis?.totalPageViews ?? kpis.totalPageViews, change: kpis.changePageViews, format: 'number', sparkKey: 'pageViews', statKey: 'pageViews' as ChartStat, color: '#a78bfa' },
+                        { label: 'Pages / Session', value: kpis.pagesPerSession || 0, change: 0, format: 'decimal', sparkKey: 'pagesPerSession', statKey: 'pageViews' as ChartStat, color: '#fbbf24' },
+                        { label: 'Bounce Rate', value: displayKpis?.avgBounceRate ?? kpis.avgBounceRate, change: kpis.changeBounceRate, format: 'percent', sparkKey: 'bounceRate', statKey: 'bounceRate' as ChartStat, color: '#f472b6' },
+                        { label: 'Avg Duration', value: kpis.avgSessionDuration || 0, change: 0, format: 'duration', sparkKey: 'avgSessionDuration', statKey: 'sessions' as ChartStat, color: '#60a5fa' },
+                    ].map((k, i) => (
+                        <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.03 }}
+                            className={`${CARD} relative overflow-hidden cursor-pointer transition-all ${
+                                chartStat === k.statKey
+                                    ? 'ring-1 ring-white/[0.12] bg-white/[0.02]'
+                                    : 'hover:bg-white/[0.02]'
+                            }`}
+                            onClick={() => setChartStat(k.statKey)}
+                        >
+                            {/* Top accent line */}
+                            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ backgroundColor: k.color, opacity: chartStat === k.statKey ? 1 : 0.3 }} />
+                            <div className="px-3 pt-3 pb-1">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: k.color }} />
+                                    <p className="text-[10px] font-medium text-zinc-500 truncate">{k.label}</p>
+                                </div>
+                                <p className="text-xl sm:text-2xl font-semibold text-white tabular-nums leading-tight">
                                     {k.format === 'duration' ? fmtDur(k.value)
                                         : k.format === 'percent' ? `${k.value}%`
                                         : k.format === 'decimal' ? (typeof k.value === 'number' ? k.value.toFixed(1) : k.value)
@@ -425,11 +506,11 @@ export default function AnalyticsPage() {
                                     }
                                 </p>
                                 <Change value={k.change} />
-                                <Sparkline data={sparklineData} dataKey={k.sparkKey} color={k.color} />
                             </div>
-                        ))}
-                    </div>
-                </motion.div>
+                            <Sparkline data={sparklineData} dataKey={k.sparkKey} color={k.color} />
+                        </motion.div>
+                    ))}
+                </div>
             )}
 
             {/* ─── 2. Full-Width Chart with Stat Switcher ─── */}
@@ -586,8 +667,8 @@ export default function AnalyticsPage() {
 
             {/* ─── 5. Intelligence Cards ─── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 overflow-hidden">
-                <EngagementCard kpis={kpis} />
-                <LoyaltyCard kpis={kpis} />
+                <EngagementCard kpis={kpis} traffic={traffic} />
+                <LoyaltyCard kpis={kpis} traffic={traffic} />
                 <DiversityCard channels={channels} />
             </div>
 
@@ -621,11 +702,14 @@ function TrafficSourcesPanel({
             className={`${CARD} overflow-hidden min-w-0`}
             style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-0.5">
-                    <TabBtn label="Referrers" active={tab === 'referrers'} onClick={() => setTab('referrers')} />
-                    <TabBtn label="Channels" active={tab === 'channels'} onClick={() => setTab('channels')} />
-                    <TabBtn label="UTM" active={tab === 'utm'} onClick={() => setTab('utm')} />
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                    <h4 className="text-[13px] font-semibold text-white">Traffic Sources</h4>
+                    <div className="flex gap-0.5">
+                        <TabBtn label="Referrers" active={tab === 'referrers'} onClick={() => setTab('referrers')} />
+                        <TabBtn label="Channels" active={tab === 'channels'} onClick={() => setTab('channels')} />
+                        <TabBtn label="UTM" active={tab === 'utm'} onClick={() => setTab('utm')} />
+                    </div>
                 </div>
                 <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
                     <Maximize2 className="w-3 h-3" />
@@ -633,12 +717,15 @@ function TrafficSourcesPanel({
             </div>
             <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                 <span>{tabLabel}</span>
-                <span>{metricLabel}</span>
+                <div className="flex items-center gap-1.5">
+                    <span>{metricLabel}</span>
+                    <span className="text-zinc-700">Percents</span>
+                </div>
             </div>
-            <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
+            <div className="overflow-y-auto" style={{ height: 'calc(405px - 72px)' }}>
                 {tab === 'referrers' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {referrers.slice(0, 25).map((ref: any) => {
+                        {referrers.slice(0, 25).map((ref: any, i: number) => {
                             const pct = refTotal > 0 ? (ref.value / refTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -651,6 +738,7 @@ function TrafficSourcesPanel({
                                     href={ref.name !== '(direct)' ? `https://${ref.name}` : undefined}
                                     onClick={() => toggleFilter('referrer', ref.name)}
                                     active={filters.referrer.includes(ref.name)}
+                                    barColor={getItemColor(ref.name, i, REFERRER_COLORS)}
                                 />
                             );
                         })}
@@ -659,7 +747,7 @@ function TrafficSourcesPanel({
 
                 {tab === 'channels' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {channels.slice(0, 25).map((ch: any) => {
+                        {channels.slice(0, 25).map((ch: any, i: number) => {
                             const pct = chTotal > 0 ? (ch.value / chTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -670,6 +758,7 @@ function TrafficSourcesPanel({
                                     maxPercentage={chMaxPct}
                                     onClick={() => toggleFilter('channel', ch.name)}
                                     active={filters.channel.includes(ch.name)}
+                                    barColor={getItemColor(ch.name, i, CHANNEL_COLORS)}
                                 />
                             );
                         })}
@@ -682,6 +771,8 @@ function TrafficSourcesPanel({
                     </div>
                 )}
             </div>
+            {tab === 'referrers' && <SeeAllBtn count={referrers.length} label="Referrers" />}
+            {tab === 'channels' && <SeeAllBtn count={channels.length} label="Channels" />}
         </motion.div>
     );
 }
@@ -711,11 +802,14 @@ function PagesPanel({
             className={`${CARD} overflow-hidden min-w-0`}
             style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-0.5">
-                    <TabBtn label="Pages" active={tab === 'pages'} onClick={() => setTab('pages')} />
-                    <TabBtn label="Entry Pages" active={tab === 'entries'} onClick={() => setTab('entries')} />
-                    <TabBtn label="Exit Pages" active={tab === 'exits'} onClick={() => setTab('exits')} />
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                    <h4 className="text-[13px] font-semibold text-white">Top Pages</h4>
+                    <div className="flex gap-0.5">
+                        <TabBtn label="Pages" active={tab === 'pages'} onClick={() => setTab('pages')} />
+                        <TabBtn label="Entry Pages" active={tab === 'entries'} onClick={() => setTab('entries')} />
+                        <TabBtn label="Exit Pages" active={tab === 'exits'} onClick={() => setTab('exits')} />
+                    </div>
                 </div>
                 <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
                     <Maximize2 className="w-3 h-3" />
@@ -723,12 +817,15 @@ function PagesPanel({
             </div>
             <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                 <span>{tabLabel}</span>
-                <span>{metricLabel}</span>
+                <div className="flex items-center gap-1.5">
+                    <span>{metricLabel}</span>
+                    <span className="text-zinc-700">Percents</span>
+                </div>
             </div>
-            <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
+            <div className="overflow-y-auto" style={{ height: 'calc(405px - 72px)' }}>
                 {tab === 'pages' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {pages.slice(0, 25).map((pg: any) => {
+                        {pages.slice(0, 25).map((pg: any, i: number) => {
                             const pct = pgTotal > 0 ? (pg.views / pgTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -739,6 +836,7 @@ function PagesPanel({
                                     maxPercentage={pgMaxPct}
                                     onClick={() => toggleFilter('page', pg.page)}
                                     active={filters.page.includes(pg.page)}
+                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
                                 />
                             );
                         })}
@@ -747,7 +845,7 @@ function PagesPanel({
 
                 {tab === 'entries' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {entryPages.slice(0, 25).map((pg: any) => {
+                        {entryPages.slice(0, 25).map((pg: any, i: number) => {
                             const pct = epTotal > 0 ? (pg.sessions / epTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -756,6 +854,7 @@ function PagesPanel({
                                     value={pg.sessions}
                                     percentage={pct}
                                     maxPercentage={epMaxPct}
+                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
                                 />
                             );
                         })}
@@ -768,6 +867,8 @@ function PagesPanel({
                     </div>
                 )}
             </div>
+            {tab === 'pages' && <SeeAllBtn count={pages.length} label="Pages" />}
+            {tab === 'entries' && <SeeAllBtn count={entryPages.length} label="Entry Pages" />}
         </motion.div>
     );
 }
@@ -801,12 +902,15 @@ function TechPanel({
             className={`${CARD} overflow-hidden min-w-0`}
             style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-0.5">
-                    <TabBtn label="Browsers" active={tab === 'browsers'} onClick={() => setTab('browsers')} />
-                    <TabBtn label="Devices" active={tab === 'devices'} onClick={() => setTab('devices')} />
-                    <TabBtn label="OS" active={tab === 'os'} onClick={() => setTab('os')} />
-                    <TabBtn label="Screen" active={tab === 'screen'} onClick={() => setTab('screen')} />
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                    <h4 className="text-[13px] font-semibold text-white">Technology</h4>
+                    <div className="flex gap-0.5">
+                        <TabBtn label="Browsers" active={tab === 'browsers'} onClick={() => setTab('browsers')} />
+                        <TabBtn label="Devices" active={tab === 'devices'} onClick={() => setTab('devices')} />
+                        <TabBtn label="OS" active={tab === 'os'} onClick={() => setTab('os')} />
+                        <TabBtn label="Screen" active={tab === 'screen'} onClick={() => setTab('screen')} />
+                    </div>
                 </div>
                 <button className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="Expand">
                     <Maximize2 className="w-3 h-3" />
@@ -814,7 +918,10 @@ function TechPanel({
             </div>
             <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                 <span>{tabLabel}</span>
-                <span>Sessions</span>
+                <div className="flex items-center gap-1.5">
+                    <span>Sessions</span>
+                    <span className="text-zinc-700">Percents</span>
+                </div>
             </div>
             <div className="overflow-y-auto" style={{ height: 'calc(405px - 64px)' }}>
                 {tab === 'screen' ? (
@@ -823,7 +930,7 @@ function TechPanel({
                     </div>
                 ) : (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {data.slice(0, 25).map((item: any) => {
+                        {data.slice(0, 25).map((item: any, i: number) => {
                             const pct = total > 0 ? (item.value / total) * 100 : 0;
                             const icon = tab === 'devices'
                                 ? <DeviceIcon device={item.name} />
@@ -840,12 +947,14 @@ function TechPanel({
                                     icon={icon}
                                     onClick={() => toggleFilter(dim, item.name)}
                                     active={filters[dim].includes(item.name)}
+                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
                                 />
                             );
                         })}
                     </div>
                 )}
             </div>
+            <SeeAllBtn count={data.length} label={tabLabel + 's'} />
         </motion.div>
     );
 }
@@ -880,13 +989,16 @@ function GeoPanel({
             className={`${CARD} overflow-hidden min-w-0`}
             style={{ height: 405 }}
         >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-                <div className="flex gap-0.5 overflow-x-auto scrollbar-hide">
-                    <TabBtn label="Countries" active={tab === 'countries'} onClick={() => setTab('countries')} />
-                    <TabBtn label="Regions" active={tab === 'regions'} onClick={() => setTab('regions')} />
-                    <TabBtn label="Cities" active={tab === 'cities'} onClick={() => setTab('cities')} />
-                    <TabBtn label="Languages" active={tab === 'languages'} onClick={() => setTab('languages')} />
-                    <TabBtn label="Map" active={tab === 'map'} onClick={() => setTab('map')} />
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2 min-w-0">
+                    <h4 className="text-[13px] font-semibold text-white flex-shrink-0">Geography</h4>
+                    <div className="flex gap-0.5 overflow-x-auto scrollbar-hide">
+                        <TabBtn label="Countries" active={tab === 'countries'} onClick={() => setTab('countries')} />
+                        <TabBtn label="Regions" active={tab === 'regions'} onClick={() => setTab('regions')} />
+                        <TabBtn label="Cities" active={tab === 'cities'} onClick={() => setTab('cities')} />
+                        <TabBtn label="Languages" active={tab === 'languages'} onClick={() => setTab('languages')} />
+                        <TabBtn label="Map" active={tab === 'map'} onClick={() => setTab('map')} />
+                    </div>
                 </div>
                 <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                     {allCountries.slice(0, 4).map((c: any, i: number) => (
@@ -900,13 +1012,16 @@ function GeoPanel({
             {tab !== 'map' && (
                 <div className="flex justify-between px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider font-medium">
                     <span>{tabLabel}</span>
-                    <span>{metricLabel}</span>
+                    <div className="flex items-center gap-1.5">
+                        <span>{metricLabel}</span>
+                        <span className="text-zinc-700">Percents</span>
+                    </div>
                 </div>
             )}
             <div className="overflow-y-auto" style={{ height: tab === 'map' ? 'calc(405px - 40px)' : 'calc(405px - 64px)' }}>
                 {tab === 'countries' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {countries.slice(0, 25).map((c: any) => {
+                        {countries.slice(0, 25).map((c: any, i: number) => {
                             const pct = cTotal > 0 ? (c.users / cTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -918,6 +1033,7 @@ function GeoPanel({
                                     icon={<CountryFlag country={c.country} />}
                                     onClick={() => toggleFilter('country', c.country)}
                                     active={filters.country.includes(c.country)}
+                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
                                 />
                             );
                         })}
@@ -942,6 +1058,7 @@ function GeoPanel({
                                     percentage={pct}
                                     maxPercentage={cityMaxPct}
                                     icon={<CountryFlag country={c.country} />}
+                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
                                 />
                             );
                         })}
@@ -950,7 +1067,7 @@ function GeoPanel({
 
                 {tab === 'languages' && (
                     <div className="space-y-0.5 px-1 pb-2">
-                        {languages.slice(0, 25).map((l: any) => {
+                        {languages.slice(0, 25).map((l: any, i: number) => {
                             const pct = langTotal > 0 ? (l.value / langTotal) * 100 : 0;
                             return (
                                 <DataRow
@@ -959,6 +1076,7 @@ function GeoPanel({
                                     value={l.value}
                                     percentage={pct}
                                     maxPercentage={langMaxPct}
+                                    barColor={PANEL_COLORS[i % PANEL_COLORS.length]}
                                 />
                             );
                         })}
@@ -976,59 +1094,131 @@ function GeoPanel({
                     </div>
                 )}
             </div>
+            {tab === 'countries' && <SeeAllBtn count={countries.length} label="Countries" />}
+            {tab === 'cities' && <SeeAllBtn count={cities.length} label="Cities" />}
+            {tab === 'languages' && <SeeAllBtn count={languages.length} label="Languages" />}
         </motion.div>
     );
 }
 
 // ─── Intelligence: Engagement Card ───
-function EngagementCard({ kpis }: { kpis: any }) {
+function EngagementCard({ kpis, traffic }: { kpis: any; traffic: any[] }) {
     if (!kpis) return null;
     const score = Math.min(100, Math.round(
         (Math.min(kpis.avgSessionDuration / 300, 1) * 30) + (Math.min(kpis.pagesPerSession / 5, 1) * 25) +
         (Math.max(0, 1 - kpis.avgBounceRate / 100) * 25) + (Math.min((kpis.returningUsers || 0) / Math.max(kpis.totalUsers, 1), 1) * 20)
     ));
     const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400';
-    const bg = score >= 70 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400';
+    const barHex = score >= 70 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171';
+
+    // Daily engagement mini bars from traffic data
+    const dailyScores = traffic.slice(-30).map((d: any) => {
+        const durScore = Math.min(d.avgSessionDuration || 0, 300) / 300;
+        const ppsScore = d.sessions > 0 ? Math.min(d.pageViews / d.sessions, 5) / 5 : 0;
+        const bounceScore = Math.max(0, 1 - (d.bounceRate || 0) / 100);
+        return Math.round((durScore * 0.33 + ppsScore * 0.33 + bounceScore * 0.34) * 100);
+    });
+    const maxDaily = Math.max(...dailyScores, 1);
+
+    const avgDuration = fmtDur(kpis.avgSessionDuration || 0);
+    const pps = (kpis.pagesPerSession || 0).toFixed(1);
+
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
-                <Target className="w-4 h-4 text-violet-400 flex-shrink-0" />
-                <h4 className="text-sm sm:text-base font-semibold text-white truncate">Engagement Score</h4>
+            <div className="flex items-center justify-between mb-3 min-w-0">
+                <div className="flex items-center gap-2">
+                    <Target className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                    <h4 className="text-sm font-semibold text-white truncate">Engagement Score</h4>
+                </div>
+                <span className="text-[10px] text-zinc-600 tabular-nums">{dailyScores.length}d</span>
             </div>
-            <div className="flex items-end gap-2 mb-1.5 sm:mb-2">
-                <AnimatedCounter value={score} className={`text-2xl sm:text-3xl font-bold ${color}`} />
-                <span className="text-[10px] sm:text-xs text-zinc-600 mb-0.5 sm:mb-1">/ 100</span>
+            <div className="flex items-end gap-3 mb-3">
+                <AnimatedCounter value={score} className={`text-4xl sm:text-5xl font-bold ${color} leading-none`} />
+                <div className="flex items-end gap-[2px] h-[32px] flex-1 min-w-0">
+                    {dailyScores.map((s, i) => (
+                        <div
+                            key={i}
+                            className="flex-1 rounded-sm min-w-[2px] transition-all"
+                            style={{
+                                height: `${Math.max((s / maxDaily) * 100, 8)}%`,
+                                backgroundColor: barHex,
+                                opacity: 0.3 + (s / maxDaily) * 0.7,
+                            }}
+                        />
+                    ))}
+                </div>
             </div>
-            <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ duration: 0.8 }} className={`h-full rounded-full ${bg}`} />
+            <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500">Avg Duration</span>
+                    <span className="text-zinc-300 font-medium tabular-nums">{avgDuration}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500">Pages / Session</span>
+                    <span className="text-zinc-300 font-medium tabular-nums">{pps}</span>
+                </div>
             </div>
         </motion.div>
     );
 }
 
 // ─── Intelligence: Loyalty Card ───
-function LoyaltyCard({ kpis }: { kpis: any }) {
+function LoyaltyCard({ kpis, traffic }: { kpis: any; traffic: any[] }) {
     if (!kpis) return null;
     const returning = kpis.returningUsers || 0;
+    const newUsers = kpis.newUsers || (kpis.totalUsers - returning);
     const total = kpis.totalUsers || 1;
     const loyaltyPct = Math.round((returning / total) * 100);
+    const newPct = 100 - loyaltyPct;
+
+    // Daily user mini bars
+    const dailyUsers = traffic.slice(-30).map((d: any) => d.activeUsers || 0);
+    const maxDaily = Math.max(...dailyUsers, 1);
+
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-3 sm:p-5 overflow-hidden`}>
-            <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
-                <Users className="w-4 h-4 text-pink-400 flex-shrink-0" />
-                <h4 className="text-sm sm:text-base font-semibold text-white truncate">Audience Loyalty</h4>
+            <div className="flex items-center justify-between mb-3 min-w-0">
+                <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-pink-400 flex-shrink-0" />
+                    <h4 className="text-sm font-semibold text-white truncate">Audience Loyalty</h4>
+                </div>
+                <span className="text-[10px] text-zinc-600 tabular-nums">{dailyUsers.length}d</span>
             </div>
-            <div className="flex justify-between text-[10px] sm:text-xs mb-1">
-                <span className="text-zinc-600">New</span>
-                <span className="text-zinc-600">Returning</span>
+            <div className="flex items-end gap-3 mb-3">
+                <AnimatedCounter value={loyaltyPct} className="text-4xl sm:text-5xl font-bold text-pink-400 leading-none" />
+                <div className="flex items-end gap-[2px] h-[32px] flex-1 min-w-0">
+                    {dailyUsers.map((u: number, i: number) => (
+                        <div
+                            key={i}
+                            className="flex-1 rounded-sm min-w-[2px] transition-all"
+                            style={{
+                                height: `${Math.max((u / maxDaily) * 100, 8)}%`,
+                                backgroundColor: '#ec4899',
+                                opacity: 0.3 + (u / maxDaily) * 0.7,
+                            }}
+                        />
+                    ))}
+                </div>
             </div>
-            <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden flex">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${100 - loyaltyPct}%` }} transition={{ duration: 0.6 }} className="h-full bg-violet-500/50" />
-                <motion.div initial={{ width: 0 }} animate={{ width: `${loyaltyPct}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full bg-emerald-500/50" />
-            </div>
-            <div className="flex justify-between text-[10px] mt-1.5">
-                <span className="text-violet-400 font-medium">{100 - loyaltyPct}% new</span>
-                <span className="text-emerald-400 font-medium">{loyaltyPct}% returning</span>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500">New Visitors</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-violet-400 font-medium tabular-nums">{newPct}%</span>
+                        <div className="w-16 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${newPct}%` }} className="h-full bg-violet-500/60 rounded-full" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500">Returning</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-medium tabular-nums">{loyaltyPct}%</span>
+                        <div className="w-16 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${loyaltyPct}%` }} className="h-full bg-emerald-500/60 rounded-full" />
+                        </div>
+                    </div>
+                </div>
             </div>
         </motion.div>
     );
