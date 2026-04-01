@@ -53,7 +53,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
-    const { filters, clearFilter, clearAll, advancedFilters, removeAdvancedFilter } = useFilterStore();
+    const { filters, removeFilterValue, clearAll, advancedFilters, removeAdvancedFilter } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
 
@@ -172,7 +172,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                             initial={{ scale: 0.9, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
                                             exit={{ scale: 0.9, opacity: 0 }}
-                                            onClick={() => clearFilter(dim as keyof typeof filters)}
+                                            onClick={() => removeFilterValue(dim as keyof typeof filters, val)}
                                             className="analytics-filter-pill group rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300 transition hover:bg-cyan-400/[0.14]"
                                         >
                                             <span className="capitalize">{dim}:</span> {val}
