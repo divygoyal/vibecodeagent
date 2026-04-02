@@ -1,66 +1,36 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { memo, useMemo, useState } from 'react';
 
-// ─── Mercator Projection (bounded) ───
 const MAP_W = 960;
 const MAP_H = 500;
-const LON_MIN = -170, LON_MAX = 190;
-const LAT_MIN = -58, LAT_MAX = 82;
+const LON_MIN = -170;
+const LON_MAX = 190;
+const LAT_MIN = -58;
+const LAT_MAX = 82;
 const LAT_MIN_R = (LAT_MIN * Math.PI) / 180;
 const MERC_MIN = Math.log(Math.tan(Math.PI / 4 + LAT_MIN_R / 2));
 const LAT_MAX_R = (LAT_MAX * Math.PI) / 180;
 const MERC_MAX = Math.log(Math.tan(Math.PI / 4 + LAT_MAX_R / 2));
 
+const LANDMASSES = [
+    'M88 124L142 78L194 66L228 88L240 126L224 154L194 168L174 210L140 236L102 226L76 188L78 152Z',
+    'M258 74L312 54L346 68L338 102L298 118L264 102Z',
+    'M220 252L260 282L278 340L260 396L234 452L210 426L200 372L182 320L192 274Z',
+    'M372 114L422 86L484 82L544 98L616 90L694 104L774 138L840 178L872 220L848 254L790 256L730 284L676 270L642 236L598 218L556 226L512 212L470 220L442 188L406 176L382 150Z',
+    'M470 236L514 248L548 286L560 338L540 394L506 418L474 388L450 344L444 288Z',
+    'M738 356L786 344L832 366L846 404L822 432L772 438L738 414L726 382Z',
+];
+
 function project(lon: number, lat: number): [number, number] {
-    const cLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
+    const safeLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
     const x = ((lon - LON_MIN) / (LON_MAX - LON_MIN)) * MAP_W;
-    const r = (cLat * Math.PI) / 180;
-    const m = Math.log(Math.tan(Math.PI / 4 + r / 2));
-    const y = MAP_H - ((m - MERC_MIN) / (MERC_MAX - MERC_MIN)) * MAP_H;
+    const latR = (safeLat * Math.PI) / 180;
+    const merc = Math.log(Math.tan(Math.PI / 4 + latR / 2));
+    const y = MAP_H - ((merc - MERC_MIN) / (MERC_MAX - MERC_MIN)) * MAP_H;
     return [x, y];
 }
 
-// ─── Minimal TopoJSON Decoder (zero-dependency) ───
-function decodeTopo(topo: any): string[] {
-    if (!topo?.transform || !topo?.arcs) return [];
-    const { scale, translate } = topo.transform;
-    const arcs = topo.arcs.map((arc: number[][]) => {
-        let x = 0, y = 0;
-        return arc.map(([dx, dy]: number[]) => {
-            x += dx; y += dy;
-            return [x * scale[0] + translate[0], y * scale[1] + translate[1]];
-        });
-    });
-    const resolve = (idx: number) => idx >= 0 ? arcs[idx] : [...arcs[~idx]].reverse();
-    const ring = (ids: number[]) => {
-        const pts: number[][] = [];
-        ids.forEach(i => { const a = resolve(i); pts.push(...(pts.length ? a.slice(1) : a)); });
-        return pts;
-    };
-    const toPath = (coords: number[][]) => {
-        if (!coords.length) return '';
-        return coords.map(([lon, lat], i) => {
-            const [px, py] = project(lon, lat);
-            return `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`;
-        }).join('') + 'Z';
-    };
-    const paths: string[] = [];
-    const land = topo.objects.land;
-    const geoms = land.geometries || [land];
-    geoms.forEach((g: any) => {
-        const walk = (a: any, depth: number) => {
-            if (depth === 0) paths.push(toPath(ring(a)));
-            else a.forEach((s: any) => walk(s, depth - 1));
-        };
-        if (g.type === 'Polygon') walk(g.arcs, 1);
-        else if (g.type === 'MultiPolygon') walk(g.arcs, 2);
-    });
-    return paths;
-}
-
-// ─── Coordinates ───
 const COUNTRY_COORDS: Record<string, [number, number]> = {
     'India': [78.96, 20.59], 'United States': [-95.71, 37.09], 'Brazil': [-51.93, -14.24],
     'United Kingdom': [-1.17, 52.36], 'Germany': [10.45, 51.17], 'France': [2.21, 46.23],
@@ -87,13 +57,11 @@ const CITY_COORDS: Record<string, [number, number]> = {
     'Mumbai': [72.88, 19.08], 'Delhi': [77.10, 28.70], 'Bangalore': [77.59, 12.97],
     'New York': [-74.01, 40.71], 'London': [-0.13, 51.51], 'Paris': [2.35, 48.86],
     'Tokyo': [139.69, 35.69], 'Berlin': [13.41, 52.52], 'Sydney': [151.21, -33.87],
-    'Toronto': [-79.38, 43.65], 'São Paulo': [-46.63, -23.55], 'Lagos': [3.38, 6.52],
+    'Toronto': [-79.38, 43.65], 'Sao Paulo': [-46.63, -23.55], 'São Paulo': [-46.63, -23.55], 'Lagos': [3.38, 6.52],
     'Moscow': [37.62, 55.76], 'Seoul': [126.98, 37.57], 'Singapore': [103.82, 1.35],
     'Dubai': [55.27, 25.20], 'San Francisco': [-122.42, 37.77], 'Los Angeles': [-118.24, 34.05],
     'Chicago': [-87.63, 41.88], 'Houston': [-95.37, 29.76],
 };
-
-const TOPO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
 
 interface WorldMapProps {
     byCountry: { country: string; users: number }[];
@@ -103,107 +71,133 @@ interface WorldMapProps {
 }
 
 const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, activeCountry }: WorldMapProps) {
-    const [landPaths, setLandPaths] = useState<string[]>([]);
     const [tooltip, setTooltip] = useState<{ name: string; users: number; x: number; y: number } | null>(null);
 
-    // Fetch real world map on mount
-    useEffect(() => {
-        let cancel = false;
-        fetch(TOPO_URL)
-            .then(r => r.json())
-            .then(topo => { if (!cancel) setLandPaths(decodeTopo(topo)); })
-            .catch(() => {});
-        return () => { cancel = true; };
-    }, []);
-
     const bubbles = useMemo(() => {
-        const result: { name: string; x: number; y: number; users: number; type: 'country' | 'city' }[] = [];
-        if (byCity?.length) {
-            byCity.forEach(c => {
-                const co = CITY_COORDS[c.city];
-                if (co) { const [x, y] = project(co[0], co[1]); result.push({ name: `${c.city}, ${c.country}`, x, y, users: c.users, type: 'city' }); }
-            });
-        }
-        byCountry.forEach(c => {
-            const co = COUNTRY_COORDS[c.country];
-            if (co) { const [x, y] = project(co[0], co[1]); result.push({ name: c.country, x, y, users: c.users, type: 'country' }); }
+        const next: { name: string; x: number; y: number; users: number; type: 'country' | 'city' }[] = [];
+
+        byCountry.forEach((country) => {
+            const point = COUNTRY_COORDS[country.country];
+            if (!point) return;
+            const [x, y] = project(point[0], point[1]);
+            next.push({ name: country.country, x, y, users: country.users, type: 'country' });
         });
-        return result;
+
+        byCity?.forEach((city) => {
+            const point = CITY_COORDS[city.city];
+            if (!point) return;
+            const [x, y] = project(point[0], point[1]);
+            next.push({ name: `${city.city}, ${city.country}`, x, y, users: city.users, type: 'city' });
+        });
+
+        return next.sort((a, b) => a.users - b.users);
     }, [byCountry, byCity]);
 
-    const maxUsers = Math.max(...bubbles.map(b => b.users), 1);
-    const getR = (u: number) => Math.max(5, Math.min(26, (u / maxUsers) * 26));
+    const maxUsers = Math.max(...bubbles.map((bubble) => bubble.users), 1);
 
     return (
-        <div className="relative w-full h-full select-none overflow-hidden">
-            <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-                <rect width={MAP_W} height={MAP_H} fill="#0c0c18" />
+        <div className="relative h-full w-full overflow-hidden rounded-[18px] bg-[#07090f]">
+            <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="h-full w-full" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <linearGradient id="map-ocean" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0b0f17" />
+                        <stop offset="100%" stopColor="#06080d" />
+                    </linearGradient>
+                    <radialGradient id="map-glow" cx="52%" cy="18%" r="72%">
+                        <stop offset="0%" stopColor="rgba(73,224,183,0.16)" />
+                        <stop offset="45%" stopColor="rgba(73,224,183,0.05)" />
+                        <stop offset="100%" stopColor="rgba(73,224,183,0)" />
+                    </radialGradient>
+                </defs>
 
-                {/* Subtle grid */}
-                {Array.from({ length: 37 }).map((_, i) => (
-                    <line key={`v${i}`} x1={(i * MAP_W) / 36} y1={0} x2={(i * MAP_W) / 36} y2={MAP_H} stroke="rgba(255,255,255,0.02)" strokeWidth={0.3} />
-                ))}
-                {Array.from({ length: 19 }).map((_, i) => (
-                    <line key={`h${i}`} x1={0} y1={(i * MAP_H) / 18} x2={MAP_W} y2={(i * MAP_H) / 18} stroke="rgba(255,255,255,0.02)" strokeWidth={0.3} />
+                <rect width={MAP_W} height={MAP_H} fill="url(#map-ocean)" />
+                <rect width={MAP_W} height={MAP_H} fill="url(#map-glow)" opacity="0.8" />
+
+                {Array.from({ length: 9 }).map((_, index) => (
+                    <line
+                        key={`lat-${index}`}
+                        x1={0}
+                        x2={MAP_W}
+                        y1={(index * MAP_H) / 8}
+                        y2={(index * MAP_H) / 8}
+                        stroke="rgba(255,255,255,0.03)"
+                        strokeDasharray="3 10"
+                        strokeWidth="0.6"
+                    />
                 ))}
 
-                {/* Real landmasses from TopoJSON */}
-                {landPaths.map((d, i) => (
-                    <path key={i} d={d} fill="#1a1a30" stroke="#2a2a48" strokeWidth={0.4} strokeLinejoin="round" />
+                {Array.from({ length: 13 }).map((_, index) => (
+                    <line
+                        key={`lng-${index}`}
+                        x1={(index * MAP_W) / 12}
+                        x2={(index * MAP_W) / 12}
+                        y1={0}
+                        y2={MAP_H}
+                        stroke="rgba(255,255,255,0.025)"
+                        strokeDasharray="3 12"
+                        strokeWidth="0.6"
+                    />
                 ))}
 
-                {/* Bubbles */}
-                {bubbles.map((b, i) => {
-                    const r = getR(b.users);
-                    const isActive = activeCountry && b.name.includes(activeCountry);
-                    const isDimmed = activeCountry && !isActive;
-                    const color = isActive ? '#34d399' : '#3b82f6';
+                {LANDMASSES.map((path, index) => (
+                    <path
+                        key={path}
+                        d={path}
+                        fill={index === 3 ? '#111824' : '#0d131d'}
+                        stroke="rgba(130,146,176,0.16)"
+                        strokeWidth="1"
+                    />
+                ))}
+
+                {bubbles.map((bubble, index) => {
+                    const radius = Math.max(4.5, Math.min(18, (bubble.users / maxUsers) * 16));
+                    const isActive = activeCountry && bubble.name.includes(activeCountry);
+                    const dimmed = activeCountry && !isActive;
+                    const fill = isActive ? '#49e0b7' : bubble.type === 'city' ? '#7ea4ff' : '#4ad5ff';
+                    const haloOpacity = dimmed ? 0.04 : isActive ? 0.28 : 0.12;
+
                     return (
-                        <g key={`${b.name}-${i}`}>
-                            <circle cx={b.x} cy={b.y} r={r} fill="none" stroke={color} strokeWidth={0.6}>
-                                <animate attributeName="r" values={`${r};${r + 9};${r}`} dur={`${2 + (i % 4) * 0.5}s`} repeatCount="indefinite" />
-                                <animate attributeName="opacity" values="0.4;0;0.4" dur={`${2 + (i % 4) * 0.5}s`} repeatCount="indefinite" />
-                            </circle>
-                            <circle cx={b.x} cy={b.y} r={r * 2} fill={color} opacity={isDimmed ? 0.01 : 0.05} />
+                        <g key={`${bubble.name}-${index}`} opacity={dimmed ? 0.35 : 1}>
+                            <circle cx={bubble.x} cy={bubble.y} r={radius * 1.9} fill={fill} opacity={haloOpacity} />
                             <circle
-                                cx={b.x} cy={b.y} r={r}
-                                fill={color} fillOpacity={isDimmed ? 0.1 : 0.55}
-                                stroke={color} strokeWidth={isDimmed ? 0.4 : 1.2} strokeOpacity={isDimmed ? 0.1 : 0.8}
-                                className="cursor-pointer" style={{ transition: 'all 0.3s' }}
-                                onClick={() => onBubbleClick?.(b.name.split(',')[0].trim(), b.type)}
-                                onMouseEnter={(e) => {
-                                    const rect = (e.target as SVGElement).closest('svg')?.getBoundingClientRect();
-                                    if (rect) setTooltip({ name: b.name, users: b.users, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                                cx={bubble.x}
+                                cy={bubble.y}
+                                r={radius}
+                                fill={fill}
+                                stroke={isActive ? '#d7fff4' : 'rgba(255,255,255,0.7)'}
+                                strokeWidth={isActive ? 1.4 : 0.8}
+                                className="cursor-pointer transition-all duration-150"
+                                onClick={() => onBubbleClick?.(bubble.name.split(',')[0].trim(), bubble.type)}
+                                onMouseEnter={(event) => {
+                                    const rect = (event.target as SVGElement).closest('svg')?.getBoundingClientRect();
+                                    if (!rect) return;
+                                    setTooltip({
+                                        name: bubble.name,
+                                        users: bubble.users,
+                                        x: event.clientX - rect.left,
+                                        y: event.clientY - rect.top,
+                                    });
                                 }}
                                 onMouseLeave={() => setTooltip(null)}
                             />
-                            {b.users > 0 && r >= 9 && (
-                                <text x={b.x} y={b.y} textAnchor="middle" dominantBaseline="central"
-                                    fill="white" fontSize={Math.max(8, r * 0.5)} fontWeight="bold"
-                                    className="pointer-events-none" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                                    {b.users}
-                                </text>
-                            )}
                         </g>
                     );
                 })}
             </svg>
 
-            {/* Tooltip */}
-            <AnimatePresence>
-                {tooltip && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute pointer-events-none z-30 bg-[#0a0a14]/95 backdrop-blur-sm border border-white/[0.12] rounded-xl px-3 py-2 shadow-2xl"
-                        style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-                    >
-                        <p className="text-xs font-semibold text-white">{tooltip.name}</p>
-                        <p className="text-[11px] text-blue-400 tabular-nums">{tooltip.users} active users</p>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {tooltip && (
+                <div
+                    className="pointer-events-none absolute z-20 rounded-2xl border border-white/[0.08] bg-[#0a0d13]/95 px-3 py-2 shadow-2xl"
+                    style={{
+                        left: tooltip.x > 320 ? tooltip.x - 14 : tooltip.x + 14,
+                        top: Math.max(tooltip.y - 14, 16),
+                        transform: tooltip.x > 320 ? 'translateX(-100%)' : undefined,
+                    }}
+                >
+                    <p className="text-xs font-semibold text-white">{tooltip.name}</p>
+                    <p className="mt-1 text-[11px] tabular-nums text-[var(--analytics-cyan)]">{tooltip.users.toLocaleString()} active users</p>
+                </div>
+            )}
         </div>
     );
 });
