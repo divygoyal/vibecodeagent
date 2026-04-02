@@ -113,7 +113,7 @@ Plugins follow a SKILL.md documentation format. They are pre-installed in the ad
 The chatbot (`api/ai-chat`) is the most critical and complex route:
 
 1. Dashboard data (GA4 + GSC) is injected into the system prompt as context
-2. Gemini `generateContentStream` with function calling (5 tools: `get_search_performance`, `get_analytics_breakdown`, `run_page_audit`, `calculate_revenue_impact`, `generate_content_strategy`)
+2. Gemini `generateContentStream` with function calling (13 tools: `get_search_performance`, `run_ga4_report`, `run_realtime_report`, `get_custom_dimensions`, `run_page_audit`, `calculate_revenue_impact`, `generate_content_strategy`, `analyze_keyword_clusters`, `compare_time_periods`, `find_cannibalization`, `suggest_internal_links`, `generate_meta_tags`)
 3. Streams responses via SSE (`data: {type, ...}\n\n`)
 4. Tool calls are executed server-side, results sent back to Gemini for final response
 5. Max 2 tool calls per conversation, max 3 loop iterations

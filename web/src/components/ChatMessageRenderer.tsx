@@ -49,7 +49,7 @@ export interface ToolCall {
 
 const TOOL_NAMES: Record<string, string> = {
     get_search_performance: 'Search Performance',
-    get_analytics_breakdown: 'Analytics Breakdown',
+    run_ga4_report: 'GA4 Report',
     run_page_audit: 'Page Audit',
     calculate_revenue_impact: 'Revenue Impact',
     generate_content_strategy: 'Content Strategy',
@@ -58,6 +58,8 @@ const TOOL_NAMES: Record<string, string> = {
     find_cannibalization: 'Cannibalization Check',
     suggest_internal_links: 'Internal Links',
     generate_meta_tags: 'Meta Tags',
+    run_realtime_report: 'Realtime Report',
+    get_custom_dimensions: 'Custom Dimensions',
 };
 
 export function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -206,7 +208,7 @@ export default memo(function ChatMessageRenderer({ content, tools, isStreaming, 
     );
 
     const hasLiveToolResult = tools?.some(t =>
-        (t.name === 'get_search_performance' || t.name === 'get_analytics_breakdown') && (t.structuredData || t.result)
+        (t.name === 'get_search_performance' || t.name === 'run_ga4_report' || t.name === 'run_realtime_report') && (t.structuredData || t.result)
     );
 
     const liveCharts = useMemo(() => {

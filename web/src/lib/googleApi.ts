@@ -364,6 +364,88 @@ export async function runGAReport(
 }
 
 /**
+ * Flexible GA4 report — accepts any dimensions, metrics, filters, ordering.
+ * Used by the AI chatbot's run_ga4_report tool for arbitrary queries.
+ * Existing runGAReport() and fetchAnalyticsDashboard() are untouched.
+ */
+export async function runFlexibleGAReport(
+    token: string,
+    propertyId: string,
+    dimensions: string[],
+    metrics: string[],
+    dateRanges: Array<{ startDate: string; endDate: string; name?: string }>,
+    options?: {
+        dimensionFilter?: any;
+        metricFilter?: any;
+        orderBys?: Array<{ field: string; type: 'metric' | 'dimension'; desc?: boolean }>;
+        limit?: number;
+        offset?: number;
+    }
+) {
+    const body: any = {
+        dateRanges,
+        dimensions: dimensions.map(d => ({ name: d })),
+        metrics: metrics.map(m => ({ name: m })),
+        limit: Math.min(options?.limit || 100, 250),
+    };
+
+    if (options?.offset) body.offset = options.offset;
+    if (options?.dimensionFilter) body.dimensionFilter = options.dimensionFilter;
+    if (options?.metricFilter) body.metricFilter = options.metricFilter;
+
+    if (options?.orderBys && options.orderBys.length > 0) {
+        body.orderBys = options.orderBys.map(ob => {
+            if (ob.type === 'metric') {
+                return { metric: { metricName: ob.field }, desc: ob.desc ?? true };
+            }
+            return { dimension: { dimensionName: ob.field, orderType: 'ALPHANUMERIC' }, desc: ob.desc ?? false };
+        });
+    }
+
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, token, body);
+}
+
+/**
+ * Flexible GA4 realtime report — arbitrary dimensions/metrics.
+ * Used by the AI chatbot's run_realtime_report tool.
+ */
+export async function runFlexibleRealtimeReport(
+    token: string,
+    propertyId: string,
+    dimensions: string[],
+    metrics: string[],
+    options?: {
+        dimensionFilter?: any;
+        metricFilter?: any;
+        limit?: number;
+    }
+) {
+    const body: any = {
+        dimensions: dimensions.map(d => ({ name: d })),
+        metrics: metrics.map(m => ({ name: m })),
+    };
+    if (options?.limit) body.limit = options.limit;
+    if (options?.dimensionFilter) body.dimensionFilter = options.dimensionFilter;
+    if (options?.metricFilter) body.metricFilter = options.metricFilter;
+
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runRealtimeReport`, token, body);
+}
+
+/**
+ * Fetch custom dimensions and metrics for a GA4 property via the Metadata API.
+ * Used by the AI chatbot's get_custom_dimensions tool.
+ */
+export async function getPropertyMetadata(token: string, propertyId: string) {
+    const pid = cleanPropertyId(propertyId);
+    const data = await gaFetch(`${GA_DATA_BASE}/${pid}/metadata`, token);
+    const customDimensions = (data.dimensions || []).filter((d: any) => d.customDefinition);
+    const customMetrics = (data.metrics || []).filter((m: any) => m.customDefinition);
+    const standardDimensionCount = (data.dimensions || []).length - customDimensions.length;
+    const standardMetricCount = (data.metrics || []).length - customMetrics.length;
+    return { customDimensions, customMetrics, standardDimensionCount, standardMetricCount };
+}
+
+/**
  * Fetch full analytics dashboard data (KPIs, traffic, sources, pages, devices, countries).
  * Mirrors the plugin's dashboardJson() method.
  */

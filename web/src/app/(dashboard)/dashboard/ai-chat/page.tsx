@@ -22,7 +22,7 @@ const STARTER_CHIPS = [
 
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Searching your data',
-    get_analytics_breakdown: 'Analyzing traffic',
+    run_ga4_report: 'Querying analytics',
     run_page_audit: 'Running audit',
     calculate_revenue_impact: 'Calculating revenue',
     generate_content_strategy: 'Building strategy',
@@ -31,6 +31,8 @@ const TOOL_LABELS: Record<string, string> = {
     find_cannibalization: 'Checking cannibalization',
     suggest_internal_links: 'Finding links',
     generate_meta_tags: 'Generating tags',
+    run_realtime_report: 'Checking live visitors',
+    get_custom_dimensions: 'Loading custom tracking',
 };
 
 /* ─── Thinking Indicator (Gemini-style) ─── */

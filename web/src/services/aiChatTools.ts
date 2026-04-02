@@ -1,6 +1,6 @@
 // AI Chat Tools Definition & Executor
 // These tools are injected into the Gemini API so the AI can "call" them to perform deep diagnosis.
-import { getValidAccessToken } from '@/lib/googleApi';
+import { getValidAccessToken, runFlexibleGAReport, runFlexibleRealtimeReport, getPropertyMetadata } from '@/lib/googleApi';
 
 export const AI_CHAT_TOOL_DECLARATIONS = [
     {
@@ -81,38 +81,94 @@ SMART PATTERNS (ONE call each):
         },
     },
     {
-        name: 'get_analytics_breakdown',
-        description: `Fetch Google Analytics 4 (GA4) data for traffic analysis. Use when the user asks about traffic trends, sources, devices, demographics, or user behavior that ISN'T already in the dashboard context.
+        name: 'run_ga4_report',
+        description: `Run a flexible Google Analytics 4 report with ANY combination of dimensions, metrics, filters, and date ranges. This calls the GA4 Data API directly — far more powerful than the old fixed-dimension tool.
 
-WHEN TO USE:
-- "Why did my traffic drop?" → dimension="date", range=90
-- "Where does my traffic come from?" → dimension="sources"
-- "Mobile vs Desktop bounce rate?" → dimension="devices"
-- "Which countries are most valuable?" → dimension="countries"
-- "Who is linking to me?" → dimension="referrers"
-- "What are the entry pages?" → dimension="entryPages"
-- "Weekend vs weekday traffic?" → dimension="date", range=30 (then analyze the pattern)
-- "Is my viral traffic sticking?" → dimension="sources" (check bounce rates)
+WHEN TO USE: When the user asks about traffic, user behavior, conversions, or engagement that ISN'T already in the dashboard context. Check dashboard data FIRST.
 
-DO NOT USE IF the dashboard context already has this data. Check first.`,
+COMMON DIMENSIONS:
+- Traffic: date, sessionSource, sessionMedium, sessionDefaultChannelGroup, sessionCampaignName
+- Content: pagePath, pageTitle, landingPagePlusQueryString, exitPage
+- Geography: country, city, region, continent
+- Technology: deviceCategory, browser, operatingSystem, screenResolution
+- User: newVsReturning, firstSessionDate, userAgeBracket, userGender
+
+COMMON METRICS:
+- Users: activeUsers, newUsers, totalUsers
+- Sessions: sessions, sessionsPerUser, engagedSessions, engagementRate
+- Engagement: screenPageViews, screenPageViewsPerSession, averageSessionDuration, bounceRate, eventCount
+- Conversion: conversions, purchaseRevenue, totalRevenue, ecommercePurchases
+- Events: eventCount, eventValue, eventsPerSession
+
+EXAMPLE QUERIES:
+- "Why did traffic drop?" → dimensions=["date"], metrics=["activeUsers","sessions","screenPageViews"], 90-day range
+- "Bounce rate by landing page for organic" → dimensions=["landingPagePlusQueryString"], metrics=["sessions","bounceRate"], filter sessionMedium=organic
+- "Mobile vs Desktop" → dimensions=["deviceCategory"], metrics=["sessions","bounceRate","averageSessionDuration"]
+- "Top events" → dimensions=["eventName"], metrics=["eventCount","eventValue"]
+- "Revenue by country" → dimensions=["country"], metrics=["totalRevenue","ecommercePurchases"]
+- "New vs returning" → dimensions=["newVsReturning"], metrics=["activeUsers","sessions","bounceRate"]
+
+DO NOT USE IF the dashboard context already has this data.`,
         parameters: {
             type: 'OBJECT' as const,
             properties: {
-                dimension: {
-                    type: 'STRING' as const,
-                    enum: ['date', 'sources', 'devices', 'countries', 'referrers', 'entryPages', 'browsers', 'os', 'languages', 'channels', 'pages'],
-                    description: 'The dimension to break down',
-                },
                 propertyId: {
                     type: 'STRING' as const,
-                    description: 'GA4 property ID. Use the one from [AVAILABLE PROPERTIES] list.',
+                    description: 'GA4 property ID from [AVAILABLE PROPERTIES].',
                 },
-                range: {
+                dimensions: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const },
+                    description: 'GA4 dimension API names (e.g. ["date","sessionSource"]). See common dimensions above.',
+                },
+                metrics: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const },
+                    description: 'GA4 metric API names (e.g. ["activeUsers","bounceRate"]). See common metrics above.',
+                },
+                startDate: {
+                    type: 'STRING' as const,
+                    description: 'Start date: "YYYY-MM-DD", "today", "yesterday", or "NdaysAgo" (e.g. "90daysAgo")',
+                },
+                endDate: {
+                    type: 'STRING' as const,
+                    description: 'End date: "YYYY-MM-DD" or "today"',
+                },
+                dimensionFilter: {
+                    type: 'ARRAY' as const,
+                    items: {
+                        type: 'OBJECT' as const,
+                        properties: {
+                            dimension: { type: 'STRING' as const, description: 'Dimension name (e.g. "sessionMedium")' },
+                            matchType: { type: 'STRING' as const, enum: ['EXACT', 'CONTAINS', 'BEGINS_WITH', 'ENDS_WITH', 'REGEXP'], description: 'Match type. Default EXACT.' },
+                            value: { type: 'STRING' as const, description: 'Value to match' },
+                            negate: { type: 'BOOLEAN' as const, description: 'If true, negates the filter (NOT match). Default false.' },
+                        },
+                    },
+                    description: 'Optional dimension filters. All filters are AND-ed. Example: [{"dimension":"sessionMedium","value":"organic"}] for organic traffic only.',
+                },
+                metricFilter: {
+                    type: 'ARRAY' as const,
+                    items: {
+                        type: 'OBJECT' as const,
+                        properties: {
+                            metric: { type: 'STRING' as const, description: 'Metric name (e.g. "sessions")' },
+                            operator: { type: 'STRING' as const, enum: ['GREATER_THAN', 'LESS_THAN', 'EQUAL'], description: 'Comparison operator' },
+                            value: { type: 'STRING' as const, description: 'Numeric threshold as string' },
+                        },
+                    },
+                    description: 'Optional metric filters. All filters are AND-ed. Example: [{"metric":"sessions","operator":"GREATER_THAN","value":"10"}]',
+                },
+                orderBy: {
+                    type: 'STRING' as const,
+                    description: 'Metric name to sort by descending (e.g. "sessions"). Default: first metric.',
+                },
+                limit: {
                     type: 'INTEGER' as const,
-                    description: 'Number of days to look back. Default 28. Use 90 for trend analysis, 7 for recent changes.',
+                    description: 'Max rows. Default 100, max 250.',
                 },
             },
-            required: ['dimension', 'propertyId'],
+            required: ['propertyId', 'dimensions', 'metrics', 'startDate', 'endDate'],
         },
     },
     {
@@ -323,6 +379,63 @@ Returns optimized title (under 60 chars) and description (under 155 chars) with 
                 },
             },
             required: ['url'],
+        },
+    },
+    {
+        name: 'run_realtime_report',
+        description: `Query GA4 real-time data. Shows who is on the site RIGHT NOW.
+
+WHEN TO USE:
+- "Who's on my site right now?"
+- "Any visitors from paid campaigns right now?"
+- "What pages are people viewing live?"
+- "How many active users right now?"
+
+REALTIME DIMENSIONS (only these work):
+- country, city, deviceCategory, unifiedScreenName (page), sessionDefaultChannelGroup, platform, operatingSystem
+
+REALTIME METRICS (limited set):
+- activeUsers (primary — always include this)
+
+Note: Realtime API is intentionally limited by Google. For historical data, use run_ga4_report instead.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                propertyId: {
+                    type: 'STRING' as const,
+                    description: 'GA4 property ID from [AVAILABLE PROPERTIES].',
+                },
+                dimensions: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const, enum: ['country', 'city', 'deviceCategory', 'unifiedScreenName', 'sessionDefaultChannelGroup', 'platform', 'operatingSystem'] },
+                    description: 'Realtime dimensions to break down by.',
+                },
+                limit: {
+                    type: 'INTEGER' as const,
+                    description: 'Max rows. Default 20.',
+                },
+            },
+            required: ['propertyId', 'dimensions'],
+        },
+    },
+    {
+        name: 'get_custom_dimensions',
+        description: `Discover custom dimensions and metrics configured on a GA4 property. Useful to understand what custom tracking the user has set up before running queries.
+
+WHEN TO USE:
+- "What custom events do I track?"
+- "Show me my custom dimensions"
+- "What custom data is available?"
+- Before running a run_ga4_report query when the user asks about custom/event-specific data`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                propertyId: {
+                    type: 'STRING' as const,
+                    description: 'GA4 property ID from [AVAILABLE PROPERTIES].',
+                },
+            },
+            required: ['propertyId'],
         },
     },
 ];
@@ -548,83 +661,146 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         };
     }
 
-    if (name === 'get_analytics_breakdown') {
-        // Call our own internal analytics API
-        const { dimension, propertyId, range } = args;
+    if (name === 'run_ga4_report') {
+        // Flexible GA4 report — calls Data API directly (no internal route overhead)
+        const { propertyId, dimensions, metrics, startDate, endDate, dimensionFilter, metricFilter, orderBy, limit } = args;
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected. Connect it in Integrations settings.' };
+        }
+
         try {
-            const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const dims = dimensions || ['date'];
+            const mets = metrics || ['activeUsers', 'sessions'];
 
-            // We need to get a valid Google token to pass to our analytics API
-            let token = '';
-            if (gscContext?.googleAccessToken || gscContext?.googleRefreshToken) {
-                token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            // Build GA4 FilterExpression from simplified filter array
+            let ga4DimFilter: any = undefined;
+            if (dimensionFilter && Array.isArray(dimensionFilter) && dimensionFilter.length > 0) {
+                const filterExpressions = dimensionFilter.map((f: any) => {
+                    const expr: any = {
+                        filter: {
+                            fieldName: f.dimension,
+                            stringFilter: {
+                                matchType: f.matchType || 'EXACT',
+                                value: f.value,
+                            },
+                        },
+                    };
+                    if (f.negate) {
+                        return { notExpression: expr };
+                    }
+                    return expr;
+                });
+                ga4DimFilter = filterExpressions.length === 1
+                    ? filterExpressions[0]
+                    : { andGroup: { expressions: filterExpressions } };
             }
 
-            if (!token) {
-                return { error: 'Google account not connected. Cannot fetch analytics data.' };
+            // Build GA4 metric filter from simplified format
+            let ga4MetricFilter: any = undefined;
+            if (metricFilter && Array.isArray(metricFilter) && metricFilter.length > 0) {
+                const filterExpressions = metricFilter.map((f: any) => ({
+                    filter: {
+                        fieldName: f.metric,
+                        numericFilter: {
+                            operation: f.operator || 'GREATER_THAN',
+                            value: { int64Value: f.value },
+                        },
+                    },
+                }));
+                ga4MetricFilter = filterExpressions.length === 1
+                    ? filterExpressions[0]
+                    : { andGroup: { expressions: filterExpressions } };
             }
 
-            const section = dimension || 'overview';
-            const days = range || 28;
-            const url = `${baseUrl}/api/analytics?section=${section}&propertyId=${encodeURIComponent(propertyId || '')}&range=${days}`;
+            // Build orderBys
+            const orderBys = orderBy
+                ? [{ field: orderBy, type: 'metric' as const, desc: true }]
+                : mets.length > 0
+                    ? [{ field: mets[0], type: 'metric' as const, desc: true }]
+                    : undefined;
 
-            const response = await fetch(url, {
-                headers: {
-                    'Cookie': '', // Internal call, auth handled differently
-                    'x-google-token': token,
-                },
-                signal: AbortSignal.timeout(15000),
+            const data = await runFlexibleGAReport(
+                token,
+                propertyId,
+                dims,
+                mets,
+                [{ startDate, endDate }],
+                {
+                    dimensionFilter: ga4DimFilter,
+                    metricFilter: ga4MetricFilter,
+                    orderBys,
+                    limit: Math.min(limit || 100, 250),
+                }
+            );
+
+            if (!data?.rows || data.rows.length === 0) {
+                return {
+                    result: {
+                        dimensions: dims,
+                        metrics: mets,
+                        dateRange: { startDate, endDate },
+                        rowsReturned: 0,
+                        note: 'No data returned. The property may not have data for these dimensions/metrics in this date range.',
+                        csvData: '',
+                    },
+                };
+            }
+
+            // Parse response into structured rows
+            const dimHeaders = (data.dimensionHeaders || []).map((h: any) => h.name);
+            const metHeaders = (data.metricHeaders || []).map((h: any) => h.name);
+
+            const parsedRows = data.rows.map((row: any) => {
+                const entry: Record<string, any> = {};
+                dimHeaders.forEach((name: string, i: number) => {
+                    entry[name] = row.dimensionValues[i]?.value || '';
+                });
+                metHeaders.forEach((name: string, i: number) => {
+                    const raw = row.metricValues[i]?.value || '0';
+                    entry[name] = raw.includes('.') ? parseFloat(raw) : parseInt(raw);
+                });
+                return entry;
             });
 
-            if (!response.ok) {
-                return { error: `Analytics API returned ${response.status}. The GA4 property may not be accessible.` };
-            }
+            // Cap at 100 rows for token efficiency
+            const limitedRows = parsedRows.slice(0, 100);
 
-            const data = await response.json();
+            // CSV compression
+            const allCols = [...dimHeaders, ...metHeaders];
+            const csvHeader = allCols.join(',');
+            const csvRows = limitedRows.map((row: any) =>
+                allCols.map(col => `"${String(row[col] ?? '').replace(/"/g, '""')}"`).join(',')
+            );
+            const compressedCsv = [csvHeader, ...csvRows].join('\n');
 
-            // Compress the data into CSV format for token efficiency
-            let csvOutput = '';
-            if (Array.isArray(data)) {
-                // It's a list (sources, devices, etc.)
-                const keys = data.length > 0 ? Object.keys(data[0]) : [];
-                csvOutput = keys.join(',') + '\n' + data.slice(0, 30).map((row: any) =>
-                    keys.map(k => `"${String(row[k] || '').replace(/"/g, '""')}"`).join(',')
-                ).join('\n');
-            } else if (data.kpis) {
-                csvOutput = `KPIs: ${JSON.stringify(data.kpis)}\n`;
-                if (data.traffic) csvOutput += `Traffic trend: ${data.traffic.slice(0, 14).map((t: any) => `${t.date}:${t.activeUsers}u/${t.sessions}s`).join(' | ')}\n`;
-            }
-
-            // Build structured data for chart rendering
-            const dimMap: Record<string, string> = {
-                date: 'date', sources: 'source', devices: 'device',
-                countries: 'country', referrers: 'referrer', entryPages: 'page',
-                pages: 'page', channels: 'channel',
-            };
-            const chartDimension = dimMap[dimension] || dimension;
-            let structuredRows: any[] = [];
-            if (Array.isArray(data)) {
-                structuredRows = data.slice(0, 30);
-            } else if (data.traffic) {
-                structuredRows = data.traffic.slice(0, 30).map((t: any) => ({
-                    date: t.date, clicks: t.activeUsers || 0, impressions: t.sessions || 0,
-                }));
+            // Summary stats for metrics
+            const summaryParts: string[] = [];
+            for (const met of metHeaders) {
+                const total = limitedRows.reduce((sum: number, r: any) => sum + (Number(r[met]) || 0), 0);
+                const isAvg = met.toLowerCase().includes('rate') || met.toLowerCase().includes('average') || met.toLowerCase().includes('bounce');
+                const display = isAvg ? (total / limitedRows.length).toFixed(2) : total.toLocaleString();
+                summaryParts.push(`${met}: ${display}`);
             }
 
             return {
                 result: {
-                    dimension,
-                    range: `${days} days`,
-                    rowsReturned: Array.isArray(data) ? data.length : 1,
-                    csvData: csvOutput || JSON.stringify(data).slice(0, 3000),
+                    dimensions: dims,
+                    metrics: mets,
+                    dateRange: { startDate, endDate },
+                    totalRowsAvailable: data.rowCount || parsedRows.length,
+                    rowsReturned: limitedRows.length,
+                    summary: summaryParts.join(', '),
+                    note: parsedRows.length > 100 ? 'DATA TRUNCATED to top 100 rows. Use filters to narrow down.' : '',
+                    csvData: compressedCsv,
                 },
-                structuredData: structuredRows.length > 0 ? {
-                    dimensions: [chartDimension],
-                    rows: structuredRows,
-                } : undefined,
+                structuredData: {
+                    dimensions: dimHeaders,
+                    rows: limitedRows,
+                },
             };
         } catch (e: any) {
-            return { error: e.message || 'Failed to fetch analytics data' };
+            return { error: e.message || 'Failed to fetch GA4 report' };
         }
     }
 
@@ -995,5 +1171,113 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         };
     }
 
-    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, get_analytics_breakdown, run_page_audit, generate_content_strategy, analyze_keyword_clusters, compare_time_periods, find_cannibalization, suggest_internal_links, generate_meta_tags` };
+    if (name === 'run_realtime_report') {
+        const { propertyId, dimensions, limit: rowLimit } = args;
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected. Connect it in Integrations settings.' };
+        }
+
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const dims = dimensions || ['country'];
+
+            const data = await runFlexibleRealtimeReport(
+                token,
+                propertyId,
+                dims,
+                ['activeUsers'],
+                { limit: Math.min(rowLimit || 20, 50) }
+            );
+
+            if (!data?.rows || data.rows.length === 0) {
+                return {
+                    result: {
+                        activeUsers: 0,
+                        dimensions: dims,
+                        rowsReturned: 0,
+                        note: 'No active users right now, or the property may not be accessible.',
+                    },
+                };
+            }
+
+            const dimHeaders = (data.dimensionHeaders || []).map((h: any) => h.name);
+            const parsedRows = data.rows.map((row: any) => {
+                const entry: Record<string, any> = {};
+                dimHeaders.forEach((name: string, i: number) => {
+                    entry[name] = row.dimensionValues[i]?.value || '';
+                });
+                entry.activeUsers = parseInt(row.metricValues[0]?.value || '0');
+                return entry;
+            });
+
+            const totalActive = parsedRows.reduce((sum: number, r: any) => sum + (r.activeUsers || 0), 0);
+
+            // CSV compression
+            const allCols = [...dimHeaders, 'activeUsers'];
+            const csvHeader = allCols.join(',');
+            const csvRows = parsedRows.map((row: any) =>
+                allCols.map(col => `"${String(row[col] ?? '').replace(/"/g, '""')}"`).join(',')
+            );
+
+            return {
+                result: {
+                    totalActiveUsers: totalActive,
+                    dimensions: dims,
+                    rowsReturned: parsedRows.length,
+                    csvData: [csvHeader, ...csvRows].join('\n'),
+                },
+                structuredData: {
+                    dimensions: dimHeaders,
+                    rows: parsedRows,
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to fetch realtime data' };
+        }
+    }
+
+    if (name === 'get_custom_dimensions') {
+        const { propertyId } = args;
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected. Connect it in Integrations settings.' };
+        }
+
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const metadata = await getPropertyMetadata(token, propertyId);
+
+            const customDims = metadata.customDimensions.map((d: any) => ({
+                apiName: d.apiName,
+                displayName: d.uiName || d.apiName,
+                description: d.description || '',
+                scope: d.scope || '',
+            }));
+
+            const customMets = metadata.customMetrics.map((m: any) => ({
+                apiName: m.apiName,
+                displayName: m.uiName || m.apiName,
+                description: m.description || '',
+                type: m.type || '',
+            }));
+
+            return {
+                result: {
+                    propertyId,
+                    standardDimensionsAvailable: metadata.standardDimensionCount,
+                    standardMetricsAvailable: metadata.standardMetricCount,
+                    customDimensionCount: customDims.length,
+                    customMetricCount: customMets.length,
+                    customDimensions: customDims,
+                    customMetrics: customMets,
+                    note: customDims.length === 0 && customMets.length === 0
+                        ? 'No custom dimensions or metrics configured on this property. You can still use all standard GA4 dimensions and metrics with run_ga4_report.'
+                        : 'Use these apiName values in run_ga4_report dimensions/metrics parameters.',
+                },
+            };
+        } catch (e: any) {
+            return { error: e.message || 'Failed to fetch property metadata' };
+        }
+    }
+
+    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, run_ga4_report, run_page_audit, generate_content_strategy, analyze_keyword_clusters, compare_time_periods, find_cannibalization, suggest_internal_links, generate_meta_tags, run_realtime_report, get_custom_dimensions` };
 }

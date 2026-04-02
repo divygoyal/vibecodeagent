@@ -49,7 +49,7 @@ const THINKING_PHASES = [
 
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Digging through search data...',
-    get_analytics_breakdown: 'Poking around your analytics...',
+    run_ga4_report: 'Querying your analytics...',
     run_page_audit: 'Running a health check on pages...',
     calculate_revenue_impact: 'Counting potential dollars...',
     generate_content_strategy: 'Cooking up content ideas...',
@@ -58,6 +58,8 @@ const TOOL_LABELS: Record<string, string> = {
     find_cannibalization: 'Checking for cannibalization...',
     suggest_internal_links: 'Finding linking opportunities...',
     generate_meta_tags: 'Crafting meta tags...',
+    run_realtime_report: 'Checking who\'s online now...',
+    get_custom_dimensions: 'Discovering custom tracking...',
 };
 
 // Memoized message bubble — prevents re-rendering old messages when new chunks arrive
