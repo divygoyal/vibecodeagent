@@ -2,14 +2,14 @@ import type { Metadata } from 'next';
 import HomeClient from './HomeClient';
 
 export const metadata: Metadata = {
-    title: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+    title: 'TrafficClaw — AI for Google Analytics & Search Console',
     description:
-        'Monitor your Google Analytics & Search Console data, get AI-powered SEO insights, traffic drop alerts, and automated fixes. Start free — no credit card required.',
+        'Connect your Google Analytics & Search Console to AI. Ask why traffic dropped, which keywords to fix, and get step-by-step verdicts backed by your real data. Free to start.',
     alternates: { canonical: '/' },
     openGraph: {
-        title: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+        title: 'TrafficClaw — AI for Google Analytics & Search Console',
         description:
-            'Monitor your Google Analytics & Search Console data, get AI-powered SEO insights, traffic drop alerts, and automated fixes.',
+            'GA4 is confusing. Connect your Google Analytics & Search Console to AI — ask anything about your traffic and get actionable verdicts in seconds.',
         url: '/',
     },
 };
