@@ -5,6 +5,8 @@
  * Token refresh is cached in-memory so we only refresh once per hour.
  */
 
+import { normalizeTrafficSourceLabel } from '@/lib/trafficSourceUtils';
+
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
@@ -673,8 +675,10 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
     const pid = cleanPropertyId(propertyId);
     const result: any = { activeUsers: 0, byCountry: [], byCity: [], byDevice: [], byPage: [], byReferrer: [] };
 
-    // Run all real-time queries in parallel
-    const [totalData, countryData, cityData, deviceData, pageData, referrerData] = await Promise.all([
+    // GA4's realtime schema does not expose source/referrer dimensions.
+    // We fetch live visitors via runRealtimeReport, then enrich the source list
+    // from a same-day standard report so the UI stops collapsing to "Direct".
+    const [totalData, countryData, cityData, deviceData, pageData, sourceData] = await Promise.all([
         gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
             metrics: [{ name: 'activeUsers' }],
         }).catch(() => null),
@@ -698,11 +702,7 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
             metrics: [{ name: 'activeUsers' }],
             limit: 15,
         }).catch(() => null),
-        gaFetch(`${GA_DATA_BASE}/${pid}:runRealtimeReport`, token, {
-            dimensions: [{ name: 'sessionDefaultChannelGroup' }],
-            metrics: [{ name: 'activeUsers' }],
-            limit: 10,
-        }).catch(() => null),
+        runGAReport(token, pid, ['sessionSource'], ['activeUsers'], 'today', 'today', 10, 'activeUsers').catch(() => null),
     ]);
 
     // Total active users
@@ -743,10 +743,10 @@ export async function fetchRealtimeVisitors(token: string, propertyId: string) {
         }));
     }
 
-    // By referrer channel
-    if (referrerData?.rows) {
-        result.byReferrer = referrerData.rows.map((row: any) => ({
-            source: row.dimensionValues[0].value,
+    // Top sources from same-day standard reporting
+    if (sourceData?.rows) {
+        result.byReferrer = sourceData.rows.map((row: any) => ({
+            source: normalizeTrafficSourceLabel(row.dimensionValues[0].value),
             users: parseInt(row.metricValues[0].value) || 0,
         }));
     }

@@ -13,6 +13,7 @@ import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { COUNTRY_COORDS, CITY_COORDS } from '@/components/analytics/RealtimeGlobe';
 import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
+import { buildTrafficSourceBreakdown } from '@/lib/trafficSourceUtils';
 
 // ─── DiceBear avatar URL (matching globe markers) ───
 function getAvatarUrl(seed: string): string {
@@ -124,22 +125,10 @@ export default function RealtimePage() {
     const byDevice: any[] = Array.isArray(realtimeData?.byDevice) ? realtimeData.byDevice : [];
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
 
-    // ─── Referrer breakdown (real GA4 data) ───
-    const referrerBreakdown = useMemo(() => {
-        const byRef: any[] = Array.isArray(realtimeData?.byReferrer) ? realtimeData.byReferrer : [];
-        if (byRef.length === 0 && activeUsers > 0) {
-            return [{ icon: 'link', label: 'Direct', count: activeUsers }];
-        }
-        return byRef.map((r: any) => {
-            const source = String(r.source ?? 'Direct');
-            let icon = 'link';
-            const sl = source.toLowerCase();
-            if (sl.includes('social')) icon = 'x';
-            else if (sl.includes('organic')) icon = 'google';
-            else if (sl.includes('referral')) icon = 'referral';
-            else if (sl.includes('direct')) icon = 'link';
-            return { icon, label: source, count: Number(r.users) || 0 };
-        });
+    // ─── Source breakdown (same-day GA4 source data) ───
+    const sourceBreakdown = useMemo(() => {
+        const bySource: any[] = Array.isArray(realtimeData?.byReferrer) ? realtimeData.byReferrer : [];
+        return buildTrafficSourceBreakdown(bySource, activeUsers);
     }, [realtimeData?.byReferrer, activeUsers]);
 
     // ─── Activity feed with predictions ───
@@ -200,8 +189,8 @@ export default function RealtimePage() {
             const hash = hashStr(seed);
             const device = String(byDevice[hash % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
             const page = String(byPage[hash % Math.max(byPage.length, 1)]?.page ?? '/');
-            const ref = referrerBreakdown[hash % Math.max(referrerBreakdown.length, 1)];
-            const referrer = ref?.label ?? 'Direct';
+            const source = sourceBreakdown[hash % Math.max(sourceBreakdown.length, 1)];
+            const referrer = source?.label ?? 'Unknown source';
             const warmth = predictWarmth(seed, device, idx);
             const confidence = Math.round(50 + warmth * 40 + (hash % 10));
             const estVal = `$${(warmth * 3.5 + (hash % 100) / 100).toFixed(2)}`;
@@ -314,7 +303,7 @@ export default function RealtimePage() {
         });
 
         return visitors;
-    }, [byCity, byCountry, byDevice, byPage, referrerBreakdown]);
+    }, [byCity, byCountry, byDevice, byPage, sourceBreakdown]);
 
     // ─── Estimated total value ───
     const estTotalValue = useMemo(() => {
@@ -448,13 +437,13 @@ export default function RealtimePage() {
 
                     <div className="h-px bg-white/[0.05]" />
 
-                    {/* ── Stats rows: Referrers / Countries / Devices ── */}
+                    {/* ── Stats rows: Sources / Countries / Devices ── */}
                     <div className="px-4 py-2.5 space-y-2">
-                        {/* Referrers */}
+                        {/* Sources */}
                         <div className="flex items-start gap-3">
-                            <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Referrers</span>
+                            <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Sources</span>
                             <div className="flex flex-wrap gap-1">
-                                {referrerBreakdown.map((ref) => (
+                                {sourceBreakdown.map((ref) => (
                                     <div key={ref.label} className="flex items-center gap-1 text-[12px]">
                                         {ref.icon === 'link' && <Link2 className="w-3 h-3 text-zinc-400" />}
                                         {ref.icon === 'google' && (

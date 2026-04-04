@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getTrafficSourceIcon, normalizeTrafficSourceLabel } from '@/lib/trafficSourceUtils';
 
 // ─── Types ───
 export interface GlobeVisitor {
@@ -504,8 +505,9 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const cityLabel = v.city && !v.city.startsWith('(') ? v.city : '';
             const deviceLabel = v.device || 'Desktop';
             const deviceIcon = deviceLabel.toLowerCase() === 'mobile' ? '📱' : deviceLabel.toLowerCase() === 'tablet' ? '📱' : '🖥';
-            const referrerLabel = v.referrer || 'Direct';
-            const referrerIcon = referrerLabel.toLowerCase().includes('google') ? '🔍' : referrerLabel.toLowerCase().includes('social') ? '💬' : '🔗';
+            const sourceLabel = normalizeTrafficSourceLabel(v.referrer);
+            const sourceIconType = getTrafficSourceIcon(sourceLabel);
+            const sourceIcon = sourceIconType === 'google' ? '🔍' : sourceIconType === 'x' ? '💬' : '🔗';
             const pageLabel = v.page || '/';
             const estValue = v.estValue || `$${(v.warmth * 3.5).toFixed(2)}`;
             const confidence = v.confidence ?? Math.round(50 + v.warmth * 40);
@@ -543,8 +545,8 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     <!-- Stats rows -->
                     <div style="padding:8px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:11px;color:#71717a;">Referrer</span>
-                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${referrerIcon} ${referrerLabel}</span>
+                            <span style="font-size:11px;color:#71717a;">Source</span>
+                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${sourceIcon} ${sourceLabel}</span>
                         </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
                             <span style="font-size:11px;color:#71717a;">Current URL</span>

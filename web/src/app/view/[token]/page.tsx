@@ -1,17 +1,40 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { LayoutDashboard } from 'lucide-react';
-import type { DashboardLayout } from '@/types/dashboard';
+import { useState, useEffect, use, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import {
+  LayoutDashboard, Calendar, RefreshCw, AlertCircle, Clock, Eye,
+} from 'lucide-react';
+import type { DashboardLayout, DateRange } from '@/types/dashboard';
 import { getThemeCSS } from '@/lib/dashboardBuilder';
+import { usePublicWidgetData } from '@/lib/useWidgetData';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
+
+// ── Constants ──
+
+const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+  { value: '7d', label: '7d' },
+  { value: '14d', label: '14d' },
+  { value: '30d', label: '30d' },
+  { value: '90d', label: '90d' },
+];
+
+const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+// ── Page ──
 
 export default function PublicDashboardView({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
+  const searchParams = useSearchParams();
+
+  const isEmbed = searchParams.get('embed') === 'true';
+
   const [dashboard, setDashboard] = useState<DashboardLayout | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>('30d');
 
+  // Fetch dashboard config
   useEffect(() => {
     async function load() {
       try {
@@ -33,6 +56,39 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
     load();
   }, [token]);
 
+  // Fetch widget data with auto-refresh
+  const {
+    widgetData,
+    fetchedAt,
+    isLoading: dataLoading,
+    error: dataError,
+    refresh: refreshData,
+  } = usePublicWidgetData({
+    shareToken: token,
+    range: dateRange,
+    enabled: !!dashboard && dashboard.widgets.length > 0,
+    refreshInterval: AUTO_REFRESH_MS,
+  });
+
+  // Format last updated time
+  const lastUpdated = useMemo(() => {
+    if (!fetchedAt) return null;
+    try {
+      return new Date(fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return null;
+    }
+  }, [fetchedAt]);
+
+  // SEO meta tags via document.title
+  useEffect(() => {
+    if (dashboard) {
+      document.title = `${dashboard.name} | TrafficClaw Dashboard`;
+    }
+    return () => { document.title = 'TrafficClaw'; };
+  }, [dashboard]);
+
+  // ── Loading state ──
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -41,23 +97,65 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
     );
   }
 
+  // ── Error state ──
   if (error || !dashboard) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-3">
         <LayoutDashboard className="w-10 h-10 text-white/10" />
         <p className="text-sm text-white/40">{error || 'Dashboard not found'}</p>
-        <a
-          href="/"
-          className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-        >
-          Go to TrafficClaw
-        </a>
+        {!isEmbed && (
+          <a
+            href="/"
+            className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+          >
+            Go to TrafficClaw
+          </a>
+        )}
       </div>
     );
   }
 
   const themeCSS = getThemeCSS(dashboard.theme);
 
+  // ── Embed mode: minimal chrome ──
+  if (isEmbed) {
+    return (
+      <div
+        className="min-h-screen"
+        style={{
+          ...themeCSS,
+          backgroundColor: 'transparent',
+          fontFamily: 'var(--db-font)',
+        } as React.CSSProperties}
+      >
+        <div className="p-4">
+          <DashboardGrid
+            widgets={dashboard.widgets}
+            gridLayouts={dashboard.gridLayouts}
+            widgetData={widgetData ?? undefined}
+            isLoading={dataLoading && !widgetData}
+            isEditing={false}
+          />
+        </div>
+
+        {/* Minimal branding in embed */}
+        {dashboard.theme.showTrafficClawBranding && (
+          <div className="text-center pb-4">
+            <a
+              href="https://trafficclaw.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[9px] text-[var(--db-text)]/15 hover:text-[var(--db-text)]/30 transition-colors"
+            >
+              TrafficClaw
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Full public view ──
   return (
     <div
       className="min-h-screen"
@@ -87,6 +185,67 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
         {dashboard.description && (
           <p className="text-sm text-[var(--db-text)]/50 mt-1">{dashboard.description}</p>
         )}
+
+        {/* Controls bar */}
+        <div className="flex items-center justify-between mt-4 mb-2">
+          <div className="flex items-center gap-3">
+            {/* Date range picker */}
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[var(--db-text)]/40" />
+              <div className="flex items-center bg-[var(--db-text)]/5 rounded-lg p-0.5">
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setDateRange(opt.value)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                      dateRange === opt.value
+                        ? 'bg-[var(--db-primary)]/15 text-[var(--db-primary)]'
+                        : 'text-[var(--db-text)]/40 hover:text-[var(--db-text)]/60'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* View count */}
+            {dashboard.views > 0 && (
+              <div className="flex items-center gap-1 text-[var(--db-text)]/30">
+                <Eye className="w-3 h-3" />
+                <span className="text-[10px]">{dashboard.views.toLocaleString()} views</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Data error indicator */}
+            {dataError && (
+              <div className="flex items-center gap-1 text-amber-400/70">
+                <AlertCircle className="w-3 h-3" />
+                <span className="text-[10px]">Data unavailable</span>
+              </div>
+            )}
+
+            {/* Last updated */}
+            {lastUpdated && (
+              <div className="flex items-center gap-1 text-[var(--db-text)]/30">
+                <Clock className="w-3 h-3" />
+                <span className="text-[10px]">Updated {lastUpdated}</span>
+              </div>
+            )}
+
+            {/* Refresh button */}
+            <button
+              onClick={() => refreshData()}
+              disabled={dataLoading}
+              className="p-1.5 rounded-lg hover:bg-[var(--db-text)]/5 transition-colors disabled:opacity-30"
+              title="Refresh data"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[var(--db-text)]/40 ${dataLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Grid */}
@@ -94,7 +253,8 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
         <DashboardGrid
           widgets={dashboard.widgets}
           gridLayouts={dashboard.gridLayouts}
-          isLoading={false}
+          widgetData={widgetData ?? undefined}
+          isLoading={dataLoading && !widgetData}
           isEditing={false}
         />
       </div>

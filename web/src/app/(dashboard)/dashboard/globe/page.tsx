@@ -13,6 +13,7 @@ import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 import { useRealtimeData, useContainerStatus, usePropertyList } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
+import { buildTrafficSourceBreakdown } from '@/lib/trafficSourceUtils';
 import {
     ADJECTIVES, ANIMALS, AVATAR_COLORS, COUNTRY_COORDS, CITY_COORDS,
     hashStr, predictWarmth, getWarmthDot, makeName,
@@ -320,22 +321,10 @@ export default function GlobeApiPage() {
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
     const hasRealData = hasGoogleConnection && !!realtimeData && activeUsers > 0;
 
-    // ─── Referrer breakdown (real GA4 data) ───
-    const referrerBreakdown = useMemo(() => {
-        const byRef: any[] = Array.isArray(realtimeData?.byReferrer) ? realtimeData.byReferrer : [];
-        if (byRef.length === 0 && activeUsers > 0) {
-            return [{ icon: 'link', label: 'Direct', count: activeUsers }];
-        }
-        return byRef.map((r: any) => {
-            const source = String(r.source ?? 'Direct');
-            let icon = 'link';
-            const sl = source.toLowerCase();
-            if (sl.includes('social')) icon = 'x';
-            else if (sl.includes('organic')) icon = 'google';
-            else if (sl.includes('referral')) icon = 'referral';
-            else if (sl.includes('direct')) icon = 'link';
-            return { icon, label: source, count: Number(r.users) || 0 };
-        });
+    // ─── Source breakdown (same-day GA4 source data) ───
+    const sourceBreakdown = useMemo(() => {
+        const bySource: any[] = Array.isArray(realtimeData?.byReferrer) ? realtimeData.byReferrer : [];
+        return buildTrafficSourceBreakdown(bySource, activeUsers);
     }, [realtimeData?.byReferrer, activeUsers]);
 
     // ─── Globe visitors from real data ───
@@ -526,11 +515,11 @@ export default function GlobeApiPage() {
 
                         {/* Stats rows */}
                         <div className="space-y-2">
-                            {/* Referrers */}
+                            {/* Sources */}
                             <div className="flex items-start gap-3">
-                                <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Referrers</span>
+                                <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Sources</span>
                                 <div className="flex flex-wrap gap-1">
-                                    {hasRealData ? referrerBreakdown.map((ref) => (
+                                    {hasRealData ? sourceBreakdown.map((ref) => (
                                         <div key={ref.label} className="flex items-center gap-1 text-[12px]">
                                             {ref.icon === 'link' && <Link2 className="w-3 h-3 text-zinc-400" />}
                                             {ref.icon === 'google' && (

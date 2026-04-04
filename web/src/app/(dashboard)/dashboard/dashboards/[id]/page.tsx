@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Palette, Layers } from 'lucide-react';
-import type { DashboardLayout, GridLayouts, LayoutItem } from '@/types/dashboard';
+import { ArrowLeft, Palette, Layers, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
+import type { DashboardLayout, GridLayouts, LayoutItem, DateRange } from '@/types/dashboard';
 import { getThemeCSS } from '@/lib/dashboardBuilder';
 import { useDashboardBuilderStore } from '@/stores/dashboardBuilderStore';
+import { useWidgetData } from '@/lib/useWidgetData';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
 import DashboardToolbar from '@/components/dashboard-builder/DashboardToolbar';
 import WidgetPalette from '@/components/dashboard-builder/WidgetPalette';
@@ -17,6 +17,13 @@ import ThemeCustomizer from '@/components/dashboard-builder/ThemeCustomizer';
 
 type SidePanel = 'widgets' | 'theme' | 'config';
 
+const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+  { value: '7d', label: '7 days' },
+  { value: '14d', label: '14 days' },
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
+];
+
 // ── Page ──
 
 export default function DashboardEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,15 +33,16 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const {
     loadDashboard, resetEditor,
     widgets, gridLayouts, theme, selectedWidgetId,
-    onLayoutChange,
+    onLayoutChange, dashboardId,
   } = useDashboardBuilderStore();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [sidePanel, setSidePanel] = useState<SidePanel>('widgets');
+  const [dateRange, setDateRange] = useState<DateRange>('30d');
 
-  // Fetch dashboard
+  // Fetch dashboard config
   useEffect(() => {
     async function load() {
       try {
@@ -56,6 +64,18 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     load();
     return () => { resetEditor(); };
   }, [id, loadDashboard, resetEditor]);
+
+  // Fetch widget data (only when dashboard is loaded and has widgets)
+  const {
+    widgetData,
+    isLoading: dataLoading,
+    error: dataError,
+    refresh: refreshData,
+  } = useWidgetData({
+    dashboardId: dashboardId || id,
+    range: dateRange,
+    enabled: !loading && !error && widgets.length > 0,
+  });
 
   // Auto-switch to config panel when widget is selected
   useEffect(() => {
@@ -198,10 +218,50 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
+          {/* Date range selector + data status bar */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-[var(--db-text)]/40" />
+              <div className="flex items-center bg-white/5 rounded-lg p-0.5">
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setDateRange(opt.value)}
+                    className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                      dateRange === opt.value
+                        ? 'bg-[var(--db-primary)]/15 text-[var(--db-primary)]'
+                        : 'text-[var(--db-text)]/40 hover:text-[var(--db-text)]/60'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {dataError && (
+                <div className="flex items-center gap-1 text-amber-400/70">
+                  <AlertCircle className="w-3 h-3" />
+                  <span className="text-[10px]">Data unavailable</span>
+                </div>
+              )}
+              <button
+                onClick={() => refreshData()}
+                disabled={dataLoading}
+                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-30"
+                title="Refresh data"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-[var(--db-text)]/40 ${dataLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
           <DashboardGrid
             widgets={widgets}
             gridLayouts={gridLayouts}
-            isLoading={false}
+            widgetData={widgetData ?? undefined}
+            isLoading={dataLoading && !widgetData}
             isEditing={!isPreview}
             onLayoutChange={handleLayoutChange}
           />
