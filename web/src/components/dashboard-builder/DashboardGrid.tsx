@@ -4,8 +4,9 @@ import { useCallback, useMemo } from 'react';
 import { ResponsiveGridLayout, useContainerWidth, verticalCompactor } from 'react-grid-layout';
 import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import { GripVertical, Trash2, Copy, Settings2 } from 'lucide-react';
-import type { WidgetConfig, GridLayouts, LayoutItem } from '@/types/dashboard';
+import type { WidgetConfig, GridLayouts, LayoutItem, DashboardFilter } from '@/types/dashboard';
 import { useDashboardBuilderStore } from '@/stores/dashboardBuilderStore';
+import { applyDashboardFilters } from '@/lib/dashboardFilterEngine';
 import WidgetRenderer from './WidgetRenderer';
 
 import 'react-grid-layout/css/styles.css';
@@ -19,7 +20,9 @@ interface DashboardGridProps {
   widgetData?: Record<string, any>;
   isLoading?: boolean;
   isEditing?: boolean;
+  activeFilters?: DashboardFilter[];
   onLayoutChange?: (layout: LayoutItem[], allLayouts: GridLayouts) => void;
+  onInteraction?: (widgetId: string, dimension: string, value: string) => void;
 }
 
 // ── Grid ──
@@ -34,7 +37,9 @@ export default function DashboardGrid({
   widgetData,
   isLoading,
   isEditing = false,
+  activeFilters = [],
   onLayoutChange,
+  onInteraction,
 }: DashboardGridProps) {
   const { selectWidget, selectedWidgetId, removeWidget, duplicateWidget, updateWidget } =
     useDashboardBuilderStore();
@@ -51,12 +56,11 @@ export default function DashboardGrid({
     [onLayoutChange],
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const widgetMap = useMemo(() => {
-    const map = new Map<string, WidgetConfig>();
-    for (const w of widgets) map.set(w.id, w);
-    return map;
-  }, [widgets]);
+  // Apply active cross-widget filters to widget data
+  const filteredData = useMemo(() => {
+    if (!widgetData || !activeFilters.length) return widgetData;
+    return applyDashboardFilters(widgetData, widgets, activeFilters);
+  }, [widgetData, widgets, activeFilters]);
 
   if (!widgets.length) {
     return (
@@ -93,7 +97,10 @@ export default function DashboardGrid({
         >
           {widgets.map((widget) => {
             const isSelected = selectedWidgetId === widget.id;
-            const data = widgetData?.[widget.id];
+            const data = filteredData?.[widget.id];
+
+            // Check if this widget has an active filter (it's a filter source)
+            const isFilterSource = activeFilters.some((f) => f.sourceWidgetId === widget.id);
 
             return (
               <div
@@ -101,7 +108,9 @@ export default function DashboardGrid({
                 className={`group relative rounded-[var(--db-radius)] overflow-hidden transition-shadow ${
                   isSelected && isEditing
                     ? 'ring-2 ring-[var(--db-primary)] shadow-lg shadow-[var(--db-primary)]/10'
-                    : 'ring-1 ring-white/[0.06]'
+                    : isFilterSource
+                      ? 'ring-2 ring-cyan-400/40 shadow-md shadow-cyan-400/5'
+                      : 'ring-1 ring-white/[0.06]'
                 }`}
                 style={{ backgroundColor: 'var(--db-card)' }}
                 onClick={(e) => {
@@ -153,6 +162,11 @@ export default function DashboardGrid({
                     onContentChange={
                       widget.type === 'text' && isEditing
                         ? (content) => updateWidget(widget.id, { content })
+                        : undefined
+                    }
+                    onInteraction={
+                      onInteraction
+                        ? (dimension, value) => onInteraction(widget.id, dimension, value)
                         : undefined
                     }
                   />

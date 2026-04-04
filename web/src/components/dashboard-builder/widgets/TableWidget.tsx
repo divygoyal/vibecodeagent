@@ -9,9 +9,10 @@ interface TableWidgetProps {
   data?: Array<Record<string, unknown>>;
   columns?: Array<{ key: string; label: string; align?: 'left' | 'right' }>;
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
-export default function TableWidget({ config, data, columns: columnsProp, isLoading }: TableWidgetProps) {
+export default function TableWidget({ config, data, columns: columnsProp, isLoading, onInteraction }: TableWidgetProps) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -111,7 +112,17 @@ export default function TableWidget({ config, data, columns: columnsProp, isLoad
           </thead>
           <tbody>
             {sortedData.slice(0, 50).map((row, i) => (
-              <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+              <tr
+                key={i}
+                className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${onInteraction ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (onInteraction) {
+                    const dim = config.dimension || columns[0]?.key;
+                    const val = dim ? row[dim] : undefined;
+                    if (dim && val != null) onInteraction(dim, String(val));
+                  }
+                }}
+              >
                 {columns.map((col) => (
                   <td
                     key={col.key}

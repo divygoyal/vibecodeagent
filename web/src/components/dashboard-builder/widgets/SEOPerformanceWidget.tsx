@@ -10,6 +10,7 @@ interface SEOPerformanceWidgetProps {
   config: WidgetConfig;
   data?: Array<Record<string, unknown>>;
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
 export default function SEOPerformanceWidget({ config, data, isLoading }: SEOPerformanceWidgetProps) {

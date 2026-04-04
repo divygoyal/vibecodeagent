@@ -19,28 +19,36 @@ interface WidgetRendererProps {
   isLoading?: boolean;
   isEditing?: boolean;
   onContentChange?: (content: string) => void;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
 // ── Component ──
 
-export default function WidgetRenderer({ config, data, isLoading, isEditing, onContentChange }: WidgetRendererProps) {
+export default function WidgetRenderer({
+  config,
+  data,
+  isLoading,
+  isEditing,
+  onContentChange,
+  onInteraction,
+}: WidgetRendererProps) {
   switch (config.type) {
     case 'kpi':
-      return <KPIWidget config={config} data={data} isLoading={isLoading} />;
+      return <KPIWidget config={config} data={data} isLoading={isLoading} onInteraction={onInteraction} />;
     case 'area-chart':
-      return <AreaChartWidget config={config} data={data} isLoading={isLoading} />;
+      return <AreaChartWidget config={config} data={data} isLoading={isLoading} onInteraction={onInteraction} />;
     case 'bar-chart':
-      return <BarChartWidget config={config} data={data} isLoading={isLoading} />;
+      return <BarChartWidget config={config} data={data} isLoading={isLoading} onInteraction={onInteraction} />;
     case 'donut-chart':
-      return <DonutChartWidget config={config} data={data} isLoading={isLoading} />;
+      return <DonutChartWidget config={config} data={data} isLoading={isLoading} onInteraction={onInteraction} />;
     case 'table':
-      return <TableWidget config={config} data={data} isLoading={isLoading} />;
+      return <TableWidget config={config} data={data} isLoading={isLoading} onInteraction={onInteraction} />;
     case 'text':
       return <TextWidget config={config} isEditing={isEditing} onContentChange={onContentChange} />;
     case 'seo-performance':
       return <SEOPerformanceWidget config={config} data={data} isLoading={isLoading} />;
     case 'keywords-table':
-      return <KeywordsTableWidget config={config} data={data} isLoading={isLoading} />;
+      return <KeywordsTableWidget config={config} data={data} isLoading={isLoading} onInteraction={onInteraction} />;
     default:
       return (
         <div className="h-full flex items-center justify-center">

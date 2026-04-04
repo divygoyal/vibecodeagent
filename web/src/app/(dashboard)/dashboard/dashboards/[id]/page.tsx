@@ -13,6 +13,7 @@ import DashboardToolbar from '@/components/dashboard-builder/DashboardToolbar';
 import WidgetPalette from '@/components/dashboard-builder/WidgetPalette';
 import WidgetConfigPanel from '@/components/dashboard-builder/WidgetConfigPanel';
 import ThemeCustomizer from '@/components/dashboard-builder/ThemeCustomizer';
+import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
 
 // ── Types ──
 
@@ -35,6 +36,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     loadDashboard, resetEditor,
     name, widgets, gridLayouts, theme, selectedWidgetId,
     onLayoutChange, dashboardId,
+    activeFilters, handleInteraction, removeFilter, clearAllFilters,
   } = useDashboardBuilderStore();
 
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,13 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       onLayoutChange(layout, allLayouts);
     },
     [onLayoutChange],
+  );
+
+  const handleWidgetInteraction = useCallback(
+    (widgetId: string, dimension: string, value: string) => {
+      handleInteraction({ sourceWidgetId: widgetId, dimension, value });
+    },
+    [handleInteraction],
   );
 
   const handleExportPDF = useCallback(async () => {
@@ -278,13 +287,24 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           </div>
 
+          {/* Active filters bar (hidden in PDF) */}
+          <div data-pdf-ignore="true">
+            <ActiveFiltersBar
+              filters={activeFilters}
+              onRemove={removeFilter}
+              onClearAll={clearAllFilters}
+            />
+          </div>
+
           <DashboardGrid
             widgets={widgets}
             gridLayouts={gridLayouts}
             widgetData={widgetData ?? undefined}
             isLoading={dataLoading && !widgetData}
             isEditing={!isPreview}
+            activeFilters={activeFilters}
             onLayoutChange={handleLayoutChange}
+            onInteraction={handleWidgetInteraction}
           />
 
           {/* TrafficClaw branding footer */}

@@ -6,11 +6,13 @@ import {
   LayoutDashboard, Calendar, RefreshCw, AlertCircle, Clock, Eye,
   FileDown, Loader2,
 } from 'lucide-react';
-import type { DashboardLayout, DateRange } from '@/types/dashboard';
+import type { DashboardLayout, DashboardFilter, DateRange } from '@/types/dashboard';
 import { getThemeCSS } from '@/lib/dashboardBuilder';
 import { usePublicWidgetData } from '@/lib/useWidgetData';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
+import { createFilterId, isFilterableDimension } from '@/lib/dashboardFilterEngine';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
+import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
 
 // ── Constants ──
 
@@ -36,6 +38,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<DashboardFilter[]>([]);
   const dashboardContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch dashboard config
@@ -107,6 +110,41 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
     }
   }, [dashboard, dateRange, pdfExporting]);
 
+  // Cross-widget filter handlers
+  const handleWidgetInteraction = useCallback(
+    (widgetId: string, dimension: string, value: string) => {
+      if (!isFilterableDimension(dimension)) return;
+
+      const filterId = createFilterId(dimension, value);
+
+      setActiveFilters((prev) => {
+        // Toggle: if this exact filter exists, remove it
+        if (prev.find((f) => f.id === filterId)) {
+          return prev.filter((f) => f.id !== filterId);
+        }
+        // Replace any filter on the same dimension
+        const sourceWidget = dashboard?.widgets.find((w) => w.id === widgetId);
+        const newFilter: DashboardFilter = {
+          id: filterId,
+          dimension,
+          value,
+          sourceWidgetId: widgetId,
+          sourceWidgetTitle: sourceWidget?.title ?? 'Widget',
+        };
+        return [...prev.filter((f) => f.dimension !== dimension), newFilter];
+      });
+    },
+    [dashboard?.widgets],
+  );
+
+  const removeFilter = useCallback((filterId: string) => {
+    setActiveFilters((prev) => prev.filter((f) => f.id !== filterId));
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setActiveFilters([]);
+  }, []);
+
   // SEO meta tags via document.title
   useEffect(() => {
     if (dashboard) {
@@ -156,12 +194,19 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
         } as React.CSSProperties}
       >
         <div className="p-4">
+          <ActiveFiltersBar
+            filters={activeFilters}
+            onRemove={removeFilter}
+            onClearAll={clearAllFilters}
+          />
           <DashboardGrid
             widgets={dashboard.widgets}
             gridLayouts={dashboard.gridLayouts}
             widgetData={widgetData ?? undefined}
             isLoading={dataLoading && !widgetData}
             isEditing={false}
+            activeFilters={activeFilters}
+            onInteraction={handleWidgetInteraction}
           />
         </div>
 
@@ -295,12 +340,19 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
 
       {/* Grid */}
       <div className="max-w-7xl mx-auto px-6 pb-12">
+        <ActiveFiltersBar
+          filters={activeFilters}
+          onRemove={removeFilter}
+          onClearAll={clearAllFilters}
+        />
         <DashboardGrid
           widgets={dashboard.widgets}
           gridLayouts={dashboard.gridLayouts}
           widgetData={widgetData ?? undefined}
           isLoading={dataLoading && !widgetData}
           isEditing={false}
+          activeFilters={activeFilters}
+          onInteraction={handleWidgetInteraction}
         />
       </div>
 

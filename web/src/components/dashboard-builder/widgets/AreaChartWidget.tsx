@@ -10,11 +10,10 @@ interface AreaChartWidgetProps {
   config: WidgetConfig;
   data?: Array<Record<string, unknown>>;
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
-const COLORS = ['#10b981', '#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444'];
-
-export default function AreaChartWidget({ config, data, isLoading }: AreaChartWidgetProps) {
+export default function AreaChartWidget({ config, data, isLoading, onInteraction }: AreaChartWidgetProps) {
   const { dataKey, dimensionKey, chartData } = useMemo(() => {
     const dk = config.metric || 'totalUsers';
     const dimK = config.dimension || 'date';
@@ -83,7 +82,16 @@ export default function AreaChartWidget({ config, data, isLoading }: AreaChartWi
               fill={`url(#area-grad-${config.id})`}
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
+              activeDot={{
+                r: 4,
+                strokeWidth: 0,
+                cursor: onInteraction ? 'pointer' : undefined,
+                onClick: (_: unknown, payload: { payload?: Record<string, unknown> }) => {
+                  if (onInteraction && payload?.payload?.[dimensionKey] != null) {
+                    onInteraction(dimensionKey, String(payload.payload[dimensionKey]));
+                  }
+                },
+              }}
             />
           </AreaChart>
         </ResponsiveContainer>

@@ -16,6 +16,7 @@ interface KPIWidgetProps {
   config: WidgetConfig;
   data?: KPIData;
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
 // ── Helpers ──
@@ -44,7 +45,7 @@ function calcChange(current: number, previous: number): number {
 
 // ── Component ──
 
-export default function KPIWidget({ config, data, isLoading }: KPIWidgetProps) {
+export default function KPIWidget({ config, data, isLoading, onInteraction }: KPIWidgetProps) {
   const change = useMemo(() => {
     if (!data || data.previousValue == null) return null;
     return calcChange(data.value, data.previousValue);
@@ -66,7 +67,14 @@ export default function KPIWidget({ config, data, isLoading }: KPIWidgetProps) {
   const isPositive = change !== null ? (isPositionMetric ? change < 0 : change > 0) : null;
 
   return (
-    <div className="h-full flex flex-col justify-center px-4 py-3">
+    <div
+      className={`h-full flex flex-col justify-center px-4 py-3 ${onInteraction ? 'cursor-pointer hover:bg-white/[0.02] transition-colors' : ''}`}
+      onClick={() => {
+        if (onInteraction && config.metric) {
+          onInteraction('metric', config.metric);
+        }
+      }}
+    >
       <p className="text-[11px] font-medium text-[var(--db-text)]/60 uppercase tracking-wider truncate mb-1">
         {config.title}
       </p>

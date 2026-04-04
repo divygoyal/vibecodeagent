@@ -186,6 +186,24 @@ export interface WidgetMeta {
   defaultConfig: Partial<WidgetConfig>;
 }
 
+// ── Widget Interactions ──────────────────────────────────────
+
+/** Emitted by a widget when the user clicks a data element */
+export interface WidgetInteraction {
+  sourceWidgetId: string;
+  dimension: string;   // e.g. 'source', 'country', 'query', 'page'
+  value: string;       // the clicked value, e.g. 'google', 'United States'
+}
+
+/** Active cross-widget filter applied to the dashboard */
+export interface DashboardFilter {
+  id: string;                // unique filter id
+  dimension: string;         // dimension being filtered
+  value: string;             // filter value
+  sourceWidgetId: string;    // which widget created this filter
+  sourceWidgetTitle: string; // human label for the filter chip
+}
+
 // ── Builder State ────────────────────────────────────────────
 
 export interface DashboardSnapshot {

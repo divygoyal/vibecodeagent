@@ -10,9 +10,10 @@ interface BarChartWidgetProps {
   config: WidgetConfig;
   data?: Array<Record<string, unknown>>;
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
-export default function BarChartWidget({ config, data, isLoading }: BarChartWidgetProps) {
+export default function BarChartWidget({ config, data, isLoading, onInteraction }: BarChartWidgetProps) {
   const { dataKey, dimensionKey, chartData } = useMemo(() => {
     const dk = config.metric || 'sessions';
     const dimK = config.dimension || 'source';
@@ -74,6 +75,13 @@ export default function BarChartWidget({ config, data, isLoading }: BarChartWidg
               fill={colorOverride}
               radius={[4, 4, 0, 0]}
               maxBarSize={40}
+              cursor={onInteraction ? 'pointer' : undefined}
+              onClick={(entry) => {
+                const rec = entry as unknown as Record<string, unknown>;
+                if (onInteraction && rec?.[dimensionKey] != null) {
+                  onInteraction(dimensionKey, String(rec[dimensionKey]));
+                }
+              }}
             />
           </BarChart>
         </ResponsiveContainer>

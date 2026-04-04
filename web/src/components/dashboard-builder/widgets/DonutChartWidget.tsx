@@ -6,15 +6,19 @@ import {
 } from 'recharts';
 import type { WidgetConfig } from '@/types/dashboard';
 
+const CHART_COLORS = [
+  '#10b981', '#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444',
+  '#ec4899', '#14b8a6', '#6366f1', '#84cc16', '#f97316',
+];
+
 interface DonutChartWidgetProps {
   config: WidgetConfig;
   data?: Array<Record<string, unknown>>;
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
-const CHART_COLORS = ['#10b981', '#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#a855f7'];
-
-export default function DonutChartWidget({ config, data, isLoading }: DonutChartWidgetProps) {
+export default function DonutChartWidget({ config, data, isLoading, onInteraction }: DonutChartWidgetProps) {
   const { dataKey, nameKey, chartData } = useMemo(() => {
     const dk = config.metric || 'sessions';
     const nk = config.dimension || 'channelGrouping';
@@ -55,6 +59,12 @@ export default function DonutChartWidget({ config, data, isLoading }: DonutChart
               dataKey={dataKey}
               nameKey={nameKey}
               strokeWidth={0}
+              cursor={onInteraction ? 'pointer' : undefined}
+              onClick={(entry) => {
+                if (onInteraction && entry?.[nameKey] != null) {
+                  onInteraction(nameKey, String(entry[nameKey]));
+                }
+              }}
             >
               {chartData.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />

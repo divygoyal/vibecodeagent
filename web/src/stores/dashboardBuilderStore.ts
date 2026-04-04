@@ -12,12 +12,18 @@ import type {
   UpdateDashboardRequest,
   DateRange,
   LayoutItem,
+  DashboardFilter,
+  WidgetInteraction,
 } from '@/types/dashboard';
 import {
   createWidget,
   getWidgetConstraints,
   THEME_PRESETS,
 } from '@/lib/dashboardBuilder';
+import {
+  createFilterId,
+  isFilterableDimension,
+} from '@/lib/dashboardFilterEngine';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -43,6 +49,7 @@ interface DashboardBuilderState {
   lastSaved: string | null;
   undoStack: DashboardSnapshot[];
   redoStack: DashboardSnapshot[];
+  activeFilters: DashboardFilter[];
 
   // Actions — Dashboard
   loadDashboard: (dashboard: DashboardLayout) => void;
@@ -78,6 +85,11 @@ interface DashboardBuilderState {
   undo: () => void;
   redo: () => void;
   pushSnapshot: () => void;
+
+  // Actions — Cross-widget filtering
+  handleInteraction: (interaction: WidgetInteraction) => void;
+  removeFilter: (filterId: string) => void;
+  clearAllFilters: () => void;
 }
 
 // ── Defaults ─────────────────────────────────────────────────
@@ -104,6 +116,7 @@ const initialState = {
   lastSaved: null as string | null,
   undoStack: [] as DashboardSnapshot[],
   redoStack: [] as DashboardSnapshot[],
+  activeFilters: [] as DashboardFilter[],
 };
 
 // ── Store ────────────────────────────────────────────────────
@@ -129,6 +142,7 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
       selectedWidgetId: null,
       undoStack: [],
       redoStack: [],
+      activeFilters: [],
       lastSaved: dashboard.updatedAt,
     });
   },
@@ -371,4 +385,47 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
       selectedWidgetId: null,
     });
   },
+
+  // ─── Cross-widget Filtering ──────────────────────────────
+
+  handleInteraction: (interaction) => {
+    const state = get();
+    const { dimension, value, sourceWidgetId } = interaction;
+
+    // Skip non-filterable dimensions (e.g. date)
+    if (!isFilterableDimension(dimension)) return;
+
+    const filterId = createFilterId(dimension, value);
+
+    // Toggle: if this exact filter already exists, remove it
+    const existing = state.activeFilters.find((f) => f.id === filterId);
+    if (existing) {
+      set({ activeFilters: state.activeFilters.filter((f) => f.id !== filterId) });
+      return;
+    }
+
+    // Replace any existing filter on the same dimension (one filter per dimension)
+    const sourceWidget = state.widgets.find((w) => w.id === sourceWidgetId);
+    const newFilter: DashboardFilter = {
+      id: filterId,
+      dimension,
+      value,
+      sourceWidgetId,
+      sourceWidgetTitle: sourceWidget?.title ?? 'Widget',
+    };
+
+    set({
+      activeFilters: [
+        ...state.activeFilters.filter((f) => f.dimension !== dimension),
+        newFilter,
+      ],
+    });
+  },
+
+  removeFilter: (filterId) => {
+    const state = get();
+    set({ activeFilters: state.activeFilters.filter((f) => f.id !== filterId) });
+  },
+
+  clearAllFilters: () => set({ activeFilters: [] }),
 }));

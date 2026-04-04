@@ -16,6 +16,7 @@ interface KeywordsTableWidgetProps {
   config: WidgetConfig;
   data?: KeywordRow[];
   isLoading?: boolean;
+  onInteraction?: (dimension: string, value: string) => void;
 }
 
 const COLUMNS = [
@@ -38,7 +39,7 @@ function formatVal(key: string, value: unknown): string {
   return String(value);
 }
 
-export default function KeywordsTableWidget({ config, data, isLoading }: KeywordsTableWidgetProps) {
+export default function KeywordsTableWidget({ config, data, isLoading, onInteraction }: KeywordsTableWidgetProps) {
   const [sortKey, setSortKey] = useState<string>('clicks');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [search, setSearch] = useState('');
@@ -125,7 +126,15 @@ export default function KeywordsTableWidget({ config, data, isLoading }: Keyword
           </thead>
           <tbody>
             {filtered.slice(0, 50).map((row, i) => (
-              <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+              <tr
+                key={i}
+                className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${onInteraction ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (onInteraction && row.query) {
+                    onInteraction('query', row.query);
+                  }
+                }}
+              >
                 {COLUMNS.map((col) => (
                   <td
                     key={col.key}
