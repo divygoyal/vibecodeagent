@@ -5,7 +5,7 @@ Manages user containers, subscriptions, and monitoring
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from datetime import datetime, timedelta
 import json
 import docker
@@ -243,11 +243,18 @@ class UserResponse(BaseModel):
     github_username: Optional[str]
     email: Optional[str]
     plan: str
+    credits: int = 0
     container_status: str
     container_port: Optional[int]
     is_active: bool
     created_at: datetime
     bot_engine: str
+    has_google: bool = False
+    provider_count: int = 0
+    embed_token_count: int = 0
+    shared_dashboard_count: int = 0
+    custom_dashboard_count: int = 0
+    leaderboard_active: bool = False
 
 
 # ============= Helpers =============
@@ -280,6 +287,14 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
     if user:
         print(f"[DEBUG] Found user by github_id: {user.id} ({user.github_id})")
         return user
+
+    # 1b. Allow direct lookup by internal user ID for admin tooling fallbacks
+    if identifier.isdigit():
+        id_res = await db.execute(select(User).where(User.id == int(identifier)))
+        user = id_res.scalar_one_or_none()
+        if user:
+            print(f"[DEBUG] Found user by internal id: {user.id}")
+            return user
 
     # 2. Fallback: Lookup via OAuthConnection
     print(f"[DEBUG] User not found by github_id, trying OAuthConnection for '{identifier}'")
@@ -331,6 +346,124 @@ def sanitize_identifier(identifier: str) -> str:
     if safe.startswith('.') or safe.startswith('-'):
         safe = "u" + safe
     return safe
+
+
+def get_user_runtime_identifier(user: User) -> str:
+    """Best-effort stable identifier for Docker/plugin calls."""
+    return user.github_id or user.email or str(user.id)
+
+
+def has_non_empty_token(value: Optional[str]) -> bool:
+    return bool(value and str(value).strip())
+
+
+def isoformat_or_none(value: Optional[datetime]) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
+def safe_json_loads(value: Optional[str], fallback: Any):
+    if not value:
+        return fallback
+    try:
+        return json.loads(value)
+    except Exception:
+        return fallback
+
+
+def mask_secret(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "*" * len(value)
+    return f"{value[:4]}...{value[-4:]}"
+
+
+def normalize_property_id(property_id: Optional[str]) -> Optional[str]:
+    if not property_id:
+        return property_id
+    property_id = str(property_id)
+    if property_id.startswith("properties/"):
+        return property_id
+    if property_id.isdigit():
+        return f"properties/{property_id}"
+    return property_id
+
+
+def get_property_name(property_id: Optional[str], property_map: Dict[str, str]) -> Optional[str]:
+    if not property_id:
+        return property_id
+    normalized = normalize_property_id(property_id) or property_id
+    if normalized in property_map:
+        return property_map[normalized]
+    if normalized.startswith("properties/"):
+        short_id = normalized.split("/", 1)[1]
+        if short_id in property_map:
+            return property_map[short_id]
+    return property_id
+
+
+def serialize_provider(connection: OAuthConnection) -> Dict[str, Any]:
+    scopes = []
+    if connection.scope:
+        scopes = [scope for scope in str(connection.scope).replace(",", " ").split() if scope]
+
+    return {
+        "provider": connection.provider,
+        "provider_account_id": connection.provider_account_id,
+        "token_type": connection.token_type,
+        "scope": scopes,
+        "expires_at": connection.expires_at,
+        "has_refresh_token": has_non_empty_token(connection.refresh_token),
+        "created_at": isoformat_or_none(connection.created_at),
+        "updated_at": isoformat_or_none(connection.updated_at),
+    }
+
+
+async def get_connected_oauth_connections(db: AsyncSession, user_id: int) -> List[OAuthConnection]:
+    oauth_result = await db.execute(
+        select(OAuthConnection).where(OAuthConnection.user_id == user_id)
+    )
+    return [
+        connection
+        for connection in oauth_result.scalars().all()
+        if has_non_empty_token(connection.access_token)
+    ]
+
+
+def get_container_health_summary(user: User) -> Dict[str, Any]:
+    """Combine Docker health with DB metadata for admin views."""
+    runtime_identifier = get_user_runtime_identifier(user)
+    try:
+        container_status = docker_manager.get_container_status(runtime_identifier)
+    except Exception as e:
+        print(f"[ERROR] Failed to get container status for {runtime_identifier}: {e}")
+        container_status = {"status": "error", "error": str(e)}
+
+    docker_status = container_status.get("status")
+
+    if docker_status in ["not_found", "not_provisioned"]:
+        if user.container_status in ["running", "pending", "starting"]:
+            container_status["status"] = "initializing"
+        else:
+            container_status["status"] = "not_provisioned"
+    elif user.container_id == "pending":
+        container_status["status"] = "initializing"
+
+    if not user.telegram_bot_token:
+        container_status["status"] = "not_provisioned"
+
+    container_status.setdefault("status", user.container_status or "unknown")
+    container_status["port"] = user.container_port
+    container_status["engine"] = user.bot_engine or "openclaw"
+    container_status["db_status"] = user.container_status
+    container_status["container_id"] = user.container_id
+    container_status["container_name"] = user.container_name
+    container_status["last_health_check"] = isoformat_or_none(user.last_health_check)
+    container_status["restart_count"] = container_status.get("restart_count", user.restart_count or 0)
+    container_status["telegram_enabled"] = bool(user.telegram_bot_enabled)
+    container_status["telegram_bot_configured"] = bool(user.telegram_bot_token)
+
+    return container_status
 
 
 # ============= User Endpoints =============
@@ -552,9 +685,67 @@ async def list_users(
     _: bool = Depends(verify_admin_key)
 ):
     """List all users"""
-    result = await db.execute(select(User))
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
     users = result.scalars().all()
-    
+    user_ids = [user.id for user in users]
+
+    provider_counts: Dict[int, int] = {}
+    google_connected_user_ids = set()
+    embed_counts: Dict[int, int] = {}
+    shared_counts: Dict[int, int] = {}
+    custom_counts: Dict[int, int] = {}
+    leaderboard_user_ids = set()
+
+    if user_ids:
+        oauth_rows = await db.execute(
+            select(
+                OAuthConnection.user_id,
+                OAuthConnection.provider,
+                OAuthConnection.access_token,
+            ).where(OAuthConnection.user_id.in_(user_ids))
+        )
+        for user_id, provider, access_token in oauth_rows.all():
+            if not has_non_empty_token(access_token):
+                continue
+            provider_counts[user_id] = provider_counts.get(user_id, 0) + 1
+            if provider == "google":
+                google_connected_user_ids.add(user_id)
+
+        embed_rows = await db.execute(
+            select(EmbedToken.user_id).where(
+                EmbedToken.user_id.in_(user_ids),
+                EmbedToken.is_active == True,
+            )
+        )
+        for (user_id,) in embed_rows.all():
+            embed_counts[user_id] = embed_counts.get(user_id, 0) + 1
+
+        shared_rows = await db.execute(
+            select(SharedDashboard.user_id).where(
+                SharedDashboard.user_id.in_(user_ids),
+                SharedDashboard.is_active == True,
+            )
+        )
+        for (user_id,) in shared_rows.all():
+            shared_counts[user_id] = shared_counts.get(user_id, 0) + 1
+
+        custom_rows = await db.execute(
+            select(CustomDashboard.user_id).where(
+                CustomDashboard.user_id.in_(user_ids),
+                CustomDashboard.is_active == True,
+            )
+        )
+        for (user_id,) in custom_rows.all():
+            custom_counts[user_id] = custom_counts.get(user_id, 0) + 1
+
+        leaderboard_rows = await db.execute(
+            select(LeaderboardEntry.user_id).where(
+                LeaderboardEntry.user_id.in_(user_ids),
+                LeaderboardEntry.is_active == True,
+            )
+        )
+        leaderboard_user_ids = {user_id for (user_id,) in leaderboard_rows.all()}
+
     return [
         UserResponse(
             id=u.id,
@@ -562,11 +753,18 @@ async def list_users(
             github_username=u.github_username,
             email=u.email,
             plan=u.plan,
+            credits=u.credits or 0,
             container_status=u.container_status,
             container_port=u.container_port,
             is_active=u.is_active,
             created_at=u.created_at,
-            bot_engine=u.bot_engine or "openclaw"
+            bot_engine=u.bot_engine or "openclaw",
+            has_google=u.id in google_connected_user_ids,
+            provider_count=provider_counts.get(u.id, 0),
+            embed_token_count=embed_counts.get(u.id, 0),
+            shared_dashboard_count=shared_counts.get(u.id, 0),
+            custom_dashboard_count=custom_counts.get(u.id, 0),
+            leaderboard_active=u.id in leaderboard_user_ids,
         )
         for u in users
     ]
@@ -583,50 +781,10 @@ async def get_user(
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    display_token = user.telegram_bot_token or ""
-
-    # Get container status from Docker
-    try:
-        container_status = docker_manager.get_container_status(user.github_id)
-    except Exception as e:
-        print(f"[ERROR] Failed to get container status for {user.github_id}: {e}")
-        container_status = {"status": "error", "error": str(e)}
-
-    # CRITICAL FIX: If container is not provisioned in Docker, force status to "not_provisioned"
-    # UNLESS the DB says it should be running (race condition during startup)
-    docker_status = container_status.get("status")
-    
-    if docker_status in ["not_found", "not_provisioned"]:
-        # Check if DB expects it to be running (startup latency)
-        if user.container_status in ["running", "pending", "starting"]:
-            container_status["status"] = "initializing"
-            # Keep token visible if initializing, user might want to verify
-        else:
-            container_status["status"] = "not_provisioned"
-            display_token = "" # Hide if truly not provisioned
-            
-    elif user.container_id == "pending":
-         container_status["status"] = "initializing" # Treat pending as initializing
-
-    # CRITICAL FIX 2: Even if container is running, if there is NO token, it's not really provisioned
-    # This handles "zombie" containers or containers created without tokens during robustness fixes
-    if not user.telegram_bot_token:
-        container_status["status"] = "not_provisioned"
-        display_token = ""
-
-
-
-
-    
-    # Fetch connected OAuth providers (only those with valid tokens)
-    oauth_result = await db.execute(
-        select(OAuthConnection).where(OAuthConnection.user_id == user.id)
-    )
+    container_status = get_container_health_summary(user)
     connected_providers = [
-        {"provider": c.provider, "connected": True}
-        for c in oauth_result.scalars().all()
-        if c.access_token and c.access_token.strip()  # Only include if token is non-empty
+        {"provider": connection.provider, "connected": True}
+        for connection in await get_connected_oauth_connections(db, user.id)
     ]
 
     return {
@@ -644,9 +802,204 @@ async def get_user(
         "subscription_cancelled": user.subscription_cancelled or False,
         "telegram_bot_enabled": user.telegram_bot_enabled or False,
         "created_at": user.created_at,
+        "updated_at": user.updated_at,
+        "bot_engine": user.bot_engine or "openclaw",
         "telegram_bot_username": container_status.get("bot_username"), # Use container status
-        "telegram_bot_token": user.telegram_bot_token or "", # Expose masked token
+        "telegram_bot_token": mask_secret(user.telegram_bot_token),
+        "telegram_bot_configured": bool(user.telegram_bot_token),
         "connected_providers": connected_providers,
+    }
+
+
+@app.get("/api/users/{github_id}/profile")
+async def get_user_profile(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Aggregate a user profile for the superadmin dashboard."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    container_status = get_container_health_summary(user)
+    connected_provider_rows = await get_connected_oauth_connections(db, user.id)
+    providers = [serialize_provider(connection) for connection in connected_provider_rows]
+    google_inventory = await get_google_inventory_for_user(user, db)
+
+    property_name_map: Dict[str, str] = {}
+    for property_item in google_inventory["ga_properties"]:
+        property_id = property_item.get("property_id")
+        display_name = property_item.get("display_name") or property_id
+        if not property_id or not display_name:
+            continue
+        property_name_map[property_id] = display_name
+        normalized = normalize_property_id(property_id)
+        if normalized:
+            property_name_map[normalized] = display_name
+            if normalized.startswith("properties/"):
+                property_name_map[normalized.split("/", 1)[1]] = display_name
+
+    embed_result = await db.execute(
+        select(EmbedToken)
+        .where(EmbedToken.user_id == user.id, EmbedToken.is_active == True)
+        .order_by(EmbedToken.created_at.desc())
+    )
+    embed_tokens = embed_result.scalars().all()
+    embed_token_items = [
+        {
+            "id": token.id,
+            "label": token.label,
+            "property_id": token.property_id,
+            "property_name": get_property_name(token.property_id, property_name_map),
+            "allowed_origins": safe_json_loads(token.allowed_origins, []),
+            "created_at": isoformat_or_none(token.created_at),
+            "last_used_at": isoformat_or_none(token.last_used_at),
+            "is_active": bool(token.is_active),
+        }
+        for token in embed_tokens
+    ]
+
+    shared_result = await db.execute(
+        select(SharedDashboard)
+        .where(SharedDashboard.user_id == user.id, SharedDashboard.is_active == True)
+        .order_by(SharedDashboard.created_at.desc())
+    )
+    shared_dashboards = shared_result.scalars().all()
+    shared_dashboard_items = [
+        {
+            "id": share.id,
+            "property_id": share.property_id,
+            "property_name": get_property_name(share.property_id, property_name_map),
+            "site_url": share.site_url,
+            "config": safe_json_loads(share.config, {}),
+            "views": share.views or 0,
+            "is_active": bool(share.is_active),
+            "created_at": isoformat_or_none(share.created_at),
+            "last_viewed_at": isoformat_or_none(share.last_viewed_at),
+        }
+        for share in shared_dashboards
+    ]
+
+    dashboard_result = await db.execute(
+        select(CustomDashboard)
+        .where(CustomDashboard.user_id == user.id, CustomDashboard.is_active == True)
+        .order_by(CustomDashboard.updated_at.desc())
+    )
+    custom_dashboards = dashboard_result.scalars().all()
+    custom_dashboard_items = [
+        {
+            "id": dashboard.id,
+            "name": dashboard.name,
+            "description": dashboard.description,
+            "property_id": dashboard.property_id,
+            "property_name": get_property_name(dashboard.property_id, property_name_map),
+            "site_url": dashboard.site_url,
+            "widget_count": len(safe_json_loads(dashboard.widgets, [])),
+            "is_public": bool(dashboard.is_public),
+            "has_share_link": bool(dashboard.share_token),
+            "embed_enabled": bool(dashboard.embed_enabled),
+            "is_active": bool(dashboard.is_active),
+            "views": dashboard.views or 0,
+            "created_at": isoformat_or_none(dashboard.created_at),
+            "updated_at": isoformat_or_none(dashboard.updated_at),
+        }
+        for dashboard in custom_dashboards
+    ]
+
+    leaderboard_result = await db.execute(
+        select(LeaderboardEntry).where(
+            LeaderboardEntry.user_id == user.id,
+            LeaderboardEntry.is_active == True,
+        )
+    )
+    leaderboard_entry = leaderboard_result.scalar_one_or_none()
+    leaderboard = None
+    if leaderboard_entry:
+        leaderboard = {
+            "id": leaderboard_entry.id,
+            "startup_name": leaderboard_entry.startup_name,
+            "description": leaderboard_entry.description,
+            "website_url": leaderboard_entry.website_url,
+            "logo_url": leaderboard_entry.logo_url,
+            "category": leaderboard_entry.category,
+            "mrr_range": leaderboard_entry.mrr_range,
+            "looking_for": safe_json_loads(leaderboard_entry.looking_for, []),
+            "twitter_handle": leaderboard_entry.twitter_handle,
+            "ga_property_id": leaderboard_entry.ga_property_id,
+            "ga_property_name": get_property_name(leaderboard_entry.ga_property_id, property_name_map),
+            "monthly_visitors": leaderboard_entry.monthly_visitors or 0,
+            "monthly_pageviews": leaderboard_entry.monthly_pageviews or 0,
+            "engagement_rate": leaderboard_entry.engagement_rate or 0,
+            "bounce_rate": leaderboard_entry.bounce_rate or 0,
+            "avg_session_duration": leaderboard_entry.avg_session_duration or 0,
+            "visitor_trend": leaderboard_entry.visitor_trend or 0,
+            "is_verified": bool(leaderboard_entry.is_verified),
+            "last_refreshed": isoformat_or_none(leaderboard_entry.last_refreshed),
+            "created_at": isoformat_or_none(leaderboard_entry.created_at),
+            "updated_at": isoformat_or_none(leaderboard_entry.updated_at),
+        }
+
+    event_result = await db.execute(
+        select(ContainerEvent)
+        .where(ContainerEvent.user_id == user.id)
+        .order_by(ContainerEvent.created_at.desc())
+        .limit(10)
+    )
+    recent_events = [
+        {
+            "id": event.id,
+            "event_type": event.event_type,
+            "details": event.details,
+            "container_id": event.container_id,
+            "created_at": isoformat_or_none(event.created_at),
+        }
+        for event in event_result.scalars().all()
+    ]
+
+    logs = docker_manager.get_container_logs(get_user_runtime_identifier(user), tail=50)
+
+    public_custom_dashboards = [dashboard for dashboard in custom_dashboard_items if dashboard["is_public"]]
+
+    return {
+        "account": {
+            "id": user.id,
+            "identifier": get_user_runtime_identifier(user),
+            "github_id": user.github_id,
+            "username": user.github_username,
+            "email": user.email,
+            "is_active": bool(user.is_active),
+            "created_at": isoformat_or_none(user.created_at),
+            "updated_at": isoformat_or_none(user.updated_at),
+        },
+        "subscription": {
+            "plan": user.plan,
+            "credits": user.credits or 0,
+            "subscription_id": user.subscription_id,
+            "subscription_start": isoformat_or_none(user.subscription_start),
+            "subscription_end": isoformat_or_none(user.subscription_end),
+            "subscription_cancelled": bool(user.subscription_cancelled),
+            "telegram_bot_enabled": bool(user.telegram_bot_enabled),
+        },
+        "container": container_status,
+        "providers": providers,
+        "google_inventory": google_inventory,
+        "globe_assets": {
+            "embed_tokens": embed_token_items,
+            "summary": {
+                "active_embed_tokens": len(embed_token_items),
+                "used_embed_tokens": len([token for token in embed_token_items if token["last_used_at"]]),
+                "shared_dashboards": len(shared_dashboard_items),
+                "shared_dashboard_views": sum(item["views"] for item in shared_dashboard_items),
+                "public_custom_dashboards": len(public_custom_dashboards),
+                "public_custom_dashboard_views": sum(item["views"] for item in public_custom_dashboards),
+            },
+        },
+        "shared_dashboards": shared_dashboard_items,
+        "custom_dashboards": custom_dashboard_items,
+        "leaderboard": leaderboard,
+        "recent_events": recent_events,
+        "logs": logs,
     }
 
 
@@ -1179,38 +1532,35 @@ class PluginExecRequest(BaseModel):
 
 ALLOWED_PLUGINS = {"google-analytics", "google-search-console", "github-ghost"}
 
-@app.post("/api/users/{github_id}/exec")
-async def exec_plugin(
-    github_id: str,
-    req: PluginExecRequest,
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_admin_key)
-):
-    """Execute a plugin command. Google plugins run as local subprocesses (no container needed).
-    Bot-specific plugins require a running container."""
-    if req.plugin not in ALLOWED_PLUGINS:
-        raise HTTPException(status_code=400, detail=f"Plugin '{req.plugin}' not allowed")
 
-    # Validate command is alphanumeric with hyphens only (prevent path traversal)
+async def execute_plugin_command_for_user(
+    user: User,
+    db: AsyncSession,
+    plugin: str,
+    command: str,
+    args: Optional[List[str]] = None,
+    options: Optional[Dict[str, Any]] = None,
+):
+    args = args or []
+    options = options or {}
+
+    if plugin not in ALLOWED_PLUGINS:
+        raise HTTPException(status_code=400, detail=f"Plugin '{plugin}' not allowed")
+
     import re
-    if not re.match(r'^[a-zA-Z0-9_-]+$', req.command):
+    if not re.match(r"^[a-zA-Z0-9_-]+$", command):
         raise HTTPException(status_code=400, detail="Invalid command name")
 
-    # Validate args don't contain path traversal
-    for arg in req.args:
-        if '..' in arg or arg.startswith('/'):
+    for arg in args:
+        arg_str = str(arg)
+        if ".." in arg_str or arg_str.startswith("/"):
             raise HTTPException(status_code=400, detail="Invalid argument")
 
-    user = await get_user_by_identifier(db, github_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    container_required_plugins = {"github-ghost"}
+    runtime_identifier = get_user_runtime_identifier(user)
 
-    # Google plugins run locally using OAuth tokens from DB — no container needed
-    # Only bot-specific plugins (e.g. github-ghost) require a running container
-    CONTAINER_REQUIRED_PLUGINS = {"github-ghost"}
-    
-    if req.plugin in CONTAINER_REQUIRED_PLUGINS:
-        container_name = docker_manager._get_container_name(user.github_id)
+    if plugin in container_required_plugins:
+        container_name = docker_manager._get_container_name(runtime_identifier)
         try:
             container = docker_manager.client.containers.get(container_name)
             if container.status != "running":
@@ -1220,72 +1570,139 @@ async def exec_plugin(
         except Exception:
             raise HTTPException(status_code=503, detail="Container not provisioned. Set up your bot first.")
 
+    cmd = ["node", f"/app/plugins/{plugin}/index.js", command] + [str(arg) for arg in args]
+    for key, value in options.items():
+        cmd.append(f"--{key}")
+        if value is not None and value != "":
+            cmd.append(str(value))
+
+    if plugin in ["google-analytics", "google-search-console"]:
+        stmt = select(OAuthConnection).where(
+            OAuthConnection.user_id == user.id,
+            OAuthConnection.provider == "google"
+        )
+        result = await db.execute(stmt)
+        oauth = result.scalars().first()
+
+        if oauth:
+            if oauth.access_token:
+                cmd.extend(["--accessToken", oauth.access_token])
+            if oauth.refresh_token:
+                cmd.extend(["--refreshToken", oauth.refresh_token])
+
+    env = os.environ.copy()
+
+    print(f"Executing plugin: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60)
+    stdout = result.stdout
+    stderr = result.stderr
+
+    print(f"Plugin stdout: {stdout[:500]}...")
+    if stderr:
+        print(f"Plugin stderr: {stderr}")
+
     try:
-        # Build the command: node /app/plugins/<plugin>/index.js <command> <args> <options>
-        cmd = ["node", f"/app/plugins/{req.plugin}/index.js", req.command] + req.args
-        for key, value in req.options.items():
-            cmd.append(f"--{key}")
-            if value is not None and value != "":
-                cmd.append(str(value))
-
-        # Inject OAuth tokens if available
-        # Find Google tokens for analytics/search-console plugins
-        if req.plugin in ["google-analytics", "google-search-console"]:
-            from models import OAuthConnection  # Absolute import for uvicorn execution
-            from sqlalchemy import select
-            
-            stmt = select(OAuthConnection).where(
-                OAuthConnection.user_id == user.id,
-                OAuthConnection.provider == "google"
-            )
-            result = await db.execute(stmt)
-            oauth = result.scalars().first()
-            
-            if oauth:
-                if oauth.access_token:
-                    cmd.append("--accessToken")
-                    cmd.append(oauth.access_token)
-                if oauth.refresh_token:
-                    cmd.append("--refreshToken")
-                    cmd.append(oauth.refresh_token)
-
-        # Pass environment variables
-        env = os.environ.copy()
-        
-        print(f"Executing plugin: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60)
-        stdout = result.stdout
-        stderr = result.stderr
-        
-        print(f"Plugin stdout: {stdout[:500]}...") # Log first 500 chars
-        if stderr:
-            print(f"Plugin stderr: {stderr}")
-
-        # Try to parse stdout as JSON
-        import json as json_lib
+        parsed = json.loads(stdout)
+        return {"status": "ok", "data": parsed, "stderr": stderr}
+    except json.JSONDecodeError:
         try:
-            parsed = json_lib.loads(stdout)
-            return {"status": "ok", "data": parsed, "stderr": stderr}
-        except json_lib.JSONDecodeError:
-            # Fallback: Try to find JSON in the output (ignore leading log lines)
-            try:
-                # Find the start of the JSON structure (first { or [)
-                cleaned = stdout.strip()
-                start_index = -1
-                for i, char in enumerate(cleaned):
-                    if char in ['{', '[']:
-                        start_index = i
-                        break
-                
-                if start_index != -1:
-                    json_candidate = cleaned[start_index:]
-                    parsed = json_lib.loads(json_candidate)
-                    return {"status": "ok", "data": parsed, "stderr": stderr}
-            except Exception:
-                pass
-            
-            return {"status": "ok", "data": stdout, "stderr": stderr}
+            cleaned = stdout.strip()
+            start_index = -1
+            for i, char in enumerate(cleaned):
+                if char in ["{", "["]:
+                    start_index = i
+                    break
 
+            if start_index != -1:
+                json_candidate = cleaned[start_index:]
+                parsed = json.loads(json_candidate)
+                return {"status": "ok", "data": parsed, "stderr": stderr}
+        except Exception:
+            pass
+
+        return {"status": "ok", "data": stdout.strip(), "stderr": stderr}
+
+
+async def get_google_inventory_for_user(user: User, db: AsyncSession) -> Dict[str, Any]:
+    """Fetch GA properties and GSC sites using the same plugin exec path as the product UI."""
+    inventory = {
+        "connected": False,
+        "ga_properties": [],
+        "gsc_sites": [],
+        "warnings": [],
+    }
+
+    google_oauth_result = await db.execute(
+        select(OAuthConnection).where(
+            OAuthConnection.user_id == user.id,
+            OAuthConnection.provider == "google",
+        )
+    )
+    google_connection = google_oauth_result.scalars().first()
+    if not google_connection or not has_non_empty_token(google_connection.access_token):
+        return inventory
+
+    inventory["connected"] = True
+
+    try:
+        ga_result = await execute_plugin_command_for_user(user, db, "google-analytics", "list-properties-json")
+        ga_payload = ga_result.get("data")
+        if isinstance(ga_payload, dict) and ga_payload.get("error"):
+            inventory["warnings"].append(f"Google Analytics: {ga_payload['error']}")
+        elif isinstance(ga_payload, list):
+            inventory["ga_properties"] = [
+                {
+                    "property_id": normalize_property_id(item.get("property")),
+                    "display_name": item.get("displayName") or item.get("property"),
+                    "parent": item.get("parent"),
+                }
+                for item in ga_payload
+            ]
+        else:
+            inventory["warnings"].append("Google Analytics inventory returned an unexpected response.")
+    except HTTPException as exc:
+        inventory["warnings"].append(f"Google Analytics: {exc.detail}")
+    except Exception as exc:
+        inventory["warnings"].append(f"Google Analytics: {str(exc)}")
+
+    try:
+        gsc_result = await execute_plugin_command_for_user(user, db, "google-search-console", "list-sites-json")
+        gsc_payload = gsc_result.get("data")
+        if isinstance(gsc_payload, dict) and gsc_payload.get("error"):
+            inventory["warnings"].append(f"Google Search Console: {gsc_payload['error']}")
+        elif isinstance(gsc_payload, list):
+            inventory["gsc_sites"] = [
+                {
+                    "site_url": item.get("siteUrl"),
+                    "permission_level": item.get("permissionLevel"),
+                    "site_type": item.get("siteType"),
+                }
+                for item in gsc_payload
+            ]
+        else:
+            inventory["warnings"].append("Google Search Console inventory returned an unexpected response.")
+    except HTTPException as exc:
+        inventory["warnings"].append(f"Google Search Console: {exc.detail}")
+    except Exception as exc:
+        inventory["warnings"].append(f"Google Search Console: {str(exc)}")
+
+    return inventory
+
+@app.post("/api/users/{github_id}/exec")
+async def exec_plugin(
+    github_id: str,
+    req: PluginExecRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Execute a plugin command. Google plugins run as local subprocesses (no container needed).
+    Bot-specific plugins require a running container."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        return await execute_plugin_command_for_user(user, db, req.plugin, req.command, req.args, req.options)
     except subprocess.TimeoutExpired:
         print(f"Plugin exec timeout for {github_id}: {req.plugin} {req.command}")
         raise HTTPException(status_code=504, detail="Plugin execution timed out")

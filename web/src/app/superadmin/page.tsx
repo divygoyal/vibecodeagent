@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
     Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
-    Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check
+    Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check,
+    Globe, LayoutDashboard, Link2, BarChart3, Activity
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -18,15 +19,26 @@ interface StatusData {
 }
 
 interface UserData {
+    id?: number
     github_id: string
     username: string
     email: string
     plan: string
+    credits: number
     avatar_url?: string
     created_at?: string
+    is_active?: boolean
+    bot_engine?: string
+    has_google?: boolean
+    provider_count?: number
+    embed_token_count?: number
+    shared_dashboard_count?: number
+    custom_dashboard_count?: number
+    leaderboard_active?: boolean
     container?: {
         status: string
         id?: string
+        port?: number | null
     } | null
 }
 
@@ -48,9 +60,169 @@ interface QueryData {
     created_at: string | null
 }
 
-interface UserDetail {
-    user: Record<string, unknown> | null
-    logs: { logs: string } | null
+interface ProviderData {
+    provider: string
+    provider_account_id?: string | null
+    token_type?: string | null
+    scope?: string[]
+    expires_at?: number | null
+    has_refresh_token?: boolean
+    created_at?: string | null
+    updated_at?: string | null
+}
+
+interface GooglePropertyData {
+    property_id: string
+    display_name: string
+    parent?: string | null
+}
+
+interface SearchConsoleSiteData {
+    site_url?: string | null
+    permission_level?: string | null
+    site_type?: string | null
+}
+
+interface GoogleInventoryData {
+    connected: boolean
+    ga_properties: GooglePropertyData[]
+    gsc_sites: SearchConsoleSiteData[]
+    warnings: string[]
+}
+
+interface EmbedTokenData {
+    id: number
+    label?: string | null
+    property_id: string
+    property_name?: string | null
+    allowed_origins: string[]
+    created_at?: string | null
+    last_used_at?: string | null
+    is_active: boolean
+}
+
+interface SharedDashboardData {
+    id: number
+    property_id: string
+    property_name?: string | null
+    site_url?: string | null
+    config: Record<string, boolean>
+    views: number
+    is_active: boolean
+    created_at?: string | null
+    last_viewed_at?: string | null
+}
+
+interface CustomDashboardData {
+    id: string
+    name: string
+    description?: string | null
+    property_id: string
+    property_name?: string | null
+    site_url?: string | null
+    widget_count: number
+    is_public: boolean
+    has_share_link: boolean
+    embed_enabled: boolean
+    is_active: boolean
+    views: number
+    created_at?: string | null
+    updated_at?: string | null
+}
+
+interface LeaderboardData {
+    id: number
+    startup_name: string
+    description?: string | null
+    website_url?: string | null
+    logo_url?: string | null
+    category?: string | null
+    mrr_range?: string | null
+    looking_for: string[]
+    twitter_handle?: string | null
+    ga_property_id?: string | null
+    ga_property_name?: string | null
+    monthly_visitors: number
+    monthly_pageviews: number
+    engagement_rate: number
+    bounce_rate: number
+    avg_session_duration: number
+    visitor_trend: number
+    is_verified: boolean
+    last_refreshed?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+}
+
+interface UserProfileEvent {
+    id: number
+    event_type: string
+    details?: string | null
+    container_id?: string | null
+    created_at?: string | null
+}
+
+interface UserProfileData {
+    account: {
+        id: number
+        identifier: string
+        github_id?: string | null
+        username?: string | null
+        email?: string | null
+        is_active: boolean
+        created_at?: string | null
+        updated_at?: string | null
+    }
+    subscription: {
+        plan: string
+        credits: number
+        subscription_id?: string | null
+        subscription_start?: string | null
+        subscription_end?: string | null
+        subscription_cancelled: boolean
+        telegram_bot_enabled: boolean
+    }
+    container: {
+        status: string
+        health?: string | null
+        db_status?: string | null
+        port?: number | null
+        engine?: string | null
+        memory_usage_mb?: number | null
+        memory_percent?: number | null
+        restart_count?: number | null
+        started_at?: string | null
+        last_health_check?: string | null
+        telegram_status?: string | null
+        bot_username?: string | null
+        container_id?: string | null
+        container_name?: string | null
+        telegram_enabled?: boolean
+        telegram_bot_configured?: boolean
+        error?: string | null
+    }
+    providers: ProviderData[]
+    google_inventory: GoogleInventoryData
+    globe_assets: {
+        embed_tokens: EmbedTokenData[]
+        summary: {
+            active_embed_tokens: number
+            used_embed_tokens: number
+            shared_dashboards: number
+            shared_dashboard_views: number
+            public_custom_dashboards: number
+            public_custom_dashboard_views: number
+        }
+    }
+    shared_dashboards: SharedDashboardData[]
+    custom_dashboards: CustomDashboardData[]
+    leaderboard: LeaderboardData | null
+    recent_events: UserProfileEvent[]
+    logs: {
+        success?: boolean
+        logs?: string
+        error?: string
+    } | null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -95,6 +267,32 @@ function timeAgo(ts: string): string {
     if (hrs < 24) return `${hrs}h ago`
     const days = Math.floor(hrs / 24)
     return `${days}d ago`
+}
+
+function formatDateTime(ts?: string | null): string {
+    if (!ts) return '—'
+    const date = new Date(ts)
+    if (Number.isNaN(date.getTime())) return ts
+    return date.toLocaleString()
+}
+
+function formatNumber(value?: number | null): string {
+    return new Intl.NumberFormat().format(value ?? 0)
+}
+
+function formatPercent(value?: number | null): string {
+    if (value === null || value === undefined) return '—'
+    const normalized = Math.abs(value) <= 1 ? value * 100 : value
+    return `${normalized.toFixed(1)}%`
+}
+
+function formatDuration(seconds?: number | null): string {
+    if (!seconds) return '—'
+    const totalSeconds = Math.round(seconds)
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    if (mins <= 0) return `${secs}s`
+    return `${mins}m ${secs}s`
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -422,17 +620,54 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
 }) {
     const [deleteTarget, setDeleteTarget] = useState<UserData | null>(null)
     const [actionLoading, setActionLoading] = useState<string>('')
-    const [expandedUser, setExpandedUser] = useState<string | null>(null)
-    const [userLogs, setUserLogs] = useState<string>('')
+    const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
+    const [profileCache, setProfileCache] = useState<Record<string, UserProfileData>>({})
+    const [profileLoadingUserId, setProfileLoadingUserId] = useState<string | null>(null)
+    const [profileRefreshingUserId, setProfileRefreshingUserId] = useState<string | null>(null)
+    const [profileError, setProfileError] = useState('')
     const [creditInputs, setCreditInputs] = useState<Record<string, string>>({})
     const [showCreditInput, setShowCreditInput] = useState<string | null>(null)
-    const [userCredits, setUserCredits] = useState<Record<string, number>>({})
+
+    const loadUserProfile = useCallback(async (user: UserData, force = false) => {
+        if (!force && profileCache[user.github_id]) {
+            setProfileError('')
+            return
+        }
+
+        setProfileError('')
+        if (force && profileCache[user.github_id]) {
+            setProfileRefreshingUserId(user.github_id)
+        } else {
+            setProfileLoadingUserId(user.github_id)
+        }
+
+        try {
+            const detail: UserProfileData = await apiGet('user-profile', user.github_id)
+            setProfileCache(prev => ({ ...prev, [user.github_id]: detail }))
+        } catch (err) {
+            setProfileError((err as Error).message || 'Failed to load user profile')
+        } finally {
+            setProfileLoadingUserId(current => current === user.github_id ? null : current)
+            setProfileRefreshingUserId(current => current === user.github_id ? null : current)
+        }
+    }, [profileCache])
+
+    useEffect(() => {
+        if (!selectedUser) return
+        const updatedUser = users.find(user => user.github_id === selectedUser.github_id)
+        if (updatedUser) {
+            setSelectedUser(updatedUser)
+        }
+    }, [users, selectedUser])
 
     const handleAction = async (action: string, githubId: string, params?: Record<string, unknown>) => {
         setActionLoading(`${action}-${githubId}`)
         try {
             await apiPost(action, { githubId, params })
             onRefresh()
+            if (selectedUser?.github_id === githubId) {
+                await loadUserProfile(selectedUser, true)
+            }
         } catch (err) {
             alert((err as Error).message)
         } finally {
@@ -445,6 +680,12 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         try {
             await apiPost('delete', { githubId: user.github_id })
             setDeleteTarget(null)
+            setSelectedUser(current => current?.github_id === user.github_id ? null : current)
+            setProfileCache(prev => {
+                const next = { ...prev }
+                delete next[user.github_id]
+                return next
+            })
             onRefresh()
         } catch (err) {
             alert((err as Error).message)
@@ -453,18 +694,9 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         }
     }
 
-    const handleExpand = async (githubId: string) => {
-        if (expandedUser === githubId) {
-            setExpandedUser(null)
-            return
-        }
-        setExpandedUser(githubId)
-        try {
-            const detail: UserDetail = await apiGet('user-detail', githubId)
-            setUserLogs(detail.logs?.logs || 'No logs available')
-        } catch {
-            setUserLogs('Failed to load logs')
-        }
+    const handleOpenProfile = (user: UserData) => {
+        setSelectedUser(user)
+        void loadUserProfile(user)
     }
 
     const handleAddCredits = async (githubId: string) => {
@@ -473,36 +705,20 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         await handleAction('add-credits', githubId, { amount, reason: 'Admin grant' })
         setCreditInputs(prev => ({ ...prev, [githubId]: '' }))
         setShowCreditInput(null)
-        // Refresh credits
-        try {
-            const data = await apiPost('get-credits', { githubId })
-            setUserCredits(prev => ({ ...prev, [githubId]: data.remaining ?? data.credits ?? 0 }))
-        } catch { /* silent */ }
     }
-
-    const fetchCredits = async (githubId: string) => {
-        try {
-            const data = await apiPost('get-credits', { githubId })
-            setUserCredits(prev => ({ ...prev, [githubId]: data.remaining ?? data.credits ?? 0 }))
-        } catch { /* silent */ }
-    }
-
-    useEffect(() => {
-        users.forEach(u => {
-            if (userCredits[u.github_id] === undefined) {
-                fetchCredits(u.github_id)
-            }
-        })
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [users])
 
     const containerStatusColor = (status: string | undefined | null) => {
         if (!status) return 'bg-zinc-700 text-zinc-400'
         const s = status.toLowerCase()
         if (s === 'running') return 'bg-emerald-500/20 text-emerald-400'
         if (s === 'stopped' || s === 'exited') return 'bg-red-500/20 text-red-400'
+        if (s === 'initializing' || s === 'starting' || s === 'pending') return 'bg-amber-500/20 text-amber-400'
         return 'bg-zinc-700 text-zinc-400'
     }
+
+    const selectedProfile = selectedUser ? profileCache[selectedUser.github_id] ?? null : null
+    const isProfileLoading = selectedUser ? profileLoadingUserId === selectedUser.github_id : false
+    const isProfileRefreshing = selectedUser ? profileRefreshingUserId === selectedUser.github_id : false
 
     return (
         <div className="space-y-4">
@@ -533,6 +749,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Email</th>
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Plan</th>
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Credits</th>
+                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Signals</th>
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Container</th>
                                 <th className="text-right px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Actions</th>
                             </tr>
@@ -540,23 +757,21 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                         <tbody>
                             {users.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-12 text-zinc-600">No users found</td>
+                                    <td colSpan={7} className="text-center py-12 text-zinc-600">No users found</td>
                                 </tr>
                             )}
                             {users.map(user => (
                                 <UserRow
                                     key={user.github_id}
                                     user={user}
+                                    selected={selectedUser?.github_id === user.github_id}
                                     actionLoading={actionLoading}
-                                    expanded={expandedUser === user.github_id}
-                                    userLogs={expandedUser === user.github_id ? userLogs : ''}
-                                    credits={userCredits[user.github_id]}
                                     showCreditInput={showCreditInput === user.github_id}
                                     creditInputValue={creditInputs[user.github_id] || ''}
                                     containerStatusColor={containerStatusColor}
                                     onAction={handleAction}
                                     onDelete={() => setDeleteTarget(user)}
-                                    onExpand={() => handleExpand(user.github_id)}
+                                    onOpenDetails={() => handleOpenProfile(user)}
                                     onToggleCreditInput={() => setShowCreditInput(showCreditInput === user.github_id ? null : user.github_id)}
                                     onCreditInputChange={(v) => setCreditInputs(prev => ({ ...prev, [user.github_id]: v }))}
                                     onAddCredits={() => handleAddCredits(user.github_id)}
@@ -566,6 +781,31 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                     </table>
                 </div>
             </div>
+
+            <UserProfileDrawer
+                user={selectedUser}
+                profile={selectedProfile}
+                loading={isProfileLoading}
+                refreshing={isProfileRefreshing}
+                error={profileError}
+                actionLoading={actionLoading}
+                showCreditInput={showCreditInput === selectedUser?.github_id}
+                creditInputValue={selectedUser ? creditInputs[selectedUser.github_id] || '' : ''}
+                containerStatusColor={containerStatusColor}
+                onClose={() => setSelectedUser(null)}
+                onRefresh={() => selectedUser && void loadUserProfile(selectedUser, true)}
+                onAction={handleAction}
+                onDelete={() => selectedUser && setDeleteTarget(selectedUser)}
+                onToggleCreditInput={() => {
+                    if (!selectedUser) return
+                    setShowCreditInput(showCreditInput === selectedUser.github_id ? null : selectedUser.github_id)
+                }}
+                onCreditInputChange={(value) => {
+                    if (!selectedUser) return
+                    setCreditInputs(prev => ({ ...prev, [selectedUser.github_id]: value }))
+                }}
+                onAddCredits={() => selectedUser && void handleAddCredits(selectedUser.github_id)}
+            />
 
             {/* Delete Confirmation Modal */}
             <AnimatePresence>
@@ -621,18 +861,55 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
 
 // ─── User Row ────────────────────────────────────────────────────────────────
 
-function UserRow({ user, actionLoading, expanded, userLogs, credits, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onExpand, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
+function SignalPill({ tone = 'zinc', children }: { tone?: 'zinc' | 'emerald' | 'cyan' | 'amber' | 'purple'; children: ReactNode }) {
+    const toneMap: Record<string, string> = {
+        zinc: 'bg-zinc-800 text-zinc-300 border border-white/[0.06]',
+        emerald: 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/20',
+        cyan: 'bg-cyan-500/15 text-cyan-300 border border-cyan-400/20',
+        amber: 'bg-amber-500/15 text-amber-300 border border-amber-400/20',
+        purple: 'bg-purple-500/15 text-purple-300 border border-purple-400/20',
+    }
+
+    return (
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${toneMap[tone] || toneMap.zinc}`}>
+            {children}
+        </span>
+    )
+}
+
+function UserSignals({ user }: { user: UserData }) {
+    const hasSignals =
+        user.has_google ||
+        (user.embed_token_count || 0) > 0 ||
+        (user.shared_dashboard_count || 0) > 0 ||
+        (user.custom_dashboard_count || 0) > 0 ||
+        user.leaderboard_active
+
+    if (!hasSignals) {
+        return <span className="text-xs text-zinc-600">No advanced assets yet</span>
+    }
+
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {user.has_google && <SignalPill tone="emerald">Google</SignalPill>}
+            {(user.embed_token_count || 0) > 0 && <SignalPill tone="cyan">Globe {user.embed_token_count}</SignalPill>}
+            {(user.shared_dashboard_count || 0) > 0 && <SignalPill tone="amber">Shared {user.shared_dashboard_count}</SignalPill>}
+            {(user.custom_dashboard_count || 0) > 0 && <SignalPill tone="purple">Dashboards {user.custom_dashboard_count}</SignalPill>}
+            {user.leaderboard_active && <SignalPill tone="emerald">Leaderboard</SignalPill>}
+        </div>
+    )
+}
+
+function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
     user: UserData
+    selected: boolean
     actionLoading: string
-    expanded: boolean
-    userLogs: string
-    credits: number | undefined
     showCreditInput: boolean
     creditInputValue: string
     containerStatusColor: (s: string | undefined | null) => string
     onAction: (action: string, githubId: string, params?: Record<string, unknown>) => void
     onDelete: () => void
-    onExpand: () => void
+    onOpenDetails: () => void
     onToggleCreditInput: () => void
     onCreditInputChange: (v: string) => void
     onAddCredits: () => void
@@ -641,144 +918,459 @@ function UserRow({ user, actionLoading, expanded, userLogs, credits, showCreditI
     const isRunning = containerStatus?.toLowerCase() === 'running'
 
     return (
-        <>
-            <tr className="border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors">
-                {/* User */}
-                <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                        {user.avatar_url ? (
-                            <img
-                                src={user.avatar_url}
-                                alt={user.username}
-                                className="w-8 h-8 rounded-full bg-zinc-800"
-                            />
-                        ) : (
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
-                                {(user.username || '?')[0]?.toUpperCase()}
-                            </div>
-                        )}
-                        <div>
-                            <button onClick={onExpand} className="text-white hover:text-emerald-400 transition-colors font-medium flex items-center gap-1">
-                                {user.username || user.github_id}
-                                <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-                            </button>
-                            <span className="text-xs text-zinc-600">ID: {user.github_id}</span>
+        <tr className={`border-b border-white/[0.02] transition-colors ${selected ? 'bg-emerald-500/[0.07]' : 'hover:bg-white/[0.02]'}`}>
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                    {user.avatar_url ? (
+                        <img
+                            src={user.avatar_url}
+                            alt={user.username}
+                            className="w-8 h-8 rounded-full bg-zinc-800"
+                        />
+                    ) : (
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
+                            {(user.username || '?')[0]?.toUpperCase()}
                         </div>
-                    </div>
-                </td>
-
-                {/* Email */}
-                <td className="px-4 py-3 text-zinc-400">{user.email || '-'}</td>
-
-                {/* Plan */}
-                <td className="px-4 py-3">
-                    <select
-                        value={user.plan || 'free'}
-                        onChange={(e) => onAction('update-plan', user.github_id, { plan: e.target.value })}
-                        className="bg-black/30 border border-white/[0.08] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
-                    >
-                        <option value="free">Free</option>
-                        <option value="starter">Starter</option>
-                        <option value="pro">Pro</option>
-                    </select>
-                </td>
-
-                {/* Credits */}
-                <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-zinc-300 tabular-nums">{credits ?? '...'}</span>
-                        <button
-                            onClick={onToggleCreditInput}
-                            className="p-1 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors"
-                            title="Add credits"
-                        >
-                            {showCreditInput ? <Minus className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                    )}
+                    <div className="min-w-0">
+                        <button onClick={onOpenDetails} className="text-white hover:text-emerald-400 transition-colors font-medium text-left">
+                            {user.username || user.github_id}
                         </button>
-                        {showCreditInput && (
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={creditInputValue}
-                                    onChange={(e) => onCreditInputChange(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && onAddCredits()}
-                                    placeholder="0"
-                                    className="w-16 bg-black/30 border border-white/[0.08] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500/50"
-                                />
-                                <button
-                                    onClick={onAddCredits}
-                                    className="px-2 py-1 rounded bg-emerald-600/30 text-emerald-400 text-xs hover:bg-emerald-600/50 transition-colors"
-                                >
-                                    Add
-                                </button>
-                            </div>
-                        )}
+                        <div className="text-xs text-zinc-600 truncate">ID: {user.github_id}</div>
                     </div>
-                </td>
+                </div>
+            </td>
 
-                {/* Container Status */}
-                <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${containerStatusColor(containerStatus)}`}>
+            <td className="px-4 py-3 text-zinc-400">{user.email || '-'}</td>
+
+            <td className="px-4 py-3">
+                <select
+                    value={user.plan || 'free'}
+                    onChange={(e) => onAction('update-plan', user.github_id, { plan: e.target.value })}
+                    className="bg-black/30 border border-white/[0.08] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                >
+                    <option value="free">Free</option>
+                    <option value="starter">Starter</option>
+                    <option value="pro">Pro</option>
+                </select>
+            </td>
+
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-zinc-300 tabular-nums">{formatNumber(user.credits)}</span>
+                    <button
+                        onClick={onToggleCreditInput}
+                        className="p-1 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors"
+                        title="Add credits"
+                    >
+                        {showCreditInput ? <Minus className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                    </button>
+                    {showCreditInput && (
+                        <div className="flex items-center gap-1">
+                            <input
+                                type="number"
+                                min="1"
+                                value={creditInputValue}
+                                onChange={(e) => onCreditInputChange(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && onAddCredits()}
+                                placeholder="0"
+                                className="w-16 bg-black/30 border border-white/[0.08] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                            />
+                            <button
+                                onClick={onAddCredits}
+                                className="px-2 py-1 rounded bg-emerald-600/30 text-emerald-400 text-xs hover:bg-emerald-600/50 transition-colors"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </td>
+
+            <td className="px-4 py-3">
+                <UserSignals user={user} />
+            </td>
+
+            <td className="px-4 py-3">
+                <div className="flex flex-col gap-1">
+                    <span className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-xs font-medium ${containerStatusColor(containerStatus)}`}>
                         {containerStatus || 'none'}
                     </span>
-                </td>
+                    {user.container?.port ? <span className="text-[11px] text-zinc-600">Port {user.container.port}</span> : null}
+                </div>
+            </td>
 
-                {/* Actions */}
-                <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                        {!isRunning ? (
-                            <button
-                                onClick={() => onAction('start', user.github_id)}
-                                disabled={actionLoading === `start-${user.github_id}`}
-                                className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-30"
-                                title="Start"
-                            >
-                                <Play className="w-4 h-4" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => onAction('stop', user.github_id)}
-                                disabled={actionLoading === `stop-${user.github_id}`}
-                                className="p-1.5 rounded hover:bg-amber-500/20 text-zinc-500 hover:text-amber-400 transition-colors disabled:opacity-30"
-                                title="Stop"
-                            >
-                                <Square className="w-4 h-4" />
-                            </button>
-                        )}
+            <td className="px-4 py-3">
+                <div className="flex items-center justify-end gap-1">
+                    <button
+                        onClick={onOpenDetails}
+                        className="p-1.5 rounded hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-200 transition-colors"
+                        title="Open details"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                    </button>
+                    {!isRunning ? (
                         <button
-                            onClick={() => onAction('restart', user.github_id)}
-                            disabled={actionLoading === `restart-${user.github_id}`}
-                            className="p-1.5 rounded hover:bg-cyan-500/20 text-zinc-500 hover:text-cyan-400 transition-colors disabled:opacity-30"
-                            title="Restart"
+                            onClick={() => onAction('start', user.github_id)}
+                            disabled={actionLoading === `start-${user.github_id}`}
+                            className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-30"
+                            title="Start"
                         >
-                            <RotateCw className="w-4 h-4" />
+                            <Play className="w-4 h-4" />
                         </button>
+                    ) : (
                         <button
-                            onClick={onDelete}
-                            className="p-1.5 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors"
-                            title="Delete"
+                            onClick={() => onAction('stop', user.github_id)}
+                            disabled={actionLoading === `stop-${user.github_id}`}
+                            className="p-1.5 rounded hover:bg-amber-500/20 text-zinc-500 hover:text-amber-400 transition-colors disabled:opacity-30"
+                            title="Stop"
                         >
-                            <Trash2 className="w-4 h-4" />
+                            <Square className="w-4 h-4" />
                         </button>
-                    </div>
-                </td>
-            </tr>
+                    )}
+                    <button
+                        onClick={() => onAction('restart', user.github_id)}
+                        disabled={actionLoading === `restart-${user.github_id}`}
+                        className="p-1.5 rounded hover:bg-cyan-500/20 text-zinc-500 hover:text-cyan-400 transition-colors disabled:opacity-30"
+                        title="Restart"
+                    >
+                        <RotateCw className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        className="p-1.5 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors"
+                        title="Delete"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
+            </td>
+        </tr>
+    )
+}
 
-            {/* Expanded Logs */}
-            {expanded && (
-                <tr>
-                    <td colSpan={6} className="px-4 py-3 bg-black/30">
-                        <div className="flex items-center gap-2 mb-2 text-xs text-zinc-500">
-                            <Terminal className="w-3.5 h-3.5" />
-                            Container Logs
+function DrawerSection({ icon: Icon, title, action, children }: {
+    icon: React.ComponentType<{ className?: string }>
+    title: string
+    action?: ReactNode
+    children: ReactNode
+}) {
+    return (
+        <section className="bg-zinc-900/70 border border-white/[0.05] rounded-2xl p-5">
+            <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-sm font-semibold text-white">{title}</h3>
+                </div>
+                {action}
+            </div>
+            {children}
+        </section>
+    )
+}
+
+function DetailStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+    return (
+        <div className="rounded-xl border border-white/[0.05] bg-black/30 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500">{label}</div>
+            <div className="mt-1 text-sm font-semibold text-white break-words">{value}</div>
+            {sub ? <div className="mt-1 text-xs text-zinc-500">{sub}</div> : null}
+        </div>
+    )
+}
+
+function EmptyState({ title, description }: { title: string; description: string }) {
+    return (
+        <div className="rounded-xl border border-dashed border-white/[0.08] bg-black/20 p-4 text-sm">
+            <div className="font-medium text-zinc-300">{title}</div>
+            <div className="mt-1 text-zinc-500">{description}</div>
+        </div>
+    )
+}
+
+function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onClose, onRefresh, onAction, onDelete, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
+    user: UserData | null
+    profile: UserProfileData | null
+    loading: boolean
+    refreshing: boolean
+    error: string
+    actionLoading: string
+    showCreditInput: boolean
+    creditInputValue: string
+    containerStatusColor: (s: string | undefined | null) => string
+    onClose: () => void
+    onRefresh: () => void
+    onAction: (action: string, githubId: string, params?: Record<string, unknown>) => void
+    onDelete: () => void
+    onToggleCreditInput: () => void
+    onCreditInputChange: (value: string) => void
+    onAddCredits: () => void
+}) {
+    if (!user) return null
+
+    const containerStatus = profile?.container.status || user.container?.status || 'unknown'
+    const isRunning = containerStatus.toLowerCase() === 'running'
+
+    return (
+        <AnimatePresence>
+            <motion.div key={user.github_id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/70" onClick={onClose}>
+                <motion.div initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }} transition={{ type: 'spring', damping: 26, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto h-full w-full max-w-3xl overflow-y-auto border-l border-white/[0.08] bg-zinc-950/95 backdrop-blur-xl">
+                    <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-zinc-950/90 px-6 py-5 backdrop-blur-xl">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-xl font-semibold text-white">{profile?.account.username || user.username || user.github_id}</h2>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${containerStatusColor(containerStatus)}`}>{containerStatus}</span>
+                                </div>
+                                <div className="mt-1 text-sm text-zinc-400">{profile?.account.email || user.email || 'No email'}</div>
+                                <div className="mt-1 text-xs text-zinc-600">ID: {profile?.account.identifier || user.github_id}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={onRefresh} className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-zinc-300 hover:text-white transition-colors">
+                                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                                    {refreshing ? 'Refreshing' : 'Refresh'}
+                                </button>
+                                <button onClick={onClose} className="rounded-lg border border-white/[0.08] bg-black/30 p-2 text-zinc-400 hover:text-white transition-colors">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
-                        <pre className="text-xs text-zinc-400 bg-black/50 rounded-lg p-3 max-h-48 overflow-auto font-mono whitespace-pre-wrap">
-                            {userLogs || 'Loading...'}
-                        </pre>
-                    </td>
-                </tr>
-            )}
-        </>
+                    </div>
+
+                    <div className="space-y-5 px-6 py-6">
+                        <DrawerSection icon={Server} title="Admin Actions">
+                            <div className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
+                                <div className="space-y-3">
+                                    <select value={user.plan || 'free'} onChange={(e) => onAction('update-plan', user.github_id, { plan: e.target.value })} className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50">
+                                        <option value="free">Free</option>
+                                        <option value="starter">Starter</option>
+                                        <option value="pro">Pro</option>
+                                    </select>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-white">{formatNumber(profile?.subscription.credits ?? user.credits)}</span>
+                                        <button onClick={onToggleCreditInput} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/20 transition-colors">
+                                            {showCreditInput ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                            {showCreditInput ? 'Hide' : 'Add credits'}
+                                        </button>
+                                        {showCreditInput ? (
+                                            <>
+                                                <input type="number" min="1" value={creditInputValue} onChange={(e) => onCreditInputChange(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onAddCredits()} placeholder="0" className="w-24 bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+                                                <button onClick={onAddCredits} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors">Apply</button>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-start gap-2">
+                                    {!isRunning ? (
+                                        <button onClick={() => onAction('start', user.github_id)} disabled={actionLoading === `start-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors"><Play className="w-4 h-4" />Start</button>
+                                    ) : (
+                                        <button onClick={() => onAction('stop', user.github_id)} disabled={actionLoading === `stop-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-40 transition-colors"><Square className="w-4 h-4" />Stop</button>
+                                    )}
+                                    <button onClick={() => onAction('restart', user.github_id)} disabled={actionLoading === `restart-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-40 transition-colors"><RotateCw className="w-4 h-4" />Restart</button>
+                                    <button onClick={onDelete} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"><Trash2 className="w-4 h-4" />Delete</button>
+                                </div>
+                            </div>
+                        </DrawerSection>
+
+                        {loading && !profile ? <div className="rounded-2xl border border-white/[0.05] bg-zinc-900/70 p-10 text-center text-zinc-500">Loading full user profile...</div> : null}
+                        {!loading && !profile && error ? <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-300">{error}</div> : null}
+                        {profile ? (
+                            <>
+                                <DrawerSection icon={Users} title="Overview">
+                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                        <DetailStat label="Account" value={profile.account.is_active ? 'Active' : 'Disabled'} />
+                                        <DetailStat label="Providers" value={String(profile.providers.length)} sub={profile.providers.map(provider => provider.provider).join(', ') || 'No connections'} />
+                                        <DetailStat label="Created" value={formatDateTime(profile.account.created_at)} />
+                                        <DetailStat label="Updated" value={formatDateTime(profile.account.updated_at)} />
+                                        <DetailStat label="Engine" value={profile.container.engine || 'openclaw'} sub={profile.container.port ? `Port ${profile.container.port}` : undefined} />
+                                        <DetailStat label="Telegram" value={profile.container.telegram_status || (profile.container.telegram_enabled ? 'enabled' : 'disabled')} sub={profile.container.bot_username ? `@${profile.container.bot_username}` : undefined} />
+                                        <DetailStat label="Memory" value={profile.container.memory_usage_mb ? `${profile.container.memory_usage_mb} MB` : '—'} sub={profile.container.memory_percent !== undefined ? `${profile.container.memory_percent}% of limit` : undefined} />
+                                        <DetailStat label="Health" value={profile.container.health || '—'} sub={profile.container.last_health_check ? `Checked ${formatDateTime(profile.container.last_health_check)}` : undefined} />
+                                    </div>
+                                    {profile.container.error ? <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">{profile.container.error}</div> : null}
+                                </DrawerSection>
+
+                                <DrawerSection icon={Coins} title="Subscription & Credits">
+                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                        <DetailStat label="Plan" value={profile.subscription.plan} />
+                                        <DetailStat label="Credits" value={formatNumber(profile.subscription.credits)} />
+                                        <DetailStat label="Subscription ID" value={profile.subscription.subscription_id || '—'} />
+                                        <DetailStat label="Start" value={formatDateTime(profile.subscription.subscription_start)} />
+                                        <DetailStat label="End" value={formatDateTime(profile.subscription.subscription_end)} />
+                                        <DetailStat label="Flags" value={profile.subscription.subscription_cancelled ? 'Cancelled' : 'Active'} sub={profile.subscription.telegram_bot_enabled ? 'Telegram bot enabled' : 'Telegram bot disabled'} />
+                                    </div>
+                                </DrawerSection>
+
+                                <DrawerSection icon={Link2} title="Integrations">
+                                    {profile.providers.length === 0 ? <EmptyState title="No connected providers" description="This user has not connected any OAuth providers with active tokens." /> : (
+                                        <div className="space-y-3">
+                                            {profile.providers.map(provider => (
+                                                <div key={`${provider.provider}-${provider.provider_account_id || provider.updated_at || 'provider'}`} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="text-sm font-semibold capitalize text-white">{provider.provider}</span>
+                                                        <SignalPill tone="emerald">Connected</SignalPill>
+                                                        {provider.has_refresh_token ? <SignalPill tone="cyan">Refresh token</SignalPill> : null}
+                                                    </div>
+                                                    <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
+                                                        <div>Account: {provider.provider_account_id || '—'}</div>
+                                                        <div>Token type: {provider.token_type || '—'}</div>
+                                                        <div>Scopes: {provider.scope?.join(', ') || '—'}</div>
+                                                        <div>Updated: {formatDateTime(provider.updated_at)}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </DrawerSection>
+
+                                <DrawerSection icon={Globe} title="Google Properties & Sites">
+                                    {profile.google_inventory.warnings.length ? <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">{profile.google_inventory.warnings.map((warning, index) => <div key={index}>{warning}</div>)}</div> : null}
+                                    {!profile.google_inventory.connected ? <EmptyState title="Google not connected" description="GA4 properties and Search Console sites will appear here once the user connects Google." /> : (
+                                        <div className="grid gap-4 xl:grid-cols-2">
+                                            <div className="space-y-3">
+                                                <div className="text-xs uppercase tracking-wider text-zinc-500">GA4 Properties</div>
+                                                {profile.google_inventory.ga_properties.length === 0 ? <EmptyState title="No properties returned" description="The live GA inventory request returned no accessible properties." /> : profile.google_inventory.ga_properties.map(property => (
+                                                    <div key={property.property_id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                        <div className="text-sm font-semibold text-white">{property.display_name || property.property_id}</div>
+                                                        <div className="mt-1 text-xs text-zinc-500">{property.property_id}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="space-y-3">
+                                                <div className="text-xs uppercase tracking-wider text-zinc-500">Search Console Sites</div>
+                                                {profile.google_inventory.gsc_sites.length === 0 ? <EmptyState title="No sites returned" description="The live Search Console request returned no verified sites." /> : profile.google_inventory.gsc_sites.map(site => (
+                                                    <div key={site.site_url || `site-${site.permission_level || 'unknown'}`} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                        <div className="text-sm font-semibold text-white break-all">{site.site_url || 'Unknown site'}</div>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {site.permission_level ? <SignalPill tone="emerald">{site.permission_level}</SignalPill> : null}
+                                                            {site.site_type ? <SignalPill tone="zinc">{site.site_type}</SignalPill> : null}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </DrawerSection>
+
+                                <DrawerSection icon={Activity} title="Globe / Embed / Share Usage">
+                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                        <DetailStat label="Active embeds" value={String(profile.globe_assets.summary.active_embed_tokens)} />
+                                        <DetailStat label="Embeds used" value={String(profile.globe_assets.summary.used_embed_tokens)} sub="Tokens with last_used_at" />
+                                        <DetailStat label="Shared dashboards" value={String(profile.globe_assets.summary.shared_dashboards)} sub={`${formatNumber(profile.globe_assets.summary.shared_dashboard_views)} total views`} />
+                                        <DetailStat label="Public dashboards" value={String(profile.globe_assets.summary.public_custom_dashboards)} sub={`${formatNumber(profile.globe_assets.summary.public_custom_dashboard_views)} total views`} />
+                                    </div>
+                                    <div className="mt-5 space-y-3">
+                                        <div className="text-xs uppercase tracking-wider text-zinc-500">Embed Tokens</div>
+                                        {profile.globe_assets.embed_tokens.length === 0 ? <EmptyState title="No embed tokens" description="This user is not currently exposing any active globe/embed tokens." /> : profile.globe_assets.embed_tokens.map(token => (
+                                            <div key={token.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="text-sm font-semibold text-white">{token.label || token.property_name || token.property_id}</div>
+                                                    <SignalPill tone={token.last_used_at ? 'emerald' : 'zinc'}>{token.last_used_at ? 'Used' : 'Never used'}</SignalPill>
+                                                </div>
+                                                <div className="mt-2 text-xs text-zinc-500">{token.property_name || token.property_id}</div>
+                                                <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
+                                                    <div>Created: {formatDateTime(token.created_at)}</div>
+                                                    <div>Last used: {formatDateTime(token.last_used_at)}</div>
+                                                    <div className="sm:col-span-2">Allowed origins: {token.allowed_origins.length ? token.allowed_origins.join(', ') : 'Any origin'}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-5 space-y-3">
+                                        <div className="text-xs uppercase tracking-wider text-zinc-500">Shared Dashboards</div>
+                                        {profile.shared_dashboards.length === 0 ? <EmptyState title="No shared dashboards" description="This user has not published any active shared dashboard links." /> : profile.shared_dashboards.map(share => (
+                                            <div key={share.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="text-sm font-semibold text-white break-all">{share.site_url || share.property_name || share.property_id}</div>
+                                                    <SignalPill tone="amber">{formatNumber(share.views)} views</SignalPill>
+                                                </div>
+                                                <div className="mt-2 text-xs text-zinc-500">{share.property_name || share.property_id}</div>
+                                                <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
+                                                    <div>Created: {formatDateTime(share.created_at)}</div>
+                                                    <div>Last viewed: {formatDateTime(share.last_viewed_at)}</div>
+                                                    <div className="sm:col-span-2">Widgets: {Object.entries(share.config || {}).filter(([, enabled]) => enabled).map(([key]) => key).join(', ') || 'Default config'}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </DrawerSection>
+
+                                <DrawerSection icon={LayoutDashboard} title="Custom Dashboards">
+                                    {profile.custom_dashboards.length === 0 ? <EmptyState title="No custom dashboards" description="This user has not created any active custom dashboards yet." /> : (
+                                        <div className="space-y-3">
+                                            {profile.custom_dashboards.map(dashboard => (
+                                                <div key={dashboard.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <div className="text-sm font-semibold text-white">{dashboard.name}</div>
+                                                        {dashboard.is_public ? <SignalPill tone="emerald">Public</SignalPill> : null}
+                                                        {dashboard.has_share_link ? <SignalPill tone="cyan">Share link</SignalPill> : null}
+                                                        {dashboard.embed_enabled ? <SignalPill tone="amber">Embed enabled</SignalPill> : null}
+                                                        <SignalPill tone="zinc">{dashboard.widget_count} widgets</SignalPill>
+                                                    </div>
+                                                    <div className="mt-2 text-xs text-zinc-500">{dashboard.property_name || dashboard.property_id}</div>
+                                                    {dashboard.description ? <div className="mt-2 text-sm text-zinc-400">{dashboard.description}</div> : null}
+                                                    <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
+                                                        <div>Site: {dashboard.site_url || '—'}</div>
+                                                        <div>Views: {formatNumber(dashboard.views)}</div>
+                                                        <div>Created: {formatDateTime(dashboard.created_at)}</div>
+                                                        <div>Updated: {formatDateTime(dashboard.updated_at)}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </DrawerSection>
+
+                                <DrawerSection icon={BarChart3} title="Leaderboard">
+                                    {!profile.leaderboard ? <EmptyState title="Not listed" description="This user does not currently have an active leaderboard entry." /> : (
+                                        <div className="space-y-4">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <div className="text-lg font-semibold text-white">{profile.leaderboard.startup_name}</div>
+                                                {profile.leaderboard.is_verified ? <SignalPill tone="emerald">Verified</SignalPill> : <SignalPill tone="zinc">Unverified</SignalPill>}
+                                                {profile.leaderboard.category ? <SignalPill tone="cyan">{profile.leaderboard.category}</SignalPill> : null}
+                                            </div>
+                                            {profile.leaderboard.description ? <div className="text-sm text-zinc-400">{profile.leaderboard.description}</div> : null}
+                                            {profile.leaderboard.website_url ? <a href={profile.leaderboard.website_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-emerald-300 hover:text-emerald-200">{profile.leaderboard.website_url}<ExternalLink className="w-3.5 h-3.5" /></a> : null}
+                                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                <DetailStat label="Property" value={profile.leaderboard.ga_property_name || profile.leaderboard.ga_property_id || '—'} />
+                                                <DetailStat label="Visitors" value={formatNumber(profile.leaderboard.monthly_visitors)} />
+                                                <DetailStat label="Pageviews" value={formatNumber(profile.leaderboard.monthly_pageviews)} />
+                                                <DetailStat label="Trend" value={formatPercent(profile.leaderboard.visitor_trend)} />
+                                                <DetailStat label="Engagement" value={formatPercent(profile.leaderboard.engagement_rate)} />
+                                                <DetailStat label="Bounce" value={formatPercent(profile.leaderboard.bounce_rate)} />
+                                                <DetailStat label="Avg session" value={formatDuration(profile.leaderboard.avg_session_duration)} />
+                                                <DetailStat label="Refreshed" value={formatDateTime(profile.leaderboard.last_refreshed)} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </DrawerSection>
+
+                                <DrawerSection icon={Clock} title="Recent Events">
+                                    {profile.recent_events.length === 0 ? <EmptyState title="No recent events" description="Container/admin events for this user will appear here." /> : (
+                                        <div className="space-y-3">
+                                            {profile.recent_events.map(event => (
+                                                <div key={event.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="text-sm font-semibold capitalize text-white">{event.event_type.replace(/_/g, ' ')}</div>
+                                                        <div className="text-xs text-zinc-500">{event.created_at ? timeAgo(event.created_at) : '—'}</div>
+                                                    </div>
+                                                    {event.details ? <div className="mt-2 text-sm text-zinc-400">{event.details}</div> : null}
+                                                    <div className="mt-2 text-xs text-zinc-600">{event.container_id ? `Container: ${event.container_id}` : 'No container ID'} · {formatDateTime(event.created_at)}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </DrawerSection>
+
+                                <DrawerSection icon={Terminal} title="Container Logs">
+                                    {profile.logs?.logs || profile.logs?.error ? <pre className="max-h-80 overflow-auto rounded-xl bg-black/50 p-4 text-xs text-zinc-300 whitespace-pre-wrap">{profile.logs?.logs || profile.logs?.error}</pre> : <EmptyState title="No logs available" description="The container has not emitted logs yet, or the runtime is not provisioned." />}
+                                </DrawerSection>
+                            </>
+                        ) : null}
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
     )
 }
 

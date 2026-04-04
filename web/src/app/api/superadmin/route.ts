@@ -16,6 +16,38 @@ const PASSWORD_HASH = SUPERADMIN_PASSWORD && PASSWORD_SALT
 // Token expiry: 24 hours in milliseconds
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000
 
+function normalizeUser(user: Record<string, unknown>) {
+    const rawId = user.github_id ?? user.email ?? user.id ?? ''
+    const identifier = typeof rawId === 'string' ? rawId : String(rawId)
+    const username =
+        (typeof user.github_username === 'string' && user.github_username) ||
+        (typeof user.username === 'string' && user.username) ||
+        (typeof user.email === 'string' && user.email ? user.email.split('@')[0] : '') ||
+        identifier
+
+    const containerStatus = typeof user.container_status === 'string' && user.container_status
+        ? user.container_status
+        : 'unknown'
+
+    return {
+        ...user,
+        github_id: identifier,
+        username,
+        email: typeof user.email === 'string' ? user.email : '',
+        credits: typeof user.credits === 'number' ? user.credits : 0,
+        container: user.container ?? {
+            status: containerStatus,
+            port: typeof user.container_port === 'number' ? user.container_port : undefined,
+        },
+        has_google: Boolean(user.has_google),
+        provider_count: typeof user.provider_count === 'number' ? user.provider_count : 0,
+        embed_token_count: typeof user.embed_token_count === 'number' ? user.embed_token_count : 0,
+        shared_dashboard_count: typeof user.shared_dashboard_count === 'number' ? user.shared_dashboard_count : 0,
+        custom_dashboard_count: typeof user.custom_dashboard_count === 'number' ? user.custom_dashboard_count : 0,
+        leaderboard_active: Boolean(user.leaderboard_active),
+    }
+}
+
 function createToken(): { token: string; expiresAt: number } {
     const secret = process.env.NEXTAUTH_SECRET || ''
     const timestamp = Date.now().toString()
@@ -78,23 +110,7 @@ export async function GET(req: Request) {
             })
             if (!res.ok) throw new Error('Failed to get users')
             const users = await res.json()
-
-            const detailed = await Promise.all(
-                users.map(async (user: Record<string, unknown>) => {
-                    try {
-                        const detailRes = await fetch(`${ADMIN_API_URL}/api/users/${user.github_id}`, {
-                            headers: { 'X-API-Key': ADMIN_API_KEY }
-                        })
-                        if (detailRes.ok) {
-                            const detail = await detailRes.json()
-                            return { ...user, container: detail.container }
-                        }
-                    } catch { /* silent */ }
-                    return user
-                })
-            )
-
-            return NextResponse.json(detailed)
+            return NextResponse.json(Array.isArray(users) ? users.map(normalizeUser) : [])
         }
 
         if (endpoint === 'events') {
@@ -116,12 +132,13 @@ export async function GET(req: Request) {
         if (endpoint === 'user-detail') {
             const githubId = searchParams.get('id')
             if (!githubId) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+            const encodedId = encodeURIComponent(githubId)
 
             const [userRes, logsRes] = await Promise.all([
-                fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
+                fetch(`${ADMIN_API_URL}/api/users/${encodedId}`, {
                     headers: { 'X-API-Key': ADMIN_API_KEY }
                 }),
-                fetch(`${ADMIN_API_URL}/api/users/${githubId}/logs?tail=30`, {
+                fetch(`${ADMIN_API_URL}/api/users/${encodedId}/logs?tail=30`, {
                     headers: { 'X-API-Key': ADMIN_API_KEY }
                 })
             ])
@@ -130,6 +147,22 @@ export async function GET(req: Request) {
             const logsData = logsRes.ok ? await logsRes.json() : null
 
             return NextResponse.json({ user: userData, logs: logsData })
+        }
+
+        if (endpoint === 'user-profile') {
+            const githubId = searchParams.get('id')
+            if (!githubId) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+            const encodedId = encodeURIComponent(githubId)
+
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodedId}/profile`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Failed to get user profile' }))
+                throw new Error(err.detail || err.error || 'Failed to get user profile')
+            }
+
+            return NextResponse.json(await res.json())
         }
 
         return NextResponse.json({ error: 'Invalid endpoint' }, { status: 400 })
@@ -165,7 +198,7 @@ export async function POST(req: Request) {
 
         if (action === 'restart' || action === 'stop' || action === 'start') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
-            const res = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/container`, {
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}/container`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -178,7 +211,7 @@ export async function POST(req: Request) {
 
         if (action === 'delete') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
-            const res = await fetch(`${ADMIN_API_URL}/api/users/${githubId}?remove_data=true`, {
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}?remove_data=true`, {
                 method: 'DELETE',
                 headers: { 'X-API-Key': ADMIN_API_KEY }
             })
@@ -188,7 +221,7 @@ export async function POST(req: Request) {
         if (action === 'update-plan') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
             const { params } = body
-            const res = await fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -202,7 +235,7 @@ export async function POST(req: Request) {
         if (action === 'add-credits') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
             const { params } = body
-            const res = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/credits/add`, {
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}/credits/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -215,7 +248,7 @@ export async function POST(req: Request) {
 
         if (action === 'get-credits') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
-            const res = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/credits`, {
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}/credits`, {
                 headers: { 'X-API-Key': ADMIN_API_KEY }
             })
             return NextResponse.json(await res.json())
