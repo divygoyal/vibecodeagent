@@ -4,17 +4,19 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Save, Share2, Eye, EyeOff, Undo2, Redo2, Check, Copy, Link2, Loader2, Code2,
+  FileDown,
 } from 'lucide-react';
 import { useDashboardBuilderStore } from '@/stores/dashboardBuilderStore';
 
 interface DashboardToolbarProps {
   onPreviewToggle?: () => void;
   isPreview?: boolean;
+  onExportPDF?: () => Promise<void>;
 }
 
 type ShareTab = 'link' | 'embed';
 
-export default function DashboardToolbar({ onPreviewToggle, isPreview }: DashboardToolbarProps) {
+export default function DashboardToolbar({ onPreviewToggle, isPreview, onExportPDF }: DashboardToolbarProps) {
   const {
     name, setName, isDirty, isSaving, save, dashboardId,
     undoStack, redoStack, undo, redo,
@@ -26,6 +28,7 @@ export default function DashboardToolbar({ onPreviewToggle, isPreview }: Dashboa
   const [copied, setCopied] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [shareTab, setShareTab] = useState<ShareTab>('link');
+  const [pdfExporting, setPdfExporting] = useState(false);
 
   const handleSave = useCallback(async () => {
     try {
@@ -95,6 +98,16 @@ export default function DashboardToolbar({ onPreviewToggle, isPreview }: Dashboa
     setTimeout(() => setCopiedEmbed(false), 2000);
   }, [getEmbedCode]);
 
+  const handleExportPDF = useCallback(async () => {
+    if (!onExportPDF || pdfExporting) return;
+    setPdfExporting(true);
+    try {
+      await onExportPDF();
+    } finally {
+      setPdfExporting(false);
+    }
+  }, [onExportPDF, pdfExporting]);
+
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/[0.06] bg-zinc-950/80 backdrop-blur-sm">
       {/* Left: Dashboard name */}
@@ -145,6 +158,23 @@ export default function DashboardToolbar({ onPreviewToggle, isPreview }: Dashboa
           {isPreview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           {isPreview ? 'Edit' : 'Preview'}
         </button>
+
+        {/* PDF export */}
+        {onExportPDF && (
+          <button
+            onClick={handleExportPDF}
+            disabled={pdfExporting}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg hover:bg-white/5 text-white/60 transition-colors disabled:opacity-40"
+            title="Download PDF"
+          >
+            {pdfExporting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5" />
+            )}
+            {pdfExporting ? 'Exporting...' : 'PDF'}
+          </button>
+        )}
 
         {/* Share button */}
         <div className="relative">

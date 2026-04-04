@@ -72,9 +72,9 @@ export async function POST(req: Request) {
         description: description || '',
         property_id: propertyId,
         site_url: siteUrl || '',
-        widgets: widgets || [],
-        grid_layouts: gridLayouts || { lg: [], md: [], sm: [] },
-        theme: theme || {},
+        widgets: JSON.stringify(widgets || []),
+        grid_layouts: JSON.stringify(gridLayouts || { lg: [], md: [], sm: [] }),
+        theme: JSON.stringify(theme || {}),
         is_template: isTemplate || false,
       }),
     });

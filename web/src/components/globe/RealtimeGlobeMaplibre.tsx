@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getTrafficSourceIcon, normalizeTrafficSourceLabel } from '@/lib/trafficSourceUtils';
 
 // ─── Types ───
 export interface GlobeVisitor {
@@ -18,7 +17,6 @@ export interface GlobeVisitor {
     // Optional enriched fields for popup card
     city?: string;
     device?: string;
-    referrer?: string;
     page?: string;
     estValue?: string;
     confidence?: number;
@@ -505,9 +503,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const cityLabel = v.city && !v.city.startsWith('(') ? v.city : '';
             const deviceLabel = v.device || 'Desktop';
             const deviceIcon = deviceLabel.toLowerCase() === 'mobile' ? '📱' : deviceLabel.toLowerCase() === 'tablet' ? '📱' : '🖥';
-            const sourceLabel = normalizeTrafficSourceLabel(v.referrer);
-            const sourceIconType = getTrafficSourceIcon(sourceLabel);
-            const sourceIcon = sourceIconType === 'google' ? '🔍' : sourceIconType === 'x' ? '💬' : '🔗';
             const pageLabel = v.page || '/';
             const estValue = v.estValue || `$${(v.warmth * 3.5).toFixed(2)}`;
             const confidence = v.confidence ?? Math.round(50 + v.warmth * 40);
@@ -544,10 +539,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
                     <!-- Stats rows -->
                     <div style="padding:8px 16px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:11px;color:#71717a;">Source</span>
-                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${sourceIcon} ${sourceLabel}</span>
-                        </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
                             <span style="font-size:11px;color:#71717a;">Current URL</span>
                             <span style="font-size:11px;font-weight:500;color:#d4d4d8;font-family:ui-monospace,monospace;background:rgba(255,255,255,0.04);padding:1px 6px;border-radius:4px;">${pageLabel.length > 20 ? pageLabel.slice(0, 20) + '…' : pageLabel}</span>

@@ -7,13 +7,12 @@ import { useRealtimeData } from '@/lib/useDashboardData';
 import { useAnalyticsContext } from '../layout';
 import {
     Loader2, Monitor, Smartphone, Tablet, Eye, X as XIcon,
-    Share2, Music, History, Maximize2, Link2, ExternalLink, AlertTriangle, RotateCcw, Navigation
+    Share2, Music, History, Maximize2, ExternalLink, AlertTriangle, RotateCcw, Navigation
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { COUNTRY_COORDS, CITY_COORDS } from '@/components/analytics/RealtimeGlobe';
 import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
-import { buildTrafficSourceBreakdown } from '@/lib/trafficSourceUtils';
 
 // ─── DiceBear avatar URL (matching globe markers) ───
 function getAvatarUrl(seed: string): string {
@@ -125,12 +124,6 @@ export default function RealtimePage() {
     const byDevice: any[] = Array.isArray(realtimeData?.byDevice) ? realtimeData.byDevice : [];
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
 
-    // ─── Source breakdown (same-day GA4 source data) ───
-    const sourceBreakdown = useMemo(() => {
-        const bySource: any[] = Array.isArray(realtimeData?.byReferrer) ? realtimeData.byReferrer : [];
-        return buildTrafficSourceBreakdown(bySource, activeUsers);
-    }, [realtimeData?.byReferrer, activeUsers]);
-
     // ─── Activity feed with predictions ───
     const activityFeed = useMemo<ActivityItem[]>(() => {
         // Track duplicate city+country to match globe naming
@@ -189,12 +182,10 @@ export default function RealtimePage() {
             const hash = hashStr(seed);
             const device = String(byDevice[hash % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
             const page = String(byPage[hash % Math.max(byPage.length, 1)]?.page ?? '/');
-            const source = sourceBreakdown[hash % Math.max(sourceBreakdown.length, 1)];
-            const referrer = source?.label ?? 'Unknown source';
             const warmth = predictWarmth(seed, device, idx);
             const confidence = Math.round(50 + warmth * 40 + (hash % 10));
             const estVal = `$${(warmth * 3.5 + (hash % 100) / 100).toFixed(2)}`;
-            return { device, page, referrer, warmth, confidence, estValue: estVal };
+            return { device, page, warmth, confidence, estValue: estVal };
         };
 
         const sortedCities = [...byCity].sort((a: any, b: any) => {
@@ -303,7 +294,7 @@ export default function RealtimePage() {
         });
 
         return visitors;
-    }, [byCity, byCountry, byDevice, byPage, sourceBreakdown]);
+    }, [byCity, byCountry, byDevice, byPage]);
 
     // ─── Estimated total value ───
     const estTotalValue = useMemo(() => {
@@ -437,29 +428,8 @@ export default function RealtimePage() {
 
                     <div className="h-px bg-white/[0.05]" />
 
-                    {/* ── Stats rows: Sources / Countries / Devices ── */}
+                    {/* ── Stats rows: Countries / Devices ── */}
                     <div className="px-4 py-2.5 space-y-2">
-                        {/* Sources */}
-                        <div className="flex items-start gap-3">
-                            <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Sources</span>
-                            <div className="flex flex-wrap gap-1">
-                                {sourceBreakdown.map((ref) => (
-                                    <div key={ref.label} className="flex items-center gap-1 text-[12px]">
-                                        {ref.icon === 'link' && <Link2 className="w-3 h-3 text-zinc-400" />}
-                                        {ref.icon === 'google' && (
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4" /><text x="12" y="16" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">G</text></svg>
-                                        )}
-                                        {ref.icon === 'x' && (
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#000"/><text x="12" y="17" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">X</text></svg>
-                                        )}
-                                        {ref.icon === 'referral' && <ExternalLink className="w-3 h-3 text-zinc-400" />}
-                                        <span className="text-zinc-300">{ref.label}</span>
-                                        <span className="text-zinc-500">({ref.count})</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
                         {/* Countries */}
                         <div className="flex items-start gap-3">
                             <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Countries</span>

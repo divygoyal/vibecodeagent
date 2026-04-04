@@ -6,14 +6,13 @@ import { motion } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import {
     Share2, Music, History, Maximize2, Navigation, Monitor, Smartphone, Tablet,
-    Link2, ExternalLink, Copy, Check, Code2, Zap, Globe,
+    ExternalLink, Copy, Check, Code2, Zap, Globe,
     ChevronRight, ChevronUp, ChevronDown, BookOpen, Server, Palette, DollarSign, Shield, AlertTriangle
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 import { useRealtimeData, useContainerStatus, usePropertyList } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
-import { buildTrafficSourceBreakdown } from '@/lib/trafficSourceUtils';
 import {
     ADJECTIVES, ANIMALS, AVATAR_COLORS, COUNTRY_COORDS, CITY_COORDS,
     hashStr, predictWarmth, getWarmthDot, makeName,
@@ -321,12 +320,6 @@ export default function GlobeApiPage() {
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
     const hasRealData = hasGoogleConnection && !!realtimeData && activeUsers > 0;
 
-    // ─── Source breakdown (same-day GA4 source data) ───
-    const sourceBreakdown = useMemo(() => {
-        const bySource: any[] = Array.isArray(realtimeData?.byReferrer) ? realtimeData.byReferrer : [];
-        return buildTrafficSourceBreakdown(bySource, activeUsers);
-    }, [realtimeData?.byReferrer, activeUsers]);
-
     // ─── Globe visitors from real data ───
     const realGlobeVisitors = useMemo<GlobeVisitor[]>(() => {
         if (!hasRealData) return [];
@@ -515,33 +508,6 @@ export default function GlobeApiPage() {
 
                         {/* Stats rows */}
                         <div className="space-y-2">
-                            {/* Sources */}
-                            <div className="flex items-start gap-3">
-                                <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Sources</span>
-                                <div className="flex flex-wrap gap-1">
-                                    {hasRealData ? sourceBreakdown.map((ref) => (
-                                        <div key={ref.label} className="flex items-center gap-1 text-[12px]">
-                                            {ref.icon === 'link' && <Link2 className="w-3 h-3 text-zinc-400" />}
-                                            {ref.icon === 'google' && (
-                                                <svg className="w-3 h-3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4" /><text x="12" y="16" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">G</text></svg>
-                                            )}
-                                            {ref.icon === 'x' && (
-                                                <svg className="w-3 h-3" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#000"/><text x="12" y="17" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">X</text></svg>
-                                            )}
-                                            {ref.icon === 'referral' && <ExternalLink className="w-3 h-3 text-zinc-400" />}
-                                            <span className="text-zinc-300">{ref.label}</span>
-                                            <span className="text-zinc-500">({ref.count})</span>
-                                        </div>
-                                    )) : (
-                                        <div className="flex items-center gap-1 text-[12px]">
-                                            <Link2 className="w-3 h-3 text-zinc-400" />
-                                            <span className="text-zinc-300">Direct</span>
-                                            <span className="text-zinc-500">({displayActiveUsers})</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
                             {/* Countries */}
                             <div className="flex items-start gap-3">
                                 <span className="text-[12px] text-zinc-500 w-[68px] flex-shrink-0 pt-0.5">Countries</span>

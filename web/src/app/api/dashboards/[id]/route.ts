@@ -66,17 +66,21 @@ export async function PUT(
     const body = await req.json();
     const userId = session.user.id;
 
-    const res = await fetch(`${ADMIN_API_URL}/api/custom-dashboards/${id}`, {
+    // Build snake_case payload, JSON-stringify nested objects for admin API
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload: Record<string, any> = {};
+    if (body.name !== undefined) payload.name = body.name;
+    if (body.description !== undefined) payload.description = body.description;
+    if (body.widgets !== undefined) payload.widgets = typeof body.widgets === 'string' ? body.widgets : JSON.stringify(body.widgets);
+    if (body.gridLayouts !== undefined) payload.grid_layouts = typeof body.gridLayouts === 'string' ? body.gridLayouts : JSON.stringify(body.gridLayouts);
+    if (body.theme !== undefined) payload.theme = typeof body.theme === 'string' ? body.theme : JSON.stringify(body.theme);
+    if (body.isPublic !== undefined) payload.is_public = body.isPublic;
+    if (body.embedEnabled !== undefined) payload.embed_enabled = body.embedEnabled;
+
+    const res = await fetch(`${ADMIN_API_URL}/api/custom-dashboards/${id}?user_identifier=${userId}`, {
       method: 'PUT',
       headers: { 'X-API-Key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_identifier: userId,
-        ...body,
-        // Map camelCase to snake_case where needed
-        grid_layouts: body.gridLayouts,
-        is_public: body.isPublic,
-        embed_enabled: body.embedEnabled,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

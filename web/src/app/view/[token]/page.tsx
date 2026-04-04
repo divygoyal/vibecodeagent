@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, use, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard, Calendar, RefreshCw, AlertCircle, Clock, Eye,
+  FileDown, Loader2,
 } from 'lucide-react';
 import type { DashboardLayout, DateRange } from '@/types/dashboard';
 import { getThemeCSS } from '@/lib/dashboardBuilder';
 import { usePublicWidgetData } from '@/lib/useWidgetData';
+import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
 
 // ── Constants ──
@@ -33,6 +35,8 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
+  const [pdfExporting, setPdfExporting] = useState(false);
+  const dashboardContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch dashboard config
   useEffect(() => {
@@ -79,6 +83,29 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
       return null;
     }
   }, [fetchedAt]);
+
+  // PDF export handler
+  const handleExportPDF = useCallback(async () => {
+    const el = dashboardContainerRef.current;
+    if (!el || !dashboard || pdfExporting) return;
+    setPdfExporting(true);
+    const rangeLabels: Record<DateRange, string> = {
+      '7d': 'Last 7 days',
+      '14d': 'Last 14 days',
+      '30d': 'Last 30 days',
+      '90d': 'Last 90 days',
+    };
+    try {
+      await exportDashboardToPDF(el, {
+        dashboardName: dashboard.name,
+        dateRangeLabel: rangeLabels[dateRange],
+        companyName: dashboard.theme.companyName,
+        backgroundColor: dashboard.theme.backgroundColor,
+      });
+    } finally {
+      setPdfExporting(false);
+    }
+  }, [dashboard, dateRange, pdfExporting]);
 
   // SEO meta tags via document.title
   useEffect(() => {
@@ -158,6 +185,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
   // ── Full public view ──
   return (
     <div
+      ref={dashboardContainerRef}
       className="min-h-screen"
       style={{ ...themeCSS, backgroundColor: 'var(--db-bg)', fontFamily: 'var(--db-font)' } as React.CSSProperties}
     >
@@ -186,8 +214,8 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
           <p className="text-sm text-[var(--db-text)]/50 mt-1">{dashboard.description}</p>
         )}
 
-        {/* Controls bar */}
-        <div className="flex items-center justify-between mt-4 mb-2">
+        {/* Controls bar (hidden in PDF export) */}
+        <div className="flex items-center justify-between mt-4 mb-2" data-pdf-ignore="true">
           <div className="flex items-center gap-3">
             {/* Date range picker */}
             <div className="flex items-center gap-1.5">
@@ -241,8 +269,25 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
               disabled={dataLoading}
               className="p-1.5 rounded-lg hover:bg-[var(--db-text)]/5 transition-colors disabled:opacity-30"
               title="Refresh data"
+              data-pdf-ignore="true"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[var(--db-text)]/40 ${dataLoading ? 'animate-spin' : ''}`} />
+            </button>
+
+            {/* PDF download */}
+            <button
+              onClick={handleExportPDF}
+              disabled={pdfExporting}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--db-text)]/5 text-[var(--db-text)]/40 hover:text-[var(--db-text)]/60 transition-colors disabled:opacity-40"
+              title="Download PDF"
+              data-pdf-ignore="true"
+            >
+              {pdfExporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileDown className="w-3.5 h-3.5" />
+              )}
+              <span className="text-[10px] font-medium">{pdfExporting ? 'Exporting...' : 'PDF'}</span>
             </button>
           </div>
         </div>

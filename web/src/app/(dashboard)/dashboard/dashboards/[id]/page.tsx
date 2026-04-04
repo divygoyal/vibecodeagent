@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Palette, Layers, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import type { DashboardLayout, GridLayouts, LayoutItem, DateRange } from '@/types/dashboard';
 import { getThemeCSS } from '@/lib/dashboardBuilder';
 import { useDashboardBuilderStore } from '@/stores/dashboardBuilderStore';
 import { useWidgetData } from '@/lib/useWidgetData';
+import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
 import DashboardToolbar from '@/components/dashboard-builder/DashboardToolbar';
 import WidgetPalette from '@/components/dashboard-builder/WidgetPalette';
@@ -32,7 +33,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   const {
     loadDashboard, resetEditor,
-    widgets, gridLayouts, theme, selectedWidgetId,
+    name, widgets, gridLayouts, theme, selectedWidgetId,
     onLayoutChange, dashboardId,
   } = useDashboardBuilderStore();
 
@@ -41,6 +42,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const [isPreview, setIsPreview] = useState(false);
   const [sidePanel, setSidePanel] = useState<SidePanel>('widgets');
   const [dateRange, setDateRange] = useState<DateRange>('30d');
+  const gridContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch dashboard config
   useEffect(() => {
@@ -112,6 +114,23 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     [onLayoutChange],
   );
 
+  const handleExportPDF = useCallback(async () => {
+    const el = gridContainerRef.current;
+    if (!el) return;
+    const rangeLabels: Record<DateRange, string> = {
+      '7d': 'Last 7 days',
+      '14d': 'Last 14 days',
+      '30d': 'Last 30 days',
+      '90d': 'Last 90 days',
+    };
+    await exportDashboardToPDF(el, {
+      dashboardName: name,
+      dateRangeLabel: rangeLabels[dateRange],
+      companyName: theme.companyName,
+      backgroundColor: theme.backgroundColor,
+    });
+  }, [name, dateRange, theme.companyName, theme.backgroundColor]);
+
   const themeCSS = getThemeCSS(theme);
 
   if (loading) {
@@ -142,6 +161,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       <DashboardToolbar
         isPreview={isPreview}
         onPreviewToggle={() => setIsPreview(!isPreview)}
+        onExportPDF={handleExportPDF}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -190,6 +210,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
         {/* Main grid area */}
         <div
+          ref={gridContainerRef}
           className="flex-1 overflow-auto p-6"
           style={{ backgroundColor: 'var(--db-bg)', fontFamily: 'var(--db-font)' }}
           onClick={() => {
@@ -218,8 +239,8 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          {/* Date range selector + data status bar */}
-          <div className="flex items-center justify-between mb-4">
+          {/* Date range selector + data status bar (hidden in PDF) */}
+          <div className="flex items-center justify-between mb-4" data-pdf-ignore="true">
             <div className="flex items-center gap-2">
               <Calendar className="w-3.5 h-3.5 text-[var(--db-text)]/40" />
               <div className="flex items-center bg-white/5 rounded-lg p-0.5">
