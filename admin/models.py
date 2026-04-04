@@ -180,6 +180,35 @@ class Annotation(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class CustomDashboard(Base):
+    """User-created customizable dashboards with drag-and-drop layout"""
+    __tablename__ = "custom_dashboards"
+
+    id = Column(String(36), primary_key=True)  # UUID
+    user_id = Column(Integer, nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    property_id = Column(String(100), nullable=False)
+    site_url = Column(String(500))
+
+    # Layout data (JSON)
+    widgets = Column(Text, nullable=False, default='[]')        # JSON: WidgetConfig[]
+    grid_layouts = Column(Text, nullable=False, default='{"lg":[],"md":[],"sm":[]}')
+    theme = Column(Text, nullable=False, default='{}')           # JSON: DashboardTheme
+
+    # Sharing
+    is_public = Column(Boolean, default=False)
+    share_token = Column(String(64), unique=True, nullable=True, index=True)
+    embed_enabled = Column(Boolean, default=False)
+
+    # Metadata
+    is_template = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    views = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class LeaderboardEntry(Base):
     """Public leaderboard entries — opt-in verified traffic sharing"""
     __tablename__ = "leaderboard_entries"

@@ -21,7 +21,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SharedDashboard, LeaderboardEntry, Annotation
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SharedDashboard, LeaderboardEntry, Annotation, CustomDashboard
 from docker_manager import docker_manager
 
 
@@ -2300,6 +2300,356 @@ async def delete_annotation(
     await db.delete(annotation)
     await db.commit()
     return {"success": True, "deleted_id": annotation_id}
+
+
+# ============= Custom Dashboards (Dashboard Builder) =============
+
+class CustomDashboardCreate(BaseModel):
+    user_identifier: str
+    name: str
+    description: Optional[str] = None
+    property_id: str
+    site_url: Optional[str] = None
+    widgets: Optional[str] = "[]"         # JSON string
+    grid_layouts: Optional[str] = '{"lg":[],"md":[],"sm":[]}'
+    theme: Optional[str] = "{}"
+
+class CustomDashboardUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    widgets: Optional[str] = None
+    grid_layouts: Optional[str] = None
+    theme: Optional[str] = None
+    is_public: Optional[bool] = None
+    embed_enabled: Optional[bool] = None
+
+
+def _dashboard_to_dict(d, user_identifier: str = None):
+    """Convert a CustomDashboard ORM object to camelCase dict."""
+    return {
+        "id": d.id,
+        "userId": user_identifier or str(d.user_id),
+        "name": d.name,
+        "description": d.description,
+        "propertyId": d.property_id,
+        "siteUrl": d.site_url,
+        "widgets": json.loads(d.widgets) if d.widgets else [],
+        "gridLayouts": json.loads(d.grid_layouts) if d.grid_layouts else {"lg": [], "md": [], "sm": []},
+        "theme": json.loads(d.theme) if d.theme else {},
+        "isPublic": bool(d.is_public),
+        "shareToken": d.share_token,
+        "embedEnabled": bool(d.embed_enabled),
+        "isTemplate": bool(d.is_template),
+        "views": d.views or 0,
+        "createdAt": d.created_at.isoformat() if d.created_at else None,
+        "updatedAt": d.updated_at.isoformat() if d.updated_at else None,
+    }
+
+
+@app.post("/api/custom-dashboards")
+async def create_custom_dashboard(
+    data: CustomDashboardCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Create a new custom dashboard."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    import uuid
+    dashboard_id = str(uuid.uuid4())
+
+    dashboard = CustomDashboard(
+        id=dashboard_id,
+        user_id=user.id,
+        name=data.name,
+        description=data.description,
+        property_id=data.property_id,
+        site_url=data.site_url or "",
+        widgets=data.widgets or "[]",
+        grid_layouts=data.grid_layouts or '{"lg":[],"md":[],"sm":[]}',
+        theme=data.theme or "{}",
+    )
+    db.add(dashboard)
+    await db.commit()
+    await db.refresh(dashboard)
+
+    return _dashboard_to_dict(dashboard, data.user_identifier)
+
+
+@app.get("/api/custom-dashboards")
+async def list_custom_dashboards(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List all active custom dashboards for a user."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"dashboards": []}
+
+    result = await db.execute(
+        select(CustomDashboard)
+        .where(CustomDashboard.user_id == user.id, CustomDashboard.is_active == True)
+        .order_by(CustomDashboard.updated_at.desc())
+    )
+    dashboards = result.scalars().all()
+
+    return {
+        "dashboards": [
+            {
+                "id": d.id,
+                "name": d.name,
+                "description": d.description,
+                "propertyId": d.property_id,
+                "widgetCount": len(json.loads(d.widgets)) if d.widgets else 0,
+                "isPublic": bool(d.is_public),
+                "shareToken": d.share_token,
+                "views": d.views or 0,
+                "createdAt": d.created_at.isoformat() if d.created_at else None,
+                "updatedAt": d.updated_at.isoformat() if d.updated_at else None,
+            }
+            for d in dashboards
+        ]
+    }
+
+
+@app.get("/api/custom-dashboards/{dashboard_id}")
+async def get_custom_dashboard(
+    dashboard_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Get a custom dashboard by ID."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.id == dashboard_id,
+            CustomDashboard.user_id == user.id,
+            CustomDashboard.is_active == True,
+        )
+    )
+    dashboard = result.scalar_one_or_none()
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    return _dashboard_to_dict(dashboard, user_identifier)
+
+
+@app.put("/api/custom-dashboards/{dashboard_id}")
+async def update_custom_dashboard(
+    dashboard_id: str,
+    data: CustomDashboardUpdate,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Update a custom dashboard."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.id == dashboard_id,
+            CustomDashboard.user_id == user.id,
+            CustomDashboard.is_active == True,
+        )
+    )
+    dashboard = result.scalar_one_or_none()
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    if data.name is not None:
+        dashboard.name = data.name
+    if data.description is not None:
+        dashboard.description = data.description
+    if data.widgets is not None:
+        dashboard.widgets = data.widgets
+    if data.grid_layouts is not None:
+        dashboard.grid_layouts = data.grid_layouts
+    if data.theme is not None:
+        dashboard.theme = data.theme
+    if data.is_public is not None:
+        dashboard.is_public = data.is_public
+    if data.embed_enabled is not None:
+        dashboard.embed_enabled = data.embed_enabled
+    dashboard.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(dashboard)
+
+    return _dashboard_to_dict(dashboard, user_identifier)
+
+
+@app.delete("/api/custom-dashboards/{dashboard_id}")
+async def delete_custom_dashboard(
+    dashboard_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Soft-delete a custom dashboard."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.id == dashboard_id,
+            CustomDashboard.user_id == user.id,
+        )
+    )
+    dashboard = result.scalar_one_or_none()
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    dashboard.is_active = False
+    await db.commit()
+    return {"deleted": True, "id": dashboard_id}
+
+
+@app.post("/api/custom-dashboards/{dashboard_id}/share")
+async def share_custom_dashboard(
+    dashboard_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Generate a share token for a custom dashboard."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.id == dashboard_id,
+            CustomDashboard.user_id == user.id,
+            CustomDashboard.is_active == True,
+        )
+    )
+    dashboard = result.scalar_one_or_none()
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    if not dashboard.share_token:
+        dashboard.share_token = secrets.token_hex(16)
+    dashboard.is_public = True
+    await db.commit()
+    await db.refresh(dashboard)
+
+    return {"shareToken": dashboard.share_token, "id": dashboard.id}
+
+
+@app.delete("/api/custom-dashboards/{dashboard_id}/share")
+async def unshare_custom_dashboard(
+    dashboard_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Revoke sharing for a custom dashboard."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.id == dashboard_id,
+            CustomDashboard.user_id == user.id,
+        )
+    )
+    dashboard = result.scalar_one_or_none()
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    dashboard.share_token = None
+    dashboard.is_public = False
+    await db.commit()
+    return {"unshared": True, "id": dashboard_id}
+
+
+@app.post("/api/custom-dashboards/{dashboard_id}/duplicate")
+async def duplicate_custom_dashboard(
+    dashboard_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Clone a custom dashboard."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.id == dashboard_id,
+            CustomDashboard.user_id == user.id,
+            CustomDashboard.is_active == True,
+        )
+    )
+    original = result.scalar_one_or_none()
+    if not original:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    import uuid
+    new_id = str(uuid.uuid4())
+
+    clone = CustomDashboard(
+        id=new_id,
+        user_id=user.id,
+        name=f"{original.name} (copy)",
+        description=original.description,
+        property_id=original.property_id,
+        site_url=original.site_url,
+        widgets=original.widgets,
+        grid_layouts=original.grid_layouts,
+        theme=original.theme,
+    )
+    db.add(clone)
+    await db.commit()
+    await db.refresh(clone)
+
+    return _dashboard_to_dict(clone, user_identifier)
+
+
+@app.get("/api/custom-dashboards/public/{token}")
+async def get_public_custom_dashboard(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint: get a shared custom dashboard by share token. NO auth required."""
+    result = await db.execute(
+        select(CustomDashboard).where(
+            CustomDashboard.share_token == token,
+            CustomDashboard.is_public == True,
+            CustomDashboard.is_active == True,
+        )
+    )
+    dashboard = result.scalar_one_or_none()
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    # Increment views
+    dashboard.views = (dashboard.views or 0) + 1
+    await db.commit()
+
+    # Resolve owner identifier for Google token lookup
+    user_result = await db.execute(select(User).where(User.id == dashboard.user_id))
+    owner = user_result.scalar_one_or_none()
+    user_identifier = None
+    if owner:
+        user_identifier = owner.github_id or owner.email
+
+    return {
+        **_dashboard_to_dict(dashboard, user_identifier),
+        "ownerIdentifier": user_identifier,
+    }
 
 
 # ============= Health Check =============
