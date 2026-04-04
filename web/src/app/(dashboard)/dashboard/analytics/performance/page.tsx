@@ -12,6 +12,9 @@ import {
     Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useAnalyticsContext } from '../layout';
+import { useAnnotationStore, type ChartAnnotation } from '@/stores/annotationStore';
+import { getAnnotationLines, AddAnnotationButton, ToggleAnnotationsButton } from '@/components/ChartAnnotations';
+import AnnotationModal from '@/components/AnnotationModal';
 
 // ─── Types ───
 
@@ -216,6 +219,25 @@ export default function PerformancePage() {
     const [sortKey, setSortKey] = useState<'page' | 'score'>('score');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
+    // ─── Annotations ───
+    const { annotations, fetchAnnotations, showAnnotations, toggleAnnotations, deleteAnnotation } = useAnnotationStore();
+    const [annotationModal, setAnnotationModal] = useState<{ open: boolean; annotation?: ChartAnnotation | null; defaultDate?: string }>({ open: false });
+
+    useEffect(() => {
+        fetchAnnotations(selectedProperty);
+    }, [selectedProperty, fetchAnnotations]);
+
+    const handleEditAnnotation = (annotation: ChartAnnotation) => {
+        setAnnotationModal({ open: true, annotation });
+    };
+    const handleDeleteAnnotation = async (id: number) => {
+        await deleteAnnotation(id);
+    };
+    const handleAnnotationModalClose = () => {
+        setAnnotationModal({ open: false });
+        fetchAnnotations(selectedProperty);
+    };
+
     useEffect(() => {
         if (!selectedProperty) return;
         async function fetchData() {
@@ -386,7 +408,13 @@ export default function PerformancePage() {
                         <h3 className="text-sm font-bold text-white">Web Vitals Trend</h3>
                         <p className="text-[11px] text-zinc-600 mt-0.5">Last 30 days</p>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <ToggleAnnotationsButton
+                            show={showAnnotations}
+                            count={annotations.length}
+                            onClick={toggleAnnotations}
+                        />
+                        <AddAnnotationButton onClick={() => setAnnotationModal({ open: true })} />
                         {metrics.map(([key, cfg]) => {
                             const isActive = activeMetrics.includes(key);
                             return (
@@ -443,6 +471,12 @@ export default function PerformancePage() {
                                     />
                                 ) : null
                             )}
+                            {showAnnotations && getAnnotationLines({
+                                annotations,
+                                chartHeight: 300,
+                                onEdit: handleEditAnnotation,
+                                onDelete: handleDeleteAnnotation,
+                            })}
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -634,6 +668,14 @@ export default function PerformancePage() {
                     ))}
                 </div>
             </motion.div>
+
+            <AnnotationModal
+                open={annotationModal.open}
+                onClose={handleAnnotationModalClose}
+                annotation={annotationModal.annotation}
+                defaultDate={annotationModal.defaultDate}
+                propertyId={selectedProperty}
+            />
         </div>
     );
 }

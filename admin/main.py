@@ -21,7 +21,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SharedDashboard, LeaderboardEntry
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SharedDashboard, LeaderboardEntry, Annotation
 from docker_manager import docker_manager
 
 
@@ -2115,6 +2115,191 @@ async def update_leaderboard_stats(
     entry.last_refreshed = datetime.utcnow()
     await db.commit()
     return {"success": True}
+
+
+# ============= Annotations =============
+
+VALID_ANNOTATION_CATEGORIES = {"marketing", "technical", "product", "algorithm_update", "custom"}
+
+class AnnotationCreate(BaseModel):
+    user_identifier: str
+    date: str  # YYYY-MM-DD
+    category: str = "custom"
+    title: str
+    description: Optional[str] = None
+    color: Optional[str] = None
+    url: Optional[str] = None
+    source: str = "manual"
+    property_id: Optional[str] = None
+
+class AnnotationUpdate(BaseModel):
+    date: Optional[str] = None
+    category: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+    url: Optional[str] = None
+    property_id: Optional[str] = None
+
+
+@app.post("/api/annotations")
+async def create_annotation(
+    data: AnnotationCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Create a chart annotation."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if data.category not in VALID_ANNOTATION_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Invalid category. Options: {list(VALID_ANNOTATION_CATEGORIES)}")
+
+    annotation = Annotation(
+        user_id=user.id,
+        date=data.date[:10],
+        category=data.category,
+        title=data.title[:200],
+        description=data.description[:2000] if data.description else None,
+        color=data.color,
+        url=data.url[:500] if data.url else None,
+        source=data.source,
+        property_id=data.property_id,
+    )
+    db.add(annotation)
+    await db.commit()
+    await db.refresh(annotation)
+
+    return {
+        "id": annotation.id,
+        "date": annotation.date,
+        "category": annotation.category,
+        "title": annotation.title,
+        "description": annotation.description,
+        "color": annotation.color,
+        "url": annotation.url,
+        "source": annotation.source,
+        "property_id": annotation.property_id,
+        "created_at": annotation.created_at.isoformat() if annotation.created_at else None,
+    }
+
+
+@app.get("/api/annotations")
+async def list_annotations(
+    user_identifier: str,
+    property_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List annotations for a user, optionally filtered by property and date range."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return []
+
+    query = select(Annotation).where(Annotation.user_id == user.id)
+
+    if property_id:
+        # Return annotations scoped to this property OR global (null property_id)
+        query = query.where(
+            (Annotation.property_id == property_id) | (Annotation.property_id.is_(None))
+        )
+
+    if start_date:
+        query = query.where(Annotation.date >= start_date)
+    if end_date:
+        query = query.where(Annotation.date <= end_date)
+
+    query = query.order_by(Annotation.date.desc())
+
+    result = await db.execute(query)
+    annotations = result.scalars().all()
+
+    return [
+        {
+            "id": a.id,
+            "date": a.date,
+            "category": a.category,
+            "title": a.title,
+            "description": a.description,
+            "color": a.color,
+            "url": a.url,
+            "source": a.source,
+            "property_id": a.property_id,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+        }
+        for a in annotations
+    ]
+
+
+@app.put("/api/annotations/{annotation_id}")
+async def update_annotation(
+    annotation_id: int,
+    data: AnnotationUpdate,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Update a chart annotation (only the owner can update)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(Annotation).where(Annotation.id == annotation_id, Annotation.user_id == user.id)
+    )
+    annotation = result.scalar_one_or_none()
+    if not annotation:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "category" in update_data and update_data["category"] not in VALID_ANNOTATION_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Invalid category. Options: {list(VALID_ANNOTATION_CATEGORIES)}")
+
+    for key, value in update_data.items():
+        setattr(annotation, key, value)
+    annotation.updated_at = datetime.utcnow()
+
+    await db.commit()
+    return {
+        "id": annotation.id,
+        "date": annotation.date,
+        "category": annotation.category,
+        "title": annotation.title,
+        "description": annotation.description,
+        "color": annotation.color,
+        "url": annotation.url,
+        "source": annotation.source,
+        "property_id": annotation.property_id,
+        "updated_at": annotation.updated_at.isoformat() if annotation.updated_at else None,
+    }
+
+
+@app.delete("/api/annotations/{annotation_id}")
+async def delete_annotation(
+    annotation_id: int,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Delete a chart annotation (only the owner can delete)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(Annotation).where(Annotation.id == annotation_id, Annotation.user_id == user.id)
+    )
+    annotation = result.scalar_one_or_none()
+    if not annotation:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+
+    await db.delete(annotation)
+    await db.commit()
+    return {"success": True, "deleted_id": annotation_id}
 
 
 # ============= Health Check =============

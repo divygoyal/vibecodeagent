@@ -162,6 +162,24 @@ class ContactQuery(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Annotation(Base):
+    """User annotations on analytics charts (product launches, campaigns, algorithm updates, etc.)"""
+    __tablename__ = "annotations"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    date = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    category = Column(String(30), nullable=False, default="custom")  # marketing, technical, product, algorithm_update, custom
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    color = Column(String(7))  # hex color override, e.g. #34d399
+    url = Column(String(500))  # optional reference link
+    source = Column(String(30), default="manual")  # manual, auto (for algorithm update feed)
+    property_id = Column(String(100))  # GA4 property scope (null = all properties)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class LeaderboardEntry(Base):
     """Public leaderboard entries — opt-in verified traffic sharing"""
     __tablename__ = "leaderboard_entries"

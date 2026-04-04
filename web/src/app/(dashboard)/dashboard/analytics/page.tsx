@@ -20,6 +20,9 @@ import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { SkeletonDashboard } from '@/components/analytics/SkeletonLoader';
 import DrilldownDrawer from '@/components/analytics/DrilldownDrawer';
 import { useFilterStore, type DashboardFilters } from '@/stores/analyticsFilterStore';
+import { useAnnotationStore, type ChartAnnotation } from '@/stores/annotationStore';
+import { getAnnotationLines, AddAnnotationButton, ToggleAnnotationsButton } from '@/components/ChartAnnotations';
+import AnnotationModal from '@/components/AnnotationModal';
 
 const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr: false });
 
@@ -300,6 +303,26 @@ export default function AnalyticsPage() {
     const [bucket, setBucket] = useState<TimeBucket>('day');
     const [showComparison, setShowComparison] = useState(true);
 
+    // ─── Annotations ───
+    const { annotations, fetchAnnotations, showAnnotations, toggleAnnotations, deleteAnnotation } = useAnnotationStore();
+    const [annotationModal, setAnnotationModal] = useState<{ open: boolean; annotation?: ChartAnnotation | null; defaultDate?: string }>({ open: false });
+
+    useEffect(() => {
+        fetchAnnotations(selectedProperty);
+    }, [selectedProperty, fetchAnnotations]);
+
+    const handleEditAnnotation = (annotation: ChartAnnotation) => {
+        setAnnotationModal({ open: true, annotation });
+    };
+    const handleDeleteAnnotation = async (id: number) => {
+        await deleteAnnotation(id);
+    };
+    const handleAnnotationModalClose = () => {
+        setAnnotationModal({ open: false });
+        // Refresh annotations after create/edit
+        fetchAnnotations(selectedProperty);
+    };
+
     useEffect(() => {
         const csvHandler = () => { if (analyticsData) exportAnalyticsData(analyticsData); };
         const zipHandler = () => { if (analyticsData) exportAnalyticsZip(analyticsData); };
@@ -532,6 +555,12 @@ export default function AnalyticsPage() {
                         )}
                     </div>
                     <div className="flex items-center gap-2">
+                        <ToggleAnnotationsButton
+                            show={showAnnotations}
+                            count={annotations.length}
+                            onClick={toggleAnnotations}
+                        />
+                        <AddAnnotationButton onClick={() => setAnnotationModal({ open: true })} />
                         <button
                             onClick={() => setShowComparison(!showComparison)}
                             title={showComparison ? 'Hide previous period' : 'Show previous period'}
@@ -618,6 +647,12 @@ export default function AnalyticsPage() {
                                 strokeWidth={2}
                                 dot={false}
                             />
+                            {showAnnotations && bucket === 'day' && getAnnotationLines({
+                                annotations,
+                                chartHeight: 300,
+                                onEdit: handleEditAnnotation,
+                                onDelete: handleDeleteAnnotation,
+                            })}
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
@@ -673,6 +708,14 @@ export default function AnalyticsPage() {
             </div>
 
             <DrilldownDrawer open={!!drilldown} onClose={() => setDrilldown(null)} data={drilldown} />
+
+            <AnnotationModal
+                open={annotationModal.open}
+                onClose={handleAnnotationModalClose}
+                annotation={annotationModal.annotation}
+                defaultDate={annotationModal.defaultDate}
+                propertyId={selectedProperty}
+            />
         </div>
     );
 }
