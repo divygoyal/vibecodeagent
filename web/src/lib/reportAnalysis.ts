@@ -177,6 +177,7 @@ export interface ReportAnalysis {
     fixPrompts: FixPrompt[];
     dailySessions: Array<{ date: string; sessions: number }>;
     dailyClicks: Array<{ date: string; clicks: number }>;
+    dailyImpressions: Array<{ date: string; impressions: number }>;
     totalRevenueEstimate: number;
 }
 
@@ -770,6 +771,7 @@ export function analyzeReportData(data: ReportRawData): ReportAnalysis {
         fixPrompts,
         dailySessions: data.ga4.dailyCurrent.map(d => ({ date: d.date, sessions: d.sessions })),
         dailyClicks: data.gsc.dailyCurrent.map(d => ({ date: d.date, clicks: d.clicks })),
+        dailyImpressions: data.gsc.dailyCurrent.map(d => ({ date: d.date, impressions: d.impressions })),
         totalRevenueEstimate: Math.round(totalRevenueEstimate),
     };
 }

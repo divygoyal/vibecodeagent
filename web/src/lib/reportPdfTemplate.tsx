@@ -107,22 +107,56 @@ function Sparkline({ data, width = 90, height = 20, color = C.emerald }: { data:
     );
 }
 
-function DailyBarChart({ data, anomalyDates, width = 460, height = 70 }: { data: Array<{ date: string; sessions: number }>; anomalyDates: string[]; width?: number; height?: number }) {
+function DailyBarChart({ data, valueKey, anomalyDates, color = C.emerald, width = 460, height = 90 }: {
+    data: Array<Record<string, unknown>>;
+    valueKey: string;
+    anomalyDates?: string[];
+    color?: string;
+    width?: number;
+    height?: number;
+}) {
     if (data.length === 0) return null;
-    const max = Math.max(...data.map(d => d.sessions), 1);
-    const barWidth = Math.min(36, (width - 20) / data.length - 4);
-    const anomalySet = new Set(anomalyDates);
+    const vals = data.map(d => Number(d[valueKey]) || 0);
+    const max = Math.max(...vals, 1);
+    const yAxisW = 32;
+    const xAxisH = 14;
+    const chartW = width - yAxisW;
+    const chartH = height - xAxisH;
+    const barWidth = Math.min(28, (chartW - 10) / data.length - 3);
+    const anomalySet = new Set(anomalyDates ?? []);
+
+    const yTicks = [0, Math.round(max / 2), max];
+    const labelInterval = Math.max(1, Math.ceil(data.length / 7));
+
     return (
-        <Svg width={width} height={height + 4}>
-            <Line x1={0} y1={height} x2={width} y2={height} stroke={C.border} strokeWidth={1} />
-            {data.map((d, i) => {
-                const barH = (d.sessions / max) * (height - 8);
-                const x = i * ((width - 10) / data.length) + 8;
-                const y = height - barH;
-                const isAnomaly = anomalySet.has(d.date);
+        <Svg width={width} height={height}>
+            {/* Y-axis labels */}
+            {yTicks.map(tick => {
+                const y = chartH - (tick / max) * (chartH - 8);
                 return (
-                    <G key={d.date}>
-                        <Rect x={x} y={y} width={barWidth} height={barH} fill={isAnomaly ? C.red : C.emerald} rx={2} />
+                    <G key={`y-${tick}`}>
+                        <Text x={yAxisW - 4} y={y + 3} textAnchor="end" fill={C.textMuted} style={{ fontSize: 6 }}>{tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : String(tick)}</Text>
+                        <Line x1={yAxisW} y1={y} x2={width} y2={y} stroke={C.border} strokeWidth={0.5} strokeDasharray="2,2" />
+                    </G>
+                );
+            })}
+            {/* Baseline */}
+            <Line x1={yAxisW} y1={chartH} x2={width} y2={chartH} stroke={C.border} strokeWidth={1} />
+            {/* Bars + X-axis labels */}
+            {data.map((d, i) => {
+                const v = vals[i];
+                const barH = (v / max) * (chartH - 8);
+                const x = yAxisW + i * (chartW / data.length) + 4;
+                const y = chartH - barH;
+                const isAnomaly = anomalySet.has(String(d.date));
+                const dateStr = String(d.date ?? '');
+                const shortDate = dateStr.length >= 10 ? `${dateStr.slice(5, 7)}/${dateStr.slice(8, 10)}` : dateStr;
+                return (
+                    <G key={`bar-${i}`}>
+                        <Rect x={x} y={y} width={barWidth} height={barH} fill={isAnomaly ? C.red : color} rx={2} />
+                        {i % labelInterval === 0 && (
+                            <Text x={x + barWidth / 2} y={chartH + 10} textAnchor="middle" fill={C.textMuted} style={{ fontSize: 5 }}>{shortDate}</Text>
+                        )}
                     </G>
                 );
             })}
@@ -133,15 +167,16 @@ function DailyBarChart({ data, anomalyDates, width = 460, height = 70 }: { data:
 function HorizontalBar({ label, current, prev, maxVal, width = 300 }: { label: string; current: number; prev: number; maxVal: number; width?: number }) {
     const currentW = maxVal > 0 ? (current / maxVal) * width : 0;
     const prevW = maxVal > 0 ? (prev / maxVal) * width : 0;
+    const showPrev = prev > 0;
     return (
         <View style={{ marginBottom: 6 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
                 <Text style={{ fontSize: 7, color: C.text }}>{label}</Text>
                 <Text style={{ fontSize: 7, color: C.textMuted }}>{current.toFixed(1)}%</Text>
             </View>
-            <Svg width={width} height={12}>
-                <Rect x={0} y={0} width={prevW} height={5} fill={C.border} rx={2} />
-                <Rect x={0} y={6} width={currentW} height={5} fill={C.emerald} rx={2} />
+            <Svg width={width} height={showPrev ? 12 : 6}>
+                {showPrev && <Rect x={0} y={0} width={prevW} height={5} fill={C.border} rx={2} />}
+                <Rect x={0} y={showPrev ? 6 : 0} width={currentW} height={5} fill={C.emerald} rx={2} />
             </Svg>
         </View>
     );
@@ -184,10 +219,10 @@ function PageHeader({ siteUrl }: { siteUrl: string }) {
     );
 }
 
-function PageFooter({ pageNum }: { pageNum: number }) {
+function PageFooter() {
     return (
         <View style={s.footer} fixed>
-            <Text style={s.footerText}>Page {pageNum}</Text>
+            <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
             <Text style={s.footerText}>trafficclaw.com</Text>
         </View>
     );
@@ -262,6 +297,8 @@ function CoverPage({ siteUrl, period }: { siteUrl: string; period: ReportPeriod 
     return (
         <Page size="A4" style={[s.page, { justifyContent: 'center', alignItems: 'center' }]}>
             <View style={{ width: '100%', height: 6, backgroundColor: C.accentBar, position: 'absolute', top: 0, left: 0 }} />
+            <View style={{ width: 3, height: 120, backgroundColor: C.emerald, position: 'absolute', left: 50, top: '35%', borderRadius: 2, opacity: 0.4 }} />
+            <View style={{ width: 3, height: 80, backgroundColor: C.cyan, position: 'absolute', right: 50, top: '45%', borderRadius: 2, opacity: 0.3 }} />
             <Text style={{ fontSize: 32, fontFamily: 'Helvetica-Bold', color: C.emerald, marginBottom: 4 }}>TrafficClaw</Text>
             <Text style={{ fontSize: 11, color: C.textMuted, marginBottom: 40 }}>AI-Powered Deep Analytics Report</Text>
             <View style={{ width: 200, height: 1, backgroundColor: C.border, marginBottom: 40 }} />
@@ -269,7 +306,7 @@ function CoverPage({ siteUrl, period }: { siteUrl: string; period: ReportPeriod 
             <View style={[s.badge, s.badgeGrowing, { marginBottom: 16 }]}><Text>{periodLabel}</Text></View>
             <Text style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>{period.startDate} - {period.endDate}</Text>
             <Text style={{ fontSize: 8, color: C.textLight }}>Generated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
-            <Text style={{ fontSize: 7, color: C.textLight, marginTop: 30 }}>14-page comprehensive analysis with actionable fix prompts</Text>
+            <Text style={{ fontSize: 7, color: C.textLight, marginTop: 30 }}>Comprehensive analysis with actionable fix prompts</Text>
             <View style={{ position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 7, color: C.textLight }}>trafficclaw.com</Text>
                 <Text style={{ fontSize: 7, color: C.textLight }}>Confidential</Text>
@@ -341,7 +378,7 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
                     <Text style={{ fontSize: 7, color: C.emeraldDark, lineHeight: 1.4 }}>{prob.fix}</Text>
                 </View>
             ))}
-            <PageFooter pageNum={2} />
+            <PageFooter />
         </Page>
     );
 }
@@ -351,12 +388,13 @@ function PerformanceScorecardPage({ analysis, siteUrl, period }: ReportProps) {
     const kpi = analysis.kpis;
     const sessionData = analysis.dailySessions.map(d => d.sessions);
     const clickData = analysis.dailyClicks.map(d => d.clicks);
+    const impressionData = analysis.dailyImpressions.map(d => d.impressions);
 
     const metrics = [
         { label: 'Users', value: kpi.users.toLocaleString(), delta: kpi.usersDelta, spark: sessionData },
         { label: 'Sessions', value: kpi.sessions.toLocaleString(), delta: kpi.sessionsDelta, spark: sessionData },
         { label: 'Organic Clicks', value: kpi.clicks.toLocaleString(), delta: kpi.clicksDelta, spark: clickData },
-        { label: 'Impressions', value: kpi.impressions.toLocaleString(), delta: kpi.impressionsDelta, spark: [] },
+        { label: 'Impressions', value: kpi.impressions.toLocaleString(), delta: kpi.impressionsDelta, spark: impressionData },
         { label: 'Avg Position', value: kpi.avgPosition.toString(), delta: kpi.avgPositionDelta, invert: true, spark: [] },
         { label: 'Bounce Rate', value: `${(kpi.bounceRate * 100).toFixed(1)}%`, delta: Math.round(kpi.bounceRateDelta * 100), invert: true, spark: [] },
         { label: 'Session Duration', value: `${kpi.avgSessionDuration}s`, delta: 0, spark: [] },
@@ -381,16 +419,15 @@ function PerformanceScorecardPage({ analysis, siteUrl, period }: ReportProps) {
             {/* Session trend chart */}
             <View style={s.card}>
                 <Text style={s.cardTitle}>Daily Sessions Trend</Text>
-                <DailyBarChart data={analysis.dailySessions} anomalyDates={analysis.anomalies.map(a => a.date)} />
+                <DailyBarChart data={analysis.dailySessions as unknown as Array<Record<string, unknown>>} valueKey="sessions" anomalyDates={analysis.anomalies.map(a => a.date)} />
             </View>
 
+            {/* Clicks trend chart */}
             <View style={s.card}>
-                <Text style={s.cardTitle}>Period Summary</Text>
-                <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5 }}>
-                    Total pageviews: {kpi.pageviews.toLocaleString()} ({kpi.pageviewsDelta > 0 ? '+' : ''}{kpi.pageviewsDelta}%). New users made up {kpi.newUserRatio}% of total traffic. Average session lasted {kpi.avgSessionDuration} seconds with a {(kpi.bounceRate * 100).toFixed(1)}% bounce rate.
-                </Text>
+                <Text style={s.cardTitle}>Daily Organic Clicks Trend</Text>
+                <DailyBarChart data={analysis.dailyClicks as unknown as Array<Record<string, unknown>>} valueKey="clicks" color={C.cyan} />
             </View>
-            <PageFooter pageNum={3} />
+            <PageFooter />
         </Page>
     );
 }
@@ -440,7 +477,7 @@ function AnomalyDeepDivePage({ analysis, gemini, siteUrl }: ReportProps) {
                     );
                 })
             )}
-            <PageFooter pageNum={4} />
+            <PageFooter />
         </Page>
     );
 }
@@ -513,7 +550,7 @@ function KeywordIntelligencePage({ analysis, gemini, siteUrl }: ReportProps) {
                 )}
                 <Text style={{ fontSize: 7, color: C.textMuted, marginTop: 6, lineHeight: 1.4 }}>{gemini.keywordDecelCommentary}</Text>
             </View>
-            <PageFooter pageNum={5} />
+            <PageFooter />
         </Page>
     );
 }
@@ -569,7 +606,7 @@ function ContentDecayPage({ analysis, gemini, siteUrl }: ReportProps) {
                     <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4 }}>{fix.refreshStrategy}</Text>
                 </View>
             ))}
-            <PageFooter pageNum={6} />
+            <PageFooter />
         </Page>
     );
 }
@@ -619,7 +656,52 @@ function CannibalizationPage({ analysis, gemini, siteUrl }: ReportProps) {
                     </View>
                 ))
             )}
-            <PageFooter pageNum={7} />
+            <PageFooter />
+        </Page>
+    );
+}
+
+// Combined Content Health page — used when both decay and cannibalization are sparse
+function ContentHealthPage({ analysis, gemini, siteUrl }: ReportProps) {
+    return (
+        <Page size="A4" style={s.page}>
+            <View style={s.accentSidebar} />
+            <PageHeader siteUrl={siteUrl} />
+            <Text style={s.sectionTitle}>5. Content Health</Text>
+            <Text style={s.sectionSubtitle}>Decay analysis and cannibalization review</Text>
+
+            {/* Decay section */}
+            <View style={[s.card, { marginBottom: 8 }]}>
+                <Text style={[s.cardTitle, { color: C.emeraldDark, fontSize: 9 }]}>Content Decay</Text>
+                <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5, marginBottom: 4 }}>{gemini.decayOverview}</Text>
+                <Text style={{ fontSize: 8, color: analysis.kpis.clicks < 10 ? C.amber : C.emeraldDark }}>
+                    {analysis.kpis.clicks < 10
+                        ? `Organic data is too limited for decay analysis (${analysis.kpis.clicks} click(s), ${analysis.kpis.impressions} impressions). Building visibility is the first priority.`
+                        : 'No significant content decay detected this period.'}
+                </Text>
+            </View>
+
+            {/* Cannibalization section */}
+            <View style={[s.card, { marginBottom: 8 }]}>
+                <Text style={[s.cardTitle, { color: C.cyan, fontSize: 9 }]}>Keyword Cannibalization</Text>
+                <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5, marginBottom: 4 }}>{gemini.cannibalizationOverview}</Text>
+                <Text style={{ fontSize: 8, color: analysis.kpis.impressions < 50 ? C.amber : C.emeraldDark }}>
+                    {analysis.kpis.impressions < 50
+                        ? `Insufficient search data for cannibalization analysis (${analysis.kpis.impressions} impressions).`
+                        : 'No keyword cannibalization detected — pages are targeting distinct queries.'}
+                </Text>
+            </View>
+
+            {/* Gemini assessment for the combined page */}
+            {(gemini.criticalProblems.length > 0 || analysis.criticalAlerts.length > 0) && (
+                <View style={[s.card, { backgroundColor: C.redLight, borderLeftWidth: 3, borderLeftColor: C.red }]}>
+                    <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.red, marginBottom: 3 }}>Note</Text>
+                    <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4 }}>
+                        Although no decay or cannibalization patterns are detectable, {analysis.criticalAlerts.length} critical alert(s) were flagged in the Executive Summary. Review those before concluding content is healthy.
+                    </Text>
+                </View>
+            )}
+            <PageFooter />
         </Page>
     );
 }
@@ -639,7 +721,7 @@ function RevenueOpportunityPage({ analysis, gemini, siteUrl }: ReportProps) {
 
             <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>{gemini.opportunityOverview}</Text>
 
-            {opps.length > 0 && (
+            {opps.length > 0 ? (
                 <>
                     <View style={s.tableHeader}>
                         <Text style={[s.tableHeaderCell, { width: '28%' }]}>Keyword</Text>
@@ -665,9 +747,18 @@ function RevenueOpportunityPage({ analysis, gemini, siteUrl }: ReportProps) {
                         );
                     })}
                 </>
+            ) : (
+                <View style={[s.card, { backgroundColor: C.amberLight, borderLeftWidth: 3, borderLeftColor: C.amber }]}>
+                    <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.amber, marginBottom: 3 }}>No ranking opportunities detected</Text>
+                    <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4 }}>
+                        {analysis.kpis.impressions < 50
+                            ? `With only ${analysis.kpis.impressions} total impressions, the site has not yet built enough search visibility for keyword opportunities. Focus on publishing quality content targeting low-competition keywords.`
+                            : 'No striking-distance or CTR-fix opportunities met the threshold this period. Keep monitoring as rankings develop.'}
+                    </Text>
+                </View>
             )}
 
-            {gemini.opportunityStrategies.slice(0, 2).map((strat, i) => (
+            {gemini.opportunityStrategies.filter(st => st.keyword.length > 0).slice(0, opps.length === 0 ? 4 : 2).map((strat, i) => (
                 <View key={`strat-${i}`} style={[s.card, { marginTop: 6 }]}>
                     <Text style={[s.cardTitle, { fontSize: 9 }]}>Strategy: &quot;{strat.keyword.slice(0, 35)}&quot;</Text>
                     <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4 }}>{strat.strategy}</Text>
@@ -675,12 +766,14 @@ function RevenueOpportunityPage({ analysis, gemini, siteUrl }: ReportProps) {
                 </View>
             ))}
 
-            <View style={[s.card, { marginTop: 6, alignItems: 'center' }]}>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: C.text }}>
-                    {opps.length} opportunities = +{opps.reduce((s, o) => s + o.potentialClicks, 0).toLocaleString()} clicks/mo = ~${analysis.totalRevenueEstimate.toLocaleString()}/mo
-                </Text>
-            </View>
-            <PageFooter pageNum={8} />
+            {opps.length > 0 && (
+                <View style={[s.card, { marginTop: 6, alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: C.text }}>
+                        {opps.length} opportunities = +{opps.reduce((sum, o) => sum + o.potentialClicks, 0).toLocaleString()} clicks/mo = ~${analysis.totalRevenueEstimate.toLocaleString()}/mo
+                    </Text>
+                </View>
+            )}
+            <PageFooter />
         </Page>
     );
 }
@@ -726,7 +819,7 @@ function TopPagesPage({ analysis, gemini, siteUrl }: ReportProps) {
                     <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4 }}>{po.fixes}</Text>
                 </View>
             ))}
-            <PageFooter pageNum={9} />
+            <PageFooter />
         </Page>
     );
 }
@@ -808,7 +901,7 @@ function TrafficDNAPage({ analysis, gemini, period, siteUrl }: ReportProps) {
                 <Text style={s.cardTitle}>Analysis</Text>
                 <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5 }}>{gemini.trafficDNAInterpretation}</Text>
             </View>
-            <PageFooter pageNum={10} />
+            <PageFooter />
         </Page>
     );
 }
@@ -844,7 +937,7 @@ function FixPromptsPage({ analysis, gemini, siteUrl }: ReportProps) {
                     </View>
                 ))
             )}
-            <PageFooter pageNum={11} />
+            <PageFooter />
         </Page>
     );
 }
@@ -871,7 +964,7 @@ function FixPromptsPage2({ analysis, siteUrl }: ReportProps) {
                     <PromptBox label={p.title} text={p.prompt} />
                 </View>
             ))}
-            <PageFooter pageNum={12} />
+            <PageFooter />
         </Page>
     );
 }
@@ -921,10 +1014,10 @@ function ActionPlanPage({ analysis, gemini, period, siteUrl }: ReportProps) {
             <View style={[s.card, { backgroundColor: C.emeraldLight }]}>
                 <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.emeraldDark, marginBottom: 4 }}>Summary</Text>
                 <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5 }}>
-                    {analysis.decayPages.length} pages need content refresh. {analysis.cannibalization.length} cannibalization groups to resolve. {analysis.opportunities.length} keyword opportunities worth ~${analysis.totalRevenueEstimate}/month. {analysis.fixPrompts.length} recommended fixes generated.
+                    {gemini.actionPlanThisWeek.length} quick win(s) and {gemini.actionPlanThisMonth.length} strategic action(s) planned.{analysis.opportunities.length > 0 ? ` ${analysis.opportunities.length} keyword opportunities worth ~$${analysis.totalRevenueEstimate}/month.` : ''}{analysis.decayPages.length > 0 ? ` ${analysis.decayPages.length} pages need content refresh.` : ''}{analysis.cannibalization.length > 0 ? ` ${analysis.cannibalization.length} cannibalization groups to resolve.` : ''}{analysis.criticalAlerts.length > 0 ? ` ${analysis.criticalAlerts.length} critical alert(s) require attention.` : ''}
                 </Text>
             </View>
-            <PageFooter pageNum={13} />
+            <PageFooter />
         </Page>
     );
 }
@@ -986,7 +1079,7 @@ function MethodologyPage({ siteUrl }: ReportProps) {
                     Narrative insights are generated using Google Gemini AI, prompted with the structured analysis data. The AI provides root cause analysis, strategic recommendations, and actionable fix prompts. All AI content is grounded in your actual data.
                 </Text>
             </View>
-            <PageFooter pageNum={14} />
+            <PageFooter />
         </Page>
     );
 }
@@ -1026,6 +1119,8 @@ export interface ReportDocumentProps {
 
 export function ReportDocument({ analysis, gemini, period, siteUrl }: ReportDocumentProps) {
     const rp: ReportProps = { analysis, gemini, period, siteUrl };
+    const bothContentSparse = analysis.decayPages.length === 0 && analysis.cannibalization.length === 0;
+    const hasFixPrompts = analysis.fixPrompts.length > 0 || gemini.criticalProblems.length > 0;
 
     return (
         <Document
@@ -1038,13 +1133,19 @@ export function ReportDocument({ analysis, gemini, period, siteUrl }: ReportDocu
             <PerformanceScorecardPage {...rp} />
             <AnomalyDeepDivePage {...rp} />
             <KeywordIntelligencePage {...rp} />
-            <ContentDecayPage {...rp} />
-            <CannibalizationPage {...rp} />
+            {bothContentSparse ? (
+                <ContentHealthPage {...rp} />
+            ) : (
+                <>
+                    <ContentDecayPage {...rp} />
+                    <CannibalizationPage {...rp} />
+                </>
+            )}
             <RevenueOpportunityPage {...rp} />
             <TopPagesPage {...rp} />
             <TrafficDNAPage {...rp} />
-            <FixPromptsPage {...rp} />
-            <FixPromptsPage2 {...rp} />
+            {hasFixPrompts && <FixPromptsPage {...rp} />}
+            {hasFixPrompts && <FixPromptsPage2 {...rp} />}
             <ActionPlanPage {...rp} />
             <MethodologyPage {...rp} />
             <CTAPage />
