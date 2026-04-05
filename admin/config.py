@@ -29,9 +29,11 @@ class Settings(BaseSettings):
     # OpenClaw needs significant RAM - Node.js heap + system overhead
     MEMORY_LIMIT_FREE: str = "1536m"     # 1.5GB for free tier (768MB heap + overhead)
     MEMORY_LIMIT_STARTER: str = "2g"     # 2GB for starter
+    MEMORY_LIMIT_GROWTH: str = "3g"      # 3GB for growth
     MEMORY_LIMIT_PRO: str = "4g"         # 4GB for pro
     CPU_LIMIT_FREE: float = 0.5
     CPU_LIMIT_STARTER: float = 1.0
+    CPU_LIMIT_GROWTH: float = 1.5
     CPU_LIMIT_PRO: float = 2.0
     
     # API Keys (for shared key mode)
@@ -74,13 +76,20 @@ PLANS = {
         "cpu_limit": settings.CPU_LIMIT_STARTER,
         "max_daily_messages": 500,
         "features": ["basic_chat", "github-ghost"],
-        "price_usd": 30
+        "price_usd": 9
+    },
+    "growth": {
+        "memory_limit": settings.MEMORY_LIMIT_GROWTH,
+        "cpu_limit": settings.CPU_LIMIT_GROWTH,
+        "max_daily_messages": 2000,
+        "features": ["basic_chat", "github-ghost", "google-search-console", "google-analytics"],
+        "price_usd": 19
     },
     "pro": {
         "memory_limit": settings.MEMORY_LIMIT_PRO,
         "cpu_limit": settings.CPU_LIMIT_PRO,
         "max_daily_messages": 5000,
         "features": ["basic_chat", "github-ghost", "google-search-console", "google-analytics", "custom_rules"],
-        "price_usd": 50
+        "price_usd": 29
     }
 }

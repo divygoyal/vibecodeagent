@@ -951,6 +951,7 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
                 >
                     <option value="free">Free</option>
                     <option value="starter">Starter</option>
+                    <option value="growth">Growth</option>
                     <option value="pro">Pro</option>
                 </select>
             </td>
@@ -1144,6 +1145,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                     <select value={user.plan || 'free'} onChange={(e) => onAction('update-plan', user.github_id, { plan: e.target.value })} className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50">
                                         <option value="free">Free</option>
                                         <option value="starter">Starter</option>
+                                        <option value="growth">Growth</option>
                                         <option value="pro">Pro</option>
                                     </select>
                                     <div className="flex flex-wrap items-center gap-2">

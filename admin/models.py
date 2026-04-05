@@ -20,7 +20,7 @@ class User(Base):
     github_username = Column(String(100), nullable=True)
     
     # Subscription
-    plan = Column(String(20), default="free")  # free, starter, pro
+    plan = Column(String(20), default="free")  # free, starter, growth, pro
     subscription_start = Column(DateTime)
     subscription_end = Column(DateTime)
     

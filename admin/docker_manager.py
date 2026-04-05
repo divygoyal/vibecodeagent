@@ -674,7 +674,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             logger.warning(f"Could not chown user_dir for {user_identifier}: {e}")
         
         # Environment variables
-        heap_sizes = {"free": "768", "starter": "1536", "pro": "3584"}
+        heap_sizes = {"free": "768", "starter": "1536", "growth": "2048", "pro": "3584"}
         node_heap = heap_sizes.get(plan, "768")
         
         # Calculate enabled skills based on connections

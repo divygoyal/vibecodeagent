@@ -67,7 +67,6 @@ const sidebarGroups: SidebarGroup[] = [
     ]},
     { label: 'Analytics', items: [
         { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
-        { icon: LayoutDashboard, label: 'Dashboards', href: '/dashboard/dashboards' },
         { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
     { label: 'SEO & Growth', items: [
