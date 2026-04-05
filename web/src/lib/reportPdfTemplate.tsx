@@ -273,7 +273,7 @@ function EffortImpactBadge({ effort, impact }: { effort: string; impact: string 
 }
 
 function PromptBox({ label, text }: { label: string; text: string }) {
-    const truncated = text.length > 400 ? text.slice(0, 397) + '...' : text;
+    const truncated = text.length > 250 ? text.slice(0, 247) + '...' : text;
     return (
         <View style={s.promptBox}>
             <Text style={s.promptLabel}>[COPY THIS PROMPT] {label}</Text>
@@ -334,7 +334,7 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
 
             {analysis.criticalAlerts.length > 0 && (
                 <View style={{ marginBottom: 10 }}>
-                    {analysis.criticalAlerts.slice(0, 3).map((alert, i) => {
+                    {analysis.criticalAlerts.slice(0, 2).map((alert, i) => {
                         const alertStyle = alert.severity === 'critical' ? { bg: C.redLight, border: C.red, text: C.red }
                             : alert.severity === 'danger' ? { bg: C.amberLight, border: C.amber, text: C.amber }
                             : { bg: '#EFF6FF', border: '#3B82F6', text: '#3B82F6' };
@@ -372,7 +372,7 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
             </View>
 
             {gemini.criticalProblems.slice(0, 2).map((prob, i) => (
-                <View key={`prob-${i}`} style={[s.card, { marginTop: 6, borderLeftWidth: 3, borderLeftColor: C.red }]}>
+                <View key={`prob-${i}`} wrap={false} style={[s.card, { marginTop: 6, borderLeftWidth: 3, borderLeftColor: C.red }]}>
                     <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.red, marginBottom: 3 }}>{prob.title}</Text>
                     <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4, marginBottom: 3 }}>{prob.explanation}</Text>
                     <Text style={{ fontSize: 7, color: C.emeraldDark, lineHeight: 1.4 }}>{prob.fix}</Text>
@@ -926,8 +926,8 @@ function FixPromptsPage({ analysis, gemini, siteUrl }: ReportProps) {
                     </Text>
                 </View>
             ) : (
-                prompts.slice(0, 4).map(p => (
-                    <View key={p.id} style={{ marginBottom: 8 }}>
+                prompts.slice(0, 3).map(p => (
+                    <View key={p.id} wrap={false} style={{ marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                             <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.text }}>{p.title}</Text>
                             <Text style={{ fontSize: 6, color: C.emerald, fontFamily: 'Helvetica-Bold' }}>{p.category.toUpperCase()}</Text>
@@ -944,7 +944,7 @@ function FixPromptsPage({ analysis, gemini, siteUrl }: ReportProps) {
 
 // Page 12: Fix Prompts Continued (if needed)
 function FixPromptsPage2({ analysis, siteUrl }: ReportProps) {
-    const prompts = analysis.fixPrompts.slice(4);
+    const prompts = analysis.fixPrompts.slice(3);
     if (prompts.length === 0) return null;
 
     return (
@@ -955,7 +955,7 @@ function FixPromptsPage2({ analysis, siteUrl }: ReportProps) {
             <Text style={s.sectionSubtitle}>More fixes for your remaining issues</Text>
 
             {prompts.slice(0, 4).map(p => (
-                <View key={p.id} style={{ marginBottom: 8 }}>
+                <View key={p.id} wrap={false} style={{ marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                         <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.text }}>{p.title}</Text>
                         <Text style={{ fontSize: 6, color: C.emerald, fontFamily: 'Helvetica-Bold' }}>{p.category.toUpperCase()}</Text>

@@ -1089,6 +1089,27 @@ function EmptyState({ title, description }: { title: string; description: string
     )
 }
 
+function extractDomain(url: string): string {
+    let d = url.trim().toLowerCase()
+    if (d.startsWith('sc-domain:')) d = d.slice(10)
+    d = d.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '')
+    return d
+}
+
+function matchGscSite(displayName: string, gscSites: SearchConsoleSiteData[]): string {
+    if (gscSites.length <= 1) return gscSites[0]?.site_url || ''
+    const propDomain = extractDomain(displayName)
+    if (!propDomain) return gscSites[0]?.site_url || ''
+    for (const site of gscSites) {
+        if (!site.site_url) continue
+        const gscDomain = extractDomain(site.site_url)
+        if (gscDomain === propDomain || gscDomain.includes(propDomain) || propDomain.includes(gscDomain)) {
+            return site.site_url
+        }
+    }
+    return gscSites[0]?.site_url || ''
+}
+
 function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, reportLoadingKey, weeklyKey, monthlyKey, onGenerate }: {
     property: GooglePropertyData
     gscSites: SearchConsoleSiteData[]
@@ -1341,7 +1362,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                 {profile.google_inventory.ga_properties.length === 0 ? <EmptyState title="No properties returned" description="The live GA inventory request returned no accessible properties." /> : profile.google_inventory.ga_properties.map(property => {
                                                     const gscSites = profile.google_inventory.gsc_sites.filter(s => s.site_url)
                                                     const hasGsc = gscSites.length > 0
-                                                    const defaultSiteUrl = gscSites[0]?.site_url || ''
+                                                    const defaultSiteUrl = matchGscSite(property.display_name, gscSites)
                                                     const weeklyKey = `${property.property_id}:weekly`
                                                     const monthlyKey = `${property.property_id}:monthly`
                                                     return (
