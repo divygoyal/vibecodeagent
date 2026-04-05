@@ -4,7 +4,9 @@
  * Generates a weekly or monthly PDF analytics report for a given user.
  * Intended to be called from the superadmin panel.
  * 
- * Body: { token, githubId, period: 'weekly' | 'monthly' }
+ * Body: { token, githubId, period: 'weekly' | 'monthly', propertyId?, siteUrl? }
+ * When propertyId/siteUrl are provided they are used directly (per-property reports).
+ * When omitted the first available GA4 property and GSC site are auto-selected.
  * Returns: PDF file as application/pdf
  */
 
@@ -47,7 +49,13 @@ function verifyToken(token: string): boolean {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { token, githubId, period: periodType } = body;
+        const {
+            token,
+            githubId,
+            period: periodType,
+            propertyId: explicitPropertyId,
+            siteUrl: explicitSiteUrl,
+        } = body;
 
         if (!verifyToken(token)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
@@ -77,27 +85,36 @@ export async function POST(req: Request) {
         const oauthData = await oauthRes.json();
         const accessToken = await getValidAccessToken(oauthData.access_token, oauthData.refresh_token);
 
-        // Fetch user's GA4 property and GSC site from admin API
-        const profileRes = await fetch(`${ADMIN_API_URL}/api/users/${encodedId}/profile`, {
-            headers: { 'X-API-Key': ADMIN_API_KEY },
-        });
+        // Resolve GA4 property and GSC site — prefer explicit params, fall back to inventory
+        let propertyId = explicitPropertyId as string | undefined;
+        let siteUrl = explicitSiteUrl as string | undefined;
 
-        if (!profileRes.ok) {
-            return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+        if (!propertyId || !siteUrl) {
+            const profileRes = await fetch(`${ADMIN_API_URL}/api/users/${encodedId}/profile`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY },
+            });
+
+            if (!profileRes.ok) {
+                return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+            }
+
+            const profile = await profileRes.json();
+            const googleInventory = profile.google_inventory;
+
+            if (!googleInventory) {
+                return NextResponse.json(
+                    { error: 'No Google Analytics or Search Console data available for this user' },
+                    { status: 400 }
+                );
+            }
+
+            if (!propertyId) {
+                propertyId = googleInventory.ga_properties?.[0]?.property_id;
+            }
+            if (!siteUrl) {
+                siteUrl = googleInventory.gsc_sites?.[0]?.site_url;
+            }
         }
-
-        const profile = await profileRes.json();
-        const googleInventory = profile.google_inventory;
-
-        if (!googleInventory) {
-            return NextResponse.json(
-                { error: 'No Google Analytics or Search Console data available for this user' },
-                { status: 400 }
-            );
-        }
-
-        const propertyId = googleInventory.ga4_properties?.[0]?.id;
-        const siteUrl = googleInventory.gsc_sites?.[0]?.url;
 
         if (!propertyId || !siteUrl) {
             const missing = [

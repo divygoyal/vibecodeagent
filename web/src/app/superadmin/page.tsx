@@ -6,7 +6,7 @@ import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
     Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
     Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check,
-    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Download, Loader2
+    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Loader2
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1089,6 +1089,72 @@ function EmptyState({ title, description }: { title: string; description: string
     )
 }
 
+function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, reportLoadingKey, weeklyKey, monthlyKey, onGenerate }: {
+    property: GooglePropertyData
+    gscSites: SearchConsoleSiteData[]
+    hasGsc: boolean
+    defaultSiteUrl: string
+    reportLoadingKey: string | null
+    weeklyKey: string
+    monthlyKey: string
+    onGenerate: (period: 'weekly' | 'monthly', propertyId: string, siteUrl: string, propertyName?: string) => void
+}) {
+    const [selectedSite, setSelectedSite] = useState(defaultSiteUrl)
+    const isLoadingWeekly = reportLoadingKey === weeklyKey
+    const isLoadingMonthly = reportLoadingKey === monthlyKey
+    const isAnyLoading = !!reportLoadingKey
+
+    return (
+        <div className="rounded-xl border border-white/[0.05] bg-black/25 p-4 space-y-3">
+            <div>
+                <div className="text-sm font-semibold text-white">{property.display_name || property.property_id}</div>
+                <div className="mt-1 text-xs text-zinc-500">{property.property_id}</div>
+            </div>
+            {hasGsc ? (
+                <>
+                    {gscSites.length > 1 && (
+                        <div>
+                            <label className="block text-xs text-zinc-500 mb-1">Search Console site for report</label>
+                            <select
+                                value={selectedSite}
+                                onChange={(e) => setSelectedSite(e.target.value)}
+                                className="w-full rounded-lg border border-white/[0.08] bg-zinc-900 px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                            >
+                                {gscSites.map(s => (
+                                    <option key={s.site_url} value={s.site_url || ''}>{s.site_url}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {gscSites.length === 1 && (
+                        <div className="text-xs text-zinc-500">GSC: {defaultSiteUrl}</div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={() => onGenerate('weekly', property.property_id, selectedSite, property.display_name)}
+                            disabled={isAnyLoading}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                            {isLoadingWeekly ? 'Generating...' : 'Weekly'}
+                        </button>
+                        <button
+                            onClick={() => onGenerate('monthly', property.property_id, selectedSite, property.display_name)}
+                            disabled={isAnyLoading}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                            {isLoadingMonthly ? 'Generating...' : 'Monthly'}
+                        </button>
+                    </div>
+                </>
+            ) : (
+                <p className="text-xs text-amber-400">No Search Console site available — report requires both GA4 and GSC data.</p>
+            )}
+        </div>
+    )
+}
+
 function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onClose, onRefresh, onAction, onDelete, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
     user: UserData | null
     profile: UserProfileData | null
@@ -1107,12 +1173,13 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
     onCreditInputChange: (value: string) => void
     onAddCredits: () => void
 }) {
-    const [reportLoading, setReportLoading] = useState<'weekly' | 'monthly' | null>(null)
+    const [reportLoadingKey, setReportLoadingKey] = useState<string | null>(null)
     const [reportError, setReportError] = useState('')
 
-    const handleGenerateReport = async (period: 'weekly' | 'monthly') => {
-        if (!user || reportLoading) return
-        setReportLoading(period)
+    const handleGenerateReport = async (period: 'weekly' | 'monthly', propertyId: string, siteUrl: string, propertyName?: string) => {
+        if (!user || reportLoadingKey) return
+        const loadingKey = `${propertyId}:${period}`
+        setReportLoadingKey(loadingKey)
         setReportError('')
 
         try {
@@ -1120,7 +1187,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
             const res = await fetch('/api/report/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, githubId: user.github_id, period }),
+                body: JSON.stringify({ token, githubId: user.github_id, period, propertyId, siteUrl }),
             })
 
             if (!res.ok) {
@@ -1132,7 +1199,8 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `TrafficClaw_${period}_${user.github_id}.pdf`
+            const safeName = (propertyName || propertyId).replace(/[^a-zA-Z0-9_-]/g, '_')
+            a.download = `TrafficClaw_${period}_${safeName}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -1140,7 +1208,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
         } catch (err) {
             setReportError((err as Error).message)
         } finally {
-            setReportLoading(null)
+            setReportLoadingKey(null)
         }
     }
     if (!user) return null
@@ -1210,36 +1278,6 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                             </div>
                         </DrawerSection>
 
-                        <DrawerSection icon={FileText} title="AI Analytics Report">
-                            <div className="space-y-3">
-                                <p className="text-sm text-zinc-400">Generate a detailed AI-powered PDF report with anomaly detection, keyword velocity, traffic DNA analysis, and actionable insights.</p>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <button
-                                        onClick={() => handleGenerateReport('weekly')}
-                                        disabled={!!reportLoading || !user.has_google}
-                                        className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        {reportLoading === 'weekly' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                        {reportLoading === 'weekly' ? 'Generating...' : 'Weekly Report'}
-                                    </button>
-                                    <button
-                                        onClick={() => handleGenerateReport('monthly')}
-                                        disabled={!!reportLoading || !user.has_google}
-                                        className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-2.5 text-sm font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        {reportLoading === 'monthly' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                        {reportLoading === 'monthly' ? 'Generating...' : 'Monthly Report'}
-                                    </button>
-                                </div>
-                                {!user.has_google && (
-                                    <p className="text-xs text-amber-400">Google account not connected — report requires GA4 and/or Search Console data.</p>
-                                )}
-                                {reportError && (
-                                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{reportError}</div>
-                                )}
-                            </div>
-                        </DrawerSection>
-
                         {loading && !profile ? <div className="rounded-2xl border border-white/[0.05] bg-zinc-900/70 p-10 text-center text-zinc-500">Loading full user profile...</div> : null}
                         {!loading && !profile && error ? <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-300">{error}</div> : null}
                         {profile ? (
@@ -1293,16 +1331,33 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
 
                                 <DrawerSection icon={Globe} title="Google Properties & Sites">
                                     {profile.google_inventory.warnings.length ? <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">{profile.google_inventory.warnings.map((warning, index) => <div key={index}>{warning}</div>)}</div> : null}
+                                    {reportError && (
+                                        <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{reportError}</div>
+                                    )}
                                     {!profile.google_inventory.connected ? <EmptyState title="Google not connected" description="GA4 properties and Search Console sites will appear here once the user connects Google." /> : (
-                                        <div className="grid gap-4 xl:grid-cols-2">
+                                        <div className="space-y-6">
                                             <div className="space-y-3">
                                                 <div className="text-xs uppercase tracking-wider text-zinc-500">GA4 Properties</div>
-                                                {profile.google_inventory.ga_properties.length === 0 ? <EmptyState title="No properties returned" description="The live GA inventory request returned no accessible properties." /> : profile.google_inventory.ga_properties.map(property => (
-                                                    <div key={property.property_id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                        <div className="text-sm font-semibold text-white">{property.display_name || property.property_id}</div>
-                                                        <div className="mt-1 text-xs text-zinc-500">{property.property_id}</div>
-                                                    </div>
-                                                ))}
+                                                {profile.google_inventory.ga_properties.length === 0 ? <EmptyState title="No properties returned" description="The live GA inventory request returned no accessible properties." /> : profile.google_inventory.ga_properties.map(property => {
+                                                    const gscSites = profile.google_inventory.gsc_sites.filter(s => s.site_url)
+                                                    const hasGsc = gscSites.length > 0
+                                                    const defaultSiteUrl = gscSites[0]?.site_url || ''
+                                                    const weeklyKey = `${property.property_id}:weekly`
+                                                    const monthlyKey = `${property.property_id}:monthly`
+                                                    return (
+                                                        <PropertyReportCard
+                                                            key={property.property_id}
+                                                            property={property}
+                                                            gscSites={gscSites}
+                                                            hasGsc={hasGsc}
+                                                            defaultSiteUrl={defaultSiteUrl}
+                                                            reportLoadingKey={reportLoadingKey}
+                                                            weeklyKey={weeklyKey}
+                                                            monthlyKey={monthlyKey}
+                                                            onGenerate={handleGenerateReport}
+                                                        />
+                                                    )
+                                                })}
                                             </div>
                                             <div className="space-y-3">
                                                 <div className="text-xs uppercase tracking-wider text-zinc-500">Search Console Sites</div>
