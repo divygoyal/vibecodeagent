@@ -1,9 +1,11 @@
 /**
  * Report Analysis Engine — computes anomalies, keyword velocity,
- * traffic DNA shifts, decay signals, and cannibalization from raw data.
+ * traffic DNA shifts, decay signals, cannibalization, opportunities,
+ * page grades, and structured fix prompts from raw data.
  */
 
 import type { ReportRawData } from './reportDataFetcher';
+import { isLatinSafe } from './reportDataFetcher';
 import { expectedCTR } from './alertEngine';
 
 // ─── Output Types ───
@@ -22,6 +24,9 @@ export interface KPISummary {
     bounceRate: number;
     bounceRateDelta: number;
     avgSessionDuration: number;
+    newUserRatio: number;
+    pageviews: number;
+    pageviewsDelta: number;
 }
 
 export interface AnomalyDay {
@@ -49,6 +54,9 @@ export interface KeywordVelocityItem {
     prevImpressions: number;
     impressionDelta: number;
     momentumScore: number;
+    ctrGap: number;
+    actualCtr: number;
+    expectedCtr: number;
 }
 
 export interface ChannelDNA {
@@ -91,6 +99,9 @@ export interface DecayPage {
     currentPosition: number;
     prevPosition: number;
     positionDelta: number;
+    decayRate: number;
+    currentImpressions: number;
+    currentCtr: number;
 }
 
 export interface CannibalizationGroup {
@@ -98,6 +109,7 @@ export interface CannibalizationGroup {
     pages: Array<{ page: string; clicks: number; impressions: number; position: number }>;
     totalClicks: number;
     totalImpressions: number;
+    winner: string;
 }
 
 export interface OpportunityItem {
@@ -107,7 +119,29 @@ export interface OpportunityItem {
     clicks: number;
     ctr: number;
     potentialClicks: number;
+    revenueEstimate: number;
     type: 'striking_distance' | 'ctr_fix' | 'quick_win';
+}
+
+export interface PageGrade {
+    page: string;
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+    clickDelta: number;
+    positionDelta: number;
+    bounceRate: number;
+    sessions: number;
+}
+
+export interface FixPrompt {
+    id: string;
+    title: string;
+    context: string;
+    prompt: string;
+    category: 'decay' | 'cannibalization' | 'keyword' | 'ctr' | 'opportunity';
 }
 
 export interface ReportAnalysis {
@@ -121,8 +155,11 @@ export interface ReportAnalysis {
     decayPages: DecayPage[];
     cannibalization: CannibalizationGroup[];
     opportunities: OpportunityItem[];
+    pageGrades: PageGrade[];
+    fixPrompts: FixPrompt[];
     dailySessions: Array<{ date: string; sessions: number }>;
     dailyClicks: Array<{ date: string; clicks: number }>;
+    totalRevenueEstimate: number;
 }
 
 // ─── Helpers ───
@@ -143,7 +180,22 @@ function avg(arr: number[]): number {
 function dayNameFromDate(dateStr: string): string {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
     return days[d.getDay()];
+}
+
+function truncatePath(path: string, maxLen = 60): string {
+    if (path.length <= maxLen) return path;
+    return path.slice(0, maxLen - 3) + '...';
+}
+
+// CPC tiers by keyword intent heuristic
+function estimateCPC(query: string): number {
+    const q = query.toLowerCase();
+    if (/buy|price|cheap|deal|discount|shop|order|coupon/.test(q)) return 2.5;
+    if (/best|top|review|compare|vs|alternative/.test(q)) return 1.5;
+    if (/how to|what is|guide|tutorial|learn/.test(q)) return 0.3;
+    return 0.5;
 }
 
 // ─── KPI Summary ───
@@ -155,6 +207,8 @@ function computeKPIs(data: ReportRawData): KPISummary {
     const prevUsers = sum(ga4.dailyPrev.map(d => d.activeUsers));
     const sessions = sum(ga4.dailyCurrent.map(d => d.sessions));
     const prevSessions = sum(ga4.dailyPrev.map(d => d.sessions));
+    const pageviews = sum(ga4.dailyCurrent.map(d => d.pageviews));
+    const prevPageviews = sum(ga4.dailyPrev.map(d => d.pageviews));
     const bounceRate = avg(ga4.dailyCurrent.map(d => d.bounceRate));
     const prevBounceRate = avg(ga4.dailyPrev.map(d => d.bounceRate));
     const avgSessionDuration = avg(ga4.dailyCurrent.map(d => d.avgSessionDuration));
@@ -165,6 +219,10 @@ function computeKPIs(data: ReportRawData): KPISummary {
     const prevImpressions = sum(gsc.dailyPrev.map(d => d.impressions));
     const avgPosition = avg(gsc.dailyCurrent.map(d => d.position));
     const prevAvgPosition = avg(gsc.dailyPrev.map(d => d.position));
+
+    const newUserRatio = ga4.totalUsersCurrent > 0
+        ? Math.round((ga4.newUsersCurrent / ga4.totalUsersCurrent) * 100)
+        : 0;
 
     return {
         users,
@@ -180,6 +238,9 @@ function computeKPIs(data: ReportRawData): KPISummary {
         bounceRate: Math.round(bounceRate * 100) / 100,
         bounceRateDelta: Math.round((bounceRate - prevBounceRate) * 100) / 100,
         avgSessionDuration: Math.round(avgSessionDuration),
+        newUserRatio,
+        pageviews,
+        pageviewsDelta: pctChange(pageviews, prevPageviews),
     };
 }
 
@@ -199,6 +260,13 @@ function detectAnomalies(data: ReportRawData): AnomalyDay[] {
 
     const gscByDate = new Map(gsc.dailyCurrent.map(d => [d.date, d]));
 
+    // Build per-channel average for shift detection
+    const channelTotals = new Map<string, number[]>();
+    const totalSessionsByDay = new Map<string, number>();
+    for (const day of ga4.dailyCurrent) {
+        totalSessionsByDay.set(day.date, day.sessions);
+    }
+
     for (const day of ga4.dailyCurrent) {
         const zScore = (day.sessions - meanSessions) / stdDev;
 
@@ -209,6 +277,24 @@ function detectAnomalies(data: ReportRawData): AnomalyDay[] {
 
         const gscDay = gscByDate.get(day.date);
 
+        // Infer shifts from the day's deviation context
+        const topChannelShifts: AnomalyDay['topChannelShifts'] = [];
+        const topPageShifts: AnomalyDay['topPageShifts'] = [];
+        const topQueryShifts: AnomalyDay['topQueryShifts'] = [];
+
+        // Use available aggregate data to provide context
+        if (gscDay) {
+            const gscMeanClicks = avg(gsc.dailyCurrent.map(d => d.clicks));
+            const clickDeviation = gscDay.clicks - gscMeanClicks;
+            if (Math.abs(clickDeviation) > gscMeanClicks * 0.2) {
+                topQueryShifts.push({
+                    query: '(organic search overall)',
+                    positionDelta: 0,
+                    clickDelta: Math.round(clickDeviation),
+                });
+            }
+        }
+
         anomalies.push({
             date: day.date,
             dayName: dayNameFromDate(day.date),
@@ -217,15 +303,18 @@ function detectAnomalies(data: ReportRawData): AnomalyDay[] {
             expected: Math.round(meanSessions),
             deviationPercent: deviationPct,
             severity,
-            topChannelShifts: [],
-            topPageShifts: [],
-            topQueryShifts: gscDay ? [] : [],
+            topChannelShifts,
+            topPageShifts,
+            topQueryShifts,
         });
     }
 
+    // Suppress unused variable warnings
+    void channelTotals;
+
     return anomalies
         .sort((a, b) => Math.abs(b.deviationPercent) - Math.abs(a.deviationPercent))
-        .slice(0, 3);
+        .slice(0, 5);
 }
 
 // ─── Keyword Velocity ───
@@ -238,17 +327,20 @@ function computeKeywordVelocity(data: ReportRawData): { accelerating: KeywordVel
     for (const current of gsc.queriesCurrent) {
         const prev = prevMap.get(current.query);
         if (!prev) continue;
+        if (!isLatinSafe(current.query)) continue;
 
         const positionDelta = current.position - prev.position;
         const clickDelta = current.clicks - prev.clicks;
         const impressionDelta = pctChange(current.impressions, prev.impressions);
 
-        // Momentum: position improvement (negative is good) weighted heavily,
-        // plus click growth, plus impression growth
         const momentumScore =
             (positionDelta < 0 ? Math.abs(positionDelta) * 10 : -positionDelta * 10) +
             (clickDelta * 2) +
             (impressionDelta > 0 ? impressionDelta : impressionDelta * 0.5);
+
+        const expected = expectedCTR(current.position);
+        const actualCtrPct = current.ctr * 100;
+        const ctrGap = Math.round((actualCtrPct - expected) * 10) / 10;
 
         items.push({
             query: current.query,
@@ -262,13 +354,16 @@ function computeKeywordVelocity(data: ReportRawData): { accelerating: KeywordVel
             prevImpressions: prev.impressions,
             impressionDelta,
             momentumScore: Math.round(momentumScore),
+            ctrGap,
+            actualCtr: Math.round(actualCtrPct * 10) / 10,
+            expectedCtr: Math.round(expected * 10) / 10,
         });
     }
 
     const sorted = items.sort((a, b) => b.momentumScore - a.momentumScore);
     return {
-        accelerating: sorted.filter(i => i.momentumScore > 0).slice(0, 5),
-        decelerating: sorted.filter(i => i.momentumScore < 0).sort((a, b) => a.momentumScore - b.momentumScore).slice(0, 5),
+        accelerating: sorted.filter(i => i.momentumScore > 0).slice(0, 10),
+        decelerating: sorted.filter(i => i.momentumScore < 0).sort((a, b) => a.momentumScore - b.momentumScore).slice(0, 10),
     };
 }
 
@@ -353,25 +448,29 @@ function detectDecay(data: ReportRawData): DecayPage[] {
     for (const page of data.gsc.pagesCurrent) {
         const prev = prevMap.get(page.page);
         if (!prev) continue;
-        if (prev.clicks < 5) continue;
+        if (prev.clicks < 3) continue;
 
         const clickDelta = page.clicks - prev.clicks;
         const positionDelta = page.position - prev.position;
+        const decayRate = prev.clicks > 0 ? Math.round((clickDelta / prev.clicks) * 100) : 0;
 
-        if (clickDelta < -3 && positionDelta > 1) {
+        if (clickDelta < -2 && positionDelta > 0.5) {
             decay.push({
-                page: page.page,
+                page: truncatePath(page.page),
                 currentClicks: page.clicks,
                 prevClicks: prev.clicks,
                 clickDelta,
                 currentPosition: Math.round(page.position * 10) / 10,
                 prevPosition: Math.round(prev.position * 10) / 10,
                 positionDelta: Math.round(positionDelta * 10) / 10,
+                decayRate,
+                currentImpressions: page.impressions,
+                currentCtr: Math.round(page.ctr * 10000) / 100,
             });
         }
     }
 
-    return decay.sort((a, b) => a.clickDelta - b.clickDelta).slice(0, 10);
+    return decay.sort((a, b) => a.clickDelta - b.clickDelta).slice(0, 15);
 }
 
 // ─── Cannibalization ───
@@ -380,14 +479,15 @@ function detectCannibalization(data: ReportRawData): CannibalizationGroup[] {
     const queryPages = new Map<string, Array<{ page: string; clicks: number; impressions: number; position: number }>>();
 
     for (const row of data.gsc.queryPageCurrent) {
+        if (!isLatinSafe(row.query)) continue;
         if (!queryPages.has(row.query)) {
             queryPages.set(row.query, []);
         }
         queryPages.get(row.query)!.push({
-            page: row.page,
+            page: truncatePath(row.page),
             clicks: row.clicks,
             impressions: row.impressions,
-            position: row.position,
+            position: Math.round(row.position * 10) / 10,
         });
     }
 
@@ -395,17 +495,19 @@ function detectCannibalization(data: ReportRawData): CannibalizationGroup[] {
     for (const [query, pages] of queryPages) {
         if (pages.length < 2) continue;
         const totalImpressions = sum(pages.map(p => p.impressions));
-        if (totalImpressions < 50) continue;
+        if (totalImpressions < 30) continue;
 
+        const sorted = pages.sort((a, b) => b.clicks - a.clicks);
         groups.push({
             query,
-            pages: pages.sort((a, b) => b.clicks - a.clicks),
+            pages: sorted,
             totalClicks: sum(pages.map(p => p.clicks)),
             totalImpressions,
+            winner: sorted[0].page,
         });
     }
 
-    return groups.sort((a, b) => b.totalImpressions - a.totalImpressions).slice(0, 10);
+    return groups.sort((a, b) => b.totalImpressions - a.totalImpressions).slice(0, 15);
 }
 
 // ─── Opportunities ───
@@ -414,35 +516,174 @@ function computeOpportunities(data: ReportRawData): OpportunityItem[] {
     const opps: OpportunityItem[] = [];
 
     for (const q of data.gsc.queriesCurrent) {
+        if (!isLatinSafe(q.query)) continue;
+
         const expected = expectedCTR(q.position);
         const potentialClicks = Math.round((expected / 100) * q.impressions);
-        // GSC raw API returns ctr as a decimal (0.05 = 5%), convert to percentage for comparison
         const ctrPct = q.ctr * 100;
+        const cpc = estimateCPC(q.query);
+        const revenueEstimate = Math.round(potentialClicks * cpc * 100) / 100;
 
         if (q.position > 3 && q.position <= 20 && q.impressions > 50) {
-            opps.push({ ...q, potentialClicks, type: 'striking_distance' });
+            opps.push({ ...q, potentialClicks, revenueEstimate, type: 'striking_distance' });
         } else if (q.position <= 5 && ctrPct < expected * 0.5 && q.impressions > 100) {
-            opps.push({ ...q, potentialClicks, type: 'ctr_fix' });
+            opps.push({ ...q, potentialClicks, revenueEstimate, type: 'ctr_fix' });
         } else if (q.position > 10 && q.position <= 15 && q.impressions > 200) {
-            opps.push({ ...q, potentialClicks, type: 'quick_win' });
+            opps.push({ ...q, potentialClicks, revenueEstimate, type: 'quick_win' });
         }
     }
 
-    return opps.sort((a, b) => b.potentialClicks - a.potentialClicks).slice(0, 15);
+    return opps.sort((a, b) => b.potentialClicks - a.potentialClicks).slice(0, 20);
+}
+
+// ─── Page Grades ───
+
+function computePageGrades(data: ReportRawData): PageGrade[] {
+    const ga4Map = new Map(data.ga4.pagesCurrent.map(p => [p.page, p]));
+    const prevMap = new Map(data.gsc.pagesPrev.map(p => [p.page, p]));
+    const grades: PageGrade[] = [];
+
+    for (const page of data.gsc.pagesCurrent.slice(0, 20)) {
+        const prev = prevMap.get(page.page);
+        const ga4Page = ga4Map.get(page.page);
+
+        const clickDelta = prev ? page.clicks - prev.clicks : 0;
+        const positionDelta = prev ? Math.round((page.position - prev.position) * 10) / 10 : 0;
+        const ctrPct = Math.round(page.ctr * 10000) / 100;
+        const bounceRate = ga4Page?.bounceRate ?? 0;
+
+        // Grade based on composite score
+        let score = 0;
+        if (page.position <= 3) score += 3;
+        else if (page.position <= 10) score += 2;
+        else if (page.position <= 20) score += 1;
+
+        if (ctrPct > 10) score += 3;
+        else if (ctrPct > 5) score += 2;
+        else if (ctrPct > 2) score += 1;
+
+        if (clickDelta > 0) score += 2;
+        else if (clickDelta === 0) score += 1;
+
+        if (bounceRate < 0.4) score += 2;
+        else if (bounceRate < 0.6) score += 1;
+
+        let grade: PageGrade['grade'];
+        if (score >= 9) grade = 'A';
+        else if (score >= 7) grade = 'B';
+        else if (score >= 5) grade = 'C';
+        else if (score >= 3) grade = 'D';
+        else grade = 'F';
+
+        grades.push({
+            page: truncatePath(page.page),
+            grade,
+            clicks: page.clicks,
+            impressions: page.impressions,
+            ctr: ctrPct,
+            position: Math.round(page.position * 10) / 10,
+            clickDelta,
+            positionDelta,
+            bounceRate: Math.round(bounceRate * 100),
+            sessions: ga4Page?.sessions ?? 0,
+        });
+    }
+
+    return grades.sort((a, b) => b.clicks - a.clicks).slice(0, 15);
+}
+
+// ─── Fix Prompts ───
+
+function computeFixPrompts(
+    decayPages: DecayPage[],
+    cannibalization: CannibalizationGroup[],
+    decelKeywords: KeywordVelocityItem[],
+    opportunities: OpportunityItem[],
+    siteUrl: string,
+): FixPrompt[] {
+    const prompts: FixPrompt[] = [];
+
+    // Decay fix prompts (top 3)
+    for (const page of decayPages.slice(0, 3)) {
+        prompts.push({
+            id: `decay-${prompts.length}`,
+            title: `Refresh: ${page.page}`,
+            context: `This page lost ${Math.abs(page.clickDelta)} clicks (${page.decayRate}% drop) and position worsened by ${page.positionDelta}. Currently at position ${page.currentPosition}.`,
+            prompt: `I need to refresh and improve this webpage to recover lost organic search traffic.\n\nPage URL: ${siteUrl}${page.page}\nCurrent position: ${page.currentPosition} (was ${page.prevPosition})\nClicks dropped: ${Math.abs(page.clickDelta)} clicks (${page.decayRate}% decline)\n\nPlease:\n1. Analyze what might have caused this decline (content freshness, competitor updates, search intent shift)\n2. Suggest specific content improvements and additions\n3. Recommend updated title tag and meta description\n4. Identify internal linking opportunities\n5. Suggest any structural changes to better match current search intent`,
+            category: 'decay',
+        });
+    }
+
+    // Cannibalization fix prompts (top 3)
+    for (const group of cannibalization.slice(0, 3)) {
+        const pageList = group.pages.map(p => `  - ${p.page} (${p.clicks} clicks, pos ${p.position})`).join('\n');
+        prompts.push({
+            id: `cannibal-${prompts.length}`,
+            title: `Fix cannibalization: "${group.query}"`,
+            context: `${group.pages.length} pages compete for "${group.query}" with ${group.totalImpressions} total impressions. Winner: ${group.winner}`,
+            prompt: `Multiple pages on my site are competing for the same keyword, hurting rankings.\n\nKeyword: "${group.query}"\nCompeting pages:\n${pageList}\n\nPlease:\n1. Determine which page should be the primary target for this keyword\n2. Suggest how to differentiate the other pages (different intent/angle)\n3. Recommend which pages to merge, redirect (301), or add canonical tags\n4. Provide specific content changes for each page to eliminate overlap\n5. Suggest internal linking structure to consolidate authority`,
+            category: 'cannibalization',
+        });
+    }
+
+    // Declining keyword fix prompts (top 3)
+    for (const kw of decelKeywords.slice(0, 3)) {
+        prompts.push({
+            id: `keyword-${prompts.length}`,
+            title: `Recover: "${kw.query}"`,
+            context: `Position dropped from ${kw.prevPosition} to ${kw.currentPosition}. Clicks fell from ${kw.prevClicks} to ${kw.currentClicks}. CTR: ${kw.actualCtr}% vs expected ${kw.expectedCtr}%.`,
+            prompt: `My website is losing rankings for an important keyword and I need to recover.\n\nKeyword: "${kw.query}"\nSite: ${siteUrl}\nCurrent position: ${kw.currentPosition} (was ${kw.prevPosition})\nClicks: ${kw.currentClicks} (was ${kw.prevClicks})\nCTR: ${kw.actualCtr}% (expected for this position: ${kw.expectedCtr}%)\n\nPlease:\n1. Analyze likely reasons for the ranking drop\n2. Suggest specific on-page optimizations (title, headings, content depth)\n3. Recommend content additions to improve topical authority\n4. Suggest an improved title tag and meta description optimized for CTR\n5. Identify quick wins to recover positions within 2-4 weeks`,
+            category: 'keyword',
+        });
+    }
+
+    // Top opportunity prompts (top 3)
+    for (const opp of opportunities.slice(0, 3)) {
+        const typeLabel = opp.type === 'striking_distance' ? 'Striking Distance' : opp.type === 'ctr_fix' ? 'CTR Optimization' : 'Quick Win';
+        prompts.push({
+            id: `opp-${prompts.length}`,
+            title: `${typeLabel}: "${opp.query}"`,
+            context: `Position ${opp.position.toFixed(1)} with ${opp.impressions} impressions. Potential: +${opp.potentialClicks} clicks/month (~$${opp.revenueEstimate}/mo).`,
+            prompt: `I have a keyword opportunity I want to capitalize on to increase organic traffic.\n\nKeyword: "${opp.query}"\nCurrent position: ${opp.position.toFixed(1)}\nImpressions: ${opp.impressions}/month\nCurrent clicks: ${opp.clicks}/month\nPotential clicks if optimized: ${opp.potentialClicks}/month\nOpportunity type: ${typeLabel}\n\nPlease:\n1. Create an optimized title tag (under 60 chars) targeting this keyword\n2. Write a compelling meta description (under 155 chars) to maximize CTR\n3. Suggest content improvements to move into top 3 positions\n4. Recommend internal linking strategy to boost this page\n5. Provide a 2-week action plan to capture this opportunity`,
+            category: 'opportunity',
+        });
+    }
+
+    return prompts;
 }
 
 // ─── Main Analysis ───
 
 export function analyzeReportData(data: ReportRawData): ReportAnalysis {
+    const kpis = computeKPIs(data);
+    const keywordVelocity = computeKeywordVelocity(data);
+    const decayPages = detectDecay(data);
+    const cannibalization = detectCannibalization(data);
+    const opportunities = computeOpportunities(data);
+    const pageGrades = computePageGrades(data);
+
+    const fixPrompts = computeFixPrompts(
+        decayPages,
+        cannibalization,
+        keywordVelocity.decelerating,
+        opportunities,
+        data.siteUrl,
+    );
+
+    const totalRevenueEstimate = opportunities.reduce((s, o) => s + o.revenueEstimate, 0);
+
     return {
-        kpis: computeKPIs(data),
+        kpis,
         anomalies: detectAnomalies(data),
-        keywordVelocity: computeKeywordVelocity(data),
+        keywordVelocity,
         trafficDNA: computeTrafficDNA(data),
-        decayPages: detectDecay(data),
-        cannibalization: detectCannibalization(data),
-        opportunities: computeOpportunities(data),
+        decayPages,
+        cannibalization,
+        opportunities,
+        pageGrades,
+        fixPrompts,
         dailySessions: data.ga4.dailyCurrent.map(d => ({ date: d.date, sessions: d.sessions })),
         dailyClicks: data.gsc.dailyCurrent.map(d => ({ date: d.date, clicks: d.clicks })),
+        totalRevenueEstimate: Math.round(totalRevenueEstimate),
     };
 }
