@@ -6,7 +6,7 @@ import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
     Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
     Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check,
-    Globe, LayoutDashboard, Link2, BarChart3, Activity
+    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Download, Loader2
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1107,6 +1107,42 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
     onCreditInputChange: (value: string) => void
     onAddCredits: () => void
 }) {
+    const [reportLoading, setReportLoading] = useState<'weekly' | 'monthly' | null>(null)
+    const [reportError, setReportError] = useState('')
+
+    const handleGenerateReport = async (period: 'weekly' | 'monthly') => {
+        if (!user || reportLoading) return
+        setReportLoading(period)
+        setReportError('')
+
+        try {
+            const token = getToken()
+            const res = await fetch('/api/report/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, githubId: user.github_id, period }),
+            })
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Report generation failed' }))
+                throw new Error(err.error || 'Report generation failed')
+            }
+
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `TrafficClaw_${period}_${user.github_id}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+        } catch (err) {
+            setReportError((err as Error).message)
+        } finally {
+            setReportLoading(null)
+        }
+    }
     if (!user) return null
 
     const containerStatus = profile?.container.status || user.container?.status || 'unknown'
@@ -1171,6 +1207,36 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                     <button onClick={() => onAction('restart', user.github_id)} disabled={actionLoading === `restart-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-40 transition-colors"><RotateCw className="w-4 h-4" />Restart</button>
                                     <button onClick={onDelete} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"><Trash2 className="w-4 h-4" />Delete</button>
                                 </div>
+                            </div>
+                        </DrawerSection>
+
+                        <DrawerSection icon={FileText} title="AI Analytics Report">
+                            <div className="space-y-3">
+                                <p className="text-sm text-zinc-400">Generate a detailed AI-powered PDF report with anomaly detection, keyword velocity, traffic DNA analysis, and actionable insights.</p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        onClick={() => handleGenerateReport('weekly')}
+                                        disabled={!!reportLoading || !user.has_google}
+                                        className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {reportLoading === 'weekly' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {reportLoading === 'weekly' ? 'Generating...' : 'Weekly Report'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleGenerateReport('monthly')}
+                                        disabled={!!reportLoading || !user.has_google}
+                                        className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-2.5 text-sm font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {reportLoading === 'monthly' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {reportLoading === 'monthly' ? 'Generating...' : 'Monthly Report'}
+                                    </button>
+                                </div>
+                                {!user.has_google && (
+                                    <p className="text-xs text-amber-400">Google account not connected — report requires GA4 and/or Search Console data.</p>
+                                )}
+                                {reportError && (
+                                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{reportError}</div>
+                                )}
                             </div>
                         </DrawerSection>
 
