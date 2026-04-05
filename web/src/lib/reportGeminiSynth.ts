@@ -1,17 +1,20 @@
 /**
- * Gemini Synthesis — sends structured analysis data to Gemini via
- * 3 parallel focused calls and returns typed JSON for the PDF template.
+ * Gemini Synthesis — sends ALL raw data + analysis to Gemini via
+ * 2 comprehensive calls and returns typed JSON for the PDF template.
  *
- * Call 1: Executive summary + anomaly root cause + traffic DNA
- * Call 2: Keyword analysis + content decay + cannibalization
- * Call 3: Opportunities + action plan + page optimizations
+ * Call 1: Full site diagnosis (exec summary, anomalies, traffic DNA, critical problems)
+ * Call 2: Fixes, action plan, page optimizations
  */
 
 import { GoogleGenAI } from '@google/genai';
 import type { ReportAnalysis } from './reportAnalysis';
-import type { ReportPeriod } from './reportDataFetcher';
+import type { ReportPeriod, ReportRawData } from './reportDataFetcher';
+import { isLatinSafe } from './reportDataFetcher';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const MODEL = 'gemini-3-flash-preview';
+const MAX_TOKENS = 8192;
+const MAX_RETRIES = 2;
 
 // ─── Output Types ───
 
@@ -32,6 +35,11 @@ export interface GeminiReportOutput {
         howToFix: string;
     }>;
     trafficDNAInterpretation: string;
+    criticalProblems: Array<{
+        title: string;
+        explanation: string;
+        fix: string;
+    }>;
 
     // Call 2
     keywordAccelCommentary: string;
@@ -53,8 +61,6 @@ export interface GeminiReportOutput {
         recommendation: string;
         steps: string;
     }>;
-
-    // Call 3
     opportunityOverview: string;
     opportunityStrategies: Array<{
         keyword: string;
@@ -79,174 +85,203 @@ export interface GeminiReportOutput {
     }>;
 }
 
+// ─── Raw Data Formatters ───
+
+function fmtDailyGA4(raw: ReportRawData): string {
+    return raw.ga4.dailyCurrent.map(d =>
+        `${d.date}: ${d.sessions} sessions, ${d.activeUsers} users, ${d.pageviews} pvs, bounce ${(d.bounceRate * 100).toFixed(0)}%, duration ${Math.round(d.avgSessionDuration)}s`
+    ).join('\n');
+}
+
+function fmtDailyGSC(raw: ReportRawData): string {
+    return raw.gsc.dailyCurrent.map(d =>
+        `${d.date}: ${d.clicks} clicks, ${d.impressions} impressions, CTR ${(d.ctr * 100).toFixed(1)}%, pos ${d.position.toFixed(1)}`
+    ).join('\n');
+}
+
+function fmtQueries(raw: ReportRawData, limit = 30): string {
+    const current = raw.gsc.queriesCurrent.filter(q => isLatinSafe(q.query)).slice(0, limit);
+    const prevMap = new Map(raw.gsc.queriesPrev.map(q => [q.query, q]));
+    return current.map(q => {
+        const prev = prevMap.get(q.query);
+        const prevStr = prev ? `prev: ${prev.clicks}cl/${prev.impressions}imp/pos${prev.position.toFixed(1)}` : 'NEW';
+        return `"${q.query}": ${q.clicks}cl, ${q.impressions}imp, pos ${q.position.toFixed(1)}, CTR ${(q.ctr * 100).toFixed(1)}% | ${prevStr}`;
+    }).join('\n');
+}
+
+function fmtPages(raw: ReportRawData, limit = 20): string {
+    const prevMap = new Map(raw.gsc.pagesPrev.map(p => [p.page, p]));
+    return raw.gsc.pagesCurrent.slice(0, limit).map(p => {
+        const prev = prevMap.get(p.page);
+        const delta = prev ? `(was ${prev.clicks}cl/pos${prev.position.toFixed(1)})` : '(new)';
+        return `${p.page}: ${p.clicks}cl, ${p.impressions}imp, pos ${p.position.toFixed(1)}, CTR ${(p.ctr * 100).toFixed(1)}% ${delta}`;
+    }).join('\n');
+}
+
+function fmtChannels(raw: ReportRawData): string {
+    const totalCur = raw.ga4.channelsCurrent.reduce((s, c) => s + c.sessions, 0) || 1;
+    const totalPrev = raw.ga4.channelsPrev.reduce((s, c) => s + c.sessions, 0) || 1;
+    const prevMap = new Map(raw.ga4.channelsPrev.map(c => [c.channel, c]));
+    return raw.ga4.channelsCurrent.map(c => {
+        const pct = ((c.sessions / totalCur) * 100).toFixed(1);
+        const prev = prevMap.get(c.channel);
+        const prevPct = prev ? ((prev.sessions / totalPrev) * 100).toFixed(1) : '0';
+        return `${c.channel}: ${pct}% (${c.sessions} sessions) — prev ${prevPct}%`;
+    }).join('\n');
+}
+
 // ─── Prompt Builders ───
 
-function buildPrompt1(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: string): string {
+function buildPrompt1(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: string, raw: ReportRawData): string {
     const periodLabel = period.type === 'weekly' ? 'week' : 'month';
-    const dateRange = `${period.startDate} to ${period.endDate}`;
     const kpi = analysis.kpis;
-    const anomalies = analysis.anomalies;
-    const dna = analysis.trafficDNA;
 
-    return `You are a senior SEO analyst writing a ${periodLabel}ly analytics briefing for ${siteUrl}.
-Period: ${dateRange} vs prior ${periodLabel} (${period.prevStartDate} to ${period.prevEndDate}).
+    return `You are a senior SEO analyst writing an in-depth ${periodLabel}ly diagnostic for ${siteUrl}.
+Period: ${period.startDate} to ${period.endDate} vs previous ${periodLabel} (${period.prevStartDate} to ${period.prevEndDate}).
 
-CRITICAL: Be specific with real numbers. Give VERDICTS and ROOT CAUSES, not generic advice. Explain WHY things happened with evidence from the data.
+YOUR JOB: Find EVERY problem, anomaly, and risk in this data. Be SPECIFIC with dates, numbers, and root causes. Give VERDICTS, not generic advice. If data is sparse, explain what that means and what the user should do about it.
 
-## KPIs
+## KPIs (current vs previous)
 - Users: ${kpi.users} (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%)
 - Sessions: ${kpi.sessions} (${kpi.sessionsDelta > 0 ? '+' : ''}${kpi.sessionsDelta}%)
 - Organic Clicks: ${kpi.clicks} (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%)
 - Impressions: ${kpi.impressions} (${kpi.impressionsDelta > 0 ? '+' : ''}${kpi.impressionsDelta}%)
-- Avg Position: ${kpi.avgPosition} (${kpi.avgPositionDelta > 0 ? '+' : ''}${kpi.avgPositionDelta})
-- Bounce Rate: ${(kpi.bounceRate * 100).toFixed(1)}% (${kpi.bounceRateDelta > 0 ? '+' : ''}${(kpi.bounceRateDelta * 100).toFixed(1)}pp)
+- Avg Position: ${kpi.avgPosition} (delta ${kpi.avgPositionDelta > 0 ? '+' : ''}${kpi.avgPositionDelta})
+- Bounce Rate: ${(kpi.bounceRate * 100).toFixed(1)}% (delta ${(kpi.bounceRateDelta * 100).toFixed(1)}pp)
 - New User Ratio: ${kpi.newUserRatio}%
 - Avg Session Duration: ${kpi.avgSessionDuration}s
+- Pageviews: ${kpi.pageviews} (${kpi.pageviewsDelta > 0 ? '+' : ''}${kpi.pageviewsDelta}%)
 
-## Anomaly Days
-${anomalies.length === 0 ? 'No significant anomalies.' : anomalies.map(a =>
-        `- ${a.dayName} ${a.date}: ${a.actual} sessions vs ~${a.expected} expected (${a.deviationPercent > 0 ? '+' : ''}${a.deviationPercent}%, ${a.severity})${a.topQueryShifts.length > 0 ? ` — organic clicks also shifted by ${a.topQueryShifts[0].clickDelta}` : ''}`
+## Critical Alerts (auto-detected)
+${analysis.criticalAlerts.length === 0 ? 'None detected by automated system.' : analysis.criticalAlerts.map(a => `- [${a.severity.toUpperCase()}] ${a.title}: ${a.detail}`).join('\n')}
+
+## Daily GA4 Metrics
+${fmtDailyGA4(raw)}
+
+## Daily GSC Metrics
+${fmtDailyGSC(raw)}
+
+## All Search Queries (current vs previous)
+${fmtQueries(raw)}
+
+## All Pages in Search (current vs previous)
+${fmtPages(raw)}
+
+## Channel Mix
+${fmtChannels(raw)}
+
+## Devices
+${analysis.trafficDNA.devices.map(d => `${d.device}: ${d.currentShare}% (${d.shareDelta > 0 ? '+' : ''}${d.shareDelta}pp)`).join(', ')}
+
+## Countries
+${analysis.trafficDNA.countries.map(c => `${c.country}: ${c.currentShare}% (${c.shareDelta > 0 ? '+' : ''}${c.shareDelta}pp)`).join(', ')}
+
+## Anomaly Days (z-score > 1.5)
+${analysis.anomalies.length === 0 ? 'No statistically significant session anomalies (stddev-based).' : analysis.anomalies.map(a =>
+        `- ${a.dayName} ${a.date}: ${a.actual} sessions vs ~${a.expected} expected (${a.deviationPercent > 0 ? '+' : ''}${a.deviationPercent}%, ${a.severity})`
     ).join('\n')}
 
-## Traffic DNA
-- Channels: ${dna.channels.slice(0, 5).map(c => `${c.channel} ${c.currentShare}% (${c.shareDelta > 0 ? '+' : ''}${c.shareDelta}pp)`).join(', ')}
-- Devices: ${dna.devices.map(d => `${d.device} ${d.currentShare}% (${d.shareDelta > 0 ? '+' : ''}${d.shareDelta}pp)`).join(', ')}
-- Countries: ${dna.countries.map(c => `${c.country} ${c.currentShare}% (${c.shareDelta > 0 ? '+' : ''}${c.shareDelta}pp)`).join(', ')}
-- Top page: ${dna.topPage} drives ${dna.topPageShare}% of sessions
-- New user ratio: ${dna.newUserRatio}%
-
-## OUTPUT (valid JSON only, no markdown):
+Respond with ONLY valid JSON (no markdown fences):
 {
   "executiveSummary": {
     "healthStatus": "growing|stable|at_risk|declining",
-    "narrative": "4-6 sentence detailed executive summary with specific numbers, trends, and verdict",
-    "highlights": ["highlight with number 1", "highlight with number 2", "highlight 3", "highlight 4"],
-    "oneAction": "The single highest-impact action (specific, not generic)",
+    "narrative": "6-8 sentence detailed analysis with SPECIFIC numbers, dates, root causes, and verdict. Mention the biggest problems first.",
+    "highlights": ["finding with specific number 1", "finding 2", "finding 3", "finding 4", "finding 5"],
+    "oneAction": "The single most important action (be specific)",
     "oneActionWhy": "Why this matters with data evidence (2-3 sentences)",
-    "oneActionImpact": "Specific expected result (e.g. 'Could recover 200+ organic clicks/week')"
+    "oneActionImpact": "Expected result with numbers"
   },
-  "anomalyExplanations": [${anomalies.map(() => `{
+  "anomalyExplanations": [${analysis.anomalies.map(() => `{
       "date": "YYYY-MM-DD",
-      "rootCause": "Detailed root cause analysis (3-4 sentences) explaining WHY with evidence",
+      "rootCause": "4-5 sentences explaining WHY this happened based on the daily data and channel/query shifts",
       "impact": "Precise traffic impact with numbers",
-      "howToFix": "3 specific actionable steps to fix or capitalize on this"
+      "howToFix": "3-4 specific actionable steps"
     }`).join(',')}],
-  "trafficDNAInterpretation": "5-6 sentence deep analysis of traffic composition shifts, what they mean for the business, and any red flags or opportunities"
-}`;
+  "trafficDNAInterpretation": "6-8 sentences: deep analysis of traffic sources, what the channel mix reveals about the business, risks (over-reliance on one channel), the device split implications, and geographic opportunities",
+  "criticalProblems": [
+    {"title": "Problem title", "explanation": "3-4 sentences with evidence from the data", "fix": "3-4 specific numbered steps to fix this"}
+  ]
 }
 
-function buildPrompt2(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: string): string {
+For "criticalProblems": identify 3-5 real problems from the data. If organic clicks are near zero, that IS the main problem. If there is a disconnect between GA4 traffic and GSC data, explain it. If pages have zero clicks despite ranking, explain why. Never say "no problems found" — every site has areas to improve.`;
+}
+
+function buildPrompt2(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: string, raw: ReportRawData): string {
     const periodLabel = period.type === 'weekly' ? 'week' : 'month';
     const accel = analysis.keywordVelocity.accelerating;
     const decel = analysis.keywordVelocity.decelerating;
+    const newKw = analysis.keywordVelocity.newKeywords;
+    const lostKw = analysis.keywordVelocity.lostKeywords;
     const decay = analysis.decayPages;
     const cannibal = analysis.cannibalization;
-
-    return `You are a senior SEO strategist analyzing keyword performance and content issues for ${siteUrl}.
-Period: ${period.startDate} to ${period.endDate} (${periodLabel}ly report).
-
-CRITICAL: Give SPECIFIC, ACTIONABLE advice per keyword/page. Include real numbers. No generic tips.
-
-## Accelerating Keywords
-${accel.length === 0 ? 'None' : accel.map(k =>
-        `- "${k.query}": pos ${k.prevPosition}->${k.currentPosition}, clicks ${k.prevClicks}->${k.currentClicks}, CTR ${k.actualCtr}% (expected ${k.expectedCtr}%), gap ${k.ctrGap}pp`
-    ).join('\n')}
-
-## Decelerating Keywords
-${decel.length === 0 ? 'None' : decel.map(k =>
-        `- "${k.query}": pos ${k.prevPosition}->${k.currentPosition}, clicks ${k.prevClicks}->${k.currentClicks}, CTR ${k.actualCtr}% (expected ${k.expectedCtr}%), gap ${k.ctrGap}pp`
-    ).join('\n')}
-
-## Content Decay (${decay.length} pages)
-${decay.length === 0 ? 'No decay.' : decay.slice(0, 5).map(p =>
-        `- ${p.page}: clicks ${p.prevClicks}->${p.currentClicks} (${p.decayRate}%), pos ${p.prevPosition}->${p.currentPosition}, CTR ${p.currentCtr}%`
-    ).join('\n')}
-
-## Cannibalization (${cannibal.length} groups)
-${cannibal.length === 0 ? 'None.' : cannibal.slice(0, 5).map(c =>
-        `- "${c.query}" (${c.totalImpressions} impr): ${c.pages.map(p => `${p.page} [${p.clicks}cl, pos ${p.position}]`).join(' vs ')}`
-    ).join('\n')}
-
-## OUTPUT (valid JSON only, no markdown):
-{
-  "keywordAccelCommentary": "3-4 sentences analyzing accelerating keywords as a group — what trend they indicate, business opportunity",
-  "keywordDecelCommentary": "3-4 sentences analyzing decelerating keywords — what's happening, severity, and urgency",
-  "keywordFixes": [${decel.slice(0, 5).map(k => `{
-      "keyword": "${k.query.replace(/"/g, '\\"')}",
-      "diagnosis": "2-3 sentences: why this keyword is declining",
-      "fixSteps": "3-4 numbered specific steps to recover this keyword"
-    }`).join(',')}],
-  "decayOverview": "3-4 sentences: overall assessment of content health, how many pages affected, urgency level",
-  "decayFixes": [${decay.slice(0, 3).map(p => `{
-      "page": "${p.page.replace(/"/g, '\\"')}",
-      "diagnosis": "2-3 sentences: why this page is decaying",
-      "refreshStrategy": "3-4 numbered steps to refresh this specific page"
-    }`).join(',')}],
-  "cannibalizationOverview": "3-4 sentences: how severe the cannibalization is, impact on rankings",
-  "cannibalizationFixes": [${cannibal.slice(0, 3).map(c => `{
-      "query": "${c.query.replace(/"/g, '\\"')}",
-      "recommendation": "Which page should win and why (2 sentences)",
-      "steps": "3-4 numbered steps to resolve (merge, redirect, differentiate)"
-    }`).join(',')}]
-}`;
-}
-
-function buildPrompt3(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: string): string {
-    const periodLabel = period.type === 'weekly' ? 'week' : 'month';
     const opps = analysis.opportunities;
     const pages = analysis.pageGrades;
 
-    return `You are a senior SEO strategist creating an action plan for ${siteUrl}.
+    return `You are a senior SEO strategist creating a detailed action plan for ${siteUrl}.
 Period: ${period.startDate} to ${period.endDate} (${periodLabel}ly report).
 
-CRITICAL: Every action must be SPECIFIC and ACTIONABLE with expected results.
+CRITICAL: Every recommendation must be SPECIFIC and ACTIONABLE. Include real numbers and URLs. No generic advice like "improve content quality."
 
-## Top Opportunities (${opps.length} found)
-${opps.slice(0, 8).map(o =>
-        `- "${o.query}" pos ${o.position.toFixed(1)}, ${o.impressions} impr, potential +${o.potentialClicks} clicks (~$${o.revenueEstimate}/mo), type: ${o.type}`
-    ).join('\n')}
+## Accelerating Keywords
+${accel.length === 0 ? 'None detected.' : accel.map(k => `- "${k.query}": pos ${k.prevPosition}->${k.currentPosition}, clicks ${k.prevClicks}->${k.currentClicks}, CTR ${k.actualCtr}% (expected ${k.expectedCtr}%), gap ${k.ctrGap}pp`).join('\n')}
 
-Total estimated monthly value: $${analysis.totalRevenueEstimate}
+## Decelerating Keywords
+${decel.length === 0 ? 'None detected.' : decel.map(k => `- "${k.query}": pos ${k.prevPosition}->${k.currentPosition}, clicks ${k.prevClicks}->${k.currentClicks}, CTR ${k.actualCtr}% (expected ${k.expectedCtr}%), gap ${k.ctrGap}pp`).join('\n')}
 
-## Pages Needing Optimization
-${pages.filter(p => p.grade === 'D' || p.grade === 'F').slice(0, 5).map(p =>
-        `- ${p.page}: grade ${p.grade}, pos ${p.position}, CTR ${p.ctr}%, ${p.clicks} clicks, bounce ${p.bounceRate}%`
-    ).join('\n') || 'All pages graded C or above.'}
+## New Keywords (appeared this period)
+${newKw.length === 0 ? 'None.' : newKw.map(k => `- "${k.query}": ${k.clicks}cl, ${k.impressions}imp, pos ${k.position}`).join('\n')}
 
-## Key Metrics
+## Lost Keywords (disappeared this period)
+${lostKw.length === 0 ? 'None.' : lostKw.map(k => `- "${k.query}": was ${k.clicks}cl, ${k.impressions}imp, pos ${k.position}`).join('\n')}
+
+## Content Decay (${decay.length} pages)
+${decay.length === 0 ? 'No decay detected.' : decay.slice(0, 8).map(p => `- ${p.page}: clicks ${p.prevClicks}->${p.currentClicks} (${p.decayRate}%), pos ${p.prevPosition}->${p.currentPosition}, CTR ${p.currentCtr}%`).join('\n')}
+
+## Cannibalization (${cannibal.length} groups)
+${cannibal.length === 0 ? 'None detected.' : cannibal.slice(0, 5).map(c => `- "${c.query}" (${c.totalImpressions} impr): ${c.pages.map(p => `${p.page} [${p.clicks}cl, pos ${p.position}]`).join(' vs ')}`).join('\n')}
+
+## Opportunities (${opps.length} found, est. $${analysis.totalRevenueEstimate}/mo)
+${opps.slice(0, 10).map(o => `- "${o.query}" pos ${o.position.toFixed(1)}, ${o.impressions} impr, potential +${o.potentialClicks} clicks (~$${o.revenueEstimate}/mo), type: ${o.type}`).join('\n')}
+
+## Pages Performance
+${pages.slice(0, 10).map(p => `- ${p.page}: grade ${p.grade}, pos ${p.position}, CTR ${p.ctr}%, ${p.clicks} clicks (delta ${p.clickDelta}), bounce ${p.bounceRate}%`).join('\n')}
+
+## All Search Queries (raw data for context)
+${fmtQueries(raw, 20)}
+
+## All Pages in Search (raw data for context)
+${fmtPages(raw, 15)}
+
+## Key Stats
 - Total organic clicks: ${analysis.kpis.clicks} (${analysis.kpis.clicksDelta > 0 ? '+' : ''}${analysis.kpis.clicksDelta}%)
-- Decay pages: ${analysis.decayPages.length}
-- Cannibalization groups: ${analysis.cannibalization.length}
-- Fix prompts generated: ${analysis.fixPrompts.length}
+- Total impressions: ${analysis.kpis.impressions} (${analysis.kpis.impressionsDelta > 0 ? '+' : ''}${analysis.kpis.impressionsDelta}%)
+- Decay pages: ${decay.length} | Cannibalization: ${cannibal.length} | Opportunities: ${opps.length}
 
-## OUTPUT (valid JSON only, no markdown):
+Respond with ONLY valid JSON (no markdown fences):
 {
-  "opportunityOverview": "3-4 sentences: overall opportunity landscape, total value, urgency",
-  "opportunityStrategies": [${opps.slice(0, 5).map(o => `{
-      "keyword": "${o.query.replace(/"/g, '\\"')}",
-      "strategy": "3-4 sentences: specific steps to capture this opportunity",
-      "timeline": "Realistic timeline (e.g. '2-3 weeks for initial impact')"
-    }`).join(',')}],
-  "revenueNarrative": "3-4 sentences: explain the revenue methodology and total opportunity value",
+  "keywordAccelCommentary": "3-4 sentences analyzing accelerating keywords. If none, explain what this means for the site and what to do.",
+  "keywordDecelCommentary": "3-4 sentences analyzing decelerating keywords with severity. If none, analyze new/lost keywords instead.",
+  "keywordFixes": [${decel.slice(0, 5).map(k => `{"keyword": "${k.query.replace(/"/g, '\\"')}", "diagnosis": "2-3 sentences why", "fixSteps": "3-4 numbered steps"}`).join(',')}],
+  "decayOverview": "3-4 sentences on content health. If no decay, explain what the data pattern means.",
+  "decayFixes": [${decay.slice(0, 3).map(p => `{"page": "${p.page.replace(/"/g, '\\"')}", "diagnosis": "2-3 sentences", "refreshStrategy": "3-4 numbered steps"}`).join(',')}],
+  "cannibalizationOverview": "3-4 sentences. If no cannibalization, explain what this means.",
+  "cannibalizationFixes": [${cannibal.slice(0, 3).map(c => `{"query": "${c.query.replace(/"/g, '\\"')}", "recommendation": "2 sentences", "steps": "3-4 numbered steps"}`).join(',')}],
+  "opportunityOverview": "3-4 sentences on opportunity landscape with total value.",
+  "opportunityStrategies": [${opps.slice(0, 5).map(o => `{"keyword": "${o.query.replace(/"/g, '\\"')}", "strategy": "3-4 sentences with specific steps", "timeline": "realistic timeline"}`).join(',')}],
+  "revenueNarrative": "3-4 sentences explaining revenue methodology and total value",
   "actionPlanThisWeek": [
-    {"action": "Specific action 1 with expected result", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific action 2", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific action 3", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific action 4", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific action 5", "effort": "low|medium|high", "impact": "low|medium|high"}
+    {"action": "Specific action with expected result", "effort": "low|medium|high", "impact": "low|medium|high"},
+    {"action": "Action 2", "effort": "low|medium|high", "impact": "low|medium|high"},
+    {"action": "Action 3", "effort": "low|medium|high", "impact": "low|medium|high"},
+    {"action": "Action 4", "effort": "low|medium|high", "impact": "low|medium|high"},
+    {"action": "Action 5", "effort": "low|medium|high", "impact": "low|medium|high"}
   ],
   "actionPlanThisMonth": [
-    {"action": "Specific longer-term action 1", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific longer-term action 2", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific longer-term action 3", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific longer-term action 4", "effort": "low|medium|high", "impact": "low|medium|high"},
-    {"action": "Specific longer-term action 5", "effort": "low|medium|high", "impact": "low|medium|high"}
+    {"action": "Longer-term action 1", "effort": "low|medium|high", "impact": "low|medium|high"},
+    {"action": "Action 2", "effort": "low|medium|high", "impact": "low|medium|high"},
+    {"action": "Action 3", "effort": "low|medium|high", "impact": "low|medium|high"}
   ],
-  "pageOptimizations": [${pages.filter(p => p.grade === 'D' || p.grade === 'F' || p.grade === 'C').slice(0, 3).map(p => `{
-      "page": "${p.page.replace(/"/g, '\\"')}",
-      "issues": "2-3 sentences: what's wrong with this page (specific metrics)",
-      "fixes": "3-4 numbered specific optimization steps"
-    }`).join(',')}]
+  "pageOptimizations": [${pages.filter(p => p.grade === 'D' || p.grade === 'F' || p.grade === 'C').slice(0, 3).map(p => `{"page": "${p.page.replace(/"/g, '\\"')}", "issues": "2-3 sentences", "fixes": "3-4 numbered steps"}`).join(',')}]
 }`;
 }
 
@@ -267,7 +302,7 @@ function validEI(v: unknown): EffortImpact {
     return 'medium';
 }
 
-function validateCall1(raw: unknown): Pick<GeminiReportOutput, 'executiveSummary' | 'anomalyExplanations' | 'trafficDNAInterpretation'> {
+function validateCall1(raw: unknown): Pick<GeminiReportOutput, 'executiveSummary' | 'anomalyExplanations' | 'trafficDNAInterpretation' | 'criticalProblems'> {
     const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
     const es = (obj.executiveSummary && typeof obj.executiveSummary === 'object' ? obj.executiveSummary : {}) as Record<string, unknown>;
 
@@ -279,143 +314,92 @@ function validateCall1(raw: unknown): Pick<GeminiReportOutput, 'executiveSummary
     return {
         executiveSummary: {
             healthStatus,
-            narrative: str(es.narrative, 'Report analyzed but narrative incomplete.'),
-            highlights: strArr(es.highlights, ['Data analyzed', 'See metrics below']),
-            oneAction: str(es.oneAction, 'Review your top-performing pages.'),
-            oneActionWhy: str(es.oneActionWhy, 'Maintaining top content keeps organic traffic stable.'),
-            oneActionImpact: str(es.oneActionImpact, 'Potential improvement in organic visibility.'),
+            narrative: str(es.narrative, ''),
+            highlights: strArr(es.highlights, []),
+            oneAction: str(es.oneAction, ''),
+            oneActionWhy: str(es.oneActionWhy, ''),
+            oneActionImpact: str(es.oneActionImpact, ''),
         },
         anomalyExplanations: Array.isArray(obj.anomalyExplanations)
             ? obj.anomalyExplanations.map((a: Record<string, unknown>) => ({
                 date: str(a?.date, ''),
-                rootCause: str(a?.rootCause, 'Unable to determine root cause.'),
-                impact: str(a?.impact, 'Unknown impact.'),
-                howToFix: str(a?.howToFix, 'Review the data manually for this date.'),
+                rootCause: str(a?.rootCause, ''),
+                impact: str(a?.impact, ''),
+                howToFix: str(a?.howToFix, ''),
             }))
             : [],
-        trafficDNAInterpretation: str(obj.trafficDNAInterpretation as string, 'Traffic composition data was analyzed.'),
+        trafficDNAInterpretation: str(obj.trafficDNAInterpretation as string, ''),
+        criticalProblems: Array.isArray(obj.criticalProblems)
+            ? obj.criticalProblems.map((p: Record<string, unknown>) => ({
+                title: str(p?.title, ''),
+                explanation: str(p?.explanation, ''),
+                fix: str(p?.fix, ''),
+            })).filter((p: { title: string }) => p.title.length > 0)
+            : [],
     };
 }
 
-function validateCall2(raw: unknown): Pick<GeminiReportOutput, 'keywordAccelCommentary' | 'keywordDecelCommentary' | 'keywordFixes' | 'decayOverview' | 'decayFixes' | 'cannibalizationOverview' | 'cannibalizationFixes'> {
+function validateCall2(raw: unknown): Omit<GeminiReportOutput, 'executiveSummary' | 'anomalyExplanations' | 'trafficDNAInterpretation' | 'criticalProblems'> {
     const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
 
     return {
-        keywordAccelCommentary: str(obj.keywordAccelCommentary, 'No accelerating keyword commentary available.'),
-        keywordDecelCommentary: str(obj.keywordDecelCommentary, 'No decelerating keyword commentary available.'),
+        keywordAccelCommentary: str(obj.keywordAccelCommentary, ''),
+        keywordDecelCommentary: str(obj.keywordDecelCommentary, ''),
         keywordFixes: Array.isArray(obj.keywordFixes)
-            ? obj.keywordFixes.map((f: Record<string, unknown>) => ({
-                keyword: str(f?.keyword, ''),
-                diagnosis: str(f?.diagnosis, 'Analysis pending.'),
-                fixSteps: str(f?.fixSteps, 'Update content and optimize on-page elements.'),
-            }))
+            ? obj.keywordFixes.map((f: Record<string, unknown>) => ({ keyword: str(f?.keyword, ''), diagnosis: str(f?.diagnosis, ''), fixSteps: str(f?.fixSteps, '') }))
             : [],
-        decayOverview: str(obj.decayOverview, 'Content decay analysis complete.'),
+        decayOverview: str(obj.decayOverview, ''),
         decayFixes: Array.isArray(obj.decayFixes)
-            ? obj.decayFixes.map((f: Record<string, unknown>) => ({
-                page: str(f?.page, ''),
-                diagnosis: str(f?.diagnosis, 'Analysis pending.'),
-                refreshStrategy: str(f?.refreshStrategy, 'Refresh content and update meta tags.'),
-            }))
+            ? obj.decayFixes.map((f: Record<string, unknown>) => ({ page: str(f?.page, ''), diagnosis: str(f?.diagnosis, ''), refreshStrategy: str(f?.refreshStrategy, '') }))
             : [],
-        cannibalizationOverview: str(obj.cannibalizationOverview, 'Cannibalization analysis complete.'),
+        cannibalizationOverview: str(obj.cannibalizationOverview, ''),
         cannibalizationFixes: Array.isArray(obj.cannibalizationFixes)
-            ? obj.cannibalizationFixes.map((f: Record<string, unknown>) => ({
-                query: str(f?.query, ''),
-                recommendation: str(f?.recommendation, 'Consolidate competing pages.'),
-                steps: str(f?.steps, 'Merge content and set up 301 redirects.'),
-            }))
+            ? obj.cannibalizationFixes.map((f: Record<string, unknown>) => ({ query: str(f?.query, ''), recommendation: str(f?.recommendation, ''), steps: str(f?.steps, '') }))
             : [],
-    };
-}
-
-function validateCall3(raw: unknown): Pick<GeminiReportOutput, 'opportunityOverview' | 'opportunityStrategies' | 'revenueNarrative' | 'actionPlanThisWeek' | 'actionPlanThisMonth' | 'pageOptimizations'> {
-    const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-
-    return {
-        opportunityOverview: str(obj.opportunityOverview, 'Opportunity analysis complete.'),
+        opportunityOverview: str(obj.opportunityOverview, ''),
         opportunityStrategies: Array.isArray(obj.opportunityStrategies)
-            ? obj.opportunityStrategies.map((s: Record<string, unknown>) => ({
-                keyword: str(s?.keyword, ''),
-                strategy: str(s?.strategy, 'Optimize content targeting this keyword.'),
-                timeline: str(s?.timeline, '2-4 weeks'),
-            }))
+            ? obj.opportunityStrategies.map((s: Record<string, unknown>) => ({ keyword: str(s?.keyword, ''), strategy: str(s?.strategy, ''), timeline: str(s?.timeline, '2-4 weeks') }))
             : [],
-        revenueNarrative: str(obj.revenueNarrative, 'Revenue estimate based on keyword opportunity analysis.'),
+        revenueNarrative: str(obj.revenueNarrative, ''),
         actionPlanThisWeek: Array.isArray(obj.actionPlanThisWeek)
-            ? obj.actionPlanThisWeek.map((a: Record<string, unknown>) => ({
-                action: str(a?.action, 'Review top pages.'),
-                effort: validEI(a?.effort),
-                impact: validEI(a?.impact),
-            }))
-            : [{ action: 'Review and refresh top decaying content.', effort: 'medium' as const, impact: 'high' as const }],
+            ? obj.actionPlanThisWeek.map((a: Record<string, unknown>) => ({ action: str(a?.action, ''), effort: validEI(a?.effort), impact: validEI(a?.impact) })).filter((a: { action: string }) => a.action.length > 0)
+            : [],
         actionPlanThisMonth: Array.isArray(obj.actionPlanThisMonth)
-            ? obj.actionPlanThisMonth.map((a: Record<string, unknown>) => ({
-                action: str(a?.action, 'Implement content strategy.'),
-                effort: validEI(a?.effort),
-                impact: validEI(a?.impact),
-            }))
-            : [{ action: 'Build internal linking structure.', effort: 'high' as const, impact: 'high' as const }],
+            ? obj.actionPlanThisMonth.map((a: Record<string, unknown>) => ({ action: str(a?.action, ''), effort: validEI(a?.effort), impact: validEI(a?.impact) })).filter((a: { action: string }) => a.action.length > 0)
+            : [],
         pageOptimizations: Array.isArray(obj.pageOptimizations)
-            ? obj.pageOptimizations.map((p: Record<string, unknown>) => ({
-                page: str(p?.page, ''),
-                issues: str(p?.issues, 'Page needs optimization.'),
-                fixes: str(p?.fixes, 'Improve content and meta tags.'),
-            }))
+            ? obj.pageOptimizations.map((p: Record<string, unknown>) => ({ page: str(p?.page, ''), issues: str(p?.issues, ''), fixes: str(p?.fixes, '') }))
             : [],
     };
 }
 
-// ─── Gemini Call Helper ───
+// ─── Gemini Call Helper with Retry ───
 
-async function callGemini(prompt: string): Promise<unknown> {
+async function callGemini(prompt: string, label: string): Promise<unknown> {
     const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
-        },
-    });
 
-    const text = response.text?.trim() || '';
-    const jsonStr = text.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
-    return JSON.parse(jsonStr);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await ai.models.generateContent({
+                model: MODEL,
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                config: { temperature: 0.3, maxOutputTokens: MAX_TOKENS },
+            });
+
+            const text = response.text?.trim() || '';
+            const jsonStr = text.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
+            const parsed = JSON.parse(jsonStr);
+            console.log(`[Report] Gemini ${label}: OK (attempt ${attempt})`);
+            return parsed;
+        } catch (err) {
+            console.error(`[Report] Gemini ${label} attempt ${attempt}/${MAX_RETRIES} failed:`, err instanceof Error ? err.message : err);
+            if (attempt === MAX_RETRIES) return null;
+        }
+    }
+    return null;
 }
 
-// ─── Main Synthesis ───
-
-export async function synthesizeWithGemini(
-    analysis: ReportAnalysis,
-    period: ReportPeriod,
-    siteUrl: string
-): Promise<GeminiReportOutput> {
-    if (!GEMINI_API_KEY) {
-        return fallbackOutput(analysis, period);
-    }
-
-    try {
-        const prompt1 = buildPrompt1(analysis, period, siteUrl);
-        const prompt2 = buildPrompt2(analysis, period, siteUrl);
-        const prompt3 = buildPrompt3(analysis, period, siteUrl);
-
-        const [raw1, raw2, raw3] = await Promise.all([
-            callGemini(prompt1).catch(err => { console.error('[Report] Gemini call 1 failed:', err); return null; }),
-            callGemini(prompt2).catch(err => { console.error('[Report] Gemini call 2 failed:', err); return null; }),
-            callGemini(prompt3).catch(err => { console.error('[Report] Gemini call 3 failed:', err); return null; }),
-        ]);
-
-        const call1 = raw1 ? validateCall1(raw1) : validateCall1({});
-        const call2 = raw2 ? validateCall2(raw2) : validateCall2({});
-        const call3 = raw3 ? validateCall3(raw3) : validateCall3({});
-
-        return { ...call1, ...call2, ...call3 };
-    } catch (err) {
-        console.error('[Report] Gemini synthesis failed, using fallback:', err);
-        return fallbackOutput(analysis, period);
-    }
-}
+// ─── Data-Driven Fallback ───
 
 function fallbackOutput(analysis: ReportAnalysis, period: ReportPeriod): GeminiReportOutput {
     const kpi = analysis.kpis;
@@ -423,76 +407,101 @@ function fallbackOutput(analysis: ReportAnalysis, period: ReportPeriod): GeminiR
 
     let healthStatus: GeminiReportOutput['executiveSummary']['healthStatus'] = 'stable';
     if (kpi.clicksDelta > 10 && kpi.sessionsDelta > 5) healthStatus = 'growing';
-    else if (kpi.clicksDelta < -15 || kpi.sessionsDelta < -15) healthStatus = 'declining';
-    else if (kpi.clicksDelta < -5 || kpi.avgPositionDelta > 2) healthStatus = 'at_risk';
+    else if (kpi.clicksDelta < -20 || kpi.impressionsDelta < -30) healthStatus = 'declining';
+    else if (kpi.clicksDelta < -5 || kpi.avgPositionDelta > 2 || kpi.clicks < 10) healthStatus = 'at_risk';
+
+    const highlights: string[] = [];
+    if (kpi.clicksDelta !== 0) highlights.push(`Organic clicks ${kpi.clicksDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.clicksDelta)}% (${kpi.clicks} total)`);
+    if (kpi.impressionsDelta !== 0) highlights.push(`Impressions ${kpi.impressionsDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.impressionsDelta)}% (${kpi.impressions} total)`);
+    highlights.push(`${kpi.users.toLocaleString()} users, ${kpi.sessions.toLocaleString()} sessions this ${periodLabel}`);
+    if (kpi.clicks < 10 && kpi.sessions > 100) highlights.push(`Only ${kpi.clicks} organic click(s) despite ${kpi.sessions.toLocaleString()} sessions — organic visibility is critically low`);
+    if (kpi.newUserRatio >= 85) highlights.push(`${kpi.newUserRatio}% new user ratio — almost no returning visitors`);
+
+    const narrative = analysis.criticalAlerts.length > 0
+        ? `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited with ${kpi.sessions.toLocaleString()} sessions, but the organic performance is alarming: only ${kpi.clicks} organic click(s) (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%) from ${kpi.impressions} impressions. ${analysis.criticalAlerts[0].detail} Average position is ${kpi.avgPosition} with a ${(kpi.bounceRate * 100).toFixed(0)}% bounce rate. Immediate action is needed to address the organic visibility crisis.`
+        : `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%) with ${kpi.clicks.toLocaleString()} organic clicks (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%). Average position: ${kpi.avgPosition}. Bounce rate: ${(kpi.bounceRate * 100).toFixed(1)}%.`;
+
+    const criticalProblems = analysis.criticalAlerts.map(a => ({
+        title: a.title,
+        explanation: a.detail,
+        fix: a.severity === 'critical'
+            ? '1. Check Google Search Console for manual actions or security issues. 2. Verify all important pages are indexed (site:yourdomain.com). 3. Review recent changes to the site that might have caused ranking loss. 4. Check for technical SEO issues (robots.txt, canonical tags, redirects).'
+            : '1. Review the affected pages and keywords. 2. Update content to match current search intent. 3. Improve internal linking to the affected pages.',
+    }));
 
     return {
-        executiveSummary: {
-            healthStatus,
-            narrative: `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%) with ${kpi.clicks.toLocaleString()} organic clicks (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%). Average position: ${kpi.avgPosition}. Bounce rate: ${(kpi.bounceRate * 100).toFixed(1)}%.`,
-            highlights: [
-                `Organic clicks ${kpi.clicksDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.clicksDelta)}%`,
-                `${kpi.users.toLocaleString()} total users this ${periodLabel}`,
-                `Average position: ${kpi.avgPosition}`,
-                `${kpi.newUserRatio}% new user ratio`,
-            ],
-            oneAction: 'Focus on the top declining keywords and refresh their landing pages.',
-            oneActionWhy: 'Recovering declining keywords is faster than ranking for new ones.',
-            oneActionImpact: `Could recover ${Math.abs(analysis.keywordVelocity.decelerating.reduce((s, k) => s + k.clickDelta, 0))} lost clicks.`,
-        },
-        anomalyExplanations: analysis.anomalies.map(a => ({
-            date: a.date,
-            rootCause: `Sessions were ${a.deviationPercent > 0 ? 'higher' : 'lower'} than expected (${a.actual} vs ~${a.expected}). This ${a.severity} anomaly represents a ${Math.abs(a.deviationPercent)}% deviation from the mean.`,
-            impact: `${Math.abs(a.actual - a.expected)} sessions ${a.deviationPercent > 0 ? 'gained' : 'lost'} on ${a.dayName}.`,
-            howToFix: a.deviationPercent < 0
-                ? '1. Check for technical issues or server downtime. 2. Review if any pages lost rankings on this day. 3. Verify no crawl errors in Search Console.'
-                : '1. Identify the traffic source driving the spike. 2. Analyze which pages received extra traffic. 3. Create more content on similar topics.',
-        })),
-        trafficDNAInterpretation: `Your top channel is ${analysis.trafficDNA.channels[0]?.channel || 'Organic Search'} at ${analysis.trafficDNA.channels[0]?.currentShare || 0}% of traffic. ${analysis.trafficDNA.devices[0]?.device || 'Desktop'} leads device usage at ${analysis.trafficDNA.devices[0]?.currentShare || 0}%.`,
-        keywordAccelCommentary: analysis.keywordVelocity.accelerating.length > 0
-            ? `${analysis.keywordVelocity.accelerating.length} keywords gaining momentum with improving positions.`
-            : 'No keywords showed significant acceleration this period.',
-        keywordDecelCommentary: analysis.keywordVelocity.decelerating.length > 0
-            ? `${analysis.keywordVelocity.decelerating.length} keywords losing momentum — requires attention.`
-            : 'No keywords showed significant deceleration.',
-        keywordFixes: analysis.keywordVelocity.decelerating.slice(0, 5).map(k => ({
-            keyword: k.query,
-            diagnosis: `Position dropped from ${k.prevPosition} to ${k.currentPosition}. Clicks fell by ${Math.abs(k.clickDelta)}.`,
-            fixSteps: `1. Refresh content targeting "${k.query}". 2. Add internal links from high-authority pages. 3. Update title and meta description for better CTR.`,
-        })),
-        decayOverview: `${analysis.decayPages.length} pages showing declining traffic and worsening positions.`,
-        decayFixes: analysis.decayPages.slice(0, 3).map(p => ({
-            page: p.page,
-            diagnosis: `Clicks dropped by ${Math.abs(p.clickDelta)} (${p.decayRate}% decline). Position worsened from ${p.prevPosition} to ${p.currentPosition}.`,
-            refreshStrategy: `1. Update content with fresh data. 2. Improve heading structure and readability. 3. Add new sections addressing recent search trends.`,
-        })),
-        cannibalizationOverview: `${analysis.cannibalization.length} keywords have multiple competing pages.`,
-        cannibalizationFixes: analysis.cannibalization.slice(0, 3).map(c => ({
-            query: c.query,
-            recommendation: `Keep ${c.winner} as the primary page. It has the most clicks.`,
-            steps: `1. Consolidate thin competing pages. 2. Set up 301 redirects for removed pages. 3. Add canonical tags if pages serve different intents.`,
-        })),
-        opportunityOverview: `${analysis.opportunities.length} opportunities worth ~$${analysis.totalRevenueEstimate}/month.`,
-        opportunityStrategies: analysis.opportunities.slice(0, 5).map(o => ({
-            keyword: o.query,
-            strategy: `Currently at position ${o.position.toFixed(1)} with ${o.impressions} impressions. Optimizing could capture ${o.potentialClicks} additional clicks.`,
-            timeline: '2-4 weeks for initial results.',
-        })),
-        revenueNarrative: `Based on current keyword positions and search volume, the estimated monthly organic value is $${analysis.totalRevenueEstimate}. This is calculated from potential click gains multiplied by estimated CPC for each keyword.`,
-        actionPlanThisWeek: [
-            { action: 'Refresh top 3 decaying pages', effort: 'medium' as const, impact: 'high' as const },
-            { action: 'Fix meta descriptions for CTR underperformers', effort: 'low' as const, impact: 'medium' as const },
-            { action: 'Add internal links to striking distance keywords', effort: 'low' as const, impact: 'medium' as const },
-        ],
-        actionPlanThisMonth: [
-            { action: 'Resolve keyword cannibalization (top 3 groups)', effort: 'high' as const, impact: 'high' as const },
-            { action: 'Create content targeting top 5 opportunities', effort: 'high' as const, impact: 'high' as const },
-            { action: 'Build internal linking structure', effort: 'medium' as const, impact: 'medium' as const },
-        ],
-        pageOptimizations: analysis.pageGrades.filter(p => p.grade === 'D' || p.grade === 'F').slice(0, 3).map(p => ({
-            page: p.page,
-            issues: `Grade ${p.grade}: position ${p.position}, CTR ${p.ctr}%, bounce ${p.bounceRate}%.`,
-            fixes: `1. Rewrite title tag for better CTR. 2. Improve content depth. 3. Add structured data.`,
-        })),
+        executiveSummary: { healthStatus, narrative, highlights, oneAction: analysis.criticalAlerts.length > 0 ? `Address: ${analysis.criticalAlerts[0].title}` : 'Focus on the top declining keywords and refresh their landing pages.', oneActionWhy: analysis.criticalAlerts.length > 0 ? analysis.criticalAlerts[0].detail : 'Recovering declining keywords is faster than ranking for new ones.', oneActionImpact: `Could recover ${Math.abs(analysis.keywordVelocity.decelerating.reduce((s, k) => s + k.clickDelta, 0))} lost clicks.` },
+        anomalyExplanations: analysis.anomalies.map(a => ({ date: a.date, rootCause: `Sessions were ${a.deviationPercent > 0 ? 'higher' : 'lower'} than expected (${a.actual} vs ~${a.expected}). This ${a.severity} anomaly represents a ${Math.abs(a.deviationPercent)}% deviation from the mean.`, impact: `${Math.abs(a.actual - a.expected)} sessions ${a.deviationPercent > 0 ? 'gained' : 'lost'} on ${a.dayName}.`, howToFix: a.deviationPercent < 0 ? '1. Check for technical issues or server downtime. 2. Review if any pages lost rankings on this day. 3. Verify no crawl errors in Search Console.' : '1. Identify the traffic source driving the spike. 2. Analyze which pages received extra traffic. 3. Create more content on similar topics.' })),
+        trafficDNAInterpretation: `Your top channel is ${analysis.trafficDNA.channels[0]?.channel || 'Direct'} at ${analysis.trafficDNA.channels[0]?.currentShare || 0}% of traffic. ${analysis.trafficDNA.devices[0]?.device || 'Desktop'} leads device usage at ${analysis.trafficDNA.devices[0]?.currentShare || 0}%. ${kpi.clicks < 10 && kpi.sessions > 100 ? `The massive disconnect between ${kpi.sessions.toLocaleString()} GA4 sessions and only ${kpi.clicks} organic clicks indicates the site relies almost entirely on non-organic traffic sources. Building organic visibility should be the primary strategic objective.` : ''}`,
+        criticalProblems,
+        keywordAccelCommentary: analysis.keywordVelocity.accelerating.length > 0 ? `${analysis.keywordVelocity.accelerating.length} keywords gaining momentum.` : `No keywords showed acceleration. ${analysis.keywordVelocity.newKeywords.length > 0 ? `However, ${analysis.keywordVelocity.newKeywords.length} new keyword(s) appeared this period.` : 'The site needs to build keyword authority through new content and optimization.'}`,
+        keywordDecelCommentary: analysis.keywordVelocity.decelerating.length > 0 ? `${analysis.keywordVelocity.decelerating.length} keywords losing momentum — requires attention.` : `No keywords showed deceleration. ${analysis.keywordVelocity.lostKeywords.length > 0 ? `However, ${analysis.keywordVelocity.lostKeywords.length} keyword(s) disappeared entirely.` : ''}`,
+        keywordFixes: analysis.keywordVelocity.decelerating.slice(0, 5).map(k => ({ keyword: k.query, diagnosis: `Position dropped from ${k.prevPosition} to ${k.currentPosition}. Clicks fell by ${Math.abs(k.clickDelta)}.`, fixSteps: `1. Refresh content targeting "${k.query}". 2. Add internal links from high-authority pages. 3. Update title and meta description for better CTR.` })),
+        decayOverview: analysis.decayPages.length > 0 ? `${analysis.decayPages.length} page(s) showing declining traffic and worsening positions.` : kpi.clicks < 10 ? `No decay detected because organic data is too sparse (${kpi.clicks} total clicks). Building organic visibility is the prerequisite.` : 'No significant content decay detected this period.',
+        decayFixes: analysis.decayPages.slice(0, 3).map(p => ({ page: p.page, diagnosis: `Clicks dropped by ${Math.abs(p.clickDelta)} (${p.decayRate}% decline). Position worsened from ${p.prevPosition} to ${p.currentPosition}.`, refreshStrategy: `1. Update content with fresh data. 2. Improve heading structure. 3. Add new sections addressing recent search trends.` })),
+        cannibalizationOverview: analysis.cannibalization.length > 0 ? `${analysis.cannibalization.length} keyword(s) have competing pages.` : 'No cannibalization detected.',
+        cannibalizationFixes: analysis.cannibalization.slice(0, 3).map(c => ({ query: c.query, recommendation: `Keep ${c.winner} as the primary page.`, steps: `1. Consolidate thin competing pages. 2. Set up 301 redirects for removed pages. 3. Add canonical tags if pages serve different intents.` })),
+        opportunityOverview: analysis.opportunities.length > 0 ? `${analysis.opportunities.length} opportunities worth ~$${analysis.totalRevenueEstimate}/month.` : kpi.impressions < 50 ? `No keyword opportunities detected — the site has only ${kpi.impressions} impressions. Priority is building any organic presence first.` : 'No actionable keyword opportunities found this period.',
+        opportunityStrategies: analysis.opportunities.slice(0, 5).map(o => ({ keyword: o.query, strategy: `Position ${o.position.toFixed(1)} with ${o.impressions} impressions. Optimizing could capture ${o.potentialClicks} additional clicks.`, timeline: '2-4 weeks for initial results.' })),
+        revenueNarrative: `Estimated monthly organic value: $${analysis.totalRevenueEstimate}. ${analysis.opportunities.length === 0 && kpi.clicks < 10 ? 'The site currently has negligible organic value. Building organic visibility through content creation and technical SEO is the foundation for revenue growth.' : 'Based on keyword positions and estimated CPC values.'}`,
+        actionPlanThisWeek: analysis.criticalAlerts.length > 0
+            ? [{ action: `Investigate and address: ${analysis.criticalAlerts[0].title}`, effort: 'medium' as const, impact: 'high' as const }, { action: 'Verify all important pages are indexed in Google Search Console', effort: 'low' as const, impact: 'high' as const }, { action: 'Check for crawl errors and fix any 404s or server errors', effort: 'low' as const, impact: 'medium' as const }]
+            : [{ action: 'Refresh top 3 decaying pages', effort: 'medium' as const, impact: 'high' as const }, { action: 'Fix meta descriptions for CTR underperformers', effort: 'low' as const, impact: 'medium' as const }, { action: 'Add internal links to striking distance keywords', effort: 'low' as const, impact: 'medium' as const }],
+        actionPlanThisMonth: [{ action: analysis.criticalAlerts.length > 0 ? 'Build a content strategy targeting 10+ relevant keywords' : 'Resolve keyword cannibalization (top 3 groups)', effort: 'high' as const, impact: 'high' as const }, { action: 'Create content targeting top 5 keyword opportunities', effort: 'high' as const, impact: 'high' as const }, { action: 'Build internal linking structure across all key pages', effort: 'medium' as const, impact: 'medium' as const }],
+        pageOptimizations: analysis.pageGrades.filter(p => p.grade === 'D' || p.grade === 'F').slice(0, 3).map(p => ({ page: p.page, issues: `Grade ${p.grade}: position ${p.position}, CTR ${p.ctr}%, bounce ${p.bounceRate}%.`, fixes: `1. Rewrite title tag for better CTR. 2. Improve content depth. 3. Add structured data.` })),
     };
+}
+
+// ─── Main Synthesis ───
+
+export async function synthesizeWithGemini(
+    analysis: ReportAnalysis,
+    period: ReportPeriod,
+    siteUrl: string,
+    rawData: ReportRawData
+): Promise<GeminiReportOutput> {
+    if (!GEMINI_API_KEY) {
+        console.warn('[Report] No GEMINI_API_KEY — using data-driven fallback');
+        return fallbackOutput(analysis, period);
+    }
+
+    try {
+        const prompt1 = buildPrompt1(analysis, period, siteUrl, rawData);
+        const prompt2 = buildPrompt2(analysis, period, siteUrl, rawData);
+
+        const [raw1, raw2] = await Promise.all([
+            callGemini(prompt1, 'diagnosis'),
+            callGemini(prompt2, 'action-plan'),
+        ]);
+
+        const call1 = validateCall1(raw1 ?? {});
+        const call2 = validateCall2(raw2 ?? {});
+
+        // If Gemini returned empty narratives, merge with fallback data
+        const fb = (call1.executiveSummary.narrative.length === 0 || call2.actionPlanThisWeek.length === 0)
+            ? fallbackOutput(analysis, period) : null;
+
+        return {
+            executiveSummary: call1.executiveSummary.narrative.length > 0 ? call1.executiveSummary : (fb?.executiveSummary ?? call1.executiveSummary),
+            anomalyExplanations: call1.anomalyExplanations.length > 0 ? call1.anomalyExplanations : (fb?.anomalyExplanations ?? []),
+            trafficDNAInterpretation: call1.trafficDNAInterpretation.length > 0 ? call1.trafficDNAInterpretation : (fb?.trafficDNAInterpretation ?? ''),
+            criticalProblems: call1.criticalProblems.length > 0 ? call1.criticalProblems : (fb?.criticalProblems ?? []),
+            keywordAccelCommentary: call2.keywordAccelCommentary || fb?.keywordAccelCommentary || '',
+            keywordDecelCommentary: call2.keywordDecelCommentary || fb?.keywordDecelCommentary || '',
+            keywordFixes: call2.keywordFixes.length > 0 ? call2.keywordFixes : (fb?.keywordFixes ?? []),
+            decayOverview: call2.decayOverview || fb?.decayOverview || '',
+            decayFixes: call2.decayFixes.length > 0 ? call2.decayFixes : (fb?.decayFixes ?? []),
+            cannibalizationOverview: call2.cannibalizationOverview || fb?.cannibalizationOverview || '',
+            cannibalizationFixes: call2.cannibalizationFixes.length > 0 ? call2.cannibalizationFixes : (fb?.cannibalizationFixes ?? []),
+            opportunityOverview: call2.opportunityOverview || fb?.opportunityOverview || '',
+            opportunityStrategies: call2.opportunityStrategies.length > 0 ? call2.opportunityStrategies : (fb?.opportunityStrategies ?? []),
+            revenueNarrative: call2.revenueNarrative || fb?.revenueNarrative || '',
+            actionPlanThisWeek: call2.actionPlanThisWeek.length > 0 ? call2.actionPlanThisWeek : (fb?.actionPlanThisWeek ?? []),
+            actionPlanThisMonth: call2.actionPlanThisMonth.length > 0 ? call2.actionPlanThisMonth : (fb?.actionPlanThisMonth ?? []),
+            pageOptimizations: call2.pageOptimizations.length > 0 ? call2.pageOptimizations : (fb?.pageOptimizations ?? []),
+        };
+    } catch (err) {
+        console.error('[Report] Gemini synthesis failed, using fallback:', err);
+        return fallbackOutput(analysis, period);
+    }
 }

@@ -144,12 +144,30 @@ export interface FixPrompt {
     category: 'decay' | 'cannibalization' | 'keyword' | 'ctr' | 'opportunity';
 }
 
+export interface CriticalAlert {
+    severity: 'critical' | 'danger' | 'warning';
+    title: string;
+    detail: string;
+    metric: string;
+}
+
+export interface NewLostKeyword {
+    query: string;
+    clicks: number;
+    impressions: number;
+    position: number;
+    ctr: number;
+}
+
 export interface ReportAnalysis {
     kpis: KPISummary;
     anomalies: AnomalyDay[];
+    criticalAlerts: CriticalAlert[];
     keywordVelocity: {
         accelerating: KeywordVelocityItem[];
         decelerating: KeywordVelocityItem[];
+        newKeywords: NewLostKeyword[];
+        lostKeywords: NewLostKeyword[];
     };
     trafficDNA: TrafficDNA;
     decayPages: DecayPage[];
@@ -319,9 +337,10 @@ function detectAnomalies(data: ReportRawData): AnomalyDay[] {
 
 // ─── Keyword Velocity ───
 
-function computeKeywordVelocity(data: ReportRawData): { accelerating: KeywordVelocityItem[]; decelerating: KeywordVelocityItem[] } {
+function computeKeywordVelocity(data: ReportRawData): ReportAnalysis['keywordVelocity'] {
     const { gsc } = data;
     const prevMap = new Map(gsc.queriesPrev.map(q => [q.query, q]));
+    const currentSet = new Set(gsc.queriesCurrent.map(q => q.query));
     const items: KeywordVelocityItem[] = [];
 
     for (const current of gsc.queriesCurrent) {
@@ -360,10 +379,24 @@ function computeKeywordVelocity(data: ReportRawData): { accelerating: KeywordVel
         });
     }
 
+    const newKeywords: NewLostKeyword[] = gsc.queriesCurrent
+        .filter(q => !prevMap.has(q.query) && isLatinSafe(q.query))
+        .sort((a, b) => b.impressions - a.impressions)
+        .slice(0, 10)
+        .map(q => ({ query: q.query, clicks: q.clicks, impressions: q.impressions, position: Math.round(q.position * 10) / 10, ctr: Math.round(q.ctr * 10000) / 100 }));
+
+    const lostKeywords: NewLostKeyword[] = gsc.queriesPrev
+        .filter(q => !currentSet.has(q.query) && isLatinSafe(q.query))
+        .sort((a, b) => b.clicks - a.clicks)
+        .slice(0, 10)
+        .map(q => ({ query: q.query, clicks: q.clicks, impressions: q.impressions, position: Math.round(q.position * 10) / 10, ctr: Math.round(q.ctr * 10000) / 100 }));
+
     const sorted = items.sort((a, b) => b.momentumScore - a.momentumScore);
     return {
         accelerating: sorted.filter(i => i.momentumScore > 0).slice(0, 10),
         decelerating: sorted.filter(i => i.momentumScore < 0).sort((a, b) => a.momentumScore - b.momentumScore).slice(0, 10),
+        newKeywords,
+        lostKeywords,
     };
 }
 
@@ -448,13 +481,16 @@ function detectDecay(data: ReportRawData): DecayPage[] {
     for (const page of data.gsc.pagesCurrent) {
         const prev = prevMap.get(page.page);
         if (!prev) continue;
-        if (prev.clicks < 3) continue;
 
         const clickDelta = page.clicks - prev.clicks;
         const positionDelta = page.position - prev.position;
         const decayRate = prev.clicks > 0 ? Math.round((clickDelta / prev.clicks) * 100) : 0;
 
-        if (clickDelta < -2 && positionDelta > 0.5) {
+        const isDecaying = (prev.clicks >= 3 && clickDelta < -2 && positionDelta > 0.5)
+            || (prev.clicks >= 1 && clickDelta < 0 && decayRate <= -50)
+            || (prev.clicks >= 1 && clickDelta < -1 && positionDelta > 1);
+
+        if (isDecaying) {
             decay.push({
                 page: truncatePath(page.page),
                 currentClicks: page.clicks,
@@ -495,7 +531,7 @@ function detectCannibalization(data: ReportRawData): CannibalizationGroup[] {
     for (const [query, pages] of queryPages) {
         if (pages.length < 2) continue;
         const totalImpressions = sum(pages.map(p => p.impressions));
-        if (totalImpressions < 30) continue;
+        if (totalImpressions < 5) continue;
 
         const sorted = pages.sort((a, b) => b.clicks - a.clicks);
         groups.push({
@@ -524,11 +560,11 @@ function computeOpportunities(data: ReportRawData): OpportunityItem[] {
         const cpc = estimateCPC(q.query);
         const revenueEstimate = Math.round(potentialClicks * cpc * 100) / 100;
 
-        if (q.position > 3 && q.position <= 20 && q.impressions > 50) {
+        if (q.position > 3 && q.position <= 20 && q.impressions >= 5) {
             opps.push({ ...q, potentialClicks, revenueEstimate, type: 'striking_distance' });
-        } else if (q.position <= 5 && ctrPct < expected * 0.5 && q.impressions > 100) {
+        } else if (q.position <= 5 && ctrPct < expected * 0.5 && q.impressions >= 10) {
             opps.push({ ...q, potentialClicks, revenueEstimate, type: 'ctr_fix' });
-        } else if (q.position > 10 && q.position <= 15 && q.impressions > 200) {
+        } else if (q.position > 10 && q.position <= 15 && q.impressions >= 10) {
             opps.push({ ...q, potentialClicks, revenueEstimate, type: 'quick_win' });
         }
     }
@@ -652,6 +688,53 @@ function computeFixPrompts(
     return prompts;
 }
 
+// ─── Critical Alerts ───
+
+function computeCriticalAlerts(kpis: KPISummary, data: ReportRawData): CriticalAlert[] {
+    const alerts: CriticalAlert[] = [];
+
+    if (kpis.clicksDelta <= -50) {
+        alerts.push({ severity: 'critical', title: 'Organic Click Collapse', detail: `Organic clicks dropped ${Math.abs(kpis.clicksDelta)}% (${kpis.clicks} this period vs previous). This signals a severe loss in search visibility requiring immediate investigation.`, metric: `${kpis.clicks} clicks (${kpis.clicksDelta}%)` });
+    } else if (kpis.clicksDelta <= -20) {
+        alerts.push({ severity: 'danger', title: 'Significant Organic Decline', detail: `Organic clicks fell ${Math.abs(kpis.clicksDelta)}%. Check for ranking losses, algorithm updates, or technical issues.`, metric: `${kpis.clicks} clicks (${kpis.clicksDelta}%)` });
+    }
+
+    if (kpis.clicks < 10 && kpis.sessions > 100) {
+        const ratio = kpis.sessions > 0 ? Math.round((kpis.clicks / kpis.sessions) * 100) : 0;
+        alerts.push({ severity: 'critical', title: 'Near-Zero Organic Visibility', detail: `Only ${kpis.clicks} organic click(s) despite ${kpis.sessions.toLocaleString()} sessions. Organic makes up just ${ratio}% of traffic — the site is almost invisible in search results.`, metric: `${kpis.clicks} organic clicks / ${kpis.sessions.toLocaleString()} sessions` });
+    }
+
+    if (kpis.impressionsDelta <= -30 && kpis.impressions > 0) {
+        alerts.push({ severity: 'danger', title: 'Search Impressions Dropping', detail: `Impressions fell ${Math.abs(kpis.impressionsDelta)}% — Google is showing your pages to fewer people. Check for lost rankings or indexing issues.`, metric: `${kpis.impressions} impressions (${kpis.impressionsDelta}%)` });
+    }
+
+    if (kpis.impressions === 0 && kpis.sessions > 50) {
+        alerts.push({ severity: 'critical', title: 'Zero Search Impressions', detail: `Your site received zero search impressions. This could indicate indexing problems, a manual penalty, or Search Console verification issues.`, metric: '0 impressions' });
+    }
+
+    const homePage = data.gsc.pagesCurrent.find(p => p.page === '/' || p.page.endsWith('.com/') || p.page.endsWith('.com'));
+    const homePagePrev = data.gsc.pagesPrev.find(p => p.page === '/' || p.page.endsWith('.com/') || p.page.endsWith('.com'));
+    if (homePagePrev && homePagePrev.clicks >= 2 && homePage) {
+        const homeDelta = homePage.clicks - homePagePrev.clicks;
+        if (homeDelta < 0 && homePage.clicks === 0) {
+            alerts.push({ severity: 'critical', title: 'Homepage Organic Collapse', detail: `Homepage went from ${homePagePrev.clicks} organic clicks to 0. This is your most important page — investigate immediately for ranking loss, title tag changes, or indexing issues.`, metric: `${homePagePrev.clicks} → 0 clicks` });
+        }
+    }
+
+    if (kpis.newUserRatio >= 90 && kpis.sessions > 200) {
+        alerts.push({ severity: 'warning', title: 'No Returning Visitors', detail: `${kpis.newUserRatio}% of visitors are new — almost no one returns. This suggests low content stickiness or missing email capture / engagement loops.`, metric: `${kpis.newUserRatio}% new user ratio` });
+    }
+
+    if (kpis.bounceRate > 0.7 && kpis.sessions > 100) {
+        alerts.push({ severity: 'warning', title: 'High Bounce Rate', detail: `Bounce rate is ${(kpis.bounceRate * 100).toFixed(0)}% — more than 70% of visitors leave after one page. Check page load speed, content relevance, and mobile UX.`, metric: `${(kpis.bounceRate * 100).toFixed(0)}% bounce rate` });
+    }
+
+    return alerts.sort((a, b) => {
+        const sev = { critical: 0, danger: 1, warning: 2 };
+        return sev[a.severity] - sev[b.severity];
+    });
+}
+
 // ─── Main Analysis ───
 
 export function analyzeReportData(data: ReportRawData): ReportAnalysis {
@@ -672,9 +755,12 @@ export function analyzeReportData(data: ReportRawData): ReportAnalysis {
 
     const totalRevenueEstimate = opportunities.reduce((s, o) => s + o.revenueEstimate, 0);
 
+    const criticalAlerts = computeCriticalAlerts(kpis, data);
+
     return {
         kpis,
         anomalies: detectAnomalies(data),
+        criticalAlerts,
         keywordVelocity,
         trafficDNA: computeTrafficDNA(data),
         decayPages,

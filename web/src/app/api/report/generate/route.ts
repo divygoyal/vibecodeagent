@@ -139,12 +139,12 @@ export async function POST(req: Request) {
         const t2 = Date.now();
         console.log(`[Report] Running analysis...`);
         const analysis = analyzeReportData(rawData);
-        console.log(`[Report] Analysis: ${Date.now() - t2}ms (${analysis.fixPrompts.length} fix prompts, ${analysis.pageGrades.length} page grades)`);
+        console.log(`[Report] Analysis: ${Date.now() - t2}ms | ${analysis.criticalAlerts.length} critical alerts, ${analysis.fixPrompts.length} fix prompts, ${analysis.pageGrades.length} page grades, ${analysis.opportunities.length} opportunities`);
 
-        // Stage 3: Gemini synthesis (3 parallel calls)
+        // Stage 3: Gemini synthesis (2 parallel calls with raw data)
         const t3 = Date.now();
-        console.log(`[Report] Synthesizing with Gemini (3 parallel calls)...`);
-        const gemini = await synthesizeWithGemini(analysis, period, siteUrl || propertyId || '');
+        console.log(`[Report] Synthesizing with Gemini (2 parallel calls, model: gemini-3-flash-preview)...`);
+        const gemini = await synthesizeWithGemini(analysis, period, siteUrl || propertyId || '', rawData);
         console.log(`[Report] Gemini synthesis: ${Date.now() - t3}ms`);
 
         // Stage 4: PDF generation

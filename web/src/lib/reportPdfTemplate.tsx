@@ -294,6 +294,23 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
                 <HealthBadge status={es.healthStatus} />
             </View>
             <Text style={s.sectionSubtitle}>AI-generated deep analysis of your site performance</Text>
+
+            {analysis.criticalAlerts.length > 0 && (
+                <View style={{ marginBottom: 10 }}>
+                    {analysis.criticalAlerts.slice(0, 3).map((alert, i) => {
+                        const alertStyle = alert.severity === 'critical' ? { bg: C.redLight, border: C.red, text: C.red }
+                            : alert.severity === 'danger' ? { bg: C.amberLight, border: C.amber, text: C.amber }
+                            : { bg: '#EFF6FF', border: '#3B82F6', text: '#3B82F6' };
+                        return (
+                            <View key={`alert-${i}`} style={{ backgroundColor: alertStyle.bg, borderRadius: 6, padding: 8, borderLeftWidth: 3, borderLeftColor: alertStyle.border, marginBottom: 4 }}>
+                                <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: alertStyle.text }}>[{alert.severity.toUpperCase()}] {alert.title}</Text>
+                                <Text style={{ fontSize: 7, color: C.text, marginTop: 2, lineHeight: 1.3 }}>{alert.detail}</Text>
+                            </View>
+                        );
+                    })}
+                </View>
+            )}
+
             <Text style={s.narrative}>{es.narrative}</Text>
 
             <View style={s.kpiRow}>
@@ -316,6 +333,14 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
                 <Text style={[s.actionText, { color: C.textMuted, marginTop: 3 }]}>Why: {es.oneActionWhy}</Text>
                 <Text style={[s.actionText, { color: C.emeraldDark, marginTop: 2 }]}>Expected: {es.oneActionImpact}</Text>
             </View>
+
+            {gemini.criticalProblems.slice(0, 2).map((prob, i) => (
+                <View key={`prob-${i}`} style={[s.card, { marginTop: 6, borderLeftWidth: 3, borderLeftColor: C.red }]}>
+                    <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.red, marginBottom: 3 }}>{prob.title}</Text>
+                    <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4, marginBottom: 3 }}>{prob.explanation}</Text>
+                    <Text style={{ fontSize: 7, color: C.emeraldDark, lineHeight: 1.4 }}>{prob.fix}</Text>
+                </View>
+            ))}
             <PageFooter pageNum={2} />
         </Page>
     );
@@ -381,8 +406,12 @@ function AnomalyDeepDivePage({ analysis, gemini, siteUrl }: ReportProps) {
 
             {analysis.anomalies.length === 0 ? (
                 <View style={s.card}>
-                    <Text style={s.cardTitle}>Clean Period</Text>
-                    <Text style={{ fontSize: 8, color: C.textMuted }}>No significant anomalies detected. Traffic patterns were within normal ranges throughout the period.</Text>
+                    <Text style={s.cardTitle}>No Statistical Anomalies</Text>
+                    <Text style={{ fontSize: 8, color: C.textMuted }}>
+                        Session variance stayed within normal ranges (z-score under 1.5). {analysis.criticalAlerts.length > 0
+                            ? `However, ${analysis.criticalAlerts.length} critical issue(s) were detected in other metrics — see Executive Summary.`
+                            : 'Daily traffic patterns were consistent.'}
+                    </Text>
                 </View>
             ) : (
                 gemini.anomalyExplanations.map((ae, i) => {
@@ -430,7 +459,7 @@ function KeywordIntelligencePage({ analysis, gemini, siteUrl }: ReportProps) {
             <View style={s.card}>
                 <Text style={[s.cardTitle, { color: C.emeraldDark }]}>Accelerating Keywords ({accelerating.length})</Text>
                 {accelerating.length === 0 ? (
-                    <Text style={{ fontSize: 7, color: C.textMuted }}>No keywords showed significant acceleration.</Text>
+                    <Text style={{ fontSize: 7, color: C.textMuted }}>No keywords showed significant acceleration. {analysis.keywordVelocity.newKeywords.length > 0 ? `${analysis.keywordVelocity.newKeywords.length} new keyword(s) appeared this period — see below.` : 'Build keyword authority by creating targeted content.'}</Text>
                 ) : (
                     <>
                         <View style={s.tableHeader}>
@@ -459,7 +488,7 @@ function KeywordIntelligencePage({ analysis, gemini, siteUrl }: ReportProps) {
             <View style={s.card}>
                 <Text style={[s.cardTitle, { color: C.red }]}>Decelerating Keywords ({decelerating.length})</Text>
                 {decelerating.length === 0 ? (
-                    <Text style={{ fontSize: 7, color: C.textMuted }}>No keywords showed significant deceleration.</Text>
+                    <Text style={{ fontSize: 7, color: C.textMuted }}>No keywords showed significant deceleration. {analysis.keywordVelocity.lostKeywords.length > 0 ? `However, ${analysis.keywordVelocity.lostKeywords.length} keyword(s) disappeared entirely this period.` : ''}</Text>
                 ) : (
                     <>
                         <View style={s.tableHeader}>
@@ -504,7 +533,11 @@ function ContentDecayPage({ analysis, gemini, siteUrl }: ReportProps) {
 
             {decay.length === 0 ? (
                 <View style={s.card}>
-                    <Text style={{ fontSize: 8, color: C.emeraldDark }}>No significant content decay detected — your content is holding strong.</Text>
+                    <Text style={{ fontSize: 8, color: analysis.kpis.clicks < 10 ? C.amber : C.emeraldDark }}>
+                        {analysis.kpis.clicks < 10
+                            ? `Organic data is too limited for decay analysis (${analysis.kpis.clicks} total click(s), ${analysis.kpis.impressions} impressions). Building organic visibility is the first priority.`
+                            : 'No significant content decay detected this period — content is holding steady.'}
+                    </Text>
                 </View>
             ) : (
                 <>
@@ -556,7 +589,11 @@ function CannibalizationPage({ analysis, gemini, siteUrl }: ReportProps) {
 
             {cannibal.length === 0 ? (
                 <View style={s.card}>
-                    <Text style={{ fontSize: 8, color: C.emeraldDark }}>No significant cannibalization detected.</Text>
+                    <Text style={{ fontSize: 8, color: analysis.kpis.impressions < 50 ? C.amber : C.emeraldDark }}>
+                        {analysis.kpis.impressions < 50
+                            ? `Insufficient search data for cannibalization analysis (${analysis.kpis.impressions} total impressions). Focus on building organic presence first.`
+                            : 'No keyword cannibalization detected — pages are targeting distinct queries.'}
+                    </Text>
                 </View>
             ) : (
                 cannibal.slice(0, 4).map((group, i) => (
@@ -777,19 +814,23 @@ function TrafficDNAPage({ analysis, gemini, period, siteUrl }: ReportProps) {
 }
 
 // Page 11: Fix Prompts Collection
-function FixPromptsPage({ analysis, siteUrl }: ReportProps) {
+function FixPromptsPage({ analysis, gemini, siteUrl }: ReportProps) {
     const prompts = analysis.fixPrompts;
 
     return (
         <Page size="A4" style={s.page}>
             <View style={s.accentSidebar} />
             <PageHeader siteUrl={siteUrl} />
-            <Text style={s.sectionTitle}>10. AI Fix Prompts</Text>
-            <Text style={s.sectionSubtitle}>Copy-paste these prompts into ChatGPT, Gemini, or Claude to get specific fixes</Text>
+            <Text style={s.sectionTitle}>10. Recommended Fixes</Text>
+            <Text style={s.sectionSubtitle}>AI-generated fix prompts — copy into ChatGPT, Gemini, or Claude for detailed solutions</Text>
 
-            {prompts.length === 0 ? (
+            {prompts.length === 0 && gemini.criticalProblems.length === 0 ? (
                 <View style={s.card}>
-                    <Text style={{ fontSize: 8, color: C.emeraldDark }}>No critical issues found — no fix prompts needed this period.</Text>
+                    <Text style={{ fontSize: 8, color: analysis.kpis.clicks < 10 ? C.amber : C.emeraldDark }}>
+                        {analysis.kpis.clicks < 10
+                            ? `Organic presence is too weak for targeted fix prompts. See the Critical Problems and Action Plan sections for strategic recommendations.`
+                            : 'No targeted fix prompts generated this period. Review the Action Plan for strategic recommendations.'}
+                    </Text>
                 </View>
             ) : (
                 prompts.slice(0, 4).map(p => (
@@ -817,8 +858,8 @@ function FixPromptsPage2({ analysis, siteUrl }: ReportProps) {
         <Page size="A4" style={s.page}>
             <View style={s.accentSidebar} />
             <PageHeader siteUrl={siteUrl} />
-            <Text style={s.sectionTitle}>10. AI Fix Prompts (continued)</Text>
-            <Text style={s.sectionSubtitle}>More prompts for your remaining issues</Text>
+            <Text style={s.sectionTitle}>10. Recommended Fixes (continued)</Text>
+            <Text style={s.sectionSubtitle}>More fixes for your remaining issues</Text>
 
             {prompts.slice(0, 4).map(p => (
                 <View key={p.id} style={{ marginBottom: 8 }}>
@@ -880,7 +921,7 @@ function ActionPlanPage({ analysis, gemini, period, siteUrl }: ReportProps) {
             <View style={[s.card, { backgroundColor: C.emeraldLight }]}>
                 <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.emeraldDark, marginBottom: 4 }}>Summary</Text>
                 <Text style={{ fontSize: 8, color: C.text, lineHeight: 1.5 }}>
-                    {analysis.decayPages.length} pages need content refresh. {analysis.cannibalization.length} cannibalization groups to resolve. {analysis.opportunities.length} keyword opportunities worth ~${analysis.totalRevenueEstimate}/month. {analysis.fixPrompts.length} AI prompts generated to help you fix these issues.
+                    {analysis.decayPages.length} pages need content refresh. {analysis.cannibalization.length} cannibalization groups to resolve. {analysis.opportunities.length} keyword opportunities worth ~${analysis.totalRevenueEstimate}/month. {analysis.fixPrompts.length} recommended fixes generated.
                 </Text>
             </View>
             <PageFooter pageNum={13} />
