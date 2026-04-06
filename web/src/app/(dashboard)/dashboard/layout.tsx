@@ -9,14 +9,13 @@ import dynamic from 'next/dynamic';
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
-const FloatingAuditBanner = dynamic(() => import('@/components/FloatingAuditBanner'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Book, Newspaper, Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Target
+    ChevronDown, Bell, Globe, Sparkles, Target, type LucideIcon
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
@@ -24,6 +23,14 @@ import { useChatStore } from '@/stores/chatStore';
 
 // Extended user type — id is added via JWT callback in auth.ts
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
+type SiteOption = { siteUrl: string };
+type PropertyOption = { displayName?: string; propertyId?: string; property?: string };
+type AlertItem = {
+    id: string | number;
+    title?: string;
+    metric?: string;
+    severity?: 'critical' | 'warning' | 'success' | string;
+};
 
 // Registration context to coordinate registration with data fetching
 interface RegistrationContextType {
@@ -54,7 +61,7 @@ const RegistrationContext = createContext<RegistrationContextType>({
 
 export const useRegistration = () => useContext(RegistrationContext);
 
-type SidebarItem = { icon: any; label: string; href: string };
+type SidebarItem = { icon: LucideIcon; label: string; href: string };
 type SidebarGroup = { label: string | null; items: SidebarItem[] };
 
 const sidebarGroups: SidebarGroup[] = [
@@ -87,6 +94,10 @@ export default function DashboardLayout({
 }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
+    const isOverviewRoute = pathname === '/dashboard';
+    const shellRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-xl';
+    const shellCompactRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-lg';
+    const shellBadgeRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-full';
     const { credits, plan: userPlan, subscriptionCancelled } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -186,30 +197,33 @@ export default function DashboardLayout({
     const { hasGoogleConnection } = useContainerStatus();
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties } = usePropertyList(hasGoogleConnection);
-    const alertSiteUrl = selectedSite || (gscSites.length > 0 ? gscSites[0].siteUrl : '');
+    const typedSites = gscSites as SiteOption[];
+    const typedProperties = properties as PropertyOption[];
+    const alertSiteUrl = selectedSite || (typedSites.length > 0 ? typedSites[0].siteUrl : '');
     const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
-    const criticalAlertCount = alerts.filter((a: any) => a.severity === 'critical' || a.severity === 'warning').length;
+    const typedAlerts = alerts as AlertItem[];
+    const criticalAlertCount = typedAlerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length;
 
     // Auto-sync: when selectedSite changes, find and set the matching GA4 property
     useEffect(() => {
-        if (!selectedSite || properties.length === 0) return;
+        if (!selectedSite || typedProperties.length === 0) return;
         const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
         const domainRoot = domain.split('.')[0];
         const matched =
-            properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
-            properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-            properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
-            properties[0];
+            typedProperties.find((property) => property.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
+            typedProperties.find((property) => (property.propertyId || property.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
+            typedProperties.find((property) => property.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
+            typedProperties[0];
         if (matched?.property && matched.property !== selectedProperty) {
             setSelectedProperty(matched.property);
         }
-    }, [selectedSite, properties, selectedProperty, setSelectedProperty]);
+    }, [selectedProperty, selectedSite, setSelectedProperty, typedProperties]);
 
     // Send browser push notifications for new critical alerts
     const prevAlertCountRef = useRef(criticalAlertCount);
     useEffect(() => {
         if (criticalAlertCount > prevAlertCountRef.current && isPushEnabled()) {
-            const newAlerts = alerts.filter((a: any) => a.severity === 'critical');
+            const newAlerts = typedAlerts.filter((alert) => alert.severity === 'critical');
             if (newAlerts.length > 0) {
                 sendBrowserNotification(
                     'TrafficClaw Alert',
@@ -219,7 +233,7 @@ export default function DashboardLayout({
             }
         }
         prevAlertCountRef.current = criticalAlertCount;
-    }, [criticalAlertCount, alerts]);
+    }, [criticalAlertCount, typedAlerts]);
 
     // Enforce dark mode — clear any stale light-mode preference
     useEffect(() => {
@@ -357,7 +371,7 @@ export default function DashboardLayout({
                 {/* Logo */}
                 <div className="h-16 flex items-center px-4 border-b border-[var(--divider)]">
                     <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
-                        <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg flex-shrink-0" />
+                        <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className={`${shellCompactRadiusClass} flex-shrink-0`} />
                         {!collapsed && (
                             <span className="text-base font-bold text-[var(--text-primary)] whitespace-nowrap">
                                 Traffic<span className="text-emerald-400">Claw</span>
@@ -372,10 +386,10 @@ export default function DashboardLayout({
                         <div className="relative">
                             <button
                                 onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] hover:border-white/[0.12] transition ${collapsed ? 'justify-center' : ''}`}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.08] ${shellCompactRadiusClass} hover:bg-white/[0.06] hover:border-white/[0.12] transition ${collapsed ? 'justify-center' : ''}`}
                                 aria-label="Switch site"
                             >
-                                <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                <div className={`w-4 h-4 ${isOverviewRoute ? 'rounded-none' : 'rounded'} bg-emerald-500/20 flex items-center justify-center flex-shrink-0`}>
                                     <Globe className="w-2.5 h-2.5 text-emerald-400" />
                                 </div>
                                 {!collapsed && (
@@ -388,12 +402,12 @@ export default function DashboardLayout({
                             {siteDropdownOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
-                                    <div className={`absolute ${collapsed ? 'left-full ml-1 top-0' : 'left-0 right-0 mt-1'} z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/40 py-1.5 min-w-[200px] max-h-[260px] overflow-y-auto`}>
+                                    <div className={`absolute ${collapsed ? 'left-full ml-1 top-0' : 'left-0 right-0 mt-1'} z-50 bg-[#0a0a0f] border border-white/[0.1] ${shellRadiusClass} shadow-2xl shadow-black/40 py-1.5 min-w-[200px] max-h-[260px] overflow-y-auto`}>
                                         <div className="px-3 pb-1.5 pt-0.5">
                                             <span className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">Sites</span>
                                         </div>
-                                        {gscSites.map((site: any) => {
-                                            const url = site.siteUrl || site;
+                                        {typedSites.map((site) => {
+                                            const url = site.siteUrl;
                                             const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                             const isSelected = url === selectedSite;
                                             return (
@@ -406,7 +420,7 @@ export default function DashboardLayout({
                                                 >
                                                     <Globe className="w-3 h-3 flex-shrink-0" />
                                                     <span className="truncate">{label}</span>
-                                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto flex-shrink-0" />}
+                                                    {isSelected && <span className={`w-1.5 h-1.5 ${shellBadgeRadiusClass} bg-emerald-400 ml-auto flex-shrink-0`} />}
                                                 </button>
                                             );
                                         })}
@@ -434,7 +448,7 @@ export default function DashboardLayout({
                                         <Link
                                             key={item.href}
                                             href={item.href}
-                                            className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${isActive
+                                            className={`flex items-center gap-3 px-3 py-2 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isActive
                                                 ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
                                                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                             }`}
@@ -457,7 +471,7 @@ export default function DashboardLayout({
                         return (
                             <Link
                                 href="/dashboard/settings"
-                                className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${isSettingsActive
+                                className={`flex items-center gap-3 px-3 py-2 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isSettingsActive
                                     ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
                                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                 }`}
@@ -472,7 +486,7 @@ export default function DashboardLayout({
                     {credits !== null && !collapsed && (
                         <Link
                             href="/dashboard/plan"
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:opacity-80 ${credits < 20
+                            className={`flex items-center gap-2.5 px-3 py-2 ${shellRadiusClass} border transition-all hover:opacity-80 ${credits < 20
                                 ? 'bg-red-500/[0.08] border-red-500/[0.15]'
                                 : credits < 50
                                     ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
@@ -492,14 +506,14 @@ export default function DashboardLayout({
                                     <img
                                         src={session.user.image}
                                         alt=""
-                                        className="w-7 h-7 rounded-full ring-1 ring-white/[0.1]"
+                                        className={`w-7 h-7 ${shellBadgeRadiusClass} ring-1 ring-white/[0.1]`}
                                     />
                                 )}
                                 <div className="flex-1 min-w-0">
                                     <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
                                         {session.user.name}
                                         <span
-                                            className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
+                                            className={`text-[8px] px-1.5 py-0.5 ${shellBadgeRadiusClass} font-bold uppercase tracking-wider leading-none ${
                                                 subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                                 : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
                                                 : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
@@ -528,7 +542,7 @@ export default function DashboardLayout({
 
                     <button
                         onClick={() => setCollapsed(!collapsed)}
-                        className="w-full flex items-center justify-center py-2 text-zinc-600 hover:text-zinc-400 transition-colors rounded-lg hover:bg-white/[0.04]"
+                        className={`w-full flex items-center justify-center py-2 text-zinc-600 hover:text-zinc-400 transition-colors ${shellCompactRadiusClass} hover:bg-white/[0.04]`}
                     >
                         {collapsed ? (
                             <ChevronRight className="w-4 h-4" />
@@ -540,9 +554,9 @@ export default function DashboardLayout({
             </aside>
 
             {/* ─── Main content area ─── */}
-            <div className="flex-1 flex flex-col min-h-screen w-full min-w-0">
+            <div className={`flex-1 flex flex-col min-h-screen w-full min-w-0 ${isOverviewRoute ? 'bg-[#010203]' : ''}`}>
                 {/* Top bar — minimal: just date picker + bell */}
-                <header className="h-12 flex items-center px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-40">
+                <header className={`h-12 flex items-center px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] ${isOverviewRoute ? 'bg-[#020305]/95' : 'bg-[var(--header-bg)]'} backdrop-blur-xl sticky top-0 z-40`}>
                     {/* Mobile menu button */}
                     <button
                         className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0 mr-auto"
@@ -563,7 +577,7 @@ export default function DashboardLayout({
                         <div className="relative" ref={bellRef}>
                             <button
                                 onClick={() => setBellOpen(!bellOpen)}
-                                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0"
+                                className={`relative w-8 h-8 ${shellCompactRadiusClass} flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0`}
                                 aria-label={`Alerts${criticalAlertCount > 0 ? ` (${criticalAlertCount} active)` : ''}`}
                                 aria-expanded={bellOpen}
                                 aria-haspopup="true"
@@ -571,13 +585,13 @@ export default function DashboardLayout({
                             >
                                 <Bell className="w-4 h-4" />
                                 {criticalAlertCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[var(--background)]">
+                                    <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 ${shellBadgeRadiusClass} bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[var(--background)]`}>
                                         {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
                                     </span>
                                 )}
                             </button>
                             {bellOpen && (
-                                <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden">
+                                <div className={`absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] ${shellRadiusClass} shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden`}>
                                     <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
                                         <span className="text-xs font-semibold text-white">Alerts</span>
                                         {alertCount > 0 && (
@@ -591,10 +605,10 @@ export default function DashboardLayout({
                                                 <p className="text-[11px] text-zinc-600">No alerts right now</p>
                                             </div>
                                         ) : (
-                                            alerts.slice(0, 10).map((alert: any) => (
+                                            typedAlerts.slice(0, 10).map((alert) => (
                                                 <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
                                                     <div className="flex items-start gap-2.5">
-                                                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                                        <div className={`w-2 h-2 ${shellBadgeRadiusClass} mt-1.5 flex-shrink-0 ${
                                                             alert.severity === 'critical' ? 'bg-red-400' :
                                                             alert.severity === 'warning' ? 'bg-amber-400' :
                                                             alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
@@ -628,7 +642,7 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Page content */}
-                <main id="main-content" className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden max-w-full" role="main">
+                <main id="main-content" className={`flex-1 overflow-y-auto overflow-x-hidden p-3 max-w-full sm:p-4 md:p-6 ${isOverviewRoute ? 'bg-[#010203]' : ''}`} role="main">
                     <div className="max-w-7xl mx-auto">
                         <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
                             {children}
@@ -639,9 +653,6 @@ export default function DashboardLayout({
 
             {/* Global AI Chatbot — available on every page */}
             <AIChatbot />
-
-            {/* Floating audit banner — available on every page */}
-            <FloatingAuditBanner />
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
@@ -702,8 +713,8 @@ export default function DashboardLayout({
                                 </button>
                                 {siteDropdownOpen && (
                                     <div className="mt-1 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 max-h-[200px] overflow-y-auto">
-                                        {gscSites.map((site: any) => {
-                                            const url = site.siteUrl || site;
+                                        {typedSites.map((site) => {
+                                            const url = site.siteUrl;
                                             const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                             const isSelected = url === selectedSite;
                                             return (

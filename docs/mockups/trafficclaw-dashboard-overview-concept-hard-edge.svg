@@ -1,0 +1,307 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A1115"/>
+      <stop offset="0.5" stop-color="#05080B"/>
+      <stop offset="1" stop-color="#020406"/>
+    </linearGradient>
+    <radialGradient id="emeraldGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(540 140) rotate(24) scale(560 240)">
+      <stop offset="0" stop-color="#19D79A" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#19D79A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cyanGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1290 100) rotate(150) scale(360 200)">
+      <stop offset="0" stop-color="#1FC2FF" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#1FC2FF" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="microGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" stroke="#0E151A" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1014"/>
+      <stop offset="1" stop-color="#070B0E"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="274" y1="120" x2="1088" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0C151A"/>
+      <stop offset="0.5" stop-color="#0A1015"/>
+      <stop offset="1" stop-color="#090D11"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#27E0A1"/>
+      <stop offset="1" stop-color="#1BB4F6"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#182128"/>
+      <stop offset="1" stop-color="#11181E"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+    <style>
+      .display { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #F5FBFD; font-weight: 700; }
+      .heading { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #EDF6FA; font-size: 18px; font-weight: 700; }
+      .body { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #C4D3DB; font-size: 13px; font-weight: 500; }
+      .muted { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #728492; font-size: 12px; font-weight: 500; }
+      .label { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #8FA3B0; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; }
+      .chip { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #EAF7FA; font-size: 11px; font-weight: 600; }
+      .nav { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #A2B3BF; font-size: 14px; font-weight: 600; }
+      .navActive { font-family: "Space Grotesk", "Segoe UI", sans-serif; fill: #EEFFFA; font-size: 14px; font-weight: 700; }
+      .mono { font-family: "IBM Plex Mono", "Consolas", monospace; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#020405"/>
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <rect width="1600" height="1000" fill="url(#microGrid)" opacity="0.28"/>
+  <ellipse cx="540" cy="140" rx="560" ry="240" fill="url(#emeraldGlow)"/>
+  <ellipse cx="1290" cy="100" rx="360" ry="200" fill="url(#cyanGlow)"/>
+
+  <rect x="14" y="14" width="1572" height="972" fill="#05080A" stroke="#121A20" stroke-width="1.5"/>
+  <rect x="32" y="32" width="226" height="936" fill="#04080B" stroke="#11191F"/>
+  <rect x="274" y="32" width="1294" height="68" fill="#060D12" stroke="#141D23"/>
+
+  <rect x="48" y="48" width="36" height="36" fill="#0D1418" stroke="#1E2C35"/>
+  <rect x="57" y="57" width="18" height="18" fill="url(#brand)"/>
+  <text x="98" y="69" class="display" font-size="22">TrafficClaw</text>
+  <text x="98" y="88" class="muted">growth command center</text>
+
+  <text x="48" y="140" class="label">OVERVIEW</text>
+
+  <rect x="48" y="154" width="194" height="40" fill="#0E1C18" stroke="#185342"/>
+  <rect x="60" y="165" width="18" height="18" fill="#123327"/>
+  <rect x="66" y="171" width="6" height="6" fill="#29E1A3"/>
+  <text x="92" y="179" class="navActive">Overview</text>
+
+  <rect x="48" y="202" width="194" height="40" fill="#090E12" stroke="#141C22"/>
+  <rect x="60" y="213" width="18" height="18" fill="#11171C"/>
+  <rect x="66" y="219" width="6" height="6" fill="#6F808E"/>
+  <text x="92" y="227" class="nav">Analytics</text>
+
+  <rect x="48" y="250" width="194" height="40" fill="#090E12" stroke="#141C22"/>
+  <rect x="60" y="261" width="18" height="18" fill="#11171C"/>
+  <rect x="66" y="267" width="6" height="6" fill="#6F808E"/>
+  <text x="92" y="275" class="nav">SEO</text>
+
+  <rect x="48" y="298" width="194" height="40" fill="#090E12" stroke="#141C22"/>
+  <rect x="60" y="309" width="18" height="18" fill="#11171C"/>
+  <rect x="66" y="315" width="6" height="6" fill="#6F808E"/>
+  <text x="92" y="323" class="nav">Audit</text>
+
+  <rect x="48" y="346" width="194" height="40" fill="#090E12" stroke="#141C22"/>
+  <rect x="60" y="357" width="18" height="18" fill="#11171C"/>
+  <rect x="66" y="363" width="6" height="6" fill="#6F808E"/>
+  <text x="92" y="371" class="nav">Bot</text>
+
+  <rect x="48" y="394" width="194" height="40" fill="#090E12" stroke="#141C22"/>
+  <rect x="60" y="405" width="18" height="18" fill="#11171C"/>
+  <rect x="66" y="411" width="6" height="6" fill="#6F808E"/>
+  <text x="92" y="419" class="nav">Settings</text>
+
+  <text x="48" y="500" class="label">TODAY</text>
+  <rect x="48" y="514" width="194" height="176" fill="url(#panel)" stroke="#151E24"/>
+  <text x="64" y="544" class="heading" font-size="17">Focus Stack</text>
+  <text x="64" y="568" class="body">A tighter overview should push the work, not the chrome.</text>
+
+  <rect x="64" y="590" width="162" height="26" fill="#0D1418" stroke="#19242B"/>
+  <text x="76" y="607" class="chip">refresh decaying pages</text>
+  <rect x="64" y="624" width="162" height="26" fill="#0D1418" stroke="#19242B"/>
+  <text x="76" y="641" class="chip">fix low CTR titles</text>
+  <rect x="64" y="658" width="162" height="26" fill="#0D1418" stroke="#19242B"/>
+  <text x="76" y="675" class="chip">strengthen internal links</text>
+
+  <rect x="48" y="892" width="194" height="56" fill="#090E12" stroke="#141C22"/>
+  <rect x="64" y="906" width="28" height="28" fill="#141C22"/>
+  <text x="104" y="918" class="body">Divy</text>
+  <text x="104" y="934" class="muted">growth plan</text>
+
+  <rect x="300" y="50" width="176" height="30" fill="#091015" stroke="#162026"/>
+  <rect x="316" y="62" width="6" height="6" fill="#29E1A3"/>
+  <text x="336" y="70" class="chip">acme.com</text>
+  <text x="416" y="70" class="muted">site context</text>
+
+  <rect x="1238" y="50" width="118" height="30" fill="#091015" stroke="#162026"/>
+  <text x="1263" y="70" class="chip">last 30 days</text>
+  <rect x="1372" y="50" width="58" height="30" fill="#091015" stroke="#162026"/>
+  <text x="1392" y="70" class="chip">sync</text>
+  <rect x="1446" y="50" width="94" height="30" fill="#091015" stroke="#162026"/>
+  <rect x="1461" y="62" width="6" height="6" fill="#29E1A3"/>
+  <text x="1479" y="70" class="chip">live pulse</text>
+
+  <g filter="url(#shadow)">
+    <rect x="274" y="120" width="818" height="226" fill="url(#hero)" stroke="#182128"/>
+  </g>
+  <rect x="274" y="120" width="818" height="226" fill="url(#microGrid)" opacity="0.12"/>
+  <rect x="294" y="142" width="154" height="28" fill="#0D171A" stroke="#195441"/>
+  <text x="314" y="161" class="label" fill="#7CF0C8">MISSION CONTROL</text>
+
+  <text x="294" y="210" class="display" font-size="32">You have growth momentum, but the overview still needs to feel sharper and more deliberate.</text>
+  <text x="294" y="248" class="body" font-size="15">The redesign direction here is a hard-edge command surface: square cards, square controls, sharper separators, and clearer content hierarchy. The main job of the page is to surface the next best actions without feeling soft or generic.</text>
+
+  <rect x="294" y="278" width="206" height="40" fill="url(#brand)"/>
+  <text x="332" y="303" class="display" font-size="15" fill="#041015">start priority sprint</text>
+  <rect x="512" y="278" width="148" height="40" fill="#0D1418" stroke="#19242B"/>
+  <text x="549" y="303" class="chip">view breakdown</text>
+
+  <line x1="294" y1="330" x2="1072" y2="330" stroke="#162027"/>
+  <rect x="294" y="336" width="8" height="8" fill="#29E1A3"/>
+  <text x="312" y="344" class="muted">6 quick wins ready</text>
+  <rect x="454" y="336" width="8" height="8" fill="#1FC2FF"/>
+  <text x="472" y="344" class="muted">+14% clicks potential</text>
+  <rect x="664" y="336" width="8" height="8" fill="#FFBE54"/>
+  <text x="682" y="344" class="muted">2 pages at risk</text>
+
+  <rect x="818" y="148" width="250" height="146" fill="#0A1116" stroke="#182128"/>
+  <text x="838" y="174" class="label" fill="#86F0D0">NEXT 7 DAYS</text>
+  <text x="838" y="202" class="display mono" font-size="24" fill="#29E1A3">+12%</text>
+  <text x="902" y="202" class="muted">session momentum</text>
+  <line x1="838" y1="222" x2="1048" y2="222" stroke="#152026"/>
+  <line x1="838" y1="248" x2="1048" y2="248" stroke="#122027"/>
+  <line x1="838" y1="274" x2="1048" y2="274" stroke="#122027"/>
+  <polyline points="838,278 866,270 894,260 922,262 950,242 978,230 1006,220 1034,208 1048,202" fill="none" stroke="#29E1A3" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+  <polyline points="838,292 866,288 894,282 922,272 950,266 978,256 1006,248 1034,238 1048,230" fill="none" stroke="#1FC2FF" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" opacity="0.82"/>
+  <text x="838" y="292" class="muted">search clicks</text>
+  <text x="934" y="292" class="muted">opportunity curve</text>
+
+  <rect x="1110" y="120" width="458" height="226" fill="url(#panel)" stroke="#182128"/>
+  <rect x="1130" y="142" width="112" height="28" fill="#0D1418" stroke="#19242B"/>
+  <text x="1153" y="161" class="label">LIVE PULSE</text>
+  <text x="1130" y="208" class="display mono" font-size="42">28</text>
+  <text x="1193" y="208" class="body" font-size="15">active users right now</text>
+  <text x="1130" y="234" class="muted">last updated 3 minutes ago</text>
+
+  <rect x="1416" y="154" width="114" height="114" fill="#081015" stroke="#182128"/>
+  <rect x="1440" y="178" width="66" height="66" fill="none" stroke="#132028" stroke-width="10"/>
+  <path d="M1440 210H1440V178H1506V244H1468" stroke="#29E1A3" stroke-width="10" stroke-linecap="square"/>
+  <text x="1460" y="216" class="display mono" font-size="22">84</text>
+  <text x="1458" y="236" class="muted">health</text>
+
+  <rect x="1130" y="278" width="116" height="28" fill="#0E1816" stroke="#185342"/>
+  <rect x="1144" y="289" width="6" height="6" fill="#29E1A3"/>
+  <text x="1159" y="297" class="chip">bot live</text>
+  <rect x="1262" y="278" width="112" height="28" fill="#16140E" stroke="#5C4A20"/>
+  <rect x="1276" y="289" width="6" height="6" fill="#FFBE54"/>
+  <text x="1291" y="297" class="chip">2 risks</text>
+  <rect x="1390" y="278" width="140" height="28" fill="#0D1418" stroke="#19242B"/>
+  <rect x="1404" y="289" width="6" height="6" fill="#1FC2FF"/>
+  <text x="1419" y="297" class="chip">fresh data</text>
+
+  <rect x="274" y="364" width="310" height="122" fill="url(#panel)" stroke="#182128"/>
+  <text x="294" y="390" class="label">TOTAL USERS</text>
+  <text x="294" y="430" class="display mono" font-size="30">48.2K</text>
+  <text x="404" y="430" class="chip" fill="#85F4D1">+9.4%</text>
+  <text x="294" y="454" class="muted">High-value pages are still pulling new traffic.</text>
+  <line x1="294" y1="466" x2="562" y2="466" stroke="#122027"/>
+  <polyline points="294,476 318,470 342,462 366,464 390,454 414,446 438,438 462,430 486,420 510,412 544,404" fill="none" stroke="#29E1A3" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+
+  <rect x="602" y="364" width="310" height="122" fill="url(#panel)" stroke="#182128"/>
+  <text x="622" y="390" class="label">PAGE VIEWS</text>
+  <text x="622" y="430" class="display mono" font-size="30">132K</text>
+  <text x="730" y="430" class="chip" fill="#85F4D1">+5.1%</text>
+  <text x="622" y="454" class="muted">Internal linking is improving deeper page discovery.</text>
+  <line x1="622" y1="466" x2="890" y2="466" stroke="#122027"/>
+  <polyline points="622,476 646,472 670,468 694,460 718,456 742,448 766,444 790,436 814,428 838,420 872,412" fill="none" stroke="#1FC2FF" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+
+  <rect x="930" y="364" width="310" height="122" fill="url(#panel)" stroke="#182128"/>
+  <text x="950" y="390" class="label">SEARCH CLICKS</text>
+  <text x="950" y="430" class="display mono" font-size="30">19.6K</text>
+  <text x="1066" y="430" class="chip" fill="#85F4D1">+12.8%</text>
+  <text x="950" y="454" class="muted">Title fixes are the fastest next lever to pull.</text>
+  <line x1="950" y1="466" x2="1218" y2="466" stroke="#122027"/>
+  <polyline points="950,476 974,468 998,460 1022,462 1046,450 1070,438 1094,434 1118,422 1142,414 1166,406 1200,394" fill="none" stroke="#938CFF" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+
+  <rect x="1258" y="364" width="310" height="122" fill="url(#panel)" stroke="#182128"/>
+  <text x="1278" y="390" class="label">AVG. POSITION</text>
+  <text x="1278" y="430" class="display mono" font-size="30">6.8</text>
+  <text x="1358" y="430" class="chip" fill="#85F4D1">-0.7</text>
+  <text x="1278" y="454" class="muted">Rankings are stronger, but page two still matters.</text>
+  <line x1="1278" y1="466" x2="1546" y2="466" stroke="#122027"/>
+  <polyline points="1278,476 1302,470 1326,462 1350,456 1374,448 1398,440 1422,432 1446,424 1470,416 1494,408 1528,398" fill="none" stroke="#FFB94E" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+
+  <rect x="274" y="506" width="820" height="292" fill="url(#panel)" stroke="#182128"/>
+  <rect x="294" y="526" width="146" height="28" fill="#0D1418" stroke="#19242B"/>
+  <text x="316" y="545" class="label">PRIORITY QUEUE</text>
+  <text x="294" y="584" class="display" font-size="24">One ranked queue, not ten competing widgets.</text>
+  <text x="294" y="608" class="body">This is the center of the redesign. Alerts, opportunities, and guidance collapse into one ranked work queue with impact and one clear next step per row.</text>
+
+  <rect x="294" y="636" width="780" height="34" fill="#0A1014" stroke="#182128"/>
+  <text x="314" y="658" class="muted">priority</text>
+  <text x="396" y="658" class="muted">recommendation</text>
+  <text x="816" y="658" class="muted">impact</text>
+  <text x="956" y="658" class="muted">action</text>
+
+  <rect x="294" y="670" width="780" height="46" fill="#0D1418" stroke="#182128"/>
+  <rect x="312" y="684" width="40" height="16" fill="#123327"/>
+  <text x="326" y="696" class="chip" fill="#7DF1CB">P1</text>
+  <text x="396" y="698" class="body">fix low-CTR winners on two high-impression queries</text>
+  <text x="816" y="698" class="chip" fill="#7DF1CB">+8.4k impressions</text>
+  <rect x="956" y="680" width="96" height="24" fill="#10181D" stroke="#19242B"/>
+  <text x="978" y="696" class="chip">optimize</text>
+
+  <rect x="294" y="716" width="780" height="46" fill="#0B1014" stroke="#182128"/>
+  <rect x="312" y="730" width="40" height="16" fill="#30250F"/>
+  <text x="326" y="742" class="chip" fill="#FFD48A">P2</text>
+  <text x="396" y="744" class="body">refresh three landing pages slipping from positions 4-8</text>
+  <text x="816" y="744" class="chip" fill="#FFD48A">2h effort</text>
+  <rect x="956" y="726" width="96" height="24" fill="#10181D" stroke="#19242B"/>
+  <text x="982" y="742" class="chip">refresh</text>
+
+  <rect x="294" y="762" width="780" height="46" fill="#0D1418" stroke="#182128"/>
+  <rect x="312" y="776" width="40" height="16" fill="#102334"/>
+  <text x="326" y="788" class="chip" fill="#93DFFF">P3</text>
+  <text x="396" y="790" class="body">strengthen internal links for twelve page-two opportunities</text>
+  <text x="816" y="790" class="chip" fill="#93DFFF">mid lift</text>
+  <rect x="956" y="772" width="96" height="24" fill="#10181D" stroke="#19242B"/>
+  <text x="982" y="788" class="chip">review</text>
+
+  <rect x="294" y="818" width="780" height="72" fill="#0A1014" stroke="#182128"/>
+  <text x="314" y="844" class="label">WORKFLOW NOTE</text>
+  <text x="314" y="868" class="body">The sharper direction is not just “less border radius.” It means tighter framing, more decisive rows, fewer decorative pills, and clearer rectangular structure across the whole dashboard.</text>
+
+  <rect x="1110" y="506" width="458" height="154" fill="url(#panel)" stroke="#182128"/>
+  <rect x="1130" y="526" width="92" height="28" fill="#10131B" stroke="#232354"/>
+  <text x="1152" y="545" class="label" fill="#B7B8FF">AI BRIEF</text>
+  <text x="1130" y="586" class="body" font-size="15">Traffic is stable enough to support a focused sprint. The overview should feel like a command surface, not a glossy widget gallery. Keep the main decision at the top, put the queue in the center, and move proof panels below.</text>
+  <rect x="1130" y="620" width="118" height="24" fill="#10181D" stroke="#19242B"/>
+  <text x="1152" y="636" class="chip">refresh pages</text>
+  <rect x="1262" y="620" width="108" height="24" fill="#10181D" stroke="#19242B"/>
+  <text x="1287" y="636" class="chip">fix titles</text>
+  <rect x="1384" y="620" width="124" height="24" fill="#10181D" stroke="#19242B"/>
+  <text x="1408" y="636" class="chip">review links</text>
+
+  <rect x="1110" y="676" width="458" height="122" fill="url(#panel)" stroke="#182128"/>
+  <rect x="1130" y="696" width="110" height="28" fill="#0D1418" stroke="#19242B"/>
+  <text x="1153" y="715" class="label">TOP MOVERS</text>
+  <text x="1130" y="746" class="body">best b2b crm comparison</text>
+  <text x="1496" y="746" class="chip" fill="#7DF1CB">+6</text>
+  <text x="1130" y="770" class="body">saas lead scoring template</text>
+  <text x="1496" y="770" class="chip" fill="#7DF1CB">+4</text>
+  <text x="1296" y="746" class="body" fill="#A4B2BC">pricing automation software</text>
+  <text x="1514" y="746" class="chip" fill="#FFA18A">-3</text>
+
+  <rect x="274" y="816" width="638" height="132" fill="url(#panel)" stroke="#182128"/>
+  <rect x="294" y="836" width="126" height="28" fill="#0D1418" stroke="#19242B"/>
+  <text x="316" y="855" class="label" fill="#7CF0C8">TRAFFIC TREND</text>
+  <text x="294" y="890" class="body">Traffic is climbing steadily after content refreshes and title changes.</text>
+  <text x="294" y="918" class="display mono" font-size="24" fill="#29E1A3">+12.8%</text>
+  <text x="382" y="918" class="muted">search clicks this period</text>
+  <line x1="560" y1="936" x2="888" y2="936" stroke="#122027"/>
+  <line x1="560" y1="910" x2="888" y2="910" stroke="#122027"/>
+  <line x1="560" y1="884" x2="888" y2="884" stroke="#122027"/>
+  <polyline points="560,922 592,916 624,908 656,912 688,896 720,884 752,872 784,858 816,844 848,834 888,818" fill="none" stroke="#29E1A3" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+  <polyline points="560,934 592,930 624,924 656,916 688,910 720,900 752,894 784,886 816,878 848,868 888,858" fill="none" stroke="#1FC2FF" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" opacity="0.78"/>
+
+  <rect x="930" y="816" width="638" height="132" fill="url(#panel)" stroke="#182128"/>
+  <rect x="950" y="836" width="106" height="28" fill="#0D1418" stroke="#19242B"/>
+  <text x="973" y="855" class="label">TOP PAGES</text>
+  <text x="950" y="892" class="body">/solutions/lead-scoring</text>
+  <rect x="950" y="900" width="424" height="10" fill="#11171C"/>
+  <rect x="950" y="900" width="338" height="10" fill="url(#brand)"/>
+  <text x="1392" y="909" class="chip">4.8k clicks</text>
+  <text x="950" y="924" class="body">/blog/b2b-crm-comparison</text>
+  <rect x="950" y="932" width="424" height="10" fill="#11171C"/>
+  <rect x="950" y="932" width="252" height="10" fill="#1FC2FF"/>
+  <text x="1392" y="941" class="chip">3.2k clicks</text>
+  <rect x="1410" y="876" width="132" height="56" fill="#0E1519" stroke="#19242B"/>
+  <text x="1430" y="896" class="muted">Quick access</text>
+  <text x="1430" y="916" class="chip">Analytics  SEO</text>
+  <text x="1430" y="936" class="chip">Audit  Bot</text>
+</svg>

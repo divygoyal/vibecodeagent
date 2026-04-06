@@ -265,7 +265,7 @@ body {
 }
 
 /* ========== Connect banner animations ========== */
-@keyframes shimmer {
+@keyframes shimmer-slide {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
@@ -276,7 +276,7 @@ body {
 }
 
 .animate-shimmer {
-  animation: shimmer 3s ease-in-out infinite;
+  animation: shimmer-slide 3s ease-in-out infinite;
 }
 
 .animate-pulse-border {
@@ -357,7 +357,7 @@ body {
 }
 
 /* ========== Skeleton loading ========== */
-@keyframes shimmer {
+@keyframes shimmer-skeleton {
   0% {
     background-position: -200% 0;
   }
@@ -370,7 +370,7 @@ body {
 .skeleton {
   background: linear-gradient(90deg, rgba(15, 15, 22, 0.6) 25%, rgba(30, 30, 42, 0.5) 50%, rgba(15, 15, 22, 0.6) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  animation: shimmer-skeleton 1.5s ease-in-out infinite;
   border-radius: 8px;
 }
 
@@ -781,7 +781,7 @@ select:focus-visible {
 }
 
 /* Gradient text shimmer */
-@keyframes shimmer {
+@keyframes shimmer-text {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
@@ -792,7 +792,7 @@ select:focus-visible {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: shimmer 4s linear infinite;
+  animation: shimmer-text 4s linear infinite;
 }
 
 /* ========== Button press effect ========== */
@@ -866,6 +866,17 @@ select:focus-visible {
 
   .mobile-full {
     width: 100%;
+  }
+}
+
+/* ========== Mobile section snap scrolling ========== */
+@media (max-width: 1023px) {
+  .mobile-snap-y {
+    scroll-snap-type: y proximity;
+  }
+
+  .mobile-snap-section {
+    scroll-snap-align: start;
   }
 }
 
@@ -1009,12 +1020,6 @@ select:focus-visible {
   filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.3));
 }
 
-/* Premium section divider */
-.section-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.2), rgba(34, 211, 238, 0.2), transparent);
-}
-
 /* Floating action button */
 .fab-pulse {
   animation: fab-glow 3s ease-in-out infinite;
@@ -1129,7 +1134,7 @@ select:focus-visible {
 .shimmer-loading {
   background: linear-gradient(90deg, var(--card-bg) 25%, rgba(52, 211, 153, 0.05) 50%, var(--card-bg) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer-skeleton 1.5s infinite;
 }
 
 /* Cascade fade for staggered list items */
@@ -1255,3 +1260,61 @@ select:focus-visible {
 [data-theme='light'] .annotation-badge-cannibalizing { background: rgba(245, 158, 11, 0.08); color: #d97706; border-color: rgba(245, 158, 11, 0.15); }
 [data-theme='light'] .annotation-badge-striking { background: rgba(59, 130, 246, 0.08); color: #2563eb; border-color: rgba(59, 130, 246, 0.15); }
 [data-theme='light'] .annotation-badge-zombie { background: rgba(168, 85, 247, 0.08); color: #9333ea; border-color: rgba(168, 85, 247, 0.15); }
+
+/* ========== Live pulse glow on active user count ========== */
+@keyframes livePulseGlow {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.3), 0 0 20px rgba(52, 211, 153, 0.1);
+  }
+  50% {
+    text-shadow: 0 0 14px rgba(52, 211, 153, 0.5), 0 0 32px rgba(52, 211, 153, 0.2);
+  }
+}
+
+.live-pulse-glow {
+  animation: livePulseGlow 2.5s ease-in-out infinite;
+}
+
+/* ========== Health gauge breathing ring ========== */
+@keyframes healthBreathing {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px var(--health-glow)) drop-shadow(0 0 14px var(--health-glow-dim));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px var(--health-glow)) drop-shadow(0 0 22px var(--health-glow-dim));
+  }
+}
+
+.health-ring-breathe {
+  animation: healthBreathing 4s ease-in-out infinite;
+}
+
+/* ========== Brain icon subtle pulse ========== */
+@keyframes brainPulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+.brain-pulse {
+  animation: brainPulse 3s ease-in-out infinite;
+}
+
+/* ========== Section divider hover brightness ========== */
+.section-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.3), rgba(34, 211, 238, 0.3), transparent);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.1), 0 0 8px rgba(34, 211, 238, 0.1);
+  transition: opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-divider-wrap:hover .section-divider {
+  background: linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.5), rgba(34, 211, 238, 0.5), transparent);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.18), 0 0 12px rgba(34, 211, 238, 0.18);
+}
+
+/* ========== Revalidation progress bar ========== */
+@keyframes progress-bar {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(300%); }
+}
