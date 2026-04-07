@@ -32,6 +32,7 @@ import {
 
 import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import { getDashboardBriefing } from '@/lib/dashboardBriefing';
+import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
 import {
   XMentionsPickerRail,
   XMentionsProvider,
@@ -413,7 +414,7 @@ function MetricCard({
 
   return (
     <div
-      className="group relative h-full cursor-pointer overflow-hidden border border-white/[0.08] bg-[#020508] shadow-[0_18px_48px_rgba(0,0,0,0.35)] transition-all duration-200 hover:border-white/[0.16] hover:translate-y-[-1px] hover:shadow-[0_18px_48px_rgba(0,0,0,0.35),0_0_24px_rgba(52,211,153,0.05)]"
+      className="dashboard-hover-item group relative h-full cursor-pointer overflow-hidden border border-white/[0.08] bg-[#020508] shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
       onClick={() => setFlipped((f) => !f)}
     >
       {/* ─── Static header: always visible ─── */}
@@ -1126,14 +1127,18 @@ export default function OverviewCommandCenter({
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_360px]">
-        <section className="group/mc relative overflow-hidden border border-white/[0.08] bg-[#020508] p-4 shadow-[0_22px_60px_rgba(0,0,0,0.35)] transition-shadow duration-300 hover:shadow-[0_22px_60px_rgba(0,0,0,0.35),0_0_24px_rgba(52,211,153,0.05)] sm:p-6 lg:p-7">
+        <DashboardHoverSurface
+          as="section"
+          tone="mixed"
+          className="group/mc border border-white/[0.08] bg-[#020508] p-4 shadow-[0_22px_60px_rgba(0,0,0,0.35)] sm:p-6 lg:p-7"
+        >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.12),transparent_48%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.10),transparent_42%)]" />
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center border border-white/[0.08] bg-[#070c10] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
+              <div className="dashboard-hover-chip inline-flex items-center border border-white/[0.08] bg-[#070c10] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
                 Overview
               </div>
-              <div className="inline-flex items-center gap-1.5 border border-white/[0.08] bg-[#070c10] px-3 py-1 text-[11px] text-zinc-400">
+              <div className="dashboard-hover-chip inline-flex items-center gap-1.5 border border-white/[0.08] bg-[#070c10] px-3 py-1 text-[11px] text-zinc-400">
                 <Clock3 className="h-3.5 w-3.5 text-cyan-300" />
                 Synced {timeAgo(lastUpdated).toLowerCase()}
               </div>
@@ -1147,15 +1152,15 @@ export default function OverviewCommandCenter({
             </p>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <div className="inline-flex items-center gap-2 border border-white/[0.08] bg-[#0a0f14] px-3 py-2 text-[12px] text-zinc-300 transition-all duration-200 hover:border-amber-500/20 hover:bg-amber-500/[0.04] hover:shadow-[0_0_12px_rgba(251,191,36,0.06)]">
+              <div className="dashboard-hover-chip inline-flex items-center gap-2 border border-white/[0.08] bg-[#0a0f14] px-3 py-2 text-[12px] text-zinc-300" data-tone="amber">
                 <AlertTriangle className="h-4 w-4 text-amber-300" />
                 {model.riskCount} active risk{model.riskCount === 1 ? '' : 's'}
               </div>
-              <div className="inline-flex items-center gap-2 border border-white/[0.08] bg-[#0a0f14] px-3 py-2 text-[12px] text-zinc-300 transition-all duration-200 hover:border-emerald-500/20 hover:bg-emerald-500/[0.04] hover:shadow-[0_0_12px_rgba(52,211,153,0.06)]">
+              <div className="dashboard-hover-chip inline-flex items-center gap-2 border border-white/[0.08] bg-[#0a0f14] px-3 py-2 text-[12px] text-zinc-300" data-tone="emerald">
                 <Target className="h-4 w-4 text-emerald-300" />
                 {model.opportunities.length} ranked opportunit{model.opportunities.length === 1 ? 'y' : 'ies'}
               </div>
-              <div className="inline-flex items-center gap-2 border border-white/[0.08] bg-[#0a0f14] px-3 py-2 text-[12px] text-zinc-300 transition-all duration-200 hover:border-cyan-500/20 hover:bg-cyan-500/[0.04] hover:shadow-[0_0_12px_rgba(34,211,238,0.06)]">
+              <div className="dashboard-hover-chip inline-flex items-center gap-2 border border-white/[0.08] bg-[#0a0f14] px-3 py-2 text-[12px] text-zinc-300" data-tone="cyan">
                 <CheckCircle2 className="h-4 w-4 text-cyan-300" />
                 {model.goalCount} goal{model.goalCount === 1 ? '' : 's'} reporting
               </div>
@@ -1165,7 +1170,8 @@ export default function OverviewCommandCenter({
               <button
                 type="button"
                 onClick={() => document.querySelector('[data-panel="priority-queue"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                className="inline-flex min-h-[44px] items-center gap-2 bg-[linear-gradient(135deg,#34e1a3_0%,#1eb8f6_100%)] px-5 py-3 text-sm font-semibold text-[#041015] transition-all duration-200 hover:opacity-90 hover:translate-y-[-1px] hover:shadow-[0_4px_12px_rgba(52,211,153,0.2)]"
+                className="dashboard-hover-action inline-flex min-h-[44px] items-center gap-2 bg-[linear-gradient(135deg,#34e1a3_0%,#1eb8f6_100%)] px-5 py-3 text-sm font-semibold text-[#041015]"
+                data-variant="primary"
               >
                 Review top action
                 <ArrowRight className="h-4 w-4" />
@@ -1173,21 +1179,22 @@ export default function OverviewCommandCenter({
               <button
                 type="button"
                 onClick={onExportReport}
-                className="inline-flex min-h-[44px] items-center gap-2 border border-white/[0.1] bg-[#070c10] px-5 py-3 text-sm font-medium text-zinc-200 transition-colors hover:border-white/[0.18] hover:bg-white/[0.04]"
+                className="dashboard-hover-action inline-flex min-h-[44px] items-center gap-2 border border-white/[0.1] bg-[#070c10] px-5 py-3 text-sm font-medium text-zinc-200"
+                data-variant="ghost"
               >
                 <FileDown className="h-4 w-4" />
                 Export report
               </button>
             </div>
           </div>
-        </section>
+        </DashboardHoverSurface>
 
-        <section className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.35)] transition-shadow duration-300 hover:shadow-[0_22px_60px_rgba(0,0,0,0.35),0_0_24px_rgba(52,211,153,0.05)] sm:p-6">
+        <DashboardHoverSurface as="section" tone="emerald" className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.35)] sm:p-6">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Status Watchlist</div>
           <div className="mt-5 space-y-3">
             <Link
               href="/dashboard/seo"
-              className="flex min-h-[56px] items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4 transition-colors hover:border-white/[0.12] hover:bg-[#0a0f14]"
+              className="dashboard-hover-item flex min-h-[56px] items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4"
             >
               <div className="flex items-center gap-3">
                 <div className="border border-emerald-500/16 bg-emerald-500/10 p-2">
@@ -1206,7 +1213,7 @@ export default function OverviewCommandCenter({
             <button
               type="button"
               onClick={onOpenLiveDrawer}
-              className="flex min-h-[56px] w-full items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4 text-left transition-colors hover:border-white/[0.12] hover:bg-[#0a0f14]"
+              className="dashboard-hover-item flex min-h-[56px] w-full items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4 text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="border border-cyan-500/16 bg-cyan-500/10 p-2">
@@ -1225,7 +1232,7 @@ export default function OverviewCommandCenter({
 
             <Link
               href="/dashboard/seo"
-              className="flex min-h-[56px] items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4 transition-colors hover:border-white/[0.12] hover:bg-[#0a0f14]"
+              className="dashboard-hover-item flex min-h-[56px] items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4"
             >
               <div className="flex items-center gap-3">
                 <div className="border border-amber-500/16 bg-amber-500/10 p-2">
@@ -1241,7 +1248,7 @@ export default function OverviewCommandCenter({
               </div>
             </Link>
 
-            <div className="flex min-h-[56px] items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4">
+            <div className="dashboard-hover-item flex min-h-[56px] items-center justify-between border border-white/[0.06] bg-[#060b0f] px-4">
               <div className="flex items-center gap-3">
                 <div className="border border-emerald-500/16 bg-emerald-500/10 p-2">
                   <Bot className="h-4 w-4 text-emerald-300" />
@@ -1257,7 +1264,7 @@ export default function OverviewCommandCenter({
               </div>
             </div>
           </div>
-        </section>
+        </DashboardHoverSurface>
       </div>
 
       <section>
@@ -1286,7 +1293,7 @@ export default function OverviewCommandCenter({
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_320px] xl:grid-cols-[minmax(0,1.55fr)_360px]">
         {/* Left column: Priority Queue + Chart */}
         <div className="space-y-4">
-        <section data-panel="priority-queue" className="group/pq border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(52,211,153,0.05)] sm:p-6">
+        <DashboardHoverSurface as="section" tone="emerald" data-panel="priority-queue" className="group/pq border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6">
           <SectionHeader
             label="Priority Queue"
             title="What to do next"
@@ -1296,7 +1303,7 @@ export default function OverviewCommandCenter({
             {model.actions.map((action) => {
               const style = toneStyles(action.tone);
               return (
-                <div key={action.title} className="border border-white/[0.06] bg-[#060b0f] p-4 transition-all duration-200 hover:bg-white/[0.03]">
+                <div key={action.title} className="dashboard-hover-item border border-white/[0.06] bg-[#060b0f] p-4">
                   <div className="flex items-start gap-4">
                     <div className={`mt-1 h-14 w-1 shrink-0 ${action.tone === 'red' ? 'bg-red-400' : action.tone === 'amber' ? 'bg-amber-400' : action.tone === 'cyan' ? 'bg-cyan-400' : 'bg-emerald-400'}`} />
                     <div className="min-w-0 flex-1">
@@ -1311,7 +1318,7 @@ export default function OverviewCommandCenter({
                         <div className="text-sm font-medium text-zinc-200">{action.impact}</div>
                         <Link
                           href={action.href}
-                          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-emerald-300 transition-colors hover:text-emerald-200"
+                          className="dashboard-hover-link inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-emerald-300"
                         >
                           {action.cta}
                           <ChevronRight className="h-4 w-4" />
@@ -1323,9 +1330,9 @@ export default function OverviewCommandCenter({
               );
             })}
           </div>
-        </section>
+        </DashboardHoverSurface>
 
-        <section className="group/ch border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(52,211,153,0.05)] sm:p-6">
+        <DashboardHoverSurface as="section" tone="mixed" className="group/ch border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6">
           {/* Header: title + tab switcher */}
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -1405,7 +1412,7 @@ export default function OverviewCommandCenter({
           </div>
 
           {/* Chart area */}
-          <div className="h-[340px] border border-white/[0.06] bg-[#060b0f] px-2 py-4 transition-colors duration-200 hover:border-white/[0.14]">
+          <div className="dashboard-hover-item h-[340px] border border-white/[0.06] bg-[#060b0f] px-2 py-4">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={model.chartData} margin={{ top: 8, right: chartMode === 'seo' && !isMobile ? 48 : 8, left: -16, bottom: 0 }}>
                 <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -1664,15 +1671,15 @@ export default function OverviewCommandCenter({
 
           {/* Footer insight */}
           <p className="mt-2 text-[11px] leading-5 text-zinc-500">{model.chartSummaries[chartMode]}</p>
-        </section>
+        </DashboardHoverSurface>
 
-        <XMentionsTopPanel />
+        <XMentionsTopPanel premiumHover />
 
         </div>
 
         {/* Right column: Timeline + Top Pages + Keywords */}
         <div className="space-y-4">
-          <section className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.05)] sm:p-6">
+          <DashboardHoverSurface as="section" tone="cyan" className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6">
             <SectionHeader
               label="Recent Timeline"
               title="What happened mainly"
@@ -1682,7 +1689,7 @@ export default function OverviewCommandCenter({
               {model.timeline.map((item) => {
                 const style = toneStyles(item.tone);
                 return (
-                  <div key={item.key} className="border border-white/[0.06] bg-[#060b0f] p-4 transition-all duration-200 hover:bg-white/[0.03]">
+                  <div key={item.key} className="dashboard-hover-item border border-white/[0.06] bg-[#060b0f] p-4">
                     <div className="flex items-start gap-3">
                       <div className={`mt-1 border ${style.border} ${style.glow} p-2`}>
                         <Activity className={`h-4 w-4 ${style.accent}`} />
@@ -1699,21 +1706,21 @@ export default function OverviewCommandCenter({
                 );
               })}
             </div>
-          </section>
+          </DashboardHoverSurface>
 
-          <section className="group/tp border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.05)]">
+          <DashboardHoverSurface as="section" tone="cyan" className="group/tp border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)]">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Top Pages</div>
                 <h3 className="mt-2 text-lg font-semibold text-white">Where clicks are concentrating</h3>
               </div>
-              <Link href="/dashboard/seo" className="min-h-[44px] inline-flex items-center text-sm font-medium text-emerald-300 hover:text-emerald-200">
+              <Link href="/dashboard/seo" className="dashboard-hover-link min-h-[44px] inline-flex items-center text-sm font-medium text-emerald-300">
                 Open SEO
               </Link>
             </div>
             <div className="mt-4 space-y-3">
               {model.topPages.map((page) => (
-                <div key={page.page} className="group/pg border border-white/[0.06] bg-[#060b0f] p-3 transition-all duration-200 hover:bg-white/[0.02] hover:shadow-[0_0_12px_rgba(34,211,238,0.03)]">
+                <div key={page.page} className="dashboard-hover-item group/pg border border-white/[0.06] bg-[#060b0f] p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-white transition-colors duration-200 group-hover/pg:text-zinc-100">{page.page}</div>
@@ -1730,21 +1737,21 @@ export default function OverviewCommandCenter({
                 </div>
               ))}
             </div>
-          </section>
+          </DashboardHoverSurface>
 
-          <section className="group/sm border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.05)]">
+          <DashboardHoverSurface as="section" tone="cyan" className="group/sm border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)]">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Top Search Movers</div>
                 <h3 className="mt-2 text-lg font-semibold text-white">Keywords moving the fastest</h3>
               </div>
-              <Link href="/dashboard/opportunities" className="min-h-[44px] inline-flex items-center text-sm font-medium text-cyan-300 hover:text-cyan-200">
+              <Link href="/dashboard/opportunities" className="dashboard-hover-link min-h-[44px] inline-flex items-center text-sm font-medium text-cyan-300">
                 Explore
               </Link>
             </div>
             <div className="mt-4 space-y-3">
               {model.searchMovers.map((query) => (
-                <div key={query.query} className="group/mv border border-white/[0.06] bg-[#060b0f] p-3 transition-all duration-200 hover:border-white/[0.12] hover:bg-[#0a0f14]">
+                <div key={query.query} className="dashboard-hover-item group/mv border border-white/[0.06] bg-[#060b0f] p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-white">{query.query}</div>
@@ -1760,21 +1767,21 @@ export default function OverviewCommandCenter({
                 </div>
               ))}
             </div>
-          </section>
+          </DashboardHoverSurface>
         </div>
       </div>
 
-      <XMentionsPickerRail className="mt-4" />
+      <XMentionsPickerRail className="mt-4" premiumHover />
       </XMentionsProvider>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(52,211,153,0.05)] sm:p-6">
+        <DashboardHoverSurface as="section" tone="emerald" className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Goals Progress</div>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">What is converting right now</h2>
             </div>
-            <Link href="/dashboard/analytics/goals" className="min-h-[44px] inline-flex items-center gap-2 text-sm font-medium text-emerald-300 hover:text-emerald-200">
+            <Link href="/dashboard/analytics/goals" className="dashboard-hover-link min-h-[44px] inline-flex items-center gap-2 text-sm font-medium text-emerald-300">
               Open goals
               <ExternalLink className="h-4 w-4" />
             </Link>
@@ -1783,7 +1790,7 @@ export default function OverviewCommandCenter({
           {model.goalCards.length > 0 ? (
             <div className="mt-5 space-y-4">
               {model.goalCards.map((goal) => (
-                <div key={goal.id} className="border border-white/[0.06] bg-[#060b0f] p-4 transition-all duration-200 hover:bg-white/[0.03]">
+                <div key={goal.id} className="dashboard-hover-item border border-white/[0.06] bg-[#060b0f] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-white">{goal.name}</div>
@@ -1815,9 +1822,9 @@ export default function OverviewCommandCenter({
               </p>
             </div>
           )}
-        </section>
+        </DashboardHoverSurface>
 
-        <section className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.05)] sm:p-6">
+        <DashboardHoverSurface as="section" tone="mixed" className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Indexing and Technical</div>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">How discoverable the site looks</h2>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
@@ -1825,12 +1832,12 @@ export default function OverviewCommandCenter({
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="border border-white/[0.06] bg-[#060b0f] p-4">
+            <div className="dashboard-hover-item border border-white/[0.06] bg-[#060b0f] p-4">
               <div className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Indexed pages</div>
               <div className="mt-3 font-mono text-[30px] font-semibold text-white">{formatCompact(seoKPIs?.indexedPages)}</div>
               <div className="mt-2 text-sm text-zinc-400">Pages currently surfaced in the search snapshot.</div>
             </div>
-            <div className="border border-white/[0.06] bg-[#060b0f] p-4">
+            <div className="dashboard-hover-item border border-white/[0.06] bg-[#060b0f] p-4">
               <div className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Technical issues</div>
               <div className="mt-3 font-mono text-[30px] font-semibold text-white">{formatCompact(seoKPIs?.crawlErrors)}</div>
               <div className="mt-2 text-sm text-zinc-400">
@@ -1839,10 +1846,10 @@ export default function OverviewCommandCenter({
             </div>
           </div>
 
-          <div className="mt-5 border border-white/[0.06] bg-[#060b0f] p-4">
+          <div className="dashboard-hover-item mt-5 border border-white/[0.06] bg-[#060b0f] p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-medium text-white">Technical interpretation</div>
-              <Link href="/dashboard/seo" className="min-h-[44px] inline-flex items-center text-sm font-medium text-amber-300 hover:text-amber-200">
+              <Link href="/dashboard/seo" className="dashboard-hover-link min-h-[44px] inline-flex items-center text-sm font-medium text-amber-300">
                 Review details
               </Link>
             </div>
@@ -1864,7 +1871,7 @@ export default function OverviewCommandCenter({
                 : `${formatCompact(seoKPIs?.indexedPages)} pages are indexed and no crawl errors are currently being surfaced in the overview data.`}
             </p>
           </div>
-        </section>
+        </DashboardHoverSurface>
       </div>
     </div>
   );

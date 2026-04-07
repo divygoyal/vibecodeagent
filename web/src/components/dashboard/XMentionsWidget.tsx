@@ -13,6 +13,8 @@ import {
 } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
+import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
+
 type XMention = {
   id: string;
   text: string;
@@ -71,10 +73,12 @@ interface XMentionsProviderProps {
 
 interface XMentionsTopPanelProps {
   className?: string;
+  premiumHover?: boolean;
 }
 
 interface XMentionsPickerRailProps {
   className?: string;
+  premiumHover?: boolean;
 }
 
 type XMentionsContextValue = {
@@ -813,7 +817,7 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
   return <XMentionsContext.Provider value={value}>{children}</XMentionsContext.Provider>;
 }
 
-export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '' }: XMentionsTopPanelProps) {
+export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '', premiumHover = false }: XMentionsTopPanelProps) {
   const {
     domain,
     activated,
@@ -877,9 +881,12 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
   }, [activate, activated, domain]);
 
   return (
-    <section
+    <DashboardHoverSurface
       ref={sectionRef}
-      className={`border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.05)] sm:p-6 ${className}`.trim()}
+      as="section"
+      tone="cyan"
+      interactive={premiumHover}
+      className={`border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6 ${className}`.trim()}
       tabIndex={hasMentions ? 0 : -1}
       onKeyDown={(event) => {
         if (event.key === 'ArrowLeft') {
@@ -907,7 +914,8 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
               type="button"
               onClick={handlePrev}
               disabled={!canGoPrev}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-[#0a0f14] disabled:cursor-not-allowed disabled:opacity-40"
+              className="dashboard-hover-action inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+              data-variant="ghost"
               aria-label="Show previous posts"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -916,7 +924,8 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
               type="button"
               onClick={handleNext}
               disabled={!canGoNext}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-[#0a0f14] disabled:cursor-not-allowed disabled:opacity-40"
+              className="dashboard-hover-action inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+              data-variant="ghost"
               aria-label="Show next posts"
             >
               <ChevronRight className="h-4 w-4" />
@@ -1018,7 +1027,10 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
                 const cardState = getCardState(mention.id);
 
                 return (
-                  <div key={mention.id} className="w-full max-w-[360px] border border-white/[0.06] bg-[#060b0f] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
+                  <div
+                    key={mention.id}
+                    className={`${premiumHover ? 'dashboard-hover-item ' : ''}w-full max-w-[360px] border border-white/[0.06] bg-[#060b0f] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]`}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
@@ -1065,11 +1077,11 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
           )}
         </div>
       )}
-    </section>
+    </DashboardHoverSurface>
   );
 });
 
-export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className = '' }: XMentionsPickerRailProps) {
+export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className = '', premiumHover = false }: XMentionsPickerRailProps) {
   const {
     activated,
     mentions,
@@ -1130,8 +1142,11 @@ export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className
   }
 
   return (
-    <section
-      className={`border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] transition-shadow duration-300 hover:shadow-[0_18px_42px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.05)] sm:p-6 ${className}`.trim()}
+    <DashboardHoverSurface
+      as="section"
+      tone="cyan"
+      interactive={premiumHover}
+      className={`border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6 ${className}`.trim()}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -1153,7 +1168,8 @@ export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className
                 type="button"
                 onClick={() => scrollRail(-1)}
                 disabled={!canScrollLeft}
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-[#0a0f14] disabled:cursor-not-allowed disabled:opacity-40"
+                className="dashboard-hover-action inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                data-variant="ghost"
                 aria-label="Scroll recent mentions left"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -1162,7 +1178,8 @@ export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className
                 type="button"
                 onClick={() => scrollRail(1)}
                 disabled={!canScrollRight}
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-[#0a0f14] disabled:cursor-not-allowed disabled:opacity-40"
+                className="dashboard-hover-action inline-flex min-h-[44px] min-w-[44px] items-center justify-center border border-white/[0.08] bg-[#060b0f] text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                data-variant="ghost"
                 aria-label="Scroll recent mentions right"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -1207,10 +1224,10 @@ export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className
                   key={mention.id}
                   type="button"
                   onClick={() => goToWindowStart(index)}
-                  className={`flex h-[220px] w-[252px] shrink-0 snap-start flex-col overflow-hidden border p-4 text-left transition-all ${
+                  className={`flex h-[220px] w-[252px] shrink-0 snap-start flex-col overflow-hidden border p-4 text-left ${
                     isVisibleAbove
                       ? 'border-cyan-500/30 bg-cyan-500/[0.08] shadow-[0_0_0_1px_rgba(34,211,238,0.08)]'
-                      : 'border-white/[0.06] bg-[#060b0f] hover:border-white/[0.12] hover:bg-[#091017]'
+                      : `${premiumHover ? 'dashboard-hover-item ' : ''}border-white/[0.06] bg-[#060b0f]`
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -1260,6 +1277,6 @@ export const XMentionsPickerRail = memo(function XMentionsPickerRail({ className
           </div>
         </div>
       )}
-    </section>
+    </DashboardHoverSurface>
   );
 });
