@@ -10,13 +10,20 @@ export const dynamic = 'force-dynamic';
 
 async function resolveTwitterBinAsync(): Promise<string> {
     if (process.env.TWITTER_CLI_PATH) return process.env.TWITTER_CLI_PATH;
+
+    // On Linux (Nixpacks / Docker) pip3 installs scripts to /usr/local/bin
+    const { existsSync } = await import('fs');
+    if (existsSync('/usr/local/bin/twitter')) return '/usr/local/bin/twitter';
+    if (existsSync('/usr/bin/twitter')) return '/usr/bin/twitter';
+
+    // Dynamic discovery via python3 (python may not exist on Debian)
     return new Promise((resolve) => {
         exec(
-            'python -c "import shutil,twitter_cli,os; d=os.path.dirname(os.path.dirname(twitter_cli.__file__)); scripts=os.path.join(d,\\"Scripts\\",\\"twitter.exe\\"); print(scripts if os.path.exists(scripts) else shutil.which(\\"twitter\\") or \\"twitter\\")"',
+            "python3 -c \"import shutil; print(shutil.which('twitter') or '')\"",
             { timeout: 5000 },
             (err, stdout) => {
                 const resolved = stdout?.toString().trim();
-                resolve(err || !resolved ? 'twitter' : resolved);
+                resolve(!err && resolved ? resolved : 'twitter');
             }
         );
     });
