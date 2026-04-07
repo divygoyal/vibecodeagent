@@ -40,6 +40,14 @@ type VisibleMention = {
   mention: XMention;
 };
 
+type SlideRenderStatus = 'measuring' | 'stable' | 'error';
+
+type TweetHeightState = {
+  height: number;
+  status: SlideRenderStatus;
+  renderKey: string;
+};
+
 type TwttrSdk = {
   widgets: {
     createTweet: (
@@ -90,8 +98,8 @@ type XMentionsContextValue = {
   goToWindowStart: (index: number) => void;
   handlePrev: () => void;
   handleNext: () => void;
-  handleHeightChange: (index: number, height: number) => void;
-  getCardHeight: (index: number) => number;
+  handleSlideStateChange: (tweetId: string, nextState: TweetHeightState) => void;
+  getCardState: (tweetId: string) => TweetHeightState;
 };
 
 const TWITTER_ORIGINS = [
@@ -286,27 +294,37 @@ function formatMentionPreview(text: string) {
   return `${shortened}...`;
 }
 
+function getTweetRenderKey(tweetId: string, stageWidth: number) {
+  return `${tweetId}:${stageWidth}`;
+}
+
+function createFallbackTweetState(renderKey: string, fallbackHeight: number): TweetHeightState {
+  return {
+    height: fallbackHeight,
+    status: 'measuring',
+    renderKey,
+  };
+}
+
 const XTweetSlide = memo(function XTweetSlide({
   tweetId,
   scale,
   stageWidth,
-  reservedHeight,
+  state,
   showPlaceholder = true,
-  onReady,
-  onHeightChange,
+  onStateChange,
 }: {
   tweetId: string;
   scale: number;
   stageWidth: number;
-  reservedHeight: number;
+  state: TweetHeightState;
   showPlaceholder?: boolean;
-  onReady?: () => void;
-  onHeightChange?: (height: number) => void;
+  onStateChange?: (tweetId: string, nextState: TweetHeightState) => void;
 }) {
   const scaledWrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const renderedRef = useRef(false);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const renderKey = getTweetRenderKey(tweetId, stageWidth);
+  const [status, setStatus] = useState<'loading' | 'measuring' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
     const scaledWrapper = scaledWrapperRef.current;
@@ -316,73 +334,157 @@ const XTweetSlide = memo(function XTweetSlide({
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
     let mutationObserver: MutationObserver | null = null;
+    let iframeCleanup: (() => void) | null = null;
+    const settleTimers = new Set<ReturnType<typeof setTimeout>>();
+    let previousHeight = 0;
+    let stableMatches = 0;
+    const placeholderHeight = Math.round(TWEET_LOADING_HEIGHT * scale) + 32;
 
-    const reportHeight = () => {
-      if (!onHeightChange) return;
-      const height = Math.ceil(scaledWrapper.getBoundingClientRect().height);
-      if (height > 0) {
-        onHeightChange(height);
-      }
+    const clearTimers = () => {
+      settleTimers.forEach((timer) => clearTimeout(timer));
+      settleTimers.clear();
     };
 
-    if (!renderedRef.current) {
-      renderedRef.current = true;
-      container.innerHTML = '';
+    const pushState = (nextState: TweetHeightState) => {
+      onStateChange?.(tweetId, nextState);
+    };
 
-      ensureTwitterSdk()
-        .then((twttr) =>
-          twttr.widgets.createTweet(tweetId, container, {
-            theme: 'dark',
-            conversation: 'none',
-            dnt: 'true',
-            align: 'left',
-          }),
-        )
-        .then(() => {
-          if (cancelled) return;
-          setStatus('ready');
-          onReady?.();
-          reportHeight();
+    const readHeight = () => {
+      const height = Math.ceil(scaledWrapper.getBoundingClientRect().height);
+      return height > 0 ? height : 0;
+    };
 
-          if ('ResizeObserver' in window) {
-            resizeObserver = new ResizeObserver(reportHeight);
-            resizeObserver.observe(scaledWrapper);
+    const measureHeight = () => {
+      const height = readHeight();
+      if (height <= 0) return 0;
+      pushState({
+        height,
+        status: 'measuring',
+        renderKey,
+      });
+      setStatus('measuring');
+      if (Math.abs(height - previousHeight) <= 2) {
+        stableMatches += 1;
+      } else {
+        stableMatches = 1;
+        previousHeight = height;
+      }
+      return height;
+    };
+
+    const finalizeStable = (height: number) => {
+      pushState({
+        height,
+        status: 'stable',
+        renderKey,
+      });
+      setStatus('ready');
+      clearTimers();
+    };
+
+    const scheduleSettle = (attempt = 0) => {
+      const timer = setTimeout(() => {
+        settleTimers.delete(timer);
+        if (cancelled) return;
+        const height = measureHeight();
+        if (height > 0 && stableMatches >= 2) {
+          finalizeStable(height);
+          return;
+        }
+        if (attempt >= 6) {
+          if (height > 0) {
+            finalizeStable(height);
           }
+          return;
+        }
+        scheduleSettle(attempt + 1);
+      }, attempt === 0 ? 90 : 180);
+      settleTimers.add(timer);
+    };
 
-          const iframe = container.querySelector('iframe');
-          if (iframe) {
-            mutationObserver = new MutationObserver(reportHeight);
-            mutationObserver.observe(iframe, {
-              attributes: true,
-              attributeFilter: ['style', 'height'],
-            });
-          }
+    container.innerHTML = '';
 
-          setTimeout(reportHeight, 120);
-          setTimeout(reportHeight, 320);
-          setTimeout(reportHeight, 900);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setStatus('error');
-          reportHeight();
+    ensureTwitterSdk()
+      .then((twttr) => {
+        if (cancelled) return undefined;
+        return twttr.widgets.createTweet(tweetId, container, {
+          theme: 'dark',
+          conversation: 'none',
+          dnt: 'true',
+          align: 'left',
         });
-    } else {
-      reportHeight();
-    }
+      })
+      .then(() => {
+        if (cancelled) return;
+
+        measureHeight();
+
+        if ('ResizeObserver' in window) {
+          resizeObserver = new ResizeObserver(() => {
+            const height = measureHeight();
+            if (height > 0 && stableMatches >= 2) {
+              finalizeStable(height);
+            }
+          });
+          resizeObserver.observe(scaledWrapper);
+          resizeObserver.observe(container);
+        }
+
+        const iframe = container.querySelector('iframe');
+        if (iframe) {
+          const handleIframeLoad = () => {
+            const height = measureHeight();
+            if (height > 0 && stableMatches >= 2) {
+              finalizeStable(height);
+            }
+          };
+
+          iframe.addEventListener('load', handleIframeLoad);
+          mutationObserver = new MutationObserver(() => {
+            const height = measureHeight();
+            if (height > 0 && stableMatches >= 2) {
+              finalizeStable(height);
+            }
+          });
+          mutationObserver.observe(iframe, {
+            attributes: true,
+            attributeFilter: ['style', 'height'],
+          });
+
+          iframeCleanup = () => {
+            iframe.removeEventListener('load', handleIframeLoad);
+          };
+        }
+
+        scheduleSettle();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        pushState({
+          height: placeholderHeight,
+          status: 'error',
+          renderKey,
+        });
+        setStatus('error');
+        clearTimers();
+      });
 
     return () => {
       cancelled = true;
+      container.innerHTML = '';
+      clearTimers();
+      iframeCleanup?.();
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };
-  }, [onHeightChange, onReady, scale, tweetId]);
+  }, [onStateChange, renderKey, scale, tweetId]);
 
   const placeholderHeight = Math.round(TWEET_LOADING_HEIGHT * scale) + 32;
-  const outerHeight = status === 'ready' ? reservedHeight : placeholderHeight;
+  const reservedHeight = state.status === 'stable' ? Math.max(state.height, 0) : Math.max(state.height, placeholderHeight);
+  const outerHeight = status === 'loading' || status === 'error' ? placeholderHeight : reservedHeight;
 
   return (
-    <div className="relative" style={{ width: stageWidth, height: outerHeight }}>
+    <div className="relative overflow-hidden" style={{ width: stageWidth, height: outerHeight }}>
       {showPlaceholder && status === 'loading' && (
         <div className="absolute inset-0 animate-pulse border border-white/[0.06] bg-[#060b0f] p-4">
           <div className="flex items-center gap-3">
@@ -421,7 +523,7 @@ const XTweetSlide = memo(function XTweetSlide({
           width: EMBED_WIDTH,
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
-          visibility: status === 'ready' ? 'visible' : 'hidden',
+          visibility: status === 'error' || status === 'loading' ? 'hidden' : 'visible',
         }}
       >
         <div ref={containerRef} style={{ width: EMBED_WIDTH }} />
@@ -442,10 +544,11 @@ const XEmbedPreloader = memo(function XEmbedPreloader({
   return (
     <div className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden opacity-0" aria-hidden="true">
       <XTweetSlide
+        key={getTweetRenderKey(tweetId, stageWidth)}
         tweetId={tweetId}
         scale={scale}
         stageWidth={stageWidth}
-        reservedHeight={0}
+        state={createFallbackTweetState(getTweetRenderKey(tweetId, stageWidth), Math.round(TWEET_LOADING_HEIGHT * scale) + 32)}
         showPlaceholder={false}
       />
     </div>
@@ -458,7 +561,7 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [windowStart, setWindowStart] = useState(0);
-  const [slideHeights, setSlideHeights] = useState<Record<number, number>>({});
+  const [tweetStates, setTweetStates] = useState<Record<string, TweetHeightState>>({});
   const [isNarrow, setIsNarrow] = useState(false);
 
   useEffect(() => {
@@ -476,7 +579,7 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
     setLoading(false);
     setError(null);
     setWindowStart(0);
-    setSlideHeights({});
+    setTweetStates({});
   }, [domain]);
 
   useEffect(() => {
@@ -575,7 +678,7 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
 
   useEffect(() => {
     setWindowStart(0);
-    setSlideHeights({});
+    setTweetStates({});
   }, [mentions]);
 
   const compactScale = isNarrow ? MOBILE_SCALE : DESKTOP_SCALE;
@@ -630,16 +733,30 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
     goToWindowStart(boundedWindowStart + 1);
   }, [boundedWindowStart, canGoNext, goToWindowStart]);
 
-  const handleHeightChange = useCallback((index: number, height: number) => {
-    setSlideHeights((previous) => {
-      if (previous[index] === height) return previous;
-      return { ...previous, [index]: height };
+  const handleSlideStateChange = useCallback((tweetId: string, nextState: TweetHeightState) => {
+    setTweetStates((previous) => {
+      const current = previous[tweetId];
+      if (
+        current?.height === nextState.height &&
+        current.status === nextState.status &&
+        current.renderKey === nextState.renderKey
+      ) {
+        return previous;
+      }
+      return { ...previous, [tweetId]: nextState };
     });
   }, []);
 
-  const getCardHeight = useCallback(
-    (index: number) => slideHeights[index] ?? fallbackHeight,
-    [fallbackHeight, slideHeights],
+  const getCardState = useCallback(
+    (tweetId: string) => {
+      const renderKey = getTweetRenderKey(tweetId, stageWidth);
+      const current = tweetStates[tweetId];
+      if (!current || current.renderKey !== renderKey) {
+        return createFallbackTweetState(renderKey, fallbackHeight);
+      }
+      return current;
+    },
+    [fallbackHeight, stageWidth, tweetStates],
   );
 
   const value = useMemo<XMentionsContextValue>(
@@ -664,8 +781,8 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
       goToWindowStart,
       handlePrev,
       handleNext,
-      handleHeightChange,
-      getCardHeight,
+      handleSlideStateChange,
+      getCardState,
     }),
     [
       activate,
@@ -677,9 +794,9 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
       domain,
       error,
       fallbackHeight,
-      getCardHeight,
+      getCardState,
       goToWindowStart,
-      handleHeightChange,
+      handleSlideStateChange,
       handleNext,
       handlePrev,
       hasMentions,
@@ -715,8 +832,8 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
     preloadMention,
     handlePrev,
     handleNext,
-    handleHeightChange,
-    getCardHeight,
+    handleSlideStateChange,
+    getCardState,
   } = useXMentionsContext();
 
   const sectionRef = useRef<HTMLElement>(null);
@@ -897,39 +1014,49 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
             </div>
 
             <div className="mt-4 flex flex-col gap-5 xl:flex-row xl:items-start">
-              {visibleMentions.map(({ index, mention }, position) => (
-                <div key={mention.id} className="w-full max-w-[360px] border border-white/[0.06] bg-[#060b0f] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                        {position === 0 ? 'Selected Post' : 'Following Post'}
-                      </div>
-                      <div className="mt-1 text-xs text-zinc-400">
-                        {position === 0 ? 'Primary post in the current two-post view.' : 'The next newest post in sequence.'}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {index === 0 && (
-                        <div className="rounded-full border border-cyan-500/20 bg-cyan-500/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
-                          Latest
-                        </div>
-                      )}
-                      <span className="text-[11px] uppercase tracking-[0.14em] text-zinc-500">{timeAgo(mention.createdAt)}</span>
-                    </div>
-                  </div>
+              {visibleMentions.map(({ index, mention }, position) => {
+                const cardState = getCardState(mention.id);
 
-                  <div className="mt-4" style={{ width: stageWidth, height: getCardHeight(index) }}>
-                    <XTweetSlide
-                      key={mention.id}
-                      tweetId={mention.id}
-                      scale={compactScale}
-                      stageWidth={stageWidth}
-                      reservedHeight={getCardHeight(index)}
-                      onHeightChange={(height) => handleHeightChange(index, height)}
-                    />
+                return (
+                  <div key={mention.id} className="w-full max-w-[360px] border border-white/[0.06] bg-[#060b0f] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                          {position === 0 ? 'Selected Post' : 'Following Post'}
+                        </div>
+                        <div className="mt-1 text-xs text-zinc-400">
+                          {position === 0 ? 'Primary post in the current two-post view.' : 'The next newest post in sequence.'}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {index === 0 && (
+                          <div className="rounded-full border border-cyan-500/20 bg-cyan-500/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
+                            Latest
+                          </div>
+                        )}
+                        <span className="text-[11px] uppercase tracking-[0.14em] text-zinc-500">{timeAgo(mention.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className="mt-4"
+                      style={{
+                        width: stageWidth,
+                        height: cardState.status === 'stable' ? Math.max(cardState.height, 0) : Math.max(cardState.height, fallbackHeight),
+                      }}
+                    >
+                      <XTweetSlide
+                        key={getTweetRenderKey(mention.id, stageWidth)}
+                        tweetId={mention.id}
+                        scale={compactScale}
+                        stageWidth={stageWidth}
+                        state={cardState}
+                        onStateChange={handleSlideStateChange}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

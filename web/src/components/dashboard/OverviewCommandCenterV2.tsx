@@ -31,6 +31,7 @@ import {
 } from 'recharts';
 
 import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
+import { getDashboardBriefing } from '@/lib/dashboardBriefing';
 import {
   XMentionsPickerRail,
   XMentionsProvider,
@@ -541,24 +542,40 @@ export default function OverviewCommandCenter({
 
     const riskCount = alerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length;
     const goalCount = goals.length;
+    const goalsOnTrack = goals.filter((goal) => toNumber(goal.change) >= 0).length;
     const topGoal = [...goals].sort((a, b) => b.conversions - a.conversions)[0];
     const topOpp = opportunities[0];
     const topPage = [...pages].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0];
-
-    const clicksChange = seoKPIs?.changeClicks ?? 0;
-    const usersChange = analyticsKPIs?.changeUsers ?? 0;
-    const headline =
-      clicksChange <= -8
-        ? `Search clicks softened ${Math.abs(clicksChange)}% this period, but there are clear recovery moves to make next.`
-        : clicksChange >= 8
-          ? `Search clicks climbed ${clicksChange}% this period. The next step is protecting what is already working.`
-          : usersChange <= -8
-            ? `Traffic is steady overall, but user demand dipped enough to need a closer look this period.`
-            : `The overview is stable right now, with a few concrete opportunities ready to turn into traffic gains.`;
-
-    const subcopy = selectedSiteLabel
-      ? `For ${selectedSiteLabel}, ${formatRangeLabel(range).toLowerCase()} performance is being summarized across Analytics, Search Console, goals, and operational status.`
-      : `This overview combines Analytics, Search Console, goals, and operational status into one daily briefing.`;
+    const lastVisibleDate =
+      search[search.length - 1]?.date ||
+      traffic[traffic.length - 1]?.date ||
+      lastUpdated?.toISOString() ||
+      null;
+    const briefing = getDashboardBriefing({
+      hasData,
+      selectedSiteLabel,
+      range,
+      rangeLabel: formatRangeLabel(range),
+      lastVisibleDate,
+      lastUpdated,
+      searchClickChange: seoKPIs?.changeClicks,
+      usersChange: analyticsKPIs?.changeUsers,
+      pageViewsChange: analyticsKPIs?.changePageViews,
+      avgPositionChange: seoKPIs?.changePosition,
+      crawlErrors: seoKPIs?.crawlErrors,
+      riskCount,
+      opportunityCount: opportunities.length,
+      goalCount,
+      goalsOnTrack,
+      topGoalName: topGoal?.name,
+      topGoalConversions: topGoal?.conversions,
+      topPagePath: topPage?.page,
+      topOpportunityQuery: topOpp?.query,
+      topOpportunityPosition: topOpp?.position,
+      topOpportunityPotentialClicks: topOpp?.potentialClicks,
+      activeUsers,
+      isLive,
+    });
 
     const metricCards = [
       {
@@ -994,8 +1011,8 @@ export default function OverviewCommandCenter({
       opportunities,
       riskCount,
       goalCount,
-      headline,
-      subcopy,
+      headline: briefing.headline,
+      subcopy: briefing.subcopy,
       metricCards,
       actions,
       chartData,

@@ -22,11 +22,12 @@ import {
 } from 'lucide-react';
 
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useRealtimeData, useGoalsData } from '@/lib/useDashboardData';
-import { computeAlerts } from '@/lib/alertEngine';
+import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
+import { getDashboardBriefing } from '@/lib/dashboardBriefing';
 import { useRegistration } from './layout';
 import { ConnectGoogleState } from '@/components/EmptyState';
 import OverviewCommandCenter from '@/components/dashboard/OverviewCommandCenterV2';
-import MobileQuickStats from '@/components/dashboard/MobileQuickStats';
+import MobileOverviewAppShell from '@/components/dashboard/MobileOverviewAppShell';
 import MobileBottomBar from '@/components/dashboard/MobileBottomBar';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import GoalProgress from '@/components/dashboard/GoalProgress';
@@ -162,20 +163,6 @@ function getTimeGreeting() {
   return 'Good evening';
 }
 
-function getContextualSummary(
-  hasData: boolean,
-  clickChange?: number,
-  userChange?: number,
-  riskCount?: number,
-) {
-  if (!hasData) return 'Your dashboard is loading.';
-  if (riskCount && riskCount > 0) return `You have ${riskCount} risk${riskCount > 1 ? 's' : ''} that need${riskCount === 1 ? 's' : ''} attention.`;
-  if (clickChange !== undefined && clickChange > 5) return 'Search traffic is growing — keep the momentum going.';
-  if (userChange !== undefined && userChange > 5) return 'User growth is strong this period.';
-  if (clickChange !== undefined && clickChange < -5) return 'Traffic has softened — the priority queue has your next moves.';
-  return 'Performance is steady. Check the priority queue for your next action.';
-}
-
 export default function DashboardOverview() {
   const { data: session } = useSession();
   const {
@@ -185,6 +172,7 @@ export default function DashboardOverview() {
     selectedProperty,
     setSelectedProperty,
     range,
+    setRange,
   } = useRegistration();
 
   useKeyboardShortcuts();
@@ -239,8 +227,14 @@ export default function DashboardOverview() {
   const typedGoalsData = goalsData as GoalsResponse | undefined;
   const analyticsKPIs = analyticsDashboardData?.kpis;
   const seoKPIs = seoDashboardData?.kpis;
-  const trafficData = Array.isArray(analyticsDashboardData?.traffic) ? analyticsDashboardData.traffic : [];
-  const searchTrend = Array.isArray(seoDashboardData?.trend) ? seoDashboardData.trend : [];
+  const trafficData = useMemo(
+    () => (Array.isArray(analyticsDashboardData?.traffic) ? analyticsDashboardData.traffic : []),
+    [analyticsDashboardData?.traffic],
+  );
+  const searchTrend = useMemo(
+    () => (Array.isArray(seoDashboardData?.trend) ? seoDashboardData.trend : []),
+    [seoDashboardData?.trend],
+  );
   const hasData = !!(analyticsKPIs || seoKPIs);
 
   const { data: realtimeData } = useRealtimeData(matchedProp?.property, canFetchData && hasData);
@@ -276,6 +270,83 @@ export default function DashboardOverview() {
     () => (hasData ? computeAlerts(seoData, analyticsData) : []),
     [hasData, seoData, analyticsData],
   );
+  const pageBriefing = useMemo(() => {
+    const opportunities = hasData ? computeOpportunities(seoData) : [];
+    const goals = Array.isArray(typedGoalsData?.goals) ? typedGoalsData.goals : [];
+    const pages = Array.isArray(seoData?.pages) ? seoData.pages : [];
+    const search = Array.isArray(searchTrend) ? searchTrend : [];
+    const traffic = Array.isArray(trafficData) ? trafficData : [];
+    const topGoal = [...goals].sort((a, b) => b.conversions - a.conversions)[0];
+    const topOpp = opportunities[0];
+    const topPage = [...pages].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0];
+    const goalsOnTrack = goals.filter((goal) => (goal.change ?? 0) >= 0).length;
+    const riskCount = recentAlerts.filter(
+      (alert) => alert.severity === 'critical' || alert.severity === 'warning',
+    ).length;
+    const lastVisibleDate =
+      search[search.length - 1]?.date ||
+      traffic[traffic.length - 1]?.date ||
+      lastUpdated?.toISOString() ||
+      null;
+
+    return getDashboardBriefing({
+      hasData,
+      selectedSiteLabel,
+      range,
+      rangeLabel:
+        {
+          today: 'Today',
+          yesterday: 'Yesterday',
+          '7d': 'Last 7 days',
+          '14d': 'Last 14 days',
+          '30d': 'Last 30 days',
+          '60d': 'Last 60 days',
+          '90d': 'Last 90 days',
+          '6m': 'Last 6 months',
+          '12m': 'Last 12 months',
+          this_week: 'This week',
+          last_week: 'Last week',
+          this_month: 'This month',
+          last_month: 'Last month',
+          this_year: 'This year',
+          last_year: 'Last year',
+          all: 'All time',
+        }[range] || 'Selected period',
+      lastVisibleDate,
+      lastUpdated,
+      searchClickChange: seoKPIs?.changeClicks,
+      usersChange: analyticsKPIs?.changeUsers,
+      pageViewsChange: analyticsKPIs?.changePageViews,
+      avgPositionChange: seoKPIs?.changePosition,
+      crawlErrors: seoKPIs?.crawlErrors,
+      riskCount,
+      opportunityCount: opportunities.length,
+      goalCount: goals.length,
+      goalsOnTrack,
+      topGoalName: topGoal?.name,
+      topGoalConversions: topGoal?.conversions,
+      topPagePath: topPage?.page,
+      topOpportunityQuery: topOpp?.query,
+      topOpportunityPosition: topOpp?.position,
+      topOpportunityPotentialClicks: topOpp?.potentialClicks,
+      activeUsers,
+      isLive,
+    });
+  }, [
+    activeUsers,
+    analyticsKPIs,
+    hasData,
+    isLive,
+    lastUpdated,
+    range,
+    recentAlerts,
+    searchTrend,
+    selectedSiteLabel,
+    seoData,
+    seoKPIs,
+    trafficData,
+    typedGoalsData,
+  ]);
 
   // Phase 3: Build implicit goal items from KPI data
   const goalItems = useMemo(() => {
@@ -353,18 +424,20 @@ export default function DashboardOverview() {
   }, [refreshAnalytics, refreshSeo]);
 
   const handleAskAI = useCallback(() => {
-    // Open the AI chatbot by dispatching a custom event that AIChatbot listens for
     window.dispatchEvent(new CustomEvent('open-ai-chat'));
   }, []);
 
   const handleNotifications = useCallback(() => {
-    // Scroll to the recent activity / Phase 3 section
-    const activitySection = document.querySelector('[data-section="activity"]');
-    if (activitySection) {
-      activitySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    const target =
+      document.querySelector('[data-mobile-section="timeline"]') ||
+      document.querySelector('[data-section="activity"]');
+
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
     }
+
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }, []);
 
 
@@ -389,73 +462,13 @@ export default function DashboardOverview() {
 
   return (
     <div className="relative">
-    <div className="mobile-snap-y space-y-4 overflow-hidden bg-[#010203] pb-20 sm:space-y-6 lg:pb-8">
+    <div className="mobile-snap-y space-y-4 overflow-hidden bg-[#010203] pb-24 sm:space-y-6 md:pb-8">
       {/* Top-of-page progress bar during SWR revalidation */}
       {isRef && hasData && (
         <div className="fixed inset-x-0 top-0 z-50 h-0.5">
           <div className="h-full w-1/3 animate-[progress-bar_1.5s_ease-in-out_infinite] bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500" />
         </div>
       )}
-      {/* Mobile sticky quick stats bar */}
-      {hasData && (
-        <MobileQuickStats
-          totalUsers={analyticsKPIs?.totalUsers}
-          totalPageViews={analyticsKPIs?.totalPageViews}
-          totalClicks={seoKPIs?.totalClicks}
-          avgPosition={seoKPIs?.avgPosition}
-        />
-      )}
-
-      {/* Personalized greeting header */}
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -mx-4 h-36 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.08),transparent_54%)]" />
-        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="inline-flex border border-white/[0.08] bg-[#04080b] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-                Overview
-              </div>
-              {hasData && (
-                <div className="inline-flex border border-white/[0.06] bg-[#04080b] px-2.5 py-1 text-[10px] text-zinc-500">
-                  Last {range.replace('d', ' days')}
-                </div>
-              )}
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{greeting}</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-                {hasData
-                  ? getContextualSummary(hasData, seoKPIs?.changeClicks, analyticsKPIs?.changeUsers)
-                  : 'Real-time analytics, SEO performance, and AI-powered actions in one view.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {activeUsers !== null && (
-              <button
-                type="button"
-                onClick={() => setLiveDrawerOpen(true)}
-                className="inline-flex items-center gap-2 border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-2 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/[0.12]"
-              >
-                <Activity className="h-4 w-4" />
-                {activeUsers} live
-              </button>
-            )}
-
-            {hasData && (
-              <button
-                type="button"
-                onClick={handleExportReport}
-                className="inline-flex items-center gap-2 border border-white/[0.08] bg-[#04080b] px-3 py-2 text-sm text-zinc-200 transition-colors hover:border-white/[0.14] hover:bg-white/[0.04]"
-              >
-                <FileDown className="h-4 w-4" />
-                Export report
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Connect Google empty state */}
       {showConnectGoogle && (
@@ -564,51 +577,128 @@ export default function DashboardOverview() {
         </div>
       )}
 
-      {/* Bot setup banner */}
-      {!containerLoading && hasGoogleConnection && !botRunning && !isEmptyShell && (
-        <div className="border border-emerald-500/18 bg-[linear-gradient(135deg,rgba(52,211,153,0.08),rgba(34,211,238,0.04))] p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center border border-emerald-500/20 bg-emerald-500/10">
-              <Bot className="h-4 w-4 text-emerald-300" />
-            </div>
-            <p className="flex-1 text-sm text-zinc-300">
-              Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="font-medium text-emerald-300 hover:text-emerald-200">Set up your bot</Link>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Main command center */}
       {!isEmptyShell && (
-        <div data-section="activity">
-          <OverviewCommandCenter
-            selectedSiteLabel={selectedSiteLabel}
-            range={range}
-            activeUsers={activeUsers}
-            isLive={isLive}
-            hasData={hasData}
-            isLoading={isRef}
-            lastUpdated={lastUpdated}
-            analyticsData={analyticsDashboardData}
-            seoData={seoDashboardData}
-            analyticsKPIs={analyticsKPIs}
-            seoKPIs={seoKPIs}
-            trafficData={trafficData}
-            searchTrend={searchTrend}
-            goalsData={typedGoalsData}
-            onOpenLiveDrawer={() => setLiveDrawerOpen(true)}
-            onExportReport={handleExportReport}
-          />
-        </div>
-      )}
+        <>
+          <div className="md:hidden">
+            <MobileOverviewAppShell
+              selectedSiteLabel={selectedSiteLabel}
+              range={range}
+              setRange={setRange}
+              activeUsers={activeUsers}
+              isLive={isLive}
+              botRunning={botRunning}
+              hasData={hasData}
+              isLoading={isRef}
+              lastUpdated={lastUpdated}
+              analyticsData={analyticsDashboardData}
+              seoData={seoDashboardData}
+              analyticsKPIs={analyticsKPIs}
+              seoKPIs={seoKPIs}
+              trafficData={trafficData}
+              searchTrend={searchTrend}
+              goalsData={typedGoalsData}
+              recentAlerts={recentAlerts}
+              onOpenLiveDrawer={() => setLiveDrawerOpen(true)}
+              onExportReport={handleExportReport}
+              onAskAI={handleAskAI}
+              onNotifications={handleNotifications}
+            />
+          </div>
 
-      {/* Phase 3: New sections — Activity Feed, Goals, Indexing */}
-      {hasData && !isEmptyShell && (
-        <div className="grid gap-4 xl:grid-cols-3">
-          <RecentActivity alerts={recentAlerts} maxItems={6} />
-          <GoalProgress goals={goalItems} />
-          <IndexingStatus />
-        </div>
+          <div className="hidden md:block">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-x-0 top-0 -mx-4 h-36 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.08),transparent_54%)]" />
+              <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex border border-white/[0.08] bg-[#04080b] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                      Overview
+                    </div>
+                    {hasData && (
+                      <div className="inline-flex border border-white/[0.06] bg-[#04080b] px-2.5 py-1 text-[10px] text-zinc-500">
+                        Last {range.replace('d', ' days')}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{greeting}</h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                      {hasData
+                        ? pageBriefing.shortSummary
+                        : 'Real-time analytics, SEO performance, and AI-powered actions in one view.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeUsers !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setLiveDrawerOpen(true)}
+                      className="inline-flex items-center gap-2 border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-2 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/[0.12]"
+                    >
+                      <Activity className="h-4 w-4" />
+                      {activeUsers} live
+                    </button>
+                  )}
+
+                  {hasData && (
+                    <button
+                      type="button"
+                      onClick={handleExportReport}
+                      className="inline-flex items-center gap-2 border border-white/[0.08] bg-[#04080b] px-3 py-2 text-sm text-zinc-200 transition-colors hover:border-white/[0.14] hover:bg-white/[0.04]"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Export report
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {!containerLoading && hasGoogleConnection && !botRunning && (
+              <div className="border border-emerald-500/18 bg-[linear-gradient(135deg,rgba(52,211,153,0.08),rgba(34,211,238,0.04))] p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center border border-emerald-500/20 bg-emerald-500/10">
+                    <Bot className="h-4 w-4 text-emerald-300" />
+                  </div>
+                  <p className="flex-1 text-sm text-zinc-300">
+                    Want AI-powered insights via Telegram? <Link href="/dashboard/bot" className="font-medium text-emerald-300 hover:text-emerald-200">Set up your bot</Link>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div data-section="activity">
+              <OverviewCommandCenter
+                selectedSiteLabel={selectedSiteLabel}
+                range={range}
+                activeUsers={activeUsers}
+                isLive={isLive}
+                hasData={hasData}
+                isLoading={isRef}
+                lastUpdated={lastUpdated}
+                analyticsData={analyticsDashboardData}
+                seoData={seoDashboardData}
+                analyticsKPIs={analyticsKPIs}
+                seoKPIs={seoKPIs}
+                trafficData={trafficData}
+                searchTrend={searchTrend}
+                goalsData={typedGoalsData}
+                onOpenLiveDrawer={() => setLiveDrawerOpen(true)}
+                onExportReport={handleExportReport}
+              />
+            </div>
+
+            {hasData && (
+              <div className="grid gap-4 xl:grid-cols-3">
+                <RecentActivity alerts={recentAlerts} maxItems={6} />
+                <GoalProgress goals={goalItems} />
+                <IndexingStatus />
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <LiveVisitorDrawer

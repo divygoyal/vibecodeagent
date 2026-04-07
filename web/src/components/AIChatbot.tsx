@@ -480,6 +480,12 @@ export default function AIChatbot() {
         return () => window.removeEventListener('trafficclaw:ask-ai', handler);
     }, []); // empty deps — listener is added once, never thrashes
 
+    useEffect(() => {
+        const handler = () => setIsOpen(true);
+        window.addEventListener('open-ai-chat', handler);
+        return () => window.removeEventListener('open-ai-chat', handler);
+    }, []);
+
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     const clearChat = useCallback(() => {
@@ -503,7 +509,7 @@ export default function AIChatbot() {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-20 right-4 z-50 group sm:bottom-24 sm:right-6 lg:bottom-6"
+                className="fixed bottom-[4.75rem] right-4 z-50 group sm:bottom-24 sm:right-6 lg:bottom-6"
                 aria-label="Open AI chat"
             >
                 <div className="relative">
