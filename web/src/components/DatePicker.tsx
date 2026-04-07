@@ -6,6 +6,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-rea
 interface DatePickerProps {
     range: string;
     setRange: (r: string) => void;
+    compact?: boolean;
 }
 
 type PresetItem = { label: string; value: string } | { separator: true };
@@ -111,7 +112,7 @@ function getDateRangeText(range: string): string {
     }
 }
 
-export default function DatePicker({ range, setRange }: DatePickerProps) {
+export default function DatePicker({ range, setRange, compact = false }: DatePickerProps) {
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -158,39 +159,51 @@ export default function DatePicker({ range, setRange }: DatePickerProps) {
     return (
         <div className="relative" ref={containerRef}>
             <div className="flex items-center">
-                {/* Back arrow */}
-                <button
-                    onClick={goBack}
-                    disabled={!canGoBack}
-                    className="flex items-center justify-center w-8 h-8 rounded-l-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Previous date range"
-                >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
+                {!compact && (
+                    <>
+                        {/* Back arrow */}
+                        <button
+                            onClick={goBack}
+                            disabled={!canGoBack}
+                            className="flex items-center justify-center w-8 h-8 rounded-l-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
+                            aria-label="Previous date range"
+                        >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                    </>
+                )}
 
                 {/* Center dropdown trigger */}
                 <button
                     onClick={() => setOpen(!open)}
-                    className="flex items-center gap-1.5 h-8 px-2.5 border-y border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition text-[11px]"
+                    className={`flex items-center h-8 border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition text-[11px] ${
+                        compact
+                            ? 'max-w-[108px] gap-1 rounded-lg border px-2'
+                            : 'gap-1.5 border-y px-2.5'
+                    }`}
                 >
                     <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="whitespace-nowrap">{getRangeLabel(range)}</span>
+                    <span className={`whitespace-nowrap ${compact ? 'truncate max-w-[64px]' : ''}`}>{getRangeLabel(range)}</span>
                     <ChevronDown className={`w-3 h-3 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Forward arrow */}
-                <button
-                    onClick={goForward}
-                    disabled={!canGoForward}
-                    className="flex items-center justify-center w-8 h-8 rounded-r-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Next date range"
-                >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+                {!compact && (
+                    <>
+                        {/* Forward arrow */}
+                        <button
+                            onClick={goForward}
+                            disabled={!canGoForward}
+                            className="flex items-center justify-center w-8 h-8 rounded-r-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
+                            aria-label="Next date range"
+                        >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                    </>
+                )}
             </div>
 
             {/* Date range text below the picker */}
-            {dateText && (
+            {dateText && !compact && (
                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-0.5 text-[9px] text-zinc-500 whitespace-nowrap pointer-events-none">
                     {dateText}
                 </div>

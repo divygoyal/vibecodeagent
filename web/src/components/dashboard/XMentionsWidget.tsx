@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -103,7 +104,7 @@ type XMentionsContextValue = {
   handlePrev: () => void;
   handleNext: () => void;
   handleSlideStateChange: (tweetId: string, nextState: TweetHeightState) => void;
-  getCardState: (tweetId: string) => TweetHeightState;
+  getCardState: (tweetId: string, renderWidth?: number, renderFallbackHeight?: number) => TweetHeightState;
 };
 
 const TWITTER_ORIGINS = [
@@ -752,11 +753,11 @@ export function XMentionsProvider({ domain, children }: XMentionsProviderProps) 
   }, []);
 
   const getCardState = useCallback(
-    (tweetId: string) => {
-      const renderKey = getTweetRenderKey(tweetId, stageWidth);
+    (tweetId: string, renderWidth = stageWidth, renderFallbackHeight = fallbackHeight) => {
+      const renderKey = getTweetRenderKey(tweetId, renderWidth);
       const current = tweetStates[tweetId];
       if (!current || current.renderKey !== renderKey) {
-        return createFallbackTweetState(renderKey, fallbackHeight);
+        return createFallbackTweetState(renderKey, renderFallbackHeight);
       }
       return current;
     },
@@ -832,7 +833,6 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
     canGoNext,
     compactScale,
     stageWidth,
-    fallbackHeight,
     preloadMention,
     handlePrev,
     handleNext,
@@ -843,6 +843,38 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
   const sectionRef = useRef<HTMLElement>(null);
   const touchStartX = useRef(0);
   const touchCurrentX = useRef(0);
+  const slotMeasureRef = useRef<HTMLDivElement | null>(null);
+  const [measuredSlotWidth, setMeasuredSlotWidth] = useState<number | null>(null);
+
+  const updateMeasuredSlotWidth = useCallback(() => {
+    const node = slotMeasureRef.current;
+    if (!node) {
+      setMeasuredSlotWidth(null);
+      return;
+    }
+
+    const nextWidth = Math.floor(node.getBoundingClientRect().width);
+    if (nextWidth <= 0) {
+      return;
+    }
+
+    setMeasuredSlotWidth((previous) => (previous === nextWidth ? previous : nextWidth));
+  }, []);
+
+  const handleSlotMeasureRef = useCallback((node: HTMLDivElement | null) => {
+    slotMeasureRef.current = node;
+    if (!node) {
+      setMeasuredSlotWidth(null);
+      return;
+    }
+
+    const nextWidth = Math.floor(node.getBoundingClientRect().width);
+    if (nextWidth <= 0) {
+      return;
+    }
+
+    setMeasuredSlotWidth((previous) => (previous === nextWidth ? previous : nextWidth));
+  }, []);
 
   useEffect(() => {
     if (activated || !domain) return;
@@ -879,6 +911,28 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
       }
     };
   }, [activate, activated, domain]);
+
+  useLayoutEffect(() => {
+    const node = slotMeasureRef.current;
+    if (!node || typeof window === 'undefined' || !('ResizeObserver' in window)) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateMeasuredSlotWidth();
+    });
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [boundedWindowStart, hasMentions, loading, updateMeasuredSlotWidth]);
+
+  const effectiveStageWidth = compactScale > DESKTOP_SCALE && measuredSlotWidth
+    ? Math.min(stageWidth, measuredSlotWidth)
+    : stageWidth;
+  const effectiveScale = effectiveStageWidth / EMBED_WIDTH;
+  const effectiveFallbackHeight = Math.round(TWEET_LOADING_HEIGHT * effectiveScale) + 32;
 
   return (
     <DashboardHoverSurface
@@ -954,10 +1008,17 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
 
           <div className="mt-4 flex flex-col gap-5 xl:flex-row xl:items-start">
             {Array.from({ length: 2 }).map((_, index) => (
-              <div key={index} className="w-full max-w-[360px] border border-white/[0.06] bg-[#060b0f] p-4">
+              <div
+                key={index}
+                ref={index === 0 ? handleSlotMeasureRef : null}
+                className="w-full max-w-[360px] overflow-hidden border border-white/[0.06] bg-[#060b0f] p-4"
+              >
                 <div className="h-3 w-28 animate-pulse bg-zinc-800/70" />
                 <div className="mt-2 h-2.5 w-36 animate-pulse bg-zinc-800/50" />
-                <div className="mt-4 animate-pulse border border-white/[0.06] bg-[#05090d]" style={{ width: stageWidth, height: fallbackHeight }} />
+                <div
+                  className="mt-4 max-w-full animate-pulse overflow-hidden border border-white/[0.06] bg-[#05090d]"
+                  style={{ width: effectiveStageWidth, height: effectiveFallbackHeight }}
+                />
               </div>
             ))}
           </div>
@@ -1024,12 +1085,13 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
 
             <div className="mt-4 flex flex-col gap-5 xl:flex-row xl:items-start">
               {visibleMentions.map(({ index, mention }, position) => {
-                const cardState = getCardState(mention.id);
+                const cardState = getCardState(mention.id, effectiveStageWidth, effectiveFallbackHeight);
 
                 return (
                   <div
                     key={mention.id}
-                    className={`${premiumHover ? 'dashboard-hover-item ' : ''}w-full max-w-[360px] border border-white/[0.06] bg-[#060b0f] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]`}
+                    ref={position === 0 ? handleSlotMeasureRef : null}
+                    className={`${premiumHover ? 'dashboard-hover-item ' : ''}w-full max-w-[360px] overflow-hidden border border-white/[0.06] bg-[#060b0f] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -1051,17 +1113,19 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
                     </div>
 
                     <div
-                      className="mt-4"
+                      className="mt-4 max-w-full overflow-hidden"
                       style={{
-                        width: stageWidth,
-                        height: cardState.status === 'stable' ? Math.max(cardState.height, 0) : Math.max(cardState.height, fallbackHeight),
+                        width: effectiveStageWidth,
+                        height: cardState.status === 'stable'
+                          ? Math.max(cardState.height, 0)
+                          : Math.max(cardState.height, effectiveFallbackHeight),
                       }}
                     >
                       <XTweetSlide
-                        key={getTweetRenderKey(mention.id, stageWidth)}
+                        key={getTweetRenderKey(mention.id, effectiveStageWidth)}
                         tweetId={mention.id}
-                        scale={compactScale}
-                        stageWidth={stageWidth}
+                        scale={effectiveScale}
+                        stageWidth={effectiveStageWidth}
                         state={cardState}
                         onStateChange={handleSlideStateChange}
                       />
@@ -1073,7 +1137,7 @@ export const XMentionsTopPanel = memo(function XMentionsTopPanel({ className = '
           </div>
 
           {preloadMention && (
-            <XEmbedPreloader tweetId={preloadMention.id} scale={compactScale} stageWidth={stageWidth} />
+            <XEmbedPreloader tweetId={preloadMention.id} scale={effectiveScale} stageWidth={effectiveStageWidth} />
           )}
         </div>
       )}

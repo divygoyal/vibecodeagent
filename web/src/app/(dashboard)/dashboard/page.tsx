@@ -172,7 +172,6 @@ export default function DashboardOverview() {
     selectedProperty,
     setSelectedProperty,
     range,
-    setRange,
   } = useRegistration();
 
   useKeyboardShortcuts();
@@ -583,7 +582,6 @@ export default function DashboardOverview() {
             <MobileOverviewAppShell
               selectedSiteLabel={selectedSiteLabel}
               range={range}
-              setRange={setRange}
               activeUsers={activeUsers}
               isLive={isLive}
               botRunning={botRunning}
@@ -597,11 +595,8 @@ export default function DashboardOverview() {
               trafficData={trafficData}
               searchTrend={searchTrend}
               goalsData={typedGoalsData}
-              recentAlerts={recentAlerts}
-              onOpenLiveDrawer={() => setLiveDrawerOpen(true)}
               onExportReport={handleExportReport}
               onAskAI={handleAskAI}
-              onNotifications={handleNotifications}
             />
           </div>
 

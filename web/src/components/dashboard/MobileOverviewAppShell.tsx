@@ -4,7 +4,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   Bot,
   ChevronRight,
@@ -27,13 +26,12 @@ import {
   YAxis,
 } from 'recharts';
 
-import DatePicker from '@/components/DatePicker';
 import {
   XMentionsPickerRail,
   XMentionsProvider,
   XMentionsTopPanel,
 } from '@/components/dashboard/XMentionsWidget';
-import { computeAlerts, computeOpportunities, type AlertItem } from '@/lib/alertEngine';
+import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import { getDashboardBriefing } from '@/lib/dashboardBriefing';
 
 type AnalyticsKpis = {
@@ -167,7 +165,6 @@ type ChartPoint = {
 interface MobileOverviewAppShellProps {
   selectedSiteLabel: string;
   range: string;
-  setRange: (value: string) => void;
   activeUsers: number | null;
   isLive: boolean;
   botRunning: boolean;
@@ -181,11 +178,8 @@ interface MobileOverviewAppShellProps {
   trafficData: AnalyticsPoint[];
   searchTrend: SearchTrendPoint[];
   goalsData?: GoalsResponse;
-  recentAlerts: AlertItem[];
-  onOpenLiveDrawer: () => void;
   onExportReport: () => void;
   onAskAI: () => void;
-  onNotifications: () => void;
 }
 
 const RANGE_LABELS: Record<string, string> = {
@@ -372,7 +366,6 @@ function MobileMetricCard({ card }: { card: MetricCardModel }) {
 export default function MobileOverviewAppShell({
   selectedSiteLabel,
   range,
-  setRange,
   activeUsers,
   isLive,
   botRunning,
@@ -386,11 +379,8 @@ export default function MobileOverviewAppShell({
   trafficData,
   searchTrend,
   goalsData,
-  recentAlerts,
-  onOpenLiveDrawer,
   onExportReport,
   onAskAI,
-  onNotifications,
 }: MobileOverviewAppShellProps) {
   const [chartMode, setChartMode] = useState<'traffic' | 'seo' | 'conversions'>('seo');
   const [activeMetricCard, setActiveMetricCard] = useState(0);
@@ -785,23 +775,9 @@ export default function MobileOverviewAppShell({
     trafficData,
   ]);
 
-  const alertCount = recentAlerts.filter(
-    (alert) => alert.severity === 'critical' || alert.severity === 'warning',
-  ).length;
-
   if (isLoading && !hasData) {
     return (
       <div className="md:hidden space-y-4 pb-28">
-        {/* Compact header skeleton */}
-        <div className="-mx-3 sticky top-12 z-30 border-b border-white/[0.06] bg-[#010203]/95 px-3 py-2.5 backdrop-blur-xl sm:-mx-4 sm:px-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="h-5 w-36 animate-pulse rounded-full bg-white/[0.08]" />
-            <div className="flex gap-2">
-              <div className="h-8 w-8 animate-pulse rounded-full bg-white/[0.06]" />
-              <div className="h-8 w-24 animate-pulse rounded-full bg-white/[0.06]" />
-            </div>
-          </div>
-        </div>
         {/* Brief skeleton */}
         <div className="h-[200px] animate-pulse rounded-[28px] border border-white/[0.08] bg-[#05090d]" />
         {/* Quick-nav skeleton */}
@@ -869,52 +845,6 @@ export default function MobileOverviewAppShell({
 
   return (
     <div className="md:hidden space-y-4 pb-28">
-      {/* Compact single-row sticky header */}
-      <div className="-mx-3 sticky top-12 z-30 border-b border-white/[0.06] bg-[#010203]/95 px-3 py-2.5 backdrop-blur-xl sm:-mx-4 sm:px-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-semibold tracking-tight text-white">
-              {selectedSiteLabel || 'Dashboard'}
-            </h1>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {activeUsers !== null && (
-              <button
-                type="button"
-                onClick={onOpenLiveDrawer}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-100 active:scale-[0.95] active:opacity-80 ${
-                  isLive
-                    ? 'border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-300'
-                    : 'border-white/[0.08] bg-[#05090d] text-zinc-400'
-                }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-                {formatCompact(activeUsers)}
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onNotifications}
-              aria-label={`View alerts${alertCount > 0 ? ` (${alertCount} active)` : ''}`}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-[#05090d] text-zinc-400 transition-all duration-100 active:scale-[0.93] active:opacity-80"
-            >
-              <AlertTriangle className={`h-4 w-4 ${alertCount > 0 ? 'text-amber-300' : ''}`} />
-              {alertCount > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-                  {alertCount > 9 ? '9+' : alertCount}
-                </span>
-              )}
-            </button>
-
-            <div className="transition-all duration-100 active:scale-[0.95] active:opacity-80">
-              <DatePicker range={range} setRange={setRange} />
-            </div>
-          </div>
-        </div>
-      </div>
-
       <section className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.16),transparent_46%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_42%),#05090d] p-5 shadow-[0_20px_48px_rgba(0,0,0,0.32)]">
         <div className="flex items-center justify-between gap-3">
           <div className="rounded-full border border-white/[0.08] bg-[#030609] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">

@@ -203,6 +203,11 @@ export default function DashboardLayout({
     const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
     const typedAlerts = alerts as AlertItem[];
     const criticalAlertCount = typedAlerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length;
+    const mobileOverviewSiteLabel = (() => {
+        const siteUrl = selectedSite || typedSites[0]?.siteUrl || '';
+        if (!siteUrl) return 'Dashboard';
+        return siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+    })();
 
     // Auto-sync: when selectedSite changes, find and set the matching GA4 property
     useEffect(() => {
@@ -556,89 +561,103 @@ export default function DashboardLayout({
             {/* ─── Main content area ─── */}
             <div className={`flex-1 flex flex-col min-h-screen w-full min-w-0 ${isOverviewRoute ? 'bg-[#010203]' : ''}`}>
                 {/* Top bar — minimal: just date picker + bell */}
-                <header className={`h-12 flex items-center px-3 sm:px-4 md:px-6 border-b border-[var(--card-border)] ${isOverviewRoute ? 'bg-[#020305]/95' : 'bg-[var(--header-bg)]'} backdrop-blur-xl sticky top-0 z-40`}>
-                    {/* Mobile menu button */}
-                    <button
-                        className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0 mr-auto"
-                        onClick={() => setMobileOpen(!mobileOpen)}
-                        aria-label="Open navigation menu"
-                        aria-expanded={mobileOpen}
-                    >
-                        <Menu className="w-5 h-5" />
-                    </button>
+                <header className={`border-b border-[var(--card-border)] ${isOverviewRoute ? 'bg-[#020305]/95' : 'bg-[var(--header-bg)]'} backdrop-blur-xl sticky top-0 z-40`}>
+                    <div className="flex h-12 items-center px-3 sm:px-4 md:px-6">
+                        {/* Mobile menu button */}
+                        <button
+                            className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0 mr-auto"
+                            onClick={() => setMobileOpen(!mobileOpen)}
+                            aria-label="Open navigation menu"
+                            aria-expanded={mobileOpen}
+                        >
+                            <Menu className="w-5 h-5" />
+                        </button>
 
-                    {/* Right side controls */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
-                        {/* Global Date Range Picker — hidden on mobile, shown in mobile sidebar instead */}
-                        <div className="hidden md:block">
-                            <DatePicker range={range} setRange={setRange} />
-                        </div>
-                        {/* Notification Bell */}
-                        <div className="relative" ref={bellRef}>
-                            <button
-                                onClick={() => setBellOpen(!bellOpen)}
-                                className={`relative w-8 h-8 ${shellCompactRadiusClass} flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0`}
-                                aria-label={`Alerts${criticalAlertCount > 0 ? ` (${criticalAlertCount} active)` : ''}`}
-                                aria-expanded={bellOpen}
-                                aria-haspopup="true"
-                                title="Alerts"
-                            >
-                                <Bell className="w-4 h-4" />
-                                {criticalAlertCount > 0 && (
-                                    <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 ${shellBadgeRadiusClass} bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[var(--background)]`}>
-                                        {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
-                                    </span>
-                                )}
-                            </button>
-                            {bellOpen && (
-                                <div className={`absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] ${shellRadiusClass} shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden`}>
-                                    <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-white">Alerts</span>
-                                        {alertCount > 0 && (
-                                            <span className="text-[10px] text-zinc-500">{alertCount} active</span>
-                                        )}
-                                    </div>
-                                    <div className="overflow-y-auto max-h-[300px]">
-                                        {alerts.length === 0 ? (
-                                            <div className="px-4 py-6 text-center">
-                                                <Bell className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
-                                                <p className="text-[11px] text-zinc-600">No alerts right now</p>
-                                            </div>
-                                        ) : (
-                                            typedAlerts.slice(0, 10).map((alert) => (
-                                                <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
-                                                    <div className="flex items-start gap-2.5">
-                                                        <div className={`w-2 h-2 ${shellBadgeRadiusClass} mt-1.5 flex-shrink-0 ${
-                                                            alert.severity === 'critical' ? 'bg-red-400' :
-                                                            alert.severity === 'warning' ? 'bg-amber-400' :
-                                                            alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
-                                                        }`} />
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-[11px] font-medium text-zinc-200 leading-snug">{alert.title}</p>
-                                                            {alert.metric && (
-                                                                <p className="text-[10px] text-zinc-500 mt-0.5">{alert.metric}</p>
-                                                            )}
+                        {/* Right side controls */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
+                            {/* Global Date Range Picker — desktop here, compact mobile version rendered below on overview */}
+                            <div className="hidden md:block">
+                                <DatePicker range={range} setRange={setRange} />
+                            </div>
+                            {/* Notification Bell */}
+                            <div className="relative" ref={bellRef}>
+                                <button
+                                    onClick={() => setBellOpen(!bellOpen)}
+                                    className={`relative w-8 h-8 ${shellCompactRadiusClass} flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0`}
+                                    aria-label={`Alerts${criticalAlertCount > 0 ? ` (${criticalAlertCount} active)` : ''}`}
+                                    aria-expanded={bellOpen}
+                                    aria-haspopup="true"
+                                    title="Alerts"
+                                >
+                                    <Bell className="w-4 h-4" />
+                                    {criticalAlertCount > 0 && (
+                                        <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 ${shellBadgeRadiusClass} bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[var(--background)]`}>
+                                            {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
+                                        </span>
+                                    )}
+                                </button>
+                                {bellOpen && (
+                                    <div className={`absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] ${shellRadiusClass} shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden`}>
+                                        <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-white">Alerts</span>
+                                            {alertCount > 0 && (
+                                                <span className="text-[10px] text-zinc-500">{alertCount} active</span>
+                                            )}
+                                        </div>
+                                        <div className="overflow-y-auto max-h-[300px]">
+                                            {alerts.length === 0 ? (
+                                                <div className="px-4 py-6 text-center">
+                                                    <Bell className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
+                                                    <p className="text-[11px] text-zinc-600">No alerts right now</p>
+                                                </div>
+                                            ) : (
+                                                typedAlerts.slice(0, 10).map((alert) => (
+                                                    <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
+                                                        <div className="flex items-start gap-2.5">
+                                                            <div className={`w-2 h-2 ${shellBadgeRadiusClass} mt-1.5 flex-shrink-0 ${
+                                                                alert.severity === 'critical' ? 'bg-red-400' :
+                                                                alert.severity === 'warning' ? 'bg-amber-400' :
+                                                                alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
+                                                            }`} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[11px] font-medium text-zinc-200 leading-snug">{alert.title}</p>
+                                                                {alert.metric && (
+                                                                    <p className="text-[10px] text-zinc-500 mt-0.5">{alert.metric}</p>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))
+                                                ))
+                                            )}
+                                        </div>
+                                        {alerts.length > 0 && (
+                                            <div className="px-4 py-2 border-t border-[var(--divider)]">
+                                                <Link
+                                                    href="/dashboard"
+                                                    onClick={() => setBellOpen(false)}
+                                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
+                                                >
+                                                    View all alerts →
+                                                </Link>
+                                            </div>
                                         )}
                                     </div>
-                                    {alerts.length > 0 && (
-                                        <div className="px-4 py-2 border-t border-[var(--divider)]">
-                                            <Link
-                                                href="/dashboard"
-                                                onClick={() => setBellOpen(false)}
-                                                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
-                                            >
-                                                View all alerts →
-                                            </Link>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
+                    {isOverviewRoute && (
+                        <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-3 py-2 md:hidden">
+                            <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-semibold tracking-tight text-white">
+                                    {mobileOverviewSiteLabel}
+                                </div>
+                            </div>
+                            <div className="shrink-0">
+                                <DatePicker range={range} setRange={setRange} compact />
+                            </div>
+                        </div>
+                    )}
                 </header>
 
                 {/* Page content */}

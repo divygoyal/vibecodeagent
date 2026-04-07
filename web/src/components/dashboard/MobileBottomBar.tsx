@@ -25,11 +25,11 @@ export default function MobileBottomBar({
   alertCount = 0,
 }: MobileBottomBarProps) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-[#05080c]/95 shadow-[0_-18px_42px_rgba(0,0,0,0.4)] backdrop-blur-xl md:hidden">
-      <div
-        className="flex items-center gap-2 px-3 pt-2"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
-      >
+    <div
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-[#05080c]/95 shadow-[0_-18px_42px_rgba(0,0,0,0.4)] backdrop-blur-xl md:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      <div className="flex items-center gap-2 px-3 py-2">
         {/* Refresh */}
         <button
           type="button"
