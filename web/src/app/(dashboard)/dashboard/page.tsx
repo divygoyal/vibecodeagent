@@ -21,11 +21,11 @@ import {
   Zap,
 } from 'lucide-react';
 
-import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useRealtimeData } from '@/lib/useDashboardData';
+import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useRealtimeData, useGoalsData } from '@/lib/useDashboardData';
 import { computeAlerts } from '@/lib/alertEngine';
 import { useRegistration } from './layout';
 import { ConnectGoogleState } from '@/components/EmptyState';
-import OverviewCommandCenter from '@/components/dashboard/OverviewCommandCenter';
+import OverviewCommandCenter from '@/components/dashboard/OverviewCommandCenterV2';
 import MobileQuickStats from '@/components/dashboard/MobileQuickStats';
 import MobileBottomBar from '@/components/dashboard/MobileBottomBar';
 import RecentActivity from '@/components/dashboard/RecentActivity';
@@ -62,21 +62,28 @@ type PropertyOption = {
 };
 
 type AnalyticsPoint = {
+  date?: string;
   activeUsers?: number;
+  sessions?: number;
   pageViews?: number;
+  bounceRate?: number;
 };
 
 type SearchTrendPoint = {
+  date?: string;
   clicks?: number;
   impressions?: number;
   position?: number;
+  ctr?: number;
 };
 
 type AnalyticsKpis = {
   totalUsers?: number;
+  totalSessions?: number;
   totalPageViews?: number;
   avgBounceRate?: number;
   changeUsers?: number;
+  changeSessions?: number;
   changePageViews?: number;
 };
 
@@ -85,7 +92,11 @@ type SeoKpis = {
   totalImpressions?: number;
   avgCTR?: number | string;
   avgPosition?: number | string;
+  indexedPages?: number;
+  crawlErrors?: number;
   changeClicks?: number;
+  changeImpressions?: number;
+  changePosition?: number;
 };
 
 type DashboardAnalyticsData = {
@@ -95,7 +106,49 @@ type DashboardAnalyticsData = {
 
 type DashboardSeoData = {
   kpis?: SeoKpis;
+  queries?: Array<{
+    query?: string;
+    clicks?: number;
+    impressions?: number;
+    ctr?: number;
+    position?: number;
+    changeClicks?: number;
+    changePosition?: number;
+  }>;
+  pages?: Array<{
+    page?: string;
+    clicks?: number;
+    impressions?: number;
+    ctr?: number;
+    position?: number;
+    status?: string;
+    changeClicks?: number;
+    changePosition?: number;
+  }>;
   trend?: SearchTrendPoint[];
+};
+
+type GoalTrendPoint = {
+  date: string;
+  value: number;
+};
+
+type GoalSummary = {
+  id: string | number;
+  name: string;
+  target: string;
+  description?: string;
+  conversions: number;
+  rate: number;
+  change?: number;
+  color?: string;
+  trend: GoalTrendPoint[];
+};
+
+type GoalsResponse = {
+  goals?: GoalSummary[];
+  totalConversions?: number;
+  totalSessions?: number;
 };
 
 function formatSiteLabel(site: string) {
@@ -178,10 +231,12 @@ export default function DashboardOverview() {
   const canFetchData = hasGoogleConnection || hasCachedSite;
 
   const { data: analyticsData, isLoading: analyticsLoading, refresh: refreshAnalytics } = useAnalyticsData('all', matchedProp?.property, canFetchData, range);
-  const { data: seoData, isLoading: seoLoading, refresh: refreshSeo } = useSeoData('all', selectedSite, canFetchData);
+  const { data: seoData, isLoading: seoLoading, refresh: refreshSeo } = useSeoData('all', selectedSite, canFetchData, range);
+  const { data: goalsData } = useGoalsData(matchedProp?.property, canFetchData && !!matchedProp?.property, range);
 
   const analyticsDashboardData = analyticsData as DashboardAnalyticsData | undefined;
   const seoDashboardData = seoData as DashboardSeoData | undefined;
+  const typedGoalsData = goalsData as GoalsResponse | undefined;
   const analyticsKPIs = analyticsDashboardData?.kpis;
   const seoKPIs = seoDashboardData?.kpis;
   const trafficData = Array.isArray(analyticsDashboardData?.traffic) ? analyticsDashboardData.traffic : [];
@@ -312,6 +367,7 @@ export default function DashboardOverview() {
     }
   }, []);
 
+
   if (registrationError) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center text-center">
@@ -349,6 +405,8 @@ export default function DashboardOverview() {
           avgPosition={seoKPIs?.avgPosition}
         />
       )}
+
+      {/* Personalized greeting header */}
       <div className="relative">
         <div className="pointer-events-none absolute inset-x-0 top-0 -mx-4 h-36 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.08),transparent_54%)]" />
         <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -395,15 +453,16 @@ export default function DashboardOverview() {
                 Export report
               </button>
             )}
-
           </div>
         </div>
       </div>
 
+      {/* Connect Google empty state */}
       {showConnectGoogle && (
         <ConnectGoogleState feature="real-time traffic insights, SEO performance tracking, keyword rankings, and AI-powered recommendations" />
       )}
 
+      {/* Loading skeleton while checking data */}
       {isCheckingData && !hasData && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
@@ -416,6 +475,7 @@ export default function DashboardOverview() {
         </div>
       )}
 
+      {/* Empty shell state: globe preview + workspace tabs + onboarding */}
       {isEmptyShell && (
         <div className="space-y-5">
           <div className="border border-emerald-500/18 bg-[linear-gradient(135deg,rgba(52,211,153,0.08),rgba(34,211,238,0.04))] p-6">
@@ -504,6 +564,7 @@ export default function DashboardOverview() {
         </div>
       )}
 
+      {/* Bot setup banner */}
       {!containerLoading && hasGoogleConnection && !botRunning && !isEmptyShell && (
         <div className="border border-emerald-500/18 bg-[linear-gradient(135deg,rgba(52,211,153,0.08),rgba(34,211,238,0.04))] p-4">
           <div className="flex items-center gap-3">
@@ -517,28 +578,33 @@ export default function DashboardOverview() {
         </div>
       )}
 
+      {/* Main command center */}
       {!isEmptyShell && (
-        <OverviewCommandCenter
-          selectedSiteLabel={selectedSiteLabel}
-          activeUsers={activeUsers}
-          isLive={isLive}
-          hasData={hasData}
-          isLoading={isRef}
-          lastUpdated={lastUpdated}
-          analyticsData={analyticsData}
-          seoData={seoData}
-          analyticsKPIs={analyticsKPIs}
-          seoKPIs={seoKPIs}
-          trafficData={trafficData}
-          searchTrend={searchTrend}
-          onOpenLiveDrawer={() => setLiveDrawerOpen(true)}
-          onExportReport={handleExportReport}
-        />
+        <div data-section="activity">
+          <OverviewCommandCenter
+            selectedSiteLabel={selectedSiteLabel}
+            range={range}
+            activeUsers={activeUsers}
+            isLive={isLive}
+            hasData={hasData}
+            isLoading={isRef}
+            lastUpdated={lastUpdated}
+            analyticsData={analyticsDashboardData}
+            seoData={seoDashboardData}
+            analyticsKPIs={analyticsKPIs}
+            seoKPIs={seoKPIs}
+            trafficData={trafficData}
+            searchTrend={searchTrend}
+            goalsData={typedGoalsData}
+            onOpenLiveDrawer={() => setLiveDrawerOpen(true)}
+            onExportReport={handleExportReport}
+          />
+        </div>
       )}
 
       {/* Phase 3: New sections — Activity Feed, Goals, Indexing */}
       {hasData && !isEmptyShell && (
-        <div data-section="activity" className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-3">
           <RecentActivity alerts={recentAlerts} maxItems={6} />
           <GoalProgress goals={goalItems} />
           <IndexingStatus />

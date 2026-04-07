@@ -135,6 +135,7 @@ function generateMockSearchTrend() {
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const section = searchParams.get('section') || 'all'
+    const range = searchParams.get('range') || '30d'
 
     const isProduction = !!ADMIN_API_KEY
 
@@ -218,11 +219,11 @@ export async function GET(req: Request) {
             // Fetch dashboard data (cached for 3 min per site+section)
             const cacheKey = `gsc:dashboard:${userId}:${siteUrl}:${section}`
             const dashboardData = await cachedFetch(
-                cacheKey,
+                `${cacheKey}:${range}`,
                 CACHE_TTL.DASHBOARD_DATA,
                 async () => {
                     try {
-                        return await fetchSeoDashboard(token, siteUrl!)
+                        return await fetchSeoDashboard(token, siteUrl!, range)
                     } catch (e: any) {
                         console.error('SEO direct API error:', e.message)
                         return { __error: e.message || "Failed to fetch SEO data from Google" }

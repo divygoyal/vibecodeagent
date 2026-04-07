@@ -154,6 +154,30 @@ export function resolvePrevRange(range: string): { startDate: string; endDate: s
     }
 }
 
+function resolveDateTokenToAbsolute(value: string): string {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+    const now = new Date();
+    const resolved = new Date(now);
+
+    if (value === 'today') {
+        return fmtDate(resolved);
+    }
+
+    if (value === 'yesterday') {
+        resolved.setDate(resolved.getDate() - 1);
+        return fmtDate(resolved);
+    }
+
+    const daysAgoMatch = value.match(/^(\d+)daysAgo$/);
+    if (daysAgoMatch) {
+        resolved.setDate(resolved.getDate() - parseInt(daysAgoMatch[1], 10));
+        return fmtDate(resolved);
+    }
+
+    return value;
+}
+
 /**
  * Fetch stored Google OAuth tokens from admin DB.
  * Used as fallback when JWT doesn't have Google tokens
@@ -863,31 +887,33 @@ async function runGSCQuery(
  * Fetch full SEO dashboard data (KPIs, queries, pages, trend, recommendations).
  * Mirrors the plugin's dashboardJson() method.
  */
-export async function fetchSeoDashboard(token: string, siteUrl: string) {
+export async function fetchSeoDashboard(token: string, siteUrl: string, range = '30d') {
     const result: any = { kpis: null, queries: [], pages: [], trend: [], recommendations: [] };
 
-    const now = new Date();
-    const startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - 28);
-    const prevStart = new Date(now);
-    prevStart.setDate(prevStart.getDate() - 56);
-    const prevEnd = new Date(now);
-    prevEnd.setDate(prevEnd.getDate() - 29);
+    const { startDate, endDate } = resolveRange(range);
+    const { startDate: prevStartDate, endDate: prevEndDate } = resolvePrevRange(range);
 
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const currentStart = resolveDateTokenToAbsolute(startDate);
+    const currentEnd = resolveDateTokenToAbsolute(endDate);
+    const previousStart = resolveDateTokenToAbsolute(prevStartDate);
+    const previousEnd = resolveDateTokenToAbsolute(prevEndDate);
 
     // Run all queries in parallel
-    const [currentData, prevData, queryData, pageData] = await Promise.all([
-        runGSCQuery(token, siteUrl, ['date'], fmt(startDate), fmt(now), 1000),
-        runGSCQuery(token, siteUrl, ['date'], fmt(prevStart), fmt(prevEnd), 1000),
-        runGSCQuery(token, siteUrl, ['query'], fmt(startDate), fmt(now), 12),
-        runGSCQuery(token, siteUrl, ['page'], fmt(startDate), fmt(now), 10),
+    const [currentData, prevData, queryData, prevQueryData, pageData, prevPageData] = await Promise.all([
+        runGSCQuery(token, siteUrl, ['date'], currentStart, currentEnd, 1000),
+        runGSCQuery(token, siteUrl, ['date'], previousStart, previousEnd, 1000),
+        runGSCQuery(token, siteUrl, ['query'], currentStart, currentEnd, 20),
+        runGSCQuery(token, siteUrl, ['query'], previousStart, previousEnd, 20),
+        runGSCQuery(token, siteUrl, ['page'], currentStart, currentEnd, 20),
+        runGSCQuery(token, siteUrl, ['page'], previousStart, previousEnd, 20),
     ]);
 
     const currentRows = currentData.rows || [];
     const prevRows = prevData.rows || [];
     const queryRows = queryData.rows || [];
+    const prevQueryRows = prevQueryData.rows || [];
     const pageRows = pageData.rows || [];
+    const prevPageRows = prevPageData.rows || [];
 
     // KPIs
     let totalClicks = 0, totalImpressions = 0, totalPos = 0, curCount = 0;
@@ -930,6 +956,26 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
         changePosition: +(avgPos - prevAvgPos).toFixed(1),
     };
 
+    const prevQueryMap = new Map<string, { clicks: number; position: number }>(
+        prevQueryRows.map((row: any) => [
+            row.keys?.[0],
+            {
+                clicks: row.clicks || 0,
+                position: +(row.position || 0).toFixed(1),
+            },
+        ]),
+    );
+
+    const prevPageMap = new Map<string, { clicks: number; position: number }>(
+        prevPageRows.map((row: any) => [
+            row.keys?.[0],
+            {
+                clicks: row.clicks || 0,
+                position: +(row.position || 0).toFixed(1),
+            },
+        ]),
+    );
+
     // Queries
     result.queries = queryRows.map((row: any) => ({
         query: row.keys[0],
@@ -937,6 +983,10 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
         impressions: row.impressions || 0,
         ctr: +((row.ctr || 0) * 100).toFixed(1),
         position: +(row.position || 0).toFixed(1),
+        changeClicks: pctChange(row.clicks || 0, prevQueryMap.get(row.keys[0])?.clicks || 0),
+        changePosition: +(
+            (row.position || 0) - (prevQueryMap.get(row.keys[0])?.position || row.position || 0)
+        ).toFixed(1),
     }));
 
     // Pages
@@ -945,6 +995,7 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
         let status = 'healthy';
         if (pos > 20) status = 'decay';
         else if (pos > 10) status = 'warning';
+        const prevPage = prevPageMap.get(row.keys[0]);
         return {
             page: row.keys[0],
             clicks: row.clicks || 0,
@@ -952,6 +1003,8 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
             ctr: +((row.ctr || 0) * 100).toFixed(1),
             position: +pos.toFixed(1),
             status,
+            changeClicks: pctChange(row.clicks || 0, prevPage?.clicks || 0),
+            changePosition: +(pos - (prevPage?.position || pos)).toFixed(1),
         };
     });
 
@@ -1005,7 +1058,7 @@ export async function fetchSeoDashboard(token: string, siteUrl: string) {
         recommendations.push({
             id: 'rec-decay-1', type: 'content_decay', severity: 'high',
             title: 'Significant traffic drop detected',
-            description: `Clicks across site down ${Math.abs(result.kpis.changeClicks)}% vs previous 28 days.`,
+            description: `Clicks across site down ${Math.abs(result.kpis.changeClicks)}% vs the previous ${range}.`,
             action: 'Audit top pages for lost rankings or seasonality.', impact: 'Recover traffic',
         });
     }

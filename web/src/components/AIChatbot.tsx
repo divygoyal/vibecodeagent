@@ -503,7 +503,7 @@ export default function AIChatbot() {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-50 group"
+                className="fixed bottom-20 right-4 z-50 group sm:bottom-24 sm:right-6 lg:bottom-6"
                 aria-label="Open AI chat"
             >
                 <div className="relative">

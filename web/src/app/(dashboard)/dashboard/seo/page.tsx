@@ -118,7 +118,7 @@ export default function SEOPage() {
 
     // 1. Fetch Sites (only when Google connected)
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-    const { selectedSite, setSelectedSite } = useRegistration();
+    const { selectedSite, setSelectedSite, range } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
@@ -167,7 +167,7 @@ export default function SEOPage() {
     }, [sites, selectedSite, setSelectedSite]);
 
     // 2. Fetch SEO Data (only when Google connected)
-    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, hasGoogleConnection);
+    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, hasGoogleConnection, range);
 
     // Show connect prompt if Google not connected
     if (!containerLoading && !hasGoogleConnection) {

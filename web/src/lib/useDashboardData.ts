@@ -125,9 +125,12 @@ export function useAnalyticsData(section: string, propertyId?: string, enabled =
     };
 }
 
-export function useSeoData(section: string, siteUrl?: string, enabled = true) {
-    const query = siteUrl ? `&siteUrl=${encodeURIComponent(siteUrl)}` : '';
-    const url = (section && enabled) ? `/api/seo?section=${section}${query}` : null;
+export function useSeoData(section: string, siteUrl?: string, enabled = true, range = '30d') {
+    const params = new URLSearchParams();
+    params.set('section', section);
+    if (siteUrl) params.set('siteUrl', siteUrl);
+    if (range) params.set('range', range);
+    const url = (section && enabled) ? `/api/seo?${params.toString()}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 60000,
     });
@@ -137,6 +140,24 @@ export function useSeoData(section: string, siteUrl?: string, enabled = true) {
         isLoading,
         isError: error,
         refresh: mutate
+    };
+}
+
+export function useGoalsData(propertyId?: string, enabled = true, range = '30d') {
+    const params = new URLSearchParams();
+    if (propertyId) params.set('propertyId', propertyId);
+    if (range) params.set('range', range);
+    const url = (propertyId && enabled) ? `/api/analytics/goals?${params.toString()}` : null;
+    const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
+        dedupingInterval: 300000,
+        errorRetryCount: 1,
+    });
+
+    return {
+        data,
+        isLoading,
+        isError: error,
+        refresh: mutate,
     };
 }
 
