@@ -2048,6 +2048,54 @@ function Footer() {
             <a href="https://besttoolvault.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://besttoolvault.com/assets/images/badge.png" alt="Best Tool Vault" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
             </a>
+            <a href="https://sourcedir.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://sourcedir.com/assets/images/badge.png" alt="Source Dir" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://solvertools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://solvertools.com/assets/images/badge.png" alt="Solver Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://softwarebolt.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://softwarebolt.com/assets/images/badge.png" alt="Software Bolt" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://smartkithub.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://smartkithub.com/assets/images/badge.png" alt="Smart Kit Hub" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://saaswheel.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://saaswheel.com/assets/images/badge.png" alt="SaaS Wheel" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://saastoolsdir.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://saastoolsdir.com/assets/images/badge.png" alt="SaaS Tools Dir" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://saasroots.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://saasroots.com/assets/images/badge.png" alt="SaaS Roots" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://saashubdirectory.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://saashubdirectory.com/assets/images/badge.png" alt="SaaS Hub Directory" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://saasfield.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://saasfield.com/assets/images/badge.png" alt="SaaS Field" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://productlistdir.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://productlistdir.com/assets/images/badge.png" alt="Product List Dir" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://poweruptools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://poweruptools.com/assets/images/badge.png" alt="Power Up Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://mylaunchstash.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://mylaunchstash.com/assets/images/badge.png" alt="My Launch Stash" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://mystarttools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://mystarttools.com/assets/images/badge.png" alt="My Start Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://launchscroll.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://launchscroll.com/assets/images/badge.png" alt="Launch Scroll" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://latestaiupdates.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://latestaiupdates.com/assets/images/badge.png" alt="Latest AI Updates" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://huntfortools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://huntfortools.com/assets/images/badge.png" alt="Hunt for Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
             <a href="https://www.toolpilot.ai/" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://www.toolpilot.ai/cdn/shop/files/f-w_690x151_crop_center.png" alt="Featured on ToolPilot" width="247" height="54" className="w-[247px] h-[54px] shrink-0 max-w-none object-contain" />
             </a>
