@@ -2003,6 +2003,9 @@ function Footer() {
             <a href="https://toolsaiapp.com/" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://toolsaiapp.com/wp-content/uploads/2025/12/badge.png" alt="Featured on Tools AI App" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
             </a>
+            <a href="https://acidtools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://acidtools.com/assets/images/badge.png" alt="Acid Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
             <a href="https://www.toolpilot.ai/" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://www.toolpilot.ai/cdn/shop/files/f-w_690x151_crop_center.png" alt="Featured on ToolPilot" width="247" height="54" className="w-[247px] h-[54px] shrink-0 max-w-none object-contain" />
             </a>
