@@ -2096,6 +2096,69 @@ function Footer() {
             <a href="https://huntfortools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://huntfortools.com/assets/images/badge.png" alt="Hunt for Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
             </a>
+            <a href="https://startupaideas.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://startupaideas.com/assets/images/badge.png" alt="Startup AIdeas" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://startupvessel.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://startupvessel.com/assets/images/badge.png" alt="Startup Vessel" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://superaiboom.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://superaiboom.com/assets/images/badge.png" alt="Super AI Boom" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://thatappshow.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://thatappshow.com/assets/images/badge.png" alt="That App Show" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://theapptools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://theapptools.com/assets/images/badge.png" alt="The App Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://thecoretools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://thecoretools.com/assets/images/badge.png" alt="The Core Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://thekeytools.com/submit" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://thekeytools.com/assets/images/badge.png" alt="The Key Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://themegatools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://themegatools.com/assets/images/badge.png" alt="The Mega Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://tinytoolhub.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://tinytoolhub.com/assets/images/badge.png" alt="Tiny Tool Hub" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toolcosmos.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toolcosmos.com/assets/images/badge.png" alt="Tool Cosmos" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toolfinddir.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toolfinddir.com/assets/images/badge.png" alt="Tool Find Dir" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://tooljourney.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://tooljourney.com/assets/images/badge.png" alt="Tool Journey" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toolprism.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toolprism.com/assets/images/badge.png" alt="Tool Prism" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toolsignal.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toolsignal.com/assets/images/badge.png" alt="Tool Signal" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toolslisthq.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toolslisthq.com/assets/images/badge.png" alt="Tools List HQ" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toolsunderradar.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toolsunderradar.com/assets/images/badge.png" alt="Tools Under Radar" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://toptrendtools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://toptrendtools.com/assets/images/badge.png" alt="Top Trend Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://trustiner.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://trustiner.com/assets/images/badge.png" alt="Trustiner" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://unitelist.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://unitelist.com/assets/images/badge.png" alt="Unite List" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://weliketools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://weliketools.com/assets/images/badge.png" alt="We Like Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://stackdirectory.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://stackdirectory.com/assets/images/badge.png" alt="Stack Directory" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
             <a href="https://www.toolpilot.ai/" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://www.toolpilot.ai/cdn/shop/files/f-w_690x151_crop_center.png" alt="Featured on ToolPilot" width="247" height="54" className="w-[247px] h-[54px] shrink-0 max-w-none object-contain" />
             </a>
