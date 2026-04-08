@@ -142,7 +142,7 @@ class SharedDashboard(Base):
     user_id = Column(Integer, nullable=False, index=True)
     property_id = Column(String(100), nullable=False)
     site_url = Column(String(500))
-    config = Column(Text, default='{"traffic":true,"sources":true,"pages":true,"geo":true,"seo":false}')
+    config = Column(Text, default='{"traffic":true,"sources":true,"pages":true,"geo":true,"technology":true,"seo":false}')
     views = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

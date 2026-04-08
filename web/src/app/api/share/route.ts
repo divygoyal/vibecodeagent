@@ -14,6 +14,7 @@ interface ShareConfig {
     sources: boolean;
     pages: boolean;
     geo: boolean;
+    technology?: boolean;
     seo: boolean;
 }
 
@@ -103,6 +104,14 @@ export async function POST(req: Request) {
         }
 
         const userId = session.user.id;
+        const normalizedConfig: ShareConfig = {
+            traffic: config?.traffic ?? true,
+            sources: config?.sources ?? true,
+            pages: config?.pages ?? true,
+            geo: config?.geo ?? true,
+            technology: config?.technology ?? true,
+            seo: config?.seo ?? false,
+        };
 
         // Production: use admin DB
         if (ADMIN_API_KEY) {
@@ -113,7 +122,7 @@ export async function POST(req: Request) {
                     user_identifier: userId,
                     property_id: propertyId,
                     site_url: siteUrl || '',
-                    config: config || { traffic: true, sources: true, pages: true, geo: true, seo: false },
+                    config: normalizedConfig,
                 }),
             });
             if (!res.ok) {
@@ -140,13 +149,7 @@ export async function POST(req: Request) {
             userId,
             propertyId: propertyId || '',
             siteUrl: siteUrl || '',
-            config: {
-                traffic: config?.traffic ?? true,
-                sources: config?.sources ?? true,
-                pages: config?.pages ?? true,
-                geo: config?.geo ?? true,
-                seo: config?.seo ?? false,
-            },
+            config: normalizedConfig,
             views: 0,
             createdAt: new Date().toISOString(),
         };

@@ -48,7 +48,7 @@ export default async function SharedDashboardPage({
         <div className="min-h-screen bg-[#050507] text-zinc-100">
             {/* Header */}
             <header className="border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-xl sticky top-0 z-50">
-                <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="mx-auto flex max-w-[1500px] items-center justify-between px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
                             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -71,17 +71,7 @@ export default async function SharedDashboardPage({
             </header>
 
             {/* Dashboard Content */}
-            <main className="max-w-6xl mx-auto px-6 py-8">
-                {/* Property info */}
-                {share.siteUrl && (
-                    <div className="mb-6">
-                        <p className="text-xs text-zinc-600">
-                            Analytics for{' '}
-                            <span className="text-zinc-400 font-mono">{share.siteUrl}</span>
-                        </p>
-                    </div>
-                )}
-
+            <main className="mx-auto max-w-[1500px] px-6 py-8">
                 {/* Client component handles data fetching, range selection, and rendering */}
                 <SharedDashboardClient
                     token={token}
@@ -93,7 +83,7 @@ export default async function SharedDashboardPage({
 
             {/* Footer */}
             <footer className="border-t border-white/[0.06] mt-12">
-                <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col items-center gap-3">
+                <div className="mx-auto flex max-w-[1500px] flex-col items-center gap-3 px-6 py-8">
                     <div className="flex items-center gap-2.5">
                         <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
                             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

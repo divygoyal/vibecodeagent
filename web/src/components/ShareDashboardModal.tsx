@@ -12,6 +12,7 @@ interface ShareConfig {
     sources: boolean;
     pages: boolean;
     geo: boolean;
+    technology?: boolean;
     seo: boolean;
 }
 
@@ -60,6 +61,7 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
         sources: true,
         pages: true,
         geo: true,
+        technology: true,
         seo: false,
     });
 
@@ -178,6 +180,7 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
         { key: 'sources', label: 'Traffic sources' },
         { key: 'pages', label: 'Top pages' },
         { key: 'geo', label: 'Geographic data' },
+        { key: 'technology', label: 'Technology breakdown' },
         { key: 'seo', label: 'SEO data (Search Console)' },
     ];
 

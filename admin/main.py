@@ -2059,7 +2059,7 @@ async def create_shared_dashboard(
         raise HTTPException(status_code=404, detail="User not found")
 
     token = secrets.token_hex(16)
-    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"seo":false}'
+    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"technology":true,"seo":false}'
 
     shared = SharedDashboard(
         token=token,

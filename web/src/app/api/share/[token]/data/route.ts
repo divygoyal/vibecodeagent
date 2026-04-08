@@ -47,7 +47,24 @@ export async function GET(
     const { token } = await params;
 
     /* ─── Read optional range parameter ─── */
-    const allowedRanges = ['7d', '14d', '30d', '90d'];
+    const allowedRanges = [
+        'today',
+        'yesterday',
+        '7d',
+        '14d',
+        '30d',
+        '60d',
+        '90d',
+        'this_week',
+        'last_week',
+        'this_month',
+        'last_month',
+        'this_year',
+        'last_year',
+        '6m',
+        '12m',
+        'all',
+    ];
     const rangeParam = new URL(req.url).searchParams.get('range') || '30d';
     const range = allowedRanges.includes(rangeParam) ? rangeParam : '30d';
 
@@ -91,25 +108,46 @@ export async function GET(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result: Record<string, any> = {};
 
-    if (share.config.traffic || share.config.sources || share.config.pages || share.config.geo) {
+    const shareConfig = {
+        traffic: share.config?.traffic ?? true,
+        sources: share.config?.sources ?? true,
+        pages: share.config?.pages ?? true,
+        geo: share.config?.geo ?? true,
+        technology: share.config?.technology ?? true,
+        seo: share.config?.seo ?? false,
+    };
+
+    if (shareConfig.traffic || shareConfig.sources || shareConfig.pages || shareConfig.geo || shareConfig.technology) {
         try {
             const dashboard = await fetchAnalyticsDashboard(accessToken, share.propertyId, range);
 
-            if (share.config.traffic) {
+            if (shareConfig.traffic) {
                 result.kpis = dashboard.kpis;
                 result.traffic = dashboard.traffic;
             }
 
-            if (share.config.sources) {
+            if (shareConfig.sources) {
                 result.sources = (dashboard.sources || []).slice(0, 15);
+                result.channels = (dashboard.channels || []).slice(0, 15);
+                result.referrers = (dashboard.referrers || []).slice(0, 15);
             }
 
-            if (share.config.pages) {
+            if (shareConfig.pages) {
                 result.pages = (dashboard.pages || []).slice(0, 15);
+                result.entryPages = (dashboard.entryPages || []).slice(0, 15);
             }
 
-            if (share.config.geo) {
+            if (shareConfig.geo) {
                 result.countries = (dashboard.countries || []).slice(0, 15);
+                result.cities = (dashboard.cities || []).slice(0, 15);
+                result.regions = (dashboard.regions || []).slice(0, 15);
+                result.languages = (dashboard.languages || []).slice(0, 15);
+            }
+
+            if (shareConfig.technology) {
+                result.devices = (dashboard.devices || []).slice(0, 15);
+                result.browsers = (dashboard.browsers || []).slice(0, 15);
+                result.operatingSystems = (dashboard.operatingSystems || []).slice(0, 15);
             }
         } catch (err) {
             console.error('Share data — GA4 fetch error:', err);
@@ -121,7 +159,7 @@ export async function GET(
     }
 
     /* ─── Fetch SEO data (if enabled and siteUrl is available) ─── */
-    if (share.config.seo && share.siteUrl) {
+    if (shareConfig.seo && share.siteUrl) {
         try {
             const seoDashboard = await fetchSeoDashboard(accessToken, share.siteUrl);
             result.seo = seoDashboard;
@@ -131,7 +169,7 @@ export async function GET(
             result.seo = null;
             result.seoError = 'SEO data requires a Google Search Console connection';
         }
-    } else if (share.config.seo) {
+    } else if (shareConfig.seo) {
         result.seo = null;
         result.seoError = 'SEO data requires a Google Search Console connection';
     }
