@@ -2012,6 +2012,42 @@ function Footer() {
             <a href="https://productwing.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://productwing.com/assets/images/badge.png" alt="Product Wing" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
             </a>
+            <a href="https://goodaitools.com/ai/trafficclaw" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://goodaitools.com/assets/images/badge.png" alt="Badge" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://milliondothomepage.com/product/trafficclaw" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://milliondothomepage.com/assets/images/badge.png" alt="Badge" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://launchclash.com/product/trafficclaw" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://launchclash.com/static/images/badge.png" alt="Featured on Submit Your Product - LaunchClash" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://shinylaunch.com/product/trafficclaw" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://shinylaunch.com/static/images/badge.png" alt="Submit Your" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://aigc160.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://aigc160.com/assets/images/badge.png" alt="AIGC 160" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://aitechviral.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://aitechviral.com/assets/images/badge.png" alt="AI Tech Viral" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://aitoolzs.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://aitoolzs.com/assets/images/badge.png" alt="AI Toolz" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://appalist.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://appalist.com/assets/images/badge.png" alt="Appa List" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://appsytools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://appsytools.com/assets/images/badge.png" alt="Appsy Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://ashlist.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://ashlist.com/assets/images/badge.png" alt="Ash List" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://beamtools.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://beamtools.com/assets/images/badge.png" alt="Beam Tools" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
+            <a href="https://besttoolvault.com" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
+                <img src="https://besttoolvault.com/assets/images/badge.png" alt="Best Tool Vault" height="54" className="h-[54px] shrink-0 w-auto max-w-none object-contain" />
+            </a>
             <a href="https://www.toolpilot.ai/" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://www.toolpilot.ai/cdn/shop/files/f-w_690x151_crop_center.png" alt="Featured on ToolPilot" width="247" height="54" className="w-[247px] h-[54px] shrink-0 max-w-none object-contain" />
             </a>
