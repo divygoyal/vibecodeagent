@@ -1316,13 +1316,23 @@ export default function OverviewCommandCenter({
                       <p className="mt-2 text-sm leading-6 text-zinc-400">{action.why}</p>
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                         <div className="text-sm font-medium text-zinc-200">{action.impact}</div>
-                        <Link
-                          href={action.href}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            window.dispatchEvent(
+                              new CustomEvent('trafficclaw:ask-ai', {
+                                detail: {
+                                  question: `${action.title}. ${action.why} ${action.impact} Please analyze this for my site and give specific, actionable recommendations.`,
+                                  site: selectedSiteLabel,
+                                },
+                              })
+                            )
+                          }
                           className="dashboard-hover-link inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-emerald-300"
                         >
                           {action.cta}
                           <ChevronRight className="h-4 w-4" />
-                        </Link>
+                        </button>
                       </div>
                     </div>
                   </div>
