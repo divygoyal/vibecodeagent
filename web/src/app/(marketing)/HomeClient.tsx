@@ -2048,6 +2048,9 @@ function Footer() {
             <a href="https://aitop10.tools/" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0 text-zinc-300 text-sm font-medium px-3 py-2 border border-white/10 rounded-lg">
                 AiTop10 Tools
             </a>
+            <a href="https://navs.site" target="_blank" rel="noopener noreferrer" title="AI Sites | 2026" className="block hover:opacity-80 transition-opacity shrink-0 text-zinc-300 text-sm font-medium px-3 py-2 border border-white/10 rounded-lg">
+                AI Nav Site
+            </a>
             <a href="https://yo.directory/" target="_blank" rel="noopener" className="block hover:opacity-80 transition-opacity shrink-0">
                 <img src="https://cdn.prod.website-files.com/65c1546fa73ea974db789e3d/65e1e171f89ebfa7bd0129ac_yodirectory-featured.png" alt="yo.directory" width="150" height="54" className="w-[150px] h-[54px] shrink-0 max-w-none" />
             </a>
