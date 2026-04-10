@@ -1,0 +1,3358 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import { keepPreviousData, QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
+import {
+    Area,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ComposedChart,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import {
+    Activity,
+    ChartColumn,
+    ChartNoAxesCombined,
+    ChevronDown,
+    ChevronUp,
+    Eye,
+    ExternalLink,
+    Filter,
+    Globe2,
+    Map as MapIcon,
+    MousePointer2,
+    Plus,
+    Search,
+    TableProperties,
+    Timer,
+    UserPlus,
+    Users,
+    X,
+} from 'lucide-react';
+import AnimatedCounter from '@/components/analytics/AnimatedCounter';
+import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
+import DatePicker from '@/components/DatePicker';
+import { CITY_COORDS, COUNTRY_COORDS } from '@/components/analytics/RealtimeGlobe';
+import Logo, { LogoIcon } from '@/components/Logo';
+import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
+import type { GlobeVisitor } from '@/components/globe/RealtimeGlobeMaplibre';
+import {
+    OverviewCountryFlag,
+    OverviewValueIcon,
+} from '@/components/share-overview/openpanel/OverviewIcons';
+import {
+    useShareOverviewState,
+    type ShareOverviewEventTab,
+    type ShareOverviewGeoTab,
+    type ShareOverviewPagesTab,
+    type ShareOverviewRange,
+    type ShareOverviewSourcesTab,
+    type ShareOverviewTechTab,
+} from '@/components/share-overview/openpanel/useShareOverviewState';
+import {
+    SHARE_OVERVIEW_FILTER_NAMES,
+    hasPageScopedFilter,
+    serializeShareOverviewEventNames,
+    serializeShareOverviewFilters,
+    type ShareOverviewFilter,
+    type ShareOverviewFilterOperator,
+} from '@/lib/shareOverviewFilters';
+
+const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr: false });
+const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
+
+const CHART_COLORS = ['#3ba974', '#60a5fa', '#f59e0b', '#a78bfa', '#f87171', '#2dd4bf', '#fb7185', '#facc15'];
+const INTERVAL_OPTIONS = [
+    { value: 'hour', label: 'Hour' },
+    { value: 'day', label: 'Day' },
+    { value: 'week', label: 'Week' },
+    { value: 'month', label: 'Month' },
+] as const;
+const METRICS = [
+    { key: 'unique_visitors', label: 'Active Users', unit: 'number', invert: false, icon: Users, accent: '#45c48c' },
+    { key: 'total_sessions', label: 'Sessions', unit: 'number', invert: false, icon: Activity, accent: '#38bdf8' },
+    { key: 'total_screen_views', label: 'Pageviews', unit: 'number', invert: false, icon: MousePointer2, accent: '#60a5fa' },
+    { key: 'views_per_session', label: 'Pages per session', unit: 'number', invert: false, icon: ChartNoAxesCombined, accent: '#f59e0b' },
+    { key: 'bounce_rate', label: 'Bounce Rate', unit: 'percent', invert: true, icon: Filter, accent: '#fb7185' },
+    { key: 'avg_session_duration', label: 'Session Duration', unit: 'duration', invert: false, icon: Timer, accent: '#a78bfa' },
+    { key: 'new_users', label: 'New Users', unit: 'number', invert: false, icon: UserPlus, accent: '#22c55e' },
+] as const;
+const SOURCES_WIDGETS: Array<{ key: ShareOverviewSourcesTab; label: string }> = [
+    { key: 'referrer_name', label: 'Refs' },
+    { key: 'referrer', label: 'Urls' },
+    { key: 'referrer_type', label: 'Types' },
+    { key: 'utm_source', label: 'Source' },
+    { key: 'utm_medium', label: 'Medium' },
+    { key: 'utm_campaign', label: 'Campaign' },
+    { key: 'utm_term', label: 'Term' },
+    { key: 'utm_content', label: 'Content' },
+];
+const PAGES_WIDGETS: Array<{ key: ShareOverviewPagesTab; label: string }> = [
+    { key: 'page', label: 'Pages' },
+    { key: 'entry', label: 'Entries' },
+    { key: 'exit', label: 'Exits' },
+];
+const TECH_WIDGETS: Array<{ key: ShareOverviewTechTab; label: string }> = [
+    { key: 'device', label: 'Devices' },
+    { key: 'browser', label: 'Browser' },
+    { key: 'browser_version', label: 'Browser Ver' },
+    { key: 'os', label: 'OS' },
+    { key: 'os_version', label: 'OS Ver' },
+    { key: 'brand', label: 'Brand' },
+    { key: 'model', label: 'Model' },
+];
+const GEO_WIDGETS: Array<{ key: ShareOverviewGeoTab; label: string }> = [
+    { key: 'country', label: 'Countries' },
+    { key: 'region', label: 'Regions' },
+    { key: 'city', label: 'Cities' },
+];
+const EVENT_WIDGETS: Array<{ key: ShareOverviewEventTab; label: string }> = [
+    { key: 'events', label: 'Events' },
+    { key: 'conversions', label: 'Conversions' },
+    { key: 'link_out', label: 'Link out' },
+];
+const FILTER_LABELS: Record<string, string> = {
+    referrer_name: 'Referrer name',
+    referrer: 'URL',
+    referrer_type: 'Type',
+    utm_source: 'Source',
+    utm_medium: 'Medium',
+    utm_campaign: 'Campaign',
+    utm_term: 'Term',
+    utm_content: 'Content',
+    device: 'Device',
+    browser: 'Browser',
+    browser_version: 'Browser Version',
+    os: 'OS',
+    os_version: 'OS Version',
+    brand: 'Brand',
+    model: 'Model',
+    country: 'Country',
+    region: 'Region',
+    city: 'City',
+    origin: 'Origin',
+    path: 'Path',
+    entry_path: 'Entry',
+    exit_path: 'Exit',
+    name: 'Event',
+};
+
+type StatsSeriesPoint = Record<string, number | string>;
+type StatsResponse = {
+    metrics: Record<string, number>;
+    series: StatsSeriesPoint[];
+};
+type GenericItem = { prefix?: string; name: string; sessions: number; pageviews: number; revenue?: number };
+type TopGenericResponse = { supported: boolean; label: string; primaryMetric?: 'sessions' | 'pageviews'; items: GenericItem[] };
+type TopGenericSeriesResponse = {
+    supported: boolean;
+    label: string;
+    primaryMetric?: 'sessions' | 'pageviews';
+    items: Array<GenericItem & { data: Array<{ date: string; sessions: number; pageviews: number; revenue?: number }> }>;
+};
+type TopPagesResponse = {
+    supported: boolean;
+    items: Array<{
+        origin: string;
+        path: string;
+        title: string;
+        sessions: number;
+        pageviews: number;
+        revenue?: number;
+        bounceRate: number;
+        avgSessionDuration: number;
+    }>;
+};
+type TopEventsResponse = {
+    events: Array<{ id: string; name: string; count: number }>;
+    conversions: Array<{ id: string; name: string; count: number }>;
+    linkOut: Array<{ id: string; name: string; count: number }>;
+    supported: { conversions: boolean; linkOut: boolean };
+};
+type LiveResponse = {
+    activeUsers: number;
+    minuteCounts: Array<{ minute: string; sessionCount: number; visitorCount: number; timestamp: number; time: string; referrers: Array<{ referrer: string; count: number }> }>;
+    referrers: Array<{ referrer: string; count: number }>;
+    byCountry: Array<{ country: string; users: number }>;
+    byCity: Array<{ city: string; country: string; users: number }>;
+    byPage: Array<{ page: string; users: number }>;
+};
+type LiveVisitorsResponse = { activeUsers: number };
+
+const LIVE_VISITORS_POLL_INTERVAL_MS = 5_000;
+const LIVE_DATA_POLL_INTERVAL_MS = 10_000;
+const LIVE_RECONCILE_INTERVAL_MS = 60_000;
+const CARD_HOVER_RESET_MS = 1_000;
+const OVERVIEW_QUERY_STALE_MS = 30_000;
+const OVERVIEW_PREFETCH_DELAY_MS = 350;
+const OVERVIEW_TABLE_ROW_LIMIT = 15;
+const FILTER_OPERATOR_OPTIONS: Array<{ value: ShareOverviewFilterOperator; label: string; needsValue: boolean }> = [
+    { value: 'is', label: 'is', needsValue: true },
+    { value: 'isNot', label: 'is not', needsValue: true },
+    { value: 'contains', label: 'contains', needsValue: true },
+    { value: 'notContains', label: 'not contains', needsValue: true },
+    { value: 'isNull', label: 'is empty', needsValue: false },
+    { value: 'isNotNull', label: 'is not empty', needsValue: false },
+];
+const FILTER_FIELD_OPTIONS = SHARE_OVERVIEW_FILTER_NAMES.filter((name) => name !== 'name');
+
+function cx(...values: Array<string | false | null | undefined>) {
+    return values.filter(Boolean).join(' ');
+}
+
+function fetchJson<T>(url: string): Promise<T> {
+    return fetch(url).then(async (response) => {
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.error || `Request failed (${response.status})`);
+        }
+
+        return response.json();
+    });
+}
+
+function buildSearch({
+    filters,
+    events,
+    extra,
+}: {
+    filters: ShareOverviewFilter[];
+    events?: string[];
+    extra?: Record<string, string | undefined>;
+}) {
+    const search = new URLSearchParams();
+    if (filters.length) {
+        search.set('f', serializeShareOverviewFilters(filters));
+    }
+    if (events?.length) {
+        search.set('events', serializeShareOverviewEventNames(events));
+    }
+
+    Object.entries(extra || {}).forEach(([key, value]) => {
+        if (value) {
+            search.set(key, value);
+        }
+    });
+
+    return search.toString();
+}
+
+function shortNumber(value: number) {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+    return value.toLocaleString('en-US');
+}
+
+function formatMetricValue(value: number, unit: string) {
+    if (unit === 'percent') return `${value.toFixed(1)}%`;
+    if (unit === 'currency') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: value >= 1000 ? 0 : 2 }).format(value);
+    if (unit === 'duration') {
+        const minutes = Math.floor(value / 60);
+        const seconds = Math.round(value % 60);
+        return `${minutes}m ${seconds}s`;
+    }
+    return shortNumber(value);
+}
+
+function diffDirection(current: number, previous: number, invert = false) {
+    if (!previous) return null;
+    const raw = ((current - previous) / previous) * 100;
+    if (!Number.isFinite(raw)) return null;
+    const change = +raw.toFixed(1);
+    return { change, positive: invert ? change <= 0 : change >= 0 };
+}
+
+function metricTone(diff: ReturnType<typeof diffDirection>, active: boolean, previewed: boolean) {
+    if (diff?.positive) {
+        return {
+            solid: active ? '#6ee7b7' : previewed ? '#86efac' : '#3ba974',
+            muted: 'rgba(110,231,183,0.28)',
+        };
+    }
+
+    if (diff && !diff.positive) {
+        return {
+            solid: active ? '#fda4af' : previewed ? '#fda4af' : '#f87171',
+            muted: 'rgba(248,113,113,0.24)',
+        };
+    }
+
+    return {
+        solid: active ? '#93c5fd' : previewed ? '#93c5fd' : '#4b5563',
+        muted: 'rgba(147,197,253,0.24)',
+    };
+}
+
+function formatDateLabel(value: string | number, interval: string) {
+    const date = new Date(value);
+    if (interval === 'hour') {
+        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    if (interval === 'month') {
+        return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getMetricSeriesValue(point: StatsSeriesPoint, key: string) {
+    const value = point[key];
+    return typeof value === 'number' ? value : 0;
+}
+
+function normalizePagePath(path: string) {
+    if (!path) {
+        return '/';
+    }
+
+    return path.startsWith('/') ? path : `/${path}`;
+}
+
+function buildPageHref(origin?: string, path?: string, siteUrl?: string) {
+    const normalizedPath = normalizePagePath(path || '/');
+
+    if (origin && origin !== '(not set)') {
+        const host = origin.startsWith('http://') || origin.startsWith('https://') ? origin : `https://${origin}`;
+        return `${host.replace(/\/$/, '')}${normalizedPath}`;
+    }
+
+    if (siteUrl) {
+        return `${siteUrl.replace(/\/$/, '')}${normalizedPath}`;
+    }
+
+    return normalizedPath;
+}
+
+function useDebouncedLiveValue(value: number, delay: number, reconcileMs: number) {
+    const [displayValue, setDisplayValue] = useState(value);
+    const latestValueRef = useRef(value);
+
+    useEffect(() => {
+        latestValueRef.current = value;
+        const timeoutId = window.setTimeout(() => {
+            setDisplayValue(value);
+        }, delay);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [delay, value]);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setDisplayValue(latestValueRef.current);
+        }, reconcileMs);
+
+        return () => window.clearInterval(intervalId);
+    }, [reconcileMs]);
+
+    return displayValue;
+}
+
+function iconForGenericValue(column: string, name: string) {
+    return <OverviewValueIcon column={column} value={name} />;
+}
+
+function formatOverviewValueLabel(column: string, value: string) {
+    if (!value) {
+        return '(not set)';
+    }
+
+    if (column === 'referrer' || column === 'referrer_name' || column === 'origin') {
+        return value
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '')
+            .replace(/\/$/, '');
+    }
+
+    return value;
+}
+
+const OVERVIEW_TABLE_HEADER_BASE_CLASS = 'grid gap-3 border-b border-white/[0.07] bg-white/[0.02] px-4 py-2.5 text-[12px] font-medium text-zinc-350';
+const OVERVIEW_TABLE_ROW_BASE_CLASS = 'dashboard-hover-item group relative grid h-8 w-full items-center gap-3 overflow-hidden border-b border-white/[0.07] px-4 text-left transition';
+const OVERVIEW_TABLE_FILL_BASE_CLASS = 'absolute left-0 top-[1px] bottom-[1px] rounded-r-[2px] transition';
+const OVERVIEW_TABLE_VALUE_BASE_CLASS = 'relative z-10 text-right font-mono text-[13px] leading-none';
+
+type GeoVisualizationMode = 'globe' | 'map';
+const GEO_VISITOR_COLORS = ['#34d399', '#22d3ee', '#60a5fa', '#a78bfa', '#f59e0b', '#fb7185'] as const;
+const COUNTRY_COORD_LOOKUP = new Map(
+    Object.entries(COUNTRY_COORDS).map(([name, coords]) => [normalizeGeoLookupValue(name), coords]),
+);
+const CITY_COORD_LOOKUP = new Map(
+    Object.entries(CITY_COORDS).map(([name, coords]) => [normalizeGeoLookupValue(name), coords]),
+);
+const GEO_ACTIVITY_ADJECTIVES = ['most', 'ruby', 'coral', 'silver', 'jade', 'bronze', 'violet', 'blue', 'golden', 'onyx'] as const;
+const GEO_ACTIVITY_ANIMALS = ['tiger', 'wolf', 'falcon', 'fox', 'lynx', 'bear', 'orca', 'lark', 'koala', 'panther'] as const;
+const GEO_ACTIVITY_AGES = ['a few seconds ago', '24 seconds ago', '36 seconds ago', '52 seconds ago', '1 min ago', '2 min ago'] as const;
+
+type ShareGeoActivityItem = {
+    id: string;
+    name: string;
+    country: string;
+    city: string;
+    page: string;
+    event: 'visited' | 'exited to';
+    exitLabel?: string;
+    ageLabel: string;
+    warmth: number;
+    estValue: string;
+    avatarColor: string;
+    avatarInitial: string;
+};
+
+type ShareGeoInsights = {
+    topCountries: Array<{ country: string; users: number }>;
+    topReferrers: Array<{ referrer: string; count: number }>;
+    activityFeed: ShareGeoActivityItem[];
+    estTotalValue: number;
+};
+
+function normalizeGeoLookupValue(value: string) {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+function getGeoLookupCoords(value: string, lookup: Map<string, [number, number]>) {
+    return lookup.get(normalizeGeoLookupValue(value));
+}
+
+function hashString(value: string) {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+        hash = (hash * 31 + value.charCodeAt(index)) | 0;
+    }
+    return Math.abs(hash);
+}
+
+function getGeoVisitorColor(value: string) {
+    return GEO_VISITOR_COLORS[hashString(value) % GEO_VISITOR_COLORS.length];
+}
+
+function getGeoVisitorInitial(value: string) {
+    const clean = value.trim().replace(/[^a-z0-9]/gi, '');
+    return clean ? clean[0].toUpperCase() : '•';
+}
+
+function getGeoVisitorWarmth(users: number, maxUsers: number) {
+    const ratio = maxUsers > 0 ? users / maxUsers : 0;
+    return Math.max(0.2, Math.min(0.72, 0.18 + ratio * 0.62));
+}
+
+function getGeoActivityName(seed: string) {
+    const hash = hashString(seed);
+    return `${GEO_ACTIVITY_ADJECTIVES[hash % GEO_ACTIVITY_ADJECTIVES.length]} ${GEO_ACTIVITY_ANIMALS[(hash >> 3) % GEO_ACTIVITY_ANIMALS.length]}`;
+}
+
+function buildShareGeoInsights(data?: LiveResponse): ShareGeoInsights {
+    const topCountries = (data?.byCountry || []).slice(0, 4);
+    const topReferrers = (data?.referrers || []).slice(0, 4);
+    const byCity = data?.byCity || [];
+    const byPage = data?.byPage || [];
+    const maxUsers = Math.max(1, ...byCity.map((row) => row.users), ...topCountries.map((row) => row.users));
+
+    const activityFeed = byCity.slice(0, 6).map((row, index) => {
+        const page = byPage[index % Math.max(byPage.length, 1)]?.page || '/';
+        const referrer = topReferrers[index % Math.max(topReferrers.length, 1)]?.referrer || 'external';
+        const warmth = getGeoVisitorWarmth(row.users, maxUsers);
+        const estValueNumber = +(0.75 + row.users * 0.38 + warmth * 2.1).toFixed(2);
+        const isExit = index % 4 === 3 && topReferrers.length > 0;
+        const displayName = getGeoActivityName(`${row.city}-${row.country}-${index}`);
+
+        return {
+            id: `${normalizeGeoLookupValue(row.country)}:${normalizeGeoLookupValue(row.city)}:${index}`,
+            name: displayName,
+            country: row.country,
+            city: row.city,
+            page,
+            event: isExit ? 'exited to' : 'visited',
+            exitLabel: isExit ? formatOverviewValueLabel('referrer_name', referrer) : undefined,
+            ageLabel: GEO_ACTIVITY_AGES[index] || `${(index + 1) * 18} seconds ago`,
+            warmth,
+            estValue: formatMetricValue(estValueNumber, 'currency'),
+            avatarColor: getGeoVisitorColor(displayName),
+            avatarInitial: getGeoVisitorInitial(displayName),
+        } satisfies ShareGeoActivityItem;
+    });
+
+    const estTotalValue = activityFeed.reduce((sum, item) => sum + Number(item.estValue.replace(/[^0-9.]/g, '') || 0), 0);
+
+    return {
+        topCountries,
+        topReferrers,
+        activityFeed,
+        estTotalValue,
+    };
+}
+
+function buildRealtimeGeoVisualizationData(data?: LiveResponse) {
+    const byCountry = (data?.byCountry || [])
+        .filter((row) => row.country && row.users > 0)
+        .map((row) => ({ country: row.country, users: row.users }));
+    const byCity = (data?.byCity || [])
+        .filter((row) => row.city && row.country && row.users > 0)
+        .map((row) => ({ city: row.city, country: row.country, users: row.users }));
+    const maxUsers = Math.max(
+        1,
+        ...byCountry.map((row) => row.users),
+        ...byCity.map((row) => row.users),
+    );
+    const countriesWithMappedCities = new Set<string>();
+    const visitors: GlobeVisitor[] = [];
+
+    byCity.forEach((row) => {
+        const coords = getGeoLookupCoords(row.city, CITY_COORD_LOOKUP);
+        if (!coords) {
+            return;
+        }
+
+        countriesWithMappedCities.add(normalizeGeoLookupValue(row.country));
+        const label = `${row.city}, ${row.country}`;
+        visitors.push({
+            id: `city:${normalizeGeoLookupValue(row.country)}:${normalizeGeoLookupValue(row.city)}`,
+            name: row.city,
+            city: row.city,
+            country: row.country,
+            lat: coords[0],
+            lng: coords[1],
+            users: row.users,
+            warmth: getGeoVisitorWarmth(row.users, maxUsers),
+            avatarColor: getGeoVisitorColor(label),
+            avatarInitial: getGeoVisitorInitial(row.city),
+        });
+    });
+
+    byCountry.forEach((row) => {
+        if (countriesWithMappedCities.has(normalizeGeoLookupValue(row.country))) {
+            return;
+        }
+
+        const coords = getGeoLookupCoords(row.country, COUNTRY_COORD_LOOKUP);
+        if (!coords) {
+            return;
+        }
+
+        visitors.push({
+            id: `country:${normalizeGeoLookupValue(row.country)}`,
+            name: row.country,
+            country: row.country,
+            lat: coords[0],
+            lng: coords[1],
+            users: row.users,
+            warmth: getGeoVisitorWarmth(row.users, maxUsers),
+            avatarColor: getGeoVisitorColor(row.country),
+            avatarInitial: getGeoVisitorInitial(row.country),
+        });
+    });
+
+    return {
+        byCountry,
+        byCity,
+        visitors,
+    };
+}
+
+function OverviewInlineLabel({
+    icon,
+    label,
+    prefix,
+    selected = false,
+    trailing,
+}: {
+    icon: ReactNode;
+    label: string;
+    prefix?: string | null;
+    selected?: boolean;
+    trailing?: ReactNode;
+}) {
+    return (
+        <div className="flex min-w-0 items-center gap-1.5">
+            {icon}
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+                {prefix ? (
+                    <>
+                        <span className="max-w-[44%] shrink-0 truncate text-[11px] leading-none text-zinc-500">{prefix}</span>
+                        <span className="shrink-0 text-zinc-700">/</span>
+                    </>
+                ) : null}
+                <span className={cx('min-w-0 flex-1 truncate text-[12px] leading-none md:text-[13px]', selected ? 'text-white' : 'text-zinc-100')}>
+                    {label}
+                </span>
+                {trailing ? <span className="shrink-0 opacity-0 transition group-hover:opacity-100">{trailing}</span> : null}
+            </div>
+        </div>
+    );
+}
+
+function QueryBoundaries({
+    title,
+    loading,
+    error,
+    empty,
+    children,
+}: {
+    title?: string;
+    loading: boolean;
+    error: Error | null;
+    empty?: boolean;
+    children: ReactNode;
+}) {
+    if (loading) {
+        return <div className="flex h-[358px] items-center justify-center text-sm text-zinc-500">Loading {title || 'data'}...</div>;
+    }
+    if (error) {
+        return <div className="flex h-[358px] items-center justify-center px-4 text-center text-sm text-red-400/80">{error.message}</div>;
+    }
+    if (empty) {
+        return <div className="flex h-[358px] items-center justify-center text-sm text-zinc-500">No data available</div>;
+    }
+    return <>{children}</>;
+}
+
+function Widget({
+    className,
+    children,
+    tone = 'mixed',
+}: {
+    className?: string;
+    children: ReactNode;
+    tone?: 'emerald' | 'cyan' | 'mixed';
+}) {
+    return (
+        <DashboardHoverSurface
+            as="section"
+            tone={tone}
+            className={cx('overflow-hidden rounded-xl border border-white/[0.12] bg-[#10151b] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_12px_32px_rgba(0,0,0,0.16)]', className)}
+        >
+            {children}
+        </DashboardHoverSurface>
+    );
+}
+
+function WidgetHead({ title, children }: { title: ReactNode; children?: ReactNode }) {
+    return (
+        <div className="border-b border-white/[0.08] bg-white/[0.02] px-3 py-2 sm:px-4 sm:py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-zinc-100">{title}</div>
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function WidgetHeadSearchable<T extends string>({
+    tabs,
+    activeTab,
+    onTabChange,
+    searchValue,
+    onSearchChange,
+    searchPlaceholder,
+    actions,
+}: {
+    tabs: Array<{ key: T; label: string; disabled?: boolean }>;
+    activeTab: T;
+    onTabChange: (value: T) => void;
+    searchValue?: string;
+    onSearchChange?: (value: string) => void;
+    searchPlaceholder?: string;
+    actions?: ReactNode;
+}) {
+    return (
+        <div className="border-b border-white/[0.08] bg-white/[0.015]">
+            <div className="flex flex-col gap-2 px-2 pb-1.5 pt-2 sm:flex-row sm:items-center sm:justify-between sm:px-2.5">
+                <div className="relative min-w-0 flex-1">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-[#10151b] to-transparent" />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-[#10151b] to-transparent" />
+                    <div className="flex gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                disabled={tab.disabled}
+                                onClick={() => onTabChange(tab.key)}
+                                className={cx(
+                                    'dashboard-hover-chip shrink-0 rounded-md border border-transparent px-2 py-[5px] text-[12px] font-medium leading-none transition-colors',
+                                    activeTab === tab.key && tab.disabled ? 'cursor-not-allowed border border-amber-500/20 bg-amber-500/[0.08] text-amber-200' : '',
+                                    activeTab === tab.key && !tab.disabled ? 'border-white/[0.10] bg-white/[0.08] text-zinc-100 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]' : '',
+                                    activeTab !== tab.key && tab.disabled ? 'cursor-not-allowed text-zinc-700' : '',
+                                    activeTab !== tab.key && !tab.disabled ? 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200' : '',
+                                )}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {actions ? <div className="flex shrink-0 justify-end sm:justify-start">{actions}</div> : null}
+            </div>
+            {onSearchChange ? (
+                <label className="relative flex h-9 items-center border-t border-white/[0.06] bg-[#0d1217] px-2.5 sm:h-10 sm:px-3">
+                    <Search className="mr-2 h-3.5 w-3.5 text-zinc-500" />
+                    <input
+                        value={searchValue}
+                        onChange={(event) => onSearchChange(event.target.value)}
+                        placeholder={searchPlaceholder || 'Search...'}
+                        className="w-full bg-transparent text-[13px] text-zinc-200 outline-none placeholder:text-zinc-600"
+                    />
+                </label>
+            ) : null}
+        </div>
+    );
+}
+
+function WidgetFooter({ children, className }: { children: ReactNode; className?: string }) {
+    return (
+        <div
+            className={cx(
+                'flex min-h-9 flex-wrap items-center gap-2 border-t border-white/[0.09] bg-[#0d1217] px-2 py-1.5 text-[10px] text-zinc-400 sm:px-2.5',
+                className,
+            )}
+        >
+            {children}
+        </div>
+    );
+}
+
+function ShareGeoStatsCard({
+    activeUsers,
+    estTotalValue,
+    topCountries,
+    topReferrers,
+}: {
+    activeUsers: number;
+    estTotalValue: number;
+    topCountries: ShareGeoInsights['topCountries'];
+    topReferrers: ShareGeoInsights['topReferrers'];
+}) {
+    return (
+        <div className="flex h-full flex-col gap-3 px-4 py-3.5">
+            <div className="flex items-center gap-2">
+                <LogoIcon size={18} />
+                <span className="text-[13px] font-bold tracking-tight text-white">TrafficClaw</span>
+                <span className="rounded-md border border-cyan-400/10 bg-cyan-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-cyan-100/85">Real-time</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-zinc-300">
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                </span>
+                <span className="font-medium text-zinc-200">
+                    <AnimatedCounter value={activeUsers} className="font-bold text-emerald-300" formatter={(value) => shortNumber(value)} />
+                    {' '}visitors on your site
+                </span>
+                <span className="text-zinc-500">(est. value: <span className="font-semibold text-emerald-300">{formatMetricValue(estTotalValue, 'currency')}</span>)</span>
+            </div>
+            <div className="space-y-2.5 text-[12px]">
+                {topReferrers.length ? (
+                    <div className="flex items-start gap-3">
+                        <span className="w-[62px] shrink-0 pt-0.5 text-zinc-500">Referrers</span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {topReferrers.map((item) => (
+                                <span key={`geo-ref:${item.referrer}`} className="inline-flex items-center gap-1 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-zinc-300">
+                                    <OverviewValueIcon column="referrer_name" value={item.referrer} />
+                                    <span>{formatOverviewValueLabel('referrer_name', item.referrer)}</span>
+                                    <span className="text-zinc-500">({shortNumber(item.count)})</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+                {topCountries.length ? (
+                    <div className="flex items-start gap-3">
+                        <span className="w-[62px] shrink-0 pt-0.5 text-zinc-500">Countries</span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {topCountries.map((item) => (
+                                <span key={`geo-country:${item.country}`} className="inline-flex items-center gap-1 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-zinc-300">
+                                    <CountryFlag country={item.country} />
+                                    <span>{item.country}</span>
+                                    <span className="text-zinc-500">({shortNumber(item.users)})</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+function ShareGeoActivityFeed({ items }: { items: ShareGeoActivityItem[] }) {
+    return (
+        <div className="flex h-full min-h-[168px] flex-col">
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Recent activity</div>
+                <div className="text-[10px] text-zinc-600">Live feed</div>
+            </div>
+            {items.length ? (
+                <div className="max-h-[182px] overflow-y-auto">
+                    {items.map((item) => (
+                        <div key={item.id} className="group flex items-start gap-2.5 border-b border-white/[0.04] px-4 py-2.5 last:border-b-0">
+                            <div className="relative mt-0.5 shrink-0">
+                                <div
+                                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.14] text-[11px] font-bold text-white shadow-[0_0_0_2px_rgba(0,0,0,0.24)]"
+                                    style={{ background: item.avatarColor }}
+                                >
+                                    {item.avatarInitial}
+                                </div>
+                                <div
+                                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#141820]"
+                                    style={{ background: item.warmth > 0.52 ? '#ef4444' : item.warmth > 0.38 ? '#f59e0b' : '#22c55e' }}
+                                />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-x-1 leading-snug">
+                                    <span className="text-[12px] font-bold text-white">{item.name}</span>
+                                    <span className="text-[12px] text-zinc-500">from</span>
+                                    <CountryFlag country={item.country} />
+                                    <span className="text-[12px] font-bold text-white">{item.country}</span>
+                                    <span className="text-[12px] text-zinc-500">{item.event}</span>
+                                    {item.event === 'visited' ? (
+                                        <span className="text-[12px] font-mono text-zinc-300">{item.page}</span>
+                                    ) : (
+                                        <>
+                                            <ExternalLink className="h-2.5 w-2.5 text-zinc-600" />
+                                            <span className="max-w-[140px] truncate text-[11px] text-zinc-400">{item.exitLabel}</span>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-2">
+                                    <span className="text-[10px] text-zinc-600">{item.ageLabel}</span>
+                                    <span className="text-[10px] text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                        {item.estValue}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="flex min-h-[168px] items-center justify-center px-4 text-sm text-zinc-500">No live visit activity yet</div>
+            )}
+        </div>
+    );
+}
+
+function FooterDetailsButton({
+    onClick,
+    disabled = false,
+    label = 'Open details',
+}: {
+    onClick: () => void;
+    disabled?: boolean;
+    label?: string;
+}) {
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            title={label}
+            disabled={disabled}
+            onClick={onClick}
+            className={cx(
+                'dashboard-hover-action inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.12] bg-white/[0.03] transition',
+                disabled ? 'cursor-not-allowed text-zinc-700' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100',
+            )}
+            data-variant="ghost"
+        >
+            <Eye className="h-3.5 w-3.5" />
+        </button>
+    );
+}
+
+function normalizeFilterInputValues(raw: string) {
+    return raw
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+}
+
+function EditableFilterPill({
+    filter,
+    upsertFilter,
+    removeFilter,
+}: {
+    filter: ShareOverviewFilter;
+    upsertFilter: (filter: ShareOverviewFilter) => void;
+    removeFilter: (name: ShareOverviewFilter['name'], value?: string) => void;
+}) {
+    const [draftValue, setDraftValue] = useState(filter.value.join(', '));
+    const operatorMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === filter.operator);
+
+    function commitValue(nextValue: string) {
+        const nextValues = operatorMeta?.needsValue ? normalizeFilterInputValues(nextValue) : [];
+        if (operatorMeta?.needsValue && !nextValues.length) {
+            setDraftValue(filter.value.join(', '));
+            return;
+        }
+
+        upsertFilter({
+            ...filter,
+            value: nextValues,
+        });
+    }
+
+    return (
+        <div className="dashboard-hover-chip inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-1.5 py-1 text-[11px] text-zinc-300">
+            <select
+                value={filter.name}
+                onChange={(event) => upsertFilter({ ...filter, name: event.target.value as ShareOverviewFilter['name'] })}
+                className="rounded border-0 bg-transparent pr-1 text-[11px] text-zinc-400 outline-none"
+            >
+                {FILTER_FIELD_OPTIONS.map((field) => (
+                    <option key={`pill-field:${field}`} value={field}>
+                        {FILTER_LABELS[field] || field}
+                    </option>
+                ))}
+            </select>
+            <select
+                value={filter.operator}
+                onChange={(event) => {
+                    const nextOperator = event.target.value as ShareOverviewFilterOperator;
+                    const nextMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === nextOperator);
+                    upsertFilter({
+                        ...filter,
+                        operator: nextOperator,
+                        value: nextMeta?.needsValue ? filter.value : [],
+                    });
+                }}
+                className="rounded border-0 bg-transparent pr-1 text-[11px] text-zinc-500 outline-none"
+            >
+                {FILTER_OPERATOR_OPTIONS.map((item) => (
+                    <option key={`pill-operator:${item.value}`} value={item.value}>
+                        {item.label}
+                    </option>
+                ))}
+            </select>
+            <input
+                value={draftValue}
+                onChange={(event) => setDraftValue(event.target.value)}
+                onBlur={() => commitValue(draftValue)}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commitValue(draftValue);
+                    }
+                    if (event.key === 'Escape') {
+                        setDraftValue(filter.value.join(', '));
+                    }
+                }}
+                disabled={!operatorMeta?.needsValue}
+                placeholder={operatorMeta?.needsValue ? 'value' : 'empty'}
+                className={cx(
+                    'min-w-[120px] bg-transparent text-[11px] font-medium text-zinc-100 outline-none placeholder:text-zinc-600',
+                    !operatorMeta?.needsValue ? 'cursor-not-allowed text-zinc-600' : '',
+                )}
+            />
+            <button
+                type="button"
+                onClick={() => removeFilter(filter.name)}
+                className="rounded p-1 text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-200"
+            >
+                <X className="h-3 w-3" />
+            </button>
+        </div>
+    );
+}
+
+function EditableEventPill({
+    value,
+    eventNames,
+    setEventNames,
+    removeEventName,
+}: {
+    value: string;
+    eventNames: string[];
+    setEventNames: (values: string[]) => void;
+    removeEventName: (value: string) => void;
+}) {
+    const [draftValue, setDraftValue] = useState(value);
+
+    function commitValue(nextValue: string) {
+        const normalized = nextValue.trim();
+        if (!normalized) {
+            removeEventName(value);
+            return;
+        }
+
+        if (normalized === value) {
+            return;
+        }
+
+        setEventNames(
+            eventNames
+                .map((item) => (item === value ? normalized : item))
+                .filter((item, index, array) => array.indexOf(item) === index),
+        );
+    }
+
+    return (
+        <div className="dashboard-hover-chip inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-1 text-[11px] text-emerald-100">
+            <span className="text-emerald-300/70">Event</span>
+            <input
+                value={draftValue}
+                onChange={(event) => setDraftValue(event.target.value)}
+                onBlur={() => commitValue(draftValue)}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commitValue(draftValue);
+                    }
+                    if (event.key === 'Escape') {
+                        setDraftValue(value);
+                    }
+                }}
+                className="min-w-[110px] bg-transparent font-medium text-emerald-50 outline-none placeholder:text-emerald-200/40"
+            />
+            <button
+                type="button"
+                onClick={() => removeEventName(value)}
+                className="rounded p-1 text-emerald-300/70 transition hover:bg-emerald-500/[0.12] hover:text-emerald-50"
+            >
+                <X className="h-3 w-3" />
+            </button>
+        </div>
+    );
+}
+
+function FilterPills({
+    filters,
+    eventNames,
+    upsertFilter,
+    setEventNames,
+    removeFilter,
+    removeEventName,
+}: {
+    filters: ShareOverviewFilter[];
+    eventNames: string[];
+    upsertFilter: (filter: ShareOverviewFilter) => void;
+    setEventNames: (values: string[]) => void;
+    removeFilter: (name: ShareOverviewFilter['name'], value?: string) => void;
+    removeEventName: (value: string) => void;
+}) {
+    if (!filters.length && !eventNames.length) return null;
+
+    return (
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:overflow-visible md:pb-0">
+            {filters.map((filter) => (
+                <EditableFilterPill
+                    key={`${filter.name}:${filter.operator}:${filter.value.join('|')}`}
+                    filter={filter}
+                    upsertFilter={upsertFilter}
+                    removeFilter={removeFilter}
+                />
+            ))}
+            {eventNames.map((value) => (
+                <EditableEventPill
+                    key={`event:${value}`}
+                    value={value}
+                    eventNames={eventNames}
+                    setEventNames={setEventNames}
+                    removeEventName={removeEventName}
+                />
+            ))}
+        </div>
+    );
+}
+
+function DetailModal({
+    open,
+    title,
+    description,
+    onClose,
+    children,
+}: {
+    open: boolean;
+    title: string;
+    description?: string;
+    onClose: () => void;
+    children: ReactNode;
+}) {
+    if (!open) {
+        return null;
+    }
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-start sm:p-4">
+            <div className="w-full max-w-full overflow-hidden rounded-t-[22px] border border-white/[0.1] bg-[#090c10] shadow-2xl sm:mt-10 sm:max-w-5xl sm:rounded-2xl">
+                <div className="border-b border-white/[0.06] px-4 pt-2.5 sm:hidden">
+                    <div className="mx-auto h-1 w-12 rounded-full bg-white/[0.12]" />
+                </div>
+                <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] px-4 py-3.5 sm:px-5 sm:py-4">
+                    <div>
+                        <div className="text-sm font-semibold text-zinc-100">{title}</div>
+                        {description ? <div className="mt-1 text-xs text-zinc-500">{description}</div> : null}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-md border border-white/[0.08] p-2 text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-200"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+                <div className="max-h-[85vh] overflow-auto sm:max-h-[75vh]">{children}</div>
+            </div>
+        </div>
+    );
+}
+
+type SortDirection = 'desc' | 'asc' | null;
+
+function SortableHeader({
+    label,
+    active,
+    direction,
+    onClick,
+    align = 'left',
+}: {
+    label: string;
+    active: boolean;
+    direction: SortDirection;
+    onClick: () => void;
+    align?: 'left' | 'right';
+}) {
+    const Icon = active ? (direction === 'asc' ? ChevronUp : ChevronDown) : ChevronDown;
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cx(
+                'inline-flex items-center gap-1 text-zinc-400 transition hover:text-zinc-200',
+                align === 'right' ? 'ml-auto justify-end' : 'justify-start',
+            )}
+        >
+            <span>{label}</span>
+            <Icon className={cx('h-3 w-3', active ? 'text-zinc-500' : 'text-zinc-700/80')} />
+        </button>
+    );
+}
+
+function nextSortState(column: string, currentColumn: string | null, currentDirection: SortDirection) {
+    if (currentColumn !== column) {
+        return { column, direction: 'desc' as const };
+    }
+    if (currentDirection === 'desc') {
+        return { column, direction: 'asc' as const };
+    }
+    return { column: null, direction: null };
+}
+
+function FilterEditorModal({
+    open,
+    onClose,
+    filters,
+    eventNames,
+    upsertFilter,
+    removeFilter,
+    setEventNames,
+}: {
+    open: boolean;
+    onClose: () => void;
+    filters: ShareOverviewFilter[];
+    eventNames: string[];
+    upsertFilter: (filter: ShareOverviewFilter) => void;
+    removeFilter: (name: ShareOverviewFilter['name'], value?: string) => void;
+    setEventNames: (values: string[]) => void;
+}) {
+    const [draftField, setDraftField] = useState<(typeof FILTER_FIELD_OPTIONS)[number]>('referrer_name');
+    const [draftOperator, setDraftOperator] = useState<ShareOverviewFilterOperator>('is');
+    const [draftValue, setDraftValue] = useState('');
+    const [draftEventName, setDraftEventName] = useState('');
+
+    if (!open) {
+        return null;
+    }
+
+    const operatorMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === draftOperator);
+
+    function normalizeValues(raw: string) {
+        return raw
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+
+    function addDraftFilter() {
+        const values = operatorMeta?.needsValue ? normalizeValues(draftValue) : [];
+        if (operatorMeta?.needsValue && !values.length) {
+            return;
+        }
+
+        upsertFilter({
+            name: draftField,
+            operator: draftOperator,
+            value: values,
+        });
+        setDraftValue('');
+    }
+
+    function addEventName() {
+        const next = draftEventName.trim();
+        if (!next || eventNames.includes(next)) {
+            return;
+        }
+        setEventNames([...eventNames, next]);
+        setDraftEventName('');
+    }
+
+    return (
+        <DetailModal
+            open={open}
+            onClose={onClose}
+            title="Filters"
+            description="Edit property filters and event filters using the same shared URL state the overview uses."
+        >
+            <div className="grid gap-4 p-4 sm:gap-5 sm:p-5">
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5 sm:p-4">
+                    <div className="mb-3 text-sm font-semibold text-zinc-100">Event filters</div>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                        {eventNames.length ? eventNames.map((event) => (
+                            <button
+                                key={`editor-event:${event}`}
+                                type="button"
+                                onClick={() => setEventNames(eventNames.filter((value) => value !== event))}
+                                className="inline-flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1.5 text-xs text-emerald-100 transition hover:bg-emerald-500/[0.12]"
+                            >
+                                <span>{event}</span>
+                                <X className="h-3 w-3 text-emerald-300/70" />
+                            </button>
+                        )) : <div className="text-xs text-zinc-500">No event-specific filters yet.</div>}
+                    </div>
+                    <div className="flex flex-col gap-2 md:flex-row">
+                        <input
+                            value={draftEventName}
+                            onChange={(event) => setDraftEventName(event.target.value)}
+                            placeholder="Add event name"
+                            className="h-9 flex-1 rounded-md border border-white/[0.08] bg-[#0c1015] px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-white/[0.16]"
+                        />
+                        <button
+                            type="button"
+                            onClick={addEventName}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.12] px-3 text-sm text-emerald-100 transition hover:bg-emerald-500/[0.18]"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add event
+                        </button>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5 sm:p-4">
+                    <div className="mb-3 text-sm font-semibold text-zinc-100">Property filters</div>
+                    <div className="space-y-3">
+                        {filters.length ? filters.map((filter) => {
+                            const operator = FILTER_OPERATOR_OPTIONS.find((item) => item.value === filter.operator);
+                            const valueString = filter.value.join(', ');
+
+                            return (
+                                <div key={`editor-filter:${filter.name}`} className="grid gap-2 rounded-lg border border-white/[0.06] bg-[#0b0f14] p-3 md:grid-cols-[170px_140px_minmax(0,1fr)_auto]">
+                                    <select
+                                        value={filter.name}
+                                        onChange={(event) => upsertFilter({
+                                            ...filter,
+                                            name: event.target.value as ShareOverviewFilter['name'],
+                                        })}
+                                        className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
+                                    >
+                                        {FILTER_FIELD_OPTIONS.map((field) => (
+                                            <option key={`field:${field}`} value={field}>
+                                                {FILTER_LABELS[field] || field}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={filter.operator}
+                                        onChange={(event) => {
+                                            const nextOperator = event.target.value as ShareOverviewFilterOperator;
+                                            const nextMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === nextOperator);
+                                            upsertFilter({
+                                                ...filter,
+                                                operator: nextOperator,
+                                                value: nextMeta?.needsValue ? filter.value : [],
+                                            });
+                                        }}
+                                        className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
+                                    >
+                                        {FILTER_OPERATOR_OPTIONS.map((item) => (
+                                            <option key={`operator:${item.value}`} value={item.value}>
+                                                {item.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        value={valueString}
+                                        onChange={(event) => upsertFilter({
+                                            ...filter,
+                                            value: operator?.needsValue ? normalizeValues(event.target.value) : [],
+                                        })}
+                                        disabled={!operator?.needsValue}
+                                        placeholder={operator?.needsValue ? 'Comma-separated values' : 'No value needed'}
+                                        className={cx(
+                                            'h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600',
+                                            !operator?.needsValue ? 'cursor-not-allowed text-zinc-600' : '',
+                                        )}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => removeFilter(filter.name)}
+                                        className="inline-flex h-9 items-center justify-center rounded-md border border-rose-500/20 bg-rose-500/[0.08] px-3 text-sm text-rose-200 transition hover:bg-rose-500/[0.12]"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            );
+                        }) : <div className="text-xs text-zinc-500">No property filters applied yet.</div>}
+                    </div>
+
+                    <div className="mt-4 grid gap-2 rounded-lg border border-dashed border-white/[0.08] bg-[#0b0f14] p-3 md:grid-cols-[170px_140px_minmax(0,1fr)_auto]">
+                        <select
+                            value={draftField}
+                            onChange={(event) => setDraftField(event.target.value as (typeof FILTER_FIELD_OPTIONS)[number])}
+                            className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
+                        >
+                            {FILTER_FIELD_OPTIONS.map((field) => (
+                                <option key={`draft-field:${field}`} value={field}>
+                                    {FILTER_LABELS[field] || field}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={draftOperator}
+                            onChange={(event) => setDraftOperator(event.target.value as ShareOverviewFilterOperator)}
+                            className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
+                        >
+                            {FILTER_OPERATOR_OPTIONS.map((item) => (
+                                <option key={`draft-operator:${item.value}`} value={item.value}>
+                                    {item.label}
+                                </option>
+                            ))}
+                        </select>
+                        <input
+                            value={draftValue}
+                            onChange={(event) => setDraftValue(event.target.value)}
+                            disabled={!operatorMeta?.needsValue}
+                            placeholder={operatorMeta?.needsValue ? 'Comma-separated values' : 'No value needed'}
+                            className={cx(
+                                'h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600',
+                                !operatorMeta?.needsValue ? 'cursor-not-allowed text-zinc-600' : '',
+                            )}
+                        />
+                        <button
+                            type="button"
+                            onClick={addDraftFilter}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.05] px-3 text-sm text-zinc-100 transition hover:bg-white/[0.08]"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </DetailModal>
+    );
+}
+
+function IntervalButtons({
+    value,
+    onChange,
+    className,
+}: {
+    value: string;
+    onChange: (value: (typeof INTERVAL_OPTIONS)[number]['value']) => void;
+    className?: string;
+}) {
+    return (
+        <div className={cx('inline-flex items-center rounded-lg border border-white/[0.08] bg-white/[0.03] p-1', className)}>
+            {INTERVAL_OPTIONS.map((option) => (
+                <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => onChange(option.value)}
+                    className={cx(
+                        'dashboard-hover-chip rounded-md px-2 py-1 text-[11px] transition sm:px-2.5 sm:text-xs',
+                        value === option.value ? 'bg-white/[0.08] text-zinc-100' : 'text-zinc-500 hover:text-zinc-200',
+                    )}
+                >
+                    {option.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function FiltersButton({
+    onClick,
+    activeCount,
+    compact = false,
+}: {
+    onClick: () => void;
+    activeCount: number;
+    compact?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cx(
+                'dashboard-hover-action inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-300 transition hover:bg-white/[0.06] hover:text-zinc-100',
+                compact ? 'h-8 px-3 text-[12px]' : 'h-9 px-3 text-sm',
+            )}
+            data-variant="ghost"
+        >
+            <Filter className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+            <span>Filters</span>
+            {activeCount ? (
+                <span className="rounded-full bg-emerald-500/[0.16] px-1.5 py-0.5 text-[11px] text-emerald-100">
+                    {activeCount}
+                </span>
+            ) : null}
+        </button>
+    );
+}
+
+function LiveNowPill({
+    activeUsers,
+    compact = false,
+}: {
+    activeUsers: number;
+    compact?: boolean;
+}) {
+    return (
+        <DashboardHoverSurface
+            as="div"
+            tone="emerald"
+            className={cx(
+                'flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-sm',
+                compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2',
+            )}
+        >
+            <span className={cx('relative rounded-full', compact ? 'h-2 w-2' : 'h-2.5 w-2.5', activeUsers > 0 ? 'bg-emerald-400' : 'bg-zinc-600')}>
+                {activeUsers > 0 ? <span className="absolute inset-0 rounded-full bg-emerald-400 opacity-60 animate-ping" /> : null}
+            </span>
+            <span className={cx('font-mono text-zinc-100', compact ? 'text-[12px]' : '')}>{shortNumber(activeUsers)}</span>
+            <span className="text-zinc-500">live now</span>
+        </DashboardHoverSurface>
+    );
+}
+
+function OverviewViewToggle({
+    view,
+    setView,
+    disabled = false,
+}: {
+    view: 'table' | 'chart';
+    setView: (value: 'table' | 'chart') => void;
+    disabled?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setView(view === 'table' ? 'chart' : 'table')}
+            className={cx(
+                'dashboard-hover-action inline-flex h-7 items-center gap-1.5 rounded-md border border-white/[0.12] bg-white/[0.03] px-2.5 transition',
+                disabled ? 'cursor-not-allowed text-zinc-700' : 'text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100',
+            )}
+            data-variant="ghost"
+        >
+            {view === 'table' ? (
+                <>
+                    <ChartColumn className="h-3.5 w-3.5" />
+                    Chart
+                </>
+            ) : (
+                <>
+                    <TableProperties className="h-3.5 w-3.5" />
+                    Table
+                </>
+            )}
+        </button>
+    );
+}
+
+function MetricCard({
+    metric,
+    active,
+    onClick,
+    data,
+    current,
+    previous,
+    interval,
+    primary,
+}: {
+    metric: (typeof METRICS)[number];
+    active: boolean;
+    onClick: () => void;
+    data: StatsSeriesPoint[];
+    current: number;
+    previous: number;
+    interval: string;
+    primary: boolean;
+}) {
+    const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+    const [cardHovered, setCardHovered] = useState(false);
+    const hoverResetTimer = useRef<number | null>(null);
+    const miniChartHoverRef = useRef<HTMLDivElement | null>(null);
+    const miniSeries = useMemo(
+        () =>
+            data.map((point) => ({
+                current: getMetricSeriesValue(point, metric.key),
+                previous: getMetricSeriesValue(point, `prev_${metric.key}`),
+                date: String(point.date),
+            })),
+        [data, metric.key],
+    );
+    const hoveredPoint = currentIndex === null ? null : miniSeries[currentIndex] || null;
+    const displayedCurrent = hoveredPoint?.current ?? current;
+    const displayedPrevious = hoveredPoint?.previous ?? previous;
+    const diff = diffDirection(displayedCurrent, displayedPrevious, metric.invert);
+    const highlighted = active || cardHovered;
+    const tone = metricTone(diff, active, cardHovered);
+    const hoverPosition = currentIndex === null || !miniSeries.length
+        ? null
+        : `${((currentIndex + 0.5) / miniSeries.length) * 100}%`;
+
+    const clearHoverResetTimer = useCallback(() => {
+        if (hoverResetTimer.current) {
+            window.clearTimeout(hoverResetTimer.current);
+            hoverResetTimer.current = null;
+        }
+    }, []);
+
+    const queueHoverReset = useCallback(() => {
+        clearHoverResetTimer();
+        hoverResetTimer.current = window.setTimeout(() => {
+            setCurrentIndex(null);
+        }, CARD_HOVER_RESET_MS);
+    }, [clearHoverResetTimer]);
+
+    const updateHoverIndex = useCallback((clientX: number) => {
+        const element = miniChartHoverRef.current;
+        if (!element || !miniSeries.length) {
+            setCurrentIndex(null);
+            return;
+        }
+
+        const bounds = element.getBoundingClientRect();
+        if (bounds.width <= 0) {
+            setCurrentIndex(null);
+            return;
+        }
+
+        const relativeX = Math.min(Math.max(clientX - bounds.left, 0), bounds.width);
+        const nextIndex = Math.min(
+            miniSeries.length - 1,
+            Math.max(0, Math.floor((relativeX / bounds.width) * miniSeries.length)),
+        );
+        setCurrentIndex(nextIndex);
+    }, [miniSeries.length]);
+
+    useEffect(() => {
+        return () => {
+            clearHoverResetTimer();
+        };
+    }, [clearHoverResetTimer]);
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            onMouseEnter={() => {
+                clearHoverResetTimer();
+                setCardHovered(true);
+            }}
+            onMouseLeave={() => {
+                setCardHovered(false);
+                queueHoverReset();
+            }}
+            onFocus={() => {
+                clearHoverResetTimer();
+                setCardHovered(true);
+            }}
+            onBlur={() => {
+                setCardHovered(false);
+                queueHoverReset();
+            }}
+            aria-pressed={active}
+            data-active={active ? 'true' : 'false'}
+            className={cx(
+                'group relative min-h-[104px] border-b border-r border-white/[0.07] text-left transition-all duration-200 [&:nth-child(2n)]:border-r-0 md:min-h-[112px] md:[&:nth-child(2n)]:border-r md:[&:nth-child(4n)]:border-r-0',
+                active ? 'bg-white/[0.075] shadow-[inset_0_0_0_1px_rgba(74,222,128,0.28)]' : cardHovered ? 'bg-white/[0.035]' : '',
+            )}
+        >
+            <div
+                className={cx(
+                    'pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/0 to-transparent opacity-0 transition',
+                    active ? 'via-emerald-300/90 opacity-100' : cardHovered ? 'via-white/35 opacity-100' : '',
+                )}
+            />
+            {hoveredPoint && hoverPosition ? (
+                <div
+                    className="pointer-events-none absolute bottom-11 z-20 -translate-x-1/2 rounded-lg border border-white/[0.08] bg-[#0f141a]/95 px-3 py-2 text-[10px] shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md"
+                    style={{ left: hoverPosition }}
+                >
+                    <div className="text-zinc-500">{formatDateLabel(hoveredPoint.date, interval)}</div>
+                    <div className="mt-1 flex items-center gap-2 whitespace-nowrap">
+                        <span className="font-mono text-[11px] text-zinc-100">{formatMetricValue(hoveredPoint.current, metric.unit)}</span>
+                        {hoveredPoint.previous > 0 ? (
+                            <span className="font-mono text-[11px] text-zinc-500">{formatMetricValue(hoveredPoint.previous, metric.unit)}</span>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
+            <div className="relative z-10 flex h-full flex-col px-3 pb-2.5 pt-3 sm:px-4 sm:pb-3 sm:pt-3.5">
+                <div className="mb-2 flex items-center gap-1.5">
+                    <metric.icon className={cx('h-3 w-3 transition-colors sm:h-3.5 sm:w-3.5', highlighted ? 'text-zinc-300' : 'text-zinc-500')} />
+                    <span className={cx('text-[11px] leading-none transition-colors sm:text-[12px]', highlighted ? 'text-zinc-200' : 'text-zinc-400')}>
+                        {metric.label}
+                    </span>
+                </div>
+                <div className={cx('font-mono font-bold leading-[0.96] tracking-[-0.04em] text-zinc-100', primary ? 'text-[24px] sm:text-[30px]' : 'text-[22px] sm:text-[26px]')}>
+                    {formatMetricValue(displayedCurrent, metric.unit)}
+                </div>
+                <div className="mt-auto pt-3 sm:pt-4">
+                    <div
+                        ref={miniChartHoverRef}
+                        className="relative h-[38px] opacity-90 transition duration-200 group-hover:opacity-100 sm:h-[42px]"
+                        onMouseEnter={(event) => {
+                            clearHoverResetTimer();
+                            updateHoverIndex(event.clientX);
+                        }}
+                        onMouseMove={(event) => {
+                            clearHoverResetTimer();
+                            updateHoverIndex(event.clientX);
+                        }}
+                        onMouseLeave={() => queueHoverReset()}
+                    >
+                        <div className="pointer-events-none absolute inset-x-0 bottom-[2px] h-[30px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={miniSeries}>
+                                    <Tooltip content={() => null} cursor={false} />
+                                    <Bar dataKey="current" radius={[1.5, 1.5, 0, 0]} fill={tone.solid} fillOpacity={1} isAnimationActive={false} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </button>
+    );
+}
+
+function LiveMetricTile({
+    data,
+    total,
+    className,
+}: {
+    data?: LiveResponse;
+    total: number;
+    className?: string;
+}) {
+    const topReferrers = (data?.referrers || []).slice(0, 2);
+
+    return (
+        <div className={cx('relative col-span-2 min-h-[112px] border-b border-white/[0.07] bg-[linear-gradient(180deg,rgba(56,189,248,0.05),transparent_62%)] px-3 pb-3 pt-3 text-left sm:px-4 sm:pb-3 sm:pt-3.5 md:col-span-1', className)}>
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/65 to-transparent" />
+            <div className="relative z-10 flex h-full flex-col">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <div className="text-[11px] leading-none text-zinc-400 sm:text-[12px]">Sessions last 30 min</div>
+                        <div className="mt-3 font-mono text-[26px] font-bold leading-[0.96] tracking-[-0.04em] text-zinc-100 sm:text-[30px]">
+                            {shortNumber(total)}
+                        </div>
+                    </div>
+                    {topReferrers.length ? (
+                        <div className="hidden items-center gap-1.5 md:flex">
+                            {topReferrers.map((item) => (
+                                <span
+                                    key={item.referrer}
+                                    className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.03] px-1.5 py-1 text-[10px] text-zinc-400"
+                                >
+                                    <OverviewValueIcon column="referrer_name" value={item.referrer} />
+                                    <span className="max-w-[52px] truncate">{item.count}</span>
+                                </span>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+                <div className="mt-auto pt-3 sm:pt-4">
+                    <div className="h-[56px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data?.minuteCounts || []}>
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const row = payload[0]?.payload as LiveResponse['minuteCounts'][number];
+                                        return (
+                                            <div className="rounded-lg border border-white/[0.08] bg-[#0f141a]/95 px-3 py-2 text-xs shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md">
+                                                <div className="mb-1 text-zinc-500">{row.time}</div>
+                                                <div className="font-mono text-zinc-100">{row.sessionCount} sessions</div>
+                                                {row.referrers?.length ? (
+                                                    <div className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
+                                                        {row.referrers.map((item) => (
+                                                            <div key={`${row.timestamp}:${item.referrer}`} className="flex items-center justify-between gap-3">
+                                                                <span className="flex items-center gap-1.5 text-zinc-400">
+                                                                    <OverviewValueIcon column="referrer_name" value={item.referrer} />
+                                                                    <span className="max-w-[120px] truncate">{item.referrer}</span>
+                                                                </span>
+                                                                <span className="font-mono text-zinc-100">{item.count}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    }}
+                                />
+                                <Bar dataKey="sessionCount" fill="#45c48c" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function GenericTable({
+    rows,
+    column,
+    onRowClick,
+    renderLabel,
+    valueLabel = 'Sessions',
+    secondaryLabel = 'Pageviews',
+    primaryMetric = 'sessions',
+    secondaryMetric = 'pageviews',
+    isSelected,
+    interactionDisabled = false,
+    limitRows = OVERVIEW_TABLE_ROW_LIMIT,
+}: {
+    rows: GenericItem[];
+    column: string;
+    onRowClick: (row: GenericItem) => void;
+    renderLabel?: (row: GenericItem) => ReactNode;
+    valueLabel?: string;
+    secondaryLabel?: string;
+    primaryMetric?: 'sessions' | 'pageviews';
+    secondaryMetric?: 'sessions' | 'pageviews';
+    isSelected?: (row: GenericItem) => boolean;
+    interactionDisabled?: boolean;
+    limitRows?: number | null;
+}) {
+    const [sortColumn, setSortColumn] = useState<'label' | 'primary' | 'secondary' | 'revenue' | null>(null);
+    const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+    const showRevenue = rows.some((row) => Number(row.revenue || 0) > 0);
+    const desktopGridTemplate = showRevenue
+        ? 'md:grid-cols-[minmax(0,1fr)_84px_84px_96px]'
+        : 'md:grid-cols-[minmax(0,1fr)_84px_84px]';
+
+    const sortedRows = useMemo(() => {
+        if (!sortColumn || !sortDirection) {
+            return rows;
+        }
+
+        const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+        const multiplier = sortDirection === 'desc' ? -1 : 1;
+
+        return [...rows].sort((left, right) => {
+            if (sortColumn === 'label') {
+                const leftLabel = left.prefix ? `${left.prefix} / ${left.name}` : left.name;
+                const rightLabel = right.prefix ? `${right.prefix} / ${right.name}` : right.name;
+                return collator.compare(leftLabel, rightLabel) * multiplier;
+            }
+
+            if (sortColumn === 'revenue') {
+                return ((Number(left.revenue || 0) - Number(right.revenue || 0))) * multiplier;
+            }
+
+            const metricKey = sortColumn === 'primary' ? primaryMetric : secondaryMetric;
+            return (Number(left[metricKey] || 0) - Number(right[metricKey] || 0)) * multiplier;
+        });
+    }, [primaryMetric, rows, secondaryMetric, sortColumn, sortDirection]);
+
+    const visibleRows = typeof limitRows === 'number' ? sortedRows.slice(0, limitRows) : sortedRows;
+    const maxPrimaryValue = Math.max(...visibleRows.map((row) => Number(row[primaryMetric] || 0)), 1);
+
+    function toggleSort(columnName: 'label' | 'primary' | 'secondary' | 'revenue') {
+        const next = nextSortState(columnName, sortColumn, sortDirection);
+        setSortColumn(next.column as 'label' | 'primary' | 'secondary' | 'revenue' | null);
+        setSortDirection(next.direction);
+    }
+
+    return (
+        <div className="min-h-[358px]">
+            <div className="grid grid-cols-[minmax(0,1fr)_104px] gap-2.5 border-b border-white/[0.07] bg-white/[0.02] px-3 py-1.5 text-[10px] font-medium text-zinc-350 md:hidden">
+                <span>{FILTER_LABELS[column] || column}</span>
+                <div className="text-right">
+                    <div>{valueLabel}</div>
+                    <div className="mt-0.5 text-[10px] text-zinc-500">{secondaryLabel}</div>
+                </div>
+            </div>
+            <div className={cx(OVERVIEW_TABLE_HEADER_BASE_CLASS, 'hidden md:grid', desktopGridTemplate)}>
+                <SortableHeader
+                    label={FILTER_LABELS[column] || column}
+                    active={sortColumn === 'label'}
+                    direction={sortDirection}
+                    onClick={() => toggleSort('label')}
+                />
+                <SortableHeader
+                    label={valueLabel}
+                    active={sortColumn === 'primary'}
+                    direction={sortDirection}
+                    onClick={() => toggleSort('primary')}
+                    align="right"
+                />
+                <SortableHeader
+                    label={secondaryLabel}
+                    active={sortColumn === 'secondary'}
+                    direction={sortDirection}
+                    onClick={() => toggleSort('secondary')}
+                    align="right"
+                />
+                {showRevenue ? (
+                    <SortableHeader
+                        label="Revenue"
+                        active={sortColumn === 'revenue'}
+                        direction={sortDirection}
+                        onClick={() => toggleSort('revenue')}
+                        align="right"
+                    />
+                ) : null}
+            </div>
+            <div>
+                {visibleRows.map((row) => {
+                    const selected = isSelected?.(row) ?? false;
+                    const primaryValue = Number(row[primaryMetric] || 0);
+                    const secondaryValue = Number(row[secondaryMetric] || 0);
+                    const revenueValue = Number(row.revenue || 0);
+
+                    return (
+                        <button
+                            key={`${row.prefix || ''}-${row.name}`}
+                            type="button"
+                            disabled={interactionDisabled}
+                            aria-pressed={selected}
+                            onClick={() => onRowClick(row)}
+                            className={cx(
+                                OVERVIEW_TABLE_ROW_BASE_CLASS,
+                                'h-auto min-h-[42px] grid-cols-[minmax(0,1fr)_104px] px-3 py-1.5 md:h-8 md:min-h-8 md:px-4 md:py-0',
+                                desktopGridTemplate,
+                                interactionDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                                selected ? 'bg-blue-500/[0.14]' : '',
+                            )}
+                        >
+                            <div
+                                className={cx(
+                                    OVERVIEW_TABLE_FILL_BASE_CLASS,
+                                    selected ? 'bg-blue-500/[0.18]' : 'bg-white/[0.035]',
+                                    !interactionDisabled ? 'group-hover:bg-blue-500/[0.10]' : '',
+                                )}
+                                style={{ width: `${(primaryValue / maxPrimaryValue) * 100}%` }}
+                            />
+                            <div className="relative z-10 min-w-0">
+                                {renderLabel ? renderLabel(row) : (
+                                    <OverviewInlineLabel
+                                        icon={iconForGenericValue(column, row.prefix || row.name)}
+                                        prefix={row.prefix ? formatOverviewValueLabel(column, row.prefix) : null}
+                                        label={formatOverviewValueLabel(column, row.name)}
+                                        selected={selected}
+                                    />
+                                )}
+                            </div>
+                            <div className="relative z-10 flex flex-col items-end text-right md:hidden">
+                                <span className={cx('font-mono text-[12px] leading-none', selected ? 'text-white' : 'text-zinc-100')}>
+                                    {shortNumber(primaryValue)}
+                                </span>
+                                <span className={cx('mt-0.5 font-mono text-[9px] leading-none', selected ? 'text-blue-50' : 'text-zinc-500')}>
+                                    {secondaryLabel}: {shortNumber(secondaryValue)}
+                                </span>
+                                {showRevenue ? (
+                                    <span className={cx('mt-0.5 font-mono text-[9px] leading-none', selected ? 'text-amber-200' : 'text-amber-300')}>
+                                        {revenueValue > 0 ? formatMetricValue(revenueValue, 'currency') : '-'}
+                                    </span>
+                                ) : null}
+                            </div>
+                            <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-white' : 'text-zinc-100')}>{shortNumber(primaryValue)}</div>
+                            <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-blue-50' : 'text-zinc-300')}>{shortNumber(secondaryValue)}</div>
+                            {showRevenue ? (
+                                <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-amber-200' : 'text-amber-300')}>
+                                    {revenueValue > 0 ? formatMetricValue(revenueValue, 'currency') : '-'}
+                                </div>
+                            ) : null}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+function transformSeriesChartData(items: TopGenericSeriesResponse['items']) {
+    const allDates = new Set<string>();
+    items.forEach((item) => item.data.forEach((point) => allDates.add(point.date)));
+
+    return Array.from(allDates).sort().map((date) => {
+        const entry: Record<string, string | number> = { date };
+        items.forEach((item) => {
+            const key = item.prefix ? `${item.prefix}:${item.name}` : item.name;
+            const point = item.data.find((row) => row.date === date);
+            entry[key] = point?.sessions || 0;
+        });
+        return entry;
+    });
+}
+
+function MultiSeriesLineChart({
+    items,
+    interval,
+    metric = 'sessions',
+}: {
+    items: TopGenericSeriesResponse['items'];
+    interval: string;
+    metric?: 'sessions' | 'pageviews';
+}) {
+    const data = useMemo(() => transformSeriesChartData(items).map((entry) => {
+        const next: Record<string, string | number> = { date: String(entry.date) };
+        items.forEach((item) => {
+            const key = item.prefix ? `${item.prefix}:${item.name}` : item.name;
+            const point = item.data.find((row) => row.date === entry.date);
+            next[key] = metric === 'pageviews' ? point?.pageviews || 0 : point?.sessions || 0;
+        });
+        return next;
+    }), [items, metric]);
+
+    return (
+        <div className="px-4 pb-3 pt-4">
+            <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data}>
+                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="date" tickFormatter={(value) => formatDateLabel(value, interval)} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis tickFormatter={(value: number) => shortNumber(value)} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
+                        <Tooltip
+                            cursor={{ stroke: 'rgba(255,255,255,0.12)' }}
+                            content={({ active, payload, label }) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                    <div className="rounded-lg border border-white/[0.08] bg-[#11151a] px-3 py-2 text-xs shadow-xl">
+                                        <div className="mb-2 text-zinc-400">{formatDateLabel(label || '', interval)}</div>
+                                        <div className="space-y-1.5">
+                                            {payload.slice(0, 6).map((item, index) => (
+                                                <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-5">
+                                                    <div className="flex items-center gap-2 text-zinc-300">
+                                                        <span className="h-2 w-2 rounded-full" style={{ background: item.color as string }} />
+                                                        <span className="max-w-[160px] truncate">{String(item.name).split(':').join(' / ')}</span>
+                                                    </div>
+                                                    <span className="font-mono text-zinc-100">{shortNumber(Number(item.value || 0))}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            }}
+                        />
+                        {items.map((item, index) => {
+                            const key = item.prefix ? `${item.prefix}:${item.name}` : item.name;
+                            return <Line key={key} type="monotone" dataKey={key} name={key} stroke={CHART_COLORS[index % CHART_COLORS.length]} strokeWidth={2} dot={false} isAnimationActive={false} />;
+                        })}
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                {items.map((item, index) => (
+                    <div key={`${item.prefix || ''}-${item.name}`} className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full" style={{ background: CHART_COLORS[index % CHART_COLORS.length] }} />
+                        <span className="text-zinc-400">
+                            {item.prefix ? `${item.prefix} / ` : ''}
+                            <span className="text-zinc-200">{item.name}</span>
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function OverviewMetrics({ token }: { token: string }) {
+    const { range, interval, metric, setMetric, startDate, endDate, filters, eventNames } = useShareOverviewState();
+    const pageScoped = hasPageScopedFilter(filters);
+
+    const statsQuery = useQuery<StatsResponse, Error>({
+        queryKey: ['share-overview', token, 'stats', range, interval, startDate, endDate, filters, eventNames],
+        queryFn: () => fetchJson(`/api/share/${token}/overview/stats?${buildSearch({
+            filters,
+            events: eventNames,
+            extra: {
+                range,
+                overrideInterval: interval,
+                start: startDate || undefined,
+                end: endDate || undefined,
+            },
+        })}`),
+        placeholderData: keepPreviousData,
+        staleTime: OVERVIEW_QUERY_STALE_MS,
+    });
+    const liveQuery = useQuery<LiveResponse, Error>({
+        queryKey: ['share-overview', token, 'live', filters, eventNames],
+        queryFn: () => fetchJson(`/api/share/${token}/overview/live?${buildSearch({
+            filters,
+            events: eventNames,
+        })}`),
+        refetchInterval: LIVE_DATA_POLL_INTERVAL_MS,
+        placeholderData: keepPreviousData,
+    });
+
+    const displayedMetric = METRICS[metric] || METRICS[0];
+    const data = statsQuery.data?.series || [];
+    const liveTotal = (liveQuery.data?.minuteCounts || []).reduce((sum, item) => sum + item.sessionCount, 0);
+    const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
+    const activeMetricColor = displayedMetric.accent;
+    const chartHelperText = pageScoped
+        ? 'Page-specific filters keep page breakdowns truthful, but some session-level cards stay limited.'
+        : 'Click a metric tile to update the chart.';
+
+    return (
+        <div className="col-span-6">
+            <DashboardHoverSurface
+                as="section"
+                tone="mixed"
+                className="relative overflow-hidden rounded-[14px] border border-white/[0.12] bg-[#0c1117] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_60px_rgba(0,0,0,0.24)]"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(120% 110% at 0% 0%, rgba(69,196,140,0.11), transparent 44%), radial-gradient(90% 90% at 100% 0%, rgba(56,189,248,0.09), transparent 34%)',
+                }}
+            >
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_24%)]" />
+                <div className="relative">
+                    <div className="grid grid-cols-2 overflow-hidden md:grid-cols-4">
+                        {METRICS.map((item, index) => (
+                            <MetricCard
+                                key={item.key}
+                                metric={item}
+                                active={metric === index}
+                                onClick={() => setMetric(index)}
+                                data={data}
+                                current={statsQuery.data?.metrics[item.key] || 0}
+                                previous={statsQuery.data?.metrics[`prev_${item.key}`] || 0}
+                                interval={interval}
+                                primary={index < 4}
+                            />
+                        ))}
+                        <LiveMetricTile data={liveQuery.data} total={displayedLiveTotal} className="col-span-2 md:col-span-1" />
+                    </div>
+
+                    <div className="border-t border-white/[0.08] bg-[#0d131a]/85 px-3 pb-3.5 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
+                        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                            <div>
+                                <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">Selected Metric</div>
+                                <div className="mt-1.5 flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activeMetricColor }} />
+                                    <span className="text-[15px] font-semibold text-zinc-100">{displayedMetric.label}</span>
+                                </div>
+                            </div>
+                            <span className="max-w-none text-left text-[11px] leading-5 text-zinc-500 sm:max-w-[360px] sm:text-right">
+                                {chartHelperText}
+                            </span>
+                        </div>
+                        <div className="mt-4 h-[216px] sm:h-[272px]">
+                            {statsQuery.isLoading ? (
+                                <div className="flex h-full items-center justify-center text-sm text-zinc-500">Loading chart...</div>
+                            ) : statsQuery.error ? (
+                                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-red-400/80">{statsQuery.error.message}</div>
+                            ) : !data.length ? (
+                                <div className="flex h-full items-center justify-center text-sm text-zinc-500">No data available</div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ComposedChart data={data}>
+                                        <defs>
+                                            <linearGradient id="metricFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor={activeMetricColor} stopOpacity={0.22} />
+                                                <stop offset="100%" stopColor={activeMetricColor} stopOpacity={0.02} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                        <XAxis
+                                            dataKey="date"
+                                            tickFormatter={(value) => formatDateLabel(value, interval)}
+                                            tick={{ fill: '#778196', fontSize: 11 }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            minTickGap={24}
+                                        />
+                                        <YAxis
+                                            tickFormatter={(value: number) => shortNumber(value)}
+                                            tick={{ fill: '#778196', fontSize: 11 }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            width={44}
+                                        />
+                                        <Tooltip
+                                            cursor={{ stroke: 'rgba(255,255,255,0.10)', strokeWidth: 1 }}
+                                            content={({ active, payload, label }) => {
+                                                if (!active || !payload?.length) return null;
+                                                const currentValue = Number(payload.find((item) => item.dataKey === displayedMetric.key)?.value || 0);
+                                                const previousValue = Number(payload.find((item) => item.dataKey === `prev_${displayedMetric.key}`)?.value || 0);
+
+                                                return (
+                                                    <div className="rounded-xl border border-white/[0.08] bg-[#0f141a]/96 px-3.5 py-3 text-xs shadow-[0_18px_36px_rgba(0,0,0,0.42)] backdrop-blur-md">
+                                                        <div className="mb-2 text-zinc-500">{formatDateLabel(label || '', interval)}</div>
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-center justify-between gap-6">
+                                                                <span className="text-zinc-500">Current</span>
+                                                                <span className="font-mono text-zinc-100">{formatMetricValue(currentValue, displayedMetric.unit)}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between gap-6">
+                                                                <span className="text-zinc-500">Previous</span>
+                                                                <span className="font-mono text-zinc-300">{formatMetricValue(previousValue, displayedMetric.unit)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                        <Line type="monotone" dataKey={`prev_${displayedMetric.key}`} stroke="rgba(203,213,225,0.22)" strokeWidth={2} dot={false} isAnimationActive={false} />
+                                        <Area type="monotone" dataKey={displayedMetric.key} stroke={activeMetricColor} fill="url(#metricFill)" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </DashboardHoverSurface>
+        </div>
+    );
+}
+
+function TopSourcesWidget({ token }: { token: string }) {
+    const {
+        range,
+        interval,
+        startDate,
+        endDate,
+        filters,
+        eventNames,
+        addFilter,
+        sourcesTab,
+        setSourcesTab,
+        view,
+        setView,
+        hasFilter,
+    } = useShareOverviewState();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const queryClient = useQueryClient();
+    const genericSearch = useMemo(() => buildSearch({
+        filters,
+        events: eventNames,
+        extra: {
+            column: sourcesTab,
+            range,
+            start: startDate || undefined,
+            end: endDate || undefined,
+        },
+    }), [endDate, eventNames, filters, range, sourcesTab, startDate]);
+    const seriesSearch = useMemo(() => buildSearch({
+        filters,
+        events: eventNames,
+        extra: {
+            column: sourcesTab,
+            range,
+            overrideInterval: interval,
+            start: startDate || undefined,
+            end: endDate || undefined,
+        },
+    }), [endDate, eventNames, filters, interval, range, sourcesTab, startDate]);
+    const genericQueryKey = useMemo(
+        () => ['share-overview', token, 'top-generic', sourcesTab, range, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, range, sourcesTab, startDate, token],
+    );
+    const seriesQueryKey = useMemo(
+        () => ['share-overview', token, 'top-generic-series', sourcesTab, range, interval, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, interval, range, sourcesTab, startDate, token],
+    );
+
+    const query = useQuery<TopGenericResponse, Error>({
+        queryKey: genericQueryKey,
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic?${genericSearch}`),
+    });
+    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
+        queryKey: seriesQueryKey,
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+        enabled: view === 'chart',
+    });
+
+    const rows = useMemo(() => {
+        const data = query.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => `${item.prefix || ''} ${item.name}`.toLowerCase().includes(needle));
+    }, [query.data?.items, searchQuery]);
+    const chartItems = useMemo(() => {
+        const data = seriesQuery.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => `${item.prefix || ''} ${item.name}`.toLowerCase().includes(needle));
+    }, [seriesQuery.data?.items, searchQuery]);
+
+    useEffect(() => {
+        if (view !== 'table' || !query.data?.items.length) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            void queryClient.prefetchQuery({
+                queryKey: seriesQueryKey,
+                queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+                staleTime: OVERVIEW_QUERY_STALE_MS,
+            });
+        }, OVERVIEW_PREFETCH_DELAY_MS);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [query.data?.items.length, queryClient, seriesQueryKey, seriesSearch, token, view]);
+
+    return (
+        <>
+            <Widget className="col-span-6 md:col-span-3">
+                <WidgetHeadSearchable
+                    tabs={SOURCES_WIDGETS}
+                    activeTab={sourcesTab}
+                    onTabChange={setSourcesTab}
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={`Search ${SOURCES_WIDGETS.find((item) => item.key === sourcesTab)?.label.toLowerCase() || 'sources'}`}
+                />
+            <QueryBoundaries
+                title="sources"
+                loading={view === 'chart' ? (seriesQuery.isLoading && !seriesQuery.data) : (query.isLoading && !query.data)}
+                error={(view === 'chart' ? seriesQuery.error : query.error) || null}
+                empty={view === 'chart' ? !chartItems.length : !rows.length}
+            >
+                {view === 'chart' ? (
+                    <MultiSeriesLineChart items={chartItems} interval={interval} metric={query.data?.primaryMetric || 'sessions'} />
+                ) : (
+                    <GenericTable
+                        rows={rows}
+                        column={sourcesTab}
+                        onRowClick={(row) => addFilter(sourcesTab, row.name)}
+                        primaryMetric={query.data?.primaryMetric || 'sessions'}
+                        secondaryMetric={query.data?.primaryMetric === 'pageviews' ? 'sessions' : 'pageviews'}
+                        valueLabel={query.data?.primaryMetric === 'pageviews' ? 'Pageviews' : 'Sessions'}
+                        secondaryLabel={query.data?.primaryMetric === 'pageviews' ? 'Sessions' : 'Pageviews'}
+                        isSelected={(row) => hasFilter(sourcesTab, row.name)}
+                    />
+                )}
+            </QueryBoundaries>
+            <WidgetFooter className="justify-between">
+                <FooterDetailsButton onClick={() => setDetailsOpen(true)} />
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                    <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-zinc-500">
+                        {query.data?.supported === false ? 'Limited' : 'Shared view'}
+                    </span>
+                    <OverviewViewToggle view={view} setView={setView} disabled={query.data?.supported === false} />
+                </div>
+            </WidgetFooter>
+            </Widget>
+            <DetailModal
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                title={`Sources — ${SOURCES_WIDGETS.find((item) => item.key === sourcesTab)?.label || 'Details'}`}
+                description="Expanded breakdown with the same global dashboard filters applied."
+            >
+                <GenericTable
+                    rows={rows}
+                    column={sourcesTab}
+                    onRowClick={(row) => addFilter(sourcesTab, row.name)}
+                    primaryMetric={query.data?.primaryMetric || 'sessions'}
+                    secondaryMetric={query.data?.primaryMetric === 'pageviews' ? 'sessions' : 'pageviews'}
+                    valueLabel={query.data?.primaryMetric === 'pageviews' ? 'Pageviews' : 'Sessions'}
+                    secondaryLabel={query.data?.primaryMetric === 'pageviews' ? 'Sessions' : 'Pageviews'}
+                    isSelected={(row) => hasFilter(sourcesTab, row.name)}
+                    limitRows={null}
+                />
+            </DetailModal>
+        </>
+    );
+}
+
+function TopPagesWidget({ token, siteUrl }: { token: string; siteUrl?: string }) {
+    const { range, startDate, endDate, filters, eventNames, addFilter, hasFilter, pagesTab, setPagesTab, showDomain, setShowDomain } = useShareOverviewState();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [sortColumn, setSortColumn] = useState<'label' | 'primary' | 'secondary' | 'revenue' | null>('primary');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+    const query = useQuery<TopPagesResponse, Error>({
+        queryKey: ['share-overview', token, 'top-pages', pagesTab, range, startDate, endDate, filters, eventNames],
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-pages?${buildSearch({
+            filters,
+            events: eventNames,
+            extra: {
+                mode: pagesTab,
+                range,
+                start: startDate || undefined,
+                end: endDate || undefined,
+            },
+        })}`),
+    });
+
+    const rows = useMemo(() => {
+        const data = query.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => `${item.path} ${item.title}`.toLowerCase().includes(needle));
+    }, [query.data?.items, searchQuery]);
+    const showRevenue = rows.some((item) => Number(item.revenue || 0) > 0);
+    const desktopGridTemplate = showRevenue
+        ? 'md:grid-cols-[minmax(0,1fr)_84px_84px_96px]'
+        : 'md:grid-cols-[minmax(0,1fr)_84px_84px]';
+    const sortedRows = useMemo(() => {
+        if (!sortColumn || !sortDirection) {
+            return rows;
+        }
+
+        const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+        const multiplier = sortDirection === 'desc' ? -1 : 1;
+
+        return [...rows].sort((left, right) => {
+            if (sortColumn === 'label') {
+                return collator.compare(left.path, right.path) * multiplier;
+            }
+            if (sortColumn === 'primary') {
+                return ((pagesTab === 'page' ? left.pageviews : left.sessions) - (pagesTab === 'page' ? right.pageviews : right.sessions)) * multiplier;
+            }
+            if (sortColumn === 'revenue') {
+                return (Number(left.revenue || 0) - Number(right.revenue || 0)) * multiplier;
+            }
+
+            const leftSecondary = pagesTab === 'page' ? left.sessions : left.bounceRate;
+            const rightSecondary = pagesTab === 'page' ? right.sessions : right.bounceRate;
+            return (leftSecondary - rightSecondary) * multiplier;
+        });
+    }, [pagesTab, rows, sortColumn, sortDirection]);
+    const visibleRows = sortedRows.slice(0, OVERVIEW_TABLE_ROW_LIMIT);
+    const maxSessions = Math.max(...visibleRows.map((row) => pagesTab === 'page' ? row.pageviews : row.sessions), 1);
+    const maxDetailValue = Math.max(...sortedRows.map((row) => pagesTab === 'page' ? row.pageviews : row.sessions), 1);
+    const filterName = pagesTab === 'page' ? 'path' : pagesTab === 'entry' ? 'entry_path' : 'exit_path';
+    const primaryLabel = pagesTab === 'page' ? 'Views' : pagesTab === 'entry' ? 'Entries' : 'Exits';
+    const secondaryLabel = pagesTab === 'page' ? 'Sess.' : 'Bounce';
+
+    function toggleSort(columnName: 'label' | 'primary' | 'secondary' | 'revenue') {
+        const next = nextSortState(columnName, sortColumn, sortDirection);
+        setSortColumn(next.column as 'label' | 'primary' | 'secondary' | 'revenue' | null);
+        setSortDirection(next.direction);
+    }
+
+    return (
+        <>
+            <Widget className="col-span-6 md:col-span-3">
+                <WidgetHeadSearchable
+                    tabs={PAGES_WIDGETS}
+                    activeTab={pagesTab}
+                    onTabChange={setPagesTab}
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={`Search ${PAGES_WIDGETS.find((item) => item.key === pagesTab)?.label.toLowerCase() || 'pages'}`}
+                />
+                <QueryBoundaries title="pages" loading={query.isLoading && !query.data} error={query.error || null} empty={!sortedRows.length}>
+                    <div className="min-h-[358px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_104px] gap-2.5 border-b border-white/[0.07] bg-white/[0.02] px-3 py-1.5 text-[10px] font-medium text-zinc-350 md:hidden">
+                            <span>Path</span>
+                            <div className="text-right">
+                                <div>{primaryLabel}</div>
+                                <div className="mt-0.5 text-[10px] text-zinc-500">{secondaryLabel}</div>
+                            </div>
+                        </div>
+                        <div className={cx(OVERVIEW_TABLE_HEADER_BASE_CLASS, 'hidden md:grid', desktopGridTemplate)}>
+                            <SortableHeader
+                                label="Path"
+                                active={sortColumn === 'label'}
+                                direction={sortDirection}
+                                onClick={() => toggleSort('label')}
+                            />
+                            <SortableHeader
+                                label={primaryLabel}
+                                active={sortColumn === 'primary'}
+                                direction={sortDirection}
+                                onClick={() => toggleSort('primary')}
+                                align="right"
+                            />
+                            <SortableHeader
+                                label={secondaryLabel}
+                                active={sortColumn === 'secondary'}
+                                direction={sortDirection}
+                                onClick={() => toggleSort('secondary')}
+                                align="right"
+                            />
+                            {showRevenue ? (
+                                <SortableHeader
+                                    label="Revenue"
+                                    active={sortColumn === 'revenue'}
+                                    direction={sortDirection}
+                                    onClick={() => toggleSort('revenue')}
+                                    align="right"
+                                />
+                            ) : null}
+                        </div>
+                        {visibleRows.map((row) => {
+                            const hasOrigin = Boolean(row.origin && row.origin !== '(not set)');
+                            const selected = hasFilter(filterName, row.path) && (!hasOrigin || hasFilter('origin', row.origin));
+                            const href = buildPageHref(row.origin, row.path, siteUrl);
+
+                            return (
+                                <button
+                                    key={`${pagesTab}:${row.origin}:${row.path}`}
+                                    type="button"
+                                    aria-pressed={selected}
+                                    onClick={() => {
+                                        addFilter(filterName, row.path);
+                                        if (hasOrigin) {
+                                            addFilter('origin', row.origin);
+                                        }
+                                    }}
+                                    className={cx(
+                                        OVERVIEW_TABLE_ROW_BASE_CLASS,
+                                        'h-auto min-h-[42px] grid-cols-[minmax(0,1fr)_104px] px-3 py-1.5 md:h-8 md:min-h-8 md:px-4 md:py-0',
+                                        desktopGridTemplate,
+                                        selected ? 'bg-blue-500/[0.14]' : '',
+                                    )}
+                                >
+                                    <div
+                                        className={cx(
+                                            OVERVIEW_TABLE_FILL_BASE_CLASS,
+                                            'group-hover:bg-blue-500/[0.10]',
+                                            selected ? 'bg-blue-500/[0.18]' : 'bg-white/[0.035]',
+                                        )}
+                                        style={{ width: `${(((pagesTab === 'page' ? row.pageviews : row.sessions) || 0) / maxSessions) * 100}%` }}
+                                    />
+                                    <div className="relative z-10 min-w-0">
+                                        <OverviewInlineLabel
+                                            icon={<OverviewValueIcon column="origin" value={hasOrigin ? row.origin : row.path} />}
+                                            prefix={showDomain && hasOrigin ? formatOverviewValueLabel('origin', row.origin) : null}
+                                            label={row.path}
+                                            selected={selected}
+                                            trailing={href.startsWith('http') ? (
+                                                <a
+                                                    href={href}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    className="inline-flex text-zinc-500 hover:text-zinc-200"
+                                                >
+                                                    <ExternalLink className="h-3 w-3" />
+                                                </a>
+                                            ) : null}
+                                        />
+                                    </div>
+                                    <div className="relative z-10 flex flex-col items-end text-right md:hidden">
+                                        <span className={cx('font-mono text-[12px] leading-none', selected ? 'text-white' : 'text-zinc-100')}>
+                                            {pagesTab === 'page' ? shortNumber(row.pageviews) : shortNumber(row.sessions)}
+                                        </span>
+                                        <span className={cx('mt-0.5 font-mono text-[9px] leading-none', selected ? 'text-blue-50' : 'text-zinc-500')}>
+                                            {pagesTab === 'page' ? `${secondaryLabel}: ${shortNumber(row.sessions)}` : `${secondaryLabel}: ${row.bounceRate.toFixed(1)}%`}
+                                        </span>
+                                        {showRevenue ? (
+                                            <span className={cx('mt-0.5 font-mono text-[9px] leading-none', selected ? 'text-amber-200' : 'text-amber-300')}>
+                                                {row.revenue ? formatMetricValue(row.revenue, 'currency') : '-'}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-white' : 'text-zinc-100')}>
+                                        {pagesTab === 'page' ? shortNumber(row.pageviews) : shortNumber(row.sessions)}
+                                    </div>
+                                    <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-blue-50' : 'text-zinc-300')}>
+                                        {pagesTab === 'page' ? shortNumber(row.sessions) : `${row.bounceRate.toFixed(1)}%`}
+                                    </div>
+                                    {showRevenue ? (
+                                        <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-amber-200' : 'text-amber-300')}>
+                                            {row.revenue ? formatMetricValue(row.revenue, 'currency') : '-'}
+                                        </div>
+                                    ) : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </QueryBoundaries>
+                <WidgetFooter className="justify-between">
+                    <FooterDetailsButton onClick={() => setDetailsOpen(true)} />
+                    <button
+                        type="button"
+                        onClick={() => setShowDomain(!showDomain)}
+                        className={cx(
+                            'inline-flex h-7 items-center rounded-md border border-white/[0.12] bg-white/[0.03] px-2.5 text-[11px] transition',
+                            showDomain ? 'bg-white/[0.08] text-zinc-100' : 'text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100',
+                        )}
+                    >
+                        {showDomain ? 'Hide domain' : 'Show domain'}
+                    </button>
+                </WidgetFooter>
+            </Widget>
+            <DetailModal
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                title={`Pages — ${PAGES_WIDGETS.find((item) => item.key === pagesTab)?.label || 'Details'}`}
+                description="Expanded page breakdown using the same share-safe filters and date state."
+            >
+                <div className="min-h-[358px]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_104px] gap-2.5 border-b border-white/[0.07] bg-white/[0.02] px-3 py-1.5 text-[10px] font-medium text-zinc-350 md:hidden">
+                        <span>Path</span>
+                        <div className="text-right">
+                            <div>{primaryLabel}</div>
+                            <div className="mt-0.5 text-[10px] text-zinc-500">{secondaryLabel}</div>
+                        </div>
+                    </div>
+                    <div className={cx(OVERVIEW_TABLE_HEADER_BASE_CLASS, 'hidden md:grid', desktopGridTemplate)}>
+                        <SortableHeader
+                            label="Path"
+                            active={sortColumn === 'label'}
+                            direction={sortDirection}
+                            onClick={() => toggleSort('label')}
+                        />
+                        <SortableHeader
+                            label={primaryLabel}
+                            active={sortColumn === 'primary'}
+                            direction={sortDirection}
+                            onClick={() => toggleSort('primary')}
+                            align="right"
+                        />
+                        <SortableHeader
+                            label={secondaryLabel}
+                            active={sortColumn === 'secondary'}
+                            direction={sortDirection}
+                            onClick={() => toggleSort('secondary')}
+                            align="right"
+                        />
+                        {showRevenue ? (
+                            <SortableHeader
+                                label="Revenue"
+                                active={sortColumn === 'revenue'}
+                                direction={sortDirection}
+                                onClick={() => toggleSort('revenue')}
+                                align="right"
+                            />
+                        ) : null}
+                    </div>
+                    {sortedRows.map((row) => {
+                        const hasOrigin = Boolean(row.origin && row.origin !== '(not set)');
+                        const selected = hasFilter(filterName, row.path) && (!hasOrigin || hasFilter('origin', row.origin));
+
+                        return (
+                            <button
+                                key={`details:${pagesTab}:${row.origin}:${row.path}`}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => {
+                                    addFilter(filterName, row.path);
+                                    if (hasOrigin) {
+                                        addFilter('origin', row.origin);
+                                    }
+                                }}
+                                className={cx(
+                                    OVERVIEW_TABLE_ROW_BASE_CLASS,
+                                    'h-auto min-h-[42px] grid-cols-[minmax(0,1fr)_104px] px-3 py-1.5 md:h-8 md:min-h-8 md:px-4 md:py-0',
+                                    desktopGridTemplate,
+                                    selected ? 'bg-blue-500/[0.14]' : '',
+                                )}
+                            >
+                                <div
+                                    className={cx(
+                                        OVERVIEW_TABLE_FILL_BASE_CLASS,
+                                        'group-hover:bg-blue-500/[0.10]',
+                                        selected ? 'bg-blue-500/[0.18]' : 'bg-white/[0.035]',
+                                    )}
+                                    style={{ width: `${(((pagesTab === 'page' ? row.pageviews : row.sessions) || 0) / maxDetailValue) * 100}%` }}
+                                />
+                                <div className="relative z-10 min-w-0">
+                                    <OverviewInlineLabel
+                                        icon={<OverviewValueIcon column="origin" value={hasOrigin ? row.origin : row.path} />}
+                                        prefix={showDomain && hasOrigin ? formatOverviewValueLabel('origin', row.origin) : null}
+                                        label={row.path}
+                                        selected={selected}
+                                    />
+                                </div>
+                                <div className="relative z-10 flex flex-col items-end text-right md:hidden">
+                                    <span className={cx('font-mono text-[12px] leading-none', selected ? 'text-white' : 'text-zinc-100')}>
+                                        {pagesTab === 'page' ? shortNumber(row.pageviews) : shortNumber(row.sessions)}
+                                    </span>
+                                    <span className={cx('mt-0.5 font-mono text-[9px] leading-none', selected ? 'text-blue-50' : 'text-zinc-500')}>
+                                        {pagesTab === 'page' ? `${secondaryLabel}: ${shortNumber(row.sessions)}` : `${secondaryLabel}: ${row.bounceRate.toFixed(1)}%`}
+                                    </span>
+                                    {showRevenue ? (
+                                        <span className={cx('mt-0.5 font-mono text-[9px] leading-none', selected ? 'text-amber-200' : 'text-amber-300')}>
+                                            {row.revenue ? formatMetricValue(row.revenue, 'currency') : '-'}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-white' : 'text-zinc-100')}>
+                                    {pagesTab === 'page' ? shortNumber(row.pageviews) : shortNumber(row.sessions)}
+                                </div>
+                                <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-blue-50' : 'text-zinc-300')}>
+                                    {pagesTab === 'page' ? shortNumber(row.sessions) : `${row.bounceRate.toFixed(1)}%`}
+                                </div>
+                                {showRevenue ? (
+                                    <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, 'hidden md:block', selected ? 'text-amber-200' : 'text-amber-300')}>
+                                        {row.revenue ? formatMetricValue(row.revenue, 'currency') : '-'}
+                                    </div>
+                                ) : null}
+                            </button>
+                        );
+                    })}
+                </div>
+            </DetailModal>
+        </>
+    );
+}
+
+function TopDevicesWidget({ token }: { token: string }) {
+    const {
+        range,
+        interval,
+        startDate,
+        endDate,
+        filters,
+        eventNames,
+        addFilter,
+        techTab,
+        setTechTab,
+        view,
+        setView,
+        hasFilter,
+    } = useShareOverviewState();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const queryClient = useQueryClient();
+    const genericSearch = useMemo(() => buildSearch({
+        filters,
+        events: eventNames,
+        extra: {
+            column: techTab,
+            range,
+            start: startDate || undefined,
+            end: endDate || undefined,
+        },
+    }), [endDate, eventNames, filters, range, startDate, techTab]);
+    const seriesSearch = useMemo(() => buildSearch({
+        filters,
+        events: eventNames,
+        extra: {
+            column: techTab,
+            range,
+            overrideInterval: interval,
+            start: startDate || undefined,
+            end: endDate || undefined,
+        },
+    }), [endDate, eventNames, filters, interval, range, startDate, techTab]);
+    const genericQueryKey = useMemo(
+        () => ['share-overview', token, 'top-generic', techTab, range, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, range, startDate, techTab, token],
+    );
+    const seriesQueryKey = useMemo(
+        () => ['share-overview', token, 'top-generic-series', techTab, range, interval, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, interval, range, startDate, techTab, token],
+    );
+
+    const query = useQuery<TopGenericResponse, Error>({
+        queryKey: genericQueryKey,
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic?${genericSearch}`),
+    });
+    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
+        queryKey: seriesQueryKey,
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+        enabled: view === 'chart',
+    });
+
+    const rows = useMemo(() => {
+        const data = query.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => item.name.toLowerCase().includes(needle));
+    }, [query.data?.items, searchQuery]);
+    const chartItems = useMemo(() => {
+        const data = seriesQuery.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => item.name.toLowerCase().includes(needle));
+    }, [seriesQuery.data?.items, searchQuery]);
+
+    useEffect(() => {
+        if (view !== 'table' || !query.data?.items.length) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            void queryClient.prefetchQuery({
+                queryKey: seriesQueryKey,
+                queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+                staleTime: OVERVIEW_QUERY_STALE_MS,
+            });
+        }, OVERVIEW_PREFETCH_DELAY_MS);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [query.data?.items.length, queryClient, seriesQueryKey, seriesSearch, token, view]);
+
+    return (
+        <>
+            <Widget className="col-span-6 md:col-span-3">
+                <WidgetHeadSearchable
+                    tabs={TECH_WIDGETS}
+                    activeTab={techTab}
+                    onTabChange={setTechTab}
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={`Search ${TECH_WIDGETS.find((item) => item.key === techTab)?.label.toLowerCase() || 'devices'}`}
+                />
+            <QueryBoundaries
+                title="devices"
+                loading={view === 'chart' ? (seriesQuery.isLoading && !seriesQuery.data) : (query.isLoading && !query.data)}
+                error={(view === 'chart' ? seriesQuery.error : query.error) || null}
+                empty={view === 'chart' ? !chartItems.length : !rows.length}
+            >
+                {view === 'chart' ? (
+                    <MultiSeriesLineChart items={chartItems} interval={interval} metric={query.data?.primaryMetric || 'sessions'} />
+                ) : (
+                    <GenericTable
+                        rows={rows}
+                        column={techTab}
+                        onRowClick={(row) => addFilter(techTab, row.name)}
+                        primaryMetric={query.data?.primaryMetric || 'sessions'}
+                        secondaryMetric={query.data?.primaryMetric === 'pageviews' ? 'sessions' : 'pageviews'}
+                        valueLabel={query.data?.primaryMetric === 'pageviews' ? 'Pageviews' : 'Sessions'}
+                        secondaryLabel={query.data?.primaryMetric === 'pageviews' ? 'Sessions' : 'Pageviews'}
+                        isSelected={(row) => hasFilter(techTab, row.name)}
+                        renderLabel={(row) => (
+                            <OverviewInlineLabel
+                                icon={iconForGenericValue(techTab, row.prefix || row.name)}
+                                prefix={row.prefix ? formatOverviewValueLabel(techTab, row.prefix) : null}
+                                label={formatOverviewValueLabel(techTab, row.name)}
+                                selected={hasFilter(techTab, row.name)}
+                            />
+                        )}
+                    />
+                )}
+            </QueryBoundaries>
+            <WidgetFooter className="justify-between">
+                <FooterDetailsButton onClick={() => setDetailsOpen(true)} />
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                    <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-zinc-500">
+                        {query.data?.supported === false ? 'Limited' : 'Shared view'}
+                    </span>
+                    <OverviewViewToggle view={view} setView={setView} disabled={query.data?.supported === false} />
+                </div>
+            </WidgetFooter>
+            </Widget>
+            <DetailModal
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                title={`Devices — ${TECH_WIDGETS.find((item) => item.key === techTab)?.label || 'Details'}`}
+                description="Expanded device breakdown with version, brand, and model aware labels where GA4 supports them."
+            >
+                <GenericTable
+                    rows={rows}
+                    column={techTab}
+                    onRowClick={(row) => addFilter(techTab, row.name)}
+                    primaryMetric={query.data?.primaryMetric || 'sessions'}
+                    secondaryMetric={query.data?.primaryMetric === 'pageviews' ? 'sessions' : 'pageviews'}
+                    valueLabel={query.data?.primaryMetric === 'pageviews' ? 'Pageviews' : 'Sessions'}
+                    secondaryLabel={query.data?.primaryMetric === 'pageviews' ? 'Sessions' : 'Pageviews'}
+                    isSelected={(row) => hasFilter(techTab, row.name)}
+                    limitRows={null}
+                />
+            </DetailModal>
+        </>
+    );
+}
+
+function TopEventsWidget({ token }: { token: string }) {
+    const router = useRouter();
+    const {
+        range,
+        startDate,
+        endDate,
+        filters,
+        eventNames,
+        eventTab,
+        setEventTab,
+    } = useShareOverviewState();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortColumn, setSortColumn] = useState<'label' | 'count' | null>('count');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+    const query = useQuery<TopEventsResponse, Error>({
+        queryKey: ['share-overview', token, 'top-events', range, startDate, endDate, filters, eventNames],
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-events?${buildSearch({
+            filters,
+            events: eventNames,
+            extra: {
+                range,
+                start: startDate || undefined,
+                end: endDate || undefined,
+            },
+        })}`),
+    });
+
+    const items = useMemo(() => {
+        if (!query.data) return [];
+        if (eventTab === 'conversions') return query.data.conversions;
+        if (eventTab === 'link_out') return query.data.linkOut;
+        return query.data.events;
+    }, [eventTab, query.data]);
+    const filteredItems = useMemo(() => {
+        if (!searchQuery.trim()) return items;
+        const needle = searchQuery.toLowerCase();
+        return items.filter((item) => item.name.toLowerCase().includes(needle));
+    }, [items, searchQuery]);
+    const sortedItems = useMemo(() => {
+        if (!sortColumn || !sortDirection) {
+            return filteredItems;
+        }
+
+        const multiplier = sortDirection === 'desc' ? -1 : 1;
+        const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+
+        return [...filteredItems].sort((left, right) => {
+            if (sortColumn === 'label') {
+                return collator.compare(left.name, right.name) * multiplier;
+            }
+
+            return (left.count - right.count) * multiplier;
+        });
+    }, [filteredItems, sortColumn, sortDirection]);
+    const visibleItems = sortedItems.slice(0, OVERVIEW_TABLE_ROW_LIMIT);
+    const maxCount = Math.max(...visibleItems.map((item) => item.count), 1);
+    const limitedMessage =
+        eventTab === 'conversions' && query.data?.supported.conversions === false
+            ? 'Conversions are unavailable for this property in share mode'
+            : eventTab === 'link_out' && query.data?.supported.linkOut === false
+                ? 'Link-out events are unavailable for this property in share mode'
+                : 'Event rows open the share-safe event report with the current overview state preserved';
+
+    function openEventReport(eventName?: string) {
+        const nextEvents = eventName
+            ? Array.from(new Set([...eventNames, eventName]))
+            : eventNames;
+        const search = buildSearch({
+            filters,
+            events: nextEvents,
+            extra: {
+                range,
+                start: startDate || undefined,
+                end: endDate || undefined,
+                ev: eventTab,
+            },
+        });
+        router.push(`/share/${token}/events${search ? `?${search}` : ''}`);
+    }
+
+    function toggleSort(columnName: 'label' | 'count') {
+        const next = nextSortState(columnName, sortColumn, sortDirection);
+        setSortColumn(next.column as 'label' | 'count' | null);
+        setSortDirection(next.direction);
+    }
+
+    return (
+        <>
+            <Widget className="col-span-6 md:col-span-3">
+                <WidgetHeadSearchable
+                    tabs={EVENT_WIDGETS.map((tab) => ({
+                        ...tab,
+                        disabled: (tab.key === 'conversions' && !query.data?.supported.conversions) || (tab.key === 'link_out' && !query.data?.supported.linkOut),
+                    }))}
+                    activeTab={eventTab}
+                    onTabChange={setEventTab}
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={`Search ${EVENT_WIDGETS.find((item) => item.key === eventTab)?.label.toLowerCase() || 'events'}`}
+                />
+            <QueryBoundaries title="events" loading={query.isLoading && !query.data} error={query.error || null} empty={!sortedItems.length}>
+                <div className="min-h-[358px]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2.5 border-b border-white/[0.07] bg-white/[0.02] px-3 py-1.5 text-[10px] font-medium text-zinc-350 md:hidden">
+                        <span>{eventTab === 'events' ? 'Event' : eventTab === 'conversions' ? 'Conversion' : 'Link out'}</span>
+                        <span className="text-right">Count</span>
+                    </div>
+                    <div className={cx(OVERVIEW_TABLE_HEADER_BASE_CLASS, 'hidden md:grid md:grid-cols-[minmax(0,1fr)_84px]')}>
+                        <SortableHeader
+                            label={eventTab === 'events' ? 'Event' : eventTab === 'conversions' ? 'Conversion' : 'Link out'}
+                            active={sortColumn === 'label'}
+                            direction={sortDirection}
+                            onClick={() => toggleSort('label')}
+                        />
+                        <SortableHeader
+                            label="Count"
+                            active={sortColumn === 'count'}
+                            direction={sortDirection}
+                            onClick={() => toggleSort('count')}
+                            align="right"
+                        />
+                    </div>
+                    {visibleItems.map((item) => (
+                        <button
+                            key={item.id}
+                            type="button"
+                            aria-pressed={eventNames.includes(item.name)}
+                            onClick={() => openEventReport(item.name)}
+                            className={cx(
+                                OVERVIEW_TABLE_ROW_BASE_CLASS,
+                                'h-auto min-h-[40px] grid-cols-[minmax(0,1fr)_72px] px-3 py-1.5 md:h-8 md:min-h-8 md:grid-cols-[minmax(0,1fr)_84px] md:px-4 md:py-0',
+                                eventNames.includes(item.name) ? 'bg-blue-500/[0.14]' : '',
+                            )}
+                        >
+                            <div
+                                className={cx(
+                                    OVERVIEW_TABLE_FILL_BASE_CLASS,
+                                    'group-hover:bg-blue-500/[0.10]',
+                                    eventNames.includes(item.name) ? 'bg-blue-500/[0.18]' : 'bg-white/[0.035]',
+                                )}
+                                style={{ width: `${(item.count / maxCount) * 100}%` }}
+                            />
+                            <div className="relative z-10 min-w-0">
+                                <OverviewInlineLabel
+                                    icon={<OverviewValueIcon column={eventTab === 'link_out' ? 'link_out' : eventTab === 'conversions' ? 'conversions' : 'event'} value={item.name} />}
+                                    label={item.name}
+                                    selected={eventNames.includes(item.name)}
+                                />
+                            </div>
+                            <div className={cx(OVERVIEW_TABLE_VALUE_BASE_CLASS, eventNames.includes(item.name) ? 'text-white' : 'text-zinc-100')}>{shortNumber(item.count)}</div>
+                        </button>
+                    ))}
+                </div>
+            </QueryBoundaries>
+            <WidgetFooter className="justify-between">
+                <FooterDetailsButton onClick={() => openEventReport()} disabled={!sortedItems.length} label="Open event report" />
+                <span className="w-full text-left text-zinc-600 sm:w-auto sm:text-right">{limitedMessage}</span>
+            </WidgetFooter>
+            </Widget>
+        </>
+    );
+}
+
+function TopGeoTableWidget({ token }: { token: string }) {
+    const {
+        range,
+        interval,
+        startDate,
+        endDate,
+        filters,
+        eventNames,
+        addFilter,
+        geoTab,
+        setGeoTab,
+        view,
+        setView,
+        hasFilter,
+    } = useShareOverviewState();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const queryClient = useQueryClient();
+    const genericSearch = useMemo(() => buildSearch({
+        filters,
+        events: eventNames,
+        extra: {
+            column: geoTab,
+            range,
+            start: startDate || undefined,
+            end: endDate || undefined,
+        },
+    }), [endDate, eventNames, filters, geoTab, range, startDate]);
+    const seriesSearch = useMemo(() => buildSearch({
+        filters,
+        events: eventNames,
+        extra: {
+            column: geoTab,
+            range,
+            overrideInterval: interval,
+            start: startDate || undefined,
+            end: endDate || undefined,
+        },
+    }), [endDate, eventNames, filters, geoTab, interval, range, startDate]);
+    const genericQueryKey = useMemo(
+        () => ['share-overview', token, 'top-generic', geoTab, range, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, geoTab, range, startDate, token],
+    );
+    const seriesQueryKey = useMemo(
+        () => ['share-overview', token, 'top-generic-series', geoTab, range, interval, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, geoTab, interval, range, startDate, token],
+    );
+
+    const query = useQuery<TopGenericResponse, Error>({
+        queryKey: genericQueryKey,
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic?${genericSearch}`),
+    });
+    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
+        queryKey: seriesQueryKey,
+        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+        enabled: view === 'chart',
+    });
+
+    const rows = useMemo(() => {
+        const data = query.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => `${item.prefix || ''} ${item.name}`.toLowerCase().includes(needle));
+    }, [query.data?.items, searchQuery]);
+    const chartItems = useMemo(() => {
+        const data = seriesQuery.data?.items || [];
+        if (!searchQuery.trim()) return data;
+        const needle = searchQuery.toLowerCase();
+        return data.filter((item) => `${item.prefix || ''} ${item.name}`.toLowerCase().includes(needle));
+    }, [seriesQuery.data?.items, searchQuery]);
+
+    useEffect(() => {
+        if (view !== 'table' || !query.data?.items.length) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            void queryClient.prefetchQuery({
+                queryKey: seriesQueryKey,
+                queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+                staleTime: OVERVIEW_QUERY_STALE_MS,
+            });
+        }, OVERVIEW_PREFETCH_DELAY_MS);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [query.data?.items.length, queryClient, seriesQueryKey, seriesSearch, token, view]);
+
+    return (
+        <>
+            <Widget className="col-span-6 md:col-span-3">
+                <WidgetHeadSearchable
+                    tabs={GEO_WIDGETS}
+                    activeTab={geoTab}
+                    onTabChange={setGeoTab}
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={`Search ${GEO_WIDGETS.find((item) => item.key === geoTab)?.label.toLowerCase() || 'geo'}`}
+                />
+                <QueryBoundaries
+                    title="geo"
+                    loading={view === 'chart' ? (seriesQuery.isLoading && !seriesQuery.data) : (query.isLoading && !query.data)}
+                    error={(view === 'chart' ? seriesQuery.error : query.error) || null}
+                    empty={view === 'chart' ? !chartItems.length : !rows.length}
+                >
+                    {view === 'chart' ? (
+                        <MultiSeriesLineChart items={chartItems} interval={interval} metric={query.data?.primaryMetric || 'sessions'} />
+                    ) : (
+                        <GenericTable
+                            rows={rows}
+                            column={geoTab}
+                            onRowClick={(row) => {
+                                addFilter(geoTab, row.name);
+                                if (geoTab === 'country') setGeoTab('region');
+                                else if (geoTab === 'region') setGeoTab('city');
+                            }}
+                            primaryMetric={query.data?.primaryMetric || 'sessions'}
+                            secondaryMetric={query.data?.primaryMetric === 'pageviews' ? 'sessions' : 'pageviews'}
+                            valueLabel={query.data?.primaryMetric === 'pageviews' ? 'Pageviews' : 'Sessions'}
+                            secondaryLabel={query.data?.primaryMetric === 'pageviews' ? 'Sessions' : 'Pageviews'}
+                            isSelected={(row) => hasFilter(geoTab, row.name)}
+                            renderLabel={(row) => (
+                                <OverviewInlineLabel
+                                    icon={<OverviewCountryFlag country={row.prefix || row.name} />}
+                                    prefix={row.prefix ? formatOverviewValueLabel('country', row.prefix) : null}
+                                    label={formatOverviewValueLabel(geoTab, row.name)}
+                                    selected={hasFilter(geoTab, row.name)}
+                                />
+                            )}
+                        />
+                    )}
+                </QueryBoundaries>
+                <WidgetFooter className="justify-between">
+                    <FooterDetailsButton onClick={() => setDetailsOpen(true)} />
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                        <span className="hidden rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-zinc-500 md:inline">
+                            Geo data from share-safe GA4 totals
+                        </span>
+                        <OverviewViewToggle view={view} setView={setView} disabled={query.data?.supported === false} />
+                    </div>
+                </WidgetFooter>
+            </Widget>
+            <DetailModal
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                title={`Geo — ${GEO_WIDGETS.find((item) => item.key === geoTab)?.label || 'Details'}`}
+                description="Expanded geography detail with drilldown-compatible labels."
+            >
+                <GenericTable
+                    rows={rows}
+                    column={geoTab}
+                    onRowClick={(row) => {
+                        addFilter(geoTab, row.name);
+                        if (geoTab === 'country') setGeoTab('region');
+                        else if (geoTab === 'region') setGeoTab('city');
+                    }}
+                    primaryMetric={query.data?.primaryMetric || 'sessions'}
+                    secondaryMetric={query.data?.primaryMetric === 'pageviews' ? 'sessions' : 'pageviews'}
+                    valueLabel={query.data?.primaryMetric === 'pageviews' ? 'Pageviews' : 'Sessions'}
+                    secondaryLabel={query.data?.primaryMetric === 'pageviews' ? 'Sessions' : 'Pageviews'}
+                    isSelected={(row) => hasFilter(geoTab, row.name)}
+                    limitRows={null}
+                    renderLabel={(row) => (
+                        <OverviewInlineLabel
+                            icon={<OverviewCountryFlag country={row.prefix || row.name} />}
+                            prefix={row.prefix ? formatOverviewValueLabel('country', row.prefix) : null}
+                            label={formatOverviewValueLabel(geoTab, row.name)}
+                            selected={hasFilter(geoTab, row.name)}
+                        />
+                    )}
+                />
+            </DetailModal>
+        </>
+    );
+}
+
+function TopGeoMapWidget({ token }: { token: string }) {
+    const { filters, eventNames, addFilter, setGeoTab, getFilterValues } = useShareOverviewState();
+    const [visualization, setVisualization] = useState<GeoVisualizationMode>('globe');
+    const liveGeoQuery = useQuery<LiveResponse, Error>({
+        queryKey: ['share-overview', token, 'live', filters, eventNames],
+        queryFn: () => fetchJson(`/api/share/${token}/overview/live?${buildSearch({
+            filters,
+            events: eventNames,
+        })}`),
+        refetchInterval: LIVE_DATA_POLL_INTERVAL_MS,
+        placeholderData: keepPreviousData,
+    });
+    const geoVisualizationData = useMemo(() => buildRealtimeGeoVisualizationData(liveGeoQuery.data), [liveGeoQuery.data]);
+    const geoInsights = useMemo(() => buildShareGeoInsights(liveGeoQuery.data), [liveGeoQuery.data]);
+    const activeCountry = getFilterValues('country')[0] || null;
+
+    function handleGeoSelection(name: string, type: 'country' | 'city') {
+        if (type === 'city') {
+            addFilter('city', name);
+            setGeoTab('city');
+            return;
+        }
+
+        addFilter('country', name);
+        setGeoTab('region');
+    }
+
+    return (
+        <Widget className="col-span-6 md:col-span-3" tone="cyan">
+            <WidgetHead title="Live Geo">
+                <div className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+                    <button
+                        type="button"
+                        onClick={() => setVisualization('globe')}
+                        aria-pressed={visualization === 'globe'}
+                        className={cx(
+                            'dashboard-hover-chip inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium transition',
+                            visualization === 'globe'
+                                ? 'border-cyan-400/20 bg-cyan-400/[0.14] text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.05)]'
+                                : 'border-transparent text-zinc-500 hover:text-zinc-100',
+                        )}
+                    >
+                        <Globe2 className="h-3.5 w-3.5" />
+                        Globe
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setVisualization('map')}
+                        aria-pressed={visualization === 'map'}
+                        className={cx(
+                            'dashboard-hover-chip inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium transition',
+                            visualization === 'map'
+                                ? 'border-cyan-400/20 bg-cyan-400/[0.14] text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.05)]'
+                                : 'border-transparent text-zinc-500 hover:text-zinc-100',
+                        )}
+                    >
+                        <MapIcon className="h-3.5 w-3.5" />
+                        Map
+                    </button>
+                </div>
+            </WidgetHead>
+            <div className="min-h-[358px] p-3">
+                <QueryBoundaries
+                    title="live geo"
+                    loading={liveGeoQuery.isLoading && !liveGeoQuery.data}
+                    error={liveGeoQuery.error || null}
+                    empty={!geoVisualizationData.byCountry.length && !geoVisualizationData.byCity.length}
+                >
+                    <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-[#091118] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                        <div className="h-[296px] overflow-hidden border-b border-white/[0.08] bg-[#091118]">
+                            {visualization === 'globe' ? (
+                                <RealtimeGlobeMaplibre
+                                    visitors={geoVisualizationData.visitors}
+                                    byCountry={geoVisualizationData.byCountry}
+                                    byCity={geoVisualizationData.byCity}
+                                    autoPan={false}
+                                    initialZoom={1.55}
+                                />
+                            ) : (
+                                <WorldMap
+                                    byCountry={geoVisualizationData.byCountry}
+                                    byCity={geoVisualizationData.byCity}
+                                    activeCountry={activeCountry}
+                                    onBubbleClick={handleGeoSelection}
+                                />
+                            )}
+                        </div>
+                        <div className="grid border-t border-white/[0.04] bg-[linear-gradient(180deg,rgba(12,17,23,0.98),rgba(10,15,21,0.98))] lg:grid-cols-[0.95fr_1.05fr]">
+                            <div className="border-b border-white/[0.06] lg:border-b-0 lg:border-r lg:border-white/[0.06]">
+                                <ShareGeoStatsCard
+                                    activeUsers={liveGeoQuery.data?.activeUsers || 0}
+                                    estTotalValue={geoInsights.estTotalValue}
+                                    topCountries={geoInsights.topCountries}
+                                    topReferrers={geoInsights.topReferrers}
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <ShareGeoActivityFeed items={geoInsights.activityFeed} />
+                            </div>
+                        </div>
+                    </div>
+                </QueryBoundaries>
+            </div>
+        </Widget>
+    );
+}
+
+function ShareOverviewPage({ token, siteUrl, views }: { token: string; siteUrl?: string; views: number }) {
+    const {
+        range,
+        setRange,
+        interval,
+        setInterval,
+        filters,
+        eventNames,
+        removeFilter,
+        removeEventName,
+        upsertFilter,
+        setEventNames,
+    } = useShareOverviewState();
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const handleRangeChange = (value: string) => setRange(value as ShareOverviewRange);
+    const activeFilterCount = filters.length + eventNames.length;
+
+    const liveVisitorsQuery = useQuery<LiveVisitorsResponse, Error>({
+        queryKey: ['share-overview', token, 'live-visitors', filters, eventNames],
+        queryFn: () => fetchJson(`/api/share/${token}/overview/live-visitors?${buildSearch({ filters, events: eventNames })}`),
+        refetchInterval: LIVE_VISITORS_POLL_INTERVAL_MS,
+    });
+    const debouncedLiveVisitors = useDebouncedLiveValue(liveVisitorsQuery.data?.activeUsers || 0, 1_000, LIVE_RECONCILE_INTERVAL_MS);
+
+    return (
+        <div className="min-h-screen bg-[#080b0e] text-zinc-100">
+            <div className="border-b border-white/[0.06] bg-[#07090c]">
+                <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="min-w-0">
+                        <div className="mb-1 flex items-center gap-3">
+                            <Logo size="sm" className="shrink-0" />
+                            <span className="dashboard-hover-chip inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-100">
+                                Shared analytics
+                            </span>
+                        </div>
+                        {siteUrl ? <div className="truncate text-xs text-zinc-500">Analytics for <span className="font-mono text-zinc-300">{siteUrl}</span></div> : null}
+                    </div>
+                    <div className="shrink-0 sm:text-right">
+                        <div className="text-xs text-zinc-500">Share visits</div>
+                        <div className="font-mono text-lg text-zinc-100">{shortNumber(views)}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#080b0e]/92 shadow-[0_10px_24px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+                <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
+                    <div className="hidden items-center justify-between gap-4 md:flex">
+                        <div className="flex items-center gap-2">
+                            <DatePicker range={range} setRange={handleRangeChange} />
+                            <IntervalButtons value={interval} onChange={setInterval} />
+                            <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} />
+                        </div>
+                        <LiveNowPill activeUsers={debouncedLiveVisitors} />
+                    </div>
+                    <div className="space-y-2.5 md:hidden">
+                        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2">
+                            <div className="min-w-0">
+                                <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">TrafficClaw share</div>
+                                <div className="truncate text-[12px] text-zinc-300">
+                                    {siteUrl ? siteUrl : 'Shared analytics dashboard'}
+                                </div>
+                            </div>
+                            <LiveNowPill activeUsers={debouncedLiveVisitors} compact />
+                        </div>
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                            <div className="min-w-0">
+                                <DatePicker range={range} setRange={handleRangeChange} compact />
+                            </div>
+                            <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} compact />
+                        </div>
+                        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            <IntervalButtons value={interval} onChange={setInterval} className="min-w-max" />
+                        </div>
+                    </div>
+                    {(filters.length || eventNames.length) ? (
+                        <div className="mt-3 border-t border-white/[0.06] pt-3">
+                            <FilterPills
+                                filters={filters}
+                                eventNames={eventNames}
+                                upsertFilter={upsertFilter}
+                                setEventNames={setEventNames}
+                                removeFilter={removeFilter}
+                                removeEventName={removeEventName}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+            <FilterEditorModal
+                open={filtersOpen}
+                onClose={() => setFiltersOpen(false)}
+                filters={filters}
+                eventNames={eventNames}
+                upsertFilter={upsertFilter}
+                removeFilter={removeFilter}
+                setEventNames={setEventNames}
+            />
+
+            <div className="mx-auto grid max-w-7xl grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4">
+                <OverviewMetrics token={token} />
+                <TopSourcesWidget token={token} />
+                <TopGeoTableWidget token={token} />
+                <TopDevicesWidget token={token} />
+                <TopPagesWidget token={token} siteUrl={siteUrl} />
+                <TopEventsWidget token={token} />
+                <TopGeoMapWidget token={token} />
+            </div>
+        </div>
+    );
+}
+
+export default function SharedOverviewClient({
+    token,
+    siteUrl,
+    views,
+}: {
+    token: string;
+    siteUrl?: string;
+    views: number;
+}) {
+    const [queryClient] = useState(() => new QueryClient({
+        defaultOptions: {
+            queries: {
+                staleTime: OVERVIEW_QUERY_STALE_MS,
+                gcTime: 10 * 60 * 1000,
+                placeholderData: keepPreviousData,
+                retry: 1,
+                refetchOnWindowFocus: false,
+            },
+        },
+    }));
+
+    return (
+        <QueryClientProvider client={queryClient}>
+            <NuqsAdapter>
+                <ShareOverviewPage token={token} siteUrl={siteUrl} views={views} />
+            </NuqsAdapter>
+        </QueryClientProvider>
+    );
+}

@@ -178,12 +178,12 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
                     onClick={() => setOpen(!open)}
                     className={`flex items-center h-8 border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition text-[11px] ${
                         compact
-                            ? 'max-w-[108px] gap-1 rounded-lg border px-2'
+                            ? 'w-full justify-between gap-1 rounded-lg border px-2.5 sm:max-w-[120px]'
                             : 'gap-1.5 border-y px-2.5'
                     }`}
                 >
                     <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className={`whitespace-nowrap ${compact ? 'truncate max-w-[64px]' : ''}`}>{getRangeLabel(range)}</span>
+                    <span className={`whitespace-nowrap ${compact ? 'truncate' : ''}`}>{getRangeLabel(range)}</span>
                     <ChevronDown className={`w-3 h-3 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
                 </button>
 

@@ -60,7 +60,7 @@ export async function GET(
     }
 
     /* ─── Validate share token ─── */
-    const share = await getShareData(token);
+    const share = await getShareData(token, { incrementView: false });
     if (!share) {
         return NextResponse.json(
             { error: 'Share not found or revoked' },

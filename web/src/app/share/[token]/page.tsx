@@ -1,6 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { getShareData } from '@/app/api/share/route';
+import SharedOverviewClient from '@/components/share-overview/openpanel/SharedOverviewClient';
+import SharedUmamiClient from '@/components/share-overview/umami/SharedUmamiClient';
 import SharedDashboardClient from './SharedDashboardClient';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +19,7 @@ export default async function SharedDashboardPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    const share = await getShareData(token);
+    const share = await getShareData(token, { incrementView: true });
 
     /* ─── Invalid / revoked token ─── */
     if (!share) {
@@ -41,6 +43,26 @@ export default async function SharedDashboardPage({
                     </Link>
                 </div>
             </div>
+        );
+    }
+
+    if (share.config.layoutMode === 'openpanel_overview') {
+        return (
+            <SharedOverviewClient
+                token={token}
+                siteUrl={share.siteUrl}
+                views={share.views}
+            />
+        );
+    }
+
+    if (share.config.layoutMode === 'umami_fork') {
+        return (
+            <SharedUmamiClient
+                token={token}
+                siteUrl={share.siteUrl}
+                views={share.views}
+            />
         );
     }
 
