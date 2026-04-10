@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+const ALLOW_IN_MEMORY_SHARES = !ADMIN_API_KEY && process.env.NODE_ENV !== 'production';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Session = { user?: { id: string; [key: string]: any } } | null;
@@ -46,6 +47,13 @@ function normalizeShareData(raw: {
         ...raw,
         config: normalizeShareConfig(raw.config),
     };
+}
+
+function createPersistentShareError() {
+    return NextResponse.json(
+        { error: 'Share storage is unavailable right now. Please try again in a moment.' },
+        { status: 503 },
+    );
 }
 
 function getCreateConfig(config?: ShareConfig | null) {
@@ -154,6 +162,10 @@ export async function GET() {
             return NextResponse.json({ shares: normalizedShares });
         }
 
+        if (!ALLOW_IN_MEMORY_SHARES) {
+            return createPersistentShareError();
+        }
+
         // Dev fallback: in-memory store
         const userShares: ShareData[] = [];
         for (const share of inMemoryShares.values()) {
@@ -234,12 +246,20 @@ export async function POST(req: Request) {
                 console.error('Admin API patch share config error:', error);
             }
 
-            return NextResponse.json({
-                share: normalizeShareData({
-                    ...share,
-                    config: hydratedConfig,
-                }),
-            });
+            const verifiedShare = await getShareData(share.token, { incrementView: false });
+            if (!verifiedShare) {
+                console.error('Share verification failed after create:', share.token);
+                return NextResponse.json(
+                    { error: 'Share link was created but could not be verified. Please try again.' },
+                    { status: 503 },
+                );
+            }
+
+            return NextResponse.json({ share: verifiedShare });
+        }
+
+        if (!ALLOW_IN_MEMORY_SHARES) {
+            return createPersistentShareError();
         }
 
         // Dev fallback: in-memory store
@@ -322,6 +342,10 @@ export async function DELETE(req: Request) {
             return NextResponse.json(data);
         }
 
+        if (!ALLOW_IN_MEMORY_SHARES) {
+            return createPersistentShareError();
+        }
+
         // Dev fallback: in-memory store
         if (revokeAll) {
             let count = 0;
@@ -378,6 +402,10 @@ export async function getShareData(
         } catch {
             return null;
         }
+    }
+
+    if (!ALLOW_IN_MEMORY_SHARES) {
+        return null;
     }
 
     // Dev fallback: in-memory store

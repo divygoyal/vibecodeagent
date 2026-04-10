@@ -55,10 +55,17 @@ function getShareUrl(token: string): string {
     return `${window.location.origin}/share/${token}`;
 }
 
+function upsertShareItem(shares: ShareItem[], incoming: ShareItem): ShareItem[] {
+    const next = [incoming, ...shares.filter((share) => share.token !== incoming.token)];
+    next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return next;
+}
+
 /* ─── Component ─── */
 export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl }: Props) {
     const [activeShares, setActiveShares] = useState<ShareItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [refreshingShares, setRefreshingShares] = useState(false);
     const [generating, setGenerating] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -70,9 +77,13 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
     const [latestToken, setLatestToken] = useState<string | null>(null);
 
     /* ─── Fetch active shares ─── */
-    const fetchShares = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    const fetchShares = useCallback(async (options?: { background?: boolean }) => {
+        if (options?.background) {
+            setRefreshingShares(true);
+        } else {
+            setLoading(true);
+            setError(null);
+        }
         try {
             const res = await fetch('/api/share');
             if (!res.ok) throw new Error('Failed to load shares');
@@ -80,9 +91,15 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
             setActiveShares(data.shares || []);
         } catch (err) {
             console.error('Fetch shares error:', err);
-            setError('Failed to load active shares');
+            if (!options?.background) {
+                setError('Failed to load active shares');
+            }
         } finally {
-            setLoading(false);
+            if (options?.background) {
+                setRefreshingShares(false);
+            } else {
+                setLoading(false);
+            }
         }
     }, []);
 
@@ -120,8 +137,15 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
             }
 
             const data = await res.json();
-            setLatestToken(data.share?.token || null);
-            await fetchShares();
+            const createdShare = data.share as ShareItem | undefined;
+            if (createdShare?.token) {
+                setLatestToken(createdShare.token);
+                setActiveShares((prev) => upsertShareItem(prev, createdShare));
+            } else {
+                setLatestToken(null);
+            }
+
+            void fetchShares({ background: true });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Failed to generate link';
             setError(message);
@@ -293,6 +317,11 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                                         <label className="text-xs font-medium text-zinc-400">
                                             Active Shares ({activeShares.length})
                                         </label>
+                                        {refreshingShares && (
+                                            <span className="text-[10px] text-zinc-500 animate-pulse">
+                                                Refreshing...
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="space-y-1.5">
                                         {activeShares.map((share) => (
@@ -348,7 +377,7 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                             )}
 
                             {/* Loading state */}
-                            {loading && (
+                            {loading && activeShares.length === 0 && (
                                 <div className="text-center py-3">
                                     <p className="text-xs text-zinc-500 animate-pulse">Loading shares...</p>
                                 </div>

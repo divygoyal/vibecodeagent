@@ -9,6 +9,7 @@ const shareRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const SHARE_RATE_WINDOW = 60_000;
 const SHARE_RATE_LIMIT = 180;
 const SHARE_OVERVIEW_CONTEXT_TTL = 15_000;
+const MISSING_SHARE_SENTINEL = { __isError: true } as const;
 
 export const SHARE_OVERVIEW_CACHE_TTL = {
     journey: 120_000,
@@ -91,11 +92,16 @@ export function parseOverviewRequest(req: Request) {
 }
 
 async function getShareMeta(token: string): Promise<ShareData | null> {
-    return cachedFetch(
+    const result = await cachedFetch<ShareData | typeof MISSING_SHARE_SENTINEL>(
         `share-meta:${token}`,
         60_000,
-        () => getShareData(token, { incrementView: false }),
+        async () => {
+            const share = await getShareData(token, { incrementView: false });
+            return share ?? MISSING_SHARE_SENTINEL;
+        },
     );
+
+    return '__isError' in result ? null : result;
 }
 
 export async function getShareOverviewContext(token: string): Promise<{

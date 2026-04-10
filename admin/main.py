@@ -2040,11 +2040,40 @@ async def get_embed_token_google_creds(
 
 # ============= Shared Dashboards =============
 
+def serialize_shared_dashboard(shared: SharedDashboard, user_identifier: Optional[str]):
+    return {
+        "token": shared.token,
+        "userId": user_identifier,
+        "propertyId": shared.property_id,
+        "siteUrl": shared.site_url,
+        "config": json.loads(shared.config) if shared.config else {},
+        "views": shared.views,
+        "createdAt": shared.created_at.isoformat() if shared.created_at else None,
+    }
+
+
 class SharedDashboardCreate(BaseModel):
     user_identifier: str
     property_id: str
     site_url: Optional[str] = None
     config: Optional[dict] = None
+
+
+class SharedDashboardUpdate(BaseModel):
+    user_identifier: str
+    site_url: Optional[str] = None
+    config: Optional[dict] = None
+
+
+async def resolve_shared_dashboard_owner_identifier(
+    db: AsyncSession,
+    shared: SharedDashboard,
+) -> Optional[str]:
+    user_result = await db.execute(select(User).where(User.id == shared.user_id))
+    owner = user_result.scalar_one_or_none()
+    if not owner:
+        return None
+    return owner.github_id or owner.email
 
 
 @app.post("/api/shared-dashboards")
@@ -2059,7 +2088,7 @@ async def create_shared_dashboard(
         raise HTTPException(status_code=404, detail="User not found")
 
     token = secrets.token_hex(16)
-    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"technology":true,"seo":false}'
+    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"technology":true,"seo":false,"layoutMode":"openpanel_overview","shareProvider":"openpanel_overview"}'
 
     shared = SharedDashboard(
         token=token,
@@ -2072,15 +2101,41 @@ async def create_shared_dashboard(
     await db.commit()
     await db.refresh(shared)
 
-    return {
-        "token": shared.token,
-        "userId": data.user_identifier,
-        "propertyId": shared.property_id,
-        "siteUrl": shared.site_url,
-        "config": json.loads(shared.config) if shared.config else {},
-        "views": shared.views,
-        "createdAt": shared.created_at.isoformat() if shared.created_at else None,
-    }
+    return serialize_shared_dashboard(shared, data.user_identifier)
+
+
+@app.patch("/api/shared-dashboards/{token}")
+async def update_shared_dashboard(
+    token: str,
+    data: SharedDashboardUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Update shared dashboard metadata after provider provisioning."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(SharedDashboard).where(
+            SharedDashboard.token == token,
+            SharedDashboard.user_id == user.id,
+            SharedDashboard.is_active == True
+        )
+    )
+    shared = result.scalar_one_or_none()
+    if not shared:
+        raise HTTPException(status_code=404, detail="Shared dashboard not found")
+
+    if data.site_url is not None:
+        shared.site_url = data.site_url
+    if data.config is not None:
+        shared.config = json.dumps(data.config)
+
+    await db.commit()
+    await db.refresh(shared)
+
+    return serialize_shared_dashboard(shared, data.user_identifier)
 
 
 @app.get("/api/shared-dashboards")
@@ -2103,15 +2158,7 @@ async def list_shared_dashboards(
 
     return {
         "shares": [
-            {
-                "token": s.token,
-                "userId": user_identifier,
-                "propertyId": s.property_id,
-                "siteUrl": s.site_url,
-                "config": json.loads(s.config) if s.config else {},
-                "views": s.views,
-                "createdAt": s.created_at.isoformat() if s.created_at else None,
-            }
+            serialize_shared_dashboard(s, user_identifier)
             for s in shares
         ]
     }
@@ -2164,22 +2211,30 @@ async def view_shared_dashboard(
     shared.last_viewed_at = datetime.utcnow()
     await db.commit()
 
-    # Look up the owner's GitHub ID so the web app can fetch their Google tokens
-    user_identifier = None
-    user_result = await db.execute(select(User).where(User.id == shared.user_id))
-    owner = user_result.scalar_one_or_none()
-    if owner:
-        user_identifier = owner.github_id or owner.email
+    user_identifier = await resolve_shared_dashboard_owner_identifier(db, shared)
 
-    return {
-        "token": shared.token,
-        "userId": user_identifier,
-        "propertyId": shared.property_id,
-        "siteUrl": shared.site_url,
-        "config": json.loads(shared.config) if shared.config else {},
-        "views": shared.views,
-        "createdAt": shared.created_at.isoformat() if shared.created_at else None,
-    }
+    return serialize_shared_dashboard(shared, user_identifier)
+
+
+@app.get("/api/shared-dashboards/{token}")
+async def get_shared_dashboard(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public read endpoint: get shared dashboard metadata without incrementing views."""
+    result = await db.execute(
+        select(SharedDashboard).where(
+            SharedDashboard.token == token,
+            SharedDashboard.is_active == True
+        )
+    )
+    shared = result.scalar_one_or_none()
+    if not shared:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    user_identifier = await resolve_shared_dashboard_owner_identifier(db, shared)
+
+    return serialize_shared_dashboard(shared, user_identifier)
 
 
 @app.delete("/api/shared-dashboards/user/{user_identifier}")
