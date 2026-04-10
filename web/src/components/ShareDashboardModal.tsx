@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, Link, Copy, Check, Share2, Eye, Trash2, Shield
 } from 'lucide-react';
+import { OVERVIEW_SHARE_CONFIG } from '@/lib/shareTypes';
 
 /* ─── Types ─── */
 interface ShareConfig {
@@ -14,6 +15,13 @@ interface ShareConfig {
     geo: boolean;
     technology?: boolean;
     seo: boolean;
+    layoutMode?: 'legacy' | 'openpanel_overview' | 'umami_fork';
+    shareProvider?: 'legacy' | 'openpanel_overview' | 'umami_fork';
+    umamiWebsiteId?: string | null;
+    umamiShareId?: string | null;
+    umamiShareUrl?: string | null;
+    umamiEnabledAt?: string | null;
+    siteName?: string | null;
 }
 
 interface ShareItem {
@@ -55,15 +63,9 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
     const [copied, setCopied] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    const [config] = useState<ShareConfig>(OVERVIEW_SHARE_CONFIG);
     // Data inclusion config
-    const [config, setConfig] = useState<ShareConfig>({
-        traffic: true,
-        sources: true,
-        pages: true,
-        geo: true,
-        technology: true,
-        seo: false,
-    });
+    const [config] = useState<ShareConfig>(OVERVIEW_SHARE_CONFIG);
 
     // Latest generated link
     const [latestToken, setLatestToken] = useState<string | null>(null);
@@ -169,21 +171,6 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
         }
     };
 
-    /* ─── Toggle config checkbox ─── */
-    const toggleConfig = (key: keyof ShareConfig) => {
-        setConfig((prev) => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    /* ─── Checkbox items ─── */
-    const checkboxItems: { key: keyof ShareConfig; label: string }[] = [
-        { key: 'traffic', label: 'Traffic overview & KPIs' },
-        { key: 'sources', label: 'Traffic sources' },
-        { key: 'pages', label: 'Top pages' },
-        { key: 'geo', label: 'Geographic data' },
-        { key: 'technology', label: 'Technology breakdown' },
-        { key: 'seo', label: 'SEO data (Search Console)' },
-    ];
-
     return (
         <AnimatePresence>
             {open && (
@@ -260,31 +247,15 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                                 </div>
                             )}
 
-                            {/* Config checkboxes */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-zinc-400">Include:</label>
-                                <div className="space-y-2">
-                                    {checkboxItems.map(({ key, label }) => (
-                                        <label
-                                            key={key}
-                                            className="flex items-center gap-2.5 cursor-pointer group"
-                                        >
-                                            <div
-                                                className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                                                    config[key]
-                                                        ? 'bg-emerald-500/20 border-emerald-500/50'
-                                                        : 'bg-white/[0.03] border-white/[0.15] group-hover:border-white/[0.25]'
-                                                }`}
-                                                onClick={() => toggleConfig(key)}
-                                            >
-                                                {config[key] && (
-                                                    <Check className="w-2.5 h-2.5 text-emerald-400" />
-                                                )}
-                                            </div>
-                                            <span className="text-sm text-zinc-300">{label}</span>
-                                        </label>
-                                    ))}
-                                </div>
+                            <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+                                <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+                                    OpenPanel-Style Overview
+                                </p>
+                                <p className="mt-2 text-sm text-zinc-300">
+                                    New links open the interaction-first shared overview. The page keeps the
+                                    OpenPanel-style connected dashboard behavior while staying wired to your real
+                                    TrafficClaw analytics data.
+                                </p>
                             </div>
 
                             {/* Error message */}

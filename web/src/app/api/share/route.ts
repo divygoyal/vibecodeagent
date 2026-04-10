@@ -1,32 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { randomBytes } from 'crypto';
-import { authOptions } from '@/lib/auth';
+import { authOptions, ensureAdminUserSynced } from '@/lib/adminUserSync';
+import { ensureUmamiWebsiteProvisioned } from '@/lib/umamiClient';
+import {
+    normalizeShareConfig,
+    OVERVIEW_SHARE_CONFIG,
+    type ShareConfig,
+    type ShareData,
+    type NormalizedShareConfig,
+} from '@/lib/shareTypes';
 
 export const dynamic = 'force-dynamic';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-
-/* ─── Types ─── */
-interface ShareConfig {
-    traffic: boolean;
-    sources: boolean;
-    pages: boolean;
-    geo: boolean;
-    technology?: boolean;
-    seo: boolean;
-}
-
-interface ShareData {
-    token: string;
-    userId: string;
-    propertyId: string;
-    siteUrl: string;
-    config: ShareConfig;
-    views: number;
-    createdAt: string;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Session = { user?: { id: string; [key: string]: any } } | null;
@@ -45,6 +33,95 @@ function cleanupStaleShares() {
     }
 }
 
+function normalizeShareData(raw: {
+    token: string;
+    userId: string;
+    propertyId: string;
+    siteUrl: string;
+    config?: ShareConfig | null;
+    views: number;
+    createdAt: string;
+}): ShareData {
+    return {
+        ...raw,
+        config: normalizeShareConfig(raw.config),
+    };
+}
+
+function getCreateConfig(config?: ShareConfig | null) {
+    return {
+        ...OVERVIEW_SHARE_CONFIG,
+        ...config,
+        layoutMode: config?.layoutMode ?? 'openpanel_overview',
+        shareProvider: config?.shareProvider ?? config?.layoutMode ?? 'openpanel_overview',
+    };
+}
+
+async function hydrateCreatedShareConfig(input: {
+    token: string;
+    propertyId: string;
+    siteUrl?: string;
+    config: ShareConfig | NormalizedShareConfig;
+}) {
+    const normalized = normalizeShareConfig(input.config);
+    if (normalized.layoutMode !== 'umami_fork') {
+        return normalized;
+    }
+
+    try {
+        const provisioning = await ensureUmamiWebsiteProvisioned({
+            token: input.token,
+            propertyId: input.propertyId,
+            siteUrl: input.siteUrl,
+            existingWebsiteId: normalized.umamiWebsiteId,
+            existingShareId: normalized.umamiShareId,
+        });
+
+        return normalizeShareConfig({
+            ...normalized,
+            layoutMode: 'umami_fork',
+            shareProvider: 'umami_fork',
+            umamiWebsiteId: provisioning.websiteId ?? normalized.umamiWebsiteId,
+            umamiShareId: provisioning.shareId ?? normalized.umamiShareId,
+            umamiShareUrl: provisioning.shareUrl ?? normalized.umamiShareUrl,
+            umamiEnabledAt: provisioning.enabledAt ?? normalized.umamiEnabledAt,
+            siteName: provisioning.siteName ?? normalized.siteName,
+        });
+    } catch (error) {
+        console.error('Umami share provisioning failed:', error);
+        return normalized;
+    }
+}
+
+async function updateAdminShareConfig(input: {
+    token: string;
+    userId: string;
+    siteUrl?: string;
+    config: NormalizedShareConfig;
+}) {
+    if (!ADMIN_API_KEY) {
+        return;
+    }
+
+    const response = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/${input.token}`, {
+        method: 'PATCH',
+        headers: {
+            'X-API-Key': ADMIN_API_KEY,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_identifier: input.userId,
+            site_url: input.siteUrl || '',
+            config: input.config,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Failed to update share config (${response.status}): ${errorText}`);
+    }
+}
+
 /**
  * GET /api/share — List the current user's active shares
  * Authenticated endpoint.
@@ -60,6 +137,11 @@ export async function GET() {
 
         // Production: use admin DB
         if (ADMIN_API_KEY) {
+            const sync = await ensureAdminUserSynced(session);
+            if (!sync.synced && !sync.skipped) {
+                console.warn('Admin user sync before share list failed:', sync.reason);
+            }
+
             const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards?user_identifier=${userId}`, {
                 headers: { 'X-API-Key': ADMIN_API_KEY },
             });
@@ -68,7 +150,8 @@ export async function GET() {
                 return NextResponse.json({ shares: [] });
             }
             const shares = await res.json();
-            return NextResponse.json({ shares: Array.isArray(shares) ? shares : shares.shares || [] });
+            const normalizedShares = (Array.isArray(shares) ? shares : shares.shares || []).map(normalizeShareData);
+            return NextResponse.json({ shares: normalizedShares });
         }
 
         // Dev fallback: in-memory store
@@ -77,7 +160,7 @@ export async function GET() {
             if (share.userId === userId) userShares.push(share);
         }
         userShares.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return NextResponse.json({ shares: userShares });
+        return NextResponse.json({ shares: userShares.map(normalizeShareData) });
     } catch (err) {
         console.error('List shares error:', err);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -103,18 +186,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'propertyId is required' }, { status: 400 });
         }
 
+        const createConfig = getCreateConfig(config);
+
         const userId = session.user.id;
-        const normalizedConfig: ShareConfig = {
-            traffic: config?.traffic ?? true,
-            sources: config?.sources ?? true,
-            pages: config?.pages ?? true,
-            geo: config?.geo ?? true,
-            technology: config?.technology ?? true,
-            seo: config?.seo ?? false,
-        };
 
         // Production: use admin DB
         if (ADMIN_API_KEY) {
+            const sync = await ensureAdminUserSynced(session);
+            if (!sync.synced) {
+                console.error('Admin user sync before share create failed:', sync.reason);
+            }
+
             const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards`, {
                 method: 'POST',
                 headers: { 'X-API-Key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
@@ -122,16 +204,42 @@ export async function POST(req: Request) {
                     user_identifier: userId,
                     property_id: propertyId,
                     site_url: siteUrl || '',
-                    config: normalizedConfig,
+                    config: createConfig,
                 }),
             });
             if (!res.ok) {
                 const errText = await res.text();
                 console.error('Admin API create share error:', res.status, errText);
-                return NextResponse.json({ error: 'Failed to create share' }, { status: res.status });
+                const message = res.status === 404
+                    ? 'Local user is not synced with the admin backend yet. Reload the dashboard and try again.'
+                    : 'Failed to create share';
+                return NextResponse.json({ error: message }, { status: res.status });
             }
             const share = await res.json();
-            return NextResponse.json({ share });
+            const hydratedConfig = await hydrateCreatedShareConfig({
+                token: share.token,
+                propertyId,
+                siteUrl,
+                config: share.config || createConfig,
+            });
+
+            try {
+                await updateAdminShareConfig({
+                    token: share.token,
+                    userId,
+                    siteUrl,
+                    config: hydratedConfig,
+                });
+            } catch (error) {
+                console.error('Admin API patch share config error:', error);
+            }
+
+            return NextResponse.json({
+                share: normalizeShareData({
+                    ...share,
+                    config: hydratedConfig,
+                }),
+            });
         }
 
         // Dev fallback: in-memory store
@@ -144,12 +252,19 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Maximum 10 active shares. Revoke one first.' }, { status: 400 });
         }
 
+        const hydratedConfig = await hydrateCreatedShareConfig({
+            token,
+            propertyId,
+            siteUrl,
+            config: createConfig,
+        });
+
         const shareData: ShareData = {
             token,
             userId,
             propertyId: propertyId || '',
             siteUrl: siteUrl || '',
-            config: normalizedConfig,
+            config: hydratedConfig,
             views: 0,
             createdAt: new Date().toISOString(),
         };
@@ -181,6 +296,11 @@ export async function DELETE(req: Request) {
 
         // Production: use admin DB
         if (ADMIN_API_KEY) {
+            const sync = await ensureAdminUserSynced(session);
+            if (!sync.synced && !sync.skipped) {
+                console.warn('Admin user sync before share revoke failed:', sync.reason);
+            }
+
             if (revokeAll) {
                 const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/user/${userId}`, {
                     method: 'DELETE',
@@ -240,13 +360,21 @@ export async function DELETE(req: Request) {
  * Not an HTTP handler — used via direct function call from the server component.
  * In production, calls the admin API. In dev, uses the in-memory store.
  */
-export async function getShareData(token: string): Promise<ShareData | null> {
+export async function getShareData(
+    token: string,
+    options?: { incrementView?: boolean }
+): Promise<ShareData | null> {
+    const incrementView = options?.incrementView ?? true;
+
     // Production: use admin DB
     if (ADMIN_API_KEY) {
         try {
-            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/${token}/view`);
+            const path = incrementView
+                ? `${ADMIN_API_URL}/api/shared-dashboards/${token}/view`
+                : `${ADMIN_API_URL}/api/shared-dashboards/${token}`;
+            const res = await fetch(path);
             if (!res.ok) return null;
-            return await res.json();
+            return normalizeShareData(await res.json());
         } catch {
             return null;
         }
@@ -255,6 +383,8 @@ export async function getShareData(token: string): Promise<ShareData | null> {
     // Dev fallback: in-memory store
     const share = inMemoryShares.get(token);
     if (!share) return null;
-    share.views++;
-    return { ...share };
+    if (incrementView) {
+        share.views++;
+    }
+    return normalizeShareData({ ...share });
 }
