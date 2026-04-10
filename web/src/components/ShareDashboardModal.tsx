@@ -65,7 +65,6 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
 
     const [config] = useState<ShareConfig>(OVERVIEW_SHARE_CONFIG);
     // Data inclusion config
-    const [config] = useState<ShareConfig>(OVERVIEW_SHARE_CONFIG);
 
     // Latest generated link
     const [latestToken, setLatestToken] = useState<string | null>(null);

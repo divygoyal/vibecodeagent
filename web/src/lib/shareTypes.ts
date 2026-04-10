@@ -6,6 +6,7 @@ export interface ShareConfig {
     sources?: boolean;
     pages?: boolean;
     geo?: boolean;
+    technology?: boolean;
     seo?: boolean;
     layoutMode?: ShareLayoutMode;
     shareProvider?: ShareProvider;
@@ -21,6 +22,7 @@ export interface NormalizedShareConfig {
     sources: boolean;
     pages: boolean;
     geo: boolean;
+    technology: boolean;
     seo: boolean;
     layoutMode: ShareLayoutMode;
     shareProvider: ShareProvider;
@@ -46,6 +48,7 @@ export const LEGACY_SHARE_CONFIG: NormalizedShareConfig = {
     sources: true,
     pages: true,
     geo: true,
+    technology: true,
     seo: false,
     layoutMode: 'legacy',
     shareProvider: 'legacy',
@@ -61,6 +64,7 @@ export const OVERVIEW_SHARE_CONFIG: NormalizedShareConfig = {
     sources: true,
     pages: true,
     geo: true,
+    technology: true,
     seo: false,
     layoutMode: 'openpanel_overview',
     shareProvider: 'openpanel_overview',
@@ -76,6 +80,7 @@ export const UMAMI_SHARE_CONFIG: NormalizedShareConfig = {
     sources: true,
     pages: true,
     geo: true,
+    technology: true,
     seo: false,
     layoutMode: 'umami_fork',
     shareProvider: 'umami_fork',
@@ -112,6 +117,7 @@ export function normalizeShareConfig(config?: ShareConfig | null): NormalizedSha
         sources: config?.sources ?? true,
         pages: config?.pages ?? true,
         geo: config?.geo ?? true,
+        technology: config?.technology ?? true,
         seo: config?.seo ?? false,
         layoutMode,
         shareProvider,
