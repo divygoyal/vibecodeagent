@@ -2026,7 +2026,7 @@ function OverviewMetrics({ token }: { token: string }) {
             <DashboardHoverSurface
                 as="section"
                 tone="mixed"
-                className="relative overflow-hidden rounded-[14px] border border-white/[0.12] bg-[#0c1117] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_60px_rgba(0,0,0,0.24)]"
+                className="relative overflow-hidden rounded-[12px] border border-white/[0.12] bg-[#0c1117] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_60px_rgba(0,0,0,0.24)]"
                 style={{
                     backgroundImage:
                         'radial-gradient(120% 110% at 0% 0%, rgba(69,196,140,0.11), transparent 44%), radial-gradient(90% 90% at 100% 0%, rgba(56,189,248,0.09), transparent 34%)',
