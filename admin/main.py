@@ -14,6 +14,7 @@ import secrets
 import subprocess
 import os
 import requests
+from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -21,7 +22,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SharedDashboard, LeaderboardEntry, Annotation, CustomDashboard
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, Annotation, CustomDashboard
 from docker_manager import docker_manager
 
 
@@ -41,6 +42,15 @@ async def init_db():
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
             except Exception:
                 pass
+
+        try:
+            await conn.execute(
+                text(
+                    """ALTER TABLE social_embed_tokens ADD COLUMN config TEXT DEFAULT '{"visibleCards":3}'"""
+                )
+            )
+        except Exception:
+            pass
 
 
 async def get_db():
@@ -288,15 +298,9 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
         print(f"[DEBUG] Found user by github_id: {user.id} ({user.github_id})")
         return user
 
-    # 1b. Allow direct lookup by internal user ID for admin tooling fallbacks
-    if identifier.isdigit():
-        id_res = await db.execute(select(User).where(User.id == int(identifier)))
-        user = id_res.scalar_one_or_none()
-        if user:
-            print(f"[DEBUG] Found user by internal id: {user.id}")
-            return user
-
     # 2. Fallback: Lookup via OAuthConnection
+    # Provider account IDs can be large numeric strings (for example Google),
+    # so resolve OAuth identities before attempting internal integer ID lookup.
     print(f"[DEBUG] User not found by github_id, trying OAuthConnection for '{identifier}'")
     stmt = select(OAuthConnection).where(OAuthConnection.provider_account_id == identifier)
     oauth_res = await db.execute(stmt)
@@ -309,7 +313,22 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
         if user:
             print(f"[DEBUG] Resolved to user via OAuth: {user.id} ({user.github_id})")
         return user
-    
+
+    # 2b. Allow direct lookup by internal user ID for admin tooling fallbacks.
+    # SQLite integers are signed 64-bit, so skip oversized numeric identifiers.
+    if identifier.isdigit():
+        try:
+            numeric_identifier = int(identifier)
+        except ValueError:
+            numeric_identifier = None
+
+        if numeric_identifier is not None and 0 <= numeric_identifier <= 9223372036854775807:
+            id_res = await db.execute(select(User).where(User.id == numeric_identifier))
+            user = id_res.scalar_one_or_none()
+            if user:
+                print(f"[DEBUG] Found user by internal id: {user.id}")
+                return user
+
     # 3. Fallback: Lookup by email (handles cross-provider identity)
     if "@" in identifier:
         print(f"[DEBUG] Trying email lookup for '{identifier}'")
@@ -2038,6 +2057,212 @@ async def get_embed_token_google_creds(
     }
 
 
+# ============= Social Embed Tokens =============
+
+def normalize_social_embed_domain(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Domain is required")
+
+    if "://" not in normalized:
+        normalized = f"https://{normalized}"
+
+    parsed = urlparse(normalized)
+    hostname = (parsed.hostname or "").strip().lower()
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+
+    if not hostname or "." not in hostname:
+        raise HTTPException(status_code=400, detail="Invalid domain")
+
+    return hostname
+
+
+def normalize_social_embed_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    candidate = config or {}
+    visible_cards = candidate.get("visibleCards")
+    try:
+        visible_cards = int(visible_cards)
+    except (TypeError, ValueError):
+        visible_cards = None
+
+    if visible_cards not in {1, 2, 3, 4}:
+        legacy_count = candidate.get("tweetCount")
+        try:
+            legacy_count = int(legacy_count)
+        except (TypeError, ValueError):
+            legacy_count = None
+
+        visible_cards = legacy_count if legacy_count in {1, 2, 3, 4} else 3
+
+    return {
+        "visibleCards": visible_cards,
+    }
+
+
+def serialize_social_embed_token(token: SocialEmbedToken):
+    try:
+        parsed_config = json.loads(token.config) if token.config else None
+    except Exception:
+        parsed_config = None
+
+    return {
+        "token": token.token,
+        "platform": token.platform,
+        "domain": token.domain,
+        "source_site_url": token.source_site_url,
+        "label": token.label,
+        "is_active": token.is_active,
+        "allowed_origins": json.loads(token.allowed_origins) if token.allowed_origins else None,
+        "created_at": token.created_at.isoformat() if token.created_at else None,
+        "last_used_at": token.last_used_at.isoformat() if token.last_used_at else None,
+        "config": normalize_social_embed_config(parsed_config),
+    }
+
+
+class SocialEmbedTokenCreate(BaseModel):
+    user_identifier: str
+    platform: str
+    domain: str
+    source_site_url: Optional[str] = None
+    label: Optional[str] = None
+    allowed_origins: Optional[List[str]] = None
+    config: Optional[Dict[str, Any]] = None
+
+
+class SocialEmbedTokenUpdate(BaseModel):
+    user_identifier: str
+    domain: str
+    source_site_url: Optional[str] = None
+    label: Optional[str] = None
+    allowed_origins: Optional[List[str]] = None
+    config: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/social-embed-tokens")
+async def create_social_embed_token(
+    body: SocialEmbedTokenCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    user = await get_user_by_identifier(db, body.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    platform = (body.platform or "").strip().lower()
+    if platform not in {"x", "reddit"}:
+        raise HTTPException(status_code=400, detail="Unsupported social platform")
+
+    social_embed_token = SocialEmbedToken(
+        token=secrets.token_hex(32),
+        user_id=user.id,
+        platform=platform,
+        domain=normalize_social_embed_domain(body.domain),
+        source_site_url=body.source_site_url,
+        label=body.label,
+        allowed_origins=json.dumps(body.allowed_origins) if body.allowed_origins else None,
+        config=json.dumps(normalize_social_embed_config(body.config)),
+    )
+    db.add(social_embed_token)
+    await db.commit()
+    await db.refresh(social_embed_token)
+    return serialize_social_embed_token(social_embed_token)
+
+
+@app.get("/api/social-embed-tokens")
+async def list_social_embed_tokens(
+    user_identifier: str,
+    platform: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    query = select(SocialEmbedToken).where(SocialEmbedToken.user_id == user.id)
+    normalized_platform = (platform or "").strip().lower()
+    if normalized_platform:
+        query = query.where(SocialEmbedToken.platform == normalized_platform)
+
+    result = await db.execute(query.order_by(SocialEmbedToken.created_at.desc()))
+    tokens = result.scalars().all()
+    return [serialize_social_embed_token(token) for token in tokens]
+
+
+@app.patch("/api/social-embed-tokens/{token}")
+async def update_social_embed_token(
+    token: str,
+    body: SocialEmbedTokenUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    user = await get_user_by_identifier(db, body.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(SocialEmbedToken).where(
+            SocialEmbedToken.token == token,
+            SocialEmbedToken.user_id == user.id,
+            SocialEmbedToken.is_active == True
+        )
+    )
+    social_embed_token = result.scalar_one_or_none()
+    if not social_embed_token:
+        raise HTTPException(status_code=404, detail="Token not found")
+
+    social_embed_token.domain = normalize_social_embed_domain(body.domain)
+    social_embed_token.source_site_url = body.source_site_url
+    social_embed_token.label = body.label
+    social_embed_token.allowed_origins = json.dumps(body.allowed_origins) if body.allowed_origins else None
+    social_embed_token.config = json.dumps(normalize_social_embed_config(body.config))
+
+    await db.commit()
+    await db.refresh(social_embed_token)
+    return serialize_social_embed_token(social_embed_token)
+
+
+@app.delete("/api/social-embed-tokens/{token}")
+async def revoke_social_embed_token(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    result = await db.execute(
+        select(SocialEmbedToken).where(SocialEmbedToken.token == token)
+    )
+    social_embed_token = result.scalar_one_or_none()
+    if not social_embed_token:
+        raise HTTPException(status_code=404, detail="Token not found")
+
+    social_embed_token.is_active = False
+    await db.commit()
+    return {"success": True}
+
+
+@app.get("/api/social-embed-tokens/{token}")
+async def validate_social_embed_token(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    result = await db.execute(
+        select(SocialEmbedToken).where(
+            SocialEmbedToken.token == token,
+            SocialEmbedToken.is_active == True
+        )
+    )
+    social_embed_token = result.scalar_one_or_none()
+    if not social_embed_token:
+        raise HTTPException(status_code=404, detail="Invalid or revoked token")
+
+    social_embed_token.last_used_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(social_embed_token)
+    return serialize_social_embed_token(social_embed_token)
+
+
 # ============= Shared Dashboards =============
 
 def serialize_shared_dashboard(shared: SharedDashboard, user_identifier: Optional[str]):
@@ -2088,7 +2313,7 @@ async def create_shared_dashboard(
         raise HTTPException(status_code=404, detail="User not found")
 
     token = secrets.token_hex(16)
-    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"technology":true,"seo":false,"layoutMode":"openpanel_overview","shareProvider":"openpanel_overview"}'
+    config_json = json.dumps(data.config) if data.config else '{"traffic":true,"sources":true,"pages":true,"geo":true,"seo":false,"layoutMode":"openpanel_overview","shareProvider":"openpanel_overview"}'
 
     shared = SharedDashboard(
         token=token,

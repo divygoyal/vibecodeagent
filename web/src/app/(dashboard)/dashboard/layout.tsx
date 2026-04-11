@@ -76,6 +76,9 @@ const sidebarGroups: SidebarGroup[] = [
         { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
         { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
+    { label: 'Social APIs', items: [
+        { icon: Sparkles, label: 'X (Twitter) API', href: '/dashboard/x-api' },
+    ]},
     { label: 'SEO & Growth', items: [
         { icon: Search, label: 'SEO', href: '/dashboard/seo' },
         { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
@@ -317,14 +320,19 @@ export default function DashboardLayout({
                 });
 
                 if (res.ok) {
-                    // Persist in sessionStorage with user identity
-                    sessionStorage.setItem('tc-registered', 'true');
-                    sessionStorage.setItem('tc-registered-user', session.user?.email || session.user?.name || '');
-                    setRegistrationState({
-                        isRegistered: true,
-                        isRegistering: false,
-                        registrationError: null,
-                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (data?.synced) {
+                        // Persist in sessionStorage with user identity only after admin sync succeeds
+                        sessionStorage.setItem('tc-registered', 'true');
+                        sessionStorage.setItem('tc-registered-user', session.user?.email || session.user?.name || '');
+                        setRegistrationState({
+                            isRegistered: true,
+                            isRegistering: false,
+                            registrationError: null,
+                        });
+                    } else {
+                        throw new Error(data?.reason || 'Provider sync is still pending');
+                    }
                 } else {
                     const data = await res.json().catch(() => ({}));
                     throw new Error(data.error || 'Failed to register provider');

@@ -133,6 +133,24 @@ class EmbedToken(Base):
     last_used_at = Column(DateTime)
 
 
+class SocialEmbedToken(Base):
+    """Tokens that authorize public social embed pages like X and Reddit widgets"""
+    __tablename__ = "social_embed_tokens"
+
+    id = Column(Integer, primary_key=True)
+    token = Column(String(64), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, nullable=False, index=True)
+    platform = Column(String(32), nullable=False, index=True)  # x, reddit
+    domain = Column(String(255), nullable=False, index=True)
+    source_site_url = Column(String(500))
+    label = Column(String(100))
+    is_active = Column(Boolean, default=True)
+    allowed_origins = Column(Text)
+    config = Column(Text, default='{"visibleCards":3}')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime)
+
+
 class SharedDashboard(Base):
     """Shared public dashboard links"""
     __tablename__ = "shared_dashboards"
@@ -142,7 +160,7 @@ class SharedDashboard(Base):
     user_id = Column(Integer, nullable=False, index=True)
     property_id = Column(String(100), nullable=False)
     site_url = Column(String(500))
-    config = Column(Text, default='{"traffic":true,"sources":true,"pages":true,"geo":true,"technology":true,"seo":false}')
+    config = Column(Text, default='{"traffic":true,"sources":true,"pages":true,"geo":true,"seo":false}')
     views = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

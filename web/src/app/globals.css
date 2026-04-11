@@ -846,6 +846,24 @@ select:focus-visible {
   outline: none;
 }
 
+.x-api-domain-input,
+.x-api-domain-input:-webkit-autofill,
+.x-api-domain-input:-webkit-autofill:hover,
+.x-api-domain-input:-webkit-autofill:focus,
+.x-api-domain-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+}
+
+.x-api-domain-input:-webkit-autofill,
+.x-api-domain-input:-webkit-autofill:hover,
+.x-api-domain-input:-webkit-autofill:focus,
+.x-api-domain-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #05080d inset !important;
+  box-shadow: 0 0 0 1000px #05080d inset !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* ========== Firefox scrollbar fallback ========== */
 * {
   scrollbar-width: thin;

@@ -12,9 +12,19 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
+import {
+  EMBED_WIDTH,
+  TWEET_LOADING_HEIGHT,
+  XEmbedPreloader,
+  XTweetSlide,
+  createFallbackTweetState,
+  getTweetRenderKey,
+  type TweetHeightState,
+} from '@/components/social/OfficialXTweetRenderer';
+import { ensureTwitterSdk, type TwttrSdk } from '@/lib/xWidgetSdk';
 
 type XMention = {
   id: string;
@@ -41,24 +51,6 @@ type XMention = {
 type VisibleMention = {
   index: number;
   mention: XMention;
-};
-
-type SlideRenderStatus = 'measuring' | 'stable' | 'error';
-
-type TweetHeightState = {
-  height: number;
-  status: SlideRenderStatus;
-  renderKey: string;
-};
-
-type TwttrSdk = {
-  widgets: {
-    createTweet: (
-      id: string,
-      el: HTMLElement,
-      opts: Record<string, string>,
-    ) => Promise<HTMLElement | undefined>;
-  };
 };
 
 type WindowWithTwitter = Window & typeof globalThis & {
@@ -107,22 +99,12 @@ type XMentionsContextValue = {
   getCardState: (tweetId: string, renderWidth?: number, renderFallbackHeight?: number) => TweetHeightState;
 };
 
-const TWITTER_ORIGINS = [
-  'https://platform.twitter.com',
-  'https://syndication.twitter.com',
-  'https://pbs.twimg.com',
-];
-
-const EMBED_WIDTH = 480;
 const DESKTOP_SCALE = 0.64;
 const MOBILE_SCALE = 0.74;
-const TWEET_LOADING_HEIGHT = 250;
 const RAIL_CARD_WIDTH = 252;
 const RAIL_CARD_GAP = 12;
 
 const XMentionsContext = createContext<XMentionsContextValue | null>(null);
-
-let twitterSdkPromise: Promise<TwttrSdk> | null = null;
 
 function useXMentionsContext() {
   const value = useContext(XMentionsContext);
@@ -175,101 +157,6 @@ function sortMentionsByNewest(mentions: XMention[]) {
   return [...mentions].sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
 }
 
-function ensureTwitterSdk(): Promise<TwttrSdk> {
-  if (typeof window === 'undefined') {
-    return Promise.reject(new Error('Twitter widgets can only load in the browser'));
-  }
-
-  const browserWindow = window as WindowWithTwitter;
-  if (browserWindow.twttr?.widgets?.createTweet) {
-    return Promise.resolve(browserWindow.twttr);
-  }
-
-  if (twitterSdkPromise) {
-    return twitterSdkPromise;
-  }
-
-  TWITTER_ORIGINS.forEach((origin) => {
-    if (!document.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {
-      const link = document.createElement('link');
-      link.rel = 'preconnect';
-      link.href = origin;
-      document.head.appendChild(link);
-    }
-  });
-
-  twitterSdkPromise = new Promise<TwttrSdk>((resolve, reject) => {
-    const resolveWhenReady = () => {
-      if (browserWindow.twttr?.widgets?.createTweet) {
-        resolve(browserWindow.twttr);
-        return true;
-      }
-      return false;
-    };
-
-    if (resolveWhenReady()) {
-      return;
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>('script[src*="platform.twitter.com/widgets.js"]');
-    const script =
-      existingScript ||
-      (() => {
-        const element = document.createElement('script');
-        element.src = 'https://platform.twitter.com/widgets.js';
-        element.async = true;
-        element.charset = 'utf-8';
-        document.head.appendChild(element);
-        return element;
-      })();
-
-    let pollTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const stopPolling = () => {
-      if (pollTimer) clearTimeout(pollTimer);
-    };
-
-    const poll = (attemptsLeft: number) => {
-      if (resolveWhenReady()) {
-        stopPolling();
-        return;
-      }
-      if (attemptsLeft <= 0) {
-        stopPolling();
-        twitterSdkPromise = null;
-        reject(new Error('Twitter widgets failed to initialize'));
-        return;
-      }
-      pollTimer = setTimeout(() => poll(attemptsLeft - 1), 100);
-    };
-
-    script.addEventListener(
-      'error',
-      () => {
-        stopPolling();
-        twitterSdkPromise = null;
-        reject(new Error('Twitter widgets failed to load'));
-      },
-      { once: true },
-    );
-
-    if (existingScript) {
-      poll(40);
-      return;
-    }
-
-    script.addEventListener(
-      'load',
-      () => {
-        poll(40);
-      },
-      { once: true },
-    );
-  });
-
-  return twitterSdkPromise;
-}
-
 function timeAgo(value?: string) {
   if (!value) return 'Recently';
   const timestamp = new Date(value).getTime();
@@ -298,267 +185,6 @@ function formatMentionPreview(text: string) {
   const shortened = candidate.slice(0, 85).replace(/\s+\S*$/, '').trim();
   return `${shortened}...`;
 }
-
-function getTweetRenderKey(tweetId: string, stageWidth: number) {
-  return `${tweetId}:${stageWidth}`;
-}
-
-function createFallbackTweetState(renderKey: string, fallbackHeight: number): TweetHeightState {
-  return {
-    height: fallbackHeight,
-    status: 'measuring',
-    renderKey,
-  };
-}
-
-const XTweetSlide = memo(function XTweetSlide({
-  tweetId,
-  scale,
-  stageWidth,
-  state,
-  showPlaceholder = true,
-  onStateChange,
-}: {
-  tweetId: string;
-  scale: number;
-  stageWidth: number;
-  state: TweetHeightState;
-  showPlaceholder?: boolean;
-  onStateChange?: (tweetId: string, nextState: TweetHeightState) => void;
-}) {
-  const scaledWrapperRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const renderKey = getTweetRenderKey(tweetId, stageWidth);
-  const [status, setStatus] = useState<'loading' | 'measuring' | 'ready' | 'error'>('loading');
-
-  useEffect(() => {
-    const scaledWrapper = scaledWrapperRef.current;
-    const container = containerRef.current;
-    if (!scaledWrapper || !container) return;
-
-    let cancelled = false;
-    let resizeObserver: ResizeObserver | null = null;
-    let mutationObserver: MutationObserver | null = null;
-    let iframeCleanup: (() => void) | null = null;
-    const settleTimers = new Set<ReturnType<typeof setTimeout>>();
-    let previousHeight = 0;
-    let stableMatches = 0;
-    const placeholderHeight = Math.round(TWEET_LOADING_HEIGHT * scale) + 32;
-
-    const clearTimers = () => {
-      settleTimers.forEach((timer) => clearTimeout(timer));
-      settleTimers.clear();
-    };
-
-    const pushState = (nextState: TweetHeightState) => {
-      onStateChange?.(tweetId, nextState);
-    };
-
-    const readHeight = () => {
-      const height = Math.ceil(scaledWrapper.getBoundingClientRect().height);
-      return height > 0 ? height : 0;
-    };
-
-    const measureHeight = () => {
-      const height = readHeight();
-      if (height <= 0) return 0;
-      pushState({
-        height,
-        status: 'measuring',
-        renderKey,
-      });
-      setStatus('measuring');
-      if (Math.abs(height - previousHeight) <= 2) {
-        stableMatches += 1;
-      } else {
-        stableMatches = 1;
-        previousHeight = height;
-      }
-      return height;
-    };
-
-    const finalizeStable = (height: number) => {
-      pushState({
-        height,
-        status: 'stable',
-        renderKey,
-      });
-      setStatus('ready');
-      clearTimers();
-    };
-
-    const scheduleSettle = (attempt = 0) => {
-      const timer = setTimeout(() => {
-        settleTimers.delete(timer);
-        if (cancelled) return;
-        const height = measureHeight();
-        if (height > 0 && stableMatches >= 2) {
-          finalizeStable(height);
-          return;
-        }
-        if (attempt >= 6) {
-          if (height > 0) {
-            finalizeStable(height);
-          }
-          return;
-        }
-        scheduleSettle(attempt + 1);
-      }, attempt === 0 ? 90 : 180);
-      settleTimers.add(timer);
-    };
-
-    container.innerHTML = '';
-
-    ensureTwitterSdk()
-      .then((twttr) => {
-        if (cancelled) return undefined;
-        return twttr.widgets.createTweet(tweetId, container, {
-          theme: 'dark',
-          conversation: 'none',
-          dnt: 'true',
-          align: 'left',
-        });
-      })
-      .then(() => {
-        if (cancelled) return;
-
-        measureHeight();
-
-        if ('ResizeObserver' in window) {
-          resizeObserver = new ResizeObserver(() => {
-            const height = measureHeight();
-            if (height > 0 && stableMatches >= 2) {
-              finalizeStable(height);
-            }
-          });
-          resizeObserver.observe(scaledWrapper);
-          resizeObserver.observe(container);
-        }
-
-        const iframe = container.querySelector('iframe');
-        if (iframe) {
-          const handleIframeLoad = () => {
-            const height = measureHeight();
-            if (height > 0 && stableMatches >= 2) {
-              finalizeStable(height);
-            }
-          };
-
-          iframe.addEventListener('load', handleIframeLoad);
-          mutationObserver = new MutationObserver(() => {
-            const height = measureHeight();
-            if (height > 0 && stableMatches >= 2) {
-              finalizeStable(height);
-            }
-          });
-          mutationObserver.observe(iframe, {
-            attributes: true,
-            attributeFilter: ['style', 'height'],
-          });
-
-          iframeCleanup = () => {
-            iframe.removeEventListener('load', handleIframeLoad);
-          };
-        }
-
-        scheduleSettle();
-      })
-      .catch(() => {
-        if (cancelled) return;
-        pushState({
-          height: placeholderHeight,
-          status: 'error',
-          renderKey,
-        });
-        setStatus('error');
-        clearTimers();
-      });
-
-    return () => {
-      cancelled = true;
-      container.innerHTML = '';
-      clearTimers();
-      iframeCleanup?.();
-      resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
-    };
-  }, [onStateChange, renderKey, scale, tweetId]);
-
-  const placeholderHeight = Math.round(TWEET_LOADING_HEIGHT * scale) + 32;
-  const reservedHeight = state.status === 'stable' ? Math.max(state.height, 0) : Math.max(state.height, placeholderHeight);
-  const outerHeight = status === 'loading' || status === 'error' ? placeholderHeight : reservedHeight;
-
-  return (
-    <div className="relative overflow-hidden" style={{ width: stageWidth, height: outerHeight }}>
-      {showPlaceholder && status === 'loading' && (
-        <div className="absolute inset-0 animate-pulse border border-white/[0.06] bg-[#060b0f] p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-zinc-800" />
-            <div className="space-y-2">
-              <div className="h-2.5 w-24 bg-zinc-800" />
-              <div className="h-2 w-14 bg-zinc-800/60" />
-            </div>
-          </div>
-          <div className="mt-4 space-y-2">
-            <div className="h-2.5 w-full bg-zinc-800/55" />
-            <div className="h-2.5 w-[90%] bg-zinc-800/45" />
-            <div className="h-2.5 w-[78%] bg-zinc-800/35" />
-          </div>
-          <div className="mt-5 h-[84px] bg-zinc-800/25" />
-          <div className="mt-4 flex items-center gap-2 text-[11px] text-zinc-500">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Loading official X post
-          </div>
-        </div>
-      )}
-
-      {showPlaceholder && status === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 border border-white/[0.06] bg-[#060b0f] px-5 text-center">
-          <div className="text-sm font-medium text-white">Post failed to render</div>
-          <div className="text-sm leading-6 text-zinc-500">
-            X did not finish embedding this post. Try another recent mention or refresh later.
-          </div>
-        </div>
-      )}
-
-      <div
-        ref={scaledWrapperRef}
-        className="absolute left-0 top-0"
-        style={{
-          width: EMBED_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          visibility: status === 'error' || status === 'loading' ? 'hidden' : 'visible',
-        }}
-      >
-        <div ref={containerRef} style={{ width: EMBED_WIDTH }} />
-      </div>
-    </div>
-  );
-});
-
-const XEmbedPreloader = memo(function XEmbedPreloader({
-  tweetId,
-  scale,
-  stageWidth,
-}: {
-  tweetId: string;
-  scale: number;
-  stageWidth: number;
-}) {
-  return (
-    <div className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden opacity-0" aria-hidden="true">
-      <XTweetSlide
-        key={getTweetRenderKey(tweetId, stageWidth)}
-        tweetId={tweetId}
-        scale={scale}
-        stageWidth={stageWidth}
-        state={createFallbackTweetState(getTweetRenderKey(tweetId, stageWidth), Math.round(TWEET_LOADING_HEIGHT * scale) + 32)}
-        showPlaceholder={false}
-      />
-    </div>
-  );
-});
 
 export function XMentionsProvider({ domain, children }: XMentionsProviderProps) {
   const [activated, setActivated] = useState(false);
