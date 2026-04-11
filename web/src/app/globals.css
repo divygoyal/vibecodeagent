@@ -252,6 +252,11 @@ body {
   --surface-glow-b: rgba(103, 232, 249, 0.07);
 }
 
+.dashboard-hover-surface[data-tone='amber'] {
+  --surface-glow-a: rgba(251, 191, 36, 0.13);
+  --surface-glow-b: rgba(249, 115, 22, 0.08);
+}
+
 .dashboard-hover-surface[data-tone='mixed'] {
   --surface-glow-a: rgba(52, 211, 153, 0.1);
   --surface-glow-b: rgba(34, 211, 238, 0.08);

@@ -4,54 +4,50 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 import { LogoIcon } from '@/components/Logo';
-import OfficialXTweetEmbed from '@/components/social/OfficialXTweetEmbed';
-import XMentionsLockup from '@/components/social/XMentionsMark';
-import {
-    DEFAULT_X_WIDGET_CONFIG,
-    type XWidgetConfig,
-} from '@/lib/socialEmbeds';
-import type { XMentionPayload } from '@/lib/xMentionsShared';
+import OfficialRedditPostEmbed from '@/components/social/OfficialRedditPostEmbed';
+import RedditMentionsLockup from '@/components/social/RedditMentionsMark';
+import { DEFAULT_X_WIDGET_CONFIG, type XWidgetConfig } from '@/lib/socialEmbeds';
+import type { RedditMentionPayload } from '@/lib/redditMentionsShared';
 
-type EmbedResponse = {
+type RedditEmbedResponse = {
     token: string;
-    platform: 'x';
+    platform: 'reddit';
     domain: string;
     label: string | null;
     showBranding: boolean;
-    mentions: XMentionPayload[];
+    mentions: RedditMentionPayload[];
     config?: XWidgetConfig;
     warning?: string;
     error?: string;
 };
 
-export type XWidgetRenderMode = 'embed' | 'preview' | 'builder';
+export type RedditWidgetRenderMode = 'embed' | 'preview' | 'builder';
 
-export type XWidgetData = {
+export type RedditWidgetData = {
     domain: string;
     label?: string | null;
     showBranding?: boolean;
-    mentions: XMentionPayload[];
+    mentions: RedditMentionPayload[];
     config?: Partial<XWidgetConfig> | XWidgetConfig;
     warning?: string;
     error?: string;
     resizeKey?: string;
 };
 
-type XWidgetSurfaceProps = {
-    data: XWidgetData;
-    mode?: XWidgetRenderMode;
+type RedditWidgetSurfaceProps = {
+    data: RedditWidgetData;
+    mode?: RedditWidgetRenderMode;
     loading?: boolean;
 };
 
 type ViewState = {
     key: string;
-    failedTweetIds: string[];
     pageStart: number;
 };
 
-type XWebsiteEmbedProps = {
+type RedditWebsiteEmbedProps = {
     token: string;
-    mode?: Exclude<XWidgetRenderMode, 'builder'>;
+    mode?: Exclude<RedditWidgetRenderMode, 'builder'>;
 };
 
 const FOUR_CARD_THRESHOLD = 1360;
@@ -65,19 +61,6 @@ function getResponsiveVisibleCapacity(width: number) {
     return 1;
 }
 
-function getCardRenderWidth(visibleCards: number) {
-    switch (visibleCards) {
-        case 4:
-            return 276;
-        case 3:
-            return 320;
-        case 2:
-            return 360;
-        default:
-            return 520;
-    }
-}
-
 function WidgetShell({
     children,
     showBranding,
@@ -89,7 +72,10 @@ function WidgetShell({
         <div className="bg-[#05080d] text-white">
             <div className="mx-auto w-full overflow-hidden rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,#0c1117_0%,#090e14_100%)] shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
                 <div className="border-b border-white/[0.06] px-4 py-3.5 sm:px-5">
-                    <XMentionsLockup iconClassName="h-5 w-5" textClassName="text-[11px] font-semibold uppercase tracking-[0.2em] text-white" />
+                    <RedditMentionsLockup
+                        iconClassName="h-5 w-5 text-orange-400"
+                        textClassName="text-[11px] font-semibold uppercase tracking-[0.2em] text-white"
+                    />
                 </div>
 
                 {children}
@@ -116,27 +102,22 @@ function WidgetShell({
     );
 }
 
-export function XWidgetSurface({
+export function RedditWidgetSurface({
     data,
     mode = 'embed',
     loading = false,
-}: XWidgetSurfaceProps) {
+}: RedditWidgetSurfaceProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const stateKey = useMemo(
         () => `${data.domain}:${data.mentions.map((mention) => mention.id).join(',')}`,
         [data.domain, data.mentions],
     );
-    const [viewState, setViewState] = useState<ViewState>({
-        key: stateKey,
-        failedTweetIds: [],
-        pageStart: 0,
-    });
+    const [viewState, setViewState] = useState<ViewState>({ key: stateKey, pageStart: 0 });
     const [contentWidth, setContentWidth] = useState(1200);
     const resolvedViewState = viewState.key === stateKey
         ? viewState
-        : { key: stateKey, failedTweetIds: [], pageStart: 0 };
-    const failedTweetIdSet = useMemo(() => new Set(resolvedViewState.failedTweetIds), [resolvedViewState.failedTweetIds]);
+        : { key: stateKey, pageStart: 0 };
 
     useEffect(() => {
         const node = contentRef.current;
@@ -165,64 +146,28 @@ export function XWidgetSurface({
         () => Math.max(1, getResponsiveVisibleCapacity(contentWidth)),
         [contentWidth],
     );
-    const cardRenderWidth = useMemo(() => getCardRenderWidth(visibleCards), [visibleCards]);
-    const skeletonHeight = 320;
-    const availableMentions = useMemo(
-        () => data.mentions.filter((mention) => !failedTweetIdSet.has(mention.id)),
-        [data.mentions, failedTweetIdSet],
-    );
-
     const maxPageStart = useMemo(() => {
-        if (availableMentions.length === 0) return 0;
-        return Math.floor((availableMentions.length - 1) / visibleCards) * visibleCards;
-    }, [availableMentions.length, visibleCards]);
-
-    const pageStart = Math.min(resolvedViewState.pageStart, maxPageStart);
+        if (data.mentions.length === 0) return 0;
+        return Math.floor((data.mentions.length - 1) / visibleCards) * visibleCards;
+    }, [data.mentions.length, visibleCards]);
+    const currentPageStart = Math.min(resolvedViewState.pageStart, maxPageStart);
     const currentMentions = useMemo(
-        () => availableMentions.slice(pageStart, pageStart + visibleCards),
-        [availableMentions, pageStart, visibleCards],
+        () => data.mentions.slice(currentPageStart, currentPageStart + visibleCards),
+        [currentPageStart, data.mentions, visibleCards],
     );
-    const canPagePrev = pageStart > 0;
-    const canPageNext = pageStart + visibleCards < availableMentions.length;
-    const rangeStart = availableMentions.length > 0 ? pageStart + 1 : 0;
-    const rangeEnd = availableMentions.length > 0 ? Math.min(pageStart + visibleCards, availableMentions.length) : 0;
-    const showUnavailableEmbedsState =
-        !loading &&
-        !data.error &&
-        data.mentions.length > 0 &&
-        availableMentions.length === 0;
-
-    const handleTweetResolved = useCallback((tweetId: string, status: 'stable' | 'error') => {
-        if (status === 'stable') {
-            setViewState((previous) => {
-                const base = previous.key === stateKey ? previous : { key: stateKey, failedTweetIds: [], pageStart: 0 };
-                return {
-                    ...base,
-                    failedTweetIds: base.failedTweetIds.filter((id) => id !== tweetId),
-                };
-            });
-            return;
-        }
-
-        setViewState((previous) => {
-            const base = previous.key === stateKey ? previous : { key: stateKey, failedTweetIds: [], pageStart: 0 };
-            return base.failedTweetIds.includes(tweetId)
-                ? base
-                : { ...base, failedTweetIds: [...base.failedTweetIds, tweetId] };
-        });
-    }, [stateKey]);
+    const canPagePrev = currentPageStart > 0;
+    const canPageNext = currentPageStart + visibleCards < data.mentions.length;
+    const rangeStart = data.mentions.length > 0 ? currentPageStart + 1 : 0;
+    const rangeEnd = data.mentions.length > 0 ? Math.min(currentPageStart + visibleCards, data.mentions.length) : 0;
 
     const handlePageChange = useCallback((direction: -1 | 1) => {
         setViewState((previous) => {
-            const base = previous.key === stateKey ? previous : { key: stateKey, failedTweetIds: [], pageStart: 0 };
-            const nextPageStart = base.pageStart + direction * visibleCards;
-
-            return {
-                ...base,
-                pageStart: direction < 0
-                    ? Math.max(0, nextPageStart)
-                    : Math.min(maxPageStart, nextPageStart),
-            };
+            const base = previous.key === stateKey ? previous : { key: stateKey, pageStart: 0 };
+            const next = base.pageStart + direction * visibleCards;
+            if (direction < 0) {
+                return { ...base, pageStart: Math.max(0, next) };
+            }
+            return { ...base, pageStart: Math.min(maxPageStart, next) };
         });
     }, [maxPageStart, stateKey, visibleCards]);
 
@@ -236,7 +181,7 @@ export function XWidgetSurface({
             const height = Math.ceil(wrapper.getBoundingClientRect().height);
             window.parent?.postMessage(
                 {
-                    type: 'trafficclaw:x-embed-resize',
+                    type: 'trafficclaw:reddit-embed-resize',
                     token: data.resizeKey || data.domain,
                     height,
                 },
@@ -265,19 +210,18 @@ export function XWidgetSurface({
                     {loading ? (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between gap-3">
-                                <div className="text-sm font-medium text-white">Loading the latest mentions</div>
-                                <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+                                <div className="text-sm font-medium text-white">Loading the latest Reddit mentions</div>
+                                <Loader2 className="h-5 w-5 animate-spin text-orange-400" />
                             </div>
 
                             <div
-                                className="grid items-start gap-4"
+                                className="grid items-stretch gap-4"
                                 style={{ gridTemplateColumns: `repeat(${visibleCards}, minmax(0, 1fr))` }}
                             >
                                 {Array.from({ length: visibleCards }).map((_, index) => (
                                     <div
                                         key={index}
-                                        className="animate-pulse rounded-[12px] border border-white/[0.06] bg-[#060b0f]"
-                                        style={{ height: skeletonHeight }}
+                                        className="h-[320px] animate-pulse rounded-[12px] border border-white/[0.06] bg-[#060b0f]"
                                     />
                                 ))}
                             </div>
@@ -286,40 +230,37 @@ export function XWidgetSurface({
 
                     {!loading && data.error && !data.mentions.length ? (
                         <div className="rounded-[12px] border border-white/[0.06] bg-[#080c12] px-6 py-10 text-center">
-                            <div className="text-base font-medium text-white">This X widget is unavailable</div>
+                            <div className="text-base font-medium text-white">This Reddit widget is unavailable</div>
                             <p className="mt-2 text-sm text-zinc-500">{data.error}</p>
                         </div>
                     ) : null}
 
-                    {!loading && !data.error && data.mentions.length === 0 ? (
+                    {!loading && !data.error && data.warning && !data.mentions.length ? (
+                        <div className="rounded-[12px] border border-amber-400/20 bg-amber-500/[0.08] px-6 py-10 text-center">
+                            <div className="text-base font-medium text-white">Reddit mentions are temporarily unavailable</div>
+                            <p className="mt-2 text-sm text-amber-100">{data.warning}</p>
+                        </div>
+                    ) : null}
+
+                    {!loading && !data.error && !data.warning && data.mentions.length === 0 ? (
                         <div className="rounded-[12px] border border-white/[0.06] bg-[#080c12] px-6 py-10 text-center">
-                            <div className="text-base font-medium text-white">No X mentions found yet</div>
+                            <div className="text-base font-medium text-white">No Reddit mentions found yet</div>
                             <p className="mt-2 text-sm text-zinc-500">
-                                We&apos;ll refresh the latest posts about {data.domain} again tomorrow.
+                                We&apos;ll refresh the latest discussions about {data.domain} again tomorrow.
                             </p>
                         </div>
                     ) : null}
 
-                    {showUnavailableEmbedsState ? (
-                        <div className="rounded-[12px] border border-white/[0.06] bg-[#080c12] px-6 py-10 text-center">
-                            <div className="text-base font-medium text-white">Official X posts are unavailable right now</div>
-                            <p className="mt-2 text-sm text-zinc-500">
-                                We found mention candidates for {data.domain}, but X refused to fully embed them today.
-                                We&apos;ll try again on the next daily refresh.
-                            </p>
-                        </div>
-                    ) : null}
-
-                    {!loading && availableMentions.length > 0 ? (
+                    {!loading && data.mentions.length > 0 ? (
                         <div className="space-y-4">
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="text-sm text-zinc-400">
-                                    Showing {rangeStart}-{rangeEnd} of {availableMentions.length}
+                                    Showing {rangeStart}-{rangeEnd} of {data.mentions.length}
                                 </div>
 
                                 <div className="flex items-center gap-2">
                                     {data.warning ? (
-                                        <div className="hidden rounded-[10px] border border-amber-400/20 bg-amber-500/8 px-3 py-1 text-[11px] text-amber-200 sm:block">
+                                        <div className="hidden rounded-[10px] border border-amber-400/20 bg-amber-500/[0.08] px-3 py-1 text-[11px] text-amber-200 sm:block">
                                             {data.warning}
                                         </div>
                                     ) : null}
@@ -328,8 +269,8 @@ export function XWidgetSurface({
                                         type="button"
                                         onClick={() => handlePageChange(-1)}
                                         disabled={!canPagePrev}
-                                        className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                                        aria-label="Show previous tweets"
+                                        className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-orange-400/30 hover:bg-orange-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                        aria-label="Show previous Reddit mentions"
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                     </button>
@@ -337,8 +278,8 @@ export function XWidgetSurface({
                                         type="button"
                                         onClick={() => handlePageChange(1)}
                                         disabled={!canPageNext}
-                                        className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                                        aria-label="Show next tweets"
+                                        className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-orange-400/30 hover:bg-orange-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                        aria-label="Show next Reddit mentions"
                                     >
                                         <ChevronRight className="h-4 w-4" />
                                     </button>
@@ -346,25 +287,17 @@ export function XWidgetSurface({
                             </div>
 
                             {data.warning ? (
-                                <div className="rounded-[10px] border border-amber-400/20 bg-amber-500/8 px-4 py-3 text-sm text-amber-200 sm:hidden">
+                                <div className="rounded-[10px] border border-amber-400/20 bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-200 sm:hidden">
                                     {data.warning}
                                 </div>
                             ) : null}
 
                             <div
-                                className="grid items-start gap-4"
+                                className="grid items-stretch gap-4"
                                 style={{ gridTemplateColumns: `repeat(${Math.max(currentMentions.length, 1)}, minmax(0, 1fr))` }}
                             >
                                 {currentMentions.map((mention) => (
-                                    <div key={mention.id} className="flex min-w-0 justify-center self-start">
-                                        <OfficialXTweetEmbed
-                                            tweetId={mention.id}
-                                            maxRenderWidth={cardRenderWidth}
-                                            className="w-full"
-                                            onResolvedStatusChange={handleTweetResolved}
-                                            showErrorState={false}
-                                        />
-                                    </div>
+                                    <OfficialRedditPostEmbed key={mention.id} mention={mention} />
                                 ))}
                             </div>
                         </div>
@@ -375,8 +308,8 @@ export function XWidgetSurface({
     );
 }
 
-export default function XWebsiteEmbed({ token, mode = 'embed' }: XWebsiteEmbedProps) {
-    const [data, setData] = useState<EmbedResponse | null>(null);
+export default function RedditWebsiteEmbed({ token, mode = 'embed' }: RedditWebsiteEmbedProps) {
+    const [data, setData] = useState<RedditEmbedResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -388,7 +321,7 @@ export default function XWebsiteEmbed({ token, mode = 'embed' }: XWebsiteEmbedPr
             setError(null);
 
             try {
-                const response = await fetch(`/api/embed/x?token=${encodeURIComponent(token)}`, {
+                const response = await fetch(`/api/embed/reddit?token=${encodeURIComponent(token)}`, {
                     cache: 'no-store',
                 });
                 const payload = await response.json().catch(() => ({}));
@@ -400,8 +333,8 @@ export default function XWebsiteEmbed({ token, mode = 'embed' }: XWebsiteEmbedPr
                     return;
                 }
 
-                setData(payload as EmbedResponse);
-                setError((payload as EmbedResponse).error || null);
+                setData(payload as RedditEmbedResponse);
+                setError((payload as RedditEmbedResponse).error || null);
             } catch {
                 if (!cancelled) {
                     setError('Failed to load this embed.');
@@ -421,17 +354,17 @@ export default function XWebsiteEmbed({ token, mode = 'embed' }: XWebsiteEmbedPr
     }, [token]);
 
     return (
-        <XWidgetSurface
+        <RedditWidgetSurface
             mode={mode}
             loading={loading}
             data={{
-                domain: data?.domain || 'your site',
-                label: data?.label || null,
-                showBranding: data?.showBranding ?? true,
+                domain: data?.domain || token,
+                label: data?.label,
                 mentions: data?.mentions || [],
                 config: data?.config || DEFAULT_X_WIDGET_CONFIG,
                 warning: data?.warning,
                 error: error || data?.error,
+                showBranding: data?.showBranding !== false,
                 resizeKey: token,
             }}
         />

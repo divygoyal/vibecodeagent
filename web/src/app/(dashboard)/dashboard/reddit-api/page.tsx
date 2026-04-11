@@ -10,32 +10,34 @@ import {
     Globe2,
     Link2,
     Loader2,
+    MessageCircle,
     RefreshCcw,
     Sparkles,
     Trash2,
 } from 'lucide-react';
 
 import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
-import XMentionsLockup from '@/components/social/XMentionsMark';
-import { XWidgetSurface } from '@/components/social/XWebsiteEmbed';
+import RedditMentionsLockup from '@/components/social/RedditMentionsMark';
+import { RedditWidgetSurface } from '@/components/social/RedditWebsiteEmbed';
 import {
-    buildXEmbedCode,
+    buildRedditEmbedCode,
     DEFAULT_X_WIDGET_CONFIG,
     normalizeXWidgetConfig,
     type SocialEmbedTokenRecord,
 } from '@/lib/socialEmbeds';
-import { canonicalizeDomainInput, type XMentionPayload } from '@/lib/xMentionsShared';
+import { type RedditMentionPayload } from '@/lib/redditMentionsShared';
+import { canonicalizeDomainInput } from '@/lib/xMentionsShared';
 
 type MentionFetchResult = {
     canonicalDomain: string;
-    mentions: XMentionPayload[];
+    mentions: RedditMentionPayload[];
     warning?: string;
     error?: string;
 };
 
 type DemoState = {
     status: 'loading' | 'ready' | 'error';
-    mentions: XMentionPayload[];
+    mentions: RedditMentionPayload[];
     warning?: string;
     error?: string;
 };
@@ -75,7 +77,7 @@ function CopyButton({
             type="button"
             onClick={onClick}
             disabled={disabled}
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3.5 py-2 text-sm font-medium text-zinc-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3.5 py-2 text-sm font-medium text-zinc-300 transition hover:border-orange-400/30 hover:bg-orange-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
             {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
             {copied ? 'Copied' : label}
@@ -91,7 +93,7 @@ function CodeBlock({ code }: { code: string }) {
     );
 }
 
-export default function XApiPage() {
+export default function RedditApiPage() {
     const [appOrigin, setAppOrigin] = useState('https://trafficclaw.com');
     const [domainInput, setDomainInput] = useState('');
     const [demoState, setDemoState] = useState<DemoState>({ status: 'loading', mentions: [] });
@@ -121,7 +123,7 @@ export default function XApiPage() {
     }, []);
 
     const fetchMentions = useCallback(async (domain: string): Promise<MentionFetchResult> => {
-        const response = await fetch('/api/x-mentions', {
+        const response = await fetch('/api/reddit-mentions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ domain }),
@@ -140,7 +142,7 @@ export default function XApiPage() {
         }
 
         if (!response.ok && mentions.length === 0) {
-            throw new Error(error || 'Failed to load X mentions right now.');
+            throw new Error(error || 'Failed to load Reddit mentions right now.');
         }
 
         return { canonicalDomain, mentions, warning, error };
@@ -154,7 +156,7 @@ export default function XApiPage() {
         }
 
         try {
-            const response = await fetch('/api/social-embeds/tokens?platform=x', { cache: 'no-store' });
+            const response = await fetch('/api/social-embeds/tokens?platform=reddit', { cache: 'no-store' });
             const data = await response.json().catch(() => []);
 
             if (response.ok && Array.isArray(data)) {
@@ -215,8 +217,8 @@ export default function XApiPage() {
     }, [fetchMentions]);
 
     const resolvedDomain = useMemo(() => canonicalizeDomainInput(domainInput) || '', [domainInput]);
-    const embedUrl = currentWidget ? `${appOrigin}/embed/x/${currentWidget.token}` : null;
-    const embedCode = currentWidget ? buildXEmbedCode({ token: currentWidget.token, origin: appOrigin }) : '';
+    const embedUrl = currentWidget ? `${appOrigin}/embed/reddit/${currentWidget.token}` : null;
+    const embedCode = currentWidget ? buildRedditEmbedCode({ token: currentWidget.token, origin: appOrigin }) : '';
     const previewDomain = latestPreview?.canonicalDomain || 'trafficclaw.com';
     const previewMentions = latestPreview?.mentions || demoState.mentions;
     const previewWarning = latestPreview?.warning || (!latestPreview ? demoState.warning : undefined);
@@ -231,9 +233,9 @@ export default function XApiPage() {
 
     const saveWidget = useCallback(async (preview: MentionFetchResult) => {
         const payload = {
-            platform: 'x',
+            platform: 'reddit',
             domain: preview.canonicalDomain,
-            label: `${preview.canonicalDomain} X mentions`,
+            label: `${preview.canonicalDomain} Reddit mentions`,
             config: DEFAULT_X_WIDGET_CONFIG,
         };
 
@@ -272,7 +274,7 @@ export default function XApiPage() {
                 data.error ||
                 (response.status === 405
                     ? 'Your local admin backend does not support widget updates yet. Restart admin-api or click Start a new widget.'
-                    : 'Failed to save your X widget.')
+                    : 'Failed to save your Reddit widget.')
             );
         }
 
@@ -386,22 +388,25 @@ export default function XApiPage() {
         <div className="space-y-6 pb-12">
             <DashboardHoverSurface
                 as="section"
-                tone="cyan"
-                className="overflow-hidden border border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.09),transparent_30%),linear-gradient(180deg,#0b1016_0%,#080c12_100%)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:p-8 lg:p-9"
+                tone="amber"
+                className="overflow-hidden border border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.1),transparent_30%),linear-gradient(180deg,#0b1016_0%,#080c12_100%)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:p-8 lg:p-9"
             >
                 <div className="max-w-5xl space-y-6">
-                    <XMentionsLockup iconClassName="h-6 w-6 text-white" textClassName="text-sm font-semibold uppercase tracking-[0.24em] text-white" />
+                    <RedditMentionsLockup
+                        iconClassName="h-10 w-10 text-orange-400"
+                        textClassName="text-sm font-semibold uppercase tracking-[0.24em] text-white"
+                    />
 
                     <div className="space-y-3">
                         <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                            Embed your Twitter/X mentions in your website
+                            Embed your Reddit mentions in your website
                         </h1>
 
                         <div className="flex flex-wrap items-center gap-3">
                             {STEP_ITEMS.map((step, index) => (
                                 <div key={step} className="flex items-center gap-3">
-                                    <div className="dashboard-hover-chip inline-flex items-center gap-2 rounded-[12px] border border-white/[0.08] bg-[#05090d] px-3.5 py-2.5 text-sm text-zinc-300">
-                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-[8px] border border-emerald-400/20 bg-emerald-500/10 text-xs font-semibold text-emerald-300">
+                                    <div className="dashboard-hover-chip inline-flex items-center gap-2 rounded-[12px] border border-white/[0.08] bg-[#05090d] px-3.5 py-2.5 text-sm text-zinc-300" data-tone="amber">
+                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-[8px] border border-orange-400/20 bg-orange-500/10 text-xs font-semibold text-orange-200">
                                             {index + 1}
                                         </span>
                                         {step}
@@ -415,13 +420,13 @@ export default function XApiPage() {
                     <div className="border border-white/[0.08] bg-[#0a0f14]/92 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.18)] sm:p-6">
                         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                             <div className="space-y-3">
-                                <label className="block text-sm font-medium text-white" htmlFor="x-domain-input">
+                                <label className="block text-sm font-medium text-white" htmlFor="reddit-domain-input">
                                     Website domain
                                 </label>
                                 <div className="dashboard-hover-item flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-[#05080d] px-4 py-4">
-                                    <Globe2 className="h-5 w-5 text-cyan-300" />
+                                    <Globe2 className="h-5 w-5 text-orange-300" />
                                     <input
-                                        id="x-domain-input"
+                                        id="reddit-domain-input"
                                         value={domainInput}
                                         onChange={(event) => setDomainInput(event.target.value)}
                                         placeholder="example.com"
@@ -435,7 +440,7 @@ export default function XApiPage() {
                                 onClick={() => void handleGenerate()}
                                 disabled={submitting}
                                 data-variant="primary"
-                                className="dashboard-hover-action inline-flex min-h-[58px] items-center justify-center gap-2 rounded-[12px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.95),rgba(34,211,238,0.82))] px-6 py-4 text-base font-semibold text-slate-950 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="dashboard-hover-action inline-flex min-h-[58px] items-center justify-center gap-2 rounded-[12px] border border-orange-400/20 bg-[linear-gradient(135deg,rgba(249,115,22,0.96),rgba(245,158,11,0.9))] px-6 py-4 text-base font-semibold text-slate-950 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                                 {submitting ? 'Generating...' : 'Get My Embed Code'}
@@ -443,7 +448,7 @@ export default function XApiPage() {
                         </div>
 
                         {resolvedDomain ? (
-                            <div className="dashboard-hover-chip mt-5 inline-flex items-center gap-2 rounded-[10px] border border-emerald-400/15 bg-emerald-500/[0.08] px-3 py-1.5 text-sm text-emerald-200" data-tone="emerald">
+                            <div className="dashboard-hover-chip mt-5 inline-flex items-center gap-2 rounded-[10px] border border-orange-400/15 bg-orange-500/[0.08] px-3 py-1.5 text-sm text-orange-100" data-tone="amber">
                                 Ready for <span className="font-semibold">{resolvedDomain}</span>
                             </div>
                         ) : null}
@@ -456,7 +461,7 @@ export default function XApiPage() {
                                 <button
                                     type="button"
                                     onClick={handleStartNew}
-                                    className="text-cyan-300 transition hover:text-cyan-200"
+                                    className="text-orange-300 transition hover:text-orange-200"
                                 >
                                     Start a new widget
                                 </button>
@@ -464,7 +469,7 @@ export default function XApiPage() {
                         ) : null}
 
                         {hasPendingChanges ? (
-                            <div className="dashboard-hover-item mt-5 rounded-[12px] border border-cyan-400/20 bg-cyan-500/[0.08] px-4 py-3 text-sm text-cyan-100">
+                            <div className="dashboard-hover-item mt-5 rounded-[12px] border border-orange-400/20 bg-orange-500/[0.08] px-4 py-3 text-sm text-orange-100">
                                 Preview updates immediately here. Click <span className="font-semibold">Get My Embed Code</span> to save the latest domain to your hosted widget.
                             </div>
                         ) : null}
@@ -486,12 +491,12 @@ export default function XApiPage() {
 
             <DashboardHoverSurface
                 as="section"
-                tone="cyan"
+                tone="amber"
                 className="border border-white/[0.08] bg-[#0c1117] p-5 shadow-[0_14px_40px_rgba(0,0,0,0.16)] sm:p-6"
             >
                 <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
-                        <Sparkles className="h-3.5 w-3.5" />
+                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-300">
+                        <MessageCircle className="h-3.5 w-3.5" />
                         Preview
                     </div>
                     <h2 className="text-2xl font-semibold text-white">
@@ -499,13 +504,13 @@ export default function XApiPage() {
                     </h2>
                     <p className="text-sm leading-7 text-zinc-400">
                         {isShowingUserPreview
-                            ? `Showing the latest mentions we found for ${previewDomain}.`
-                            : 'Showing the latest mentions from trafficclaw.com until you generate your own widget.'}
+                            ? `Showing the latest Reddit posts we found for ${previewDomain}.`
+                            : 'Showing the latest Reddit posts from trafficclaw.com until you generate your own widget.'}
                     </p>
                 </div>
 
                 <div className="mt-5">
-                    <XWidgetSurface
+                    <RedditWidgetSurface
                         mode="builder"
                         loading={previewLoading}
                         data={{
@@ -524,12 +529,12 @@ export default function XApiPage() {
                         <div className="dashboard-hover-item border border-white/[0.08] bg-[#091018] p-4 sm:p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-300">
                                         <Link2 className="h-3.5 w-3.5" />
                                         Get Your Code
                                     </div>
                                     <div className="mt-2 text-sm text-zinc-400">
-                                        Paste this on your website to show the live X mentions widget for <span className="font-semibold text-zinc-200">{currentWidget.domain}</span>.
+                                        Paste this on your website to show the live Reddit posts widget for <span className="font-semibold text-zinc-200">{currentWidget.domain}</span>.
                                     </div>
                                 </div>
                                 <CopyButton
@@ -564,10 +569,10 @@ export default function XApiPage() {
                                 </div>
                             </div>
 
-                            <div className="dashboard-hover-item border border-emerald-400/15 bg-[linear-gradient(180deg,rgba(16,185,129,0.12),rgba(9,16,24,0.96))] p-4 sm:p-5">
+                            <div className="dashboard-hover-item border border-orange-400/15 bg-[linear-gradient(180deg,rgba(249,115,22,0.12),rgba(9,16,24,0.96))] p-4 sm:p-5">
                                 <div className="text-sm font-medium text-white">Done</div>
                                 <p className="mt-2 text-sm leading-6 text-zinc-200">
-                                    TrafficClaw keeps the same hosted widget URL active and refreshes the mentions daily behind the scenes.
+                                    TrafficClaw keeps the same hosted widget URL active and refreshes the Reddit mentions daily behind the scenes.
                                 </p>
                             </div>
                         </div>
@@ -577,7 +582,7 @@ export default function XApiPage() {
 
             <DashboardHoverSurface
                 as="section"
-                tone="mixed"
+                tone="amber"
                 className="border border-white/[0.08] bg-[#0c1117] p-5 shadow-[0_14px_40px_rgba(0,0,0,0.16)] sm:p-6"
             >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -603,7 +608,7 @@ export default function XApiPage() {
                 <div className="mt-5 overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#091018]">
                     {loadingTokens ? (
                         <div className="flex items-center justify-center gap-3 px-5 py-12 text-zinc-400">
-                            <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                            <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
                             Loading widgets...
                         </div>
                     ) : tokens.length === 0 ? (
@@ -616,20 +621,20 @@ export default function XApiPage() {
                     ) : (
                         <div className="divide-y divide-white/[0.06]">
                             {tokens.map((token) => {
-                                const tokenUrl = `${appOrigin}/embed/x/${token.token}`;
+                                const tokenUrl = `${appOrigin}/embed/reddit/${token.token}`;
                                 const isSelected = currentWidget?.token === token.token;
 
                                 return (
                                     <div
                                         key={token.token}
                                         className={`dashboard-hover-item flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${
-                                            isSelected ? 'bg-cyan-500/[0.04]' : ''
+                                            isSelected ? 'bg-orange-500/[0.04]' : ''
                                         }`}
                                     >
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="rounded-[8px] border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-medium text-cyan-300">
-                                                    X
+                                                <span className="rounded-[8px] border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-[11px] font-medium text-orange-200">
+                                                    Reddit
                                                 </span>
                                                 <span className="truncate text-sm font-semibold text-white">{token.domain}</span>
                                                 <span className="text-xs text-zinc-500">Created {formatCreatedAt(token.created_at)}</span>
@@ -645,7 +650,7 @@ export default function XApiPage() {
                                             <button
                                                 type="button"
                                                 onClick={() => void handleLoadWidget(token)}
-                                                className="inline-flex min-h-[42px] items-center gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3.5 py-2 text-sm font-medium text-zinc-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white"
+                                                className="inline-flex min-h-[42px] items-center gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3.5 py-2 text-sm font-medium text-zinc-300 transition hover:border-orange-400/30 hover:bg-orange-500/10 hover:text-white"
                                             >
                                                 Load
                                             </button>
@@ -670,25 +675,25 @@ export default function XApiPage() {
             <DashboardHoverSurface
                 as="section"
                 tone="mixed"
-                className="border border-white/[0.08] bg-[linear-gradient(180deg,rgba(249,115,22,0.05),rgba(12,17,23,0.96))] px-5 py-5 shadow-[0_14px_36px_rgba(0,0,0,0.14)]"
+                className="border border-white/[0.08] bg-[linear-gradient(180deg,rgba(34,211,238,0.05),rgba(12,17,23,0.96))] px-5 py-5 shadow-[0_14px_36px_rgba(0,0,0,0.14)]"
             >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-2">
-                        <div className="dashboard-hover-chip inline-flex items-center gap-2 rounded-[10px] border border-orange-400/20 bg-orange-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-300" data-tone="amber">
+                        <div className="dashboard-hover-chip inline-flex items-center gap-2 rounded-[10px] border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300" data-tone="cyan">
                             Also available
                         </div>
-                        <h2 className="text-xl font-semibold text-white">Need Reddit mentions too?</h2>
+                        <h2 className="text-xl font-semibold text-white">Need X mentions too?</h2>
                         <p className="max-w-2xl text-sm leading-6 text-zinc-400">
-                            The same copy-paste flow is now live for Reddit so you can embed real community posts too.
+                            The same copy-paste flow is available for X so you can embed both conversations side by side.
                         </p>
                     </div>
 
                     <Link
-                        href="/dashboard/reddit-api"
+                        href="/dashboard/x-api"
                         data-variant="ghost"
-                        className="dashboard-hover-action inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px] border border-orange-400/20 bg-orange-500/10 px-4 py-3 text-sm font-medium text-orange-200 transition hover:border-orange-400/30 hover:bg-orange-500/14 hover:text-white"
+                        className="dashboard-hover-action inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px] border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-medium text-cyan-200 transition hover:border-cyan-400/30 hover:bg-cyan-500/14 hover:text-white"
                     >
-                        Open Reddit mentions
+                        Open X mentions
                         <ExternalLink className="h-4 w-4" />
                     </Link>
                 </div>

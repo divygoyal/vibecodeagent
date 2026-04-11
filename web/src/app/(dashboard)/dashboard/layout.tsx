@@ -14,7 +14,7 @@ import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
-    Book, Newspaper, Coins, MessageSquare,
+    Book, Newspaper, Coins, MessageCircle, MessageSquare,
     ChevronDown, Bell, Globe, Sparkles, Target, type LucideIcon
 } from 'lucide-react';
 import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
@@ -78,6 +78,7 @@ const sidebarGroups: SidebarGroup[] = [
     ]},
     { label: 'Social APIs', items: [
         { icon: Sparkles, label: 'X (Twitter) API', href: '/dashboard/x-api' },
+        { icon: MessageCircle, label: 'Reddit API', href: '/dashboard/reddit-api' },
     ]},
     { label: 'SEO & Growth', items: [
         { icon: Search, label: 'SEO', href: '/dashboard/seo' },

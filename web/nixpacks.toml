@@ -1,3 +1,3 @@
 [phases.setup]
 aptPkgs = ["python3-pip"]
-cmds = ["pip3 install --break-system-packages twitter-cli"]
+cmds = ["pip3 install --break-system-packages twitter-cli rdt-cli"]

@@ -83,3 +83,39 @@ export function buildXEmbedCode({
 })();
 </script>`;
 }
+
+export function buildRedditEmbedCode({
+    token,
+    origin,
+}: {
+    token: string;
+    origin: string;
+}) {
+    const embedUrl = `${origin}/embed/reddit/${token}`;
+    const frameId = `trafficclaw-reddit-${token.slice(0, 12)}`;
+
+    return `<!-- TrafficClaw Reddit mentions widget -->
+<iframe
+  id="${frameId}"
+  src="${embedUrl}"
+  width="100%"
+  height="620"
+  frameborder="0"
+  loading="lazy"
+  style="width:100%;max-width:1460px;display:block;margin:0 auto;border:0;overflow:hidden;border-radius:18px;background:#05080d;"
+></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${frameId}');
+  if (!iframe) return;
+  window.addEventListener('message', function(event) {
+    if (event.origin !== '${origin}') return;
+    var data = event.data || {};
+    if (data.type === 'trafficclaw:reddit-embed-resize' && data.token === '${token}') {
+      var nextHeight = Math.max(360, Number(data.height) || 0);
+      iframe.style.height = nextHeight + 'px';
+    }
+  });
+})();
+</script>`;
+}

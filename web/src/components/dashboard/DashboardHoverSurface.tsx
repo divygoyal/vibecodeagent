@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 
-type DashboardHoverTone = 'emerald' | 'cyan' | 'mixed';
+type DashboardHoverTone = 'emerald' | 'cyan' | 'amber' | 'mixed';
 type DashboardHoverElement = 'div' | 'section';
 
 interface DashboardHoverSurfaceProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
