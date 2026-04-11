@@ -28,6 +28,11 @@ type ChartDataPoint = {
     impressions: number;
 };
 
+type ChartAnnotationResult = {
+    annotations: SmartAnnotation[];
+    warning?: string;
+};
+
 const SYSTEM_PROMPT = `You are a senior web analytics consultant analyzing chart data for a website owner.
 You will receive a JSON array of daily data points with: date, sessions (from Google Analytics), clicks (from Google Search Console), impressions, and average search position.
 
@@ -51,7 +56,41 @@ Rules:
 - If the data is mostly flat/boring, still find the 5 most relatively notable points
 
 Return ONLY valid JSON with no markdown fencing, no explanation outside the JSON:
-{"annotations":[{"date":"YYYY-MM-DD","title":"...","detail":"...","suggestion":"...","tone":"emerald|red|amber|cyan"},...]}`
+{"annotations":[{"date":"YYYY-MM-DD","title":"...","detail":"...","suggestion":"...","tone":"emerald|red|amber|cyan"},...]}`;
+
+function extractJsonPayload(text: string) {
+    const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    const fencedOrRaw = (fencedMatch?.[1] || text).trim();
+    const firstBrace = fencedOrRaw.indexOf('{');
+    const lastBrace = fencedOrRaw.lastIndexOf('}');
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        return fencedOrRaw.slice(firstBrace, lastBrace + 1);
+    }
+
+    return fencedOrRaw;
+}
+
+function normalizeAnnotations(
+    rawAnnotations: Partial<SmartAnnotation>[] | undefined,
+    chartData: ChartDataPoint[]
+) {
+    const annotations: SmartAnnotation[] = (rawAnnotations || [])
+        .slice(0, 5)
+        .filter((a): a is Required<Pick<SmartAnnotation, 'date' | 'title' | 'detail' | 'suggestion' | 'tone'>> =>
+            !!(a.date && a.title && a.detail && a.suggestion && a.tone)
+        )
+        .map((a) => ({
+            date: String(a.date),
+            title: String(a.title).slice(0, 30),
+            detail: String(a.detail).slice(0, 200),
+            suggestion: String(a.suggestion).slice(0, 200),
+            tone: (['emerald', 'red', 'amber', 'cyan'].includes(a.tone) ? a.tone : 'cyan') as SmartAnnotation['tone'],
+        }));
+
+    const validDates = new Set(chartData.map((p) => p.date));
+    return annotations.filter((annotation) => validDates.has(annotation.date));
+}
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -88,7 +127,7 @@ export async function POST(req: NextRequest) {
         const userId = session.user.id || session.user.email || 'anon';
         const cacheKey = `chart-ann:${userId}:${siteUrl || 'default'}:${range || '30d'}:${firstDate}:${lastDate}`;
 
-        const result = await cachedFetch<{ annotations: SmartAnnotation[] }>(
+        const result = await cachedFetch<ChartAnnotationResult>(
             cacheKey,
             ANNOTATION_CACHE_TTL,
             async () => {
@@ -113,46 +152,43 @@ export async function POST(req: NextRequest) {
                         systemInstruction: SYSTEM_PROMPT,
                         temperature: 0.3,
                         maxOutputTokens: 1500,
+                        responseMimeType: 'application/json',
                         httpOptions: { timeout: 15000 },
                     },
                 });
 
                 const text = response.text?.trim() || '';
-
-                // Parse JSON — strip markdown fencing if Gemini wraps it
-                let cleaned = text;
-                if (cleaned.startsWith('```')) {
-                    cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+                if (!text) {
+                    return {
+                        annotations: [],
+                        warning: 'AI annotations unavailable for this chart right now',
+                    };
                 }
 
-                const parsed = JSON.parse(cleaned) as { annotations?: Partial<SmartAnnotation>[] };
-                const annotations: SmartAnnotation[] = (parsed.annotations || [])
-                    .slice(0, 5)
-                    .filter((a): a is Required<Pick<SmartAnnotation, 'date' | 'title' | 'detail' | 'suggestion' | 'tone'>> =>
-                        !!(a.date && a.title && a.detail && a.suggestion && a.tone)
-                    )
-                    .map((a) => ({
-                        date: String(a.date),
-                        title: String(a.title).slice(0, 30),
-                        detail: String(a.detail).slice(0, 200),
-                        suggestion: String(a.suggestion).slice(0, 200),
-                        tone: (['emerald', 'red', 'amber', 'cyan'].includes(a.tone) ? a.tone : 'cyan') as SmartAnnotation['tone'],
-                    }));
+                try {
+                    const parsed = JSON.parse(extractJsonPayload(text)) as {
+                        annotations?: Partial<SmartAnnotation>[];
+                    };
 
-                // Validate that annotation dates exist in the chart data
-                const validDates = new Set(chartData.map((p) => p.date));
-                const validAnnotations = annotations.filter((a) => validDates.has(a.date));
-
-                return { annotations: validAnnotations };
+                    return {
+                        annotations: normalizeAnnotations(parsed.annotations, chartData),
+                    };
+                } catch (error) {
+                    console.warn('[chart-annotations] Invalid model JSON, using static fallback:', error);
+                    return {
+                        annotations: [],
+                        warning: 'AI annotations unavailable for this chart right now',
+                    };
+                }
             }
         );
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
-        console.error('[chart-annotations] Error:', error);
+        console.warn('[chart-annotations] Falling back to static annotations:', error);
         return NextResponse.json(
-            { annotations: [], error: 'Failed to generate annotations' },
-            { status: 500 }
+            { annotations: [], warning: 'Failed to generate AI annotations' },
+            { status: 200 }
         );
     }
 }

@@ -2,6 +2,7 @@
 ClawBot Admin API
 Manages user containers, subscriptions, and monitoring
 """
+import asyncio
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -449,6 +450,84 @@ async def get_connected_oauth_connections(db: AsyncSession, user_id: int) -> Lis
     ]
 
 
+async def build_oauth_connection_payload(db: AsyncSession, user_id: int) -> Dict[str, Dict[str, Optional[str]]]:
+    connections = await get_connected_oauth_connections(db, user_id)
+    payload: Dict[str, Dict[str, Optional[str]]] = {}
+
+    for connection in connections:
+        payload[connection.provider] = {
+            "provider_account_id": connection.provider_account_id,
+            "accessToken": connection.access_token,
+            "refreshToken": connection.refresh_token,
+            "token_type": connection.token_type,
+        }
+
+    return payload
+
+
+async def sync_user_container_in_background(user_id: int, trigger: str):
+    """Recreate a bot container after the response has been returned."""
+    async with async_session() as db:
+        user = await db.get(User, user_id)
+        if not user or not user.telegram_bot_token:
+            return
+
+        try:
+            if not user.container_port:
+                user.container_port = await get_next_available_port(db)
+                await db.commit()
+                await db.refresh(user)
+
+            plan_config = PLANS.get(user.plan, PLANS["free"])
+            connections = await build_oauth_connection_payload(db, user.id)
+
+            result = await asyncio.to_thread(
+                docker_manager.sync_container,
+                user_identifier=user.github_id,
+                plan=user.plan,
+                port=user.container_port,
+                telegram_token=user.telegram_bot_token,
+                gemini_key=user.gemini_api_key,
+                connections=connections,
+                custom_rules=user.custom_rules,
+                enabled_plugins=plan_config.get("features", []),
+                bot_engine=user.bot_engine,
+            )
+
+            if result["success"]:
+                user.container_id = result.get("container_id", user.container_id)
+                user.container_status = "running"
+                await db.commit()
+                await log_container_event(
+                    db,
+                    user.id,
+                    user.container_id or "pending",
+                    "sync",
+                    f"Background sync completed ({trigger})",
+                )
+            else:
+                user.container_status = user.container_status or "error"
+                await db.commit()
+                await log_container_event(
+                    db,
+                    user.id,
+                    user.container_id or "pending",
+                    "sync_error",
+                    result.get("error") or f"Background sync failed ({trigger})",
+                )
+        except Exception as e:
+            print(f"[ERROR] background sync failed for user_id={user_id}: {e}")
+            user = await db.get(User, user_id)
+            if user:
+                await log_container_event(
+                    db,
+                    user.id,
+                    user.container_id or "pending",
+                    "sync_error",
+                    f"Background sync exception ({trigger}): {str(e)}",
+                )
+
+
 def get_container_health_summary(user: User) -> Dict[str, Any]:
     """Combine Docker health with DB metadata for admin views."""
     runtime_identifier = get_user_runtime_identifier(user)
@@ -519,18 +598,32 @@ async def create_user(
         if existing_user:
             print(f"[DEBUG] Found existing user by github_id: {existing_user.id}")
         
+    provider_sync_needed = False
+    settings_sync_needed = False
+    background_sync_reason = "user_upsert"
+
     # 3. Upsert Logic
     if existing_user:
         user = existing_user
         print(f"[USER] Found existing user={user.id}, updating fields")
+        previous_telegram_token = user.telegram_bot_token
+        previous_gemini_key = user.gemini_api_key
+        previous_bot_engine = user.bot_engine
+
         # Update fields if provided
-        if user_data.telegram_bot_token:
+        if user_data.telegram_bot_token and user_data.telegram_bot_token != user.telegram_bot_token:
             print(f"[USER] Updating telegram bot token for user={user.id}")
             user.telegram_bot_token = user_data.telegram_bot_token
-        if user_data.gemini_api_key:
+            settings_sync_needed = True
+            background_sync_reason = "telegram_token_updated"
+        if user_data.gemini_api_key and user_data.gemini_api_key != user.gemini_api_key:
             user.gemini_api_key = user_data.gemini_api_key
-        if user_data.bot_engine:
+            settings_sync_needed = True
+            background_sync_reason = "gemini_key_updated"
+        if user_data.bot_engine and user_data.bot_engine != user.bot_engine:
             user.bot_engine = user_data.bot_engine
+            settings_sync_needed = True
+            background_sync_reason = "bot_engine_updated"
             
         # Update OAuth credentials if provided (Critical for re-auth/refresh tokens)
         if user_data.provider and user_data.provider_id:
@@ -542,14 +635,23 @@ async def create_user(
             oauth = result.scalars().first()  # Use first() to handle multiple connections gracefully
             
             if oauth:
-                if user_data.access_token:
+                oauth_changed = False
+                if user_data.provider_id and user_data.provider_id != oauth.provider_account_id:
+                    oauth.provider_account_id = user_data.provider_id
+                    oauth_changed = True
+                if has_non_empty_token(user_data.access_token) and user_data.access_token != oauth.access_token:
                     oauth.access_token = user_data.access_token
-                if user_data.refresh_token:
+                    oauth_changed = True
+                if has_non_empty_token(user_data.refresh_token) and user_data.refresh_token != oauth.refresh_token:
                     oauth.refresh_token = user_data.refresh_token
-                oauth.updated_at = datetime.utcnow()
+                    oauth_changed = True
+                if oauth_changed:
+                    oauth.updated_at = datetime.utcnow()
+                    provider_sync_needed = True
+                    background_sync_reason = f"provider_updated:{user_data.provider}"
             else:
-                 # Create new connection (Link new provider)
-                 oauth = OAuthConnection(
+                # Create new connection (Link new provider)
+                oauth = OAuthConnection(
                     user_id=user.id,
                     provider=user_data.provider,
                     provider_account_id=user_data.provider_id,
@@ -558,11 +660,11 @@ async def create_user(
                     token_type="bearer",
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
-                 )
-                 db.add(oauth)
-
-        await db.commit()
-        await db.refresh(user)
+                )
+                db.add(oauth)
+                if has_non_empty_token(user_data.access_token) or has_non_empty_token(user_data.refresh_token):
+                    provider_sync_needed = True
+                    background_sync_reason = f"provider_linked:{user_data.provider}"
     else:
         # Create new user
         
@@ -609,14 +711,33 @@ async def create_user(
                     updated_at=datetime.utcnow()
                 )
                 db.add(oauth)
-                await db.commit()
+                if has_non_empty_token(user_data.access_token) or has_non_empty_token(user_data.refresh_token):
+                    provider_sync_needed = True
+                    background_sync_reason = f"provider_linked:{user_data.provider}"
 
         except Exception as e:
             await db.rollback()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # 4. Only create container if telegram_bot_token is set
-    #    Container should NOT be created on initial signup — only when bot token is provided
+    needs_container_bootstrap = bool(user.telegram_bot_token) and (
+        not existing_user
+        or settings_sync_needed
+        or user.container_status in [None, "not_provisioned", "error"]
+        or not user.container_id
+        or user.container_id == "pending"
+    )
+    should_queue_sync = bool(user.telegram_bot_token) and (provider_sync_needed or needs_container_bootstrap)
+
+    if should_queue_sync and needs_container_bootstrap:
+        user.container_status = "pending"
+
+    await db.commit()
+    await db.refresh(user)
+
+    if should_queue_sync:
+        background_tasks.add_task(sync_user_container_in_background, user.id, background_sync_reason)
+
+    # 4. Fast-return if no telegram token is configured
     if not user.telegram_bot_token:
         print(f"[DEBUG] create_user: No telegram token, skipping container creation. user_id={user.id}, github_id={user.github_id}")
         return UserResponse(
@@ -632,58 +753,10 @@ async def create_user(
             bot_engine=user.bot_engine or "openclaw"
         )
 
-    # 5. Ensure Container Exists & Is Running (only when we have a telegram token)
-    try:
-        if not user.container_port:
-             print(f"[DEBUG] create_user: existing user has no port, assigning one.")
-             user.container_port = await get_next_available_port(db)
-             await db.commit()
-
-        plan_config = PLANS[user.plan]
-        connections = {}
-        
-        # Reload ALL connections from DB — only include those with valid tokens
-        res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
-        for c in res.scalars().all():
-            if c.access_token and c.access_token.strip():
-                connections[c.provider] = {
-                    "provider_account_id": c.provider_account_id,
-                    "accessToken": c.access_token,
-                    "refreshToken": c.refresh_token,
-                    "token_type": c.token_type
-                }
-
-        docker_identifier = user.github_id 
-
-        # Use sync_container to ensure memory files + env vars are always up to date
-        result = docker_manager.sync_container(
-            user_identifier=docker_identifier,
-            plan=user.plan,
-            port=user.container_port,
-            telegram_token=user.telegram_bot_token,
-            gemini_key=user.gemini_api_key,
-            connections=connections,
-            custom_rules=user.custom_rules,
-            enabled_plugins=plan_config.get("features", []),
-            bot_engine=user.bot_engine
-        )
-        
-        if not result["success"]:
-            print(f"[ERROR] Container creation failed: {result.get('error')}")
-            raise HTTPException(status_code=500, detail=f"Container operation failed: {result['error']}")
-
-        # Update container info
-        user.container_id = result.get("container_id", user.container_id)
-        user.container_status = "running"
-        await db.commit()
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[ERROR] create_user: Failed to ensure container: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
-
-    print(f"[USER] create_user: Success. user_id={user.id}, github_id={user.github_id}, container={user.container_status}")
+    print(
+        f"[USER] create_user: Success. user_id={user.id}, github_id={user.github_id}, "
+        f"container={user.container_status}, background_sync={should_queue_sync}"
+    )
     return UserResponse(
         id=user.id,
         github_id=user.github_id or "",

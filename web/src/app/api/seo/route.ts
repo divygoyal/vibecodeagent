@@ -6,6 +6,22 @@ import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
 import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
+const SEARCH_CONSOLE_SITE_LIST_TIMEOUT_MS = 10000
+const SEARCH_CONSOLE_DASHBOARD_TIMEOUT_MS = 20000
+
+type GoogleJwt = {
+    googleAccessToken?: string
+    googleRefreshToken?: string
+}
+
+type SearchConsoleSiteOption = {
+    siteUrl: string
+}
+
+type CachedErrorResult = {
+    __isError: true
+    error: string
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -150,9 +166,9 @@ export async function GET(req: Request) {
             const userId = session.user.id
 
             // Get Google tokens from JWT first, fall back to admin DB
-            const jwt = await getToken({ req: req as any }) as any
-            let googleAccess = jwt?.googleAccessToken as string | undefined
-            let googleRefresh = jwt?.googleRefreshToken as string | undefined
+            const jwt = await getToken({ req: req as never }) as GoogleJwt | null
+            let googleAccess = jwt?.googleAccessToken
+            let googleRefresh = jwt?.googleRefreshToken
 
             // Fallback: fetch from admin DB (handles case where user signed in with GitHub)
             if (!googleAccess && !googleRefresh) {
@@ -179,10 +195,24 @@ export async function GET(req: Request) {
             const mode = searchParams.get('mode')
 
             // Helper: fetch site list (cached)
-            const fetchSiteList = () => cachedFetch(
+            const fetchSiteList = () => cachedFetch<SearchConsoleSiteOption[] | CachedErrorResult>(
                 `gsc:sites:${userId}`,
                 CACHE_TTL.PROPERTY_LIST,
-                () => listSearchConsoleSites(token)
+                async () => {
+                    try {
+                        return await listSearchConsoleSites(
+                            token,
+                            AbortSignal.timeout(SEARCH_CONSOLE_SITE_LIST_TIMEOUT_MS)
+                        )
+                    } catch (e: unknown) {
+                        const errorMessage = e instanceof Error ? e.message : 'Failed to load Search Console sites'
+                        console.error('List Search Console sites error:', errorMessage)
+                        return {
+                            __isError: true,
+                            error: errorMessage,
+                        }
+                    }
+                }
             )
 
             // Handle "list" mode for dropdown
@@ -197,15 +227,20 @@ export async function GET(req: Request) {
             }
 
             let siteUrl = searchParams.get('siteUrl')
+            const siteListResult = await fetchSiteList()
+
+            if (!Array.isArray(siteListResult)) {
+                return NextResponse.json(
+                    { error: siteListResult?.error || "Failed to load Search Console sites" },
+                    { status: 502 }
+                )
+            }
+
+            const availableSites = siteListResult
 
             if (!siteUrl) {
-                try {
-                    const sites = await fetchSiteList()
-                    if (Array.isArray(sites) && sites.length > 0) {
-                        siteUrl = sites[0].siteUrl
-                    }
-                } catch (e) {
-                    console.warn("Failed to auto-detect GSC site:", e)
+                if (availableSites.length > 0) {
+                    siteUrl = availableSites[0].siteUrl
                 }
             }
 
@@ -216,23 +251,46 @@ export async function GET(req: Request) {
                 )
             }
 
+            const siteExists = availableSites.some((site) => site.siteUrl === siteUrl)
+            if (!siteExists) {
+                return NextResponse.json(
+                    {
+                        error: "Invalid Search Console site selected. Please choose a verified site.",
+                        code: "INVALID_SITE_URL",
+                    },
+                    { status: 400 }
+                )
+            }
+
             // Fetch dashboard data (cached for 3 min per site+section)
             const cacheKey = `gsc:dashboard:${userId}:${siteUrl}:${section}`
-            const dashboardData = await cachedFetch(
+            const dashboardData = await cachedFetch<Record<string, unknown> | CachedErrorResult>(
                 `${cacheKey}:${range}`,
                 CACHE_TTL.DASHBOARD_DATA,
                 async () => {
                     try {
-                        return await fetchSeoDashboard(token, siteUrl!, range)
-                    } catch (e: any) {
-                        console.error('SEO direct API error:', e.message)
-                        return { __error: e.message || "Failed to fetch SEO data from Google" }
+                        return await fetchSeoDashboard(
+                            token,
+                            siteUrl!,
+                            range,
+                            AbortSignal.timeout(SEARCH_CONSOLE_DASHBOARD_TIMEOUT_MS)
+                        )
+                    } catch (e: unknown) {
+                        const errorMessage =
+                            e instanceof Error && e.name === 'AbortError'
+                                ? "Search Console dashboard request timed out"
+                                : e instanceof Error
+                                    ? e.message
+                                    : "Failed to fetch SEO data from Google"
+                        console.error('SEO direct API error:', errorMessage)
+                        return { __isError: true, error: errorMessage }
                     }
                 }
             )
 
-            if (dashboardData?.__error) {
-                return NextResponse.json({ error: dashboardData.__error }, { status: 502 })
+            if ('error' in dashboardData && typeof dashboardData.error === 'string') {
+                const statusCode = dashboardData.error.includes('timed out') ? 504 : 502
+                return NextResponse.json({ error: dashboardData.error }, { status: statusCode })
             }
             return NextResponse.json(dashboardData)
         }

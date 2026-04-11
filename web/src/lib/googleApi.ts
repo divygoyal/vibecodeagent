@@ -9,6 +9,7 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+const ADMIN_OAUTH_LOOKUP_TIMEOUT_MS = 8000;
 
 // In-memory token cache: refreshToken → { accessToken, expiresAt }
 // Capped at 1000 entries to prevent unbounded memory growth
@@ -190,6 +191,7 @@ export async function fetchGoogleTokensFromDb(
     try {
         const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(userId)}/oauth/google`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
+            signal: AbortSignal.timeout(ADMIN_OAUTH_LOOKUP_TIMEOUT_MS),
         });
         if (!res.ok) return null;
         const data = await res.json();
@@ -310,13 +312,13 @@ export async function getValidAccessToken(
 const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 const GA_ADMIN_BASE = 'https://analyticsadmin.googleapis.com/v1beta';
 
-async function gaFetch(url: string, token: string, body?: any) {
+async function gaFetch(url: string, token: string, body?: any, signal?: AbortSignal) {
     const opts: RequestInit = {
         headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
-        signal: AbortSignal.timeout(30000),
+        signal: signal ?? AbortSignal.timeout(30000),
     };
     if (body) {
         opts.method = 'POST';
@@ -860,8 +862,8 @@ const GSC_BASE = 'https://www.googleapis.com/webmasters/v3';
 /**
  * List all verified Search Console sites.
  */
-export async function listSearchConsoleSites(token: string) {
-    const data = await gaFetch(`${GSC_BASE}/sites`, token);
+export async function listSearchConsoleSites(token: string, signal?: AbortSignal) {
+    const data = await gaFetch(`${GSC_BASE}/sites`, token, undefined, signal);
     return data.siteEntry || [];
 }
 
@@ -871,7 +873,8 @@ async function runGSCQuery(
     dims: string[],
     startDate: string,
     endDate: string,
-    limit = 100
+    limit = 100,
+    signal?: AbortSignal
 ) {
     const body = {
         startDate,
@@ -880,14 +883,14 @@ async function runGSCQuery(
         rowLimit: limit,
         type: 'web',
     };
-    return gaFetch(`${GSC_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body);
+    return gaFetch(`${GSC_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body, signal);
 }
 
 /**
  * Fetch full SEO dashboard data (KPIs, queries, pages, trend, recommendations).
  * Mirrors the plugin's dashboardJson() method.
  */
-export async function fetchSeoDashboard(token: string, siteUrl: string, range = '30d') {
+export async function fetchSeoDashboard(token: string, siteUrl: string, range = '30d', signal?: AbortSignal) {
     const result: any = { kpis: null, queries: [], pages: [], trend: [], recommendations: [] };
 
     const { startDate, endDate } = resolveRange(range);
@@ -900,12 +903,12 @@ export async function fetchSeoDashboard(token: string, siteUrl: string, range = 
 
     // Run all queries in parallel
     const [currentData, prevData, queryData, prevQueryData, pageData, prevPageData] = await Promise.all([
-        runGSCQuery(token, siteUrl, ['date'], currentStart, currentEnd, 1000),
-        runGSCQuery(token, siteUrl, ['date'], previousStart, previousEnd, 1000),
-        runGSCQuery(token, siteUrl, ['query'], currentStart, currentEnd, 20),
-        runGSCQuery(token, siteUrl, ['query'], previousStart, previousEnd, 20),
-        runGSCQuery(token, siteUrl, ['page'], currentStart, currentEnd, 20),
-        runGSCQuery(token, siteUrl, ['page'], previousStart, previousEnd, 20),
+        runGSCQuery(token, siteUrl, ['date'], currentStart, currentEnd, 1000, signal),
+        runGSCQuery(token, siteUrl, ['date'], previousStart, previousEnd, 1000, signal),
+        runGSCQuery(token, siteUrl, ['query'], currentStart, currentEnd, 20, signal),
+        runGSCQuery(token, siteUrl, ['query'], previousStart, previousEnd, 20, signal),
+        runGSCQuery(token, siteUrl, ['page'], currentStart, currentEnd, 20, signal),
+        runGSCQuery(token, siteUrl, ['page'], previousStart, previousEnd, 20, signal),
     ]);
 
     const currentRows = currentData.rows || [];

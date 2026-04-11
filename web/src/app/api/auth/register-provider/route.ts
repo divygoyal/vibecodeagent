@@ -18,7 +18,7 @@ export async function POST() {
         const sync = await ensureAdminUserSynced(session)
 
         if (!sync.synced) {
-            console.error("Register provider error:", sync.reason)
+            console.warn("Register provider degraded:", sync.reason)
             return NextResponse.json({
                 registered: true,
                 synced: false,

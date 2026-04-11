@@ -156,17 +156,11 @@ function formatSiteLabel(site: string) {
   return site.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
 }
 
-function getTimeGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
 export default function DashboardOverview() {
   const { data: session } = useSession();
   const {
     registrationError,
+    retryRegistration,
     selectedSite,
     setSelectedSite,
     selectedProperty,
@@ -178,10 +172,7 @@ export default function DashboardOverview() {
 
   const [liveDrawerOpen, setLiveDrawerOpen] = useState(false);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>('analysis');
-  const [funnelCompleted, setFunnelCompleted] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('tc-funnel-completed') === 'true';
-  });
+  const [funnelCompleted, setFunnelCompleted] = useState(false);
   const [domainData, setDomainData] = useState<DomainOverviewData | null>(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportPeriod, setReportPeriod] = useState<'weekly' | 'monthly'>('weekly');
@@ -198,6 +189,11 @@ export default function DashboardOverview() {
       setSelectedSite(sites[0].siteUrl);
     }
   }, [selectedSite, setSelectedSite, sites]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setFunnelCompleted(localStorage.getItem('tc-funnel-completed') === 'true');
+  }, []);
 
   const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
   const domainRoot = domain.split('.')[0];
@@ -262,7 +258,7 @@ export default function DashboardOverview() {
 
   // Personalized greeting
   const firstName = session?.user?.name?.split(' ')[0] || '';
-  const greeting = `${getTimeGreeting()}${firstName ? `, ${firstName}` : ''}.`;
+  const greeting = firstName ? `Welcome back, ${firstName}.` : 'Welcome back.';
 
   // Phase 3: Compute alerts for the activity feed
   const recentAlerts = useMemo(
@@ -439,26 +435,6 @@ export default function DashboardOverview() {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }, []);
 
-
-  if (registrationError) {
-    return (
-      <div className="flex h-[60vh] flex-col items-center justify-center text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center border border-red-500/25 bg-red-500/10">
-          <AlertTriangle className="h-8 w-8 text-red-400" />
-        </div>
-        <h2 className="mb-2 text-xl font-semibold text-white">Registration Failed</h2>
-        <p className="max-w-md text-zinc-400">{registrationError}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="mt-4 border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/15"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="relative">
     <div className="mobile-snap-y space-y-4 overflow-hidden bg-[#010203] pb-24 sm:space-y-6 md:pb-8">
@@ -466,6 +442,29 @@ export default function DashboardOverview() {
       {isRef && hasData && (
         <div className="fixed inset-x-0 top-0 z-50 h-0.5">
           <div className="h-full w-1/3 animate-[progress-bar_1.5s_ease-in-out_infinite] bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500" />
+        </div>
+      )}
+
+      {registrationError && (
+        <div className="border border-amber-500/20 bg-[linear-gradient(135deg,rgba(245,158,11,0.12),rgba(34,211,238,0.05))] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center border border-amber-500/20 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-300" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Background provider sync is delayed</h2>
+                <p className="mt-1 max-w-2xl text-sm text-zinc-300">{registrationError}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={retryRegistration}
+              className="inline-flex items-center justify-center border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
+            >
+              Retry sync
+            </button>
+          </div>
         </div>
       )}
 

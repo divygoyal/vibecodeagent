@@ -202,6 +202,25 @@ export default function DashboardLayout({
     const { properties } = usePropertyList(hasGoogleConnection);
     const typedSites = gscSites as SiteOption[];
     const typedProperties = properties as PropertyOption[];
+
+    useEffect(() => {
+        if (!user || typedSites.length === 0) return;
+
+        const validSiteUrls = typedSites
+            .map((site) => site.siteUrl)
+            .filter((siteUrl): siteUrl is string => Boolean(siteUrl));
+
+        if (validSiteUrls.length === 0) return;
+
+        if (selectedSite && validSiteUrls.includes(selectedSite)) {
+            return;
+        }
+
+        const nextSite = validSiteUrls[0];
+        setSelectedSite(nextSite);
+        localStorage.setItem(getUserKey('tc-last-site'), nextSite);
+    }, [getUserKey, selectedSite, setSelectedSite, typedSites, user]);
+
     const alertSiteUrl = selectedSite || (typedSites.length > 0 ? typedSites[0].siteUrl : '');
     const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
     const typedAlerts = alerts as AlertItem[];
@@ -264,20 +283,15 @@ export default function DashboardLayout({
 
     // Registration state — check sessionStorage first to avoid re-registering on refresh
     // Bug #3 fix: validate cached registration belongs to current user
-    const [registrationState, setRegistrationState] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const cached = sessionStorage.getItem('tc-registered');
-            const cachedUser = sessionStorage.getItem('tc-registered-user');
-            // Only trust cache if a user identity was stored with it
-            if (cached === 'true' && cachedUser) {
-                return { isRegistered: true, isRegistering: false, registrationError: null as string | null };
-            }
-        }
-        return { isRegistered: false, isRegistering: true, registrationError: null as string | null };
+    const [registrationState, setRegistrationState] = useState({
+        isRegistered: false,
+        isRegistering: true,
+        registrationError: null as string | null,
     });
 
     // Bug #1 fix: prevent duplicate registration calls with a ref
     const registrationAttempted = useRef(false);
+    const registrationCacheHydrated = useRef(false);
 
     // Bug #3 fix: clear registration flag on sign-out so a different account doesn't reuse it
     useEffect(() => {
@@ -286,6 +300,25 @@ export default function DashboardLayout({
             sessionStorage.removeItem('tc-registered-user');
         }
     }, [status]);
+
+    useEffect(() => {
+        if (!session?.user || registrationCacheHydrated.current) return;
+
+        registrationCacheHydrated.current = true;
+
+        const cached = sessionStorage.getItem('tc-registered');
+        const cachedUser = sessionStorage.getItem('tc-registered-user');
+        const currentUser = session.user.email || session.user.name || '';
+
+        if (cached === 'true' && cachedUser && cachedUser === currentUser) {
+            registrationAttempted.current = true;
+            setRegistrationState({
+                isRegistered: true,
+                isRegistering: false,
+                registrationError: null,
+            });
+        }
+    }, [session?.user]);
 
     // Bug #3 fix: if session user email doesn't match cached user, invalidate cache
     useEffect(() => {
@@ -300,6 +333,28 @@ export default function DashboardLayout({
             }
         }
     }, [session?.user?.email]);
+
+    const getRegistrationWarning = useCallback((reason?: string) => {
+        const normalized = (reason || '').toLowerCase();
+
+        if (normalized.includes('abort') || normalized.includes('timed out')) {
+            return 'Background provider sync is taking longer than usual. The dashboard will keep loading while we retry.';
+        }
+
+        if (normalized.includes('missing-admin-api-key') || normalized.includes('missing-session-data')) {
+            return 'Background provider sync is temporarily unavailable. The dashboard will keep loading in degraded mode.';
+        }
+
+        return 'Background provider sync is delayed right now. The dashboard can still load while connected features catch up.';
+    }, []);
+
+    const applyDegradedRegistration = useCallback((reason?: string) => {
+        setRegistrationState({
+            isRegistered: true,
+            isRegistering: false,
+            registrationError: getRegistrationWarning(reason),
+        });
+    }, [getRegistrationWarning]);
 
     useEffect(() => {
         // Skip if already registered
@@ -330,6 +385,8 @@ export default function DashboardLayout({
                             isRegistering: false,
                             registrationError: null,
                         });
+                    } else if (data?.registered || data?.degraded) {
+                        applyDegradedRegistration(data?.reason);
                     } else {
                         throw new Error(data?.reason || 'Provider sync is still pending');
                     }
@@ -338,17 +395,13 @@ export default function DashboardLayout({
                     throw new Error(data.error || 'Failed to register provider');
                 }
             } catch (err) {
-                console.error('Registration error:', err);
-                setRegistrationState({
-                    isRegistered: false,
-                    isRegistering: false,
-                    registrationError: err instanceof Error ? err.message : 'Registration failed',
-                });
+                console.warn('Registration degraded:', err);
+                applyDegradedRegistration(err instanceof Error ? err.message : undefined);
             }
         };
 
         registerProvider();
-    }, [session?.user?.email]); // Bug #1 fix: stable dependency — only changes on actual login
+    }, [applyDegradedRegistration, registrationState.isRegistered, session?.user?.email]); // Bug #1 fix: stable dependency — only changes on actual login
 
     // Bug #6 fix: retry callback so child components can retry without full page reload
     const retryRegistration = useCallback(() => {

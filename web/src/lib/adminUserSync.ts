@@ -2,6 +2,7 @@ import { authOptions } from '@/lib/auth';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+const ADMIN_USER_SYNC_TIMEOUT_MS = 8000;
 
 export type AdminSyncSession = {
     user?: {
@@ -66,7 +67,7 @@ export async function ensureAdminUserSynced(session: AdminSyncSession) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), ADMIN_USER_SYNC_TIMEOUT_MS);
 
     try {
         const response = await fetch(`${ADMIN_API_URL}/api/users`, {
@@ -95,10 +96,17 @@ export async function ensureAdminUserSynced(session: AdminSyncSession) {
             data,
         } as const;
     } catch (error) {
+        const reason =
+            error instanceof Error && error.name === 'AbortError'
+                ? 'Admin provider sync timed out'
+                : error instanceof Error
+                    ? error.message
+                    : 'Admin user sync failed';
+
         return {
             synced: false,
             skipped: false,
-            reason: error instanceof Error ? error.message : 'Admin user sync failed',
+            reason,
         } as const;
     } finally {
         clearTimeout(timeout);
