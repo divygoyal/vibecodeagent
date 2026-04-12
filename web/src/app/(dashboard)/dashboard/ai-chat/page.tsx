@@ -2,23 +2,75 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import {
-    Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles
+    AlertTriangle, Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Search, Sparkles, Target, TrendingDown
 } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import type { LucideIcon } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 
-const STARTER_CHIPS = [
-    'Why did my traffic drop?',
-    'Quick wins I can fix today',
-    'Grade my SEO (A-F)',
-    'Keywords I can push to page 1',
-    'Top pages & why they work',
-    'Revenue I\'m leaving on the table',
-];
+type DashboardSiteOption = {
+    siteUrl: string;
+};
+
+type DashboardPropertyOption = {
+    displayName?: string;
+    propertyId?: string;
+    property?: string;
+};
+
+type SignalChip = {
+    label: string;
+    prompt: string;
+    mode?: 'briefing';
+    icon: LucideIcon;
+    tone: 'amber' | 'cyan' | 'emerald';
+};
+
+const BRIEFING_PROMPT = 'Give me my morning briefing — what changed overnight and what should I focus on today?';
+
+const SIGNAL_CHIPS: SignalChip[] = [
+    {
+        label: 'Traffic anomaly detected',
+        prompt: BRIEFING_PROMPT,
+        mode: 'briefing',
+        icon: AlertTriangle,
+        tone: 'amber',
+    },
+    {
+        label: 'Pages lost conversions',
+        prompt: 'Which pages lost conversions recently, and what changed on them?',
+        icon: TrendingDown,
+        tone: 'cyan',
+    },
+    {
+        label: 'Best opportunities this month',
+        prompt: 'What should I fix first this month to grow traffic faster?',
+        icon: Target,
+        tone: 'emerald',
+    },
+] as const;
+
+const PROMPT_GROUPS = [
+    {
+        title: 'Understand performance',
+        prompts: [
+            'Why did traffic drop?',
+            'What changed this month?',
+            'Which channels underperform?',
+        ],
+    },
+    {
+        title: 'Find opportunities',
+        prompts: [
+            'Top conversion leaks',
+            'Best pages to improve',
+            'Where can I grow fastest?',
+        ],
+    },
+] as const;
 
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Searching your data',
@@ -50,12 +102,19 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
 });
 
 export default function AIChat() {
-    const { data: session } = useSession();
-    const firstName = session?.user?.name?.split(' ')[0] || '';
     const { selectedSite, setSelectedSite } = useRegistration();
     const { hasGoogleConnection } = useContainerStatus();
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
+
+    const normalizedSites = useMemo(
+        () => (Array.isArray(gscSites) ? (gscSites as DashboardSiteOption[]) : []),
+        [gscSites],
+    );
+    const normalizedProperties = useMemo(
+        () => (Array.isArray(ga4Properties) ? (ga4Properties as DashboardPropertyOption[]) : []),
+        [ga4Properties],
+    );
 
     const { messages, setMessages, clearChat: storeClearChat } = useChatStore();
     const [input, setInput] = useState('');
@@ -68,16 +127,16 @@ export default function AIChat() {
 
     // Match GA4 property to selected site
     const matchedProperty = useMemo(() => {
-        if (!selectedSite || ga4Properties.length === 0) return ga4Properties[0];
+        if (!selectedSite || normalizedProperties.length === 0) return normalizedProperties[0];
         const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
         const domainRoot = domain.split('.')[0];
         return (
-            ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
-            ga4Properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-            ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
-            ga4Properties[0]
+            normalizedProperties.find((property) => property.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
+            normalizedProperties.find((property) => (property.propertyId || property.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
+            normalizedProperties.find((property) => property.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
+            normalizedProperties[0]
         );
-    }, [selectedSite, ga4Properties]);
+    }, [normalizedProperties, selectedSite]);
 
     const { data: analyticsData } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedSite);
     const { data: seoData } = useSeoData('all', selectedSite, hasGoogleConnection && !!selectedSite);
@@ -109,7 +168,7 @@ export default function AIChat() {
             updated[updated.length - 1] = { ...last, content: last.content + buffered };
             return updated;
         });
-    }, []);
+    }, [setMessages]);
 
     const appendStreamText = useCallback((text: string) => {
         streamBufferRef.current += text;
@@ -250,8 +309,10 @@ export default function AIChat() {
                 if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
                 flushStreamBuffer();
             }
-        } catch (err: any) {
-            const isTimeout = err?.name === 'AbortError';
+        } catch (err: unknown) {
+            const isTimeout =
+                (err instanceof DOMException && err.name === 'AbortError') ||
+                (err instanceof Error && err.name === 'AbortError');
             setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -270,23 +331,7 @@ export default function AIChat() {
             setIsLoading(false);
             setActiveTool(undefined);
         }
-    }, [input, isLoading, appendStreamText, flushStreamBuffer]);
-
-    // Daily briefing
-    const sendMessageRef = useRef(sendMessage);
-    sendMessageRef.current = sendMessage;
-    const briefingSentRef = useRef(false);
-
-    useEffect(() => {
-        if (briefingSentRef.current || messages.length > 0 || !dataReady || isLoading) return;
-        if (!analyticsData && !seoData) return;
-        const today = new Date().toISOString().split('T')[0];
-        const lastBriefing = localStorage.getItem('tc-last-briefing-date');
-        if (lastBriefing === today) return;
-        briefingSentRef.current = true;
-        localStorage.setItem('tc-last-briefing-date', today);
-        sendMessageRef.current('Give me my morning briefing — what changed overnight and what should I focus on today?', { mode: 'briefing' });
-    }, [dataReady, messages.length, isLoading, analyticsData, seoData]);
+    }, [appendStreamText, flushStreamBuffer, input, isLoading, setMessages]);
 
     const clearChat = useCallback(() => { storeClearChat(); }, [storeClearChat]);
 
@@ -312,90 +357,145 @@ export default function AIChat() {
             {/* ── Messages / Empty State ── */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
-                    /* ══════ Empty: Gemini-style centered ══════ */
-                    <div className="flex flex-col items-center justify-center h-full px-6">
-                        <div className="flex flex-col items-center mb-12">
-                            <div className="flex items-center gap-2 mb-3">
-                                <Sparkles className="w-5 h-5 text-emerald-400" />
-                                <span className="text-base text-zinc-400">{firstName ? `Hi ${firstName}` : 'Hi there'}</span>
-                            </div>
-                            <h1 className="text-3xl sm:text-4xl font-medium text-white tracking-tight text-center">
-                                What do you want to know?
-                            </h1>
-                        </div>
+                    <div className="flex min-h-full items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
+                        <section className="relative w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/[0.08] bg-[#03070c] px-5 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.38)] sm:px-8 sm:py-10 lg:px-10">
+                            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_22%,rgba(34,211,238,0.14),transparent_28%),radial-gradient(circle_at_84%_18%,rgba(16,185,129,0.12),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]" />
+                            <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(rgba(34,211,238,0.16) 1px, transparent 1px)', backgroundSize: '18px 18px', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0.95), rgba(0,0,0,0.15))' }} />
+                            <div className="pointer-events-none absolute inset-x-0 top-[26%] h-px bg-[linear-gradient(90deg,transparent,rgba(52,211,153,0.18),transparent)]" />
+                            <div className="pointer-events-none absolute inset-x-0 top-[38%] h-[120px] bg-[radial-gradient(circle_at_center,rgba(52,211,153,0.18),transparent_65%)] blur-3xl" />
 
-                        {/* ── Centered input (Gemini style) ── */}
-                        <div className="w-full max-w-[640px] mb-6">
-                            <div className="relative flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-4 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
-                                <textarea
-                                    ref={textareaRef}
-                                    value={input}
-                                    onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder="Ask about your SEO, traffic, keywords..."
-                                    disabled={isLoading || !dataReady}
-                                    rows={1}
-                                    className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 disabled:opacity-40 leading-relaxed"
-                                />
-                                <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                                    {/* Site selector pill */}
-                                    <div className="relative" ref={dropdownRef}>
-                                        <button
-                                            onClick={() => setSiteOpen(!siteOpen)}
-                                            className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 rounded-full px-3 py-1.5 transition-colors"
-                                        >
-                                            <Globe className="w-3 h-3" />
-                                            <span className="max-w-[100px] truncate">{siteLabel}</span>
-                                            <ChevronDown className={`w-3 h-3 transition-transform ${siteOpen ? 'rotate-180' : ''}`} />
-                                        </button>
-                                        {siteOpen && gscSites.length > 0 && (
-                                            <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
-                                                {gscSites.map((site: any) => {
-                                                    const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                                    const active = site.siteUrl === selectedSite;
-                                                    return (
-                                                        <button key={site.siteUrl}
-                                                            onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
-                                                            className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${active ? 'text-emerald-400 bg-emerald-500/[0.06]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-                                                        >
-                                                            {label}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                            <div className="relative">
+                                <div className="flex justify-center">
+                                    <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-300">
+                                        <Sparkles className="h-4 w-4 text-emerald-300" />
+                                        AI Analytics Copilot
                                     </div>
-                                    <button
-                                        onClick={() => sendMessage()}
-                                        disabled={!input.trim() || isLoading || !dataReady}
-                                        className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
-                                    >
-                                        <ArrowUp className="w-4 h-4" />
-                                    </button>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* ── Suggestion chips ── */}
-                        <div className="flex flex-wrap justify-center gap-2 max-w-[640px]">
-                            {STARTER_CHIPS.map((chip, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => sendMessage(chip)}
-                                    disabled={isLoading || !dataReady}
-                                    className="text-[13px] text-zinc-400 px-4 py-2.5 rounded-full bg-[#1a1a1a] hover:bg-[#252525] hover:text-white transition-all disabled:opacity-30"
-                                >
-                                    {chip}
-                                </button>
-                            ))}
-                        </div>
+                                <div className="mx-auto mt-6 max-w-3xl text-center">
+                                    <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl sm:leading-[1.02]">
+                                        Ask anything about your traffic
+                                    </h1>
+                                    <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">
+                                        Get instant answers on sessions, channels, landing pages, conversion drops,
+                                        and growth opportunities from your analytics and search data.
+                                    </p>
+                                </div>
 
-                        {!dataReady && hasGoogleConnection && (
-                            <div className="flex items-center gap-2 mt-8 text-xs text-zinc-500">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                Loading your data...
+                                <div className="mt-7 flex flex-wrap justify-center gap-3">
+                                    {SIGNAL_CHIPS.map((chip) => {
+                                        const Icon = chip.icon;
+                                        const chipTone =
+                                            chip.tone === 'amber'
+                                                ? 'border-amber-500/20 bg-amber-500/[0.08] text-amber-100'
+                                                : chip.tone === 'cyan'
+                                                    ? 'border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-100'
+                                                    : 'border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-100';
+
+                                        return (
+                                            <button
+                                                key={chip.label}
+                                                type="button"
+                                                onClick={() => sendMessage(chip.prompt, chip.mode ? { mode: chip.mode } : undefined)}
+                                                disabled={isLoading || !dataReady}
+                                                className={`inline-flex min-h-[44px] items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition-all hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white disabled:opacity-40 ${chipTone}`}
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                                <span>{chip.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="mx-auto mt-8 w-full max-w-4xl">
+                                    <div className="absolute left-1/2 mt-6 h-16 w-[75%] -translate-x-1/2 rounded-full bg-[linear-gradient(90deg,rgba(34,211,238,0.12),rgba(52,211,153,0.14),rgba(34,211,238,0.08))] blur-2xl" />
+                                    <div className="relative rounded-[28px] border border-white/[0.08] bg-[#05090e]/95 p-2 shadow-[0_24px_60px_rgba(0,0,0,0.32)]">
+                                        <div className="flex items-center gap-3 rounded-[22px] border border-white/[0.06] bg-[#0a0f14] px-4 py-4 sm:px-5">
+                                            <Search className="h-5 w-5 shrink-0 text-zinc-500" />
+                                            <textarea
+                                                ref={textareaRef}
+                                                value={input}
+                                                onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
+                                                onKeyDown={handleKeyDown}
+                                                placeholder="Ask why traffic dropped, which pages leak conversions, or what to fix first..."
+                                                disabled={isLoading || !dataReady}
+                                                rows={1}
+                                                className="min-h-[28px] flex-1 bg-transparent text-[15px] leading-relaxed text-white placeholder-zinc-500 outline-none resize-none max-h-40 disabled:opacity-40"
+                                            />
+                                            <div className="flex items-center gap-2 pl-2">
+                                                <div className="relative" ref={dropdownRef}>
+                                                    <button
+                                                        onClick={() => setSiteOpen(!siteOpen)}
+                                                        className="inline-flex h-10 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] text-zinc-300 transition-colors hover:border-white/[0.14] hover:bg-white/[0.06]"
+                                                    >
+                                                        <Globe className="h-3.5 w-3.5 text-cyan-300" />
+                                                        <span className="max-w-[120px] truncate">{siteLabel}</span>
+                                                        <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform ${siteOpen ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                    {siteOpen && normalizedSites.length > 0 && (
+                                                        <div className="absolute bottom-full right-0 z-50 mb-2 max-h-[260px] min-w-[220px] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#11161c] py-1 shadow-2xl shadow-black/70">
+                                                            {normalizedSites.map((site) => {
+                                                                const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+                                                                const active = site.siteUrl === selectedSite;
+                                                                return (
+                                                                    <button
+                                                                        key={site.siteUrl}
+                                                                        onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
+                                                                        className={`w-full px-4 py-2.5 text-left text-xs transition-colors ${
+                                                                            active
+                                                                                ? 'bg-emerald-500/[0.08] text-emerald-300'
+                                                                                : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
+                                                                        }`}
+                                                                    >
+                                                                        {label}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    onClick={() => sendMessage()}
+                                                    disabled={!input.trim() || isLoading || !dataReady}
+                                                    className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-700 text-zinc-500 transition-all enabled:bg-[linear-gradient(135deg,#34e1a3_0%,#22d3ee_100%)] enabled:text-[#031014] enabled:shadow-[0_10px_30px_rgba(52,225,163,0.24)] enabled:hover:brightness-105"
+                                                >
+                                                    <ArrowUp className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mx-auto mt-8 grid max-w-4xl gap-4 lg:grid-cols-2">
+                                    {PROMPT_GROUPS.map((group) => (
+                                        <div key={group.title} className="rounded-[24px] border border-white/[0.08] bg-[#070c11]/90 p-4">
+                                            <div className="text-sm font-medium text-zinc-300">{group.title}</div>
+                                            <div className="mt-4 space-y-2">
+                                                {group.prompts.map((prompt) => (
+                                                    <button
+                                                        key={prompt}
+                                                        type="button"
+                                                        onClick={() => sendMessage(prompt)}
+                                                        disabled={isLoading || !dataReady}
+                                                        className="flex min-h-[52px] w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#0b1015] px-4 text-left text-sm text-zinc-200 transition-all hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white disabled:opacity-40"
+                                                    >
+                                                        <span>{prompt}</span>
+                                                        <span className="text-zinc-500">›</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {!dataReady && hasGoogleConnection && (
+                                    <div className="mt-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Loading your analytics and search data...
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </section>
                     </div>
                 ) : (
                     /* ══════ Chat messages: Grok-style full-width ══════ */
@@ -443,7 +543,7 @@ export default function AIChat() {
                                 value={input}
                                 onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Ask anything"
+                                placeholder="Ask about traffic, pages, channels, or conversions"
                                 disabled={isLoading}
                                 rows={1}
                                 className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed"
@@ -458,9 +558,9 @@ export default function AIChat() {
                                         <Globe className="w-3 h-3" />
                                         <span className="max-w-[80px] truncate">{siteLabel}</span>
                                     </button>
-                                    {siteOpen && gscSites.length > 0 && (
+                                    {siteOpen && normalizedSites.length > 0 && (
                                         <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
-                                            {gscSites.map((site: any) => {
+                                            {normalizedSites.map((site) => {
                                                 const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                                 const active = site.siteUrl === selectedSite;
                                                 return (

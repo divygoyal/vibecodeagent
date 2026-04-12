@@ -34,6 +34,11 @@ import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import { getDashboardBriefing } from '@/lib/dashboardBriefing';
 import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
 import {
+  RedditMentionsPickerRail,
+  RedditMentionsProvider,
+  RedditMentionsTopPanel,
+} from '@/components/dashboard/RedditMentionsWidget';
+import {
   XMentionsPickerRail,
   XMentionsProvider,
   XMentionsTopPanel,
@@ -1783,6 +1788,13 @@ export default function OverviewCommandCenter({
 
       <XMentionsPickerRail className="mt-4" premiumHover />
       </XMentionsProvider>
+
+      <RedditMentionsProvider domain={selectedSiteLabel}>
+        <div className="mt-4 space-y-4">
+          <RedditMentionsTopPanel premiumHover />
+          <RedditMentionsPickerRail premiumHover />
+        </div>
+      </RedditMentionsProvider>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <DashboardHoverSurface as="section" tone="emerald" className="border border-white/[0.08] bg-[#020508] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:p-6">

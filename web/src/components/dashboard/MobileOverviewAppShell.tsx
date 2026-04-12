@@ -27,6 +27,11 @@ import {
 } from 'recharts';
 
 import {
+  RedditMentionsPickerRail,
+  RedditMentionsProvider,
+  RedditMentionsTopPanel,
+} from '@/components/dashboard/RedditMentionsWidget';
+import {
   XMentionsPickerRail,
   XMentionsProvider,
   XMentionsTopPanel,
@@ -1150,6 +1155,12 @@ export default function MobileOverviewAppShell({
             <XMentionsPickerRail />
           </div>
         </XMentionsProvider>
+        <RedditMentionsProvider domain={selectedSiteLabel}>
+          <div className="space-y-4">
+            <RedditMentionsTopPanel />
+            <RedditMentionsPickerRail />
+          </div>
+        </RedditMentionsProvider>
       </section>
     </div>
   );
