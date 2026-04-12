@@ -36,13 +36,13 @@ const PRESETS: PresetItem[] = [
 // Ordered list of navigable preset values (excludes separators)
 const PRESET_VALUES = PRESETS.filter((p): p is { label: string; value: string } => 'value' in p).map(p => p.value);
 
-function getRangeLabel(range: string): string {
+export function getRangeLabel(range: string): string {
     const preset = PRESETS.find((p): p is { label: string; value: string } => 'value' in p && p.value === range);
     return preset ? preset.label : range;
 }
 
 /** Compute the readable date range string for the active period */
-function getDateRangeText(range: string): string {
+export function getDateRangeText(range: string): string {
     const now = new Date();
     const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const fmtYear = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -158,74 +158,75 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
 
     return (
         <div className="relative" ref={containerRef}>
-            <div className="flex items-center">
+            <div className={compact ? 'w-full' : 'inline-flex items-center'}>
                 {!compact && (
-                    <>
-                        {/* Back arrow */}
-                        <button
-                            onClick={goBack}
-                            disabled={!canGoBack}
-                            className="flex items-center justify-center w-8 h-8 rounded-l-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
-                            aria-label="Previous date range"
-                        >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                        </button>
-                    </>
+                    <button
+                        type="button"
+                        onClick={goBack}
+                        disabled={!canGoBack}
+                        className="dashboard-hover-action flex h-10 w-10 items-center justify-center rounded-l-[14px] border border-r-0 border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label="Previous date range"
+                        data-variant="ghost"
+                    >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
                 )}
 
-                {/* Center dropdown trigger */}
                 <button
+                    type="button"
                     onClick={() => setOpen(!open)}
-                    className={`flex items-center h-8 border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition text-[11px] ${
+                    className={`dashboard-hover-action flex border border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 ${
                         compact
-                            ? 'w-full justify-between gap-1 rounded-lg border px-2.5 sm:max-w-[120px]'
-                            : 'gap-1.5 border-y px-2.5'
+                            ? 'h-10 w-full items-center justify-between gap-2 rounded-[14px] px-3 sm:max-w-[180px]'
+                            : 'h-10 min-w-[170px] items-center gap-2 border-x-0 px-3.5 text-left'
                     }`}
+                    data-variant="ghost"
                 >
-                    <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className={`whitespace-nowrap ${compact ? 'truncate' : ''}`}>{getRangeLabel(range)}</span>
-                    <ChevronDown className={`w-3 h-3 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+                    <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                        <div className={`truncate font-medium text-zinc-100 ${compact ? 'text-[12px]' : 'text-[12px]'}`}>
+                            {getRangeLabel(range)}
+                        </div>
+                        {!compact && dateText ? (
+                            <div className="truncate text-[10px] text-zinc-500">
+                                {dateText}
+                            </div>
+                        ) : null}
+                    </div>
+                    <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                 </button>
 
                 {!compact && (
-                    <>
-                        {/* Forward arrow */}
-                        <button
-                            onClick={goForward}
-                            disabled={!canGoForward}
-                            className="flex items-center justify-center w-8 h-8 rounded-r-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
-                            aria-label="Next date range"
-                        >
-                            <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                    </>
+                    <button
+                        type="button"
+                        onClick={goForward}
+                        disabled={!canGoForward}
+                        className="dashboard-hover-action flex h-10 w-10 items-center justify-center rounded-r-[14px] border border-l-0 border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label="Next date range"
+                        data-variant="ghost"
+                    >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                 )}
             </div>
 
-            {/* Date range text below the picker */}
-            {dateText && !compact && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-0.5 text-[9px] text-zinc-500 whitespace-nowrap pointer-events-none">
-                    {dateText}
-                </div>
-            )}
-
-            {/* Dropdown */}
             {open && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-                    <div className="absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 min-w-[160px] max-w-[calc(100vw-2rem)] max-h-[360px] overflow-y-auto">
+                    <div className="absolute right-0 z-50 mt-2 max-h-[360px] min-w-[190px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#0b1015]/98 p-1.5 shadow-[0_28px_56px_rgba(0,0,0,0.42)] backdrop-blur-xl">
                         {PRESETS.map((item, i) => {
                             if ('separator' in item) {
-                                return <div key={`sep-${i}`} className="border-t border-white/[0.06] my-1" />;
+                                return <div key={`sep-${i}`} className="my-1.5 border-t border-white/[0.06]" />;
                             }
                             return (
                                 <button
                                     key={item.value}
+                                    type="button"
                                     onClick={() => { setRange(item.value); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 text-[11px] transition ${
+                                    className={`w-full rounded-xl px-3 py-2.5 text-left text-[11px] transition ${
                                         range === item.value
-                                            ? 'text-emerald-400 bg-emerald-500/[0.08]'
-                                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                            ? 'border border-cyan-400/20 bg-cyan-400/[0.12] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+                                            : 'border border-transparent text-zinc-400 hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white'
                                     }`}
                                 >
                                     {item.label}

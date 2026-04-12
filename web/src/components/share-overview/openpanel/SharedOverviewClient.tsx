@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
-import DatePicker from '@/components/DatePicker';
+import DatePicker, { getRangeLabel } from '@/components/DatePicker';
 import { CITY_COORDS, COUNTRY_COORDS } from '@/components/analytics/RealtimeGlobe';
 import Logo, { LogoIcon } from '@/components/Logo';
 import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
@@ -71,6 +71,8 @@ const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr:
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
 const CHART_COLORS = ['#3ba974', '#60a5fa', '#f59e0b', '#a78bfa', '#f87171', '#2dd4bf', '#fb7185', '#facc15'];
+const OVERVIEW_CHART_GREEN = '#33CF96';
+const OVERVIEW_SKY_ACCENT = '#1FBED7';
 const INTERVAL_OPTIONS = [
     { value: 'hour', label: 'Hour' },
     { value: 'day', label: 'Day' },
@@ -191,7 +193,6 @@ type LiveVisitorsResponse = { activeUsers: number };
 const LIVE_VISITORS_POLL_INTERVAL_MS = 5_000;
 const LIVE_DATA_POLL_INTERVAL_MS = 10_000;
 const LIVE_RECONCILE_INTERVAL_MS = 60_000;
-const CARD_HOVER_RESET_MS = 1_000;
 const OVERVIEW_QUERY_STALE_MS = 30_000;
 const OVERVIEW_PREFETCH_DELAY_MS = 350;
 const OVERVIEW_TABLE_ROW_LIMIT = 15;
@@ -274,22 +275,43 @@ function diffDirection(current: number, previous: number, invert = false) {
 function metricTone(diff: ReturnType<typeof diffDirection>, active: boolean, previewed: boolean) {
     if (diff?.positive) {
         return {
-            solid: active ? '#6ee7b7' : previewed ? '#86efac' : '#3ba974',
-            muted: 'rgba(110,231,183,0.28)',
+            solid: active ? '#86F5C5' : previewed ? '#66E8AF' : OVERVIEW_CHART_GREEN,
+            muted: 'rgba(51,207,150,0.22)',
         };
     }
 
     if (diff && !diff.positive) {
         return {
-            solid: active ? '#fda4af' : previewed ? '#fda4af' : '#f87171',
-            muted: 'rgba(248,113,113,0.24)',
+            solid: active ? '#FFB0BA' : previewed ? '#FF9BA8' : '#F87171',
+            muted: 'rgba(248,113,113,0.2)',
         };
     }
 
     return {
-        solid: active ? '#93c5fd' : previewed ? '#93c5fd' : '#4b5563',
-        muted: 'rgba(147,197,253,0.24)',
+        solid: active ? '#D9E5EC' : previewed ? '#C0D1DC' : '#7A8595',
+        muted: 'rgba(148,163,184,0.18)',
     };
+}
+
+function normalizeTrendChange(diff: ReturnType<typeof diffDirection>, invert = false) {
+    if (!diff) {
+        return null;
+    }
+
+    const adjusted = invert ? -diff.change : diff.change;
+    if (!Number.isFinite(adjusted)) {
+        return null;
+    }
+
+    return +adjusted.toFixed(1);
+}
+
+function formatTrendChange(value: number | null) {
+    if (value === null) {
+        return '--';
+    }
+
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 }
 
 function formatDateLabel(value: string | number, interval: string) {
@@ -1371,15 +1393,22 @@ function IntervalButtons({
     className?: string;
 }) {
     return (
-        <div className={cx('inline-flex items-center rounded-lg border border-white/[0.08] bg-white/[0.03] p-1', className)}>
+        <div
+            className={cx(
+                'inline-flex items-center rounded-[14px] border border-white/[0.1] bg-[#0b1015]/95 p-1 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl',
+                className,
+            )}
+        >
             {INTERVAL_OPTIONS.map((option) => (
                 <button
                     key={option.value}
                     type="button"
                     onClick={() => onChange(option.value)}
                     className={cx(
-                        'dashboard-hover-chip rounded-md px-2 py-1 text-[11px] transition sm:px-2.5 sm:text-xs',
-                        value === option.value ? 'bg-white/[0.08] text-zinc-100' : 'text-zinc-500 hover:text-zinc-200',
+                        'dashboard-hover-chip rounded-[10px] border px-3 py-1.5 text-[11px] font-medium transition sm:px-3.5 sm:text-[12px]',
+                        value === option.value
+                            ? 'border-white/[0.08] bg-white/[0.08] text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_18px_rgba(0,0,0,0.18)]'
+                            : 'border-transparent text-zinc-500 hover:text-zinc-200',
                     )}
                 >
                     {option.label}
@@ -1403,15 +1432,15 @@ function FiltersButton({
             type="button"
             onClick={onClick}
             className={cx(
-                'dashboard-hover-action inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-300 transition hover:bg-white/[0.06] hover:text-zinc-100',
-                compact ? 'h-8 px-3 text-[12px]' : 'h-9 px-3 text-sm',
+                'dashboard-hover-action inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/[0.1] bg-[#0b1015]/95 font-medium text-zinc-200 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100',
+                compact ? 'h-10 px-3 text-[12px]' : 'h-10 px-3.5 text-sm',
             )}
             data-variant="ghost"
         >
             <Filter className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
             <span>Filters</span>
             {activeCount ? (
-                <span className="rounded-full bg-emerald-500/[0.16] px-1.5 py-0.5 text-[11px] text-emerald-100">
+                <span className="rounded-full border border-cyan-400/18 bg-cyan-400/[0.12] px-1.5 py-0.5 text-[11px] text-cyan-100">
                     {activeCount}
                 </span>
             ) : null}
@@ -1500,7 +1529,7 @@ function MetricCard({
 }) {
     const [currentIndex, setCurrentIndex] = useState<number | null>(null);
     const [cardHovered, setCardHovered] = useState(false);
-    const hoverResetTimer = useRef<number | null>(null);
+    const [hoverLabelPosition, setHoverLabelPosition] = useState<{ left: number; top: number } | null>(null);
     const miniChartHoverRef = useRef<HTMLDivElement | null>(null);
     const miniSeries = useMemo(
         () =>
@@ -1515,125 +1544,170 @@ function MetricCard({
     const displayedCurrent = hoveredPoint?.current ?? current;
     const displayedPrevious = hoveredPoint?.previous ?? previous;
     const diff = diffDirection(displayedCurrent, displayedPrevious, metric.invert);
-    const highlighted = active || cardHovered;
-    const tone = metricTone(diff, active, cardHovered);
-    const hoverPosition = currentIndex === null || !miniSeries.length
-        ? null
-        : `${((currentIndex + 0.5) / miniSeries.length) * 100}%`;
+    const trendChange = normalizeTrendChange(diff, metric.invert);
+    const previewed = cardHovered || currentIndex !== null;
+    const highlighted = active || previewed;
+    const tone = metricTone(diff, active, previewed);
+    const trendLabel = formatTrendChange(trendChange);
+    const TrendIcon = trendChange !== null && trendChange < 0 ? ChevronDown : ChevronUp;
+    const hoverDateLabel = hoveredPoint ? formatDateLabel(hoveredPoint.date, interval) : null;
+    const trendBadgeStyle =
+        trendChange === null
+            ? {
+                color: '#D8E3EA',
+                borderColor: 'rgba(148,163,184,0.24)',
+                background:
+                    'linear-gradient(180deg, rgba(148,163,184,0.16) 0%, rgba(15,21,28,0.92) 100%)',
+                boxShadow:
+                    'inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px rgba(148,163,184,0.04), 0 10px 24px rgba(0,0,0,0.24)',
+            }
+            : trendChange >= 0
+                ? {
+                    color: '#8CF6C8',
+                    borderColor: 'rgba(96,255,191,0.32)',
+                    background:
+                        'linear-gradient(180deg, rgba(51,207,150,0.24) 0%, rgba(9,25,19,0.94) 100%)',
+                    boxShadow:
+                        'inset 0 1px 0 rgba(255,255,255,0.07), 0 0 0 1px rgba(51,207,150,0.06), 0 12px 28px rgba(6,35,26,0.34)',
+                }
+                : {
+                    color: '#FFB1BD',
+                    borderColor: 'rgba(248,113,113,0.28)',
+                    background:
+                        'linear-gradient(180deg, rgba(248,113,113,0.2) 0%, rgba(29,12,15,0.94) 100%)',
+                    boxShadow:
+                        'inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(248,113,113,0.05), 0 12px 28px rgba(36,10,15,0.28)',
+                };
 
-    const clearHoverResetTimer = useCallback(() => {
-        if (hoverResetTimer.current) {
-            window.clearTimeout(hoverResetTimer.current);
-            hoverResetTimer.current = null;
-        }
-    }, []);
-
-    const queueHoverReset = useCallback(() => {
-        clearHoverResetTimer();
-        hoverResetTimer.current = window.setTimeout(() => {
-            setCurrentIndex(null);
-        }, CARD_HOVER_RESET_MS);
-    }, [clearHoverResetTimer]);
-
-    const updateHoverIndex = useCallback((clientX: number) => {
+    const updateHoverIndex = useCallback((clientX: number, clientY: number) => {
         const element = miniChartHoverRef.current;
         if (!element || !miniSeries.length) {
             setCurrentIndex(null);
+            setHoverLabelPosition(null);
             return;
         }
 
         const bounds = element.getBoundingClientRect();
         if (bounds.width <= 0) {
             setCurrentIndex(null);
+            setHoverLabelPosition(null);
             return;
         }
 
         const relativeX = Math.min(Math.max(clientX - bounds.left, 0), bounds.width);
+        const relativeY = Math.min(Math.max(clientY - bounds.top, 0), bounds.height);
         const nextIndex = Math.min(
             miniSeries.length - 1,
             Math.max(0, Math.floor((relativeX / bounds.width) * miniSeries.length)),
         );
-        setCurrentIndex(nextIndex);
-    }, [miniSeries.length]);
+        const labelHalfWidth = 44;
+        const left = Math.min(Math.max(relativeX, labelHalfWidth), Math.max(labelHalfWidth, bounds.width - labelHalfWidth));
+        const top = Math.max(-28, Math.min(6, relativeY - 26));
 
-    useEffect(() => {
-        return () => {
-            clearHoverResetTimer();
-        };
-    }, [clearHoverResetTimer]);
+        setCurrentIndex(nextIndex);
+        setHoverLabelPosition({ left, top });
+    }, [miniSeries.length]);
 
     return (
         <button
             type="button"
             onClick={onClick}
             onMouseEnter={() => {
-                clearHoverResetTimer();
                 setCardHovered(true);
             }}
             onMouseLeave={() => {
                 setCardHovered(false);
-                queueHoverReset();
+                setCurrentIndex(null);
+                setHoverLabelPosition(null);
             }}
             onFocus={() => {
-                clearHoverResetTimer();
                 setCardHovered(true);
             }}
             onBlur={() => {
                 setCardHovered(false);
-                queueHoverReset();
+                setCurrentIndex(null);
+                setHoverLabelPosition(null);
             }}
             aria-pressed={active}
             data-active={active ? 'true' : 'false'}
             className={cx(
-                'group relative min-h-[104px] border-b border-r border-white/[0.07] text-left transition-all duration-200 [&:nth-child(2n)]:border-r-0 md:min-h-[112px] md:[&:nth-child(2n)]:border-r md:[&:nth-child(4n)]:border-r-0',
-                active ? 'bg-white/[0.075] shadow-[inset_0_0_0_1px_rgba(74,222,128,0.28)]' : cardHovered ? 'bg-white/[0.035]' : '',
+                'group relative min-h-[134px] border-b border-r border-white/[0.08] text-left transition-all duration-200 sm:min-h-[140px] md:min-h-[148px]',
+                'bg-[linear-gradient(180deg,rgba(12,17,22,0.96),rgba(6,10,14,0.92))]',
+                'hover:bg-[linear-gradient(180deg,rgba(16,22,28,0.98),rgba(8,12,16,0.94))]',
+                '[&:nth-child(2n)]:border-r-0 md:[&:nth-child(2n)]:border-r md:[&:nth-child(4n)]:border-r-0',
+                active
+                    ? 'shadow-[inset_0_0_0_1px_rgba(51,207,150,0.34),0_18px_36px_rgba(0,0,0,0.22)]'
+                    : cardHovered
+                        ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_12px_28px_rgba(0,0,0,0.16)]'
+                        : '',
             )}
         >
             <div
                 className={cx(
                     'pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/0 to-transparent opacity-0 transition',
-                    active ? 'via-emerald-300/90 opacity-100' : cardHovered ? 'via-white/35 opacity-100' : '',
+                    active ? 'via-[#33CF96]/90 opacity-100' : cardHovered ? 'via-white/40 opacity-100' : '',
                 )}
             />
-            {hoveredPoint && hoverPosition ? (
-                <div
-                    className="pointer-events-none absolute bottom-11 z-20 -translate-x-1/2 rounded-lg border border-white/[0.08] bg-[#0f141a]/95 px-3 py-2 text-[10px] shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md"
-                    style={{ left: hoverPosition }}
-                >
-                    <div className="text-zinc-500">{formatDateLabel(hoveredPoint.date, interval)}</div>
-                    <div className="mt-1 flex items-center gap-2 whitespace-nowrap">
-                        <span className="font-mono text-[11px] text-zinc-100">{formatMetricValue(hoveredPoint.current, metric.unit)}</span>
-                        {hoveredPoint.previous > 0 ? (
-                            <span className="font-mono text-[11px] text-zinc-500">{formatMetricValue(hoveredPoint.previous, metric.unit)}</span>
-                        ) : null}
+            <div
+                className={cx(
+                    'pointer-events-none absolute inset-0 opacity-0 transition',
+                    active ? 'opacity-100' : cardHovered ? 'opacity-60' : '',
+                )}
+                style={{
+                    background:
+                        `radial-gradient(120% 140% at 0% 0%, rgba(31,190,215,0.12), transparent 52%), radial-gradient(120% 140% at 100% 0%, ${tone.muted}, transparent 54%)`,
+                }}
+            />
+            <div className="relative z-10 flex h-full flex-col px-3 pb-3 pt-3.5 sm:px-4 sm:pb-3.5 sm:pt-4">
+                <div className="flex-1">
+                    <div className="flex h-full flex-col">
+                        <div className="mb-2 flex items-center gap-1.5">
+                            <metric.icon className={cx('h-3 w-3 transition-colors sm:h-3.5 sm:w-3.5', highlighted ? 'text-zinc-200' : 'text-zinc-500')} />
+                            <span className={cx('text-[11px] leading-none transition-colors sm:text-[12px]', highlighted ? 'text-zinc-200' : 'text-zinc-400')}>
+                                {metric.label}
+                            </span>
+                        </div>
+                        <div className="mt-5 flex items-start justify-between gap-3">
+                            <div className={cx('font-mono font-bold leading-[0.96] tracking-[-0.045em] text-zinc-50', primary ? 'text-[24px] sm:text-[30px]' : 'text-[22px] sm:text-[26px]')}>
+                                {formatMetricValue(displayedCurrent, metric.unit)}
+                            </div>
+                            <span
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold tracking-[-0.01em] backdrop-blur-sm sm:px-3 sm:py-1.5 sm:text-[11px]"
+                                style={trendBadgeStyle}
+                            >
+                                {trendChange !== null ? <TrendIcon className="h-3.5 w-3.5" /> : null}
+                                <span>{trendChange === null ? 'No baseline' : trendLabel}</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
-            ) : null}
-            <div className="relative z-10 flex h-full flex-col px-3 pb-2.5 pt-3 sm:px-4 sm:pb-3 sm:pt-3.5">
-                <div className="mb-2 flex items-center gap-1.5">
-                    <metric.icon className={cx('h-3 w-3 transition-colors sm:h-3.5 sm:w-3.5', highlighted ? 'text-zinc-300' : 'text-zinc-500')} />
-                    <span className={cx('text-[11px] leading-none transition-colors sm:text-[12px]', highlighted ? 'text-zinc-200' : 'text-zinc-400')}>
-                        {metric.label}
-                    </span>
-                </div>
-                <div className={cx('font-mono font-bold leading-[0.96] tracking-[-0.04em] text-zinc-100', primary ? 'text-[24px] sm:text-[30px]' : 'text-[22px] sm:text-[26px]')}>
-                    {formatMetricValue(displayedCurrent, metric.unit)}
-                </div>
-                <div className="mt-auto pt-3 sm:pt-4">
+                <div className="mt-3 border-t border-white/[0.04] pt-2">
                     <div
                         ref={miniChartHoverRef}
-                        className="relative h-[38px] opacity-90 transition duration-200 group-hover:opacity-100 sm:h-[42px]"
+                        className="relative h-[36px] opacity-95 transition duration-200 group-hover:opacity-100 sm:h-[40px]"
                         onMouseEnter={(event) => {
-                            clearHoverResetTimer();
-                            updateHoverIndex(event.clientX);
+                            updateHoverIndex(event.clientX, event.clientY);
                         }}
                         onMouseMove={(event) => {
-                            clearHoverResetTimer();
-                            updateHoverIndex(event.clientX);
+                            updateHoverIndex(event.clientX, event.clientY);
                         }}
-                        onMouseLeave={() => queueHoverReset()}
+                        onMouseLeave={() => {
+                            setCurrentIndex(null);
+                            setHoverLabelPosition(null);
+                        }}
                     >
-                        <div className="pointer-events-none absolute inset-x-0 bottom-[2px] h-[30px]">
+                        {hoveredPoint && hoverLabelPosition ? (
+                            <div
+                                className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-full border border-white/[0.1] bg-[#05080a]/96 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-200 shadow-[0_12px_24px_rgba(0,0,0,0.34)] backdrop-blur-md"
+                                style={{
+                                    left: hoverLabelPosition.left,
+                                    top: hoverLabelPosition.top,
+                                }}
+                            >
+                                {hoverDateLabel}
+                            </div>
+                        ) : null}
+                        <div className="pointer-events-none absolute inset-x-0 bottom-[1px] h-[30px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={miniSeries}>
                                     <Tooltip content={() => null} cursor={false} />
@@ -1660,8 +1734,8 @@ function LiveMetricTile({
     const topReferrers = (data?.referrers || []).slice(0, 2);
 
     return (
-        <div className={cx('relative col-span-2 min-h-[112px] border-b border-white/[0.07] bg-[linear-gradient(180deg,rgba(56,189,248,0.05),transparent_62%)] px-3 pb-3 pt-3 text-left sm:px-4 sm:pb-3 sm:pt-3.5 md:col-span-1', className)}>
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/65 to-transparent" />
+        <div className={cx('relative col-span-2 min-h-[112px] border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(16,185,129,0.06),rgba(15,23,32,0.3))] px-3 pb-3 pt-3 text-left sm:px-4 sm:pb-3 sm:pt-3.5 md:col-span-1', className)}>
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/65 to-transparent" />
             <div className="relative z-10 flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">
                     <div>
@@ -2016,23 +2090,24 @@ function OverviewMetrics({ token }: { token: string }) {
     const data = statsQuery.data?.series || [];
     const liveTotal = (liveQuery.data?.minuteCounts || []).reduce((sum, item) => sum + item.sessionCount, 0);
     const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
-    const activeMetricColor = displayedMetric.accent;
+    const activeMetricColor = OVERVIEW_CHART_GREEN;
+    const previousMetricColor = OVERVIEW_SKY_ACCENT;
     const chartHelperText = pageScoped
-        ? 'Page-specific filters keep page breakdowns truthful, but some session-level cards stay limited.'
-        : 'Click a metric tile to update the chart.';
+        ? 'Page-scoped filters applied • Some session-level cards stay limited.'
+        : `Compared with previous period • ${getRangeLabel(range)}`;
 
     return (
         <div className="col-span-6">
             <DashboardHoverSurface
                 as="section"
                 tone="mixed"
-                className="relative overflow-hidden rounded-[12px] border border-white/[0.12] bg-[#0c1117] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_60px_rgba(0,0,0,0.24)]"
+                className="relative overflow-hidden rounded-[14px] border border-white/[0.14] bg-[#040608] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_22px_70px_rgba(0,0,0,0.34)]"
                 style={{
                     backgroundImage:
-                        'radial-gradient(120% 110% at 0% 0%, rgba(69,196,140,0.11), transparent 44%), radial-gradient(90% 90% at 100% 0%, rgba(56,189,248,0.09), transparent 34%)',
+                        'radial-gradient(120% 110% at 0% 0%, rgba(51,207,150,0.12), transparent 44%), radial-gradient(90% 90% at 100% 0%, rgba(31,190,215,0.1), transparent 34%)',
                 }}
             >
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_24%)]" />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_30%)]" />
                 <div className="relative">
                     <div className="grid grid-cols-2 overflow-hidden md:grid-cols-4">
                         {METRICS.map((item, index) => (
@@ -2051,16 +2126,29 @@ function OverviewMetrics({ token }: { token: string }) {
                         <LiveMetricTile data={liveQuery.data} total={displayedLiveTotal} className="col-span-2 md:col-span-1" />
                     </div>
 
-                    <div className="border-t border-white/[0.08] bg-[#0d131a]/85 px-3 pb-3.5 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
+                    <div className="border-t border-white/[0.10] bg-[#020406]/96 px-3 pb-4 pt-3.5 sm:px-5 sm:pb-6 sm:pt-4">
                         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <div>
-                                <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">Selected Metric</div>
+                                <div className="text-[10px] uppercase tracking-[0.26em] text-zinc-500">Selected Metric</div>
                                 <div className="mt-1.5 flex items-center gap-2">
                                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activeMetricColor }} />
                                     <span className="text-[15px] font-semibold text-zinc-100">{displayedMetric.label}</span>
                                 </div>
                             </div>
-                            <span className="max-w-none text-left text-[11px] leading-5 text-zinc-500 sm:max-w-[360px] sm:text-right">
+                            <span
+                                className={cx(
+                                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] leading-none',
+                                    pageScoped
+                                        ? 'border-amber-400/16 bg-amber-400/[0.08] text-amber-100'
+                                        : 'border-cyan-400/16 bg-cyan-400/[0.08] text-cyan-100',
+                                )}
+                            >
+                                <span
+                                    className={cx(
+                                        'h-1.5 w-1.5 rounded-full',
+                                        pageScoped ? 'bg-amber-300' : 'bg-cyan-300',
+                                    )}
+                                />
                                 {chartHelperText}
                             </span>
                         </div>
@@ -2076,52 +2164,109 @@ function OverviewMetrics({ token }: { token: string }) {
                                     <ComposedChart data={data}>
                                         <defs>
                                             <linearGradient id="metricFill" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={activeMetricColor} stopOpacity={0.22} />
-                                                <stop offset="100%" stopColor={activeMetricColor} stopOpacity={0.02} />
+                                                <stop offset="0%" stopColor={activeMetricColor} stopOpacity={0.34} />
+                                                <stop offset="45%" stopColor={activeMetricColor} stopOpacity={0.12} />
+                                                <stop offset="100%" stopColor={activeMetricColor} stopOpacity={0.015} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                        <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.06)" />
                                         <XAxis
                                             dataKey="date"
                                             tickFormatter={(value) => formatDateLabel(value, interval)}
-                                            tick={{ fill: '#778196', fontSize: 11 }}
+                                            tick={{ fill: '#7f8a9b', fontSize: 11 }}
                                             axisLine={false}
                                             tickLine={false}
                                             minTickGap={24}
                                         />
                                         <YAxis
                                             tickFormatter={(value: number) => shortNumber(value)}
-                                            tick={{ fill: '#778196', fontSize: 11 }}
+                                            tick={{ fill: '#7f8a9b', fontSize: 11 }}
                                             axisLine={false}
                                             tickLine={false}
                                             width={44}
                                         />
                                         <Tooltip
-                                            cursor={{ stroke: 'rgba(255,255,255,0.10)', strokeWidth: 1 }}
+                                            cursor={{ stroke: 'rgba(241,245,249,0.7)', strokeWidth: 1.2 }}
                                             content={({ active, payload, label }) => {
                                                 if (!active || !payload?.length) return null;
                                                 const currentValue = Number(payload.find((item) => item.dataKey === displayedMetric.key)?.value || 0);
                                                 const previousValue = Number(payload.find((item) => item.dataKey === `prev_${displayedMetric.key}`)?.value || 0);
+                                                const tooltipDiff = diffDirection(currentValue, previousValue, displayedMetric.invert);
+                                                const tooltipTrend = formatTrendChange(normalizeTrendChange(tooltipDiff, displayedMetric.invert));
+                                                const tooltipTone = metricTone(tooltipDiff, true, true);
 
                                                 return (
-                                                    <div className="rounded-xl border border-white/[0.08] bg-[#0f141a]/96 px-3.5 py-3 text-xs shadow-[0_18px_36px_rgba(0,0,0,0.42)] backdrop-blur-md">
-                                                        <div className="mb-2 text-zinc-500">{formatDateLabel(label || '', interval)}</div>
-                                                        <div className="space-y-1.5">
+                                                    <div className="rounded-[16px] border border-white/[0.08] bg-[#05080a]/96 px-3.5 py-3 text-xs shadow-[0_20px_40px_rgba(0,0,0,0.46)] backdrop-blur-xl">
+                                                        <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500">
+                                                            {formatDateLabel(label || '', interval)}
+                                                        </div>
+                                                        <div className="mt-3 space-y-2.5">
                                                             <div className="flex items-center justify-between gap-6">
-                                                                <span className="text-zinc-500">Current</span>
-                                                                <span className="font-mono text-zinc-100">{formatMetricValue(currentValue, displayedMetric.unit)}</span>
+                                                                <span className="inline-flex items-center gap-2 text-zinc-400">
+                                                                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activeMetricColor }} />
+                                                                    Current
+                                                                </span>
+                                                                <span className="font-mono text-[14px] font-semibold text-zinc-100">
+                                                                    {formatMetricValue(currentValue, displayedMetric.unit)}
+                                                                </span>
                                                             </div>
                                                             <div className="flex items-center justify-between gap-6">
-                                                                <span className="text-zinc-500">Previous</span>
-                                                                <span className="font-mono text-zinc-300">{formatMetricValue(previousValue, displayedMetric.unit)}</span>
+                                                                <span className="inline-flex items-center gap-2 text-zinc-400">
+                                                                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: previousMetricColor }} />
+                                                                    Previous
+                                                                </span>
+                                                                <span className="font-mono text-[13px] font-semibold" style={{ color: previousMetricColor }}>
+                                                                    {formatMetricValue(previousValue, displayedMetric.unit)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between gap-6 border-t border-white/[0.08] pt-2.5">
+                                                                <span className="text-zinc-500">Change</span>
+                                                                <span className="font-mono font-semibold" style={{ color: tooltipTone.solid }}>
+                                                                    {tooltipTrend}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 );
                                             }}
                                         />
-                                        <Line type="monotone" dataKey={`prev_${displayedMetric.key}`} stroke="rgba(203,213,225,0.22)" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                        <Area type="monotone" dataKey={displayedMetric.key} stroke={activeMetricColor} fill="url(#metricFill)" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                                        <Line
+                                            type="monotone"
+                                            dataKey={`prev_${displayedMetric.key}`}
+                                            stroke={previousMetricColor}
+                                            strokeOpacity={0.88}
+                                            strokeWidth={2.1}
+                                            dot={false}
+                                            activeDot={{ r: 5, fill: '#05080a', stroke: '#d9e2ec', strokeWidth: 2.2 }}
+                                            isAnimationActive={false}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey={displayedMetric.key}
+                                            stroke="none"
+                                            fill="url(#metricFill)"
+                                            dot={false}
+                                            isAnimationActive={false}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey={displayedMetric.key}
+                                            stroke={activeMetricColor}
+                                            strokeOpacity={0.18}
+                                            strokeWidth={6.5}
+                                            activeDot={false}
+                                            dot={false}
+                                            isAnimationActive={false}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey={displayedMetric.key}
+                                            stroke={activeMetricColor}
+                                            strokeWidth={2.9}
+                                            activeDot={{ r: 5.5, fill: activeMetricColor, stroke: '#e8fff6', strokeWidth: 2.2 }}
+                                            dot={false}
+                                            isAnimationActive={false}
+                                        />
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             )}
