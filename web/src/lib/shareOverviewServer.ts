@@ -13,8 +13,8 @@ const MISSING_SHARE_SENTINEL = { __isError: true } as const;
 
 export const SHARE_OVERVIEW_CACHE_TTL = {
     journey: 120_000,
-    live: 5_000,
-    liveVisitors: 5_000,
+    live: 15_000,
+    liveVisitors: 15_000,
     map: 60_000,
     stats: 45_000,
     topConversions: 45_000,

@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import { keepPreviousData, QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { keepPreviousData, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import {
     Area,
@@ -32,6 +32,7 @@ import {
     MousePointer2,
     Plus,
     Search,
+    Share2,
     TableProperties,
     Timer,
     UserPlus,
@@ -188,13 +189,26 @@ type LiveResponse = {
     byCity: Array<{ city: string; country: string; users: number }>;
     byPage: Array<{ page: string; users: number }>;
 };
-type LiveVisitorsResponse = { activeUsers: number };
 
-const LIVE_VISITORS_POLL_INTERVAL_MS = 5_000;
-const LIVE_DATA_POLL_INTERVAL_MS = 10_000;
+type SharedOverviewMode = 'share' | 'dashboard';
+
+type OverviewRuntime = {
+    mode: SharedOverviewMode;
+    queryKey: string;
+    apiBasePath: string;
+    baseParams?: Record<string, string | undefined>;
+    siteUrl?: string;
+    views: number;
+    initialRange?: string;
+    onRangeChange?: (value: string) => void;
+    onShareDashboard?: () => void;
+};
+
+const OverviewRuntimeContext = createContext<OverviewRuntime | null>(null);
+
+const LIVE_DATA_POLL_INTERVAL_MS = 15_000;
 const LIVE_RECONCILE_INTERVAL_MS = 60_000;
 const OVERVIEW_QUERY_STALE_MS = 30_000;
-const OVERVIEW_PREFETCH_DELAY_MS = 350;
 const OVERVIEW_TABLE_ROW_LIMIT = 15;
 const FILTER_OPERATOR_OPTIONS: Array<{ value: ShareOverviewFilterOperator; label: string; needsValue: boolean }> = [
     { value: 'is', label: 'is', needsValue: true },
@@ -208,6 +222,14 @@ const FILTER_FIELD_OPTIONS = SHARE_OVERVIEW_FILTER_NAMES.filter((name) => name !
 
 function cx(...values: Array<string | false | null | undefined>) {
     return values.filter(Boolean).join(' ');
+}
+
+function useOverviewRuntime() {
+    const runtime = useContext(OverviewRuntimeContext);
+    if (!runtime) {
+        throw new Error('Overview runtime missing');
+    }
+    return runtime;
 }
 
 function fetchJson<T>(url: string): Promise<T> {
@@ -245,6 +267,30 @@ function buildSearch({
     });
 
     return search.toString();
+}
+
+function buildOverviewUrl(
+    runtime: OverviewRuntime,
+    endpoint: string,
+    {
+        filters,
+        events,
+        extra,
+    }: {
+        filters: ShareOverviewFilter[];
+        events?: string[];
+        extra?: Record<string, string | undefined>;
+    },
+) {
+    const search = buildSearch({
+        filters,
+        events,
+        extra: {
+            ...(runtime.baseParams || {}),
+            ...(extra || {}),
+        },
+    });
+    return `${runtime.apiBasePath}/${endpoint}${search ? `?${search}` : ''}`;
 }
 
 function shortNumber(value: number) {
@@ -1722,6 +1768,33 @@ function MetricCard({
     );
 }
 
+function ShareDashboardButton({
+    onClick,
+    compact = false,
+}: {
+    onClick: () => void;
+    compact?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cx(
+                'dashboard-hover-action relative isolate inline-flex items-center justify-center gap-2 overflow-hidden rounded-[14px] border border-emerald-400/24 bg-[linear-gradient(135deg,rgba(8,18,14,0.98),rgba(10,32,24,0.96))] font-medium text-emerald-50 shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-emerald-300/36 hover:text-white',
+                compact ? 'h-10 w-full px-3 text-[12px]' : 'h-10 px-4 text-sm',
+            )}
+        >
+            <span className="absolute inset-0 rounded-[14px] bg-[radial-gradient(circle_at_top_left,rgba(31,190,215,0.16),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(51,207,150,0.18),transparent_46%)] opacity-90" />
+            <span className="relative inline-flex items-center gap-2">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/18 bg-emerald-400/12 text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                    <Share2 className="h-3.5 w-3.5" />
+                </span>
+                <span>Share dashboard</span>
+            </span>
+        </button>
+    );
+}
+
 function LiveMetricTile({
     data,
     total,
@@ -2057,13 +2130,14 @@ function MultiSeriesLineChart({
     );
 }
 
-function OverviewMetrics({ token }: { token: string }) {
+function OverviewMetrics({ liveData }: { liveData?: LiveResponse }) {
+    const runtime = useOverviewRuntime();
     const { range, interval, metric, setMetric, startDate, endDate, filters, eventNames } = useShareOverviewState();
     const pageScoped = hasPageScopedFilter(filters);
 
     const statsQuery = useQuery<StatsResponse, Error>({
-        queryKey: ['share-overview', token, 'stats', range, interval, startDate, endDate, filters, eventNames],
-        queryFn: () => fetchJson(`/api/share/${token}/overview/stats?${buildSearch({
+        queryKey: ['share-overview', runtime.queryKey, 'stats', range, interval, startDate, endDate, filters, eventNames],
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'stats', {
             filters,
             events: eventNames,
             extra: {
@@ -2072,23 +2146,14 @@ function OverviewMetrics({ token }: { token: string }) {
                 start: startDate || undefined,
                 end: endDate || undefined,
             },
-        })}`),
+        })),
         placeholderData: keepPreviousData,
         staleTime: OVERVIEW_QUERY_STALE_MS,
-    });
-    const liveQuery = useQuery<LiveResponse, Error>({
-        queryKey: ['share-overview', token, 'live', filters, eventNames],
-        queryFn: () => fetchJson(`/api/share/${token}/overview/live?${buildSearch({
-            filters,
-            events: eventNames,
-        })}`),
-        refetchInterval: LIVE_DATA_POLL_INTERVAL_MS,
-        placeholderData: keepPreviousData,
     });
 
     const displayedMetric = METRICS[metric] || METRICS[0];
     const data = statsQuery.data?.series || [];
-    const liveTotal = (liveQuery.data?.minuteCounts || []).reduce((sum, item) => sum + item.sessionCount, 0);
+    const liveTotal = (liveData?.minuteCounts || []).reduce((sum, item) => sum + item.sessionCount, 0);
     const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
     const activeMetricColor = OVERVIEW_CHART_GREEN;
     const previousMetricColor = OVERVIEW_SKY_ACCENT;
@@ -2123,7 +2188,7 @@ function OverviewMetrics({ token }: { token: string }) {
                                 primary={index < 4}
                             />
                         ))}
-                        <LiveMetricTile data={liveQuery.data} total={displayedLiveTotal} className="col-span-2 md:col-span-1" />
+                        <LiveMetricTile data={liveData} total={displayedLiveTotal} className="col-span-2 md:col-span-1" />
                     </div>
 
                     <div className="border-t border-white/[0.10] bg-[#020406]/96 px-3 pb-4 pt-3.5 sm:px-5 sm:pb-6 sm:pt-4">
@@ -2278,7 +2343,8 @@ function OverviewMetrics({ token }: { token: string }) {
     );
 }
 
-function TopSourcesWidget({ token }: { token: string }) {
+function TopSourcesWidget() {
+    const runtime = useOverviewRuntime();
     const {
         range,
         interval,
@@ -2295,44 +2361,33 @@ function TopSourcesWidget({ token }: { token: string }) {
     } = useShareOverviewState();
     const [searchQuery, setSearchQuery] = useState('');
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const queryClient = useQueryClient();
-    const genericSearch = useMemo(() => buildSearch({
-        filters,
-        events: eventNames,
-        extra: {
+    const genericQueryKey = useMemo(
+        () => ['share-overview', runtime.queryKey, 'top-generic', sourcesTab, range, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, range, runtime.queryKey, sourcesTab, startDate],
+    );
+    const seriesQueryKey = useMemo(
+        () => ['share-overview', runtime.queryKey, 'top-generic-series', sourcesTab, range, interval, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, interval, range, runtime.queryKey, sourcesTab, startDate],
+    );
+
+    const query = useQuery<TopGenericResponse, Error>({
+        queryKey: genericQueryKey,
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-generic', { filters, events: eventNames, extra: {
             column: sourcesTab,
             range,
             start: startDate || undefined,
             end: endDate || undefined,
-        },
-    }), [endDate, eventNames, filters, range, sourcesTab, startDate]);
-    const seriesSearch = useMemo(() => buildSearch({
-        filters,
-        events: eventNames,
-        extra: {
+        } })),
+    });
+    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
+        queryKey: seriesQueryKey,
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-generic-series', { filters, events: eventNames, extra: {
             column: sourcesTab,
             range,
             overrideInterval: interval,
             start: startDate || undefined,
             end: endDate || undefined,
-        },
-    }), [endDate, eventNames, filters, interval, range, sourcesTab, startDate]);
-    const genericQueryKey = useMemo(
-        () => ['share-overview', token, 'top-generic', sourcesTab, range, startDate, endDate, filters, eventNames] as const,
-        [endDate, eventNames, filters, range, sourcesTab, startDate, token],
-    );
-    const seriesQueryKey = useMemo(
-        () => ['share-overview', token, 'top-generic-series', sourcesTab, range, interval, startDate, endDate, filters, eventNames] as const,
-        [endDate, eventNames, filters, interval, range, sourcesTab, startDate, token],
-    );
-
-    const query = useQuery<TopGenericResponse, Error>({
-        queryKey: genericQueryKey,
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic?${genericSearch}`),
-    });
-    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
-        queryKey: seriesQueryKey,
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+        } })),
         enabled: view === 'chart',
     });
 
@@ -2348,22 +2403,6 @@ function TopSourcesWidget({ token }: { token: string }) {
         const needle = searchQuery.toLowerCase();
         return data.filter((item) => `${item.prefix || ''} ${item.name}`.toLowerCase().includes(needle));
     }, [seriesQuery.data?.items, searchQuery]);
-
-    useEffect(() => {
-        if (view !== 'table' || !query.data?.items.length) {
-            return;
-        }
-
-        const timeoutId = window.setTimeout(() => {
-            void queryClient.prefetchQuery({
-                queryKey: seriesQueryKey,
-                queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
-                staleTime: OVERVIEW_QUERY_STALE_MS,
-            });
-        }, OVERVIEW_PREFETCH_DELAY_MS);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [query.data?.items.length, queryClient, seriesQueryKey, seriesSearch, token, view]);
 
     return (
         <>
@@ -2401,7 +2440,7 @@ function TopSourcesWidget({ token }: { token: string }) {
                 <FooterDetailsButton onClick={() => setDetailsOpen(true)} />
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                     <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-zinc-500">
-                        {query.data?.supported === false ? 'Limited' : 'Shared view'}
+                        {query.data?.supported === false ? 'Limited' : runtime.mode === 'share' ? 'Shared view' : 'Dashboard view'}
                     </span>
                     <OverviewViewToggle view={view} setView={setView} disabled={query.data?.supported === false} />
                 </div>
@@ -2429,7 +2468,9 @@ function TopSourcesWidget({ token }: { token: string }) {
     );
 }
 
-function TopPagesWidget({ token, siteUrl }: { token: string; siteUrl?: string }) {
+function TopPagesWidget() {
+    const runtime = useOverviewRuntime();
+    const siteUrl = runtime.siteUrl;
     const { range, startDate, endDate, filters, eventNames, addFilter, hasFilter, pagesTab, setPagesTab, showDomain, setShowDomain } = useShareOverviewState();
     const [searchQuery, setSearchQuery] = useState('');
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -2437,8 +2478,8 @@ function TopPagesWidget({ token, siteUrl }: { token: string; siteUrl?: string })
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
     const query = useQuery<TopPagesResponse, Error>({
-        queryKey: ['share-overview', token, 'top-pages', pagesTab, range, startDate, endDate, filters, eventNames],
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-pages?${buildSearch({
+        queryKey: ['share-overview', runtime.queryKey, 'top-pages', pagesTab, range, startDate, endDate, filters, eventNames],
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-pages', {
             filters,
             events: eventNames,
             extra: {
@@ -2447,7 +2488,7 @@ function TopPagesWidget({ token, siteUrl }: { token: string; siteUrl?: string })
                 start: startDate || undefined,
                 end: endDate || undefined,
             },
-        })}`),
+        })),
     });
 
     const rows = useMemo(() => {
@@ -2757,7 +2798,8 @@ function TopPagesWidget({ token, siteUrl }: { token: string; siteUrl?: string })
     );
 }
 
-function TopDevicesWidget({ token }: { token: string }) {
+function TopDevicesWidget() {
+    const runtime = useOverviewRuntime();
     const {
         range,
         interval,
@@ -2774,44 +2816,33 @@ function TopDevicesWidget({ token }: { token: string }) {
     } = useShareOverviewState();
     const [searchQuery, setSearchQuery] = useState('');
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const queryClient = useQueryClient();
-    const genericSearch = useMemo(() => buildSearch({
-        filters,
-        events: eventNames,
-        extra: {
+    const genericQueryKey = useMemo(
+        () => ['share-overview', runtime.queryKey, 'top-generic', techTab, range, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, range, runtime.queryKey, startDate, techTab],
+    );
+    const seriesQueryKey = useMemo(
+        () => ['share-overview', runtime.queryKey, 'top-generic-series', techTab, range, interval, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, interval, range, runtime.queryKey, startDate, techTab],
+    );
+
+    const query = useQuery<TopGenericResponse, Error>({
+        queryKey: genericQueryKey,
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-generic', { filters, events: eventNames, extra: {
             column: techTab,
             range,
             start: startDate || undefined,
             end: endDate || undefined,
-        },
-    }), [endDate, eventNames, filters, range, startDate, techTab]);
-    const seriesSearch = useMemo(() => buildSearch({
-        filters,
-        events: eventNames,
-        extra: {
+        } })),
+    });
+    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
+        queryKey: seriesQueryKey,
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-generic-series', { filters, events: eventNames, extra: {
             column: techTab,
             range,
             overrideInterval: interval,
             start: startDate || undefined,
             end: endDate || undefined,
-        },
-    }), [endDate, eventNames, filters, interval, range, startDate, techTab]);
-    const genericQueryKey = useMemo(
-        () => ['share-overview', token, 'top-generic', techTab, range, startDate, endDate, filters, eventNames] as const,
-        [endDate, eventNames, filters, range, startDate, techTab, token],
-    );
-    const seriesQueryKey = useMemo(
-        () => ['share-overview', token, 'top-generic-series', techTab, range, interval, startDate, endDate, filters, eventNames] as const,
-        [endDate, eventNames, filters, interval, range, startDate, techTab, token],
-    );
-
-    const query = useQuery<TopGenericResponse, Error>({
-        queryKey: genericQueryKey,
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic?${genericSearch}`),
-    });
-    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
-        queryKey: seriesQueryKey,
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+        } })),
         enabled: view === 'chart',
     });
 
@@ -2827,22 +2858,6 @@ function TopDevicesWidget({ token }: { token: string }) {
         const needle = searchQuery.toLowerCase();
         return data.filter((item) => item.name.toLowerCase().includes(needle));
     }, [seriesQuery.data?.items, searchQuery]);
-
-    useEffect(() => {
-        if (view !== 'table' || !query.data?.items.length) {
-            return;
-        }
-
-        const timeoutId = window.setTimeout(() => {
-            void queryClient.prefetchQuery({
-                queryKey: seriesQueryKey,
-                queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
-                staleTime: OVERVIEW_QUERY_STALE_MS,
-            });
-        }, OVERVIEW_PREFETCH_DELAY_MS);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [query.data?.items.length, queryClient, seriesQueryKey, seriesSearch, token, view]);
 
     return (
         <>
@@ -2888,7 +2903,7 @@ function TopDevicesWidget({ token }: { token: string }) {
                 <FooterDetailsButton onClick={() => setDetailsOpen(true)} />
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                     <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-zinc-500">
-                        {query.data?.supported === false ? 'Limited' : 'Shared view'}
+                        {query.data?.supported === false ? 'Limited' : runtime.mode === 'share' ? 'Shared view' : 'Dashboard view'}
                     </span>
                     <OverviewViewToggle view={view} setView={setView} disabled={query.data?.supported === false} />
                 </div>
@@ -3079,7 +3094,8 @@ function TopEventsWidget({ token }: { token: string }) {
     );
 }
 
-function TopGeoTableWidget({ token }: { token: string }) {
+function TopGeoTableWidget() {
+    const runtime = useOverviewRuntime();
     const {
         range,
         interval,
@@ -3096,44 +3112,33 @@ function TopGeoTableWidget({ token }: { token: string }) {
     } = useShareOverviewState();
     const [searchQuery, setSearchQuery] = useState('');
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const queryClient = useQueryClient();
-    const genericSearch = useMemo(() => buildSearch({
-        filters,
-        events: eventNames,
-        extra: {
+    const genericQueryKey = useMemo(
+        () => ['share-overview', runtime.queryKey, 'top-generic', geoTab, range, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, geoTab, range, runtime.queryKey, startDate],
+    );
+    const seriesQueryKey = useMemo(
+        () => ['share-overview', runtime.queryKey, 'top-generic-series', geoTab, range, interval, startDate, endDate, filters, eventNames] as const,
+        [endDate, eventNames, filters, geoTab, interval, range, runtime.queryKey, startDate],
+    );
+
+    const query = useQuery<TopGenericResponse, Error>({
+        queryKey: genericQueryKey,
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-generic', { filters, events: eventNames, extra: {
             column: geoTab,
             range,
             start: startDate || undefined,
             end: endDate || undefined,
-        },
-    }), [endDate, eventNames, filters, geoTab, range, startDate]);
-    const seriesSearch = useMemo(() => buildSearch({
-        filters,
-        events: eventNames,
-        extra: {
+        } })),
+    });
+    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
+        queryKey: seriesQueryKey,
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'top-generic-series', { filters, events: eventNames, extra: {
             column: geoTab,
             range,
             overrideInterval: interval,
             start: startDate || undefined,
             end: endDate || undefined,
-        },
-    }), [endDate, eventNames, filters, geoTab, interval, range, startDate]);
-    const genericQueryKey = useMemo(
-        () => ['share-overview', token, 'top-generic', geoTab, range, startDate, endDate, filters, eventNames] as const,
-        [endDate, eventNames, filters, geoTab, range, startDate, token],
-    );
-    const seriesQueryKey = useMemo(
-        () => ['share-overview', token, 'top-generic-series', geoTab, range, interval, startDate, endDate, filters, eventNames] as const,
-        [endDate, eventNames, filters, geoTab, interval, range, startDate, token],
-    );
-
-    const query = useQuery<TopGenericResponse, Error>({
-        queryKey: genericQueryKey,
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic?${genericSearch}`),
-    });
-    const seriesQuery = useQuery<TopGenericSeriesResponse, Error>({
-        queryKey: seriesQueryKey,
-        queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
+        } })),
         enabled: view === 'chart',
     });
 
@@ -3149,22 +3154,6 @@ function TopGeoTableWidget({ token }: { token: string }) {
         const needle = searchQuery.toLowerCase();
         return data.filter((item) => `${item.prefix || ''} ${item.name}`.toLowerCase().includes(needle));
     }, [seriesQuery.data?.items, searchQuery]);
-
-    useEffect(() => {
-        if (view !== 'table' || !query.data?.items.length) {
-            return;
-        }
-
-        const timeoutId = window.setTimeout(() => {
-            void queryClient.prefetchQuery({
-                queryKey: seriesQueryKey,
-                queryFn: () => fetchJson(`/api/share/${token}/overview/top-generic-series?${seriesSearch}`),
-                staleTime: OVERVIEW_QUERY_STALE_MS,
-            });
-        }, OVERVIEW_PREFETCH_DELAY_MS);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [query.data?.items.length, queryClient, seriesQueryKey, seriesSearch, token, view]);
 
     return (
         <>
@@ -3254,20 +3243,19 @@ function TopGeoTableWidget({ token }: { token: string }) {
     );
 }
 
-function TopGeoMapWidget({ token }: { token: string }) {
-    const { filters, eventNames, addFilter, setGeoTab, getFilterValues } = useShareOverviewState();
+function TopGeoMapWidget({
+    liveData,
+    loading,
+    error,
+}: {
+    liveData?: LiveResponse;
+    loading: boolean;
+    error: Error | null;
+}) {
+    const { addFilter, setGeoTab, getFilterValues } = useShareOverviewState();
     const [visualization, setVisualization] = useState<GeoVisualizationMode>('globe');
-    const liveGeoQuery = useQuery<LiveResponse, Error>({
-        queryKey: ['share-overview', token, 'live', filters, eventNames],
-        queryFn: () => fetchJson(`/api/share/${token}/overview/live?${buildSearch({
-            filters,
-            events: eventNames,
-        })}`),
-        refetchInterval: LIVE_DATA_POLL_INTERVAL_MS,
-        placeholderData: keepPreviousData,
-    });
-    const geoVisualizationData = useMemo(() => buildRealtimeGeoVisualizationData(liveGeoQuery.data), [liveGeoQuery.data]);
-    const geoInsights = useMemo(() => buildShareGeoInsights(liveGeoQuery.data), [liveGeoQuery.data]);
+    const geoVisualizationData = useMemo(() => buildRealtimeGeoVisualizationData(liveData), [liveData]);
+    const geoInsights = useMemo(() => buildShareGeoInsights(liveData), [liveData]);
     const activeCountry = getFilterValues('country')[0] || null;
 
     function handleGeoSelection(name: string, type: 'country' | 'city') {
@@ -3318,8 +3306,8 @@ function TopGeoMapWidget({ token }: { token: string }) {
             <div className="min-h-[358px] p-3">
                 <QueryBoundaries
                     title="live geo"
-                    loading={liveGeoQuery.isLoading && !liveGeoQuery.data}
-                    error={liveGeoQuery.error || null}
+                    loading={loading && !liveData}
+                    error={error}
                     empty={!geoVisualizationData.byCountry.length && !geoVisualizationData.byCity.length}
                 >
                     <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-[#091118] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
@@ -3344,7 +3332,7 @@ function TopGeoMapWidget({ token }: { token: string }) {
                         <div className="grid border-t border-white/[0.04] bg-[linear-gradient(180deg,rgba(12,17,23,0.98),rgba(10,15,21,0.98))] lg:grid-cols-[0.95fr_1.05fr]">
                             <div className="border-b border-white/[0.06] lg:border-b-0 lg:border-r lg:border-white/[0.06]">
                                 <ShareGeoStatsCard
-                                    activeUsers={liveGeoQuery.data?.activeUsers || 0}
+                                    activeUsers={liveData?.activeUsers || 0}
                                     estTotalValue={geoInsights.estTotalValue}
                                     topCountries={geoInsights.topCountries}
                                     topReferrers={geoInsights.topReferrers}
@@ -3361,7 +3349,9 @@ function TopGeoMapWidget({ token }: { token: string }) {
     );
 }
 
-function ShareOverviewPage({ token, siteUrl, views }: { token: string; siteUrl?: string; views: number }) {
+function ShareOverviewPage() {
+    const runtime = useOverviewRuntime();
+    const searchParams = useSearchParams();
     const {
         range,
         setRange,
@@ -3375,111 +3365,187 @@ function ShareOverviewPage({ token, siteUrl, views }: { token: string; siteUrl?:
         setEventNames,
     } = useShareOverviewState();
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const didHydrateRangeRef = useRef(false);
     const handleRangeChange = (value: string) => setRange(value as ShareOverviewRange);
     const activeFilterCount = filters.length + eventNames.length;
 
-    const liveVisitorsQuery = useQuery<LiveVisitorsResponse, Error>({
-        queryKey: ['share-overview', token, 'live-visitors', filters, eventNames],
-        queryFn: () => fetchJson(`/api/share/${token}/overview/live-visitors?${buildSearch({ filters, events: eventNames })}`),
-        refetchInterval: LIVE_VISITORS_POLL_INTERVAL_MS,
+    useEffect(() => {
+        if (runtime.mode !== 'dashboard' || didHydrateRangeRef.current) {
+            return;
+        }
+
+        didHydrateRangeRef.current = true;
+        const hasExplicitRange = searchParams.has('range') || searchParams.has('start') || searchParams.has('end');
+        if (!hasExplicitRange && runtime.initialRange && runtime.initialRange !== range) {
+            setRange(runtime.initialRange as ShareOverviewRange);
+        }
+    }, [range, runtime.initialRange, runtime.mode, searchParams, setRange]);
+
+    useEffect(() => {
+        if (runtime.mode === 'dashboard' && runtime.onRangeChange) {
+            runtime.onRangeChange(range);
+        }
+    }, [range, runtime]);
+
+    const liveQuery = useQuery<LiveResponse, Error>({
+        queryKey: ['share-overview', runtime.queryKey, 'live', filters, eventNames],
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'live', { filters, events: eventNames })),
+        placeholderData: keepPreviousData,
+        staleTime: LIVE_DATA_POLL_INTERVAL_MS,
+        refetchInterval: LIVE_DATA_POLL_INTERVAL_MS,
     });
-    const debouncedLiveVisitors = useDebouncedLiveValue(liveVisitorsQuery.data?.activeUsers || 0, 1_000, LIVE_RECONCILE_INTERVAL_MS);
+    const debouncedLiveVisitors = useDebouncedLiveValue(liveQuery.data?.activeUsers || 0, 1_000, LIVE_RECONCILE_INTERVAL_MS);
 
-    return (
-        <div className="min-h-screen bg-[#080b0e] text-zinc-100">
-            <div className="border-b border-white/[0.06] bg-[#07090c]">
-                <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div className="min-w-0">
-                        <div className="mb-1 flex items-center gap-3">
-                            <Logo size="sm" className="shrink-0" />
-                            <span className="dashboard-hover-chip inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-100">
-                                Shared analytics
-                            </span>
-                        </div>
-                        {siteUrl ? <div className="truncate text-xs text-zinc-500">Analytics for <span className="font-mono text-zinc-300">{siteUrl}</span></div> : null}
+    const controls = (
+        <div className={cx(
+            runtime.mode === 'share'
+                ? 'sticky top-0 z-30 border-b border-white/[0.08] bg-[#080b0e]/92 shadow-[0_10px_24px_rgba(0,0,0,0.24)] backdrop-blur-xl'
+                : 'sticky top-0 z-20 rounded-[14px] border border-white/[0.08] bg-[#070a0d]/94 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl',
+        )}>
+            <div className={cx(runtime.mode === 'share' ? 'mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'px-3 py-3 sm:px-4 sm:py-4')}>
+                <div className="hidden items-center justify-between gap-4 md:flex">
+                    <div className="flex items-center gap-2">
+                        <DatePicker range={range} setRange={handleRangeChange} />
+                        <IntervalButtons value={interval} onChange={setInterval} />
+                        <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} />
                     </div>
-                    <div className="shrink-0 sm:text-right">
-                        <div className="text-xs text-zinc-500">Share visits</div>
-                        <div className="font-mono text-lg text-zinc-100">{shortNumber(views)}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#080b0e]/92 shadow-[0_10px_24px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-                <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
-                    <div className="hidden items-center justify-between gap-4 md:flex">
-                        <div className="flex items-center gap-2">
-                            <DatePicker range={range} setRange={handleRangeChange} />
-                            <IntervalButtons value={interval} onChange={setInterval} />
-                            <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} />
-                        </div>
+                    <div className="flex items-center gap-2">
+                        {runtime.mode === 'dashboard' && runtime.onShareDashboard ? (
+                            <ShareDashboardButton onClick={runtime.onShareDashboard} />
+                        ) : null}
                         <LiveNowPill activeUsers={debouncedLiveVisitors} />
                     </div>
-                    <div className="space-y-2.5 md:hidden">
+                </div>
+                <div className="space-y-2.5 md:hidden">
+                    {runtime.mode === 'share' ? (
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2">
                             <div className="min-w-0">
                                 <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">TrafficClaw share</div>
                                 <div className="truncate text-[12px] text-zinc-300">
-                                    {siteUrl ? siteUrl : 'Shared analytics dashboard'}
+                                    {runtime.siteUrl ? runtime.siteUrl : 'Shared analytics dashboard'}
                                 </div>
                             </div>
                             <LiveNowPill activeUsers={debouncedLiveVisitors} compact />
                         </div>
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                            <div className="min-w-0">
-                                <DatePicker range={range} setRange={handleRangeChange} compact />
-                            </div>
-                            <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} compact />
+                    ) : null}
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                        <div className="min-w-0">
+                            <DatePicker range={range} setRange={handleRangeChange} compact />
                         </div>
-                        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                            <IntervalButtons value={interval} onChange={setInterval} className="min-w-max" />
-                        </div>
+                        <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} compact />
                     </div>
-                    {(filters.length || eventNames.length) ? (
-                        <div className="mt-3 border-t border-white/[0.06] pt-3">
-                            <FilterPills
-                                filters={filters}
-                                eventNames={eventNames}
-                                upsertFilter={upsertFilter}
-                                setEventNames={setEventNames}
-                                removeFilter={removeFilter}
-                                removeEventName={removeEventName}
-                            />
+                    <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <IntervalButtons value={interval} onChange={setInterval} className="min-w-max" />
+                    </div>
+                    {runtime.mode === 'dashboard' ? (
+                        <div className="space-y-2">
+                            {runtime.onShareDashboard ? (
+                                <ShareDashboardButton onClick={runtime.onShareDashboard} compact />
+                            ) : null}
+                            <div className="flex justify-end">
+                                <LiveNowPill activeUsers={debouncedLiveVisitors} compact />
+                            </div>
                         </div>
                     ) : null}
                 </div>
-            </div>
-            <FilterEditorModal
-                open={filtersOpen}
-                onClose={() => setFiltersOpen(false)}
-                filters={filters}
-                eventNames={eventNames}
-                upsertFilter={upsertFilter}
-                removeFilter={removeFilter}
-                setEventNames={setEventNames}
-            />
-
-            <div className="mx-auto grid max-w-7xl grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4">
-                <OverviewMetrics token={token} />
-                <TopSourcesWidget token={token} />
-                <TopGeoTableWidget token={token} />
-                <TopDevicesWidget token={token} />
-                <TopPagesWidget token={token} siteUrl={siteUrl} />
-                <TopEventsWidget token={token} />
-                <TopGeoMapWidget token={token} />
+                {(filters.length || eventNames.length) ? (
+                    <div className="mt-3 border-t border-white/[0.06] pt-3">
+                        <FilterPills
+                            filters={filters}
+                            eventNames={eventNames}
+                            upsertFilter={upsertFilter}
+                            setEventNames={setEventNames}
+                            removeFilter={removeFilter}
+                            removeEventName={removeEventName}
+                        />
+                    </div>
+                ) : null}
             </div>
         </div>
+    );
+
+    const contentGrid = (
+        <div className={cx(runtime.mode === 'share' ? 'mx-auto grid max-w-7xl grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4' : 'grid grid-cols-6 gap-3 pt-4 sm:gap-4')}>
+            <OverviewMetrics liveData={liveQuery.data} />
+            <TopSourcesWidget />
+            <TopGeoTableWidget />
+            <TopDevicesWidget />
+            <TopPagesWidget />
+            {runtime.mode === 'share' ? <TopEventsWidget token={runtime.queryKey} /> : null}
+            {runtime.mode === 'share' ? <TopGeoMapWidget liveData={liveQuery.data} loading={liveQuery.isLoading} error={liveQuery.error || null} /> : null}
+        </div>
+    );
+
+    return (
+        <>
+            {runtime.mode === 'share' ? (
+                <div className="min-h-screen bg-[#080b0e] text-zinc-100">
+                    <div className="border-b border-white/[0.06] bg-[#07090c]">
+                        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <div className="min-w-0">
+                                <div className="mb-1 flex items-center gap-3">
+                                    <Logo size="sm" className="shrink-0" />
+                                    <span className="dashboard-hover-chip inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-100">
+                                        Shared analytics
+                                    </span>
+                                </div>
+                                {runtime.siteUrl ? <div className="truncate text-xs text-zinc-500">Analytics for <span className="font-mono text-zinc-300">{runtime.siteUrl}</span></div> : null}
+                            </div>
+                            <div className="shrink-0 sm:text-right">
+                                <div className="text-xs text-zinc-500">Share visits</div>
+                                <div className="font-mono text-lg text-zinc-100">{shortNumber(runtime.views)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {controls}
+                    <FilterEditorModal
+                        open={filtersOpen}
+                        onClose={() => setFiltersOpen(false)}
+                        filters={filters}
+                        eventNames={eventNames}
+                        upsertFilter={upsertFilter}
+                        removeFilter={removeFilter}
+                        setEventNames={setEventNames}
+                    />
+                    {contentGrid}
+                </div>
+            ) : (
+                <div className="space-y-4 text-zinc-100">
+                    {controls}
+                    <FilterEditorModal
+                        open={filtersOpen}
+                        onClose={() => setFiltersOpen(false)}
+                        filters={filters}
+                        eventNames={eventNames}
+                        upsertFilter={upsertFilter}
+                        removeFilter={removeFilter}
+                        setEventNames={setEventNames}
+                    />
+                    {contentGrid}
+                </div>
+            )}
+        </>
     );
 }
 
 export default function SharedOverviewClient({
+    mode = 'share',
     token,
+    propertyId,
     siteUrl,
-    views,
+    views = 0,
+    initialRange,
+    onRangeChange,
+    onShareDashboard,
 }: {
-    token: string;
+    mode?: SharedOverviewMode;
+    token?: string;
+    propertyId?: string;
     siteUrl?: string;
-    views: number;
+    views?: number;
+    initialRange?: string;
+    onRangeChange?: (value: string) => void;
+    onShareDashboard?: () => void;
 }) {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
@@ -3492,11 +3558,48 @@ export default function SharedOverviewClient({
             },
         },
     }));
+    const runtime = useMemo<OverviewRuntime | null>(() => {
+        if (mode === 'dashboard') {
+            if (!propertyId) {
+                return null;
+            }
+
+            return {
+                mode,
+                queryKey: propertyId,
+                apiBasePath: '/api/analytics/overview',
+                baseParams: { propertyId },
+                siteUrl,
+                views,
+                initialRange,
+                onRangeChange,
+                onShareDashboard,
+            };
+        }
+
+        if (!token) {
+            return null;
+        }
+
+        return {
+            mode: 'share',
+            queryKey: token,
+            apiBasePath: `/api/share/${token}/overview`,
+            siteUrl,
+            views,
+        };
+    }, [initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
+
+    if (!runtime) {
+        return null;
+    }
 
     return (
         <QueryClientProvider client={queryClient}>
             <NuqsAdapter>
-                <ShareOverviewPage token={token} siteUrl={siteUrl} views={views} />
+                <OverviewRuntimeContext.Provider value={runtime}>
+                    <ShareOverviewPage />
+                </OverviewRuntimeContext.Provider>
             </NuqsAdapter>
         </QueryClientProvider>
     );

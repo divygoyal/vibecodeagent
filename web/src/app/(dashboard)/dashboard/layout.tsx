@@ -99,6 +99,7 @@ export default function DashboardLayout({
     const { data: session, status } = useSession();
     const pathname = usePathname();
     const isOverviewRoute = pathname === '/dashboard';
+    const isAnalyticsMainRoute = pathname === '/dashboard/analytics';
     const shellRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-xl';
     const shellCompactRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-lg';
     const shellBadgeRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-full';
@@ -638,7 +639,7 @@ export default function DashboardLayout({
                         {/* Right side controls */}
                         <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
                             {/* Global Date Range Picker — desktop here, compact mobile version rendered below on overview */}
-                            <div className="hidden md:block">
+                            <div className={`hidden md:block ${isAnalyticsMainRoute ? 'invisible pointer-events-none w-0 overflow-hidden' : ''}`}>
                                 <DatePicker range={range} setRange={setRange} />
                             </div>
                             {/* Notification Bell */}

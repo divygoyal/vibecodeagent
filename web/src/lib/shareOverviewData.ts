@@ -388,7 +388,11 @@ function aggregateMetricSeries(points: MetricPoint[], interval: OverviewInterval
         });
 }
 
-function parseStatsSeriesRows(rows: GAReportRow[] | undefined, dimension: string): MetricPoint[] {
+function parseStatsSeriesRows(
+    rows: GAReportRow[] | undefined,
+    dimension: string,
+    revenueIndex?: number,
+): MetricPoint[] {
     if (!rows?.length) {
         return [];
     }
@@ -410,12 +414,14 @@ function parseStatsSeriesRows(rows: GAReportRow[] | undefined, dimension: string
             bounce_rate: +bounceRate.toFixed(2),
             avg_session_duration: +avgDuration.toFixed(2),
             views_per_session: sessions > 0 ? +(screenViews / sessions).toFixed(2) : 0,
-            total_revenue: 0,
+            total_revenue: revenueIndex === undefined
+                ? 0
+                : +(parseFloat(row.metricValues?.[revenueIndex]?.value || '0') || 0).toFixed(2),
         };
     });
 }
 
-function parseStatsTotals(row?: GAReportRow) {
+function parseStatsTotals(row?: GAReportRow, revenueIndex?: number) {
     const uniqueVisitors = parseInt(row?.metricValues?.[0]?.value || '0', 10) || 0;
     const sessions = parseInt(row?.metricValues?.[1]?.value || '0', 10) || 0;
     const screenViews = parseInt(row?.metricValues?.[2]?.value || '0', 10) || 0;
@@ -431,30 +437,10 @@ function parseStatsTotals(row?: GAReportRow) {
         bounce_rate: +bounceRate.toFixed(2),
         avg_session_duration: +avgDuration.toFixed(2),
         views_per_session: sessions > 0 ? +(screenViews / sessions).toFixed(2) : 0,
-        total_revenue: 0,
+        total_revenue: revenueIndex === undefined
+            ? 0
+            : +(parseFloat(row?.metricValues?.[revenueIndex]?.value || '0') || 0).toFixed(2),
     };
-}
-
-function mergeRevenueIntoMetricPoints(points: MetricPoint[], rows: GAReportRow[] | undefined, dimension: string) {
-    if (!rows?.length) {
-        return points;
-    }
-
-    const revenueByDate = new Map(
-        rows.map((row) => [
-            parseGaDate(row.dimensionValues?.[0]?.value || '', dimension).toISOString(),
-            parseFloat(row.metricValues?.[0]?.value || '0') || 0,
-        ]),
-    );
-
-    return points.map((point) => ({
-        ...point,
-        total_revenue: +(revenueByDate.get(point.date) || 0).toFixed(2),
-    }));
-}
-
-function parseRevenueTotal(row?: GAReportRow) {
-    return +(parseFloat(row?.metricValues?.[0]?.value || '0') || 0).toFixed(2);
 }
 
 function alignPreviousSeries(current: MetricPoint[], previous: MetricPoint[]) {
@@ -521,60 +507,67 @@ export async function fetchShareOverviewStats(input: {
     const { current, previous } = resolveOverviewRange(input.range, input.startDate, input.endDate);
     const filterExpression = buildDimensionFilter(input.filters, input.events);
     const dimension = input.interval === 'hour' ? 'dateHour' : 'date';
-    const metrics = ['activeUsers', 'sessions', 'screenPageViews', 'newUsers', 'bounceRate', 'averageSessionDuration'];
+    const baseMetrics = ['activeUsers', 'sessions', 'screenPageViews', 'newUsers', 'bounceRate', 'averageSessionDuration'];
+    const metricsWithRevenue = [...baseMetrics, 'purchaseRevenue'];
 
-    const [currentTotals, previousTotals, currentSeries, previousSeries, currentRevenueTotals, previousRevenueTotals, currentRevenueSeries, previousRevenueSeries] = await Promise.all([
-        runFlexibleGAReport(input.accessToken, input.propertyId, [], metrics, [current], {
-            dimensionFilter: filterExpression,
-            limit: 1,
-        }),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [], metrics, [previous], {
-            dimensionFilter: filterExpression,
-            limit: 1,
-        }),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], metrics, [current], {
-            dimensionFilter: filterExpression,
-            orderBys: [{ field: dimension, type: 'dimension', desc: false }],
-            limit: dimension === 'dateHour' ? 500 : 400,
-        }),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], metrics, [previous], {
-            dimensionFilter: filterExpression,
-            orderBys: [{ field: dimension, type: 'dimension', desc: false }],
-            limit: dimension === 'dateHour' ? 500 : 400,
-        }),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [], ['purchaseRevenue'], [current], {
-            dimensionFilter: filterExpression,
-            limit: 1,
-        }).catch(() => ({ rows: [] as GAReportRow[] })),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [], ['purchaseRevenue'], [previous], {
-            dimensionFilter: filterExpression,
-            limit: 1,
-        }).catch(() => ({ rows: [] as GAReportRow[] })),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], ['purchaseRevenue'], [current], {
-            dimensionFilter: filterExpression,
-            orderBys: [{ field: dimension, type: 'dimension', desc: false }],
-            limit: dimension === 'dateHour' ? 500 : 400,
-        }).catch(() => ({ rows: [] as GAReportRow[] })),
-        runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], ['purchaseRevenue'], [previous], {
-            dimensionFilter: filterExpression,
-            orderBys: [{ field: dimension, type: 'dimension', desc: false }],
-            limit: dimension === 'dateHour' ? 500 : 400,
-        }).catch(() => ({ rows: [] as GAReportRow[] })),
-    ]);
+    async function runStatsReports(metrics: string[]) {
+        return Promise.all([
+            runFlexibleGAReport(input.accessToken, input.propertyId, [], metrics, [current], {
+                dimensionFilter: filterExpression,
+                limit: 1,
+            }),
+            runFlexibleGAReport(input.accessToken, input.propertyId, [], metrics, [previous], {
+                dimensionFilter: filterExpression,
+                limit: 1,
+            }),
+            runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], metrics, [current], {
+                dimensionFilter: filterExpression,
+                orderBys: [{ field: dimension, type: 'dimension', desc: false }],
+                limit: dimension === 'dateHour' ? 500 : 400,
+            }),
+            runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], metrics, [previous], {
+                dimensionFilter: filterExpression,
+                orderBys: [{ field: dimension, type: 'dimension', desc: false }],
+                limit: dimension === 'dateHour' ? 500 : 400,
+            }),
+        ]);
+    }
 
+    function isRevenueMetricError(error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return message.includes('purchaseRevenue');
+    }
+
+    let reportMetrics = metricsWithRevenue;
+    let currentTotals: { rows?: GAReportRow[] };
+    let previousTotals: { rows?: GAReportRow[] };
+    let currentSeries: { rows?: GAReportRow[] };
+    let previousSeries: { rows?: GAReportRow[] };
+
+    try {
+        [currentTotals, previousTotals, currentSeries, previousSeries] = await runStatsReports(metricsWithRevenue);
+    } catch (error) {
+        if (!isRevenueMetricError(error)) {
+            throw error;
+        }
+        console.warn('Share overview stats: purchaseRevenue unavailable, retrying without revenue metric', error);
+        reportMetrics = baseMetrics;
+        [currentTotals, previousTotals, currentSeries, previousSeries] = await runStatsReports(baseMetrics);
+    }
+
+    const revenueIndex = reportMetrics.indexOf('purchaseRevenue');
+    const resolvedRevenueIndex = revenueIndex >= 0 ? revenueIndex : undefined;
     const currentPoints = aggregateMetricSeries(
-        mergeRevenueIntoMetricPoints(parseStatsSeriesRows(currentSeries.rows, dimension), currentRevenueSeries.rows, dimension),
+        parseStatsSeriesRows(currentSeries.rows, dimension, resolvedRevenueIndex),
         input.interval,
     );
     const previousPoints = aggregateMetricSeries(
-        mergeRevenueIntoMetricPoints(parseStatsSeriesRows(previousSeries.rows, dimension), previousRevenueSeries.rows, dimension),
+        parseStatsSeriesRows(previousSeries.rows, dimension, resolvedRevenueIndex),
         input.interval,
     );
 
-    const currentMetrics = parseStatsTotals(currentTotals.rows?.[0]);
-    const previousMetrics = parseStatsTotals(previousTotals.rows?.[0]);
-    currentMetrics.total_revenue = parseRevenueTotal(currentRevenueTotals.rows?.[0]);
-    previousMetrics.total_revenue = parseRevenueTotal(previousRevenueTotals.rows?.[0]);
+    const currentMetrics = parseStatsTotals(currentTotals.rows?.[0], resolvedRevenueIndex);
+    const previousMetrics = parseStatsTotals(previousTotals.rows?.[0], resolvedRevenueIndex);
 
     return {
         metrics: {
@@ -1150,6 +1143,31 @@ export async function fetchShareOverviewLive(input: {
             users: parseInt(row.metricValues?.[0]?.value || '0', 10) || 0,
         })),
     };
+}
+
+export async function fetchShareOverviewLiveVisitors(input: {
+    accessToken: string;
+    propertyId: string;
+    filters: ShareOverviewFilter[];
+    events?: string[];
+}) {
+    const filterExpression = buildDimensionFilter(input.filters, input.events);
+
+    try {
+        const report = await runFlexibleRealtimeReport(input.accessToken, input.propertyId, [], ['activeUsers'], {
+            dimensionFilter: filterExpression,
+            limit: 1,
+        });
+
+        return {
+            activeUsers: parseInt(report.rows?.[0]?.metricValues?.[0]?.value || '0', 10) || 0,
+        };
+    } catch (error) {
+        console.error('Share overview live visitors error:', error);
+        return {
+            activeUsers: 0,
+        };
+    }
 }
 
 export async function fetchShareOverviewMap(input: {

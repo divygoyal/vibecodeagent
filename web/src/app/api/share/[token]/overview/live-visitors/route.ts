@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cachedFetch } from '@/lib/apiCache';
-import { fetchShareOverviewLive } from '@/lib/shareOverviewData';
+import { fetchShareOverviewLiveVisitors } from '@/lib/shareOverviewData';
 import {
     buildShareOverviewCacheKey,
     getShareOverviewContext,
@@ -21,18 +21,16 @@ export async function GET(
         return shareContext.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
     }
 
-    const cacheKey = buildShareOverviewCacheKey('live', token, shareContext.share.propertyId, [
+    const cacheKey = buildShareOverviewCacheKey('liveVisitors', token, shareContext.share.propertyId, [
         request.filters,
         request.events,
     ]);
-    const data = await cachedFetch(cacheKey, SHARE_OVERVIEW_CACHE_TTL.liveVisitors, () => fetchShareOverviewLive({
+    const data = await cachedFetch(cacheKey, SHARE_OVERVIEW_CACHE_TTL.liveVisitors, () => fetchShareOverviewLiveVisitors({
         accessToken: shareContext.accessToken!,
         propertyId: shareContext.share!.propertyId,
         filters: request.filters,
         events: request.events,
     }));
 
-    return NextResponse.json({
-        activeUsers: data.activeUsers,
-    });
+    return NextResponse.json(data);
 }
