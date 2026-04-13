@@ -217,13 +217,12 @@ export async function GET(req: Request) {
 
             // Handle "list" mode for dropdown
             if (mode === 'list') {
-                try {
-                    const sites = await fetchSiteList()
-                    return NextResponse.json(Array.isArray(sites) ? sites : [])
-                } catch (e) {
-                    console.error("List sites error:", e)
-                    return NextResponse.json([])
+                const sites = await fetchSiteList()
+                if (!Array.isArray(sites)) {
+                    const statusCode = sites.error.includes('timed out') ? 504 : 502
+                    return NextResponse.json({ error: sites.error }, { status: statusCode })
                 }
+                return NextResponse.json(sites)
             }
 
             let siteUrl = searchParams.get('siteUrl')

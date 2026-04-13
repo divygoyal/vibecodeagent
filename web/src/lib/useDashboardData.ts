@@ -3,11 +3,26 @@ import useSWR from 'swr';
 import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
 import { useSession } from 'next-auth/react';
 
+type FetcherErrorInfo = {
+    error?: string;
+    code?: string;
+    [key: string]: unknown;
+};
+
+type FetcherError = Error & {
+    info?: FetcherErrorInfo;
+    status?: number;
+};
+
+type SessionUser = {
+    googleAccessToken?: string;
+};
+
 const fetcher = async (url: string) => {
     const res = await fetch(url);
     if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const error: any = new Error(body.error || `HTTP error! status: ${res.status}`);
+        const body = await res.json().catch(() => ({})) as FetcherErrorInfo;
+        const error = new Error(body.error || `HTTP error! status: ${res.status}`) as FetcherError;
         error.info = body;
         error.status = res.status;
         throw error;
@@ -30,7 +45,7 @@ const swrOptions = {
 const REGISTRATION_TIMEOUT = 1500; // 1.5 seconds max wait (reduced from 3s)
 
 function useRegisteredSWR<T = any>(url: string | null, options = {}) {
-    const { isRegistered, isRegistering, registrationError } = useRegistration();
+    const { isRegistered, registrationError } = useRegistration();
     const [timedOut, setTimedOut] = useState(false);
 
     // Optimistic: if sessionStorage says we're registered from a previous page load,
@@ -56,13 +71,13 @@ function useRegisteredSWR<T = any>(url: string | null, options = {}) {
     const canFetch = isRegistered || optimistic || timedOut || !!registrationError;
     const key = canFetch ? url : null;
 
-    return useSWR<T>(key, fetcher, { ...swrOptions, ...options });
+    return useSWR<T, FetcherError>(key, fetcher, { ...swrOptions, ...options });
 }
 
 // Immediate SWR — bypasses the registration gate entirely.
 // Used for endpoints that handle unregistered users gracefully (e.g. /api/container returns 404 → "not_provisioned").
 function useImmediateSWR<T = any>(url: string | null, options = {}) {
-    return useSWR<T>(url, fetcher, { ...swrOptions, ...options });
+    return useSWR<T, FetcherError>(url, fetcher, { ...swrOptions, ...options });
 }
 
 export function useContainerStatus() {
@@ -76,7 +91,7 @@ export function useContainerStatus() {
 
     // Bug #5 fix: ALSO check from the current NextAuth session (JWT has the token)
     // This handles the case where admin DB hasn't synced yet
-    const sessionHasGoogle = !!(session?.user as any)?.googleAccessToken;
+    const sessionHasGoogle = !!(session?.user as SessionUser | undefined)?.googleAccessToken;
 
     const hasGoogleConnection = adminHasGoogle || sessionHasGoogle;
 
@@ -189,7 +204,8 @@ export function useSiteList(enabled = true) {
     return {
         sites: Array.isArray(data) ? data : [],
         isLoading,
-        isError: error,
+        isError: Boolean(error),
+        error,
         refresh: mutate
     };
 }
@@ -218,7 +234,8 @@ export function usePropertyList(enabled = true) {
     return {
         properties: Array.isArray(data) ? data : [],
         isLoading,
-        isError: error,
+        isError: Boolean(error),
+        error,
         refresh: mutate
     };
 }
@@ -263,26 +280,26 @@ export function useOpportunitiesData(siteUrl: string | null, timeframe: string =
   const url = siteUrl
     ? `/api/seo/opportunities?siteUrl=${encodeURIComponent(siteUrl)}&timeframe=${timeframe}`
     : null;
-  return useRegisteredSWR<{ queries: any[]; comparisonQueries: any[] }>(url);
+  return useRegisteredSWR<{ queries: unknown[]; comparisonQueries: unknown[] }>(url);
 }
 
 export function useKeywordDetail(siteUrl: string | null, keyword: string | null) {
   const url = siteUrl && keyword
     ? `/api/seo/keyword-detail?siteUrl=${encodeURIComponent(siteUrl)}&keyword=${encodeURIComponent(keyword)}`
     : null;
-  return useRegisteredSWR<{ pages: any[]; trend: any[] }>(url);
+  return useRegisteredSWR<{ pages: unknown[]; trend: unknown[] }>(url);
 }
 
 export function usePageDetail(siteUrl: string | null, pageUrl: string | null) {
   const url = siteUrl && pageUrl
     ? `/api/seo/page-detail?siteUrl=${encodeURIComponent(siteUrl)}&pageUrl=${encodeURIComponent(pageUrl)}`
     : null;
-  return useRegisteredSWR<{ keywords: any[]; devices: any[] }>(url);
+  return useRegisteredSWR<{ keywords: unknown[]; devices: unknown[] }>(url);
 }
 
 export function useMobileGapData(siteUrl: string | null) {
   const url = siteUrl
     ? `/api/seo/mobile-gap?siteUrl=${encodeURIComponent(siteUrl)}`
     : null;
-  return useRegisteredSWR<{ data: any[] }>(url);
+  return useRegisteredSWR<{ data: unknown[] }>(url);
 }

@@ -1,19 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { AnalyticsIntelligenceCards } from '@/components/analytics/AnalyticsIntelligenceCards';
+import { AnalyticsSubpageEmptyState } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import SharedOverviewClient from '@/components/share-overview/openpanel/SharedOverviewClient';
+import { getGa4AvailabilityCopy } from '@/lib/dashboardSelection';
 import { useAnalyticsIntelligenceData } from '@/lib/useAnalyticsIntelligenceData';
-import { useRegistration } from '../layout';
 import { useAnalyticsContext } from './layout';
 
 const ANALYTICS_INTELLIGENCE_BOOT_DELAY_MS = 1_200;
 
 export default function AnalyticsPage() {
-    const { selectedSite } = useRegistration();
-    const { selectedProperty, range, setRange, hasGoogleConnection, openShareDashboard } = useAnalyticsContext();
+    const {
+        selectedProperty,
+        selectedSite,
+        range,
+        setRange,
+        hasGoogleConnection,
+        ga4Availability,
+        propertyInventoryError,
+        openShareDashboard,
+    } = useAnalyticsContext();
     const [intelligenceEnabled, setIntelligenceEnabled] = useState(false);
+    const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
 
     useEffect(() => {
         if (!selectedProperty || !hasGoogleConnection || intelligenceEnabled) {
@@ -35,9 +44,10 @@ export default function AnalyticsPage() {
 
     if (!selectedProperty) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-            </div>
+            <AnalyticsSubpageEmptyState
+                title={ga4AvailabilityCopy.title}
+                description={ga4AvailabilityCopy.description}
+            />
         );
     }
 

@@ -21,6 +21,7 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { formatSiteLabel } from '@/lib/dashboardSelection';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useRealtimeData, useGoalsData } from '@/lib/useDashboardData';
 import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import { getDashboardBriefing } from '@/lib/dashboardBriefing';
@@ -55,12 +56,6 @@ const PREVIEW_VISITORS: GlobeVisitor[] = [
   { id: 'p5', name: 'indigo finch', country: 'Brazil', lat: -14.23, lng: -51.92, warmth: 0.35, avatarColor: '#4f46e5', avatarInitial: 'I' },
   { id: 'p6', name: 'ruby wolf', country: 'Japan', lat: 36.2, lng: 138.25, warmth: 0.8, avatarColor: '#dc2626', avatarInitial: 'R' },
 ];
-
-type PropertyOption = {
-  displayName?: string;
-  propertyId?: string;
-  property?: string;
-};
 
 type AnalyticsPoint = {
   date?: string;
@@ -152,19 +147,16 @@ type GoalsResponse = {
   totalSessions?: number;
 };
 
-function formatSiteLabel(site: string) {
-  return site.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-}
-
 export default function DashboardOverview() {
   const { data: session } = useSession();
   const {
     registrationError,
     retryRegistration,
     selectedSite,
-    setSelectedSite,
-    selectedProperty,
-    setSelectedProperty,
+    resolvedSiteUrl,
+    resolvedPropertyId,
+    propertyInventoryError,
+    siteInventoryError,
     range,
   } = useRegistration();
 
@@ -181,41 +173,23 @@ export default function DashboardOverview() {
 
   const { botStatus, hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
   const botRunning = botStatus?.status === 'running';
-  const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-  const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
-
-  useEffect(() => {
-    if (sites.length > 0 && !selectedSite) {
-      setSelectedSite(sites[0].siteUrl);
-    }
-  }, [selectedSite, setSelectedSite, sites]);
+  const { sites, isLoading: sitesLoading, error: sitesRequestError, refresh: refreshSites } = useSiteList(hasGoogleConnection);
+  const { properties, isLoading: propsLoading, error: propsRequestError, refresh: refreshProperties } = usePropertyList(hasGoogleConnection);
+  const activeSiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
+  const reportPropertyId = resolvedPropertyId;
+  const isSeoOnlyReport = !reportPropertyId;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setFunnelCompleted(localStorage.getItem('tc-funnel-completed') === 'true');
   }, []);
+  const hasCachedSite = !!activeSiteUrl;
+  const canFetchSeoData = hasGoogleConnection || hasCachedSite;
+  const canFetchAnalyticsData = canFetchSeoData && !!resolvedPropertyId;
 
-  const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
-  const domainRoot = domain.split('.')[0];
-
-  const matchedProp =
-    properties.find((property: PropertyOption) => property.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
-    properties.find((property: PropertyOption) => (property.propertyId || property.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-    properties.find((property: PropertyOption) => property.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
-    properties[0];
-
-  useEffect(() => {
-    if (matchedProp?.property && matchedProp.property !== selectedProperty) {
-      setSelectedProperty(matchedProp.property);
-    }
-  }, [matchedProp, selectedProperty, setSelectedProperty]);
-
-  const hasCachedSite = !!selectedSite;
-  const canFetchData = hasGoogleConnection || hasCachedSite;
-
-  const { data: analyticsData, isLoading: analyticsLoading, refresh: refreshAnalytics } = useAnalyticsData('all', matchedProp?.property, canFetchData, range);
-  const { data: seoData, isLoading: seoLoading, refresh: refreshSeo } = useSeoData('all', selectedSite, canFetchData, range);
-  const { data: goalsData } = useGoalsData(matchedProp?.property, canFetchData && !!matchedProp?.property, range);
+  const { data: analyticsData, isLoading: analyticsLoading, refresh: refreshAnalytics } = useAnalyticsData('all', resolvedPropertyId, canFetchAnalyticsData, range);
+  const { data: seoData, isLoading: seoLoading, refresh: refreshSeo } = useSeoData('all', activeSiteUrl, canFetchSeoData, range);
+  const { data: goalsData } = useGoalsData(resolvedPropertyId, canFetchAnalyticsData, range);
 
   const analyticsDashboardData = analyticsData as DashboardAnalyticsData | undefined;
   const seoDashboardData = seoData as DashboardSeoData | undefined;
@@ -232,7 +206,7 @@ export default function DashboardOverview() {
   );
   const hasData = !!(analyticsKPIs || seoKPIs);
 
-  const { data: realtimeData } = useRealtimeData(matchedProp?.property, canFetchData && hasData);
+  const { data: realtimeData } = useRealtimeData(resolvedPropertyId, canFetchAnalyticsData && hasData);
   const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : null;
   const isLive = botRunning && botStatus?.telegramStatus === 'connected';
 
@@ -241,8 +215,9 @@ export default function DashboardOverview() {
 
   const isRef = analyticsLoading || seoLoading;
   const showConnectGoogle = !containerLoading ? !hasGoogleConnection : !sessionHasGoogleToken;
-  const isCheckingData = hasGoogleConnection && !containerLoading && (sitesLoading || propsLoading);
-  const isEmptyShell = hasGoogleConnection && !containerLoading && !sitesLoading && !propsLoading && sites.length === 0 && properties.length === 0;
+  const inventoryError = propertyInventoryError || siteInventoryError || (propsRequestError instanceof Error ? propsRequestError.message : null) || (sitesRequestError instanceof Error ? sitesRequestError.message : null);
+  const isCheckingData = hasGoogleConnection && !containerLoading && !inventoryError && (sitesLoading || propsLoading);
+  const isEmptyShell = hasGoogleConnection && !containerLoading && !sitesLoading && !propsLoading && !inventoryError && sites.length === 0 && properties.length === 0;
 
   // Track how many times data has finished loading (loading transition true->false with data present)
   const loadCountRef = useRef(0);
@@ -254,7 +229,7 @@ export default function DashboardOverview() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const lastUpdated = useMemo(() => (loadCountRef.current > 0 ? new Date() : null), [loadCountRef.current]);
 
-  const selectedSiteLabel = selectedSite ? formatSiteLabel(selectedSite) : '';
+  const selectedSiteLabel = activeSiteUrl ? formatSiteLabel(activeSiteUrl) : '';
 
   // Personalized greeting
   const firstName = session?.user?.name?.split(' ')[0] || '';
@@ -371,8 +346,12 @@ export default function DashboardOverview() {
     setReportModalOpen(true);
   }, []);
 
+  const handleRetryInventory = useCallback(() => {
+    void Promise.all([refreshSites(), refreshProperties()]);
+  }, [refreshProperties, refreshSites]);
+
   const handleGeneratePdf = useCallback(async () => {
-    if (!selectedProperty || !selectedSite) return;
+    if (!activeSiteUrl) return;
     setReportGenerating(true);
     setReportError(null);
     try {
@@ -381,8 +360,8 @@ export default function DashboardOverview() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           period: reportPeriod,
-          propertyId: selectedProperty,
-          siteUrl: selectedSite,
+          siteUrl: activeSiteUrl,
+          ...(reportPropertyId ? { propertyId: reportPropertyId } : {}),
         }),
       });
 
@@ -407,7 +386,7 @@ export default function DashboardOverview() {
     } finally {
       setReportGenerating(false);
     }
-  }, [selectedProperty, selectedSite, reportPeriod]);
+  }, [activeSiteUrl, reportPeriod, reportPropertyId]);
 
   // Mobile bottom bar handlers
   const [isMobileRefreshing, setIsMobileRefreshing] = useState(false);
@@ -463,6 +442,29 @@ export default function DashboardOverview() {
               className="inline-flex items-center justify-center border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
             >
               Retry sync
+            </button>
+          </div>
+        </div>
+      )}
+
+      {inventoryError && (
+        <div className="border border-amber-500/20 bg-[linear-gradient(135deg,rgba(245,158,11,0.12),rgba(34,211,238,0.05))] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center border border-amber-500/20 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-300" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Google inventory is temporarily unavailable</h2>
+                <p className="mt-1 max-w-2xl text-sm text-zinc-300">{inventoryError}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRetryInventory}
+              className="inline-flex items-center justify-center border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
+            >
+              Retry inventory
             </button>
           </div>
         </div>
@@ -733,18 +735,26 @@ export default function DashboardOverview() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Generate PDF Report</h3>
-                <p className="text-xs text-zinc-500">AI-powered analytics report</p>
+                <p className="text-xs text-zinc-500">{isSeoOnlyReport ? 'AI-powered Search Console report' : 'AI-powered analytics + SEO report'}</p>
               </div>
             </div>
 
             {/* Property info */}
             <div className="mb-4 border border-white/[0.06] bg-white/[0.02] p-3" style={{ borderRadius: 10 }}>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Property</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Site</div>
               <div className="mt-1 text-sm text-zinc-200">{selectedSiteLabel || 'No site selected'}</div>
-              {selectedProperty && (
-                <div className="mt-0.5 font-mono text-[11px] text-zinc-500">{selectedProperty}</div>
+              {reportPropertyId ? (
+                <div className="mt-0.5 font-mono text-[11px] text-zinc-500">{reportPropertyId}</div>
+              ) : (
+                <div className="mt-1 text-[11px] text-amber-300">Search Console-only report. GA4 metrics will be marked unavailable.</div>
               )}
             </div>
+
+            {isSeoOnlyReport && (
+              <div className="mb-4 border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" style={{ borderRadius: 8 }}>
+                No GA4 property is available for this site, so this export will focus on Search Console insights, keyword movement, and page-level SEO opportunities.
+              </div>
+            )}
 
             {/* Period selector */}
             <div className="mb-5">
@@ -788,7 +798,7 @@ export default function DashboardOverview() {
             <button
               type="button"
               onClick={handleGeneratePdf}
-              disabled={reportGenerating || !selectedProperty || !selectedSite}
+              disabled={reportGenerating || !activeSiteUrl}
               className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-[#041015] transition-all hover:from-emerald-400 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
               style={{ borderRadius: 10 }}
             >

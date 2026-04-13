@@ -19,6 +19,7 @@ import {
     AnalyticsSubpagePanel,
     AnalyticsSubpageShell,
 } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { getGa4AvailabilityCopy } from '@/lib/dashboardSelection';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -510,7 +511,8 @@ function ExitPagesSection({ pages }: { pages: ExitPageRow[] }) {
 // ─── Main Page ───
 
 export default function JourneysPage() {
-    const { selectedProperty, range } = useAnalyticsContext();
+    const { selectedProperty, selectedSite, range, ga4Availability, propertyInventoryError } = useAnalyticsContext();
+    const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
     const { data, isLoading, error } = useSWR<JourneyResponse>(
         selectedProperty ? `/api/analytics/journeys?propertyId=${selectedProperty}&range=${range}` : null,
         fetcher
@@ -597,6 +599,15 @@ export default function JourneysPage() {
             <AnalyticsSubpageEmptyState
                 title="Journey data is temporarily unavailable"
                 description="We couldn't load the latest path exploration view right now. Try again in a moment."
+            />
+        );
+    }
+
+    if (!selectedProperty) {
+        return (
+            <AnalyticsSubpageEmptyState
+                title={ga4AvailabilityCopy.title}
+                description={ga4AvailabilityCopy.description}
             />
         );
     }

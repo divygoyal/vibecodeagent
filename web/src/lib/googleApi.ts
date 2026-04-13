@@ -345,8 +345,8 @@ async function gaFetch(url: string, token: string, body?: any, signal?: AbortSig
 /**
  * List GA4 properties accessible by the user.
  */
-export async function listAnalyticsProperties(token: string) {
-    const data = await gaFetch(`${GA_ADMIN_BASE}/accountSummaries`, token);
+export async function listAnalyticsProperties(token: string, signal?: AbortSignal) {
+    const data = await gaFetch(`${GA_ADMIN_BASE}/accountSummaries`, token, undefined, signal);
     const properties: { displayName: string; property: string; parent: string }[] = [];
 
     if (data.accountSummaries) {

@@ -6,6 +6,23 @@ import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
 import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
+const ANALYTICS_PROPERTY_LIST_TIMEOUT_MS = 10000
+
+type AnalyticsPropertyOption = {
+    displayName?: string
+    property?: string
+    parent?: string
+}
+
+type GoogleJwt = {
+    googleAccessToken?: string
+    googleRefreshToken?: string
+}
+
+type CachedErrorResult = {
+    __isError: true
+    error: string
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -227,7 +244,7 @@ export async function GET(req: Request) {
     // Parallelize session and JWT token lookups — they're independent
     const [session, jwt] = await Promise.all([
         getServerSession(authOptions),
-        getToken({ req: req as any }) as Promise<any>,
+        getToken({ req: req as never }) as Promise<GoogleJwt | null>,
     ]);
 
     if (isProduction && !session?.user) {
@@ -266,33 +283,51 @@ export async function GET(req: Request) {
             const mode = searchParams.get('mode')
 
             // Helper: fetch property list (cached)
-            const fetchPropertyList = () => cachedFetch(
+            const fetchPropertyList = () => cachedFetch<AnalyticsPropertyOption[] | CachedErrorResult>(
                 `ga:properties:${userId}`,
                 CACHE_TTL.PROPERTY_LIST,
-                () => listAnalyticsProperties(token)
+                async () => {
+                    try {
+                        return await listAnalyticsProperties(
+                            token,
+                            AbortSignal.timeout(ANALYTICS_PROPERTY_LIST_TIMEOUT_MS)
+                        )
+                    } catch (e: unknown) {
+                        const errorMessage =
+                            e instanceof Error && e.name === 'AbortError'
+                                ? 'Google Analytics property list request timed out'
+                                : e instanceof Error
+                                    ? e.message
+                                    : 'Failed to load Google Analytics properties'
+                        console.error('List analytics properties error:', errorMessage)
+                        return {
+                            __isError: true,
+                            error: errorMessage,
+                        }
+                    }
+                }
             )
 
             // Handle "list" mode for dropdown
             if (mode === 'list') {
-                try {
-                    const properties = await fetchPropertyList()
-                    return NextResponse.json(Array.isArray(properties) ? properties : [])
-                } catch (e) {
-                    console.error("List properties error:", e)
-                    return NextResponse.json([])
+                const properties = await fetchPropertyList()
+                if (!Array.isArray(properties)) {
+                    const statusCode = properties.error.includes('timed out') ? 504 : 502
+                    return NextResponse.json({ error: properties.error }, { status: statusCode })
                 }
+                return NextResponse.json(properties)
             }
 
-            let propertyId = searchParams.get('propertyId')
+            let propertyId: string | undefined = searchParams.get('propertyId') || undefined
 
             if (!propertyId) {
-                try {
-                    const properties = await fetchPropertyList()
-                    if (Array.isArray(properties) && properties.length > 0) {
-                        propertyId = properties[0].property
-                    }
-                } catch (e) {
-                    console.warn("Failed to auto-detect GA property:", e)
+                const properties = await fetchPropertyList()
+                if (!Array.isArray(properties)) {
+                    const statusCode = properties.error.includes('timed out') ? 504 : 502
+                    return NextResponse.json({ error: properties.error }, { status: statusCode })
+                }
+                if (properties.length > 0) {
+                    propertyId = properties[0].property
                 }
             }
 
@@ -311,9 +346,10 @@ export async function GET(req: Request) {
                 async () => {
                     try {
                         return await fetchAnalyticsDashboard(token, propertyId!, range)
-                    } catch (e: any) {
-                        console.error('Analytics direct API error:', e.message)
-                        return { __error: e.message || "Failed to fetch analytics from Google" }
+                    } catch (e: unknown) {
+                        const errorMessage = e instanceof Error ? e.message : "Failed to fetch analytics from Google"
+                        console.error('Analytics direct API error:', errorMessage)
+                        return { __error: errorMessage }
                     }
                 }
             )

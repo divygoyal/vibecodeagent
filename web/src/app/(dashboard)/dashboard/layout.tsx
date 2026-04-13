@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -18,14 +18,19 @@ import {
     Book, Newspaper, Coins, MessageCircle, MessageSquare,
     ChevronDown, Bell, Globe, Sparkles, Target, type LucideIcon
 } from 'lucide-react';
+import {
+    type Ga4Availability,
+    type PropertyOption,
+    type SiteOption,
+    formatSiteLabel,
+    resolveDashboardSelection,
+} from '@/lib/dashboardSelection';
 import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
 import { useChatStore } from '@/stores/chatStore';
 
 // Extended user type — id is added via JWT callback in auth.ts
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
-type SiteOption = { siteUrl: string };
-type PropertyOption = { displayName?: string; propertyId?: string; property?: string };
 type AlertItem = {
     id: string | number;
     title?: string;
@@ -43,6 +48,14 @@ interface RegistrationContextType {
     setSelectedProperty: (v: string) => void;
     selectedSite: string;
     setSelectedSite: (v: string) => void;
+    resolvedPropertyId: string;
+    resolvedSiteUrl: string;
+    hasGa4Properties: boolean;
+    ga4Availability: Ga4Availability;
+    propertyInventoryError: string | null;
+    siteInventoryError: string | null;
+    propertyInventoryLoading: boolean;
+    siteInventoryLoading: boolean;
     range: string;
     setRange: (v: string) => void;
 }
@@ -56,11 +69,34 @@ const RegistrationContext = createContext<RegistrationContextType>({
     setSelectedProperty: () => { },
     selectedSite: '',
     setSelectedSite: () => { },
+    resolvedPropertyId: '',
+    resolvedSiteUrl: '',
+    hasGa4Properties: false,
+    ga4Availability: 'inventory_empty',
+    propertyInventoryError: null,
+    siteInventoryError: null,
+    propertyInventoryLoading: false,
+    siteInventoryLoading: false,
     range: '30d',
     setRange: () => { },
 });
 
 export const useRegistration = () => useContext(RegistrationContext);
+
+function getInventoryErrorMessage(error: unknown) {
+    if (error && typeof error === 'object' && 'info' in error) {
+        const info = (error as { info?: { error?: string } }).info;
+        if (info?.error) {
+            return info.error;
+        }
+    }
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return null;
+}
 
 type SidebarItem = { icon: LucideIcon; label: string; href: string };
 type SidebarGroup = { label: string | null; items: SidebarItem[] };
@@ -201,53 +237,81 @@ export default function DashboardLayout({
 
     // Alerts for notification bell
     const { hasGoogleConnection } = useContainerStatus();
-    const { sites: gscSites } = useSiteList(hasGoogleConnection);
-    const { properties } = usePropertyList(hasGoogleConnection);
+    const {
+        sites: gscSites,
+        isLoading: siteInventoryLoading,
+        error: siteInventoryRequestError,
+    } = useSiteList(hasGoogleConnection);
+    const {
+        properties,
+        isLoading: propertyInventoryLoading,
+        error: propertyInventoryRequestError,
+    } = usePropertyList(hasGoogleConnection);
     const typedSites = gscSites as SiteOption[];
     const typedProperties = properties as PropertyOption[];
+    const siteInventoryError = getInventoryErrorMessage(siteInventoryRequestError);
+    const propertyInventoryError = getInventoryErrorMessage(propertyInventoryRequestError);
+    const selection = useMemo(() => resolveDashboardSelection({
+        selectedSite,
+        selectedProperty,
+        sites: typedSites,
+        properties: typedProperties,
+        siteInventoryError,
+        propertyInventoryError,
+    }), [propertyInventoryError, selectedProperty, selectedSite, siteInventoryError, typedProperties, typedSites]);
+    const {
+        resolvedSiteUrl,
+        resolvedPropertyId,
+        hasGa4Properties,
+        ga4Availability,
+    } = selection;
+    const displaySiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
 
     useEffect(() => {
-        if (!user || typedSites.length === 0) return;
+        if (!user) return;
+        const siteKey = getUserKey('tc-last-site');
 
-        const validSiteUrls = typedSites
-            .map((site) => site.siteUrl)
-            .filter((siteUrl): siteUrl is string => Boolean(siteUrl));
-
-        if (validSiteUrls.length === 0) return;
-
-        if (selectedSite && validSiteUrls.includes(selectedSite)) {
+        if (resolvedSiteUrl) {
+            if (resolvedSiteUrl !== selectedSite) {
+                setSelectedSite(resolvedSiteUrl);
+            }
+            localStorage.setItem(siteKey, resolvedSiteUrl);
             return;
         }
 
-        const nextSite = validSiteUrls[0];
-        setSelectedSite(nextSite);
-        localStorage.setItem(getUserKey('tc-last-site'), nextSite);
-    }, [getUserKey, selectedSite, setSelectedSite, typedSites, user]);
+        if (!siteInventoryError && selectedSite) {
+            setSelectedSite('');
+            localStorage.removeItem(siteKey);
+        }
+    }, [getUserKey, resolvedSiteUrl, selectedSite, setSelectedSite, siteInventoryError, user]);
 
-    const alertSiteUrl = selectedSite || (typedSites.length > 0 ? typedSites[0].siteUrl : '');
+    useEffect(() => {
+        if (!user) return;
+        const propertyKey = getUserKey('tc-last-property');
+
+        if (resolvedPropertyId) {
+            if (resolvedPropertyId !== selectedProperty) {
+                setSelectedProperty(resolvedPropertyId);
+            }
+            localStorage.setItem(propertyKey, resolvedPropertyId);
+            return;
+        }
+
+        if (!propertyInventoryError && selectedProperty) {
+            setSelectedProperty('');
+            localStorage.removeItem(propertyKey);
+        }
+    }, [getUserKey, propertyInventoryError, resolvedPropertyId, selectedProperty, setSelectedProperty, user]);
+
+    const alertSiteUrl = displaySiteUrl || typedSites[0]?.siteUrl || '';
     const { alerts, alertCount } = useAlerts(alertSiteUrl, hasGoogleConnection && !!alertSiteUrl);
     const typedAlerts = alerts as AlertItem[];
     const criticalAlertCount = typedAlerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length;
     const mobileOverviewSiteLabel = (() => {
-        const siteUrl = selectedSite || typedSites[0]?.siteUrl || '';
+        const siteUrl = displaySiteUrl || typedSites[0]?.siteUrl || '';
         if (!siteUrl) return 'Dashboard';
-        return siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+        return formatSiteLabel(siteUrl);
     })();
-
-    // Auto-sync: when selectedSite changes, find and set the matching GA4 property
-    useEffect(() => {
-        if (!selectedSite || typedProperties.length === 0) return;
-        const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-        const domainRoot = domain.split('.')[0];
-        const matched =
-            typedProperties.find((property) => property.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
-            typedProperties.find((property) => (property.propertyId || property.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-            typedProperties.find((property) => property.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
-            typedProperties[0];
-        if (matched?.property && matched.property !== selectedProperty) {
-            setSelectedProperty(matched.property);
-        }
-    }, [selectedProperty, selectedSite, setSelectedProperty, typedProperties]);
 
     // Send browser push notifications for new critical alerts
     const prevAlertCountRef = useRef(criticalAlertCount);
@@ -463,7 +527,7 @@ export default function DashboardLayout({
                                 </div>
                                 {!collapsed && (
                                     <>
-                                        <span className="flex-1 text-left truncate font-medium">{selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Select site'}</span>
+                                        <span className="flex-1 text-left truncate font-medium">{displaySiteUrl ? formatSiteLabel(displaySiteUrl) : 'Select site'}</span>
                                         <ChevronDown className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
                                     </>
                                 )}
@@ -478,7 +542,7 @@ export default function DashboardLayout({
                                         {typedSites.map((site) => {
                                             const url = site.siteUrl;
                                             const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                            const isSelected = url === selectedSite;
+                                            const isSelected = url === displaySiteUrl;
                                             return (
                                                 <button
                                                     key={url}
@@ -729,7 +793,24 @@ export default function DashboardLayout({
                 {/* Page content */}
                 <main id="main-content" className={`flex-1 overflow-y-auto overflow-x-hidden p-3 max-w-full sm:p-4 md:p-6 ${isOverviewRoute ? 'bg-[#010203]' : ''}`} role="main">
                     <div className="max-w-7xl mx-auto">
-                        <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
+                        <RegistrationContext.Provider value={{
+                            ...registrationState,
+                            retryRegistration,
+                            selectedProperty,
+                            setSelectedProperty,
+                            selectedSite,
+                            setSelectedSite,
+                            resolvedPropertyId,
+                            resolvedSiteUrl,
+                            hasGa4Properties,
+                            ga4Availability,
+                            propertyInventoryError,
+                            siteInventoryError,
+                            propertyInventoryLoading,
+                            siteInventoryLoading,
+                            range,
+                            setRange,
+                        }}>
                             <ErrorBoundary>{children}</ErrorBoundary>
                         </RegistrationContext.Provider>
                     </div>
@@ -793,7 +874,7 @@ export default function DashboardLayout({
                                     className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
                                 >
                                     <Globe className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                                    <span className="flex-1 text-left truncate">{selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Select site'}</span>
+                                    <span className="flex-1 text-left truncate">{displaySiteUrl ? formatSiteLabel(displaySiteUrl) : 'Select site'}</span>
                                     <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
                                 {siteDropdownOpen && (
@@ -801,7 +882,7 @@ export default function DashboardLayout({
                                         {typedSites.map((site) => {
                                             const url = site.siteUrl;
                                             const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                            const isSelected = url === selectedSite;
+                                            const isSelected = url === displaySiteUrl;
                                             return (
                                                 <button
                                                     key={url}

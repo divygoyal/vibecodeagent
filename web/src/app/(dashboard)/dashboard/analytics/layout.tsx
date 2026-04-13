@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -13,7 +13,9 @@ import dynamic from 'next/dynamic';
 
 import { useRegistration } from '../layout';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
+import { AnalyticsSubpageEmptyState } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { getGa4AvailabilityCopy } from '@/lib/dashboardSelection';
+import { useContainerStatus } from '@/lib/useDashboardData';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
 import { ConnectGoogleState } from '@/components/EmptyState';
 import FilterBuilder from '@/components/analytics/FilterBuilder';
@@ -34,17 +36,25 @@ const TABS = [
 // Shared analytics context for sub-pages
 export const AnalyticsContext = React.createContext<{
     selectedProperty: string;
+    resolvedPropertyId: string;
     selectedSite: string;
     range: string;
     setRange: (r: string) => void;
     hasGoogleConnection: boolean;
+    hasGa4Properties: boolean;
+    ga4Availability: 'available' | 'site_unmatched' | 'inventory_empty' | 'inventory_error';
+    propertyInventoryError: string | null;
     openShareDashboard: () => void;
 }>({
     selectedProperty: '',
+    resolvedPropertyId: '',
     selectedSite: '',
     range: '30d',
     setRange: () => {},
     hasGoogleConnection: false,
+    hasGa4Properties: false,
+    ga4Availability: 'inventory_empty',
+    propertyInventoryError: null,
     openShareDashboard: () => {},
 });
 
@@ -56,31 +66,56 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const isMainAnalyticsRoute = pathname === '/dashboard/analytics';
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
-    const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
-    const { selectedProperty, setSelectedProperty, selectedSite, range, setRange } = useRegistration();
+    const {
+        resolvedPropertyId,
+        resolvedSiteUrl,
+        selectedSite,
+        range,
+        setRange,
+        hasGa4Properties,
+        ga4Availability,
+        propertyInventoryError,
+        siteInventoryError,
+        propertyInventoryLoading,
+    } = useRegistration();
     const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
-
-    useEffect(() => {
-        if (properties.length > 0 && !selectedProperty) {
-            setSelectedProperty(properties[0].property);
-        }
-    }, [properties, selectedProperty, setSelectedProperty]);
-
-    // Not connected state
-    if (!containerLoading && !hasGoogleConnection) {
-        return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="real traffic data, visitor insights, and performance metrics" /></div>;
-    }
+    const requiresGa4 = pathname !== '/dashboard/analytics/performance';
+    const activeSiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
+    const ga4AvailabilityCopy = useMemo(
+        () => getGa4AvailabilityCopy(ga4Availability, activeSiteUrl, propertyInventoryError),
+        [activeSiteUrl, ga4Availability, propertyInventoryError],
+    );
 
     const simpleFilterCount = useMemo(
         () => Object.values(filters).filter((arr) => arr.length > 0).length,
         [filters],
     );
     const activeFilterCount = simpleFilterCount + advancedFilters.length;
+    const showGa4LoadingState = requiresGa4 && propertyInventoryLoading && !resolvedPropertyId;
+    const showGa4UnavailableState = requiresGa4 && !propertyInventoryLoading && ga4Availability !== 'available';
+
+    // Not connected state
+    if (!containerLoading && !hasGoogleConnection) {
+        return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="real traffic data, visitor insights, and performance metrics" /></div>;
+    }
 
     return (
-        <AnalyticsContext.Provider value={{ selectedProperty, selectedSite, range, setRange, hasGoogleConnection, openShareDashboard: () => setShareOpen(true) }}>
+        <AnalyticsContext.Provider
+            value={{
+                selectedProperty: resolvedPropertyId,
+                resolvedPropertyId,
+                selectedSite: activeSiteUrl,
+                range,
+                setRange,
+                hasGoogleConnection,
+                hasGa4Properties,
+                ga4Availability,
+                propertyInventoryError,
+                openShareDashboard: () => setShareOpen(true),
+            }}
+        >
             <div className="space-y-0">
                 {/* ─── Sticky Top Bar ─── */}
                 <div className="sticky top-0 z-20 -mx-6 px-6 pb-2" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 88%, transparent 100%)' }}>
@@ -254,10 +289,15 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                 {/* ─── Page content ─── */}
                 <div className="pt-2 sm:pt-3">
-                    {(propsLoading || containerLoading) ? (
+                    {(containerLoading || showGa4LoadingState) ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
                         </div>
+                    ) : showGa4UnavailableState ? (
+                        <AnalyticsSubpageEmptyState
+                            title={ga4AvailabilityCopy.title}
+                            description={ga4AvailabilityCopy.description}
+                        />
                     ) : <ErrorBoundary>{children}</ErrorBoundary>}
                 </div>
 
@@ -265,7 +305,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 <ShareDashboardModal
                     open={shareOpen}
                     onClose={() => setShareOpen(false)}
-                    propertyId={selectedProperty}
+                    propertyId={resolvedPropertyId}
                 />
             </div>
         </AnalyticsContext.Provider>

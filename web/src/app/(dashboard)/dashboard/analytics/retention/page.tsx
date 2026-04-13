@@ -26,6 +26,7 @@ import {
     AnalyticsSubpageShell,
     formatPercent,
 } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { getGa4AvailabilityCopy } from '@/lib/dashboardSelection';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -374,8 +375,9 @@ function RetentionCurve({
 // ─── Main Page ───
 
 export default function RetentionPage() {
-    const { selectedProperty } = useAnalyticsContext();
+    const { selectedProperty, selectedSite, ga4Availability, propertyInventoryError } = useAnalyticsContext();
     const [mode, setMode] = useState<RetentionMode>('daily');
+    const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
     const { data, isLoading, error } = useSWR<RetentionResponse>(
         selectedProperty ? `/api/analytics/retention?propertyId=${selectedProperty}&mode=${mode}` : null,
         fetcher,
@@ -425,8 +427,22 @@ export default function RetentionPage() {
         );
     }
 
+    if (!selectedProperty) {
+        return (
+            <AnalyticsSubpageEmptyState
+                title={ga4AvailabilityCopy.title}
+                description={ga4AvailabilityCopy.description}
+            />
+        );
+    }
+
     if (!data) {
-        return null;
+        return (
+            <AnalyticsSubpageEmptyState
+                title="Retention data is temporarily unavailable"
+                description="We couldn't load the latest cohort view right now. Try again in a moment."
+            />
+        );
     }
 
     return (

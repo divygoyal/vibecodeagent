@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 
 import type { GoalDefinition, GoalDefinitionType, GoalSuggestion } from '@/lib/analyticsDefinitions';
+import { getGa4AvailabilityCopy } from '@/lib/dashboardSelection';
 import {
     AnalyticsSubpageEmptyState,
     AnalyticsSubpageLoadingState,
@@ -388,12 +389,20 @@ function GoalsKpiCard({
 }
 
 export default function GoalsPage() {
-    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const {
+        selectedProperty,
+        selectedSite,
+        range,
+        hasGoogleConnection,
+        ga4Availability,
+        propertyInventoryError,
+    } = useAnalyticsContext();
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [selectorOpen, setSelectorOpen] = useState(false);
     const [editorState, setEditorState] = useState<GoalEditorState>(EMPTY_EDITOR);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+    const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
 
     const { data: definitionsResponse, error: definitionsError, isLoading: definitionsLoading, mutate: mutateDefinitions } = useSWR<GoalDefinitionsResponse>(
         selectedProperty && hasGoogleConnection
@@ -651,11 +660,21 @@ export default function GoalsPage() {
         }
     };
 
-    if (!selectedProperty || !hasGoogleConnection) {
+    if (!hasGoogleConnection) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-            </div>
+            <AnalyticsSubpageEmptyState
+                title="Goals need Google Analytics"
+                description="Connect Google Analytics to create and analyze conversion goals."
+            />
+        );
+    }
+
+    if (!selectedProperty) {
+        return (
+            <AnalyticsSubpageEmptyState
+                title={ga4AvailabilityCopy.title}
+                description={ga4AvailabilityCopy.description}
+            />
         );
     }
 
@@ -701,7 +720,7 @@ export default function GoalsPage() {
                         Conversion Goals
                     </h1>
                     <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-400">
-                        Track conversion performance, compare goals, and spot what's changed fast.
+                        Track conversion performance, compare goals, and spot what&apos;s changed fast.
                     </p>
                 </div>
 
