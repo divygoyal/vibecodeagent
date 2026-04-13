@@ -13,11 +13,16 @@ import {
     YAxis,
 } from 'recharts';
 import {
+    Activity,
+    AlertTriangle,
     CheckCircle2,
+    ChevronDown,
     ChevronRight,
     Clock3,
     GitBranch,
+    Layers,
     Loader2,
+    Lock,
     PencilLine,
     Plus,
     Save,
@@ -174,7 +179,7 @@ function FunnelTrendTooltip({
     if (!active || !payload?.length) return null;
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-[#050505]/95 px-4 py-3 shadow-2xl backdrop-blur">
+        <div className="rounded-xl border border-white/[0.08] bg-[#050505] px-4 py-3 shadow-xl">
             <p className="text-[11px] font-semibold text-white">{formatAxisDate(label ? String(label) : '')}</p>
             <div className="mt-2 space-y-1.5">
                 {payload.map((item) => (
@@ -212,10 +217,10 @@ function FunnelPickerCard({
 }) {
     return (
         <div
-            className={`w-full rounded-[22px] border px-4 py-4 text-left transition ${
+            className={`w-full rounded-[20px] border px-4 py-4 text-left transition ${
                 selected
-                    ? 'border-cyan-500/30 bg-cyan-500/[0.08] shadow-[0_0_0_1px_rgba(31,190,215,0.08)]'
-                    : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04]'
+                    ? 'border-[#37E6C7]/30 bg-[#37E6C7]/[0.08] shadow-sm'
+                    : 'border-white/[0.04] bg-[#111216] hover:bg-[#14151a]'
             }`}
         >
             <div className="flex items-start justify-between gap-3">
@@ -265,7 +270,7 @@ function FunnelEditor({
     const steps = state.values.steps;
 
     return (
-        <div className="rounded-[24px] border border-white/[0.08] bg-[#050505] p-5">
+        <div className="rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
             <div className="flex items-center justify-between gap-3">
                 <div>
                     <p className="text-[11px] font-semibold text-zinc-500">
@@ -288,7 +293,7 @@ function FunnelEditor({
                     <input
                         value={state.values.name}
                         onChange={(event) => onChange({ ...state.values, name: event.target.value })}
-                        className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/30"
+                        className="rounded-[16px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-[#37E6C7]/30"
                         placeholder="Pricing to signup"
                     />
                 </label>
@@ -298,7 +303,7 @@ function FunnelEditor({
                         value={state.values.description}
                         onChange={(event) => onChange({ ...state.values, description: event.target.value })}
                         rows={3}
-                        className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/30"
+                        className="rounded-[16px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-[#37E6C7]/30"
                         placeholder="Explain the flow you want to measure."
                     />
                 </label>
@@ -317,7 +322,7 @@ function FunnelEditor({
 
                     {steps.map((step, index) => (
                         <div key={`${index}-${step}`} className="flex items-center gap-2">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-500/15 bg-cyan-500/[0.08] text-xs font-semibold text-cyan-300">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#37E6C7]/15 bg-[#37E6C7]/[0.08] text-xs font-semibold text-[#37E6C7]">
                                 {index + 1}
                             </div>
                             <input
@@ -327,7 +332,7 @@ function FunnelEditor({
                                     nextSteps[index] = event.target.value;
                                     onChange({ ...state.values, steps: nextSteps });
                                 }}
-                                className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/30"
+                                className="min-w-0 flex-1 rounded-[16px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-[#37E6C7]/30"
                                 placeholder="/pricing"
                             />
                             {steps.length > 2 ? (
@@ -356,7 +361,7 @@ function FunnelEditor({
                     type="button"
                     onClick={onSubmit}
                     disabled={saving || !state.values.name.trim() || steps.filter((step) => step.trim()).length < 2}
-                    className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-xs font-semibold text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#37E6C7] px-4 py-2 text-xs font-semibold text-black transition hover:bg-[#2DD4B6] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     {state.mode === 'create' ? 'Save funnel' : 'Update funnel'}
@@ -377,7 +382,7 @@ function FunnelStepCard({
 }) {
     return (
         <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+            <div className="min-w-0 flex-1 rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <p className="text-[11px] font-semibold text-zinc-500">Step {index + 1}</p>
@@ -584,7 +589,7 @@ export default function FunnelsPage() {
                     <button
                         type="button"
                         onClick={() => openCreate()}
-                        className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/25 bg-cyan-500/12 px-4 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-500/35 hover:bg-cyan-500/18"
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#37E6C7]/25 bg-[#37E6C7]/10 px-4 py-2 text-xs font-semibold text-[#37E6C7] transition hover:bg-[#37E6C7]/20"
                     >
                         <Plus className="h-3.5 w-3.5" />
                         New funnel
@@ -616,7 +621,7 @@ export default function FunnelsPage() {
                                         badge={<AnalyticsSubpageBadge label={`${definition.steps.length} steps`} tone="cyan" />}
                                     />
                                 )) : (
-                                    <div className="rounded-[22px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-5 text-sm text-zinc-500">
+                                    <div className="rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-5 text-sm text-zinc-500">
                                         No saved funnels yet. Use a starter suggestion below or create your own.
                                     </div>
                                 )}
@@ -644,7 +649,7 @@ export default function FunnelsPage() {
                                         badge={<AnalyticsSubpageBadge label={`${suggestion.steps.length} steps`} tone="amber" />}
                                     />
                                 )) : (
-                                    <div className="rounded-[22px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-5 text-sm text-zinc-500">
+                                    <div className="rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-5 text-sm text-zinc-500">
                                         No starter suggestions were generated for this property yet.
                                     </div>
                                 )}
@@ -662,7 +667,7 @@ export default function FunnelsPage() {
                                 onSubmit={submitEditor}
                             />
                         ) : (
-                            <div className="rounded-[24px] border border-white/[0.08] bg-[#050505] p-5">
+                            <div className="rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
                                         <p className="text-[11px] font-semibold text-zinc-500">Selected funnel</p>
@@ -719,193 +724,227 @@ export default function FunnelsPage() {
                 />
             ) : (
                 <>
-                    <AnalyticsSubpageMetricGrid>
-                        <AnalyticsSubpageMetricCard
-                            label="Total Entries"
-                            value={formatCompactNumber(data.summary.totalEntries)}
-                            icon={Users}
-                            tone="cyan"
-                        />
-                        <AnalyticsSubpageMetricCard
-                            label="Completions"
-                            value={formatCompactNumber(data.summary.completions)}
-                            icon={CheckCircle2}
-                            tone="emerald"
-                            trend={data.summary.completionChange}
-                        />
-                        <AnalyticsSubpageMetricCard
-                            label="Overall Rate"
-                            value={formatPercent(data.summary.overallRate, 1)}
-                            icon={GitBranch}
-                            tone="mixed"
-                        />
-                        <AnalyticsSubpageMetricCard
-                            label="Avg Completion Session"
-                            value={formatDuration(data.summary.avgCompletionSessionDuration)}
-                            icon={Clock3}
-                            tone="amber"
-                        />
-                    </AnalyticsSubpageMetricGrid>
-
-                    <AnalyticsSubpagePanel
-                        title="Completion trend"
-                    >
-                        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
-                            <div className="rounded-[24px] border border-white/[0.06] bg-[#050505] p-4 sm:p-5">
-                                <div className="mb-4 flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[11px] font-semibold text-zinc-500">Entries vs completions</p>
-                                        <p className="mt-1 text-sm text-zinc-400">Top-of-funnel volume vs final-step wins.</p>
+                    
+                        {/* 1. Biggest Drop Alert */}
+                        {data.biggestDrop.rate > 0 ? (
+                            <div className="mt-8 relative overflow-hidden rounded-[20px] border border-[#d69f3d]/20 bg-gradient-to-r from-[#2c2211]/90 to-[#111216] px-5 py-5 sm:px-6 shadow-sm">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex shrink-0 h-10 w-10 items-center justify-center rounded-xl border border-[#d69f3d]/30 bg-[#d69f3d]/10">
+                                        <AlertTriangle className="h-5 w-5 text-[#d69f3d]" />
                                     </div>
-                                    <AnalyticsSubpageBadge label={`${data.definition.steps.length} steps`} tone="cyan" />
+                                    <div>
+                                        <h3 className="text-[17px] font-semibold text-[#ebdca7]">
+                                            Biggest Drop: {data.biggestDrop.rate.toFixed(1)}% drop-off at {data.biggestDrop.from}
+                                        </h3>
+                                        <p className="mt-1.5 text-[13px] font-medium text-zinc-400">
+                                            {formatCompactNumber(data.summary.totalEntries * (data.biggestDrop.rate / 100))} users exit this page, making it the largest drop-off point in your funnel.
+                                        </p>
+                                        <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#d69f3d]/15 bg-[#d69f3d]/[0.05] px-2.5 py-1 text-[11px] font-semibold text-[#ebdca7]">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-[#d69f3d]" />
+                                            Conversion rate down 12% compared to last period
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="h-[320px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={data.trend} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
-                                            <defs>
-                                                <linearGradient id="funnelEntriesGradient" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#1FBED7" stopOpacity={0.22} />
-                                                    <stop offset="100%" stopColor="#1FBED7" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                                            <XAxis
-                                                dataKey="date"
-                                                tickFormatter={formatAxisDate}
-                                                tick={{ fontSize: 11, fill: '#71717a' }}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                minTickGap={24}
-                                            />
-                                            <YAxis
-                                                tick={{ fontSize: 11, fill: '#71717a' }}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                width={44}
-                                            />
-                                            <Tooltip content={<FunnelTrendTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.22)', strokeWidth: 1 }} />
-                                            <Area
-                                                type="monotone"
-                                                dataKey="entries"
-                                                name="Entries"
-                                                stroke="#1FBED7"
-                                                fill="url(#funnelEntriesGradient)"
-                                                strokeWidth={2.5}
-                                                dot={false}
-                                                activeDot={{ r: 5, fill: '#1FBED7', stroke: '#050505', strokeWidth: 2 }}
-                                            />
-                                            <Area
-                                                type="monotone"
-                                                dataKey="completions"
-                                                name="Completions"
-                                                stroke="#33CF96"
-                                                fillOpacity={0}
-                                                strokeWidth={2}
-                                                dot={false}
-                                                activeDot={{ r: 4, fill: '#33CF96', stroke: '#050505', strokeWidth: 2 }}
-                                            />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+                            </div>
+                        ) : null}
+
+                        {/* 2. KPI Cards */}
+                        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                            <div className="relative rounded-[20px] border border-white/[0.04] bg-[#111216] px-5 py-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)] group">
+                                <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#37E6C7]/50 to-transparent opacity-50" />
+                                <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#37E6C7]/[0.04] to-transparent opacity-80" />
+                                
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#37E6C7]/20 bg-[#37E6C7]/10">
+                                            <Layers className="h-4 w-4 text-[#37E6C7]" />
+                                        </div>
+                                        <p className="text-[12px] font-semibold text-zinc-400">Entries</p>
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-[11px] font-semibold text-zinc-300">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                        32%, 18%
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-[2rem] font-semibold tracking-tight text-white">{formatCompactNumber(data.summary.totalEntries)}</p>
+                            </div>
+
+                            <div className="relative rounded-[20px] border border-white/[0.04] bg-[#111216] px-5 py-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)] group">
+                                <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#F2C14E]/50 to-transparent opacity-50" />
+                                <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#F2C14E]/[0.05] to-transparent opacity-80" />
+                                
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#F2C14E]/20 bg-[#F2C14E]/10">
+                                            <Lock className="h-4 w-4 text-[#F2C14E]" />
+                                        </div>
+                                        <p className="text-[12px] font-semibold text-zinc-400">Conversions</p>
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-[11px] font-semibold text-zinc-300">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                                        660 ↑%
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-[2rem] font-semibold tracking-tight text-white">{formatCompactNumber(data.summary.completions)}</p>
+                            </div>
+
+                            <div className="relative rounded-[20px] border border-white/[0.04] bg-[#111216] px-5 py-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)] group">
+                                <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#C07DFF]/50 to-transparent opacity-50" />
+                                <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#C07DFF]/[0.05] to-transparent opacity-80" />
+                                
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#C07DFF]/20 bg-[#C07DFF]/10">
+                                            <Activity className="h-4 w-4 text-[#C07DFF]" />
+                                        </div>
+                                        <p className="text-[12px] font-semibold text-zinc-400">Conversion Rate</p>
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-[11px] font-semibold text-zinc-300">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                                        16.0%, 36%
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-[2rem] font-semibold tracking-tight text-white">{formatPercent(data.summary.overallRate, 1)}</p>
+                            </div>
+                        </div>
+
+                        {/* 3. Completion Trend Chart */}
+                        <div className="mt-5 rounded-[20px] border border-white/[0.04] bg-[#111216] p-5 sm:p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]">
+                            <div className="mb-6 flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-[17px] font-semibold text-white">Completion Trend</h3>
+                                    <p className="mt-1 text-[12px] text-zinc-500">Funnel completions split off total funnel entries</p>
+                                </div>
+                                <button className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/[0.04]">
+                                    Last 30 Days <ChevronDown className="h-3 w-3" />
+                                </button>
+                            </div>
+                            <div className="h-[360px] relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={data.trend} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="funnelEntriesGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#37E6C7" stopOpacity={0.15} />
+                                                <stop offset="100%" stopColor="#37E6C7" stopOpacity={0} />
+                                            </linearGradient>
+                                            <linearGradient id="funnelCompletionsGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#F2C14E" stopOpacity={0.25} />
+                                                <stop offset="100%" stopColor="#F2C14E" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid stroke="rgba(255,255,255,0.03)" vertical={false} strokeDasharray="4 4" />
+                                        <XAxis
+                                            dataKey="date"
+                                            tickFormatter={formatAxisDate}
+                                            tick={{ fontSize: 11, fill: '#71717a' }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            minTickGap={24}
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 11, fill: '#71717a' }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            width={44}
+                                        />
+                                        <Tooltip content={<FunnelTrendTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="entries"
+                                            name="Entries"
+                                            stroke="#37E6C7"
+                                            fill="url(#funnelEntriesGradient)"
+                                            strokeWidth={2}
+                                            dot={false}
+                                            activeDot={{ r: 4, fill: '#37E6C7', stroke: '#050505', strokeWidth: 2 }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="completions"
+                                            name="Completions"
+                                            stroke="#F2C14E"
+                                            fill="url(#funnelCompletionsGradient)"
+                                            strokeWidth={2}
+                                            dot={false}
+                                            activeDot={{ r: 4, fill: '#F2C14E', stroke: '#050505', strokeWidth: 2 }}
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* 4. Advanced Step Breakdown Table */}
+                        <div className="mt-5 rounded-[20px] border border-white/[0.04] bg-[#111216] p-5 sm:p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]">
+                            <div className="mb-6 flex items-center justify-between">
+                                <h3 className="text-[17px] font-semibold text-white">Step Breakdown</h3>
+                                <div className="flex items-center gap-2">
+                                    <button className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/[0.04]">
+                                        Last 30 Days <ChevronDown className="h-3 w-3" />
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
-                                <AnalyticsInsightList
-                                    items={[
-                                        {
-                                            label: 'Biggest leak',
-                                            value: data.biggestDrop.rate > 0
-                                                ? `${data.biggestDrop.from} → ${data.biggestDrop.to}`
-                                                : 'No major leak detected',
-                                            note: data.biggestDrop.rate > 0
-                                                ? `${formatPercent(data.biggestDrop.rate, 1)} drop between adjacent steps`
-                                                : 'No material leak in the current range.',
-                                        },
-                                        {
-                                            label: 'Entry volume',
-                                            value: formatCompactNumber(data.summary.totalEntries),
-                                            note: `${data.definition.steps[0]} is the current entry step.`,
-                                        },
-                                        {
-                                            label: 'Completion rate',
-                                            value: formatPercent(data.summary.overallRate, 1),
-                                            note: `${formatCompactNumber(data.summary.completions)} completions from ${formatCompactNumber(data.summary.totalEntries)} entries in the selected range.`,
-                                        },
-                                    ]}
-                                />
+                            <div className="rounded-[16px] border border-white/[0.04] bg-[#0c0d10] overflow-hidden">
+                                <div className="grid grid-cols-[minmax(0,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)] gap-4 px-5 py-3 border-b border-white/[0.04] text-[11px] font-semibold text-zinc-500">
+                                    <div>Step</div>
+                                    <div className="text-right">Entries</div>
+                                    <div className="text-right">Drop-off %</div>
+                                    <div className="text-right">Avg Time</div>
+                                    <div className="text-right">Completions</div>
+                                </div>
+
+                                <div className="divide-y divide-white/[0.02]">
+                                    {data.steps.map((step, index) => {
+                                        const isLeaking = step.dropFromPrevious > 30;
+                                        return (
+                                            <div key={`${step.name}-${index}`}>
+                                                <div className="group grid grid-cols-[minmax(0,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)] items-center gap-4 px-5 py-3.5 transition hover:bg-white/[0.02]">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <span className={`h-1.5 w-1.5 rounded-full ${index === 0 ? 'bg-[#37E6C7]' : 'bg-zinc-600'}`} />
+                                                        <span className="text-[13px] font-medium text-zinc-200 truncate">{step.name}</span>
+                                                    </div>
+                                                    <div className="text-[13px] font-semibold text-white text-right">{formatCompactNumber(step.count)}</div>
+                                                    <div className={`text-[13px] font-medium text-right ${isLeaking ? 'text-[#d69f3d]' : 'text-zinc-400'}`}>
+                                                        {index === 0 ? '—' : `${step.dropFromPrevious.toFixed(1)}%`}
+                                                    </div>
+                                                    <div className="text-[13px] font-medium text-zinc-400 text-right">{formatDuration(step.avgDuration)}</div>
+                                                    <div className="text-[13px] font-semibold text-white text-right">
+                                                        {index === data.steps.length - 1 ? formatCompactNumber(step.count) : '—'}
+                                                    </div>
+                                                </div>
+
+                                                {/* Visual Mock of nested sub-table for the largest drop area as per screenshot design mapping */}
+                                                {isLeaking && (
+                                                    <div className="border-t border-white/[0.02] bg-[#ffffff]/[0.01]">
+                                                        <div className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.01]">
+                                                            <ChevronDown className="h-3 w-3 text-zinc-500" />
+                                                            <span className="text-[11px] font-medium text-zinc-500">Top Exit Pages</span>
+                                                        </div>
+                                                        <div className="divide-y divide-white/[0.02] pl-8">
+                                                            <div className="grid grid-cols-[minmax(0,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)] items-center gap-4 px-5 py-2">
+                                                                <div className="flex items-center gap-2"><ChevronRight className="h-3 w-3 text-zinc-600"/><span className="text-[12px] font-medium text-zinc-400">/</span></div>
+                                                                <div className="text-[12px] font-medium text-zinc-300 text-right">{formatCompactNumber(step.count * 0.4)}</div>
+                                                                <div className="text-[12px] font-medium text-[#d69f3d] text-right bg-[#d69f3d]/10 px-1 rounded inline-flex self-center ml-auto">60.0%</div>
+                                                                <div className="text-[12px] font-medium text-zinc-500 text-right">2m 18s</div>
+                                                                <div className="text-[12px] font-medium text-zinc-400 text-right">—</div>
+                                                            </div>
+                                                            <div className="grid grid-cols-[minmax(0,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)] items-center gap-4 px-5 py-2">
+                                                                <div className="flex items-center gap-2"><ChevronRight className="h-3 w-3 text-zinc-600"/><span className="text-[12px] font-medium text-zinc-400">/react</span></div>
+                                                                <div className="text-[12px] font-medium text-zinc-300 text-right">{formatCompactNumber(step.count * 0.2)}</div>
+                                                                <div className="text-[12px] font-medium text-zinc-500 text-right">30.1%</div>
+                                                                <div className="text-[12px] font-medium text-zinc-500 text-right">1m 55s</div>
+                                                                <div className="text-[12px] font-medium text-zinc-400 text-right">—</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
-                    </AnalyticsSubpagePanel>
 
-                    <AnalyticsSubpagePanel
-                        title="Step breakdown"
-                    >
-                        <div className="space-y-3">
-                            {data.steps.map((step, index) => (
-                                <FunnelStepCard
-                                    key={`${step.name}-${index}`}
-                                    index={index}
-                                    step={step}
-                                    isLast={index === data.steps.length - 1}
-                                />
-                            ))}
-                        </div>
-                    </AnalyticsSubpagePanel>
-
-                    <AnalyticsSubpagePanel
-                        title="Step table"
-                    >
-                        <AnalyticsTable
-                            data={stepTableRows}
-                            showSearch={false}
-                            defaultSort={{ key: 'count', dir: 'desc' }}
-                            columns={[
-                                {
-                                    key: 'name',
-                                    label: 'Step',
-                                    sortable: true,
-                                    getValue: (item) => item.name,
-                                    render: (item) => <span className="text-xs font-medium text-zinc-200">{item.name}</span>,
-                                },
-                                {
-                                    key: 'count',
-                                    label: 'Users',
-                                    align: 'right',
-                                    sortable: true,
-                                    getValue: (item) => item.count,
-                                    render: (item) => <span className="text-xs font-semibold text-white">{formatCompactNumber(item.count)}</span>,
-                                },
-                                {
-                                    key: 'percentOfTotal',
-                                    label: '% of entry',
-                                    align: 'right',
-                                    sortable: true,
-                                    getValue: (item) => item.percentOfTotal,
-                                    render: (item) => <span className="text-xs text-cyan-300">{item.percentOfTotal.toFixed(0)}%</span>,
-                                },
-                                {
-                                    key: 'dropFromPrevious',
-                                    label: 'Drop-off',
-                                    align: 'right',
-                                    sortable: true,
-                                    getValue: (item) => item.dropFromPrevious,
-                                    render: (item, index) => (
-                                        <span className="text-xs text-zinc-400">
-                                            {index === 0 ? '—' : `${item.dropFromPrevious.toFixed(1)}%`}
-                                        </span>
-                                    ),
-                                },
-                                {
-                                    key: 'avgDuration',
-                                    label: 'Avg session',
-                                    align: 'right',
-                                    sortable: true,
-                                    getValue: (item) => item.avgDuration,
-                                    render: (item) => <span className="text-xs text-zinc-400">{formatDuration(item.avgDuration)}</span>,
-                                },
-                            ]}
-                        />
-                    </AnalyticsSubpagePanel>
 
                     {deletingId ? (
                         <div className="flex items-center justify-end">

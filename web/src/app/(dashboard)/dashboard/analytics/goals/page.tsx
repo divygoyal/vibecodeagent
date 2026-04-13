@@ -360,22 +360,28 @@ function GoalsKpiCard({
     accent: string;
     tone: 'cyan' | 'emerald' | 'violet' | 'rose';
 }) {
-    const toneStyles = {
-        cyan: 'border-cyan-500/16 bg-cyan-500/[0.08] text-cyan-200',
-        emerald: 'border-emerald-500/16 bg-emerald-500/[0.08] text-emerald-200',
-        violet: 'border-violet-500/16 bg-violet-500/[0.08] text-violet-200',
-        rose: 'border-rose-500/16 bg-rose-500/[0.08] text-rose-200',
+    const toneText = {
+        cyan: 'text-[#37E6C7]',
+        emerald: 'text-[#37E6C7]',
+        violet: 'text-[#C07DFF]',
+        rose: 'text-[#F08AC2]',
+    } as const;
+    const toneBg = {
+        cyan: 'bg-[#37E6C7]/10 border-[#37E6C7]/20',
+        emerald: 'bg-[#37E6C7]/10 border-[#37E6C7]/20',
+        violet: 'bg-[#C07DFF]/10 border-[#C07DFF]/20',
+        rose: 'bg-[#F08AC2]/10 border-[#F08AC2]/20',
     } as const;
 
     return (
-        <div className="rounded-[22px] border border-white/[0.08] bg-[#0a0c0f] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
+        <div className="rounded-[16px] border border-white/[0.04] bg-[#111216] p-5 transition-colors hover:bg-[#14151a]">
             <div className="flex items-start justify-between gap-3">
-                <p className="text-[12px] font-semibold text-zinc-400">{label}</p>
-                <span className={cx('rounded-full border px-2 py-1 text-[10px] font-semibold', toneStyles[tone])}>
+                <h3 className="text-[13px] font-medium text-[#8F95B2]">{label}</h3>
+                <span className={cx('rounded-md border px-2 py-0.5 text-[10px] font-bold shadow-sm', toneText[tone], toneBg[tone])}>
                     {accent}
                 </span>
             </div>
-            <p className="mt-4 text-[2rem] font-semibold leading-none tracking-[-0.045em] text-white">
+            <p className="mt-4 text-[32px] font-semibold tracking-[-0.02em] text-white">
                 {value}
             </p>
         </div>
@@ -689,177 +695,33 @@ export default function GoalsPage() {
     }
 
     return (
-        <div className="space-y-5 pb-6">
-            <section className="rounded-[28px] border border-white/[0.08] bg-[#08090b] px-6 py-6 shadow-[0_24px_72px_rgba(0,0,0,0.28)]">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="max-w-3xl">
-                        <p className="text-[12px] font-semibold text-zinc-500">Conversion Goals</p>
-                        <h1 className="mt-2 text-[2rem] font-semibold tracking-[-0.045em] text-white sm:text-[2.35rem]">
-                            Conversion Goals
-                        </h1>
-                        <p className="mt-2 text-[13px] font-medium text-zinc-400">
-                            Track conversion performance, compare goals, and spot what changed first.
-                        </p>
-                    </div>
+        <div className="space-y-6 pb-8">
+            <section className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <h1 className="text-[28px] font-semibold tracking-tight text-white drop-shadow-sm">
+                        Conversion Goals
+                    </h1>
+                    <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-400">
+                        Track conversion performance, compare goals, and spot what's changed fast.
+                    </p>
+                </div>
 
-                    <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-                        <div className="relative sm:min-w-[320px]">
-                            <button
-                                type="button"
-                                onClick={() => setSelectorOpen((open) => !open)}
-                                className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-white/[0.08] bg-[#0d1014] px-4 py-3 text-left shadow-[0_18px_40px_rgba(0,0,0,0.2)] transition hover:border-white/[0.12]"
-                            >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold text-white">
-                                        {currentSelection?.item.name || 'Select a goal'}
-                                    </p>
-                                    <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
-                                        {currentSelection ? `${typeLabel(currentSelection.item.type)} • ${goalTargetLabel(currentSelection)}` : 'Saved goals and starters'}
-                                    </p>
-                                </div>
-                                <ChevronDown className={cx('h-4 w-4 text-zinc-500 transition', selectorOpen && 'rotate-180')} />
-                            </button>
-
-                            {selectorOpen ? (
-                                <>
-                                    <button
-                                        type="button"
-                                        className="fixed inset-0 z-30 cursor-default"
-                                        onClick={() => setSelectorOpen(false)}
-                                    />
-                                    <div className="absolute right-0 top-full z-40 mt-2 max-h-[420px] w-full overflow-y-auto rounded-[20px] border border-white/[0.1] bg-[#090b0d] p-3 shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
-                                        {definitions.length ? (
-                                            <div className="space-y-2">
-                                                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                                                    Saved goals
-                                                </p>
-                                                {definitions.map((definition) => {
-                                                    const key = `saved:${definition.id}`;
-                                                    const isSelected = key === currentSelection?.key;
-
-                                                    return (
-                                                        <div
-                                                            key={definition.id}
-                                                            className={cx(
-                                                                'flex items-center gap-3 rounded-[16px] border px-3 py-3 transition',
-                                                                isSelected
-                                                                    ? 'border-cyan-500/22 bg-cyan-500/[0.10]'
-                                                                    : 'border-white/[0.06] bg-[#101317] hover:border-white/[0.1] hover:bg-[#13171b]',
-                                                                !definition.isActive && 'opacity-60',
-                                                            )}
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setSelectedKey(key);
-                                                                    setSelectorOpen(false);
-                                                                }}
-                                                                className="min-w-0 flex-1 text-left"
-                                                            >
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="truncate text-sm font-semibold text-white">{definition.name}</span>
-                                                                    <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-semibold text-zinc-300">
-                                                                        {definition.isActive ? 'Active' : 'Inactive'}
-                                                                    </span>
-                                                                </div>
-                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
-                                                                    {typeLabel(definition.type)} • {definition.target}
-                                                                </p>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    setSelectorOpen(false);
-                                                                    openEdit(definition);
-                                                                }}
-                                                                className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-400 transition hover:border-white/[0.12] hover:text-white"
-                                                            >
-                                                                <PencilLine className="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    setSelectorOpen(false);
-                                                                    void handleDelete(definition);
-                                                                }}
-                                                                className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-500 transition hover:border-rose-500/24 hover:text-rose-300"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : null}
-
-                                        {suggestions.length ? (
-                                            <div className={cx('space-y-2', definitions.length > 0 && 'mt-4 border-t border-white/[0.06] pt-4')}>
-                                                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                                                    Starter suggestions
-                                                </p>
-                                                {suggestions.map((suggestion, index) => {
-                                                    const key = `suggestion:${index}`;
-                                                    const isSelected = key === currentSelection?.key;
-
-                                                    return (
-                                                        <button
-                                                            key={key}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setSelectedKey(key);
-                                                                setSelectorOpen(false);
-                                                            }}
-                                                            className={cx(
-                                                                'flex w-full items-start justify-between gap-3 rounded-[16px] border px-3 py-3 text-left transition',
-                                                                isSelected
-                                                                    ? 'border-emerald-500/20 bg-emerald-500/[0.10]'
-                                                                    : 'border-white/[0.06] bg-[#101317] hover:border-white/[0.1] hover:bg-[#13171b]',
-                                                            )}
-                                                        >
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="truncate text-sm font-semibold text-white">{suggestion.name}</span>
-                                                                    <span className="rounded-full border border-emerald-500/18 bg-emerald-500/[0.12] px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
-                                                                        Starter
-                                                                    </span>
-                                                                </div>
-                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
-                                                                    {typeLabel(suggestion.type)} • {suggestion.target}
-                                                                </p>
-                                                            </div>
-                                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </>
-                            ) : null}
-                        </div>
-
-                        {currentSelection?.kind === 'saved' ? (
-                            <button
-                                type="button"
-                                onClick={() => openEdit(currentSelection.item)}
-                                className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-white/[0.08] bg-[#0d1014] px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-white/[0.12] hover:text-white"
-                            >
-                                <PencilLine className="h-4 w-4" />
-                                Edit
-                            </button>
-                        ) : null}
-
-                        <button
-                            type="button"
-                            onClick={openCreate}
-                            className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-emerald-500/20 bg-emerald-500/[0.12] px-4 py-3 text-sm font-semibold text-emerald-200 shadow-[0_12px_32px_rgba(16,185,129,0.16)] transition hover:border-emerald-400/28 hover:bg-emerald-500/[0.18]"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Create Goal
-                        </button>
-                    </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#111216] px-4 py-2 text-[13px] font-medium text-zinc-300 transition hover:bg-[#15171c]"
+                    >
+                        Last 30 Days
+                        <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={openCreate}
+                        className="flex items-center gap-2 rounded-xl border border-[#37E6C7]/30 bg-[#37E6C7]/10 px-4 py-2 text-[13px] font-medium text-[#37E6C7] transition hover:bg-[#37E6C7]/20"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Create Goal
+                    </button>
                 </div>
             </section>
 
@@ -899,28 +761,30 @@ export default function GoalsPage() {
                 />
             ) : (
                 <>
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(330px,0.9fr)]">
-                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
-                                <div>
-                                    <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Goal Performance</h2>
-                                    <p className="mt-1 text-[12px] font-medium text-zinc-400">Compare saved goals and trend direction.</p>
+                    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(330px,0.9fr)] items-start">
+                        <div className="flex flex-col gap-6">
+<section className="flex flex-col rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#37E6C7]/10 text-[#37E6C7]">
+                                        <TrendingUp className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-[17px] font-semibold text-white">Performance</h2>
+                                        <p className="mt-0.5 text-[13px] font-medium text-zinc-500">Track conversion performance, compare goals, and find trends.</p>
+                                    </div>
                                 </div>
-                                <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-zinc-300">
-                                    {board.length} goals
-                                </span>
                             </div>
 
                             <div className="overflow-x-auto">
                                 <table className="min-w-full border-separate border-spacing-0">
                                     <thead>
-                                        <tr className="bg-[#101317]">
-                                            <th className="border-b border-white/[0.08] px-5 py-3 text-left text-[11px] font-semibold text-zinc-500">Goal</th>
-                                            <th className="border-b border-white/[0.08] px-4 py-3 text-right text-[11px] font-semibold text-zinc-500">Conversions</th>
-                                            <th className="border-b border-white/[0.08] px-4 py-3 text-right text-[11px] font-semibold text-zinc-500">Rate</th>
-                                            <th className="border-b border-white/[0.08] px-4 py-3 text-left text-[11px] font-semibold text-zinc-500">Trend</th>
-                                            <th className="border-b border-white/[0.08] px-4 py-3 text-right text-[11px] font-semibold text-zinc-500">Change</th>
-                                            <th className="border-b border-white/[0.08] px-3 py-3" />
+                                        <tr>
+                                            <th className="border-b border-white/[0.04] px-1 py-3 text-left text-[11px] font-medium text-zinc-500">Goal</th>
+                                            <th className="border-b border-white/[0.04] px-4 py-3 text-right text-[11px] font-medium text-zinc-500">Total Conversions</th>
+                                            <th className="border-b border-white/[0.04] px-4 py-3 text-left text-[11px] font-medium text-zinc-500">Conv. Rate</th>
+                                            <th className="border-b border-white/[0.04] px-4 py-3 text-right text-[11px] font-medium text-zinc-500">Change</th>
+                                            <th className="border-b border-white/[0.04] px-1 py-3" />
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -930,41 +794,65 @@ export default function GoalsPage() {
                                                 <tr
                                                     key={entry.key}
                                                     className={cx(
-                                                        'cursor-pointer transition',
-                                                        isSelected ? 'bg-cyan-500/[0.06]' : 'hover:bg-white/[0.02]',
+                                                        'group cursor-pointer transition-colors duration-200',
+                                                        isSelected ? 'bg-white/[0.03]' : 'hover:bg-white/[0.02]',
                                                     )}
                                                     onClick={() => setSelectedKey(entry.key)}
                                                 >
-                                                    <td className="border-b border-white/[0.06] px-5 py-3.5">
+                                                    <td className="border-b border-white/[0.04] px-1 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <span className="h-8 w-1 rounded-full" style={{ backgroundColor: entry.color }} />
                                                             <div className="min-w-0">
-                                                                <p className="truncate text-sm font-semibold text-white">{entry.data.definition.name}</p>
-                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
+                                                                <p className="flex items-center gap-2 truncate text-[14px] font-semibold text-white">
+                                                                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                                                    {entry.data.definition.name}
+                                                                </p>
+                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-500">
                                                                     {goalTargetLabel(entry.selection)}
                                                                 </p>
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="border-b border-white/[0.06] px-4 py-3.5 text-right text-sm font-semibold text-white">
+                                                    <td className="border-b border-white/[0.04] px-4 py-4 text-right text-[14px] font-semibold text-white">
                                                         {formatCompactNumber(entry.data.summary.conversions)}
                                                     </td>
-                                                    <td className="border-b border-white/[0.06] px-4 py-3.5 text-right text-sm font-semibold text-white">
-                                                        {formatPercent(entry.data.summary.rate)}
-                                                    </td>
-                                                    <td className="border-b border-white/[0.06] px-4 py-3.5">
-                                                        <GoalSparkline trend={entry.data.trend} color={entry.color} />
+                                                    <td className="border-b border-white/[0.04] px-4 py-4">
+                                                        <div className="flex w-[120px] items-center gap-3">
+                                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                                                                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(entry.data.summary.rate, 100)}%`, backgroundColor: entry.color }} />
+                                                            </div>
+                                                        </div>
                                                     </td>
                                                     <td
                                                         className={cx(
-                                                            'border-b border-white/[0.06] px-4 py-3.5 text-right text-sm font-semibold',
-                                                            entry.data.summary.change >= 0 ? 'text-emerald-300' : 'text-rose-300',
+                                                            'border-b border-white/[0.04] px-4 py-4 text-right text-[13px] font-semibold',
+                                                            entry.data.summary.change >= 0 ? 'text-[#37E6C7]' : 'text-rose-400',
                                                         )}
                                                     >
                                                         {formatSignedPercent(entry.data.summary.change)}
                                                     </td>
-                                                    <td className="border-b border-white/[0.06] px-3 py-3.5 text-right text-zinc-600">
-                                                        <ChevronRight className="ml-auto h-4 w-4" />
+                                                    <td className="border-b border-white/[0.04] px-1 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    openEdit(entry.data.definition);
+                                                                }}
+                                                                className="rounded-md p-1.5 text-zinc-500 hover:bg-white/[0.05] hover:text-white"
+                                                            >
+                                                                <PencilLine className="h-3.5 w-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    void handleDelete(entry.data.definition);
+                                                                }}
+                                                                className="rounded-md p-1.5 text-zinc-500 hover:bg-white/[0.05] hover:text-rose-400"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -974,74 +862,13 @@ export default function GoalsPage() {
                             </div>
                         </section>
 
-                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-emerald-300" />
-                                <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Insights</h2>
-                            </div>
-                            <p className="mt-1 text-[12px] font-medium text-zinc-400">Smart summaries from the selected goal.</p>
-
-                            <div className="mt-4 space-y-3">
-                                {insights.spike ? (
-                                    <div className="rounded-[18px] border border-amber-500/18 bg-amber-500/[0.08] p-4">
-                                        <div className="flex items-center gap-2 text-amber-200">
-                                            <TrendingUp className="h-4 w-4" />
-                                            <span className="text-sm font-semibold">Spike detected</span>
-                                        </div>
-                                        <p className="mt-2 text-sm font-semibold text-white">
-                                            {selectedEntry?.data.definition.name}
-                                        </p>
-                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
-                                            {formatAxisDate(insights.spike.date)} hit {formatCompactNumber(insights.spike.conversions)} conversions, {formatSignedPercent(insights.spike.lift)} above the average day.
-                                        </p>
-                                    </div>
-                                ) : null}
-
-                                {insights.bestGoal ? (
-                                    <div className="rounded-[18px] border border-emerald-500/16 bg-emerald-500/[0.07] p-4">
-                                        <div className="flex items-center gap-2 text-emerald-200">
-                                            <Trophy className="h-4 w-4" />
-                                            <span className="text-sm font-semibold">Best converting goal</span>
-                                        </div>
-                                        <p className="mt-2 text-sm font-semibold text-white">{insights.bestGoal.data.definition.name}</p>
-                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
-                                            {formatCompactNumber(insights.bestGoal.data.summary.conversions)} conversions at {formatPercent(insights.bestGoal.data.summary.rate)}.
-                                        </p>
-                                    </div>
-                                ) : null}
-
-                                {insights.fallingGoal ? (
-                                    <div className="rounded-[18px] border border-white/[0.08] bg-[#101317] p-4">
-                                        <div className="flex items-center gap-2 text-zinc-200">
-                                            <AlertTriangle className="h-4 w-4 text-rose-300" />
-                                            <span className="text-sm font-semibold">Fastest declining goal</span>
-                                        </div>
-                                        <p className="mt-2 text-sm font-semibold text-white">{insights.fallingGoal.data.definition.name}</p>
-                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
-                                            {formatSignedPercent(insights.fallingGoal.data.summary.change)} vs the previous period.
-                                        </p>
-                                    </div>
-                                ) : null}
-                            </div>
-
-                            {selectedEntry?.data.explanation ? (
-                                <div className="mt-4 rounded-[18px] border border-white/[0.08] bg-[#101317] p-4">
-                                    <p className="text-[12px] font-semibold text-zinc-500">Selected goal</p>
-                                    <p className="mt-2 text-sm font-medium leading-6 text-zinc-300">
-                                        {selectedEntry.data.explanation}
-                                    </p>
-                                </div>
-                            ) : null}
-                        </section>
-                    </div>
-
-                    <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                        <div className="flex items-center justify-between gap-3">
+<section className="rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
+                        <div className="flex items-center justify-between gap-3 px-2">
                             <div>
-                                <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Conversion Trend</h2>
-                                <p className="mt-1 text-[12px] font-medium text-zinc-400">Goal momentum across the current range.</p>
+                                <h2 className="text-[17px] font-semibold text-white">Conversion Trend</h2>
+                                <p className="mt-1 text-[13px] font-medium text-zinc-400">Goal momentum across the current range.</p>
                             </div>
-                            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-zinc-300">
+                            <span className="rounded-full border border-white/[0.1] bg-white/[0.05] px-3.5 py-1.5 text-[11px] font-bold tracking-wide text-zinc-300 shadow-sm">
                                 {range.toUpperCase()}
                             </span>
                         </div>
@@ -1091,10 +918,9 @@ export default function GoalsPage() {
                         </div>
                     </section>
 
-                    <div className="grid gap-5 xl:grid-cols-3">
-                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                            <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Breakdown by Source</h2>
-                            <p className="mt-1 text-[12px] font-medium text-zinc-400">Where the selected goal is being completed.</p>
+<section className="flex flex-col rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
+                            <h2 className="text-[17px] font-semibold text-white">Breakdown by Source</h2>
+                            <p className="mt-1 text-[13px] font-medium text-zinc-400">Where the selected goal is being completed.</p>
 
                             {selectedEntry?.data.sourceContribution.length ? (
                                 <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-center">
@@ -1143,10 +969,114 @@ export default function GoalsPage() {
                                 <p className="mt-5 text-sm font-medium text-zinc-500">No source contribution data available for this goal.</p>
                             )}
                         </section>
+                        </div>
+                        <div className="flex flex-col gap-6">
+                        <section className="flex flex-col rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C07DFF]/10 text-[#C07DFF]">
+                                    <Sparkles className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h2 className="text-[17px] font-semibold text-white">Insights &amp; Alerts</h2>
+                                    <p className="mt-0.5 text-[13px] font-medium text-zinc-500">Smart summaries and signals.</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-4 space-y-3">
+                                {insights.spike ? (
+                                    <div className="rounded-[20px] border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.12] to-amber-500/[0.02] p-5 shadow-sm backdrop-blur-md">
+                                        <div className="flex items-center gap-2 text-amber-300 drop-shadow-sm">
+                                            <TrendingUp className="h-4 w-4" />
+                                            <span className="text-sm font-bold tracking-tight">Spike detected</span>
+                                        </div>
+                                        <p className="mt-2 text-sm font-semibold text-white">
+                                            {selectedEntry?.data.definition.name}
+                                        </p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
+                                            {formatAxisDate(insights.spike.date)} hit {formatCompactNumber(insights.spike.conversions)} conversions, {formatSignedPercent(insights.spike.lift)} above the average day.
+                                        </p>
+                                    </div>
+                                ) : null}
 
-                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                            <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Top Converting Pages</h2>
-                            <p className="mt-1 text-[12px] font-medium text-zinc-400">Pages contributing the strongest goal volume.</p>
+                                {insights.bestGoal ? (
+                                    <div className="rounded-[20px] border border-[#37E6C7]/20 bg-gradient-to-br from-emerald-500/[0.12] to-emerald-500/[0.02] p-5 shadow-sm backdrop-blur-md">
+                                        <div className="flex items-center gap-2 text-[#37E6C7] drop-shadow-sm">
+                                            <Trophy className="h-4 w-4" />
+                                            <span className="text-sm font-bold tracking-tight">Best converting goal</span>
+                                        </div>
+                                        <p className="mt-2 text-sm font-semibold text-white">{insights.bestGoal.data.definition.name}</p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
+                                            {formatCompactNumber(insights.bestGoal.data.summary.conversions)} conversions at {formatPercent(insights.bestGoal.data.summary.rate)}.
+                                        </p>
+                                    </div>
+                                ) : null}
+
+                                {insights.fallingGoal ? (
+                                    <div className="rounded-[20px] border border-white/[0.08] bg-gradient-to-br from-white/[0.05] to-transparent p-5 shadow-sm backdrop-blur-md">
+                                        <div className="flex items-center gap-2 text-zinc-200 drop-shadow-sm">
+                                            <AlertTriangle className="h-4 w-4 text-rose-400" />
+                                            <span className="text-sm font-bold tracking-tight">Fastest declining goal</span>
+                                        </div>
+                                        <p className="mt-2 text-sm font-semibold text-white">{insights.fallingGoal.data.definition.name}</p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
+                                            {formatSignedPercent(insights.fallingGoal.data.summary.change)} vs the previous period.
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {selectedEntry?.data.explanation ? (
+                                <div className="mt-4 rounded-[18px] border border-white/[0.08] bg-[#101317] p-4">
+                                    <p className="text-[12px] font-semibold text-zinc-500">Selected goal</p>
+                                    <p className="mt-2 text-sm font-medium leading-6 text-zinc-300">
+                                        {selectedEntry.data.explanation}
+                                    </p>
+                                </div>
+                            ) : null}
+                            
+                            <div className="my-6 border-t border-white/[0.04]"></div>
+                            
+                            <p className="mb-4 text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Active Alerts</p>
+                            
+                            <div className="mt-5 space-y-2.5">
+                                {goalAlerts.length ? goalAlerts.map((alert, index) => (
+                                    <div
+                                        key={`${alert.label}-${index}`}
+                                        className={cx(
+                                            'rounded-[18px] border px-4 py-3.5',
+                                            alert.tone === 'positive'
+                                                ? 'border-[#37E6C7]/16 bg-[#37E6C7]/[0.07]'
+                                                : 'border-amber-500/16 bg-amber-500/[0.07]',
+                                        )}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <span
+                                                className={cx(
+                                                    'mt-1 h-2.5 w-2.5 rounded-full',
+                                                    alert.tone === 'positive' ? 'bg-[#37E6C7]' : 'bg-amber-300',
+                                                )}
+                                            />
+                                            <div>
+                                                <p className="text-sm font-semibold text-white">{alert.label}</p>
+                                                <p className="mt-1 text-[12px] font-medium text-zinc-300">{alert.detail}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rounded-[18px] border border-white/[0.06] bg-[#101317] px-4 py-4">
+                                        <p className="text-sm font-semibold text-white">No immediate alerts</p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-400">
+                                            Current goal set looks stable across the selected range.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        
+                        </section>
+
+<section className="flex flex-col rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm">
+                            <h2 className="text-[17px] font-semibold text-white">Top Converting Pages</h2>
+                            <p className="mt-1 text-[13px] font-medium text-zinc-400">Pages contributing the strongest goal volume.</p>
 
                             <div className="mt-5 space-y-2.5">
                                 {selectedEntry?.data.pageContribution.length ? selectedEntry.data.pageContribution.slice(0, 5).map((entry, index) => (
@@ -1167,54 +1097,8 @@ export default function GoalsPage() {
                                 )}
                             </div>
                         </section>
-
-                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Goal Alerts</h2>
-                                    <p className="mt-1 text-[12px] font-medium text-zinc-400">High-signal items that need a quick look.</p>
-                                </div>
-                                <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
-                                    {goalAlerts.length} alerts
-                                </span>
-                            </div>
-
-                            <div className="mt-5 space-y-2.5">
-                                {goalAlerts.length ? goalAlerts.map((alert, index) => (
-                                    <div
-                                        key={`${alert.label}-${index}`}
-                                        className={cx(
-                                            'rounded-[18px] border px-4 py-3.5',
-                                            alert.tone === 'positive'
-                                                ? 'border-emerald-500/16 bg-emerald-500/[0.07]'
-                                                : 'border-amber-500/16 bg-amber-500/[0.07]',
-                                        )}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <span
-                                                className={cx(
-                                                    'mt-1 h-2.5 w-2.5 rounded-full',
-                                                    alert.tone === 'positive' ? 'bg-emerald-400' : 'bg-amber-300',
-                                                )}
-                                            />
-                                            <div>
-                                                <p className="text-sm font-semibold text-white">{alert.label}</p>
-                                                <p className="mt-1 text-[12px] font-medium text-zinc-300">{alert.detail}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="rounded-[18px] border border-white/[0.06] bg-[#101317] px-4 py-4">
-                                        <p className="text-sm font-semibold text-white">No immediate alerts</p>
-                                        <p className="mt-1 text-[12px] font-medium text-zinc-400">
-                                            Current goal set looks stable across the selected range.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </section>
-                    </div>
-                </>
+                        </div>
+                    </div>                </>
             )}
 
             {editorState.open ? (

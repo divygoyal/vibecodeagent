@@ -103,8 +103,8 @@ const THRESHOLDS: Record<MetricKey, ThresholdConfig> = {
     ttfb: { goodMax: 0.8, needsImprovementMax: 1.8 },
 };
 
-const PERFORMANCE_TABLE_HEADER_BASE_CLASS = 'grid gap-0 border-b border-white/[0.1] bg-[#111315]';
-const PERFORMANCE_TABLE_ROW_BASE_CLASS = 'group relative grid min-h-[42px] items-center gap-0 overflow-hidden border-b border-white/[0.09] transition md:h-8 md:min-h-8';
+const PERFORMANCE_TABLE_HEADER_BASE_CLASS = 'grid gap-0 border-b border-white/[0.1] ';
+const PERFORMANCE_TABLE_ROW_BASE_CLASS = 'group relative grid min-h-[42px] items-center gap-0 overflow-hidden border-b border-white/[0.04] transition hover:bg-white/[0.02] md:h-8 md:min-h-8';
 const PERFORMANCE_TABLE_FILL_BASE_CLASS = 'absolute left-0 top-[1px] bottom-[1px] rounded-r-[3px] transition';
 const PERFORMANCE_TABLE_VALUE_BASE_CLASS = 'relative z-10 text-right font-mono text-[13px] leading-none';
 
@@ -185,11 +185,11 @@ function rateMetric(metricKey: MetricKey, value: number): Rating {
 function severityClasses(rating: Rating) {
     if (rating === 'good') {
         return {
-            value: 'text-emerald-300',
-            valueStrong: 'text-emerald-100',
-            chip: 'border-emerald-400/28 bg-emerald-500/[0.12] text-emerald-200',
-            dot: 'bg-emerald-400',
-            marker: '#33CF96',
+            value: 'text-[#37E6C7]',
+            valueStrong: 'text-[#37E6C7]',
+            chip: 'border-[#37E6C7]/20 bg-[#37E6C7]/10 text-[#37E6C7]',
+            dot: 'bg-[#37E6C7]',
+            marker: '#37E6C7',
         };
     }
 
@@ -239,7 +239,7 @@ function PerformanceSurface({
     className?: string;
 }) {
     return (
-        <section className={`relative overflow-hidden rounded-[16px] border border-white/[0.14] bg-[#080909] shadow-[0_22px_52px_rgba(0,0,0,0.42)] ${className}`.trim()}>
+        <section className={`relative overflow-hidden rounded-[20px] border border-white/[0.04] bg-[#111216] shadow-sm ${className}`.trim()}>
             {children}
         </section>
     );
@@ -280,7 +280,7 @@ function MetricRail({
     return (
         <div className="space-y-2.5">
             <div className="relative h-[3px] overflow-hidden rounded-full bg-[#131517]">
-                <div className="absolute inset-y-0 left-0 bg-[#33CF96]" style={{ width: `${goodWidth}%` }} />
+                <div className="absolute inset-y-0 left-0 bg-[#37E6C7]" style={{ width: `${goodWidth}%` }} />
                 <div className="absolute inset-y-0 bg-[#F2C14E]" style={{ left: `${goodWidth}%`, width: `${needsWidth}%` }} />
                 <div
                     className="absolute inset-y-0 right-0 bg-[#F87171]"
@@ -310,7 +310,7 @@ function InlineVitalTile({
     const classes = severityClasses(snapshot.rating);
 
     return (
-        <div className="rounded-[14px] border border-white/[0.12] bg-[#0A0A0A] px-4 py-4">
+        <div className="rounded-[16px] border border-white/[0.04] bg-[#14151a] px-4 py-4">
             <div className="flex items-start justify-between gap-3">
                 <p className="text-[11px] font-medium tracking-[-0.01em] text-zinc-400">
                     {metric.fullLabel}
@@ -338,7 +338,7 @@ function OpportunityRow({
     const classes = severityClasses(snapshot.rating);
 
     return (
-        <div className="flex items-start justify-between gap-4 border-t border-white/[0.1] py-3.5 first:border-t-0 first:pt-0 last:pb-0">
+        <div className="flex items-start justify-between gap-4 border-t border-white/[0.04] py-3.5 first:border-t-0 first:pt-0 last:pb-0">
             <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
                     <span className={`h-2.5 w-2.5 rounded-full ${classes.dot}`} />
@@ -370,7 +370,7 @@ function DeviceMetricRow({
     const classes = severityClasses(rating);
 
     return (
-        <div className="flex items-center justify-between gap-4 border-t border-white/[0.1] py-3.5 first:border-t-0 first:pt-0 last:pb-0">
+        <div className="flex items-center justify-between gap-4 border-t border-white/[0.04] py-3.5 first:border-t-0 first:pt-0 last:pb-0">
             <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
                     <span className={`h-2.5 w-2.5 rounded-full ${classes.dot}`} />
@@ -418,7 +418,7 @@ function PerformanceTable<T>({
                 {action ? <div className="shrink-0">{action}</div> : null}
             </div>
 
-            <div className="overflow-hidden rounded-[14px] border border-white/[0.12] bg-[#090A0B]">
+            <div className="overflow-hidden border-t border-white/[0.04] bg-[#111216]">
                 <div className="overflow-x-auto">
                     <div className="min-w-[700px]">
                         <div className={cx(PERFORMANCE_TABLE_HEADER_BASE_CLASS, 'hidden md:grid', gridClassName)}>
@@ -427,7 +427,7 @@ function PerformanceTable<T>({
                                     key={column.key}
                                     className={cx(
                                         'px-4 py-2.5 text-[11px] font-semibold text-zinc-400',
-                                        index > 0 && 'border-l border-white/[0.08]',
+                                        index > 0 && 'border-l border-white/[0.04]',
                                         column.align === 'right'
                                             ? 'text-right'
                                             : column.align === 'center'
@@ -447,7 +447,7 @@ function PerformanceTable<T>({
                                 : 0;
                             const rowTone = getRowTone ? getRowTone(row) : 'needs-improvement';
                             const fillClassName = rowTone === 'good'
-                                ? 'bg-emerald-500/[0.10]'
+                                ? 'bg-[#37E6C7]/[0.08]'
                                 : rowTone === 'poor'
                                     ? 'bg-rose-500/[0.10]'
                                     : 'bg-[#F2C14E]/[0.11]';
@@ -473,7 +473,7 @@ function PerformanceTable<T>({
                                             key={column.key}
                                             className={cx(
                                                 'relative z-10 px-3 py-1.5 md:px-4 md:py-0',
-                                                columnIndex > 0 && 'border-l border-white/[0.08]',
+                                                columnIndex > 0 && 'border-l border-white/[0.04]',
                                                 column.align === 'right'
                                                     ? 'text-right'
                                                     : column.align === 'center'
@@ -573,14 +573,14 @@ export default function PerformancePage() {
     return (
         <div className="space-y-4 sm:space-y-5">
             <PerformanceSurface className="px-5 py-5 sm:px-6">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(242,193,78,0.12),transparent_30%),radial-gradient(circle_at_left,rgba(242,193,78,0.05),transparent_22%)]" />
+                
                 <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div className="max-w-3xl">
                         <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-zinc-300">
                             <Gauge className="h-3.5 w-3.5 text-[#F2C14E]" />
                             Performance
                         </div>
-                        <h1 className="mt-4 text-[2.55rem] font-semibold tracking-[-0.06em] text-white">
+                        <h1 className="mt-4 text-[28px] font-semibold tracking-tight text-white drop-shadow-sm">
                             Core Web Vitals
                         </h1>
                         <p className="mt-2 text-[13px] font-medium text-zinc-400">
@@ -598,7 +598,7 @@ export default function PerformancePage() {
 
             <PerformanceSurface className="px-5 py-5 sm:px-6">
                 <div className="grid gap-4 xl:grid-cols-[minmax(260px,0.82fr)_repeat(3,minmax(0,1fr))]">
-                    <div className="rounded-[14px] border border-white/[0.12] bg-[#0A0A0A] px-5 py-5">
+                    <div className="rounded-[16px] border border-white/[0.04] bg-[#14151a] px-5 py-5">
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-[12px] font-semibold text-zinc-300">Performance Status</p>
                             <StatusPill label={statusLabel} status={scoreStatus} />

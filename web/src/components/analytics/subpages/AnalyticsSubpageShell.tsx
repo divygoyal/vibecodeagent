@@ -10,20 +10,20 @@ type AnalyticsTone = 'emerald' | 'cyan' | 'amber' | 'mixed';
 
 const toneStyles: Record<AnalyticsTone, { icon: string; badge: string }> = {
     emerald: {
-        icon: 'border border-emerald-500/18 bg-emerald-500/[0.08] text-emerald-300',
-        badge: 'border-emerald-500/18 bg-emerald-500/[0.08] text-emerald-200',
+        icon: 'border border-[#37E6C7]/20 bg-[#37E6C7]/10 text-[#37E6C7]',
+        badge: 'border-[#37E6C7]/20 bg-[#37E6C7]/10 text-[#37E6C7]',
     },
     cyan: {
-        icon: 'border border-cyan-500/18 bg-cyan-500/[0.08] text-cyan-300',
-        badge: 'border-cyan-500/18 bg-cyan-500/[0.08] text-cyan-200',
+        icon: 'border border-[#C07DFF]/20 bg-[#C07DFF]/10 text-[#C07DFF]',
+        badge: 'border-[#C07DFF]/20 bg-[#C07DFF]/10 text-[#C07DFF]',
     },
     amber: {
-        icon: 'border border-amber-500/18 bg-amber-500/[0.08] text-amber-300',
-        badge: 'border-amber-500/18 bg-amber-500/[0.08] text-amber-200',
+        icon: 'border border-amber-500/20 bg-amber-500/10 text-amber-400',
+        badge: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
     },
     mixed: {
-        icon: 'border border-white/[0.08] bg-white/[0.03] text-zinc-200',
-        badge: 'border-white/[0.08] bg-white/[0.03] text-zinc-300',
+        icon: 'border border-white/[0.06] bg-white/[0.03] text-zinc-300',
+        badge: 'border-white/[0.06] bg-white/[0.03] text-zinc-300',
     },
 };
 
@@ -64,25 +64,18 @@ export function AnalyticsSubpageShell({
     children: ReactNode;
 }) {
     return (
-        <div className="space-y-3.5 sm:space-y-4">
-            <div className="relative overflow-hidden rounded-[22px] border border-white/[0.09] bg-[#050606] px-5 py-5 shadow-[0_20px_54px_rgba(0,0,0,0.36)] sm:px-6 sm:py-5">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.06),transparent_32%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.05),transparent_28%)]" />
-                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="max-w-3xl">
-                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-zinc-300">
-                            <Sparkles className="h-3 w-3 text-emerald-300" />
-                            <span>{eyebrow}</span>
-                        </div>
-                        <h1 className="text-[1.85rem] font-semibold tracking-[-0.035em] text-white sm:text-[2.2rem]">
-                            {title}
-                        </h1>
-                        <p className="mt-2 max-w-2xl text-[13px] font-medium leading-6 text-zinc-400 sm:text-[13px]">
-                            {description}
-                        </p>
-                    </div>
-
-                    {actions ? <div className="relative shrink-0">{actions}</div> : null}
+        <div className="space-y-6">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
+                <div>
+                    <h1 className="text-[28px] font-semibold tracking-tight text-white drop-shadow-sm">
+                        {title}
+                    </h1>
+                    <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-400">
+                        {description}
+                    </p>
                 </div>
+
+                {actions ? <div className="flex items-center gap-3 shrink-0">{actions}</div> : null}
             </div>
 
             {children}
@@ -109,9 +102,9 @@ export function AnalyticsSubpagePanel({
         <DashboardHoverSurface
             as="section"
             tone={tone}
-            className={`premium-card rounded-[20px] border border-white/[0.075] bg-[#060707] p-4 sm:p-5 ${className}`.trim()}
+            className={`flex flex-col rounded-[20px] border border-white/[0.04] bg-[#111216] p-6 shadow-sm ${className}`.trim()}
         >
-            <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="mb-6 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <h2 className="text-[1rem] font-semibold tracking-[-0.025em] text-white">
                         {title}
@@ -163,7 +156,7 @@ export function AnalyticsSubpageMetricCard({
 
     return (
         <DashboardHoverSurface
-            className="premium-card rounded-[18px] border border-white/[0.075] bg-[#070808] p-4 sm:p-[18px]"
+            className="flex flex-col rounded-[20px] border border-white/[0.04] bg-[#111216] p-5 shadow-sm"
             tone={tone}
         >
             <div className="flex items-start justify-between gap-3">
@@ -217,7 +210,7 @@ export function AnalyticsInsightList({
             {items.map((item) => (
                 <div
                     key={`${item.label}-${item.value}`}
-                    className="rounded-[16px] border border-white/[0.07] bg-[#080909] px-4 py-3.5"
+                    className="rounded-[16px] border border-white/[0.04] bg-[#111216] px-4 py-3.5"
                 >
                     <p className="text-[11px] font-semibold text-zinc-400">
                         {item.label}
@@ -244,8 +237,8 @@ export function AnalyticsSubpageEmptyState({
     description: string;
 }) {
     return (
-        <div className="rounded-[22px] border border-white/[0.08] bg-[#060707] px-6 py-12 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.03]">
+        <div className="rounded-[20px] border border-white/[0.04] bg-[#111216] px-6 py-12 text-center shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[12px] border border-white/[0.06] bg-white/[0.02]">
                 <LineChart className="h-5 w-5 text-zinc-400" />
             </div>
             <h3 className="mt-4 text-lg font-semibold tracking-[-0.02em] text-white">{title}</h3>
@@ -264,26 +257,26 @@ export function AnalyticsSubpageLoadingState({
     cards?: number;
 }) {
     return (
-        <div className="space-y-4">
-            <div className="rounded-[24px] border border-white/[0.08] bg-[#060707] px-5 py-5 sm:px-7 sm:py-6">
-                <div className="h-4 w-24 animate-pulse rounded-full bg-white/[0.05]" />
-                <div className="mt-4 h-8 w-64 animate-pulse rounded-full bg-white/[0.06]" />
-                <div className="mt-3 h-3.5 w-full max-w-xl animate-pulse rounded-full bg-white/[0.04]" />
+        <div className="space-y-6">
+            <div className="rounded-[20px] border border-white/[0.04] bg-[#111216] px-5 py-5 sm:px-7 sm:py-6 shadow-sm">
+                <div className="h-4 w-24 animate-pulse rounded-full bg-white/[0.03]" />
+                <div className="mt-4 h-8 w-64 animate-pulse rounded-full bg-white/[0.04]" />
+                <div className="mt-3 h-3.5 w-full max-w-xl animate-pulse rounded-full bg-white/[0.03]" />
             </div>
 
             <AnalyticsSubpagePanel
                 title={title}
-                description="Loading analytics"
+                description="Loading analytics..."
             >
                 <div className={`grid gap-2.5 ${cards > 2 ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-2'}`}>
                     {Array.from({ length: cards }).map((_, index) => (
                         <div
                             key={index}
-                            className="rounded-[20px] border border-white/[0.06] bg-[#090909] px-4 py-4"
+                            className="rounded-[16px] border border-white/[0.04] bg-[#111216] px-4 py-4"
                         >
-                            <div className="h-9 w-9 animate-pulse rounded-[14px] bg-white/[0.05]" />
-                            <div className="mt-4 h-3 w-20 animate-pulse rounded-full bg-white/[0.04]" />
-                            <div className="mt-3 h-8 w-28 animate-pulse rounded-full bg-white/[0.06]" />
+                            <div className="h-9 w-9 animate-pulse rounded-[10px] bg-white/[0.03]" />
+                            <div className="mt-4 h-3 w-20 animate-pulse rounded-full bg-white/[0.03]" />
+                            <div className="mt-3 h-8 w-28 animate-pulse rounded-full bg-white/[0.04]" />
                         </div>
                     ))}
                 </div>
