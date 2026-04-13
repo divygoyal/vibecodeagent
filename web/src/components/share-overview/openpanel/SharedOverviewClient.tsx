@@ -42,7 +42,7 @@ import {
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import DatePicker, { getRangeLabel } from '@/components/DatePicker';
-import { CITY_COORDS, COUNTRY_COORDS } from '@/components/analytics/RealtimeGlobe';
+import { CITY_COORDS, COUNTRY_COORDS } from '@/lib/globeUtils';
 import Logo, { LogoIcon } from '@/components/Logo';
 import DashboardHoverSurface from '@/components/dashboard/DashboardHoverSurface';
 import type { GlobeVisitor } from '@/components/globe/RealtimeGlobeMaplibre';

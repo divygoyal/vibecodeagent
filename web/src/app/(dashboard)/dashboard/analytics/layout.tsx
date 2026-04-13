@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -12,6 +12,7 @@ import {
 import dynamic from 'next/dynamic';
 
 import { useRegistration } from '../layout';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { usePropertyList, useContainerStatus } from '@/lib/useDashboardData';
 import { useFilterStore } from '@/stores/analyticsFilterStore';
 import { ConnectGoogleState } from '@/components/EmptyState';
@@ -72,7 +73,10 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
         return <div className="min-h-[60vh] flex items-center justify-center"><ConnectGoogleState feature="real traffic data, visitor insights, and performance metrics" /></div>;
     }
 
-    const simpleFilterCount = Object.values(filters).filter(arr => arr.length > 0).length;
+    const simpleFilterCount = useMemo(
+        () => Object.values(filters).filter((arr) => arr.length > 0).length,
+        [filters],
+    );
     const activeFilterCount = simpleFilterCount + advancedFilters.length;
 
     return (
@@ -254,7 +258,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
                         </div>
-                    ) : children}
+                    ) : <ErrorBoundary>{children}</ErrorBoundary>}
                 </div>
 
                 {/* Share Modal */}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import {
@@ -618,8 +619,7 @@ export default function GlobeApiPage() {
                                                 className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800"
                                                 style={{ boxShadow: `0 0 0 2px ${getWarmthRing(item.warmth)}` }}
                                             >
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={getAvatarUrl(item.name)} alt="" className="w-full h-full" />
+                                                <Image src={getAvatarUrl(item.name)} alt="" width={24} height={24} className="w-full h-full" />
                                             </div>
                                             <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#080c18] ${getWarmthDot(item.warmth)}`} />
                                         </div>

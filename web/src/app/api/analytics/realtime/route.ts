@@ -61,11 +61,11 @@ export async function GET(req: Request) {
                 () => fetchRealtimeVisitors(token, propertyId)
             );
 
-            return NextResponse.json(data);
+            return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
         }
 
         // Dev mode: return mock realtime data
-        return NextResponse.json({ activeUsers: Math.floor(Math.random() * 50) + 5 });
+        return NextResponse.json({ activeUsers: Math.floor(Math.random() * 50) + 5 }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
     } catch (err: any) {
         console.error('Realtime API error:', err);
         return NextResponse.json({ error: err.message || 'Failed to fetch realtime data' }, { status: 500 });

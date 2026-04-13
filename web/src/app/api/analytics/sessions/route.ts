@@ -19,5 +19,5 @@ export async function GET(req: Request) {
         () => fetchAnalyticsSessionsData(context.accessToken!, context.propertyId!, range),
     );
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
 }

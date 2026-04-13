@@ -51,8 +51,9 @@ function normalizeUser(user: Record<string, unknown>) {
 function createToken(): { token: string; expiresAt: number } {
     const secret = process.env.NEXTAUTH_SECRET || ''
     const timestamp = Date.now().toString()
-    const hmac = crypto.createHmac('sha256', secret).update(timestamp).digest('hex')
-    const token = `${timestamp}.${hmac}`
+    const nonce = crypto.randomBytes(16).toString('hex')
+    const hmac = crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}`).digest('hex')
+    const token = `${timestamp}.${nonce}.${hmac}`
     const expiresAt = Date.now() + TOKEN_EXPIRY_MS
     return { token, expiresAt }
 }
@@ -61,12 +62,21 @@ function verifyToken(token: string): boolean {
     if (!token) return false
     const secret = process.env.NEXTAUTH_SECRET || ''
     const parts = token.split('.')
-    if (parts.length !== 2) return false
+    if (parts.length !== 3) return false
 
-    const [timestamp, hmac] = parts
-    const expectedHmac = crypto.createHmac('sha256', secret).update(timestamp).digest('hex')
+    const [timestamp, nonce, hmac] = parts
+    const expectedHmac = crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}`).digest('hex')
 
-    if (!crypto.timingSafeEqual(Buffer.from(hmac, 'hex'), Buffer.from(expectedHmac, 'hex'))) {
+    let hmacBuf: Buffer, expectedBuf: Buffer
+    try {
+        hmacBuf = Buffer.from(hmac, 'hex')
+        expectedBuf = Buffer.from(expectedHmac, 'hex')
+        if (hmacBuf.length !== expectedBuf.length) return false
+    } catch {
+        return false
+    }
+
+    if (!crypto.timingSafeEqual(hmacBuf, expectedBuf)) {
         return false
     }
 

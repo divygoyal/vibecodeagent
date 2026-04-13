@@ -182,17 +182,17 @@ export async function GET(req: Request) {
             const data = await fetchRetentionCohorts(token, propertyId, mode);
             if (!data) {
                 // Fallback to mock data if cohort query fails (e.g. property has insufficient data)
-                return NextResponse.json(generateMockData(mode));
+                return NextResponse.json(generateMockData(mode), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
             }
             // Trends set to 0: GA4 cohort API doesn't provide period-over-period comparison
             const trends = { day1: 0, day7: 0, day14: 0, day30: 0 };
-            return NextResponse.json({ mode, cohorts: data.cohorts, averages: data.averages, curve: data.curve, trends });
+            return NextResponse.json({ mode, cohorts: data.cohorts, averages: data.averages, curve: data.curve, trends }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
         } catch (e) {
             console.error('Retention API error:', e);
-            return NextResponse.json(generateMockData(mode));
+            return NextResponse.json(generateMockData(mode), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
         }
     }
 
     // Dev mode: return mock data
-    return NextResponse.json(generateMockData(mode));
+    return NextResponse.json(generateMockData(mode), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
 }

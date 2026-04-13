@@ -48,5 +48,5 @@ export async function GET(req: Request) {
         () => fetchFunnelDefinitionAnalytics(context.accessToken!, context.propertyId!, definition, range),
     );
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
 }

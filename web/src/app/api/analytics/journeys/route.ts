@@ -90,13 +90,13 @@ export async function GET(req: Request) {
 
         try {
             const data = await fetchJourneyData(token, propertyId, range);
-            return NextResponse.json(data);
+            return NextResponse.json(data, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
         } catch (e) {
             console.error('Journeys API error:', e);
-            return NextResponse.json(generateMockData());
+            return NextResponse.json(generateMockData(), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
         }
     }
 
     // Dev mode: return mock data
-    return NextResponse.json(generateMockData());
+    return NextResponse.json(generateMockData(), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
 }

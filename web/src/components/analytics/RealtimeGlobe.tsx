@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback, memo, useState } from 'react';
+import Image from 'next/image';
 import createGlobe from 'cobe';
 
 // ─── DiceBear avatar URL generator ───
@@ -365,8 +366,7 @@ const RealtimeGlobe = memo(function RealtimeGlobe({ byCountry, byCity, visitors 
                                 background: '#0f172a',
                             }}
                         >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={getAvatarUrl(pos.visitor.name)} alt="" className="w-full h-full" />
+                            <Image src={getAvatarUrl(pos.visitor.name)} alt="" width={32} height={32} className="w-full h-full" />
                         </div>
                         {/* Warmth indicator dot */}
                         <div

@@ -224,7 +224,7 @@ export async function GET(req: Request) {
             source: 'crux',
             origin,
             collectionPeriod: overall.record?.collectionPeriod,
-        });
+        }, { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=120' } });
     } catch (err: unknown) {
         const error = err as Error;
         console.error('Performance API error:', error.message);

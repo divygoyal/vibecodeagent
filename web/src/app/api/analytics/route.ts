@@ -212,10 +212,15 @@ function generateMockLanguages() {
 
 // ============= Route handler =============
 
+const VALID_RANGES = new Set(['7d', '14d', '30d', '60d', '90d'])
+const VALID_SECTIONS = new Set(['all', 'kpis', 'traffic', 'pages', 'devices', 'geo', 'sources', 'languages', 'events'])
+
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
-    const range = searchParams.get('range') || '30d'
-    const section = searchParams.get('section') || 'all'
+    const rangeParam = searchParams.get('range') || '30d'
+    const sectionParam = searchParams.get('section') || 'all'
+    const range = VALID_RANGES.has(rangeParam) ? rangeParam : '30d'
+    const section = VALID_SECTIONS.has(sectionParam) ? sectionParam : 'all'
 
     const isProduction = !!ADMIN_API_KEY
 
@@ -316,7 +321,9 @@ export async function GET(req: Request) {
             if (dashboardData?.__error) {
                 return NextResponse.json({ error: dashboardData.__error }, { status: 502 })
             }
-            return NextResponse.json(dashboardData)
+            return NextResponse.json(dashboardData, {
+                headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' },
+            })
         }
 
         // Dev mode only: return mock data

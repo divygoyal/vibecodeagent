@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
+import ErrorBoundary from '@/components/ErrorBoundary';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
@@ -571,9 +572,11 @@ export default function DashboardLayout({
                         <div className="flex items-center gap-3 px-2 py-2">
                             <Link href="/dashboard/plan" className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer">
                                 {session.user.image && (
-                                    <img
+                                    <Image
                                         src={session.user.image}
                                         alt=""
+                                        width={28}
+                                        height={28}
                                         className={`w-7 h-7 ${shellBadgeRadiusClass} ring-1 ring-white/[0.1]`}
                                     />
                                 )}
@@ -727,7 +730,7 @@ export default function DashboardLayout({
                 <main id="main-content" className={`flex-1 overflow-y-auto overflow-x-hidden p-3 max-w-full sm:p-4 md:p-6 ${isOverviewRoute ? 'bg-[#010203]' : ''}`} role="main">
                     <div className="max-w-7xl mx-auto">
                         <RegistrationContext.Provider value={{ ...registrationState, retryRegistration, selectedProperty, setSelectedProperty, selectedSite, setSelectedSite, range, setRange }}>
-                            {children}
+                            <ErrorBoundary>{children}</ErrorBoundary>
                         </RegistrationContext.Provider>
                     </div>
                 </main>
@@ -898,7 +901,7 @@ export default function DashboardLayout({
                                 <div className="flex items-center gap-3 px-2 py-2">
                                     <Link href="/dashboard/plan" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
                                         {session.user.image && (
-                                            <img src={session.user.image} alt="" className="w-8 h-8 rounded-full" />
+                                            <Image src={session.user.image} alt="" width={32} height={32} className="w-8 h-8 rounded-full" />
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">

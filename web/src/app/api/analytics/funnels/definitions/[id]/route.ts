@@ -40,7 +40,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         return NextResponse.json({ error: responseBody.detail || responseBody.error || 'Failed to update funnel definition' }, { status: response.status });
     }
 
-    return NextResponse.json(responseBody);
+    return NextResponse.json(responseBody, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -64,5 +64,5 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
         return NextResponse.json({ error: responseBody.detail || responseBody.error || 'Failed to delete funnel definition' }, { status: response.status });
     }
 
-    return NextResponse.json(responseBody);
+    return NextResponse.json(responseBody, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } });
 }

@@ -15,7 +15,7 @@ export async function GET(
   try {
     const { token } = await params;
 
-    if (!token || typeof token !== 'string' || token.length < 8) {
+    if (!token || typeof token !== 'string' || token.length < 32) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
     }
 

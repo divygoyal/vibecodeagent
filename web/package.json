@@ -30,7 +30,6 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.564.0",
-    "mapbox-gl": "^3.20.0",
     "maplibre-gl": "^5.21.0",
     "next": "16.1.6",
     "next-auth": "^4.24.5",

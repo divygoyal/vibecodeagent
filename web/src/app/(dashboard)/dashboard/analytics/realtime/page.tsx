@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useRealtimeData } from '@/lib/useDashboardData';
 import { useAnalyticsContext } from '../layout';
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import AnimatedCounter from '@/components/analytics/AnimatedCounter';
-import { COUNTRY_COORDS, CITY_COORDS } from '@/components/analytics/RealtimeGlobe';
+import { COUNTRY_COORDS, CITY_COORDS } from '@/lib/globeUtils';
 import type { GlobeVisitor, RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 
 // ─── DiceBear avatar URL (matching globe markers) ───
@@ -512,8 +513,7 @@ export default function RealtimePage() {
                                     {/* DiceBear avatar with warmth indicator */}
                                     <div className="relative flex-shrink-0 mt-0.5">
                                         <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800" style={{ boxShadow: `0 0 0 2px ${item.warmth > 0.6 ? '#ef4444' : item.warmth > 0.4 ? '#f97316' : item.warmth > 0.25 ? '#eab308' : '#3b82f6'}` }}>
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={getAvatarUrl(item.name)} alt="" className="w-full h-full" />
+                                            <Image src={getAvatarUrl(item.name)} alt="" width={24} height={24} className="w-full h-full" />
                                         </div>
                                         <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#14141e] ${getWarmthDot(item.warmth)}`} />
                                     </div>

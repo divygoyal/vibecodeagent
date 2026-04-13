@@ -46,7 +46,7 @@ export async function GET(req: Request) {
         }
         // admin api returns { status: "ok", data: [...], ... }
         if (data.status === "ok") {
-            return NextResponse.json(data.data);
+            return NextResponse.json(data.data, { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=120' } });
         } else {
             console.error("Plugin error:", data.stderr);
             return NextResponse.json({ error: "Failed to list properties" }, { status: 500 });

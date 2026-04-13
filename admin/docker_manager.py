@@ -6,6 +6,8 @@ import docker
 import os
 import json
 import logging
+import shutil
+import subprocess
 from typing import Optional, Dict, Any
 from config import settings, PLANS
 from datetime import datetime
@@ -17,10 +19,20 @@ class DockerManager:
     """Manages Docker containers for user ClawBots"""
     
     def __init__(self):
-        self.client = docker.from_env()
+        self._docker_available = False
+        try:
+            self.client = docker.from_env()
+            self._docker_available = True
+        except docker.errors.DockerException as e:
+            logger.warning(f"Docker is not available: {e}. Running in stub mode (API will start but container operations will be no-ops).")
+            self.client = None
         self.base_dir = settings.DATA_DIR  # Host path for user data
-        self._shared_plugins_dir = self._ensure_shared_plugins()
-        self._nanobot_build_event = self._start_nanobot_build()
+        if self._docker_available:
+            self._shared_plugins_dir = self._ensure_shared_plugins()
+            self._nanobot_build_event = self._start_nanobot_build()
+        else:
+            self._shared_plugins_dir = settings.PLUGINS_DIR
+            self._nanobot_build_event = None
 
     def _get_container_name(self, user_identifier: str) -> str:
         """Generate unique container name"""
@@ -97,13 +109,15 @@ class DockerManager:
         # OpenClaw needs to write to /data/.openclaw (mounted from host).
         # Ensure directory is writable for typical non-root container users.
         try:
-            os.chmod(user_dir, 0o777)
-            os.chmod(f"{user_dir}/workspace", 0o777)
-            os.chmod(f"{user_dir}/.openclaw", 0o777)
+            # 0o755: containers access via chown (see create_container); world-execute lets
+            # non-owner processes traverse the directory tree without full write access.
+            os.chmod(user_dir, 0o755)
+            os.chmod(f"{user_dir}/workspace", 0o755)
+            os.chmod(f"{user_dir}/.openclaw", 0o755)
         except Exception as e:
             logger.warning(f"Could not chmod user_dir for {user_identifier}: {e}")
-            # Best-effort fallback
-            os.system(f"chmod -R 777 '{user_dir}'")
+            # Best-effort fallback — use list args to avoid shell injection
+            subprocess.run(["chmod", "-R", "755", user_dir], check=False, capture_output=True)
         
         return user_dir
     
@@ -129,10 +143,12 @@ class DockerManager:
                 src = f"{source_plugins}/{plugin}"
                 dst = f"{shared_dir}/{plugin}"
                 if os.path.isdir(src):
-                    os.system(f"cp -rf {src} {dst}")
+                    if os.path.exists(dst):
+                        shutil.rmtree(dst)
+                    shutil.copytree(src, dst)
             logger.info(f"Copied plugins from {source_plugins} to {shared_dir}")
             try:
-                os.chmod(shared_dir, 0o777)
+                os.chmod(shared_dir, 0o755)
             except Exception:
                 pass
             return shared_dir
@@ -166,7 +182,7 @@ class DockerManager:
         memory_dir = f"{workspace}/memory"
         os.makedirs(memory_dir, exist_ok=True)
         try:
-            os.chmod(memory_dir, 0o777)
+            os.chmod(memory_dir, 0o755)
         except Exception:
             pass
         
@@ -290,11 +306,11 @@ _(What do they care about? What projects are they working on? What annoys them? 
         # Initialize git repo in workspace (vanilla OpenClaw does this)
         git_dir = f"{workspace}/.git"
         if not os.path.exists(git_dir):
-            os.system(f"git init {workspace}")
-            os.system(f"git -C {workspace} config user.email 'bot@trafficclaw.com'")
-            os.system(f"git -C {workspace} config user.name 'TrafficClaw Bot'")
-            os.system(f"git -C {workspace} add -A")
-            os.system(f'git -C {workspace} commit -m "Initial workspace" --allow-empty')
+            subprocess.run(["git", "init", workspace], check=False, capture_output=True)
+            subprocess.run(["git", "-C", workspace, "config", "user.email", "bot@trafficclaw.com"], check=False, capture_output=True)
+            subprocess.run(["git", "-C", workspace, "config", "user.name", "TrafficClaw Bot"], check=False, capture_output=True)
+            subprocess.run(["git", "-C", workspace, "add", "-A"], check=False, capture_output=True)
+            subprocess.run(["git", "-C", workspace, "commit", "-m", "Initial workspace", "--allow-empty"], check=False, capture_output=True)
     
     def _build_nanobot_system_prompt(self, connections: Optional[Dict[str, Any]] = None) -> str:
         """Build a lean system prompt optimized for fast responses."""
@@ -602,7 +618,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             dst = f"{plugins_dir}/{plugin}"
             if os.path.exists(src):
                 # Always re-copy to ensure latest plugin code (force overwrite)
-                os.system(f"cp -rf {src} {dst}")
+                if os.path.exists(dst):
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
     
     def create_container(
         self,
@@ -669,7 +687,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # Fix ownership
         try:
             # Best-effort: if the container runs as UID 1000, this avoids EACCES.
-            os.system(f"chown -R 1000:1000 '{user_dir}'")
+            subprocess.run(["chown", "-R", "1000:1000", user_dir], check=False, capture_output=True)
         except Exception as e:
             logger.warning(f"Could not chown user_dir for {user_identifier}: {e}")
         
@@ -716,7 +734,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                     src = f"{source_plugins}/{plugin}"
                     dst = os.path.join(nanobot_skills_dir, plugin)
                     if os.path.exists(src):
-                        os.system(f"cp -rf {src} {dst}")
+                        if os.path.exists(dst):
+                            shutil.rmtree(dst)
+                        shutil.copytree(src, dst)
 
             nanobot_config = {
                 "channels": {
@@ -922,7 +942,8 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             
             if remove_data:
                 user_dir = self._get_user_data_dir(user_identifier)
-                os.system(f"rm -rf {user_dir}")
+                if os.path.exists(user_dir):
+                    shutil.rmtree(user_dir)
             
             return {"success": True, "status": "deleted"}
         except docker.errors.NotFound:

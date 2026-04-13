@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { Link2, ExternalLink, Monitor, Smartphone, Tablet, Navigation } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
@@ -263,8 +264,7 @@ export default function EmbedGlobePage() {
                                             className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800"
                                             style={{ boxShadow: `0 0 0 2px ${getWarmthRing(item.warmth)}` }}
                                         >
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={getAvatarUrl(item.name)} alt="" className="w-full h-full" />
+                                            <Image src={getAvatarUrl(item.name)} alt="" width={24} height={24} className="w-full h-full" />
                                         </div>
                                         <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#080c18] ${getWarmthDot(item.warmth)}`} />
                                     </div>

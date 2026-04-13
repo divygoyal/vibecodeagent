@@ -249,6 +249,7 @@ export async function getValidAccessToken(
         pendingRefresh.set(refreshToken, refreshPromise);
 
         (async () => {
+            let settled = false;
             try {
                 const res = await fetch('https://oauth2.googleapis.com/token', {
                     method: 'POST',
@@ -280,6 +281,7 @@ export async function getValidAccessToken(
                     });
 
                     resolveRefresh!(newToken);
+                    settled = true;
                     return;
                 }
                 const errText = await res.text();
@@ -287,15 +289,18 @@ export async function getValidAccessToken(
             } catch (err) {
                 console.error('Google token refresh network error:', err);
             } finally {
-                // Delete from map AFTER promise is settled, so all concurrent
-                // callers who got the promise reference can still await it.
+                // Delete from map AFTER promise is settled so concurrent callers
+                // who already hold the promise reference can still await it.
                 pendingRefresh.delete(refreshToken);
-            }
-            // Refresh failed — fall through to access token fallback
-            if (accessToken) {
-                resolveRefresh!(accessToken);
-            } else {
-                rejectRefresh!(new Error('Failed to refresh Google token'));
+                // Safety net: guarantee the promise is always settled, even if
+                // an unexpected exception fires before resolveRefresh/rejectRefresh.
+                if (!settled) {
+                    if (accessToken) {
+                        resolveRefresh!(accessToken);
+                    } else {
+                        rejectRefresh!(new Error('Failed to refresh Google token'));
+                    }
+                }
             }
         })();
 

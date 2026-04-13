@@ -28,5 +28,5 @@ export async function GET(req: Request) {
         events: request.events,
     }));
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }

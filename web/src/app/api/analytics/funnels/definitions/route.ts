@@ -44,7 +44,7 @@ export async function GET(req: Request) {
         }
     }
 
-    return NextResponse.json({ definitions, suggestions });
+    return NextResponse.json({ definitions, suggestions }, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } });
 }
 
 export async function POST(req: Request) {
