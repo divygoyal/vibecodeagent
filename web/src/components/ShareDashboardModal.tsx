@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    X, Link, Copy, Check, Share2, Eye, Trash2, Shield
+    X, Link, Copy, Check, Share2, Eye, Trash2, Shield, Code2
 } from 'lucide-react';
 import { OVERVIEW_SHARE_CONFIG } from '@/lib/shareTypes';
 
@@ -55,6 +55,14 @@ function getShareUrl(token: string): string {
     return `${window.location.origin}/share/${token}`;
 }
 
+function getEmbedUrl(token: string): string {
+    return `${getShareUrl(token)}?embed=true`;
+}
+
+function getEmbedIframeCode(token: string): string {
+    return `<iframe src="${getEmbedUrl(token)}" width="100%" height="1200" style="border:none;border-radius:16px;max-width:100%;" loading="lazy"></iframe>`;
+}
+
 function upsertShareItem(shares: ShareItem[], incoming: ShareItem): ShareItem[] {
     const next = [incoming, ...shares.filter((share) => share.token !== incoming.token)];
     next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -67,14 +75,11 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
     const [loading, setLoading] = useState(false);
     const [refreshingShares, setRefreshingShares] = useState(false);
     const [generating, setGenerating] = useState(false);
-    const [copied, setCopied] = useState<string | null>(null);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [selectedToken, setSelectedToken] = useState<string | null>(null);
 
     const [config] = useState<ShareConfig>(OVERVIEW_SHARE_CONFIG);
-    // Data inclusion config
-
-    // Latest generated link
-    const [latestToken, setLatestToken] = useState<string | null>(null);
 
     /* ─── Fetch active shares ─── */
     const fetchShares = useCallback(async (options?: { background?: boolean }) => {
@@ -106,9 +111,24 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
     useEffect(() => {
         if (open) {
             fetchShares();
-            setLatestToken(null);
+            setSelectedToken(null);
         }
     }, [open, fetchShares]);
+
+    useEffect(() => {
+        setSelectedToken((current) => {
+            if (current && activeShares.some((share) => share.token === current)) {
+                return current;
+            }
+
+            return activeShares[0]?.token ?? null;
+        });
+    }, [activeShares]);
+
+    const selectedShare = useMemo(
+        () => activeShares.find((share) => share.token === selectedToken) ?? null,
+        [activeShares, selectedToken],
+    );
 
     /* ─── Generate share link ─── */
     const handleGenerate = async () => {
@@ -139,10 +159,8 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
             const data = await res.json();
             const createdShare = data.share as ShareItem | undefined;
             if (createdShare?.token) {
-                setLatestToken(createdShare.token);
+                setSelectedToken(createdShare.token);
                 setActiveShares((prev) => upsertShareItem(prev, createdShare));
-            } else {
-                setLatestToken(null);
             }
 
             void fetchShares({ background: true });
@@ -162,7 +180,6 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
             });
             if (!res.ok) throw new Error('Failed to revoke');
             setActiveShares((prev) => prev.filter((s) => s.token !== token));
-            if (latestToken === token) setLatestToken(null);
         } catch (err) {
             console.error('Revoke error:', err);
             setError('Failed to revoke share');
@@ -176,7 +193,6 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
             const res = await fetch('/api/share?all=true', { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to revoke all');
             setActiveShares([]);
-            setLatestToken(null);
         } catch (err) {
             console.error('Revoke all error:', err);
             setError('Failed to revoke shares');
@@ -184,15 +200,27 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
     };
 
     /* ─── Copy to clipboard ─── */
-    const handleCopy = async (token: string) => {
+    const handleCopyValue = useCallback(async (key: string, value: string) => {
         try {
-            await navigator.clipboard.writeText(getShareUrl(token));
-            setCopied(token);
-            setTimeout(() => setCopied(null), 2000);
+            await navigator.clipboard.writeText(value);
+            setCopiedKey(key);
+            setTimeout(() => setCopiedKey(null), 2000);
         } catch {
-            setError('Failed to copy link');
+            setError('Failed to copy');
         }
-    };
+    }, []);
+
+    const handleCopyLink = useCallback((token: string) => {
+        return handleCopyValue(`link:${token}`, getShareUrl(token));
+    }, [handleCopyValue]);
+
+    const handleCopyEmbedUrl = useCallback((token: string) => {
+        return handleCopyValue(`embed-url:${token}`, getEmbedUrl(token));
+    }, [handleCopyValue]);
+
+    const handleCopyIframe = useCallback((token: string) => {
+        return handleCopyValue(`iframe:${token}`, getEmbedIframeCode(token));
+    }, [handleCopyValue]);
 
     return (
         <AnimatePresence>
@@ -241,34 +269,107 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
                             {/* Description */}
                             <p className="text-sm text-zinc-400 leading-relaxed">
-                                Share your analytics dashboard with a public link. Anyone with the link can view your data — no login required.
+                                Share your analytics dashboard with a public link or embed it in another site. Anyone with the tokenized URL can view the shared data without logging in.
                             </p>
 
-                            {/* Latest generated link */}
-                            {latestToken && (
-                                <div className="space-y-1.5">
-                                    <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
-                                        <Link className="w-3 h-3" />
-                                        Public Link
-                                    </label>
-                                    <div className="flex items-stretch gap-0 rounded-lg border border-white/[0.1] overflow-hidden">
-                                        <div className="flex-1 px-3 py-2.5 bg-white/[0.03] text-xs text-zinc-300 font-mono truncate select-all">
-                                            {getShareUrl(latestToken)}
+                            {selectedShare ? (
+                                <div className="space-y-4 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <div className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+                                                Selected Share
+                                            </div>
+                                            <div className="mt-1 text-sm text-zinc-200">
+                                                Created {formatDate(selectedShare.createdAt)}
+                                            </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleCopy(latestToken)}
-                                            className="px-3 bg-white/[0.06] hover:bg-white/[0.1] border-l border-white/[0.1] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1.5"
-                                        >
-                                            {copied === latestToken ? (
-                                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                            ) : (
-                                                <Copy className="w-3.5 h-3.5" />
-                                            )}
-                                            <span className="text-xs">{copied === latestToken ? 'Copied' : 'Copy'}</span>
-                                        </button>
+                                        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+                                            <span className="inline-flex items-center gap-1">
+                                                <Eye className="h-3 w-3" />
+                                                {selectedShare.views} views
+                                            </span>
+                                            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+                                                Active
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+                                            <Link className="w-3 h-3" />
+                                            Public Link
+                                        </label>
+                                        <div className="flex items-stretch gap-0 overflow-hidden rounded-lg border border-white/[0.1]">
+                                            <div className="flex-1 truncate bg-white/[0.03] px-3 py-2.5 font-mono text-xs text-zinc-300 select-all">
+                                                {getShareUrl(selectedShare.token)}
+                                            </div>
+                                            <button
+                                                onClick={() => handleCopyLink(selectedShare.token)}
+                                                className="flex items-center gap-1.5 border-l border-white/[0.1] bg-white/[0.06] px-3 text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-zinc-200"
+                                            >
+                                                {copiedKey === `link:${selectedShare.token}` ? (
+                                                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                                ) : (
+                                                    <Copy className="h-3.5 w-3.5" />
+                                                )}
+                                                <span className="text-xs">{copiedKey === `link:${selectedShare.token}` ? 'Copied' : 'Copy'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+                                            <Code2 className="w-3 h-3" />
+                                            Embed URL
+                                        </label>
+                                        <div className="flex items-stretch gap-0 overflow-hidden rounded-lg border border-white/[0.1]">
+                                            <div className="flex-1 truncate bg-white/[0.03] px-3 py-2.5 font-mono text-xs text-zinc-300 select-all">
+                                                {getEmbedUrl(selectedShare.token)}
+                                            </div>
+                                            <button
+                                                onClick={() => handleCopyEmbedUrl(selectedShare.token)}
+                                                className="flex items-center gap-1.5 border-l border-white/[0.1] bg-white/[0.06] px-3 text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-zinc-200"
+                                            >
+                                                {copiedKey === `embed-url:${selectedShare.token}` ? (
+                                                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                                ) : (
+                                                    <Copy className="h-3.5 w-3.5" />
+                                                )}
+                                                <span className="text-xs">{copiedKey === `embed-url:${selectedShare.token}` ? 'Copied' : 'Copy'}</span>
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] leading-5 text-zinc-500">
+                                            Use the raw embed URL if you prefer to wire the iframe into your own layout or CMS component.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+                                                <Code2 className="w-3 h-3" />
+                                                Iframe Snippet
+                                            </label>
+                                            <button
+                                                onClick={() => handleCopyIframe(selectedShare.token)}
+                                                className="flex items-center gap-1.5 text-xs text-zinc-400 transition-colors hover:text-zinc-200"
+                                            >
+                                                {copiedKey === `iframe:${selectedShare.token}` ? (
+                                                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                                ) : (
+                                                    <Copy className="h-3.5 w-3.5" />
+                                                )}
+                                                {copiedKey === `iframe:${selectedShare.token}` ? 'Copied' : 'Copy code'}
+                                            </button>
+                                        </div>
+                                        <pre className="overflow-x-auto rounded-lg border border-white/[0.08] bg-black/30 p-3 text-[11px] leading-5 text-cyan-300/80 whitespace-pre-wrap break-all">
+                                            {getEmbedIframeCode(selectedShare.token)}
+                                        </pre>
+                                        <p className="text-[11px] leading-5 text-zinc-500">
+                                            This default iframe uses a taller mobile-friendly height so stacked cards still have room to breathe on smaller screens.
+                                        </p>
                                     </div>
                                 </div>
-                            )}
+                            ) : null}
 
                             <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
                                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
@@ -327,7 +428,20 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                                         {activeShares.map((share) => (
                                             <div
                                                 key={share.token}
-                                                className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] group"
+                                                onClick={() => setSelectedToken(share.token)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Enter' || event.key === ' ') {
+                                                        event.preventDefault();
+                                                        setSelectedToken(share.token);
+                                                    }
+                                                }}
+                                                role="button"
+                                                tabIndex={0}
+                                                className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                                                    selectedShare?.token === share.token
+                                                        ? 'border-emerald-500/30 bg-emerald-500/10'
+                                                        : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
+                                                }`}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
                                                     <div className="flex flex-col min-w-0">
@@ -345,18 +459,26 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                                                         {share.views}
                                                     </span>
                                                     <button
-                                                        onClick={() => handleCopy(share.token)}
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            void handleCopyLink(share.token);
+                                                        }}
                                                         className="p-1 rounded hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors"
                                                         title="Copy link"
                                                     >
-                                                        {copied === share.token ? (
+                                                        {copiedKey === `link:${share.token}` ? (
                                                             <Check className="w-3 h-3 text-emerald-400" />
                                                         ) : (
                                                             <Copy className="w-3 h-3" />
                                                         )}
                                                     </button>
                                                     <button
-                                                        onClick={() => handleRevoke(share.token)}
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            void handleRevoke(share.token);
+                                                        }}
                                                         className="p-1 rounded hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition-colors"
                                                         title="Revoke"
                                                     >

@@ -120,10 +120,12 @@ function SharedUmamiPage({
     token,
     siteUrl,
     views,
+    embedMode = false,
 }: {
     token: string;
     siteUrl: string;
     views: number;
+    embedMode?: boolean;
 }) {
     const [range, setRange] = useQueryState(
         'range',
@@ -151,19 +153,23 @@ function SharedUmamiPage({
     const siteLabel = siteUrl || 'Shared Property';
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(180deg,_#f8fafc_0%,_#f3f4f6_100%)] text-slate-900">
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                <header className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur">
-                    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(180deg,_#f8fafc_0%,_#f3f4f6_100%)] text-slate-900">
+            <div className={embedMode ? 'mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8'}>
+                <header className={embedMode ? 'rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-5' : 'rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur'}>
+                    <div className={`flex flex-col ${embedMode ? 'gap-4 lg:flex-row lg:items-start lg:justify-between' : 'gap-6 lg:flex-row lg:items-start lg:justify-between'}`}>
                         <div className="space-y-4">
                             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                                 <ShieldCheck className="h-3.5 w-3.5" />
-                                TrafficClaw Shared Analytics
+                                {embedMode ? 'TrafficClaw Embedded Analytics' : 'TrafficClaw Shared Analytics'}
                             </div>
                             <div>
-                                <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Umami Share Fork Preview</h1>
+                                <h1 className={`${embedMode ? 'text-2xl sm:text-[28px]' : 'text-3xl'} font-semibold tracking-tight text-slate-950`}>
+                                    {embedMode ? 'Embedded shared analytics' : 'Umami Share Fork Preview'}
+                                </h1>
                                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                                    The public URL stays on TrafficClaw while this page blends TrafficClaw history with Umami-style reporting for the post-cutover window.
+                                    {embedMode
+                                        ? 'Responsive shared analytics optimized for iframe embeds and narrow mobile widths.'
+                                        : 'The public URL stays on TrafficClaw while this page blends TrafficClaw history with Umami-style reporting for the post-cutover window.'}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
@@ -209,20 +215,20 @@ function SharedUmamiPage({
                 </header>
 
                 {error && (
-                    <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className={`${embedMode ? 'mt-4' : 'mt-6'} rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700`}>
                         {error.message}
                     </div>
                 )}
 
                 {isLoading && !data && (
-                    <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500">
+                    <div className={`${embedMode ? 'mt-4' : 'mt-6'} rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500`}>
                         Loading shared analytics...
                     </div>
                 )}
 
                 {data && (
                     <>
-                        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                        <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-4 sm:grid-cols-2 xl:grid-cols-5`}>
                             <StatCard
                                 label="Pageviews"
                                 value={formatNumber(data.summary.pageviews.value)}
@@ -255,7 +261,7 @@ function SharedUmamiPage({
                             />
                         </section>
 
-                        <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+                        <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]`}>
                             <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_60px_rgba(15,23,42,0.06)]">
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
@@ -366,7 +372,7 @@ function SharedUmamiPage({
                             </div>
                         </section>
 
-                        <section className="mt-6 grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+                        <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-4 lg:grid-cols-2 2xl:grid-cols-4`}>
                             <BreakdownCard title="Top Pages" items={data.breakdowns.pages} />
                             <BreakdownCard title="Referrers" items={data.breakdowns.referrers} />
                             <BreakdownCard title="Devices" items={data.breakdowns.devices} />
@@ -374,24 +380,26 @@ function SharedUmamiPage({
                         </section>
 
                         {realtime && (
-                            <section className="mt-6 grid gap-4 lg:grid-cols-3">
+                            <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-4 lg:grid-cols-3`}>
                                 <BreakdownCard title="Live Pages" items={realtime.pages} />
                                 <BreakdownCard title="Live Referrers" items={realtime.referrers} />
                                 <BreakdownCard title="Live Countries" items={realtime.countries} />
                             </section>
                         )}
 
-                        <footer className="mt-10 flex flex-col gap-3 border-t border-slate-200 px-1 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                Shared via TrafficClaw using a TrafficClaw-branded Umami bridge.
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span>Token: {token.slice(0, 12)}...</span>
-                                {data.source.cutoverAt && (
-                                    <span>Cutover: {new Date(data.source.cutoverAt).toLocaleDateString('en-US')}</span>
-                                )}
-                            </div>
-                        </footer>
+                        {!embedMode ? (
+                            <footer className="mt-10 flex flex-col gap-3 border-t border-slate-200 px-1 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    Shared via TrafficClaw using a TrafficClaw-branded Umami bridge.
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span>Token: {token.slice(0, 12)}...</span>
+                                    {data.source.cutoverAt && (
+                                        <span>Cutover: {new Date(data.source.cutoverAt).toLocaleDateString('en-US')}</span>
+                                    )}
+                                </div>
+                            </footer>
+                        ) : null}
                     </>
                 )}
             </div>
@@ -403,6 +411,7 @@ export default function SharedUmamiClient(props: {
     token: string;
     siteUrl: string;
     views: number;
+    embedMode?: boolean;
 }) {
     return (
         <NuqsAdapter>

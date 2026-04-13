@@ -199,6 +199,7 @@ type OverviewRuntime = {
     baseParams?: Record<string, string | undefined>;
     siteUrl?: string;
     views: number;
+    embedMode?: boolean;
     initialRange?: string;
     onRangeChange?: (value: string) => void;
     onShareDashboard?: () => void;
@@ -3351,6 +3352,7 @@ function TopGeoMapWidget({
 
 function ShareOverviewPage() {
     const runtime = useOverviewRuntime();
+    const isEmbeddedShare = runtime.mode === 'share' && runtime.embedMode;
     const searchParams = useSearchParams();
     const {
         range,
@@ -3398,11 +3400,13 @@ function ShareOverviewPage() {
 
     const controls = (
         <div className={cx(
-            runtime.mode === 'share'
+            isEmbeddedShare
+                ? 'border-b border-white/[0.08] bg-[#080b0e]/92'
+                : runtime.mode === 'share'
                 ? 'sticky top-0 z-30 border-b border-white/[0.08] bg-[#080b0e]/92 shadow-[0_10px_24px_rgba(0,0,0,0.24)] backdrop-blur-xl'
                 : 'sticky top-0 z-20 rounded-[14px] border border-white/[0.08] bg-[#070a0d]/94 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl',
         )}>
-            <div className={cx(runtime.mode === 'share' ? 'mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'px-3 py-3 sm:px-4 sm:py-4')}>
+            <div className={cx(runtime.mode === 'share' && !isEmbeddedShare ? 'mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'px-3 py-3 sm:px-4 sm:py-4')}>
                 <div className="hidden items-center justify-between gap-4 md:flex">
                     <div className="flex items-center gap-2">
                         <DatePicker range={range} setRange={handleRangeChange} />
@@ -3417,7 +3421,7 @@ function ShareOverviewPage() {
                     </div>
                 </div>
                 <div className="space-y-2.5 md:hidden">
-                    {runtime.mode === 'share' ? (
+                    {runtime.mode === 'share' && !isEmbeddedShare ? (
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2">
                             <div className="min-w-0">
                                 <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">TrafficClaw share</div>
@@ -3465,7 +3469,13 @@ function ShareOverviewPage() {
     );
 
     const contentGrid = (
-        <div className={cx(runtime.mode === 'share' ? 'mx-auto grid max-w-7xl grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4' : 'grid grid-cols-6 gap-3 pt-4 sm:gap-4')}>
+        <div className={cx(
+            runtime.mode === 'share'
+                ? isEmbeddedShare
+                    ? 'grid grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4'
+                    : 'mx-auto grid max-w-7xl grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4'
+                : 'grid grid-cols-6 gap-3 pt-4 sm:gap-4',
+        )}>
             <OverviewMetrics liveData={liveQuery.data} />
             <TopSourcesWidget />
             <TopGeoTableWidget />
@@ -3479,35 +3489,39 @@ function ShareOverviewPage() {
     return (
         <>
             {runtime.mode === 'share' ? (
-                <div className="min-h-screen bg-[#080b0e] text-zinc-100">
-                    <div className="border-b border-white/[0.06] bg-[#07090c]">
-                        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <div className="min-w-0">
-                                <div className="mb-1 flex items-center gap-3">
-                                    <Logo size="sm" className="shrink-0" />
-                                    <span className="dashboard-hover-chip inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-100">
-                                        Shared analytics
-                                    </span>
+                <div className="min-h-screen overflow-x-hidden bg-[#080b0e] text-zinc-100">
+                    {isEmbeddedShare ? null : (
+                        <div className="border-b border-white/[0.06] bg-[#07090c]">
+                            <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                                <div className="min-w-0">
+                                    <div className="mb-1 flex items-center gap-3">
+                                        <Logo size="sm" className="shrink-0" />
+                                        <span className="dashboard-hover-chip inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-100">
+                                            Shared analytics
+                                        </span>
+                                    </div>
+                                    {runtime.siteUrl ? <div className="truncate text-xs text-zinc-500">Analytics for <span className="font-mono text-zinc-300">{runtime.siteUrl}</span></div> : null}
                                 </div>
-                                {runtime.siteUrl ? <div className="truncate text-xs text-zinc-500">Analytics for <span className="font-mono text-zinc-300">{runtime.siteUrl}</span></div> : null}
-                            </div>
-                            <div className="shrink-0 sm:text-right">
-                                <div className="text-xs text-zinc-500">Share visits</div>
-                                <div className="font-mono text-lg text-zinc-100">{shortNumber(runtime.views)}</div>
+                                <div className="shrink-0 sm:text-right">
+                                    <div className="text-xs text-zinc-500">Share visits</div>
+                                    <div className="font-mono text-lg text-zinc-100">{shortNumber(runtime.views)}</div>
+                                </div>
                             </div>
                         </div>
+                    )}
+                    <div className={cx(isEmbeddedShare ? 'mx-auto w-full max-w-7xl' : '')}>
+                        {controls}
+                        <FilterEditorModal
+                            open={filtersOpen}
+                            onClose={() => setFiltersOpen(false)}
+                            filters={filters}
+                            eventNames={eventNames}
+                            upsertFilter={upsertFilter}
+                            removeFilter={removeFilter}
+                            setEventNames={setEventNames}
+                        />
+                        {contentGrid}
                     </div>
-                    {controls}
-                    <FilterEditorModal
-                        open={filtersOpen}
-                        onClose={() => setFiltersOpen(false)}
-                        filters={filters}
-                        eventNames={eventNames}
-                        upsertFilter={upsertFilter}
-                        removeFilter={removeFilter}
-                        setEventNames={setEventNames}
-                    />
-                    {contentGrid}
                 </div>
             ) : (
                 <div className="space-y-4 text-zinc-100">
@@ -3537,6 +3551,7 @@ export default function SharedOverviewClient({
     initialRange,
     onRangeChange,
     onShareDashboard,
+    embedMode = false,
 }: {
     mode?: SharedOverviewMode;
     token?: string;
@@ -3546,6 +3561,7 @@ export default function SharedOverviewClient({
     initialRange?: string;
     onRangeChange?: (value: string) => void;
     onShareDashboard?: () => void;
+    embedMode?: boolean;
 }) {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
@@ -3571,6 +3587,7 @@ export default function SharedOverviewClient({
                 baseParams: { propertyId },
                 siteUrl,
                 views,
+                embedMode: false,
                 initialRange,
                 onRangeChange,
                 onShareDashboard,
@@ -3587,8 +3604,9 @@ export default function SharedOverviewClient({
             apiBasePath: `/api/share/${token}/overview`,
             siteUrl,
             views,
+            embedMode,
         };
-    }, [initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
+    }, [embedMode, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
 
     if (!runtime) {
         return null;

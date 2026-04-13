@@ -15,10 +15,15 @@ export const metadata: Metadata = {
 /* ─── Page Component ─── */
 export default async function SharedDashboardPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ token: string }>;
+    searchParams?: Promise<{ embed?: string | string[] }>;
 }) {
     const { token } = await params;
+    const resolvedSearchParams = searchParams ? await searchParams : undefined;
+    const embedParam = resolvedSearchParams?.embed;
+    const isEmbed = Array.isArray(embedParam) ? embedParam.includes('true') : embedParam === 'true';
     const share = await getShareData(token, { incrementView: true });
 
     /* ─── Invalid / revoked token ─── */
@@ -35,12 +40,14 @@ export default async function SharedDashboardPage({
                     <p className="text-sm text-zinc-500 mb-6">
                         This shared dashboard doesn&apos;t exist or has been revoked by the owner.
                     </p>
-                    <Link
-                        href="https://trafficclaw.com"
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-all"
-                    >
-                        Visit TrafficClaw
-                    </Link>
+                    {!isEmbed ? (
+                        <Link
+                            href="https://trafficclaw.com"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-all"
+                        >
+                            Visit TrafficClaw
+                        </Link>
+                    ) : null}
                 </div>
             </div>
         );
@@ -52,6 +59,7 @@ export default async function SharedDashboardPage({
                 token={token}
                 siteUrl={share.siteUrl}
                 views={share.views}
+                embedMode={isEmbed}
             />
         );
     }
@@ -62,7 +70,23 @@ export default async function SharedDashboardPage({
                 token={token}
                 siteUrl={share.siteUrl}
                 views={share.views}
+                embedMode={isEmbed}
             />
+        );
+    }
+
+    if (isEmbed) {
+        return (
+            <div className="min-h-screen overflow-x-hidden bg-[#050507] px-3 py-3 text-zinc-100 sm:px-4 sm:py-4">
+                <div className="mx-auto w-full max-w-[1500px]">
+                    <SharedDashboardClient
+                        token={token}
+                        config={share.config}
+                        siteUrl={share.siteUrl}
+                        views={share.views}
+                    />
+                </div>
+            </div>
         );
     }
 
