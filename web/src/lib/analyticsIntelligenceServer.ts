@@ -1,5 +1,7 @@
 import { resolveRange, runGAReport } from '@/lib/googleApi';
 
+const ANALYTICS_INTELLIGENCE_TIMEOUT_MS = 12_000;
+
 type GaValue = { value: string };
 type GaRow = {
     dimensionValues: GaValue[];
@@ -54,6 +56,8 @@ export async function fetchAnalyticsIntelligenceData(
             startDate,
             endDate,
             1000,
+            undefined,
+            AbortSignal.timeout(ANALYTICS_INTELLIGENCE_TIMEOUT_MS),
         ) as Promise<GaReport>,
         runGAReport(
             token,
@@ -64,6 +68,7 @@ export async function fetchAnalyticsIntelligenceData(
             endDate,
             20,
             'sessions',
+            AbortSignal.timeout(ANALYTICS_INTELLIGENCE_TIMEOUT_MS),
         ).catch(() => null) as Promise<GaReport | null>,
     ]);
 

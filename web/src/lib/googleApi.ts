@@ -380,7 +380,8 @@ export async function runGAReport(
     startDate: string,
     endDate: string,
     limit = 100,
-    orderByMetric?: string
+    orderByMetric?: string,
+    signal?: AbortSignal,
 ) {
     const body: any = {
         dateRanges: [{ startDate, endDate }],
@@ -391,7 +392,7 @@ export async function runGAReport(
     if (orderByMetric) {
         body.orderBys = [{ metric: { metricName: orderByMetric }, desc: true }];
     }
-    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, token, body);
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, token, body, signal);
 }
 
 /**
@@ -411,6 +412,7 @@ export async function runFlexibleGAReport(
         orderBys?: Array<{ field: string; type: 'metric' | 'dimension'; desc?: boolean }>;
         limit?: number;
         offset?: number;
+        signal?: AbortSignal;
     }
 ) {
     const body: any = {
@@ -433,7 +435,7 @@ export async function runFlexibleGAReport(
         });
     }
 
-    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, token, body);
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runReport`, token, body, options?.signal);
 }
 
 /**
@@ -449,6 +451,7 @@ export async function runFlexibleRealtimeReport(
         dimensionFilter?: any;
         metricFilter?: any;
         limit?: number;
+        signal?: AbortSignal;
     }
 ) {
     const body: any = {
@@ -459,7 +462,7 @@ export async function runFlexibleRealtimeReport(
     if (options?.dimensionFilter) body.dimensionFilter = options.dimensionFilter;
     if (options?.metricFilter) body.metricFilter = options.metricFilter;
 
-    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runRealtimeReport`, token, body);
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runRealtimeReport`, token, body, options?.signal);
 }
 
 /**

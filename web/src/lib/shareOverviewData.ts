@@ -76,6 +76,17 @@ type JourneyData = Awaited<ReturnType<typeof fetchJourneyData>>;
 type JourneyItem = JourneyData['journeys'][number];
 type JourneyExitPage = JourneyData['exitPages'][number];
 
+const OVERVIEW_REPORT_TIMEOUT_MS = 12_000;
+const OVERVIEW_REALTIME_TIMEOUT_MS = 8_000;
+
+function createOverviewReportSignal() {
+    return AbortSignal.timeout(OVERVIEW_REPORT_TIMEOUT_MS);
+}
+
+function createOverviewRealtimeSignal() {
+    return AbortSignal.timeout(OVERVIEW_REALTIME_TIMEOUT_MS);
+}
+
 type TopGenericDefinition = {
     dimensions: string[];
     prefixIndex?: number;
@@ -515,20 +526,24 @@ export async function fetchShareOverviewStats(input: {
             runFlexibleGAReport(input.accessToken, input.propertyId, [], metrics, [current], {
                 dimensionFilter: filterExpression,
                 limit: 1,
+                signal: createOverviewReportSignal(),
             }),
             runFlexibleGAReport(input.accessToken, input.propertyId, [], metrics, [previous], {
                 dimensionFilter: filterExpression,
                 limit: 1,
+                signal: createOverviewReportSignal(),
             }),
             runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], metrics, [current], {
                 dimensionFilter: filterExpression,
                 orderBys: [{ field: dimension, type: 'dimension', desc: false }],
                 limit: dimension === 'dateHour' ? 500 : 400,
+                signal: createOverviewReportSignal(),
             }),
             runFlexibleGAReport(input.accessToken, input.propertyId, [dimension], metrics, [previous], {
                 dimensionFilter: filterExpression,
                 orderBys: [{ field: dimension, type: 'dimension', desc: false }],
                 limit: dimension === 'dateHour' ? 500 : 400,
+                signal: createOverviewReportSignal(),
             }),
         ]);
     }
@@ -618,6 +633,7 @@ export async function fetchShareOverviewTopGeneric(input: {
                 dimensionFilter: buildDimensionFilter(input.filters, input.events),
                 orderBys: [{ field: primaryMetric, type: 'metric', desc: true }],
                 limit: input.limit ?? 50,
+                signal: createOverviewReportSignal(),
             },
         );
 
@@ -833,6 +849,7 @@ export async function fetchShareOverviewTopGenericSeries(input: {
                             dimensionFilter: combineFilters([filterExpression, itemFilter]),
                             orderBys: [{ field: dimension, type: 'dimension', desc: false }],
                             limit: dimension === 'dateHour' ? 500 : 400,
+                            signal: createOverviewReportSignal(),
                         },
                     );
 
@@ -914,6 +931,7 @@ export async function fetchShareOverviewTopPages(input: {
             dimensionFilter: buildDimensionFilter(input.filters, input.events),
             orderBys: [{ field: 'sessions', type: 'metric', desc: true }],
             limit: input.limit ?? 50,
+            signal: createOverviewReportSignal(),
         });
 
         return {
@@ -957,11 +975,13 @@ export async function fetchShareOverviewTopEvents(input: {
             dimensionFilter: filterExpression,
             orderBys: [{ field: 'eventCount', type: 'metric', desc: true }],
             limit: input.limit ?? 60,
+            signal: createOverviewReportSignal(),
         }).catch(() => null),
         runFlexibleGAReport(input.accessToken, input.propertyId, ['eventName'], ['keyEvents'], [current], {
             dimensionFilter: filterExpression,
             orderBys: [{ field: 'keyEvents', type: 'metric', desc: true }],
             limit: input.limit ?? 30,
+            signal: createOverviewReportSignal(),
         }).catch(() => null),
     ]);
 
@@ -1062,30 +1082,37 @@ export async function fetchShareOverviewLive(input: {
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, [], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 1,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, ['country'], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 20,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, ['city', 'country'], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 20,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, ['unifiedScreenName'], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 15,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, ['minutesAgo'], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 30,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, ['sessionSource'], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 8,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
         runFlexibleRealtimeReport(input.accessToken, input.propertyId, ['minutesAgo', 'sessionSource'], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 250,
+            signal: createOverviewRealtimeSignal(),
         }).catch(() => null),
     ]);
 
@@ -1157,6 +1184,7 @@ export async function fetchShareOverviewLiveVisitors(input: {
         const report = await runFlexibleRealtimeReport(input.accessToken, input.propertyId, [], ['activeUsers'], {
             dimensionFilter: filterExpression,
             limit: 1,
+            signal: createOverviewRealtimeSignal(),
         });
 
         return {
@@ -1192,6 +1220,7 @@ export async function fetchShareOverviewMap(input: {
                 dimensionFilter: buildDimensionFilter(input.filters, input.events),
                 orderBys: [{ field: 'sessions', type: 'metric', desc: true }],
                 limit: 50,
+                signal: createOverviewReportSignal(),
             },
         );
 

@@ -189,6 +189,14 @@ type LiveResponse = {
     byCity: Array<{ city: string; country: string; users: number }>;
     byPage: Array<{ page: string; users: number }>;
 };
+type LiveVisitorsResponse = {
+    activeUsers: number;
+};
+type LiveOverviewResponse = LiveResponse | LiveVisitorsResponse;
+
+function hasLiveBreakdown(data?: LiveOverviewResponse): data is LiveResponse {
+    return Boolean(data && 'minuteCounts' in data);
+}
 
 type SharedOverviewMode = 'share' | 'dashboard';
 
@@ -1801,11 +1809,13 @@ function LiveMetricTile({
     total,
     className,
 }: {
-    data?: LiveResponse;
+    data?: LiveOverviewResponse;
     total: number;
     className?: string;
 }) {
-    const topReferrers = (data?.referrers || []).slice(0, 2);
+    const hasBreakdown = hasLiveBreakdown(data);
+    const topReferrers = hasBreakdown ? data.referrers.slice(0, 2) : [];
+    const liveLabel = hasBreakdown ? 'Sessions last 30 min' : 'Active users right now';
 
     return (
         <div className={cx('relative col-span-2 min-h-[112px] border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(16,185,129,0.06),rgba(15,23,32,0.3))] px-3 pb-3 pt-3 text-left sm:px-4 sm:pb-3 sm:pt-3.5 md:col-span-1', className)}>
@@ -1813,7 +1823,7 @@ function LiveMetricTile({
             <div className="relative z-10 flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <div className="text-[11px] leading-none text-zinc-400 sm:text-[12px]">Sessions last 30 min</div>
+                        <div className="text-[11px] leading-none text-zinc-400 sm:text-[12px]">{liveLabel}</div>
                         <div className="mt-3 font-mono text-[26px] font-bold leading-[0.96] tracking-[-0.04em] text-zinc-100 sm:text-[30px]">
                             {shortNumber(total)}
                         </div>
@@ -1833,39 +1843,47 @@ function LiveMetricTile({
                     ) : null}
                 </div>
                 <div className="mt-auto pt-3 sm:pt-4">
-                    <div className="h-[56px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data?.minuteCounts || []}>
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                                    content={({ active, payload }) => {
-                                        if (!active || !payload?.length) return null;
-                                        const row = payload[0]?.payload as LiveResponse['minuteCounts'][number];
-                                        return (
-                                            <div className="rounded-lg border border-white/[0.08] bg-[#0f141a]/95 px-3 py-2 text-xs shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md">
-                                                <div className="mb-1 text-zinc-500">{row.time}</div>
-                                                <div className="font-mono text-zinc-100">{row.sessionCount} sessions</div>
-                                                {row.referrers?.length ? (
-                                                    <div className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
-                                                        {row.referrers.map((item) => (
-                                                            <div key={`${row.timestamp}:${item.referrer}`} className="flex items-center justify-between gap-3">
-                                                                <span className="flex items-center gap-1.5 text-zinc-400">
-                                                                    <OverviewValueIcon column="referrer_name" value={item.referrer} />
-                                                                    <span className="max-w-[120px] truncate">{item.referrer}</span>
-                                                                </span>
-                                                                <span className="font-mono text-zinc-100">{item.count}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                        );
-                                    }}
-                                />
-                                <Bar dataKey="sessionCount" fill="#45c48c" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {hasBreakdown ? (
+                        <div className="h-[56px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={data.minuteCounts}>
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const row = payload[0]?.payload as LiveResponse['minuteCounts'][number];
+                                            return (
+                                                <div className="rounded-lg border border-white/[0.08] bg-[#0f141a]/95 px-3 py-2 text-xs shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md">
+                                                    <div className="mb-1 text-zinc-500">{row.time}</div>
+                                                    <div className="font-mono text-zinc-100">{row.sessionCount} sessions</div>
+                                                    {row.referrers?.length ? (
+                                                        <div className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
+                                                            {row.referrers.map((item) => (
+                                                                <div key={`${row.timestamp}:${item.referrer}`} className="flex items-center justify-between gap-3">
+                                                                    <span className="flex items-center gap-1.5 text-zinc-400">
+                                                                        <OverviewValueIcon column="referrer_name" value={item.referrer} />
+                                                                        <span className="max-w-[120px] truncate">{item.referrer}</span>
+                                                                    </span>
+                                                                    <span className="font-mono text-zinc-100">{item.count}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                    <Bar dataKey="sessionCount" fill="#45c48c" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="flex h-[56px] items-end">
+                            <div className="inline-flex items-center rounded-md border border-emerald-400/15 bg-emerald-400/[0.08] px-2.5 py-1.5 text-[11px] text-emerald-100/80">
+                                Fast realtime summary
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -2131,7 +2149,7 @@ function MultiSeriesLineChart({
     );
 }
 
-function OverviewMetrics({ liveData }: { liveData?: LiveResponse }) {
+function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
     const runtime = useOverviewRuntime();
     const { range, interval, metric, setMetric, startDate, endDate, filters, eventNames } = useShareOverviewState();
     const pageScoped = hasPageScopedFilter(filters);
@@ -2154,7 +2172,9 @@ function OverviewMetrics({ liveData }: { liveData?: LiveResponse }) {
 
     const displayedMetric = METRICS[metric] || METRICS[0];
     const data = statsQuery.data?.series || [];
-    const liveTotal = (liveData?.minuteCounts || []).reduce((sum, item) => sum + item.sessionCount, 0);
+    const liveTotal = hasLiveBreakdown(liveData)
+        ? liveData.minuteCounts.reduce((sum, item) => sum + item.sessionCount, 0)
+        : liveData?.activeUsers || 0;
     const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
     const activeMetricColor = OVERVIEW_CHART_GREEN;
     const previousMetricColor = OVERVIEW_SKY_ACCENT;
@@ -3389,12 +3409,15 @@ function ShareOverviewPage() {
         }
     }, [range, runtime]);
 
-    const liveQuery = useQuery<LiveResponse, Error>({
-        queryKey: ['share-overview', runtime.queryKey, 'live', filters, eventNames],
-        queryFn: () => fetchJson(buildOverviewUrl(runtime, 'live', { filters, events: eventNames })),
+    const liveEndpoint = runtime.mode === 'dashboard' ? 'live-visitors' : 'live';
+    const liveRefreshInterval = runtime.mode === 'dashboard' ? 30_000 : LIVE_DATA_POLL_INTERVAL_MS;
+
+    const liveQuery = useQuery<LiveOverviewResponse, Error>({
+        queryKey: ['share-overview', runtime.queryKey, liveEndpoint, filters, eventNames],
+        queryFn: () => fetchJson(buildOverviewUrl(runtime, liveEndpoint, { filters, events: eventNames })),
         placeholderData: keepPreviousData,
-        staleTime: LIVE_DATA_POLL_INTERVAL_MS,
-        refetchInterval: LIVE_DATA_POLL_INTERVAL_MS,
+        staleTime: liveRefreshInterval,
+        refetchInterval: liveRefreshInterval,
     });
     const debouncedLiveVisitors = useDebouncedLiveValue(liveQuery.data?.activeUsers || 0, 1_000, LIVE_RECONCILE_INTERVAL_MS);
 
@@ -3482,7 +3505,7 @@ function ShareOverviewPage() {
             <TopDevicesWidget />
             <TopPagesWidget />
             {runtime.mode === 'share' ? <TopEventsWidget token={runtime.queryKey} /> : null}
-            {runtime.mode === 'share' ? <TopGeoMapWidget liveData={liveQuery.data} loading={liveQuery.isLoading} error={liveQuery.error || null} /> : null}
+            {runtime.mode === 'share' ? <TopGeoMapWidget liveData={liveQuery.data as LiveResponse | undefined} loading={liveQuery.isLoading} error={liveQuery.error || null} /> : null}
         </div>
     );
 
