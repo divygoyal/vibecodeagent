@@ -3,14 +3,25 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+    XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Area, AreaChart,
 } from 'recharts';
 import {
-    Users, TrendingUp, TrendingDown, Calendar, BarChart3,
-    Activity, Loader2,
+    Users, Calendar, BarChart3,
+    Activity,
 } from 'lucide-react';
 import useSWR from 'swr';
+import {
+    AnalyticsInsightList,
+    AnalyticsSubpageBadge,
+    AnalyticsSubpageEmptyState,
+    AnalyticsSubpageLoadingState,
+    AnalyticsSubpageMetricCard,
+    AnalyticsSubpageMetricGrid,
+    AnalyticsSubpagePanel,
+    AnalyticsSubpageShell,
+    formatPercent,
+} from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -29,6 +40,12 @@ interface RetentionResponse {
     averages: { day1: number; day7: number; day14: number; day30: number };
     curve: { period: number; retention: number }[];
     trends: { day1: number; day7: number; day14: number; day30: number };
+}
+
+interface ChartTooltipEntry {
+    name: string;
+    color: string;
+    value: number;
 }
 
 // ─── Mode Config ───
@@ -62,13 +79,21 @@ function retentionTextColor(value: number | null): string {
 
 // ─── Chart Tooltip ───
 
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: ChartTooltipEntry[];
+    label?: string | number;
+}) {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[160px]">
             <p className="text-[11px] font-semibold text-white mb-2">{label}</p>
             <div className="space-y-1.5">
-                {payload.map((e: any, i: number) => (
+                {payload.map((e, i) => (
                     <div key={i} className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full" style={{ background: e.color }} />
@@ -128,58 +153,6 @@ function HeatmapTooltip({
                 </div>
             </div>
         </div>
-    );
-}
-
-// ─── Overview Card ───
-
-function OverviewCard({
-    label,
-    subLabel,
-    value,
-    trend,
-    icon: Icon,
-    delay,
-}: {
-    label: string;
-    subLabel: string;
-    value: number;
-    trend: number;
-    icon: any;
-    delay: number;
-}) {
-    const isPositive = trend >= 0;
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay, duration: 0.4 }}
-            className="premium-card p-4 sm:p-5"
-        >
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <Icon className="w-3.5 h-3.5 text-emerald-400" />
-                    </div>
-                    <span className="text-[10px] sm:text-[11px] text-zinc-500 font-medium">{label}</span>
-                </div>
-                <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-                    isPositive
-                        ? 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15'
-                        : 'text-red-400 bg-red-500/8 border-red-500/15'
-                }`}>
-                    {isPositive ? (
-                        <TrendingUp className="w-2.5 h-2.5" />
-                    ) : (
-                        <TrendingDown className="w-2.5 h-2.5" />
-                    )}
-                    {isPositive ? '+' : ''}{trend}%
-                </div>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white tabular-nums">{value}%</p>
-            <p className="text-[10px] text-zinc-600 mt-1">{subLabel}</p>
-        </motion.div>
     );
 }
 
@@ -406,110 +379,85 @@ export default function RetentionPage() {
     );
 
     const config = MODE_CONFIG[mode];
-
-    // Overview card configs adapted by mode
-    const overviewCards = useMemo(() => {
+    const checkpointCards = useMemo(() => {
         if (!data) return [];
 
         if (mode === 'daily') {
             return [
-                { label: 'Day 1 Retention', subLabel: 'Avg. returning next day', value: data.averages.day1, trend: data.trends.day1, icon: Users },
-                { label: 'Day 7 Retention', subLabel: 'Avg. returning after 1 week', value: data.averages.day7, trend: data.trends.day7, icon: Calendar },
-                { label: 'Day 14 Retention', subLabel: 'Avg. returning after 2 weeks', value: data.averages.day14, trend: data.trends.day14, icon: Activity },
-                { label: 'Day 30 Retention', subLabel: 'Avg. returning after 1 month', value: data.averages.day30, trend: data.trends.day30, icon: BarChart3 },
+                { label: 'Day 1 Retention', helper: 'Average returning the next day.', value: data.averages.day1, trend: data.trends.day1, icon: Users, tone: 'emerald' as const },
+                { label: 'Day 7 Retention', helper: 'Average returning after one week.', value: data.averages.day7, trend: data.trends.day7, icon: Calendar, tone: 'cyan' as const },
+                { label: 'Day 14 Retention', helper: 'Average returning after two weeks.', value: data.averages.day14, trend: data.trends.day14, icon: Activity, tone: 'mixed' as const },
+                { label: 'Day 30 Retention', helper: 'Average returning after one month.', value: data.averages.day30, trend: data.trends.day30, icon: BarChart3, tone: 'amber' as const },
             ];
         }
 
         if (mode === 'weekly') {
             return [
-                { label: 'Week 1 Retention', subLabel: 'Avg. returning after 1 week', value: data.averages.day1, trend: data.trends.day1, icon: Users },
-                { label: 'Week 4 Retention', subLabel: 'Avg. returning after 1 month', value: data.averages.day7, trend: data.trends.day7, icon: Calendar },
-                { label: 'Week 6 Retention', subLabel: 'Avg. returning after 6 weeks', value: data.averages.day14, trend: data.trends.day14, icon: Activity },
-                { label: 'Week 8 Retention', subLabel: 'Avg. returning after 2 months', value: data.averages.day30, trend: data.trends.day30, icon: BarChart3 },
+                { label: 'Week 1 Retention', helper: 'Average returning in the following week.', value: data.averages.day1, trend: data.trends.day1, icon: Users, tone: 'emerald' as const },
+                { label: 'Week 4 Retention', helper: 'Average returning after one month.', value: data.averages.day7, trend: data.trends.day7, icon: Calendar, tone: 'cyan' as const },
+                { label: 'Week 6 Retention', helper: 'Average returning after six weeks.', value: data.averages.day14, trend: data.trends.day14, icon: Activity, tone: 'mixed' as const },
+                { label: 'Week 8 Retention', helper: 'Average returning after two months.', value: data.averages.day30, trend: data.trends.day30, icon: BarChart3, tone: 'amber' as const },
             ];
         }
 
-        // monthly
         return [
-            { label: 'Month 1 Retention', subLabel: 'Avg. returning next month', value: data.averages.day1, trend: data.trends.day1, icon: Users },
-            { label: 'Month 2 Retention', subLabel: 'Avg. returning after 2 months', value: data.averages.day7, trend: data.trends.day7, icon: Calendar },
-            { label: 'Month 3 Retention', subLabel: 'Avg. returning after 3 months', value: data.averages.day14, trend: data.trends.day14, icon: Activity },
-            { label: 'Month 5 Retention', subLabel: 'Avg. returning after 5 months', value: data.averages.day30, trend: data.trends.day30, icon: BarChart3 },
+            { label: 'Month 1 Retention', helper: 'Average returning the next month.', value: data.averages.day1, trend: data.trends.day1, icon: Users, tone: 'emerald' as const },
+            { label: 'Month 2 Retention', helper: 'Average returning after two months.', value: data.averages.day7, trend: data.trends.day7, icon: Calendar, tone: 'cyan' as const },
+            { label: 'Month 3 Retention', helper: 'Average returning after three months.', value: data.averages.day14, trend: data.trends.day14, icon: Activity, tone: 'mixed' as const },
+            { label: 'Month 5 Retention', helper: 'Average returning after five months.', value: data.averages.day30, trend: data.trends.day30, icon: BarChart3, tone: 'amber' as const },
         ];
     }, [data, mode]);
 
     if (isLoading && !data) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-            </div>
-        );
+        return <AnalyticsSubpageLoadingState title="Retention" />;
     }
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <Users className="w-6 h-6 text-red-400" />
-                </div>
-                <p className="text-red-400 text-sm font-medium">Failed to load retention data</p>
-            </div>
+            <AnalyticsSubpageEmptyState
+                title="Retention data is temporarily unavailable"
+                description="We couldn't load the latest cohort view right now. Try again in a moment."
+            />
         );
     }
 
-    if (!data) return null;
+    if (!data) {
+        return null;
+    }
 
     return (
-        <div className="space-y-6">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            >
-                <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Users className="w-5 h-5 text-emerald-400" />
-                        Retention Analysis
-                    </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                        Track how many users return after their first visit
-                    </p>
+        <AnalyticsSubpageShell
+            eyebrow="Retention"
+            title="Retention"
+            description="Cohorts, return curves, and checkpoint retention."
+            actions={(
+                <div className="flex flex-wrap items-center gap-3">
+                    <AnalyticsSubpageBadge label={`${config.label} cohorts`} tone="emerald" />
+                    <ModeSwitcher mode={mode} onChange={setMode} />
                 </div>
-                <ModeSwitcher mode={mode} onChange={setMode} />
-            </motion.div>
-
-            {/* ─── Overview Cards ─── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {overviewCards.map((card, i) => (
-                    <OverviewCard key={card.label} {...card} delay={0.05 + i * 0.04} />
+            )}
+        >
+            <AnalyticsSubpageMetricGrid>
+                {checkpointCards.map((card) => (
+                    <AnalyticsSubpageMetricCard
+                        key={card.label}
+                        label={card.label}
+                        value={formatPercent(card.value, 1)}
+                        icon={card.icon}
+                        tone={card.tone}
+                        trend={card.trend}
+                    />
                 ))}
-            </div>
+            </AnalyticsSubpageMetricGrid>
 
-            {/* ─── Cohort Heatmap ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25, duration: 0.4 }}
-                className="premium-card p-5 sm:p-6"
+            <AnalyticsSubpagePanel
+                title="Cohort heatmap"
+                action={<AnalyticsSubpageBadge label={`${data.cohorts.length} cohorts visible`} tone="mixed" />}
             >
-                <div className="flex items-center gap-2.5 mb-5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <BarChart3 className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-bold text-white">Cohort Retention Heatmap</h3>
-                        <p className="text-[10px] text-zinc-500 mt-0.5">
-                            Each row shows a cohort and their return rate over time
-                        </p>
-                    </div>
-                </div>
-
                 <CohortHeatmap cohorts={data.cohorts} mode={mode} />
 
-                {/* Legend */}
-                <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/[0.06]">
-                    <span className="text-[10px] text-zinc-600 font-medium">Retention:</span>
+                <div className="mt-4 flex items-center gap-4 border-t border-white/[0.06] pt-4">
+                    <span className="text-[10px] font-medium text-zinc-600">Retention:</span>
                     <div className="flex items-center gap-1.5">
                         {[
                             { label: '0%', bg: retentionCellBg(2) },
@@ -519,42 +467,46 @@ export default function RetentionPage() {
                             { label: '100%', bg: retentionCellBg(100) },
                         ].map((item) => (
                             <div key={item.label} className="flex items-center gap-1">
-                                <div
-                                    className="w-5 h-4 rounded"
-                                    style={{ backgroundColor: item.bg }}
-                                />
+                                <div className="h-4 w-5 rounded" style={{ backgroundColor: item.bg }} />
                                 <span className="text-[9px] text-zinc-600">{item.label}</span>
                             </div>
                         ))}
                     </div>
-                    <div className="flex items-center gap-1 ml-auto">
-                        <div className="w-5 h-4 rounded border border-zinc-800 bg-transparent" />
+                    <div className="ml-auto flex items-center gap-1">
+                        <div className="h-4 w-5 rounded border border-zinc-800 bg-transparent" />
                         <span className="text-[9px] text-zinc-600">No data</span>
                     </div>
                 </div>
-            </motion.div>
+            </AnalyticsSubpagePanel>
 
-            {/* ─── Retention Curve ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.4 }}
-                className="premium-card p-5 sm:p-6"
+            <AnalyticsSubpagePanel
+                title="Retention curve"
             >
-                <div className="flex items-center gap-2.5 mb-5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <TrendingDown className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-bold text-white">Retention Curve</h3>
-                        <p className="text-[10px] text-zinc-500 mt-0.5">
-                            Average retention % across all cohorts for each {config.periodLabel.toLowerCase()}
-                        </p>
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+                    <RetentionCurve curve={data.curve} mode={mode} />
+                    <div className="space-y-4">
+                        <AnalyticsInsightList
+                            items={[
+                                {
+                                    label: 'Fastest checkpoint',
+                                    value: formatPercent(data.averages.day1, 1),
+                                    note: `${config.periodLabel} 1 is the earliest checkpoint and usually the quickest signal of repeat value.`,
+                                },
+                                {
+                                    label: 'Long-tail retention',
+                                    value: formatPercent(data.averages.day30, 1),
+                                    note: `Use this as the healthiest long-range benchmark for the current ${config.label.toLowerCase()} mode.`,
+                                },
+                                {
+                                    label: 'Trend direction',
+                                    value: data.trends.day7 >= 0 ? 'Improving' : 'Softening',
+                                    note: `${data.trends.day7 >= 0 ? '+' : ''}${data.trends.day7.toFixed(1)}% change at the mid-cycle checkpoint.`,
+                                },
+                            ]}
+                        />
                     </div>
                 </div>
-
-                <RetentionCurve curve={data.curve} mode={mode} />
-            </motion.div>
-        </div>
+            </AnalyticsSubpagePanel>
+        </AnalyticsSubpageShell>
     );
 }

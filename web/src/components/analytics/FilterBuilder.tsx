@@ -166,10 +166,10 @@ export default function FilterBuilder() {
             {/* ─── Trigger Button ─── */}
             <button
                 onClick={() => setOpen(!open)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-lg border transition ${
+                className={`flex h-10 items-center gap-1.5 rounded-[14px] border px-3.5 text-[12px] font-semibold transition ${
                     filterCount > 0 || open
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        : 'bg-white/[0.03] border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1]'
+                        ? 'border-emerald-500/24 bg-emerald-500/[0.12] text-emerald-300 shadow-[0_10px_28px_rgba(16,185,129,0.12)]'
+                        : 'border-white/[0.08] bg-[#0f1216] text-zinc-400 hover:border-white/[0.14] hover:bg-[#13171c] hover:text-zinc-200'
                 }`}
             >
                 <Filter className="w-3 h-3" />

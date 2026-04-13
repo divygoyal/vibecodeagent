@@ -1,662 +1,1363 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import useSWR from 'swr';
 import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    Area,
+    AreaChart,
+    CartesianGrid,
+    Cell,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from 'recharts';
 import {
-    Target, Plus, TrendingUp, TrendingDown, ArrowRight,
-    BarChart3, Globe, Zap, Loader2, X,
+    AlertTriangle,
+    ChevronDown,
+    ChevronRight,
+    Loader2,
+    PencilLine,
+    Plus,
+    Sparkles,
+    Target,
+    Trash2,
+    TrendingUp,
+    Trophy,
 } from 'lucide-react';
-import useSWR from 'swr';
+
+import type { GoalDefinition, GoalDefinitionType, GoalSuggestion } from '@/lib/analyticsDefinitions';
+import {
+    AnalyticsSubpageEmptyState,
+    AnalyticsSubpageLoadingState,
+} from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { useAnalyticsContext } from '../layout';
 
-const fetcher = (url: string) => fetch(url).then(r => r.json());
-
-// ─── Custom Goal Storage (localStorage) ───
-
-const GOALS_STORAGE_KEY = 'tc-custom-goals';
-
-interface CustomGoal {
-    id: string;
-    name: string;
-    type: 'page_visit' | 'custom_event';
-    target: string; // page path like '/pricing'
-    description?: string;
+interface GoalDefinitionsResponse {
+    definitions: GoalDefinition[];
+    suggestions: GoalSuggestion[];
 }
 
-function loadGoals(): CustomGoal[] {
-    if (typeof window === 'undefined') return [];
-    try {
-        const saved = localStorage.getItem(GOALS_STORAGE_KEY);
-        return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+interface GoalAnalyticsResponse {
+    definition: GoalDefinition;
+    summary: {
+        conversions: number;
+        totalSessions: number;
+        rate: number;
+        change: number;
+        rateChange: number;
+    };
+    trend: Array<{
+        date: string;
+        conversions: number;
+        users: number;
+    }>;
+    sourceContribution: Array<{
+        source: string;
+        conversions: number;
+        share: number;
+    }>;
+    pageContribution: Array<{
+        page: string;
+        conversions: number;
+        share: number;
+    }>;
+    explanation: string;
 }
 
-function saveGoals(goals: CustomGoal[]) {
-    localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+interface GoalEditorState {
+    open: boolean;
+    mode: 'create' | 'edit';
+    editingId?: string;
+    values: {
+        name: string;
+        description: string;
+        type: GoalDefinitionType;
+        target: string;
+    };
 }
 
-// ─── Helpers ───
-
-function rateColor(rate: number): string {
-    if (rate >= 10) return 'text-emerald-400';
-    if (rate >= 4) return 'text-amber-400';
-    return 'text-red-400';
+interface GoalBoardEntry {
+    key: string;
+    selection: GoalSelection;
+    data: GoalAnalyticsResponse;
+    color: string;
 }
 
-function rateBg(rate: number): string {
-    if (rate >= 10) return 'bg-emerald-500/10 border-emerald-500/20';
-    if (rate >= 4) return 'bg-amber-500/10 border-amber-500/20';
-    return 'bg-red-500/10 border-red-500/20';
-}
-
-function rateRingColor(rate: number): string {
-    if (rate >= 10) return '#34d399';
-    if (rate >= 4) return '#fbbf24';
-    return '#ef4444';
-}
-
-// ─── Chart Tooltip ───
-
-function ChartTooltip({ active, payload, label }: any) {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-4 py-3 shadow-2xl min-w-[180px]">
-            <p className="text-[11px] font-semibold text-white mb-2">{label}</p>
-            <div className="space-y-1.5">
-                {payload.map((e: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ background: e.color }} />
-                            <span className="text-[10px] text-zinc-500">{e.name}</span>
-                        </div>
-                        <span className="text-xs font-bold text-white tabular-nums">{e.value?.toLocaleString()}</span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ─── Conversion Rate Ring ───
-
-function ConversionRing({ rate, size = 48 }: { rate: number; size?: number }) {
-    const r = (size - 6) / 2;
-    const circ = 2 * Math.PI * r;
-    const offset = circ - (Math.min(rate, 100) / 100) * circ;
-    const color = rateRingColor(rate);
-
-    return (
-        <svg width={size} height={size} className="flex-shrink-0">
-            <circle
-                cx={size / 2} cy={size / 2} r={r}
-                fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={3}
-            />
-            <circle
-                cx={size / 2} cy={size / 2} r={r}
-                fill="none" stroke={color} strokeWidth={3}
-                strokeLinecap="round"
-                strokeDasharray={circ}
-                strokeDashoffset={offset}
-                transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                className="transition-all duration-700"
-            />
-            <text
-                x={size / 2} y={size / 2}
-                textAnchor="middle" dominantBaseline="central"
-                className="fill-white text-[9px] font-bold"
-            >
-                {rate}%
-            </text>
-        </svg>
-    );
-}
-
-// ─── Goal Card ───
-
-function GoalCard({ goal, index, isSelected, onSelect, onDelete }: {
-    goal: any; index: number; isSelected: boolean; onSelect: () => void; onDelete?: () => void;
-}) {
-    const up = goal.change > 0;
-    return (
-        <motion.button
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.08, duration: 0.4 }}
-            onClick={onSelect}
-            className={`premium-card p-4 sm:p-5 text-left w-full transition-all duration-300 relative group/card ${
-                isSelected
-                    ? 'ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                    : 'hover:ring-1 hover:ring-white/10'
-            }`}
-        >
-            {onDelete && (
-                <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="absolute top-2 right-2 p-1 rounded-md bg-red-500/10 text-red-400 opacity-0 group-hover/card:opacity-100 hover:bg-red-500/20 transition-all z-10"
-                    title="Delete goal"
-                >
-                    <X className="w-3 h-3" />
-                </button>
-            )}
-            <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                    <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: `${goal.color}15` }}
-                    >
-                        <Target className="w-4 h-4" style={{ color: goal.color }} />
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-semibold text-white">{goal.name}</h3>
-                        <p className="text-[10px] text-zinc-600 mt-0.5">{goal.target}</p>
-                    </div>
-                </div>
-                <ConversionRing rate={goal.rate} size={40} />
-            </div>
-
-            <div className="flex items-end justify-between">
-                <div>
-                    <p className="text-2xl font-bold text-white tabular-nums">{goal.conversions}</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">conversions/day</p>
-                </div>
-                <div className="text-right">
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        {up ? '+' : ''}{goal.change}%
-                    </span>
-                    <p className={`text-[10px] mt-0.5 font-medium border rounded-full px-2 py-0.5 ${rateBg(goal.rate)} ${rateColor(goal.rate)}`}>
-                        Rate: {goal.rate}%
-                    </p>
-                </div>
-            </div>
-
-            {/* Mini sparkline */}
-            <div className="mt-3 h-8 opacity-60">
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={goal.trend.slice(-14)}>
-                        <defs>
-                            <linearGradient id={`spark-${goal.id}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={goal.color} stopOpacity={0.3} />
-                                <stop offset="100%" stopColor={goal.color} stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <Area
-                            type="monotone" dataKey="value"
-                            stroke={goal.color} strokeWidth={1.5}
-                            fill={`url(#spark-${goal.id})`}
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </div>
-        </motion.button>
-    );
-}
-
-// ─── Create Goal Form (collapsed by default) ───
-
-function CreateGoalForm({ onClose, onSave }: { onClose: () => void; onSave: (goal: CustomGoal) => void }) {
-    const [name, setName] = useState('');
-    const [type, setType] = useState<'page_visit' | 'custom_event'>('page_visit');
-    const [target, setTarget] = useState('');
-    const [description, setDescription] = useState('');
-
-    const handleSubmit = () => {
-        if (!name.trim() || !target.trim()) return;
-        const newGoal: CustomGoal = {
-            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: name.trim(),
-            type,
-            target: target.trim(),
-            description: description.trim() || undefined,
-        };
-        onSave(newGoal);
-        setName('');
-        setType('page_visit');
-        setTarget('');
-        setDescription('');
+type GoalSelection =
+    | {
+        kind: 'saved';
+        key: string;
+        item: GoalDefinition;
+    }
+    | {
+        kind: 'suggestion';
+        key: string;
+        item: GoalSuggestion;
     };
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-        >
-            <div className="premium-card p-5 sm:p-6 mt-4">
-                <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <h3 className="text-sm font-semibold text-white">Create New Goal</h3>
-                    </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] transition">
-                        <X className="w-4 h-4 text-zinc-500" />
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Goal Name</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="e.g., Newsletter Signup"
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Goal Type</label>
-                        <select
-                            value={type}
-                            onChange={(e) => setType(e.target.value as 'page_visit' | 'custom_event')}
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition appearance-none"
-                        >
-                            <option value="page_visit">Page Visit</option>
-                            <option value="custom_event">Custom Event</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Target URL / Event</label>
-                        <input
-                            type="text"
-                            value={target}
-                            onChange={(e) => setTarget(e.target.value)}
-                            placeholder="e.g., /thank-you or form_submit"
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Description</label>
-                        <input
-                            type="text"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="What does this goal track?"
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-white/[0.06]">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition rounded-lg hover:bg-white/[0.04]"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={!name.trim() || !target.trim()}
-                        className="px-5 py-2 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-emerald-500"
-                    >
-                        Create Goal
-                    </button>
-                </div>
-            </div>
-        </motion.div>
-    );
+interface TrendTooltipEntry {
+    color?: string;
+    dataKey?: string;
+    name?: string;
+    value?: number;
 }
 
-// ─── Source Breakdown Bar ───
+const GOAL_COLORS = ['#37E6C7', '#4E9BFF', '#C07DFF', '#F08AC2'];
+const EMPTY_DEFINITIONS: GoalDefinition[] = [];
+const EMPTY_SUGGESTIONS: GoalSuggestion[] = [];
+const EMPTY_BOARD: GoalBoardEntry[] = [];
 
-function SourceBar({ source, maxConversions }: { source: any; maxConversions: number }) {
-    const pct = maxConversions > 0 ? (source.conversions / maxConversions) * 100 : 0;
+const EMPTY_EDITOR: GoalEditorState = {
+    open: false,
+    mode: 'create',
+    values: {
+        name: '',
+        description: '',
+        type: 'event_count',
+        target: '',
+    },
+};
+
+function cx(...values: Array<string | false | null | undefined>) {
+    return values.filter(Boolean).join(' ');
+}
+
+async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+    const response = await fetch(input, init);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(body.error || body.detail || 'Request failed');
+    }
+    return body;
+}
+
+function formatCompactNumber(value: number) {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`;
+    return value.toLocaleString();
+}
+
+function formatPercent(value: number, digits = 1) {
+    return `${value.toFixed(digits)}%`;
+}
+
+function formatSignedPercent(value: number, digits = 1) {
+    return `${value > 0 ? '+' : ''}${value.toFixed(digits)}%`;
+}
+
+function formatSignedPoints(value: number) {
+    return `${value > 0 ? '+' : ''}${value.toFixed(1)} pts`;
+}
+
+function formatAxisDate(value: string) {
+    return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function typeLabel(type: GoalDefinitionType) {
+    return type === 'event_count' ? 'Event goal' : 'Page goal';
+}
+
+function goalTargetLabel(selection: GoalSelection) {
+    if (selection.item.type === 'event_count') {
+        return selection.item.target.replace(/_/g, ' ');
+    }
+
+    return selection.item.target;
+}
+
+function buildSelection(
+    selectedKey: string | null,
+    definitions: GoalDefinition[],
+    suggestions: GoalSuggestion[],
+): GoalSelection | null {
+    if (selectedKey?.startsWith('saved:')) {
+        const item = definitions.find((definition) => definition.id === selectedKey.replace('saved:', ''));
+        if (item) {
+            return { kind: 'saved', key: selectedKey, item };
+        }
+    }
+
+    if (selectedKey?.startsWith('suggestion:')) {
+        const index = Number(selectedKey.replace('suggestion:', ''));
+        const item = suggestions[index];
+        if (item) {
+            return { kind: 'suggestion', key: selectedKey, item };
+        }
+    }
+
+    const activeDefinition = definitions.find((definition) => definition.isActive);
+    if (activeDefinition) {
+        return { kind: 'saved', key: `saved:${activeDefinition.id}`, item: activeDefinition };
+    }
+
+    if (definitions[0]) {
+        return { kind: 'saved', key: `saved:${definitions[0].id}`, item: definitions[0] };
+    }
+
+    if (suggestions[0]) {
+        return { kind: 'suggestion', key: 'suggestion:0', item: suggestions[0] };
+    }
+
+    return null;
+}
+
+function buildBoardSelections(
+    selectedKey: string | null,
+    definitions: GoalDefinition[],
+    suggestions: GoalSuggestion[],
+) {
+    const selections: GoalSelection[] = [];
+    const seen = new Set<string>();
+
+    const append = (selection: GoalSelection | null) => {
+        if (!selection || seen.has(selection.key) || selections.length >= 4) return;
+        seen.add(selection.key);
+        selections.push(selection);
+    };
+
+    append(buildSelection(selectedKey, definitions, suggestions));
+
+    definitions
+        .filter((definition) => definition.isActive)
+        .forEach((definition) => append({ kind: 'saved', key: `saved:${definition.id}`, item: definition }));
+
+    suggestions.forEach((suggestion, index) => {
+        append({ kind: 'suggestion', key: `suggestion:${index}`, item: suggestion });
+    });
+
+    definitions
+        .filter((definition) => !definition.isActive)
+        .forEach((definition) => append({ kind: 'saved', key: `saved:${definition.id}`, item: definition }));
+
+    return selections;
+}
+
+function buildGoalAnalyticsUrl(propertyId: string, range: string, selection: GoalSelection) {
+    const params = new URLSearchParams({
+        propertyId,
+        range,
+        type: selection.item.type,
+        target: selection.item.target,
+        name: selection.item.name,
+    });
+
+    const description = 'description' in selection.item ? selection.item.description || '' : selection.item.description;
+    if (description) {
+        params.set('description', description);
+    }
+
+    return `/api/analytics/goals?${params.toString()}`;
+}
+
+function previousValueFromChange(current: number, changePercent: number) {
+    const denominator = 1 + changePercent / 100;
+    if (!Number.isFinite(denominator) || denominator <= 0) return 0;
+    return current / denominator;
+}
+
+function buildMergedTrend(board: GoalBoardEntry[]) {
+    const points = new Map<string, Record<string, number | string>>();
+
+    board.forEach((entry) => {
+        entry.data.trend.forEach((point) => {
+            const existing = points.get(point.date) || { date: point.date };
+            existing[entry.key] = point.conversions;
+            points.set(point.date, existing);
+        });
+    });
+
+    return Array.from(points.values()).sort((left, right) => String(left.date).localeCompare(String(right.date)));
+}
+
+function deriveSpike(entry: GoalBoardEntry | null) {
+    if (!entry || entry.data.trend.length < 3) return null;
+    const peak = entry.data.trend.reduce((max, point) => (
+        point.conversions > max.conversions ? point : max
+    ), entry.data.trend[0]);
+    const average = entry.data.trend.reduce((sum, point) => sum + point.conversions, 0) / entry.data.trend.length;
+
+    if (peak.conversions <= average * 1.25) return null;
+
+    return {
+        date: peak.date,
+        conversions: peak.conversions,
+        lift: average ? ((peak.conversions - average) / average) * 100 : 0,
+    };
+}
+
+function GoalTrendTooltip({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: TrendTooltipEntry[];
+    label?: string | number;
+}) {
+    if (!active || !payload?.length) return null;
+
     return (
-        <div className="flex items-center gap-3 group">
-            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: source.color }} />
-            <span className="text-xs text-zinc-400 w-28 truncate group-hover:text-zinc-200 transition">{source.source}</span>
-            <div className="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    className="h-full rounded-full"
-                    style={{ background: source.color }}
-                />
+        <div className="rounded-2xl border border-white/[0.1] bg-[#08090b]/95 px-4 py-3 shadow-2xl backdrop-blur">
+            <p className="text-[11px] font-semibold text-zinc-200">
+                {label ? formatAxisDate(String(label)) : ''}
+            </p>
+            <div className="mt-2 space-y-1.5">
+                {payload.map((item) => (
+                    <div key={item.dataKey || item.name} className="flex items-center justify-between gap-5">
+                        <div className="flex items-center gap-2">
+                            <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: item.color || '#ffffff' }}
+                            />
+                            <span className="text-[11px] font-medium text-zinc-400">{item.name}</span>
+                        </div>
+                        <span className="text-xs font-semibold text-white">
+                            {formatCompactNumber(Number(item.value || 0))}
+                        </span>
+                    </div>
+                ))}
             </div>
-            <span className="text-xs text-zinc-300 tabular-nums font-medium w-10 text-right">{source.percentage}%</span>
-            <span className="text-[10px] text-zinc-600 tabular-nums w-8 text-right">{source.conversions}</span>
         </div>
     );
 }
 
-// ─── Main Page ───
-
-export default function GoalsPage() {
-    const { selectedProperty, range } = useAnalyticsContext();
-    const [customGoals, setCustomGoals] = useState<CustomGoal[]>([]);
-    const [selectedGoal, setSelectedGoal] = useState<string>('all');
-    const [showCreateForm, setShowCreateForm] = useState(false);
-
-    // Load custom goals from localStorage on mount
-    useEffect(() => {
-        setCustomGoals(loadGoals());
-    }, []);
-
-    const customPages = customGoals.map(g => g.target).join(',');
-    const swrKey = selectedProperty
-        ? `/api/analytics/goals?propertyId=${selectedProperty}&range=${range}${customPages ? `&pages=${customPages}` : ''}`
-        : null;
-
-    const { data, isLoading, error, mutate } = useSWR(swrKey, fetcher);
-
-    const handleSaveGoal = useCallback((goal: CustomGoal) => {
-        setCustomGoals(prev => {
-            const updated = [...prev, goal];
-            saveGoals(updated);
-            return updated;
-        });
-        setShowCreateForm(false);
-        // mutate will auto-trigger because swrKey changes via customPages
-    }, []);
-
-    const handleDeleteGoal = useCallback((goalId: string) => {
-        setCustomGoals(prev => {
-            const updated = prev.filter(g => g.id !== goalId);
-            saveGoals(updated);
-            return updated;
-        });
-        // mutate will auto-trigger because swrKey changes via customPages
-    }, []);
-
-    // Build merged trend data for the chart
-    const chartData = useMemo(() => {
-        if (!data?.goals) return [];
-        const goals = data.goals;
-        const dateMap: Record<string, any> = {};
-
-        goals.forEach((goal: any) => {
-            goal.trend.forEach((t: any) => {
-                if (!dateMap[t.date]) {
-                    dateMap[t.date] = { date: t.date };
-                }
-                dateMap[t.date][goal.name] = t.value;
-            });
-        });
-
-        return Object.values(dateMap).sort((a: any, b: any) => a.date.localeCompare(b.date));
-    }, [data]);
-
-    if (isLoading && !data) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-            </div>
-        );
+function GoalSparkline({ trend, color }: { trend: GoalAnalyticsResponse['trend']; color: string }) {
+    if (!trend.length) {
+        return <span className="text-[11px] font-medium text-zinc-600">No trend</span>;
     }
-
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <Target className="w-6 h-6 text-red-400" />
-                </div>
-                <p className="text-red-400 text-sm font-medium">Failed to load goals</p>
-            </div>
-        );
-    }
-
-    const goals = data?.goals || [];
-    const bySource = data?.bySource || [];
-    const topPages = data?.topPages || [];
-    const totalConversions = data?.totalConversions || 0;
-    const totalSessions = data?.totalSessions || 0;
-    const maxSourceConversions = Math.max(...bySource.map((s: any) => s.conversions), 1);
-
-    // Filter chart data based on selected goal
-    const visibleGoals = selectedGoal === 'all'
-        ? goals
-        : goals.filter((g: any) => g.name === selectedGoal);
 
     return (
-        <div className="space-y-6">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between"
-            >
-                <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Target className="w-5 h-5 text-emerald-400" />
-                        Conversion Goals
-                    </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                        Track and optimize your conversion targets across {totalSessions.toLocaleString()} sessions
-                    </p>
+        <div className="h-10 w-[120px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend}>
+                    <Line
+                        type="monotone"
+                        dataKey="conversions"
+                        stroke={color}
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                    />
+                </LineChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+function GoalsKpiCard({
+    label,
+    value,
+    accent,
+    tone,
+}: {
+    label: string;
+    value: string;
+    accent: string;
+    tone: 'cyan' | 'emerald' | 'violet' | 'rose';
+}) {
+    const toneStyles = {
+        cyan: 'border-cyan-500/16 bg-cyan-500/[0.08] text-cyan-200',
+        emerald: 'border-emerald-500/16 bg-emerald-500/[0.08] text-emerald-200',
+        violet: 'border-violet-500/16 bg-violet-500/[0.08] text-violet-200',
+        rose: 'border-rose-500/16 bg-rose-500/[0.08] text-rose-200',
+    } as const;
+
+    return (
+        <div className="rounded-[22px] border border-white/[0.08] bg-[#0a0c0f] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-[12px] font-semibold text-zinc-400">{label}</p>
+                <span className={cx('rounded-full border px-2 py-1 text-[10px] font-semibold', toneStyles[tone])}>
+                    {accent}
+                </span>
+            </div>
+            <p className="mt-4 text-[2rem] font-semibold leading-none tracking-[-0.045em] text-white">
+                {value}
+            </p>
+        </div>
+    );
+}
+
+export default function GoalsPage() {
+    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [selectorOpen, setSelectorOpen] = useState(false);
+    const [editorState, setEditorState] = useState<GoalEditorState>(EMPTY_EDITOR);
+    const [saving, setSaving] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
+
+    const { data: definitionsResponse, error: definitionsError, isLoading: definitionsLoading, mutate: mutateDefinitions } = useSWR<GoalDefinitionsResponse>(
+        selectedProperty && hasGoogleConnection
+            ? `/api/analytics/goals/definitions?propertyId=${encodeURIComponent(selectedProperty)}&range=${encodeURIComponent(range)}`
+            : null,
+        fetchJson,
+    );
+
+    const definitions = useMemo(
+        () => definitionsResponse?.definitions ?? EMPTY_DEFINITIONS,
+        [definitionsResponse?.definitions],
+    );
+    const suggestions = useMemo(
+        () => definitionsResponse?.suggestions ?? EMPTY_SUGGESTIONS,
+        [definitionsResponse?.suggestions],
+    );
+
+    useEffect(() => {
+        const nextSelection = buildSelection(selectedKey, definitions, suggestions);
+        if (!nextSelection && (definitions.length || suggestions.length)) {
+            const fallback = buildSelection(null, definitions, suggestions);
+            setSelectedKey(fallback?.key || null);
+            return;
+        }
+
+        if (selectedKey && !nextSelection) {
+            const fallback = buildSelection(null, definitions, suggestions);
+            setSelectedKey(fallback?.key || null);
+        }
+    }, [definitions, selectedKey, suggestions]);
+
+    const currentSelection = useMemo(
+        () => buildSelection(selectedKey, definitions, suggestions),
+        [definitions, selectedKey, suggestions],
+    );
+
+    const boardSelections = useMemo(
+        () => buildBoardSelections(selectedKey, definitions, suggestions),
+        [definitions, selectedKey, suggestions],
+    );
+
+    const {
+        data: boardData,
+        error: boardError,
+        isLoading: boardLoading,
+        mutate: mutateBoard,
+    } = useSWR<GoalBoardEntry[]>(
+        selectedProperty && boardSelections.length
+            ? ['goal-board', selectedProperty, range, boardSelections.map((selection) => selection.key).join('|')]
+            : null,
+        async () => {
+            const results = await Promise.all(boardSelections.map(async (selection, index) => {
+                try {
+                    const data = await fetchJson<GoalAnalyticsResponse>(buildGoalAnalyticsUrl(selectedProperty, range, selection));
+                    return {
+                        key: selection.key,
+                        selection,
+                        data,
+                        color: GOAL_COLORS[index % GOAL_COLORS.length],
+                    };
+                } catch {
+                    return null;
+                }
+            }));
+
+            return results.filter((entry): entry is GoalBoardEntry => Boolean(entry));
+        },
+    );
+
+    const board = useMemo(
+        () => boardData ?? EMPTY_BOARD,
+        [boardData],
+    );
+    const selectedEntry = board.find((entry) => entry.key === currentSelection?.key) || board[0] || null;
+    const mergedTrend = useMemo(() => buildMergedTrend(board), [board]);
+
+    const totals = useMemo(() => {
+        const totalConversions = board.reduce((sum, entry) => sum + entry.data.summary.conversions, 0);
+        const totalSessions = board.reduce((sum, entry) => sum + entry.data.summary.totalSessions, 0);
+        const activeGoals = definitions.filter((definition) => definition.isActive).length;
+        const previousConversions = board.reduce((sum, entry) => (
+            sum + previousValueFromChange(entry.data.summary.conversions, entry.data.summary.change)
+        ), 0);
+        const conversionChange = previousConversions
+            ? ((totalConversions - previousConversions) / previousConversions) * 100
+            : totalConversions > 0 ? 100 : 0;
+        const averageRateChange = board.length
+            ? board.reduce((sum, entry) => sum + entry.data.summary.rateChange, 0) / board.length
+            : 0;
+
+        return {
+            totalConversions,
+            totalSessions,
+            conversionRate: totalSessions ? (totalConversions / totalSessions) * 100 : 0,
+            activeGoals,
+            conversionChange,
+            averageRateChange,
+        };
+    }, [board, definitions]);
+
+    const insights = useMemo(() => {
+        const spike = deriveSpike(selectedEntry);
+        const bestGoal = board.reduce<GoalBoardEntry | null>((currentBest, entry) => {
+            if (!currentBest) return entry;
+            return entry.data.summary.rate > currentBest.data.summary.rate ? entry : currentBest;
+        }, null);
+        const fallingGoal = board.reduce<GoalBoardEntry | null>((currentWorst, entry) => {
+            if (!currentWorst) return entry;
+            return entry.data.summary.change < currentWorst.data.summary.change ? entry : currentWorst;
+        }, null);
+
+        return { spike, bestGoal, fallingGoal };
+    }, [board, selectedEntry]);
+
+    const goalAlerts = useMemo(() => {
+        const alerts: Array<{ tone: 'positive' | 'warning'; label: string; detail: string }> = [];
+
+        if (selectedEntry?.data.sourceContribution[0]?.share > 55) {
+            alerts.push({
+                tone: 'warning',
+                label: 'Source concentration',
+                detail: `${selectedEntry.data.sourceContribution[0].source} drives ${formatPercent(selectedEntry.data.sourceContribution[0].share)} of ${selectedEntry.data.definition.name}.`,
+            });
+        }
+
+        board
+            .filter((entry) => entry.data.summary.change < 0)
+            .slice(0, 2)
+            .forEach((entry) => {
+                alerts.push({
+                    tone: 'warning',
+                    label: entry.data.definition.name,
+                    detail: `${formatSignedPercent(entry.data.summary.change)} vs previous period.`,
+                });
+            });
+
+        if (selectedEntry?.data.summary.rateChange > 0) {
+            alerts.push({
+                tone: 'positive',
+                label: 'Rate improvement',
+                detail: `${selectedEntry.data.definition.name} moved ${formatSignedPoints(selectedEntry.data.summary.rateChange)} this range.`,
+            });
+        }
+
+        return alerts.slice(0, 3);
+    }, [board, selectedEntry]);
+
+    const openCreate = () => {
+        const starter = currentSelection?.kind === 'suggestion' ? currentSelection.item : suggestions[0];
+        setActionError(null);
+        setEditorState({
+            open: true,
+            mode: 'create',
+            values: {
+                name: starter?.name || '',
+                description: starter?.description || '',
+                type: starter?.type || 'event_count',
+                target: starter?.target || '',
+            },
+        });
+    };
+
+    const openEdit = (definition: GoalDefinition) => {
+        setActionError(null);
+        setEditorState({
+            open: true,
+            mode: 'edit',
+            editingId: definition.id,
+            values: {
+                name: definition.name,
+                description: definition.description || '',
+                type: definition.type,
+                target: definition.target,
+            },
+        });
+    };
+
+    const closeEditor = () => {
+        if (saving) return;
+        setEditorState(EMPTY_EDITOR);
+        setActionError(null);
+    };
+
+    const handleSave = async () => {
+        if (!selectedProperty) return;
+        const name = editorState.values.name.trim();
+        const target = editorState.values.target.trim();
+
+        if (!name || !target) {
+            setActionError('Name and target are required.');
+            return;
+        }
+
+        try {
+            setSaving(true);
+            setActionError(null);
+
+            if (editorState.mode === 'create') {
+                const created = await fetchJson<GoalDefinition>('/api/analytics/goals/definitions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        propertyId: selectedProperty,
+                        name,
+                        description: editorState.values.description.trim(),
+                        type: editorState.values.type,
+                        target,
+                    }),
+                });
+
+                await mutateDefinitions();
+                setSelectedKey(`saved:${created.id}`);
+            } else if (editorState.editingId) {
+                await fetchJson(`/api/analytics/goals/definitions/${editorState.editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        description: editorState.values.description.trim(),
+                        type: editorState.values.type,
+                        target,
+                        isActive: true,
+                    }),
+                });
+
+                await mutateDefinitions();
+                setSelectedKey(`saved:${editorState.editingId}`);
+            }
+
+            await mutateBoard();
+            setEditorState(EMPTY_EDITOR);
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : 'Failed to save goal');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async (definition: GoalDefinition) => {
+        const confirmed = window.confirm(`Delete "${definition.name}"?`);
+        if (!confirmed) return;
+
+        try {
+            setSaving(true);
+            await fetchJson(`/api/analytics/goals/definitions/${definition.id}`, { method: 'DELETE' });
+            await mutateDefinitions();
+            await mutateBoard();
+            if (selectedKey === `saved:${definition.id}`) {
+                setSelectedKey(null);
+            }
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : 'Failed to delete goal');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (!selectedProperty || !hasGoogleConnection) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+        );
+    }
+
+    if (definitionsLoading) {
+        return <AnalyticsSubpageLoadingState title="Loading goals" cards={4} />;
+    }
+
+    if (definitionsError) {
+        return (
+            <AnalyticsSubpageEmptyState
+                title="Goals are unavailable"
+                description="We couldn't load your goal definitions right now."
+            />
+        );
+    }
+
+    if (!definitions.length && !suggestions.length) {
+        return (
+            <div className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] px-6 py-12 text-center shadow-[0_24px_72px_rgba(0,0,0,0.22)]">
+                <p className="text-lg font-semibold tracking-[-0.02em] text-white">No goals available</p>
+                <p className="mx-auto mt-2 max-w-lg text-sm font-medium text-zinc-500">
+                    Create a goal to start tracking conversion performance.
+                </p>
+                <div className="mt-5">
+                    <button
+                        type="button"
+                        onClick={openCreate}
+                        className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.12] px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400/30 hover:bg-emerald-500/[0.18]"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Create goal
+                    </button>
                 </div>
-                <button
-                    onClick={() => setShowCreateForm(!showCreateForm)}
-                    className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 hover:border-emerald-500/30 transition group"
-                >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-90 transition-transform duration-300" />
-                    Create Goal
-                </button>
-            </motion.div>
+            </div>
+        );
+    }
 
-            {/* ─── Create Goal Form (collapsed) ─── */}
-            <AnimatePresence>
-                {showCreateForm && <CreateGoalForm onClose={() => setShowCreateForm(false)} onSave={handleSaveGoal} />}
-            </AnimatePresence>
-
-            {/* ─── Summary Stats ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-            >
-                {[
-                    { label: 'Total Conversions', value: totalConversions, icon: Zap, color: 'emerald' },
-                    { label: 'Total Sessions', value: totalSessions, icon: Globe, color: 'blue' },
-                    { label: 'Avg. Rate', value: `${(goals.reduce((s: number, g: any) => s + g.rate, 0) / goals.length).toFixed(1)}%`, icon: BarChart3, color: 'violet' },
-                    { label: 'Active Goals', value: goals.length, icon: Target, color: 'pink' },
-                ].map((stat, i) => (
-                    <div key={i} className="premium-card p-3 sm:p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className={`w-6 h-6 rounded-md bg-${stat.color}-500/10 flex items-center justify-center`}>
-                                <stat.icon className={`w-3 h-3 text-${stat.color}-400`} />
-                            </div>
-                            <span className="text-[10px] text-zinc-500 font-medium">{stat.label}</span>
-                        </div>
-                        <p className="text-lg sm:text-xl font-bold text-white tabular-nums">
-                            {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+    return (
+        <div className="space-y-5 pb-6">
+            <section className="rounded-[28px] border border-white/[0.08] bg-[#08090b] px-6 py-6 shadow-[0_24px_72px_rgba(0,0,0,0.28)]">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="max-w-3xl">
+                        <p className="text-[12px] font-semibold text-zinc-500">Conversion Goals</p>
+                        <h1 className="mt-2 text-[2rem] font-semibold tracking-[-0.045em] text-white sm:text-[2.35rem]">
+                            Conversion Goals
+                        </h1>
+                        <p className="mt-2 text-[13px] font-medium text-zinc-400">
+                            Track conversion performance, compare goals, and spot what changed first.
                         </p>
                     </div>
-                ))}
-            </motion.div>
 
-            {/* ─── Goal Cards Grid ─── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                {goals.map((goal: any, i: number) => {
-                    // Check if this goal corresponds to a custom goal (by matching target page)
-                    const matchingCustomGoal = customGoals.find(cg => cg.target === goal.target);
-                    return (
-                        <GoalCard
-                            key={goal.id}
-                            goal={goal}
-                            index={i}
-                            isSelected={selectedGoal === goal.name}
-                            onSelect={() => setSelectedGoal(selectedGoal === goal.name ? 'all' : goal.name)}
-                            onDelete={matchingCustomGoal ? () => handleDeleteGoal(matchingCustomGoal.id) : undefined}
-                        />
-                    );
-                })}
-            </div>
-
-            {/* ─── Conversion Trend Chart ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="premium-card p-5 sm:p-6"
-            >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                    <h3 className="text-sm font-semibold text-white">Conversion Trend</h3>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                            onClick={() => setSelectedGoal('all')}
-                            className={`px-3 py-1.5 text-[11px] font-medium rounded-lg transition ${
-                                selectedGoal === 'all'
-                                    ? 'bg-white/[0.08] text-white'
-                                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-                            }`}
-                        >
-                            All Goals
-                        </button>
-                        {goals.map((goal: any) => (
+                    <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                        <div className="relative sm:min-w-[320px]">
                             <button
-                                key={goal.id}
-                                onClick={() => setSelectedGoal(selectedGoal === goal.name ? 'all' : goal.name)}
-                                className={`px-3 py-1.5 text-[11px] font-medium rounded-lg transition flex items-center gap-1.5 ${
-                                    selectedGoal === goal.name
-                                        ? 'bg-white/[0.08] text-white'
-                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-                                }`}
+                                type="button"
+                                onClick={() => setSelectorOpen((open) => !open)}
+                                className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-white/[0.08] bg-[#0d1014] px-4 py-3 text-left shadow-[0_18px_40px_rgba(0,0,0,0.2)] transition hover:border-white/[0.12]"
                             >
-                                <div className="w-2 h-2 rounded-full" style={{ background: goal.color }} />
-                                {goal.name}
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-white">
+                                        {currentSelection?.item.name || 'Select a goal'}
+                                    </p>
+                                    <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
+                                        {currentSelection ? `${typeLabel(currentSelection.item.type)} • ${goalTargetLabel(currentSelection)}` : 'Saved goals and starters'}
+                                    </p>
+                                </div>
+                                <ChevronDown className={cx('h-4 w-4 text-zinc-500 transition', selectorOpen && 'rotate-180')} />
                             </button>
-                        ))}
-                    </div>
-                </div>
 
-                <div className="h-[280px] sm:h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData}>
-                            <defs>
-                                {goals.map((goal: any) => (
-                                    <linearGradient key={goal.id} id={`grad-${goal.id}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={goal.color} stopOpacity={0.2} />
-                                        <stop offset="100%" stopColor={goal.color} stopOpacity={0} />
-                                    </linearGradient>
-                                ))}
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                            <XAxis
-                                dataKey="date"
-                                tick={{ fill: '#52525b', fontSize: 10 }}
-                                tickLine={false}
-                                axisLine={{ stroke: 'rgba(255,255,255,0.06)' }}
-                                tickFormatter={(v) => {
-                                    const d = new Date(v);
-                                    return `${d.getMonth() + 1}/${d.getDate()}`;
-                                }}
-                            />
-                            <YAxis
-                                tick={{ fill: '#52525b', fontSize: 10 }}
-                                tickLine={false}
-                                axisLine={false}
-                                width={35}
-                            />
-                            <Tooltip content={<ChartTooltip />} />
-                            {visibleGoals.map((goal: any) => (
-                                <Area
-                                    key={goal.id}
-                                    type="monotone"
-                                    dataKey={goal.name}
-                                    name={goal.name}
-                                    stroke={goal.color}
-                                    strokeWidth={2}
-                                    fill={`url(#grad-${goal.id})`}
-                                    dot={false}
-                                    activeDot={{ r: 4, strokeWidth: 0, fill: goal.color }}
-                                />
-                            ))}
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </motion.div>
+                            {selectorOpen ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        className="fixed inset-0 z-30 cursor-default"
+                                        onClick={() => setSelectorOpen(false)}
+                                    />
+                                    <div className="absolute right-0 top-full z-40 mt-2 max-h-[420px] w-full overflow-y-auto rounded-[20px] border border-white/[0.1] bg-[#090b0d] p-3 shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
+                                        {definitions.length ? (
+                                            <div className="space-y-2">
+                                                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                                                    Saved goals
+                                                </p>
+                                                {definitions.map((definition) => {
+                                                    const key = `saved:${definition.id}`;
+                                                    const isSelected = key === currentSelection?.key;
 
-            {/* ─── Bottom Grid: Source Breakdown + Top Converting Pages ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-                {/* Goal Breakdown by Source */}
-                <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="premium-card p-5 sm:p-6"
-                >
-                    <div className="flex items-center gap-2.5 mb-5">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                            <Globe className="w-4 h-4 text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-semibold text-white">Goal Breakdown by Source</h3>
-                            <p className="text-[10px] text-zinc-600">Where your conversions come from</p>
-                        </div>
-                    </div>
+                                                    return (
+                                                        <div
+                                                            key={definition.id}
+                                                            className={cx(
+                                                                'flex items-center gap-3 rounded-[16px] border px-3 py-3 transition',
+                                                                isSelected
+                                                                    ? 'border-cyan-500/22 bg-cyan-500/[0.10]'
+                                                                    : 'border-white/[0.06] bg-[#101317] hover:border-white/[0.1] hover:bg-[#13171b]',
+                                                                !definition.isActive && 'opacity-60',
+                                                            )}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedKey(key);
+                                                                    setSelectorOpen(false);
+                                                                }}
+                                                                className="min-w-0 flex-1 text-left"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="truncate text-sm font-semibold text-white">{definition.name}</span>
+                                                                    <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-semibold text-zinc-300">
+                                                                        {definition.isActive ? 'Active' : 'Inactive'}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
+                                                                    {typeLabel(definition.type)} • {definition.target}
+                                                                </p>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    setSelectorOpen(false);
+                                                                    openEdit(definition);
+                                                                }}
+                                                                className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-400 transition hover:border-white/[0.12] hover:text-white"
+                                                            >
+                                                                <PencilLine className="h-3.5 w-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    setSelectorOpen(false);
+                                                                    void handleDelete(definition);
+                                                                }}
+                                                                className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-500 transition hover:border-rose-500/24 hover:text-rose-300"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : null}
 
-                    <div className="space-y-3">
-                        {bySource.map((source: any, i: number) => (
-                            <motion.div
-                                key={source.source}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.25 + i * 0.05 }}
-                            >
-                                <SourceBar source={source} maxConversions={maxSourceConversions} />
-                            </motion.div>
-                        ))}
-                    </div>
+                                        {suggestions.length ? (
+                                            <div className={cx('space-y-2', definitions.length > 0 && 'mt-4 border-t border-white/[0.06] pt-4')}>
+                                                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                                                    Starter suggestions
+                                                </p>
+                                                {suggestions.map((suggestion, index) => {
+                                                    const key = `suggestion:${index}`;
+                                                    const isSelected = key === currentSelection?.key;
 
-                    <div className="mt-5 pt-4 border-t border-white/[0.06]">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-zinc-600">Total from all sources</span>
-                            <span className="text-xs font-bold text-white tabular-nums">{totalConversions.toLocaleString()} conversions</span>
-                        </div>
-                    </div>
-                </motion.div>
-
-                {/* Top Converting Pages */}
-                <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="premium-card p-5 sm:p-6"
-                >
-                    <div className="flex items-center gap-2.5 mb-5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                            <BarChart3 className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-semibold text-white">Top Converting Pages</h3>
-                            <p className="text-[10px] text-zinc-600">Pages with the highest conversions</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-1">
-                        {topPages.map((page: any, i: number) => (
-                            <motion.div
-                                key={page.page}
-                                initial={{ opacity: 0, y: 5 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.25 + i * 0.04 }}
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.03] transition group"
-                            >
-                                <span className="text-[10px] text-zinc-600 font-mono w-5 text-right tabular-nums">{i + 1}</span>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-xs text-zinc-300 truncate font-medium group-hover:text-white transition">{page.page}</span>
-                                        <ArrowRight className="w-3 h-3 text-zinc-700 flex-shrink-0 opacity-0 group-hover:opacity-100 transition" />
+                                                    return (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedKey(key);
+                                                                setSelectorOpen(false);
+                                                            }}
+                                                            className={cx(
+                                                                'flex w-full items-start justify-between gap-3 rounded-[16px] border px-3 py-3 text-left transition',
+                                                                isSelected
+                                                                    ? 'border-emerald-500/20 bg-emerald-500/[0.10]'
+                                                                    : 'border-white/[0.06] bg-[#101317] hover:border-white/[0.1] hover:bg-[#13171b]',
+                                                            )}
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="truncate text-sm font-semibold text-white">{suggestion.name}</span>
+                                                                    <span className="rounded-full border border-emerald-500/18 bg-emerald-500/[0.12] px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
+                                                                        Starter
+                                                                    </span>
+                                                                </div>
+                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
+                                                                    {typeLabel(suggestion.type)} • {suggestion.target}
+                                                                </p>
+                                                            </div>
+                                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : null}
                                     </div>
-                                    <span className="text-[10px] text-zinc-600 truncate block">{page.title}</span>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                    <span className="text-xs font-bold text-white tabular-nums">{page.conversions}</span>
-                                    <span className={`block text-[10px] font-medium tabular-nums ${rateColor(page.rate)}`}>{page.rate}%</span>
-                                </div>
-                            </motion.div>
-                        ))}
+                                </>
+                            ) : null}
+                        </div>
+
+                        {currentSelection?.kind === 'saved' ? (
+                            <button
+                                type="button"
+                                onClick={() => openEdit(currentSelection.item)}
+                                className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-white/[0.08] bg-[#0d1014] px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-white/[0.12] hover:text-white"
+                            >
+                                <PencilLine className="h-4 w-4" />
+                                Edit
+                            </button>
+                        ) : null}
+
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-emerald-500/20 bg-emerald-500/[0.12] px-4 py-3 text-sm font-semibold text-emerald-200 shadow-[0_12px_32px_rgba(16,185,129,0.16)] transition hover:border-emerald-400/28 hover:bg-emerald-500/[0.18]"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create Goal
+                        </button>
                     </div>
-                </motion.div>
+                </div>
+            </section>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <GoalsKpiCard
+                    label="Total Conversions"
+                    value={formatCompactNumber(totals.totalConversions)}
+                    accent={formatSignedPercent(totals.conversionChange)}
+                    tone="cyan"
+                />
+                <GoalsKpiCard
+                    label="Conversion Rate"
+                    value={formatPercent(totals.conversionRate)}
+                    accent={formatSignedPoints(totals.averageRateChange)}
+                    tone="emerald"
+                />
+                <GoalsKpiCard
+                    label="Tracked Sessions"
+                    value={formatCompactNumber(totals.totalSessions)}
+                    accent={`${board.length} tracked`}
+                    tone="violet"
+                />
+                <GoalsKpiCard
+                    label="Active Goals"
+                    value={String(totals.activeGoals || board.length)}
+                    accent={`${suggestions.length} suggestions`}
+                    tone="rose"
+                />
             </div>
+
+            {boardLoading ? (
+                <AnalyticsSubpageLoadingState title="Loading goal analytics" cards={4} />
+            ) : boardError || !board.length ? (
+                <AnalyticsSubpageEmptyState
+                    title="Goal analytics are unavailable"
+                    description="We couldn't load goal performance for the selected property."
+                />
+            ) : (
+                <>
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(330px,0.9fr)]">
+                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+                            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
+                                <div>
+                                    <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Goal Performance</h2>
+                                    <p className="mt-1 text-[12px] font-medium text-zinc-400">Compare saved goals and trend direction.</p>
+                                </div>
+                                <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-zinc-300">
+                                    {board.length} goals
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full border-separate border-spacing-0">
+                                    <thead>
+                                        <tr className="bg-[#101317]">
+                                            <th className="border-b border-white/[0.08] px-5 py-3 text-left text-[11px] font-semibold text-zinc-500">Goal</th>
+                                            <th className="border-b border-white/[0.08] px-4 py-3 text-right text-[11px] font-semibold text-zinc-500">Conversions</th>
+                                            <th className="border-b border-white/[0.08] px-4 py-3 text-right text-[11px] font-semibold text-zinc-500">Rate</th>
+                                            <th className="border-b border-white/[0.08] px-4 py-3 text-left text-[11px] font-semibold text-zinc-500">Trend</th>
+                                            <th className="border-b border-white/[0.08] px-4 py-3 text-right text-[11px] font-semibold text-zinc-500">Change</th>
+                                            <th className="border-b border-white/[0.08] px-3 py-3" />
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {board.map((entry) => {
+                                            const isSelected = entry.key === selectedEntry?.key;
+                                            return (
+                                                <tr
+                                                    key={entry.key}
+                                                    className={cx(
+                                                        'cursor-pointer transition',
+                                                        isSelected ? 'bg-cyan-500/[0.06]' : 'hover:bg-white/[0.02]',
+                                                    )}
+                                                    onClick={() => setSelectedKey(entry.key)}
+                                                >
+                                                    <td className="border-b border-white/[0.06] px-5 py-3.5">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="h-8 w-1 rounded-full" style={{ backgroundColor: entry.color }} />
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-semibold text-white">{entry.data.definition.name}</p>
+                                                                <p className="mt-1 truncate text-[11px] font-medium text-zinc-400">
+                                                                    {goalTargetLabel(entry.selection)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="border-b border-white/[0.06] px-4 py-3.5 text-right text-sm font-semibold text-white">
+                                                        {formatCompactNumber(entry.data.summary.conversions)}
+                                                    </td>
+                                                    <td className="border-b border-white/[0.06] px-4 py-3.5 text-right text-sm font-semibold text-white">
+                                                        {formatPercent(entry.data.summary.rate)}
+                                                    </td>
+                                                    <td className="border-b border-white/[0.06] px-4 py-3.5">
+                                                        <GoalSparkline trend={entry.data.trend} color={entry.color} />
+                                                    </td>
+                                                    <td
+                                                        className={cx(
+                                                            'border-b border-white/[0.06] px-4 py-3.5 text-right text-sm font-semibold',
+                                                            entry.data.summary.change >= 0 ? 'text-emerald-300' : 'text-rose-300',
+                                                        )}
+                                                    >
+                                                        {formatSignedPercent(entry.data.summary.change)}
+                                                    </td>
+                                                    <td className="border-b border-white/[0.06] px-3 py-3.5 text-right text-zinc-600">
+                                                        <ChevronRight className="ml-auto h-4 w-4" />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-emerald-300" />
+                                <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Insights</h2>
+                            </div>
+                            <p className="mt-1 text-[12px] font-medium text-zinc-400">Smart summaries from the selected goal.</p>
+
+                            <div className="mt-4 space-y-3">
+                                {insights.spike ? (
+                                    <div className="rounded-[18px] border border-amber-500/18 bg-amber-500/[0.08] p-4">
+                                        <div className="flex items-center gap-2 text-amber-200">
+                                            <TrendingUp className="h-4 w-4" />
+                                            <span className="text-sm font-semibold">Spike detected</span>
+                                        </div>
+                                        <p className="mt-2 text-sm font-semibold text-white">
+                                            {selectedEntry?.data.definition.name}
+                                        </p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
+                                            {formatAxisDate(insights.spike.date)} hit {formatCompactNumber(insights.spike.conversions)} conversions, {formatSignedPercent(insights.spike.lift)} above the average day.
+                                        </p>
+                                    </div>
+                                ) : null}
+
+                                {insights.bestGoal ? (
+                                    <div className="rounded-[18px] border border-emerald-500/16 bg-emerald-500/[0.07] p-4">
+                                        <div className="flex items-center gap-2 text-emerald-200">
+                                            <Trophy className="h-4 w-4" />
+                                            <span className="text-sm font-semibold">Best converting goal</span>
+                                        </div>
+                                        <p className="mt-2 text-sm font-semibold text-white">{insights.bestGoal.data.definition.name}</p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
+                                            {formatCompactNumber(insights.bestGoal.data.summary.conversions)} conversions at {formatPercent(insights.bestGoal.data.summary.rate)}.
+                                        </p>
+                                    </div>
+                                ) : null}
+
+                                {insights.fallingGoal ? (
+                                    <div className="rounded-[18px] border border-white/[0.08] bg-[#101317] p-4">
+                                        <div className="flex items-center gap-2 text-zinc-200">
+                                            <AlertTriangle className="h-4 w-4 text-rose-300" />
+                                            <span className="text-sm font-semibold">Fastest declining goal</span>
+                                        </div>
+                                        <p className="mt-2 text-sm font-semibold text-white">{insights.fallingGoal.data.definition.name}</p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-300">
+                                            {formatSignedPercent(insights.fallingGoal.data.summary.change)} vs the previous period.
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {selectedEntry?.data.explanation ? (
+                                <div className="mt-4 rounded-[18px] border border-white/[0.08] bg-[#101317] p-4">
+                                    <p className="text-[12px] font-semibold text-zinc-500">Selected goal</p>
+                                    <p className="mt-2 text-sm font-medium leading-6 text-zinc-300">
+                                        {selectedEntry.data.explanation}
+                                    </p>
+                                </div>
+                            ) : null}
+                        </section>
+                    </div>
+
+                    <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Conversion Trend</h2>
+                                <p className="mt-1 text-[12px] font-medium text-zinc-400">Goal momentum across the current range.</p>
+                            </div>
+                            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-zinc-300">
+                                {range.toUpperCase()}
+                            </span>
+                        </div>
+
+                        <div className="mt-5 h-[320px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={mergedTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        {board.map((entry) => (
+                                            <linearGradient key={entry.key} id={`goal-gradient-${entry.key}`} x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor={entry.color} stopOpacity={0.18} />
+                                                <stop offset="100%" stopColor={entry.color} stopOpacity={0} />
+                                            </linearGradient>
+                                        ))}
+                                    </defs>
+                                    <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                                    <XAxis
+                                        dataKey="date"
+                                        tickFormatter={formatAxisDate}
+                                        tick={{ fill: 'rgba(161,161,170,0.78)', fontSize: 11 }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                    />
+                                    <YAxis
+                                        tick={{ fill: 'rgba(161,161,170,0.78)', fontSize: 11 }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        width={40}
+                                    />
+                                    <Tooltip content={<GoalTrendTooltip />} />
+                                    {board.map((entry) => (
+                                        <Area
+                                            key={entry.key}
+                                            type="monotone"
+                                            dataKey={entry.key}
+                                            name={entry.data.definition.name}
+                                            stroke={entry.color}
+                                            fill={`url(#goal-gradient-${entry.key})`}
+                                            strokeWidth={2}
+                                            dot={false}
+                                            activeDot={{ r: 4, fill: entry.color, stroke: '#0b0d10', strokeWidth: 2 }}
+                                            isAnimationActive={false}
+                                        />
+                                    ))}
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </section>
+
+                    <div className="grid gap-5 xl:grid-cols-3">
+                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+                            <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Breakdown by Source</h2>
+                            <p className="mt-1 text-[12px] font-medium text-zinc-400">Where the selected goal is being completed.</p>
+
+                            {selectedEntry?.data.sourceContribution.length ? (
+                                <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-center">
+                                    <div className="mx-auto h-40 w-40 shrink-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={selectedEntry.data.sourceContribution}
+                                                    dataKey="conversions"
+                                                    nameKey="source"
+                                                    innerRadius={42}
+                                                    outerRadius={62}
+                                                    paddingAngle={3}
+                                                    stroke="rgba(255,255,255,0.05)"
+                                                    strokeWidth={1}
+                                                >
+                                                    {selectedEntry.data.sourceContribution.map((entry, index) => (
+                                                        <Cell key={`${entry.source}-${index}`} fill={GOAL_COLORS[index % GOAL_COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        {selectedEntry.data.sourceContribution.slice(0, 5).map((entry, index) => (
+                                            <div key={entry.source} className="rounded-[16px] border border-white/[0.06] bg-[#101317] px-3 py-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="flex min-w-0 items-center gap-2">
+                                                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: GOAL_COLORS[index % GOAL_COLORS.length] }} />
+                                                        <span className="truncate text-sm font-semibold text-white">{entry.source}</span>
+                                                    </div>
+                                                    <span className="text-[12px] font-semibold text-zinc-300">{formatPercent(entry.share)}</span>
+                                                </div>
+                                                <div className="mt-2 h-1.5 rounded-full bg-white/[0.05]">
+                                                    <div
+                                                        className="h-full rounded-full"
+                                                        style={{ width: `${Math.min(entry.share, 100)}%`, backgroundColor: GOAL_COLORS[index % GOAL_COLORS.length] }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="mt-5 text-sm font-medium text-zinc-500">No source contribution data available for this goal.</p>
+                            )}
+                        </section>
+
+                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+                            <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Top Converting Pages</h2>
+                            <p className="mt-1 text-[12px] font-medium text-zinc-400">Pages contributing the strongest goal volume.</p>
+
+                            <div className="mt-5 space-y-2.5">
+                                {selectedEntry?.data.pageContribution.length ? selectedEntry.data.pageContribution.slice(0, 5).map((entry, index) => (
+                                    <div key={entry.page} className="rounded-[18px] border border-white/[0.06] bg-[#101317] px-4 py-3.5">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-white">{entry.page || 'Homepage'}</p>
+                                                <p className="mt-1 text-[11px] font-medium text-zinc-400">#{index + 1} contribution</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-semibold text-white">{formatCompactNumber(entry.conversions)}</p>
+                                                <p className="mt-1 text-[11px] font-medium text-emerald-300">{formatPercent(entry.share)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <p className="text-sm font-medium text-zinc-500">No page contribution data available for this goal.</p>
+                                )}
+                            </div>
+                        </section>
+
+                        <section className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-white">Goal Alerts</h2>
+                                    <p className="mt-1 text-[12px] font-medium text-zinc-400">High-signal items that need a quick look.</p>
+                                </div>
+                                <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
+                                    {goalAlerts.length} alerts
+                                </span>
+                            </div>
+
+                            <div className="mt-5 space-y-2.5">
+                                {goalAlerts.length ? goalAlerts.map((alert, index) => (
+                                    <div
+                                        key={`${alert.label}-${index}`}
+                                        className={cx(
+                                            'rounded-[18px] border px-4 py-3.5',
+                                            alert.tone === 'positive'
+                                                ? 'border-emerald-500/16 bg-emerald-500/[0.07]'
+                                                : 'border-amber-500/16 bg-amber-500/[0.07]',
+                                        )}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <span
+                                                className={cx(
+                                                    'mt-1 h-2.5 w-2.5 rounded-full',
+                                                    alert.tone === 'positive' ? 'bg-emerald-400' : 'bg-amber-300',
+                                                )}
+                                            />
+                                            <div>
+                                                <p className="text-sm font-semibold text-white">{alert.label}</p>
+                                                <p className="mt-1 text-[12px] font-medium text-zinc-300">{alert.detail}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rounded-[18px] border border-white/[0.06] bg-[#101317] px-4 py-4">
+                                        <p className="text-sm font-semibold text-white">No immediate alerts</p>
+                                        <p className="mt-1 text-[12px] font-medium text-zinc-400">
+                                            Current goal set looks stable across the selected range.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    </div>
+                </>
+            )}
+
+            {editorState.open ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                        onClick={closeEditor}
+                    />
+                    <div className="relative w-full max-w-[720px] rounded-[28px] border border-white/[0.1] bg-[#080a0d] p-6 shadow-[0_36px_120px_rgba(0,0,0,0.56)]">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <p className="text-[12px] font-semibold text-zinc-500">
+                                    {editorState.mode === 'create' ? 'Create goal' : 'Edit goal'}
+                                </p>
+                                <h2 className="mt-2 text-[1.75rem] font-semibold tracking-[-0.04em] text-white">
+                                    {editorState.mode === 'create' ? 'Create a new goal' : 'Update goal'}
+                                </h2>
+                                <p className="mt-2 text-[13px] font-medium text-zinc-400">
+                                    Keep the management flow compact while the analytics canvas stays clean.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeEditor}
+                                className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:border-white/[0.12] hover:text-white"
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div className="mt-6 grid gap-4 md:grid-cols-2">
+                            <label className="space-y-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Goal name</span>
+                                <input
+                                    value={editorState.values.name}
+                                    onChange={(event) => setEditorState((current) => ({
+                                        ...current,
+                                        values: { ...current.values, name: event.target.value },
+                                    }))}
+                                    className="w-full rounded-[16px] border border-white/[0.08] bg-[#101317] px-4 py-3 text-sm font-medium text-white outline-none transition focus:border-emerald-500/28"
+                                    placeholder="Blog engagement"
+                                />
+                            </label>
+
+                            <label className="space-y-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Goal type</span>
+                                <select
+                                    value={editorState.values.type}
+                                    onChange={(event) => setEditorState((current) => ({
+                                        ...current,
+                                        values: { ...current.values, type: event.target.value as GoalDefinitionType },
+                                    }))}
+                                    className="w-full rounded-[16px] border border-white/[0.08] bg-[#101317] px-4 py-3 text-sm font-medium text-white outline-none transition focus:border-emerald-500/28"
+                                >
+                                    <option value="event_count">Event goal</option>
+                                    <option value="page_visit">Page goal</option>
+                                </select>
+                            </label>
+
+                            <label className="space-y-2 md:col-span-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Target</span>
+                                <input
+                                    value={editorState.values.target}
+                                    onChange={(event) => setEditorState((current) => ({
+                                        ...current,
+                                        values: { ...current.values, target: event.target.value },
+                                    }))}
+                                    className="w-full rounded-[16px] border border-white/[0.08] bg-[#101317] px-4 py-3 text-sm font-medium text-white outline-none transition focus:border-emerald-500/28"
+                                    placeholder={editorState.values.type === 'event_count' ? 'generate_lead' : '/pricing'}
+                                />
+                            </label>
+
+                            <label className="space-y-2 md:col-span-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Description</span>
+                                <textarea
+                                    value={editorState.values.description}
+                                    onChange={(event) => setEditorState((current) => ({
+                                        ...current,
+                                        values: { ...current.values, description: event.target.value },
+                                    }))}
+                                    className="min-h-[110px] w-full rounded-[16px] border border-white/[0.08] bg-[#101317] px-4 py-3 text-sm font-medium text-white outline-none transition focus:border-emerald-500/28"
+                                    placeholder="What does success mean for this goal?"
+                                />
+                            </label>
+                        </div>
+
+                        {suggestions.length && editorState.mode === 'create' ? (
+                            <div className="mt-6">
+                                <div className="mb-3 flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-emerald-300" />
+                                    <p className="text-sm font-semibold text-white">Starter suggestions</p>
+                                </div>
+                                <div className="grid gap-2 md:grid-cols-2">
+                                    {suggestions.slice(0, 4).map((suggestion, index) => (
+                                        <button
+                                            key={`${suggestion.target}-${index}`}
+                                            type="button"
+                                            onClick={() => setEditorState((current) => ({
+                                                ...current,
+                                                values: {
+                                                    name: suggestion.name,
+                                                    description: suggestion.description,
+                                                    type: suggestion.type,
+                                                    target: suggestion.target,
+                                                },
+                                            }))}
+                                            className="rounded-[18px] border border-white/[0.08] bg-[#101317] px-4 py-3 text-left transition hover:border-white/[0.12] hover:bg-[#14181d]"
+                                        >
+                                            <p className="text-sm font-semibold text-white">{suggestion.name}</p>
+                                            <p className="mt-1 text-[11px] font-medium text-zinc-400">
+                                                {typeLabel(suggestion.type)} • {suggestion.target}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {actionError ? (
+                            <div className="mt-5 rounded-[18px] border border-rose-500/18 bg-rose-500/[0.08] px-4 py-3 text-sm font-medium text-rose-200">
+                                {actionError}
+                            </div>
+                        ) : null}
+
+                        <div className="mt-6 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-[12px] font-medium text-zinc-500">
+                                <Target className="h-4 w-4 text-zinc-600" />
+                                Saved per property using the existing goals backend.
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => void handleSave()}
+                                disabled={saving}
+                                className="inline-flex items-center gap-2 rounded-[18px] border border-emerald-500/20 bg-emerald-500/[0.12] px-4 py-3 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400/28 hover:bg-emerald-500/[0.18] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                {editorState.mode === 'create' ? 'Create Goal' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

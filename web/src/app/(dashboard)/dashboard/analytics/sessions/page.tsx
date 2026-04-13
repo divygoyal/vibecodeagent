@@ -1,285 +1,427 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useAnalyticsData } from '@/lib/useDashboardData';
-import { useAnalyticsContext } from '../layout';
-import { Loader2, Search, Clock, FileText } from 'lucide-react';
-import { CountryFlag, BrowserIcon, OSIcon, DeviceIcon, ReferrerIcon } from '@/components/analytics/AnalyticsIcons';
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import { Activity, Clock3, Layers3, Users2 } from 'lucide-react';
+
 import AnalyticsTable from '@/components/analytics/AnalyticsTable';
+import {
+    AnalyticsInsightList,
+    AnalyticsSubpageEmptyState,
+    AnalyticsSubpageLoadingState,
+    AnalyticsSubpageMetricCard,
+    AnalyticsSubpageMetricGrid,
+    AnalyticsSubpagePanel,
+    AnalyticsSubpageShell,
+    formatCompactNumber,
+    formatDuration,
+} from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { useAnalyticsSubpageData } from '@/lib/useAnalyticsSubpageData';
+import { useAnalyticsContext } from '../layout';
 
-const AVATAR_GRADIENTS = [
-    'from-rose-400 to-orange-400', 'from-violet-400 to-pink-400', 'from-cyan-400 to-blue-400',
-    'from-emerald-400 to-teal-400', 'from-amber-400 to-red-400', 'from-indigo-400 to-purple-400',
-    'from-lime-400 to-green-400', 'from-fuchsia-400 to-rose-400',
-];
-
-/** Parse "m:ss" duration string into total seconds */
-function parseDuration(d: string): number {
-    if (!d) return 0;
-    const parts = d.split(':');
-    if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-    return parseInt(parts[0], 10) || 0;
+interface QualityRow {
+    label: string;
+    sessions: number;
+    engagedSessions: number;
+    engagementRate: number;
+    avgDuration: number;
+    bounceRate: number;
+    share: number;
+    qualityScore: number;
 }
 
-// Build synthetic session rows from real analytics dimensional data
-function buildSessions(
-    pages: any[], countries: any[], devices: any[], browsers: any[],
-    operatingSystems: any[], referrers: any[], entryPages: any[]
-) {
-    const sessions: any[] = [];
-    const now = new Date();
-    const count = Math.max(pages.length, countries.length, 20);
-
-    for (let i = 0; i < count; i++) {
-        const page = pages[i % Math.max(pages.length, 1)];
-        const entry = entryPages[i % Math.max(entryPages.length, 1)];
-        const country = countries[i % Math.max(countries.length, 1)];
-        const device = devices[i % Math.max(devices.length, 1)];
-        const browser = browsers[i % Math.max(browsers.length, 1)];
-        const os = operatingSystems[i % Math.max(operatingSystems.length, 1)];
-        const referrer = referrers[i % Math.max(referrers.length, 1)];
-        const ago = Math.floor(Math.random() * 1440); // up to 24h ago
-        const durationStr = page?.avgTime || '0:00';
-
-        sessions.push({
-            time: new Date(now.getTime() - ago * 60000),
-            visitor: `Anonymous`,
-            entryPage: entry?.page || page?.page || '/',
-            exitPage: page?.page || '/',
-            country: country?.country || '(not set)',
-            referrer: referrer?.name || '(direct)',
-            device: device?.device || 'Desktop',
-            os: os?.name || 'Unknown',
-            browser: browser?.name || 'Unknown',
-            duration: durationStr,
-            durationSec: parseDuration(durationStr),
-            pageViews: Math.ceil(Math.random() * 8) + 1,
-        });
-    }
-
-    return sessions.sort((a, b) => b.time.getTime() - a.time.getTime());
+interface SessionsResponse {
+    summary: {
+        sessions: number;
+        engagedSessions: number;
+        activeUsers: number;
+        pagesPerSession: number;
+        avgSessionDuration: number;
+        bounceRate: number;
+        engagementRate: number;
+    };
+    trend: Array<{
+        date: string;
+        sessions: number;
+        engagedSessions: number;
+    }>;
+    landingPatterns: QualityRow[];
+    channelQuality: QualityRow[];
+    deviceQuality: QualityRow[];
+    referrerQuality: QualityRow[];
 }
 
-function timeAgo(date: Date) {
-    const mins = Math.floor((Date.now() - date.getTime()) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
+interface ChartTooltipEntry {
+    dataKey: string;
+    color: string;
+    name: string;
+    value: number;
+}
+
+function formatAxisDate(value: string) {
+    return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function ChartTooltip({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: ChartTooltipEntry[];
+    label?: string | number;
+}) {
+    if (!active || !payload?.length) return null;
+
+    return (
+        <div className="rounded-2xl border border-white/[0.08] bg-[#050505]/95 px-4 py-3 shadow-2xl backdrop-blur">
+            <p className="text-[11px] font-semibold text-white">{formatAxisDate(label ? String(label) : '')}</p>
+            <div className="mt-2 space-y-1.5">
+                {payload.map((item) => (
+                    <div key={item.dataKey} className="flex items-center justify-between gap-5">
+                        <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="text-[11px] text-zinc-500">{item.name}</span>
+                        </div>
+                        <span className="text-xs font-semibold text-white">{formatCompactNumber(item.value)}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export default function SessionsPage() {
     const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
-    const { data, isLoading } = useAnalyticsData('all', selectedProperty, hasGoogleConnection, range);
-
-    // Advanced filter state
-    const [minPages, setMinPages] = useState(0);
-    const [minDuration, setMinDuration] = useState(0);
-    const [searchQuery, setSearchQuery] = useState('');
+    const { data, isLoading } = useAnalyticsSubpageData<SessionsResponse>(
+        '/api/analytics/sessions',
+        selectedProperty,
+        range,
+        hasGoogleConnection,
+        180_000,
+    );
 
     if (isLoading && !data) {
-        return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-zinc-500" /></div>;
+        return <AnalyticsSubpageLoadingState title="Session quality" />;
     }
 
-    const pages: any[] = data?.pages || [];
-    const countries: any[] = data?.countries || [];
-    const devices: any[] = data?.devices || [];
-    const browsers: any[] = data?.browsers || [];
-    const operatingSystems: any[] = data?.operatingSystems || [];
-    const referrers: any[] = data?.referrers || [];
-    const entryPages: any[] = data?.entryPages || [];
+    if (!data) {
+        return (
+            <AnalyticsSubpageEmptyState
+                title="Session analysis is temporarily unavailable"
+                description="We couldn't load the latest session-quality view right now. Try again in a little while."
+            />
+        );
+    }
 
-    const sessions = buildSessions(pages, countries, devices, browsers, operatingSystems, referrers, entryPages);
-
-    // Client-side filtering
-    const filteredSessions = useMemo(() => {
-        return sessions.filter(s => {
-            if (minPages > 0 && (s.pageViews || 0) < minPages) return false;
-            if (minDuration > 0 && (s.durationSec || 0) < minDuration) return false;
-            if (searchQuery) {
-                const q = searchQuery.toLowerCase();
-                const haystack = `${s.entryPage} ${s.exitPage} ${s.country} ${s.browser} ${s.referrer} ${s.os} ${s.device}`.toLowerCase();
-                if (!haystack.includes(q)) return false;
-            }
-            return true;
-        });
-    }, [sessions, minPages, minDuration, searchQuery]);
-
-    const hasActiveFilters = minPages > 0 || minDuration > 0 || searchQuery.length > 0;
+    const strongestChannel = data.channelQuality[0];
+    const strongestDevice = data.deviceQuality[0];
+    const strongestLanding = data.landingPatterns[0];
 
     return (
-        <div className="space-y-4">
-            {/* Header */}
-            <div>
-                <h2 className="text-lg font-bold text-white">Sessions</h2>
-                <p className="text-xs text-zinc-500 mt-0.5">Shows all your sessions from {range === 'today' ? 'today' : `the last ${range}`}</p>
-            </div>
+        <AnalyticsSubpageShell
+            eyebrow="Sessions"
+            title="Sessions"
+            description="Session quality, depth, and acquisition strength without fake visitor rows."
+        >
+            <AnalyticsSubpageMetricGrid>
+                <AnalyticsSubpageMetricCard
+                    label="Sessions"
+                    value={formatCompactNumber(data.summary.sessions)}
+                    icon={Users2}
+                    tone="emerald"
+                />
+                <AnalyticsSubpageMetricCard
+                    label="Engaged Sessions"
+                    value={formatCompactNumber(data.summary.engagedSessions)}
+                    icon={Activity}
+                    tone="cyan"
+                />
+                <AnalyticsSubpageMetricCard
+                    label="Pages / Session"
+                    value={data.summary.pagesPerSession.toFixed(2)}
+                    icon={Layers3}
+                    tone="mixed"
+                />
+                <AnalyticsSubpageMetricCard
+                    label="Avg Session Duration"
+                    value={formatDuration(data.summary.avgSessionDuration)}
+                    icon={Clock3}
+                    tone="amber"
+                />
+            </AnalyticsSubpageMetricGrid>
 
-            {/* Advanced Filters */}
-            <div className="premium-card rounded-xl px-4 py-3">
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Search */}
-                    <div className="flex items-center gap-2 flex-1 min-w-[180px] max-w-[280px]">
-                        <div className="relative w-full">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                placeholder="Search path, country, browser..."
-                                className="w-full pl-8 pr-3 h-7 text-xs bg-transparent border border-white/[0.08] rounded-md text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
-                            />
+            <AnalyticsSubpagePanel
+                title="Session demand"
+            >
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+                    <div className="rounded-[24px] border border-white/[0.06] bg-[#050505] p-4 sm:p-5">
+                        <div className="mb-4">
+                            <p className="text-[11px] font-semibold text-zinc-500">Session quality trend</p>
+                            <p className="mt-1 text-sm text-zinc-400">
+                                Engagement rate is {data.summary.engagementRate.toFixed(1)}% with a bounce rate of {data.summary.bounceRate.toFixed(1)}%.
+                            </p>
+                        </div>
+                        <div className="h-[320px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={data.trend} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="sessionGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#33CF96" stopOpacity={0.22} />
+                                            <stop offset="100%" stopColor="#33CF96" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                    <XAxis
+                                        dataKey="date"
+                                        tickFormatter={formatAxisDate}
+                                        tick={{ fontSize: 11, fill: '#71717a' }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        minTickGap={24}
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 11, fill: '#71717a' }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        width={44}
+                                    />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.22)', strokeWidth: 1 }} />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="sessions"
+                                        name="Sessions"
+                                        stroke="#33CF96"
+                                        fill="url(#sessionGradient)"
+                                        strokeWidth={2.5}
+                                        dot={false}
+                                        activeDot={{ r: 5, fill: '#33CF96', stroke: '#050505', strokeWidth: 2 }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="engagedSessions"
+                                        name="Engaged sessions"
+                                        stroke="#1FBED7"
+                                        fillOpacity={0}
+                                        strokeWidth={2}
+                                        dot={false}
+                                        activeDot={{ r: 4, fill: '#1FBED7', stroke: '#050505', strokeWidth: 2 }}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
 
-                    <div className="w-px h-5 bg-white/[0.06] hidden sm:block" />
-
-                    {/* Min Pages */}
-                    <div className="flex items-center gap-2">
-                        <FileText className="w-3 h-3 text-zinc-600" />
-                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Min Pages</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={minPages}
-                            onChange={e => setMinPages(+e.target.value)}
-                            className="w-16 h-7 px-2 text-xs bg-transparent border border-white/[0.08] rounded-md text-zinc-300 focus:outline-none focus:border-emerald-500/30 transition"
+                    <div className="space-y-4">
+                        <AnalyticsInsightList
+                            items={[
+                                {
+                                    label: 'Best channel quality',
+                                    value: strongestChannel ? strongestChannel.label : 'No data',
+                                    note: strongestChannel ? `${strongestChannel.engagementRate.toFixed(1)}% engagement • score ${strongestChannel.qualityScore}` : 'No channel data yet.',
+                                },
+                                {
+                                    label: 'Best device quality',
+                                    value: strongestDevice ? strongestDevice.label : 'No data',
+                                    note: strongestDevice ? `${formatDuration(strongestDevice.avgDuration)} avg duration • ${strongestDevice.bounceRate.toFixed(1)}% bounce` : 'No device data yet.',
+                                },
+                                {
+                                    label: 'Strongest landing',
+                                    value: strongestLanding ? strongestLanding.label : 'No data',
+                                    note: strongestLanding ? `${formatCompactNumber(strongestLanding.sessions)} sessions • ${strongestLanding.engagementRate.toFixed(1)}% engagement` : 'No landing data yet.',
+                                },
+                            ]}
                         />
-                    </div>
-
-                    <div className="w-px h-5 bg-white/[0.06] hidden sm:block" />
-
-                    {/* Min Duration */}
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-3 h-3 text-zinc-600" />
-                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Min Duration</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={minDuration}
-                            onChange={e => setMinDuration(+e.target.value)}
-                            className="w-16 h-7 px-2 text-xs bg-transparent border border-white/[0.08] rounded-md text-zinc-300 focus:outline-none focus:border-emerald-500/30 transition"
-                        />
-                        <span className="text-[10px] text-zinc-600">sec</span>
-                    </div>
-
-                    {/* Clear filters */}
-                    {hasActiveFilters && (
-                        <>
-                            <div className="w-px h-5 bg-white/[0.06] hidden sm:block" />
-                            <button
-                                onClick={() => { setMinPages(0); setMinDuration(0); setSearchQuery(''); }}
-                                className="text-[10px] text-zinc-500 hover:text-emerald-400 transition uppercase tracking-wider"
-                            >
-                                Clear
-                            </button>
-                        </>
-                    )}
-
-                    {/* Result count */}
-                    <div className="ml-auto text-[10px] text-zinc-600 tabular-nums">
-                        {filteredSessions.length} / {sessions.length} sessions
                     </div>
                 </div>
+            </AnalyticsSubpagePanel>
+
+            <div className="grid gap-5 xl:grid-cols-2">
+                <AnalyticsSubpagePanel
+                    title="Channel quality"
+                    tone="emerald"
+                >
+                    <AnalyticsTable
+                        data={data.channelQuality}
+                        showSearch={false}
+                        defaultSort={{ key: 'quality', dir: 'desc' }}
+                        columns={[
+                            {
+                                key: 'label',
+                                label: 'Channel',
+                                sortable: true,
+                                getValue: (item) => item.label,
+                                render: (item) => <span className="text-xs font-medium text-zinc-200">{item.label}</span>,
+                            },
+                            {
+                                key: 'sessions',
+                                label: 'Sessions',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.sessions,
+                                render: (item) => <span className="text-xs font-semibold text-white">{formatCompactNumber(item.sessions)}</span>,
+                            },
+                            {
+                                key: 'engagement',
+                                label: 'Engagement',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.engagementRate,
+                                render: (item) => <span className="text-xs text-emerald-300">{item.engagementRate.toFixed(1)}%</span>,
+                            },
+                            {
+                                key: 'quality',
+                                label: 'Quality',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.qualityScore,
+                                render: (item) => <span className="text-xs text-zinc-400">{item.qualityScore.toFixed(1)}</span>,
+                            },
+                        ]}
+                    />
+                </AnalyticsSubpagePanel>
+
+                <AnalyticsSubpagePanel
+                    title="Device quality"
+                    tone="cyan"
+                >
+                    <AnalyticsTable
+                        data={data.deviceQuality}
+                        showSearch={false}
+                        defaultSort={{ key: 'sessions', dir: 'desc' }}
+                        columns={[
+                            {
+                                key: 'label',
+                                label: 'Device',
+                                sortable: true,
+                                getValue: (item) => item.label,
+                                render: (item) => <span className="text-xs font-medium text-zinc-200">{item.label}</span>,
+                            },
+                            {
+                                key: 'sessions',
+                                label: 'Sessions',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.sessions,
+                                render: (item) => <span className="text-xs font-semibold text-white">{formatCompactNumber(item.sessions)}</span>,
+                            },
+                            {
+                                key: 'duration',
+                                label: 'Avg duration',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.avgDuration,
+                                render: (item) => <span className="text-xs text-zinc-300">{formatDuration(item.avgDuration)}</span>,
+                            },
+                            {
+                                key: 'bounce',
+                                label: 'Bounce',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.bounceRate,
+                                render: (item) => <span className="text-xs text-zinc-400">{item.bounceRate.toFixed(1)}%</span>,
+                            },
+                        ]}
+                    />
+                </AnalyticsSubpagePanel>
             </div>
 
-            {/* Sessions Table */}
-            <div className="premium-card rounded-xl overflow-hidden">
-                <AnalyticsTable
-                    data={filteredSessions}
-                    showSearch={false}
-                    columns={[
-                        {
-                            key: 'time', label: 'Time', width: '70px', sortable: true,
-                            getValue: (s: any) => s.time.getTime(),
-                            render: (s: any) => <span className="text-zinc-500 text-[11px] whitespace-nowrap">{timeAgo(s.time)}</span>,
-                        },
-                        {
-                            key: 'visitor', label: 'Visitor', width: '110px',
-                            render: (s: any, i: number) => (
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-5 h-5 rounded-full bg-gradient-to-br ${AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]} flex items-center justify-center flex-shrink-0`}>
-                                        <span className="text-[7px] text-white font-bold">A</span>
-                                    </div>
-                                    <span className="text-zinc-400 text-[11px]">Anonymous</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'entry', label: 'Entry Page', sortable: true,
-                            getValue: (s: any) => s.entryPage,
-                            render: (s: any) => <span className="text-zinc-300 text-[11px] truncate max-w-[160px] block font-mono">{s.entryPage}</span>,
-                        },
-                        {
-                            key: 'exit', label: 'Exit Page',
-                            render: (s: any) => <span className="text-zinc-500 text-[11px] truncate max-w-[130px] block font-mono">{s.exitPage}</span>,
-                        },
-                        {
-                            key: 'country', label: 'Country', width: '110px', sortable: true,
-                            getValue: (s: any) => s.country,
-                            render: (s: any) => (
-                                <div className="flex items-center gap-1.5">
-                                    <CountryFlag country={s.country} />
-                                    <span className="text-zinc-400 text-[11px] truncate max-w-[70px]">{s.country}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'referrer', label: 'Referrer', width: '100px', sortable: true,
-                            getValue: (s: any) => s.referrer,
-                            render: (s: any) => (
-                                <div className="flex items-center gap-1.5">
-                                    <ReferrerIcon referrer={s.referrer} />
-                                    <span className="text-zinc-400 text-[11px] truncate max-w-[60px]">{s.referrer}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'device', label: 'Device', width: '70px',
-                            render: (s: any) => (
-                                <div className="flex items-center gap-1">
-                                    <DeviceIcon device={s.device} />
-                                    <span className="text-zinc-500 text-[10px]">{s.device}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'os', label: 'OS', width: '70px',
-                            render: (s: any) => (
-                                <div className="flex items-center gap-1">
-                                    <OSIcon os={s.os} />
-                                    <span className="text-zinc-500 text-[10px]">{s.os}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'browser', label: 'Browser', width: '80px',
-                            render: (s: any) => (
-                                <div className="flex items-center gap-1">
-                                    <BrowserIcon browser={s.browser} />
-                                    <span className="text-zinc-500 text-[10px]">{s.browser}</span>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'pages', label: 'Pages', width: '55px', align: 'right' as const, sortable: true,
-                            getValue: (s: any) => s.pageViews,
-                            render: (s: any) => (
-                                <span className="text-zinc-300 text-[11px] tabular-nums font-medium">{s.pageViews}</span>
-                            ),
-                        },
-                        {
-                            key: 'duration', label: 'Duration', width: '65px', align: 'right' as const, sortable: true,
-                            getValue: (s: any) => s.durationSec,
-                            render: (s: any) => (
-                                <span className="text-zinc-400 text-[11px] tabular-nums">{s.duration}</span>
-                            ),
-                        },
-                    ]}
-                    defaultSort={{ key: 'time', dir: 'desc' }}
-                />
+            <div className="grid gap-5 xl:grid-cols-2">
+                <AnalyticsSubpagePanel
+                    title="Landing patterns"
+                >
+                    <AnalyticsTable
+                        data={data.landingPatterns}
+                        searchKey={(item) => item.label}
+                        searchPlaceholder="Search landing pages..."
+                        defaultSort={{ key: 'sessions', dir: 'desc' }}
+                        columns={[
+                            {
+                                key: 'label',
+                                label: 'Landing page',
+                                sortable: true,
+                                getValue: (item) => item.label,
+                                render: (item) => <span className="text-xs font-medium text-zinc-200">{item.label}</span>,
+                            },
+                            {
+                                key: 'sessions',
+                                label: 'Sessions',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.sessions,
+                                render: (item) => <span className="text-xs font-semibold text-white">{formatCompactNumber(item.sessions)}</span>,
+                            },
+                            {
+                                key: 'engagement',
+                                label: 'Engagement',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.engagementRate,
+                                render: (item) => <span className="text-xs text-emerald-300">{item.engagementRate.toFixed(1)}%</span>,
+                            },
+                            {
+                                key: 'share',
+                                label: 'Share',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.share,
+                                render: (item) => <span className="text-xs text-zinc-400">{item.share.toFixed(1)}%</span>,
+                            },
+                        ]}
+                    />
+                </AnalyticsSubpagePanel>
+
+                <AnalyticsSubpagePanel
+                    title="Referrer quality"
+                >
+                    <AnalyticsTable
+                        data={data.referrerQuality}
+                        searchKey={(item) => item.label}
+                        searchPlaceholder="Search referrers..."
+                        defaultSort={{ key: 'sessions', dir: 'desc' }}
+                        columns={[
+                            {
+                                key: 'label',
+                                label: 'Referrer',
+                                sortable: true,
+                                getValue: (item) => item.label,
+                                render: (item) => <span className="text-xs font-medium text-zinc-200">{item.label}</span>,
+                            },
+                            {
+                                key: 'sessions',
+                                label: 'Sessions',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.sessions,
+                                render: (item) => <span className="text-xs font-semibold text-white">{formatCompactNumber(item.sessions)}</span>,
+                            },
+                            {
+                                key: 'duration',
+                                label: 'Avg duration',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.avgDuration,
+                                render: (item) => <span className="text-xs text-zinc-300">{formatDuration(item.avgDuration)}</span>,
+                            },
+                            {
+                                key: 'quality',
+                                label: 'Quality',
+                                align: 'right',
+                                sortable: true,
+                                getValue: (item) => item.qualityScore,
+                                render: (item) => <span className="text-xs text-zinc-400">{item.qualityScore.toFixed(1)}</span>,
+                            },
+                        ]}
+                    />
+                </AnalyticsSubpagePanel>
             </div>
-        </div>
+        </AnalyticsSubpageShell>
     );
 }

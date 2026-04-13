@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, Annotation, CustomDashboard
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition
 from docker_manager import docker_manager
 
 
@@ -3070,6 +3070,317 @@ async def delete_annotation(
     await db.delete(annotation)
     await db.commit()
     return {"success": True, "deleted_id": annotation_id}
+
+
+# ============= Analytics Goals & Funnels =============
+
+class AnalyticsGoalDefinitionCreate(BaseModel):
+    user_identifier: str
+    property_id: str
+    name: str
+    description: Optional[str] = None
+    goal_type: str = "page_visit"
+    rule_json: str = "{}"
+    is_active: Optional[bool] = True
+
+
+class AnalyticsGoalDefinitionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    goal_type: Optional[str] = None
+    rule_json: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class AnalyticsFunnelDefinitionCreate(BaseModel):
+    user_identifier: str
+    property_id: str
+    name: str
+    description: Optional[str] = None
+    steps_json: str = "[]"
+    is_active: Optional[bool] = True
+
+
+class AnalyticsFunnelDefinitionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    steps_json: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+def _goal_definition_to_dict(definition: AnalyticsGoalDefinition):
+    parsed_rule = {}
+    try:
+        parsed_rule = json.loads(definition.rule_json or "{}")
+    except Exception:
+        parsed_rule = {}
+
+    return {
+        "id": definition.id,
+        "propertyId": definition.property_id,
+        "name": definition.name,
+        "description": definition.description,
+        "type": definition.goal_type,
+        "target": parsed_rule.get("target", ""),
+        "rule": parsed_rule,
+        "isActive": bool(definition.is_active),
+        "createdAt": definition.created_at.isoformat() if definition.created_at else None,
+        "updatedAt": definition.updated_at.isoformat() if definition.updated_at else None,
+    }
+
+
+def _funnel_definition_to_dict(definition: AnalyticsFunnelDefinition):
+    parsed_steps = []
+    try:
+        parsed_steps = json.loads(definition.steps_json or "[]")
+    except Exception:
+        parsed_steps = []
+
+    return {
+        "id": definition.id,
+        "propertyId": definition.property_id,
+        "name": definition.name,
+        "description": definition.description,
+        "steps": parsed_steps if isinstance(parsed_steps, list) else [],
+        "isActive": bool(definition.is_active),
+        "createdAt": definition.created_at.isoformat() if definition.created_at else None,
+        "updatedAt": definition.updated_at.isoformat() if definition.updated_at else None,
+    }
+
+
+@app.get("/api/analytics/goals/definitions")
+async def list_goal_definitions(
+    user_identifier: str,
+    property_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"definitions": []}
+
+    stmt = select(AnalyticsGoalDefinition).where(
+        AnalyticsGoalDefinition.user_id == user.id,
+        AnalyticsGoalDefinition.is_active == True,
+    )
+    if property_id:
+        stmt = stmt.where(AnalyticsGoalDefinition.property_id == property_id)
+    stmt = stmt.order_by(AnalyticsGoalDefinition.updated_at.desc())
+
+    result = await db.execute(stmt)
+    definitions = result.scalars().all()
+    return {"definitions": [_goal_definition_to_dict(definition) for definition in definitions]}
+
+
+@app.post("/api/analytics/goals/definitions")
+async def create_goal_definition(
+    data: AnalyticsGoalDefinitionCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    import uuid
+
+    definition = AnalyticsGoalDefinition(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        property_id=data.property_id,
+        name=data.name,
+        description=data.description,
+        goal_type=data.goal_type,
+        rule_json=data.rule_json or "{}",
+        is_active=data.is_active if data.is_active is not None else True,
+    )
+    db.add(definition)
+    await db.commit()
+    await db.refresh(definition)
+    return _goal_definition_to_dict(definition)
+
+
+@app.put("/api/analytics/goals/definitions/{definition_id}")
+async def update_goal_definition(
+    definition_id: str,
+    data: AnalyticsGoalDefinitionUpdate,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(AnalyticsGoalDefinition).where(
+            AnalyticsGoalDefinition.id == definition_id,
+            AnalyticsGoalDefinition.user_id == user.id,
+            AnalyticsGoalDefinition.is_active == True,
+        )
+    )
+    definition = result.scalar_one_or_none()
+    if not definition:
+        raise HTTPException(status_code=404, detail="Goal definition not found")
+
+    if data.name is not None:
+        definition.name = data.name
+    if data.description is not None:
+        definition.description = data.description
+    if data.goal_type is not None:
+        definition.goal_type = data.goal_type
+    if data.rule_json is not None:
+        definition.rule_json = data.rule_json
+    if data.is_active is not None:
+        definition.is_active = data.is_active
+    definition.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(definition)
+    return _goal_definition_to_dict(definition)
+
+
+@app.delete("/api/analytics/goals/definitions/{definition_id}")
+async def delete_goal_definition(
+    definition_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(AnalyticsGoalDefinition).where(
+            AnalyticsGoalDefinition.id == definition_id,
+            AnalyticsGoalDefinition.user_id == user.id,
+        )
+    )
+    definition = result.scalar_one_or_none()
+    if not definition:
+        raise HTTPException(status_code=404, detail="Goal definition not found")
+
+    definition.is_active = False
+    definition.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"deleted": True, "id": definition_id}
+
+
+@app.get("/api/analytics/funnels/definitions")
+async def list_funnel_definitions(
+    user_identifier: str,
+    property_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"definitions": []}
+
+    stmt = select(AnalyticsFunnelDefinition).where(
+        AnalyticsFunnelDefinition.user_id == user.id,
+        AnalyticsFunnelDefinition.is_active == True,
+    )
+    if property_id:
+        stmt = stmt.where(AnalyticsFunnelDefinition.property_id == property_id)
+    stmt = stmt.order_by(AnalyticsFunnelDefinition.updated_at.desc())
+
+    result = await db.execute(stmt)
+    definitions = result.scalars().all()
+    return {"definitions": [_funnel_definition_to_dict(definition) for definition in definitions]}
+
+
+@app.post("/api/analytics/funnels/definitions")
+async def create_funnel_definition(
+    data: AnalyticsFunnelDefinitionCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    import uuid
+
+    definition = AnalyticsFunnelDefinition(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        property_id=data.property_id,
+        name=data.name,
+        description=data.description,
+        steps_json=data.steps_json or "[]",
+        is_active=data.is_active if data.is_active is not None else True,
+    )
+    db.add(definition)
+    await db.commit()
+    await db.refresh(definition)
+    return _funnel_definition_to_dict(definition)
+
+
+@app.put("/api/analytics/funnels/definitions/{definition_id}")
+async def update_funnel_definition(
+    definition_id: str,
+    data: AnalyticsFunnelDefinitionUpdate,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(AnalyticsFunnelDefinition).where(
+            AnalyticsFunnelDefinition.id == definition_id,
+            AnalyticsFunnelDefinition.user_id == user.id,
+            AnalyticsFunnelDefinition.is_active == True,
+        )
+    )
+    definition = result.scalar_one_or_none()
+    if not definition:
+        raise HTTPException(status_code=404, detail="Funnel definition not found")
+
+    if data.name is not None:
+        definition.name = data.name
+    if data.description is not None:
+        definition.description = data.description
+    if data.steps_json is not None:
+        definition.steps_json = data.steps_json
+    if data.is_active is not None:
+        definition.is_active = data.is_active
+    definition.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(definition)
+    return _funnel_definition_to_dict(definition)
+
+
+@app.delete("/api/analytics/funnels/definitions/{definition_id}")
+async def delete_funnel_definition(
+    definition_id: str,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(AnalyticsFunnelDefinition).where(
+            AnalyticsFunnelDefinition.id == definition_id,
+            AnalyticsFunnelDefinition.user_id == user.id,
+        )
+    )
+    definition = result.scalar_one_or_none()
+    if not definition:
+        raise HTTPException(status_code=404, detail="Funnel definition not found")
+
+    definition.is_active = False
+    definition.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"deleted": True, "id": definition_id}
 
 
 # ============= Custom Dashboards (Dashboard Builder) =============

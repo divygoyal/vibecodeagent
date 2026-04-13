@@ -33,12 +33,14 @@ const TABS = [
 // Shared analytics context for sub-pages
 export const AnalyticsContext = React.createContext<{
     selectedProperty: string;
+    selectedSite: string;
     range: string;
     setRange: (r: string) => void;
     hasGoogleConnection: boolean;
     openShareDashboard: () => void;
 }>({
     selectedProperty: '',
+    selectedSite: '',
     range: '30d',
     setRange: () => {},
     hasGoogleConnection: false,
@@ -54,7 +56,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const isMainAnalyticsRoute = pathname === '/dashboard/analytics';
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
-    const { selectedProperty, setSelectedProperty, range, setRange } = useRegistration();
+    const { selectedProperty, setSelectedProperty, selectedSite, range, setRange } = useRegistration();
     const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
@@ -74,15 +76,15 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const activeFilterCount = simpleFilterCount + advancedFilters.length;
 
     return (
-        <AnalyticsContext.Provider value={{ selectedProperty, range, setRange, hasGoogleConnection, openShareDashboard: () => setShareOpen(true) }}>
+        <AnalyticsContext.Provider value={{ selectedProperty, selectedSite, range, setRange, hasGoogleConnection, openShareDashboard: () => setShareOpen(true) }}>
             <div className="space-y-0">
                 {/* ─── Sticky Top Bar ─── */}
-                <div className="sticky top-0 z-20 -mx-6 px-6 pb-0" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 92%, transparent 100%)' }}>
+                <div className="sticky top-0 z-20 -mx-6 px-6 pb-2" style={{ background: 'linear-gradient(180deg, #000000 0%, #000000 88%, transparent 100%)' }}>
                     {/* Single row: Tabs left, Controls right */}
-                    <div className="flex items-center border-b border-white/[0.04]">
+                    <div className="flex items-center rounded-[22px] border border-white/[0.08] bg-[#090b0d]/95 px-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
                         {/* Tabs — scrollable */}
                         <div className="flex-1 overflow-x-auto scrollbar-hide min-w-0">
-                            <div className="flex items-center gap-0 -mb-px min-w-0">
+                            <div className="flex items-center gap-0 min-w-0">
                             {TABS.map(tab => {
                                 const href = `/dashboard/analytics${tab.key}`;
                                 const isActive = tab.key === ''
@@ -92,20 +94,26 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     <Link
                                         key={tab.key}
                                         href={href}
-                                        className={`flex items-center justify-center gap-1.5 sm:gap-2 flex-none px-2 sm:px-3 py-2 sm:py-2 min-h-[36px] sm:min-h-0 text-xs sm:text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                                        className={`relative flex items-center justify-center gap-1.5 sm:gap-2 flex-none h-11 px-3 sm:px-4 text-[12px] font-semibold transition-colors whitespace-nowrap ${
                                             isActive
-                                                ? 'text-white border-white'
-                                                : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                                                ? 'text-white'
+                                                : 'text-zinc-500 hover:text-zinc-300'
                                         }`}
                                     >
+                                        {isActive ? (
+                                            <span className="absolute inset-x-1.5 inset-y-1 rounded-[14px] border border-white/[0.06] bg-white/[0.04]" />
+                                        ) : null}
                                         <tab.icon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                                        {tab.label}
+                                        <span className="relative z-10">{tab.label}</span>
                                         {'pulse' in tab && tab.pulse && (
-                                            <span className="relative flex h-1.5 w-1.5 ml-0.5">
+                                            <span className="relative z-10 ml-0.5 flex h-1.5 w-1.5">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
                                             </span>
                                         )}
+                                        {isActive ? (
+                                            <span className="absolute bottom-0 left-4 right-4 h-px rounded-full bg-white" />
+                                        ) : null}
                                     </Link>
                                 );
                             })}
@@ -114,13 +122,13 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                         {/* Controls — right side */}
                         {!isMainAnalyticsRoute ? (
-                            <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                            <div className="ml-3 flex shrink-0 items-center gap-2 border-l border-white/[0.06] pl-3">
                                 <FilterBuilder />
 
                                 <div className="relative">
                                     <button
                                         onClick={() => setExportOpen(!exportOpen)}
-                                        className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                        className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-white/[0.08] bg-[#0f1216] text-zinc-400 transition hover:border-white/[0.14] hover:bg-[#13171c] hover:text-zinc-200"
                                         title="Export data"
                                     >
                                         <Download className="w-3.5 h-3.5" />
@@ -128,16 +136,16 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                                     {exportOpen && (
                                         <>
                                             <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
-                                            <div className="absolute right-0 top-full mt-1 z-50 bg-[#0a0a0f] border border-white/[0.1] rounded-lg shadow-2xl py-1 min-w-[160px]">
+                                            <div className="absolute right-0 top-full mt-2 z-50 min-w-[180px] rounded-[18px] border border-white/[0.1] bg-[#090b0d] py-1.5 shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
                                                 <button
                                                     onClick={() => { window.dispatchEvent(new CustomEvent('trafficclaw:export-analytics')); setExportOpen(false); }}
-                                                    className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.04] transition"
+                                                    className="w-full px-4 py-2 text-left text-xs font-medium text-zinc-300 transition hover:bg-white/[0.04]"
                                                 >
                                                     Export CSV
                                                 </button>
                                                 <button
                                                     onClick={() => { window.dispatchEvent(new CustomEvent('trafficclaw:export-zip')); setExportOpen(false); }}
-                                                    className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.04] transition"
+                                                    className="w-full px-4 py-2 text-left text-xs font-medium text-zinc-300 transition hover:bg-white/[0.04]"
                                                 >
                                                     Export ZIP (all data)
                                                 </button>
@@ -148,7 +156,7 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                                 <button
                                     onClick={() => setShareOpen(true)}
-                                    className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1] transition"
+                                    className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-white/[0.08] bg-[#0f1216] text-zinc-400 transition hover:border-white/[0.14] hover:bg-[#13171c] hover:text-zinc-200"
                                     title="Share dashboard"
                                 >
                                     <Share2 className="w-3.5 h-3.5" />
@@ -156,10 +164,10 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                                 <button
                                     onClick={() => setCompareMode(!compareMode)}
-                                    className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] rounded-lg border transition ${
+                                    className={`flex h-10 items-center gap-1.5 rounded-[14px] border px-3.5 text-[12px] font-semibold transition ${
                                         compareMode
-                                            ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                                            : 'bg-white/[0.03] border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.1]'
+                                            ? 'border-cyan-500/24 bg-cyan-500/[0.12] text-cyan-300 shadow-[0_10px_28px_rgba(31,190,215,0.12)]'
+                                            : 'border-white/[0.08] bg-[#0f1216] text-zinc-400 hover:border-white/[0.14] hover:bg-[#13171c] hover:text-zinc-200'
                                     }`}
                                     title="Compare with previous period"
                                 >

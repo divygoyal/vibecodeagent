@@ -1,701 +1,919 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-    GitBranch, Plus, ArrowRight, TrendingDown, Percent,
-    ChevronDown, Loader2, Clock, Zap, X, AlertTriangle,
-    CheckCircle2, Users, Trash2,
-} from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import {
+    CheckCircle2,
+    ChevronRight,
+    Clock3,
+    GitBranch,
+    Loader2,
+    PencilLine,
+    Plus,
+    Save,
+    Trash2,
+    Users,
+    X,
+} from 'lucide-react';
+
+import AnalyticsTable from '@/components/analytics/AnalyticsTable';
+import {
+    AnalyticsInsightList,
+    AnalyticsSectionLink,
+    AnalyticsSubpageBadge,
+    AnalyticsSubpageEmptyState,
+    AnalyticsSubpageLoadingState,
+    AnalyticsSubpageMetricCard,
+    AnalyticsSubpageMetricGrid,
+    AnalyticsSubpagePanel,
+    AnalyticsSubpageShell,
+    formatCompactNumber,
+    formatDuration,
+    formatPercent,
+} from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import type { FunnelDefinition, FunnelSuggestion } from '@/lib/analyticsDefinitions';
 import { useAnalyticsContext } from '../layout';
 
-const fetcher = (url: string) => fetch(url).then(r => r.json());
+interface FunnelDefinitionsResponse {
+    definitions: FunnelDefinition[];
+    suggestions: FunnelSuggestion[];
+}
 
-// ─── Custom Funnel Storage (localStorage) ───
+interface FunnelAnalyticsResponse {
+    definition: FunnelDefinition;
+    steps: Array<{
+        name: string;
+        count: number;
+        users: number;
+        avgDuration: number;
+        percentOfTotal: number;
+        dropFromPrevious: number;
+    }>;
+    summary: {
+        totalEntries: number;
+        completions: number;
+        overallRate: number;
+        completionChange: number;
+        avgCompletionSessionDuration: number;
+    };
+    biggestDrop: {
+        from: string;
+        to: string;
+        rate: number;
+    };
+    trend: Array<{
+        date: string;
+        entries: number;
+        completions: number;
+    }>;
+}
 
-const FUNNELS_STORAGE_KEY = 'tc-custom-funnels';
+interface FunnelEditorState {
+    open: boolean;
+    mode: 'create' | 'edit';
+    editingId?: string;
+    values: {
+        name: string;
+        description: string;
+        steps: string[];
+    };
+}
 
-interface CustomFunnel {
-    id: string;
+interface ChartTooltipEntry {
+    dataKey: string;
+    color: string;
     name: string;
-    steps: string[]; // page paths like ['/', '/pricing', '/signup']
+    value: number;
 }
 
-function loadFunnels(): CustomFunnel[] {
-    if (typeof window === 'undefined') return [];
-    try {
-        const saved = localStorage.getItem(FUNNELS_STORAGE_KEY);
-        return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+type FunnelSelection =
+    | {
+        kind: 'saved';
+        key: string;
+        item: FunnelDefinition;
+    }
+    | {
+        kind: 'suggestion';
+        key: string;
+        item: FunnelSuggestion;
+    };
+
+const EMPTY_EDITOR: FunnelEditorState = {
+    open: false,
+    mode: 'create',
+    values: {
+        name: '',
+        description: '',
+        steps: ['', '', ''],
+    },
+};
+
+async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+    const response = await fetch(input, init);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(body.error || body.detail || 'Request failed');
+    }
+    return body;
 }
 
-function saveFunnels(funnels: CustomFunnel[]) {
-    localStorage.setItem(FUNNELS_STORAGE_KEY, JSON.stringify(funnels));
+function formatAxisDate(value: string) {
+    return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// ─── Step Color Gradient ───
+function buildSelection(
+    selectedKey: string | null,
+    definitions: FunnelDefinition[],
+    suggestions: FunnelSuggestion[],
+): FunnelSelection | null {
+    if (selectedKey?.startsWith('saved:')) {
+        const item = definitions.find((definition) => definition.id === selectedKey.replace('saved:', ''));
+        if (item) {
+            return { kind: 'saved', key: selectedKey, item };
+        }
+    }
 
-function stepColor(stepIndex: number, _totalSteps: number): string {
-    const colors = [
-        'from-emerald-500 to-emerald-400',
-        'from-emerald-400/80 to-teal-400/70',
-        'from-teal-400/60 to-cyan-400/50',
-        'from-cyan-400/40 to-zinc-400/30',
-        'from-zinc-400/25 to-zinc-500/20',
-    ];
-    const i = Math.min(stepIndex, colors.length - 1);
-    return colors[i];
+    if (selectedKey?.startsWith('suggestion:')) {
+        const index = Number(selectedKey.replace('suggestion:', ''));
+        const item = suggestions[index];
+        if (item) {
+            return { kind: 'suggestion', key: selectedKey, item };
+        }
+    }
+
+    if (definitions[0]) {
+        return { kind: 'saved', key: `saved:${definitions[0].id}`, item: definitions[0] };
+    }
+
+    if (suggestions[0]) {
+        return { kind: 'suggestion', key: 'suggestion:0', item: suggestions[0] };
+    }
+
+    return null;
 }
 
-function stepBorderColor(stepIndex: number): string {
-    const borders = [
-        'border-emerald-500/30',
-        'border-emerald-400/20',
-        'border-teal-400/15',
-        'border-cyan-400/10',
-        'border-zinc-500/10',
-    ];
-    return borders[Math.min(stepIndex, borders.length - 1)];
-}
-
-function stepTextColor(stepIndex: number): string {
-    const colors = [
-        'text-emerald-400',
-        'text-emerald-300',
-        'text-teal-300',
-        'text-cyan-300/70',
-        'text-zinc-400',
-    ];
-    return colors[Math.min(stepIndex, colors.length - 1)];
-}
-
-// ─── Funnel Step Card ───
-
-function FunnelStep({ step, index, totalSteps, isLast }: {
-    step: any; index: number; totalSteps: number; isLast: boolean;
+function FunnelTrendTooltip({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: ChartTooltipEntry[];
+    label?: string | number;
 }) {
-    const barWidthPercent = step.percentOfTotal;
+    if (!active || !payload?.length) return null;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 + index * 0.08, duration: 0.4 }}
-            className="flex items-center gap-2 sm:gap-3"
-        >
-            {/* Step Card */}
-            <div className={`flex-1 relative group`}>
-                {/* Funnel bar background */}
-                <div
-                    className={`relative rounded-xl border ${stepBorderColor(index)} bg-white/[0.02] p-3 sm:p-4 overflow-hidden transition hover:bg-white/[0.04]`}
-                >
-                    {/* Gradient fill bar indicating relative volume */}
-                    <div
-                        className={`absolute inset-y-0 left-0 bg-gradient-to-r ${stepColor(index, totalSteps)} opacity-[0.07] rounded-xl transition-all duration-700`}
-                        style={{ width: `${barWidthPercent}%` }}
-                    />
-
-                    <div className="relative z-10">
-                        {/* Step name and number */}
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className={`w-5 h-5 rounded-md bg-gradient-to-br ${stepColor(index, totalSteps)} flex items-center justify-center`}>
-                                    <span className="text-[8px] font-bold text-white">{index + 1}</span>
-                                </div>
-                                <span className="text-xs sm:text-sm font-semibold text-white">{step.name}</span>
-                            </div>
-                            {index > 0 && step.dropFromPrevious > 0 && (
-                                <span className="flex items-center gap-1 text-[10px] font-medium text-red-400/80 bg-red-500/8 border border-red-500/10 rounded-full px-2 py-0.5">
-                                    <TrendingDown className="w-2.5 h-2.5" />
-                                    -{step.dropFromPrevious.toFixed(1)}%
-                                </span>
-                            )}
+        <div className="rounded-2xl border border-white/[0.08] bg-[#050505]/95 px-4 py-3 shadow-2xl backdrop-blur">
+            <p className="text-[11px] font-semibold text-white">{formatAxisDate(label ? String(label) : '')}</p>
+            <div className="mt-2 space-y-1.5">
+                {payload.map((item) => (
+                    <div key={item.dataKey} className="flex items-center justify-between gap-5">
+                        <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="text-[11px] text-zinc-500">{item.name}</span>
                         </div>
-
-                        {/* Stats row */}
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <p className="text-lg sm:text-xl font-bold text-white tabular-nums">{step.count.toLocaleString()}</p>
-                                <p className="text-[10px] text-zinc-600">visitors</p>
-                            </div>
-                            <div className="text-right">
-                                <p className={`text-sm font-bold tabular-nums ${stepTextColor(index)}`}>
-                                    {step.percentOfTotal}%
-                                </p>
-                                <p className="text-[10px] text-zinc-600">of total</p>
-                            </div>
-                        </div>
-
-                        {/* Visual bar showing relative width */}
-                        <div className="mt-3 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                            <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${barWidthPercent}%` }}
-                                transition={{ duration: 0.6, delay: 0.2 + index * 0.1 }}
-                                className={`h-full rounded-full bg-gradient-to-r ${stepColor(index, totalSteps)}`}
-                            />
-                        </div>
+                        <span className="text-xs font-semibold text-white">
+                            {formatCompactNumber(item.value)}
+                        </span>
                     </div>
-                </div>
+                ))}
             </div>
-
-            {/* Arrow connector (except for last step) */}
-            {!isLast && (
-                <div className="flex-shrink-0 flex flex-col items-center gap-0.5">
-                    <ArrowRight className="w-4 h-4 text-zinc-700" />
-                    {step.dropFromPrevious > 0 || index === 0 ? null : null}
-                </div>
-            )}
-        </motion.div>
+        </div>
     );
 }
 
-// ─── Funnel Section ───
+function FunnelPickerCard({
+    title,
+    subtitle,
+    selected,
+    badge,
+    onClick,
+    onEdit,
+    onDelete,
+}: {
+    title: string;
+    subtitle: string;
+    selected: boolean;
+    badge: ReactNode;
+    onClick: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+}) {
+    return (
+        <div
+            className={`w-full rounded-[22px] border px-4 py-4 text-left transition ${
+                selected
+                    ? 'border-cyan-500/30 bg-cyan-500/[0.08] shadow-[0_0_0_1px_rgba(31,190,215,0.08)]'
+                    : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04]'
+            }`}
+        >
+            <div className="flex items-start justify-between gap-3">
+                <button type="button" onClick={onClick} className="min-w-0 flex-1 text-left">
+                    <p className="truncate text-sm font-semibold text-white">{title}</p>
+                    <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-5 text-zinc-500">{subtitle}</p>
+                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                    {badge}
+                    {onEdit ? (
+                        <button
+                            type="button"
+                            onClick={onEdit}
+                            className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-400 transition hover:border-white/[0.14] hover:text-white"
+                        >
+                            <PencilLine className="h-3.5 w-3.5" />
+                        </button>
+                    ) : null}
+                    {onDelete ? (
+                        <button
+                            type="button"
+                            onClick={onDelete}
+                            className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-500 transition hover:border-red-500/20 hover:text-red-400"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+        </div>
+    );
+}
 
-function FunnelSection({ funnel, index }: { funnel: any; index: number }) {
-    const [isExpanded, setIsExpanded] = useState(index === 0);
+function FunnelEditor({
+    state,
+    saving,
+    onClose,
+    onChange,
+    onSubmit,
+}: {
+    state: FunnelEditorState;
+    saving: boolean;
+    onClose: () => void;
+    onChange: (next: FunnelEditorState['values']) => void;
+    onSubmit: () => void;
+}) {
+    const steps = state.values.steps;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.4 }}
-            className="premium-card overflow-hidden"
-        >
-            {/* Header (always visible, clickable to expand/collapse) */}
-            <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between p-5 sm:p-6 text-left hover:bg-white/[0.02] transition"
-            >
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 flex items-center justify-center">
-                        <GitBranch className="w-5 h-5 text-emerald-400" />
+        <div className="rounded-[24px] border border-white/[0.08] bg-[#050505] p-5">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <p className="text-[11px] font-semibold text-zinc-500">
+                        {state.mode === 'create' ? 'Create funnel' : 'Edit funnel'}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">Save this flow for the current property.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-500 transition hover:border-white/[0.14] hover:text-white"
+                >
+                    <X className="h-4 w-4" />
+                </button>
+            </div>
+
+            <div className="mt-5 grid gap-4">
+                <label className="grid gap-2">
+                    <span className="text-[11px] font-medium text-zinc-500">Funnel name</span>
+                    <input
+                        value={state.values.name}
+                        onChange={(event) => onChange({ ...state.values, name: event.target.value })}
+                        className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/30"
+                        placeholder="Pricing to signup"
+                    />
+                </label>
+                <label className="grid gap-2">
+                    <span className="text-[11px] font-medium text-zinc-500">Description</span>
+                    <textarea
+                        value={state.values.description}
+                        onChange={(event) => onChange({ ...state.values, description: event.target.value })}
+                        rows={3}
+                        className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/30"
+                        placeholder="Explain the flow you want to measure."
+                    />
+                </label>
+                <div className="grid gap-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-zinc-500">Steps</span>
+                        <button
+                            type="button"
+                            onClick={() => onChange({ ...state.values, steps: [...steps, ''] })}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-[11px] text-zinc-400 transition hover:border-white/[0.12] hover:text-white"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Add step
+                        </button>
+                    </div>
+
+                    {steps.map((step, index) => (
+                        <div key={`${index}-${step}`} className="flex items-center gap-2">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-500/15 bg-cyan-500/[0.08] text-xs font-semibold text-cyan-300">
+                                {index + 1}
+                            </div>
+                            <input
+                                value={step}
+                                onChange={(event) => {
+                                    const nextSteps = [...steps];
+                                    nextSteps[index] = event.target.value;
+                                    onChange({ ...state.values, steps: nextSteps });
+                                }}
+                                className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/30"
+                                placeholder="/pricing"
+                            />
+                            {steps.length > 2 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onChange({ ...state.values, steps: steps.filter((_, stepIndex) => stepIndex !== index) })}
+                                    className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-500 transition hover:border-red-500/20 hover:text-red-400"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-white/[0.06] pt-4">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-xl border border-white/[0.08] px-4 py-2 text-xs font-medium text-zinc-400 transition hover:border-white/[0.12] hover:text-white"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={onSubmit}
+                    disabled={saving || !state.values.name.trim() || steps.filter((step) => step.trim()).length < 2}
+                    className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-xs font-semibold text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                    {state.mode === 'create' ? 'Save funnel' : 'Update funnel'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function FunnelStepCard({
+    index,
+    step,
+    isLast,
+}: {
+    index: number;
+    step: FunnelAnalyticsResponse['steps'][number];
+    isLast: boolean;
+}) {
+    return (
+        <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-zinc-500">Step {index + 1}</p>
+                        <p className="mt-2 truncate text-sm font-semibold text-white">{step.name}</p>
+                    </div>
+                    <AnalyticsSubpageBadge
+                        label={`${step.percentOfTotal.toFixed(0)}% of entry`}
+                        tone={index === 0 ? 'emerald' : 'cyan'}
+                    />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div>
+                        <p className="text-[11px] font-semibold text-zinc-500">Users</p>
+                        <p className="mt-1 text-lg font-semibold text-white">{formatCompactNumber(step.count)}</p>
                     </div>
                     <div>
-                        <h3 className="text-sm sm:text-base font-bold text-white">{funnel.name}</h3>
-                        <p className="text-[11px] text-zinc-500 mt-0.5">{funnel.description}</p>
+                        <p className="text-[11px] font-semibold text-zinc-500">Drop-off</p>
+                        <p className="mt-1 text-lg font-semibold text-white">
+                            {index === 0 ? '—' : formatPercent(step.dropFromPrevious, 1)}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[11px] font-semibold text-zinc-500">Avg session</p>
+                        <p className="mt-1 text-lg font-semibold text-white">{formatDuration(step.avgDuration)}</p>
                     </div>
                 </div>
+            </div>
+            {!isLast ? <ChevronRight className="h-5 w-5 shrink-0 text-zinc-700" /> : null}
+        </div>
+    );
+}
 
-                <div className="flex items-center gap-4 sm:gap-6">
-                    {/* Quick stats */}
-                    <div className="hidden sm:flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-xs text-zinc-500">Conversion</p>
-                            <p className="text-sm font-bold text-emerald-400 tabular-nums">{funnel.overallRate}%</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs text-zinc-500">Entries</p>
-                            <p className="text-sm font-bold text-white tabular-nums">{funnel.totalEntries.toLocaleString()}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs text-zinc-500">Completions</p>
-                            <p className="text-sm font-bold text-white tabular-nums">{funnel.completions.toLocaleString()}</p>
-                        </div>
-                    </div>
+export default function FunnelsPage() {
+    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [editor, setEditor] = useState<FunnelEditorState>(EMPTY_EDITOR);
+    const [saving, setSaving] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
-                    <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                </div>
-            </button>
+    const definitionsKey = selectedProperty && hasGoogleConnection
+        ? `/api/analytics/funnels/definitions?propertyId=${encodeURIComponent(selectedProperty)}&range=${encodeURIComponent(range)}`
+        : null;
 
-            {/* Expandable content */}
-            <AnimatePresence>
-                {isExpanded && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
+    const {
+        data: definitionData,
+        isLoading: definitionsLoading,
+        mutate: mutateDefinitions,
+    } = useSWR<FunnelDefinitionsResponse>(definitionsKey, fetchJson, {
+        keepPreviousData: true,
+    });
+
+    const definitions = useMemo(() => definitionData?.definitions ?? [], [definitionData?.definitions]);
+    const suggestions = useMemo(() => definitionData?.suggestions ?? [], [definitionData?.suggestions]);
+
+    const selectedFunnel = useMemo(
+        () => buildSelection(selectedKey, definitions, suggestions),
+        [selectedKey, definitions, suggestions],
+    );
+
+    useEffect(() => {
+        if (!selectedFunnel) {
+            const fallback = buildSelection(null, definitions, suggestions);
+            setSelectedKey(fallback?.key || null);
+            return;
+        }
+
+        if (selectedFunnel.key !== selectedKey) {
+            setSelectedKey(selectedFunnel.key);
+        }
+    }, [definitions, selectedFunnel, selectedKey, suggestions]);
+
+    const funnelQuery = useMemo(() => {
+        if (!selectedProperty || !selectedFunnel) return null;
+
+        const params = new URLSearchParams({
+            propertyId: selectedProperty,
+            range,
+            steps: selectedFunnel.item.steps.join(','),
+            name: selectedFunnel.item.name,
+        });
+
+        if ('description' in selectedFunnel.item && selectedFunnel.item.description) {
+            params.set('description', selectedFunnel.item.description);
+        }
+
+        return `/api/analytics/funnels?${params.toString()}`;
+    }, [range, selectedFunnel, selectedProperty]);
+
+    const {
+        data,
+        isLoading: analyticsLoading,
+        error: analyticsError,
+    } = useSWR<FunnelAnalyticsResponse>(funnelQuery, fetchJson, {
+        keepPreviousData: true,
+    });
+
+    const openCreate = (prefill?: Partial<FunnelEditorState['values']>) => {
+        setEditor({
+            open: true,
+            mode: 'create',
+            values: {
+                name: prefill?.name || '',
+                description: prefill?.description || '',
+                steps: prefill?.steps?.length ? prefill.steps : ['', '', ''],
+            },
+        });
+    };
+
+    const openEdit = (definition: FunnelDefinition) => {
+        setEditor({
+            open: true,
+            mode: 'edit',
+            editingId: definition.id,
+            values: {
+                name: definition.name,
+                description: definition.description || '',
+                steps: definition.steps.length ? definition.steps : ['', '', ''],
+            },
+        });
+    };
+
+    const closeEditor = () => setEditor(EMPTY_EDITOR);
+
+    const submitEditor = async () => {
+        if (!selectedProperty) return;
+
+        try {
+            setSaving(true);
+            const payload = {
+                propertyId: selectedProperty,
+                name: editor.values.name.trim(),
+                description: editor.values.description.trim(),
+                steps: editor.values.steps.map((step) => step.trim()).filter(Boolean),
+            };
+
+            const response = editor.mode === 'create'
+                ? await fetchJson<FunnelDefinition>('/api/analytics/funnels/definitions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                })
+                : await fetchJson<FunnelDefinition>(`/api/analytics/funnels/definitions/${editor.editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+            await mutateDefinitions();
+            if (response?.id) {
+                setSelectedKey(`saved:${response.id}`);
+            }
+            closeEditor();
+        } catch (error) {
+            console.error('Failed to save funnel definition:', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteFunnel = async (definition: FunnelDefinition) => {
+        try {
+            setDeletingId(definition.id);
+            await fetchJson(`/api/analytics/funnels/definitions/${definition.id}`, {
+                method: 'DELETE',
+            });
+            await mutateDefinitions();
+            setSelectedKey(null);
+        } catch (error) {
+            console.error('Failed to delete funnel definition:', error);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    if (definitionsLoading && !definitionData) {
+        return <AnalyticsSubpageLoadingState title="Funnels" />;
+    }
+
+    if (!selectedProperty || (!selectedFunnel && !definitionsLoading)) {
+        return (
+            <AnalyticsSubpageEmptyState
+                title="No funnel context available"
+                description="Connect Google Analytics and choose a property to start saving funnel definitions."
+            />
+        );
+    }
+
+    const starterSelection = selectedFunnel?.kind === 'suggestion';
+    const stepTableRows = data?.steps || [];
+
+    return (
+        <AnalyticsSubpageShell
+            eyebrow="Funnels"
+            title="Funnels"
+            description="Saved step flows with honest drop-off and completion signals."
+            actions={(
+                <div className="flex items-center gap-3">
+                    {selectedFunnel ? (
+                        <AnalyticsSubpageBadge
+                            label={selectedFunnel.kind === 'saved' ? 'Saved funnel' : 'Starter suggestion'}
+                            tone={selectedFunnel.kind === 'saved' ? 'cyan' : 'amber'}
+                        />
+                    ) : null}
+                    <button
+                        type="button"
+                        onClick={() => openCreate()}
+                        className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/25 bg-cyan-500/12 px-4 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-500/35 hover:bg-cyan-500/18"
                     >
-                        <div className="px-5 sm:px-6 pb-5 sm:pb-6 space-y-5">
-                            {/* Divider */}
-                            <div className="border-t border-white/[0.06]" />
-
-                            {/* Mobile quick stats */}
-                            <div className="grid grid-cols-3 gap-3 sm:hidden">
-                                <div className="bg-white/[0.03] rounded-xl p-3 text-center">
-                                    <Percent className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
-                                    <p className="text-xs font-bold text-white tabular-nums">{funnel.overallRate}%</p>
-                                    <p className="text-[9px] text-zinc-600">Conversion</p>
-                                </div>
-                                <div className="bg-white/[0.03] rounded-xl p-3 text-center">
-                                    <Users className="w-3.5 h-3.5 text-blue-400 mx-auto mb-1" />
-                                    <p className="text-xs font-bold text-white tabular-nums">{funnel.totalEntries.toLocaleString()}</p>
-                                    <p className="text-[9px] text-zinc-600">Entries</p>
-                                </div>
-                                <div className="bg-white/[0.03] rounded-xl p-3 text-center">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 mx-auto mb-1" />
-                                    <p className="text-xs font-bold text-white tabular-nums">{funnel.completions.toLocaleString()}</p>
-                                    <p className="text-[9px] text-zinc-600">Completions</p>
-                                </div>
+                        <Plus className="h-3.5 w-3.5" />
+                        New funnel
+                    </button>
+                </div>
+            )}
+        >
+            <AnalyticsSubpagePanel
+                title="Funnel definitions"
+                description="Saved and suggested flows."
+            >
+                <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+                    <div className="space-y-5">
+                        <div>
+                            <div className="mb-3 flex items-center justify-between">
+                                <p className="text-[11px] font-semibold text-zinc-500">Saved funnels</p>
+                                <AnalyticsSubpageBadge label={`${definitions.length} saved`} tone="cyan" />
                             </div>
+                            <div className="space-y-3">
+                                {definitions.length ? definitions.map((definition) => (
+                                    <FunnelPickerCard
+                                        key={definition.id}
+                                        title={definition.name}
+                                        subtitle={definition.description || definition.steps.join(' → ')}
+                                        selected={selectedKey === `saved:${definition.id}`}
+                                        onClick={() => setSelectedKey(`saved:${definition.id}`)}
+                                        onEdit={() => openEdit(definition)}
+                                        onDelete={() => deleteFunnel(definition)}
+                                        badge={<AnalyticsSubpageBadge label={`${definition.steps.length} steps`} tone="cyan" />}
+                                    />
+                                )) : (
+                                    <div className="rounded-[22px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-5 text-sm text-zinc-500">
+                                        No saved funnels yet. Use a starter suggestion below or create your own.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
-                            {/* Funnel Steps - Horizontal on desktop, vertical on mobile */}
-                            <div className="hidden lg:block">
-                                <div className="flex items-stretch gap-2">
-                                    {funnel.steps.map((step: any, i: number) => (
-                                        <div key={i} className="flex items-center gap-2" style={{ flex: `${step.percentOfTotal} 0 0` }}>
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: 0.15 + i * 0.08 }}
-                                                className={`flex-1 rounded-xl border ${stepBorderColor(i)} bg-white/[0.02] p-4 relative overflow-hidden hover:bg-white/[0.04] transition`}
-                                            >
-                                                {/* Background fill */}
-                                                <div
-                                                    className={`absolute inset-0 bg-gradient-to-b ${stepColor(i, funnel.steps.length)} opacity-[0.05]`}
-                                                />
-                                                <div className="relative z-10">
-                                                    <div className="flex items-center gap-1.5 mb-2">
-                                                        <div className={`w-5 h-5 rounded-md bg-gradient-to-br ${stepColor(i, funnel.steps.length)} flex items-center justify-center`}>
-                                                            <span className="text-[8px] font-bold text-white">{i + 1}</span>
-                                                        </div>
-                                                        <span className="text-xs font-semibold text-white truncate">{step.name}</span>
-                                                    </div>
-                                                    <p className="text-xl font-bold text-white tabular-nums">{step.count.toLocaleString()}</p>
-                                                    <p className={`text-xs font-medium tabular-nums mt-0.5 ${stepTextColor(i)}`}>{step.percentOfTotal}%</p>
-                                                    {i > 0 && step.dropFromPrevious > 0 && (
-                                                        <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-red-400/80">
-                                                            <TrendingDown className="w-2.5 h-2.5" />
-                                                            -{step.dropFromPrevious.toFixed(1)}%
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </motion.div>
-                                            {i < funnel.steps.length - 1 && (
-                                                <ArrowRight className="w-4 h-4 text-zinc-700 flex-shrink-0" />
-                                            )}
+                        <div>
+                            <div className="mb-3 flex items-center justify-between">
+                                <p className="text-[11px] font-semibold text-zinc-500">Starters</p>
+                                <AnalyticsSubpageBadge label={`${suggestions.length} suggested`} tone="amber" />
+                            </div>
+                            <div className="space-y-3">
+                                {suggestions.length ? suggestions.map((suggestion, index) => (
+                                    <FunnelPickerCard
+                                        key={`${suggestion.name}-${index}`}
+                                        title={suggestion.name}
+                                        subtitle={suggestion.description}
+                                        selected={selectedKey === `suggestion:${index}`}
+                                        onClick={() => setSelectedKey(`suggestion:${index}`)}
+                                        onEdit={() => openCreate({
+                                            name: suggestion.name,
+                                            description: suggestion.description,
+                                            steps: suggestion.steps,
+                                        })}
+                                        badge={<AnalyticsSubpageBadge label={`${suggestion.steps.length} steps`} tone="amber" />}
+                                    />
+                                )) : (
+                                    <div className="rounded-[22px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-5 text-sm text-zinc-500">
+                                        No starter suggestions were generated for this property yet.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-5">
+                        {editor.open ? (
+                            <FunnelEditor
+                                state={editor}
+                                saving={saving}
+                                onClose={closeEditor}
+                                onChange={(values) => setEditor((prev) => ({ ...prev, values }))}
+                                onSubmit={submitEditor}
+                            />
+                        ) : (
+                            <div className="rounded-[24px] border border-white/[0.08] bg-[#050505] p-5">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-[11px] font-semibold text-zinc-500">Selected funnel</p>
+                                        <h3 className="mt-2 text-xl font-semibold text-white">
+                                            {selectedFunnel?.item.name || 'Select a funnel'}
+                                        </h3>
+                                        <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                                            {'description' in (selectedFunnel?.item || {}) && selectedFunnel?.item.description
+                                                ? selectedFunnel.item.description
+                                                : 'Pick a funnel to load the completion view.'}
+                                        </p>
+                                    </div>
+                                    {selectedFunnel ? (
+                                        <AnalyticsSubpageBadge
+                                            label={`${selectedFunnel.item.steps.length} steps`}
+                                            tone={selectedFunnel.kind === 'saved' ? 'cyan' : 'amber'}
+                                        />
+                                    ) : null}
+                                </div>
+
+                                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                                    {selectedFunnel?.item.steps.map((step, index) => (
+                                        <div key={`${step}-${index}`} className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] p-4">
+                                            <p className="text-[11px] font-semibold text-zinc-500">Step {index + 1}</p>
+                                            <p className="mt-2 text-sm font-medium text-white">{step}</p>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
 
-                            {/* Vertical funnel for mobile/tablet */}
-                            <div className="lg:hidden space-y-2">
-                                {funnel.steps.map((step: any, i: number) => (
-                                    <FunnelStep
-                                        key={i}
-                                        step={step}
-                                        index={i}
-                                        totalSteps={funnel.steps.length}
-                                        isLast={i === funnel.steps.length - 1}
-                                    />
-                                ))}
-                            </div>
-
-                            {/* Overall conversion bar */}
-                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs text-zinc-400 font-medium">Overall Conversion Rate</span>
-                                    <span className="text-sm font-bold text-emerald-400 tabular-nums">{funnel.overallRate}%</span>
-                                </div>
-                                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${Math.min(funnel.overallRate * 4, 100)}%` }}
-                                        transition={{ duration: 0.8, delay: 0.3 }}
-                                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                                    {/* Biggest drop-off */}
-                                    <div className="flex items-center gap-2.5 bg-red-500/[0.05] border border-red-500/10 rounded-lg p-3">
-                                        <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-[10px] text-zinc-500 font-medium">Biggest Drop-off</p>
-                                            <p className="text-xs text-red-400 font-semibold truncate">
-                                                {funnel.biggestDrop.from} → {funnel.biggestDrop.to}
-                                            </p>
-                                            <p className="text-[10px] text-red-400/60 tabular-nums">-{funnel.biggestDrop.rate}%</p>
-                                        </div>
+                                {starterSelection ? (
+                                    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
+                                        <AnalyticsSectionLink
+                                            label="Save starter as funnel"
+                                            onClick={() => openCreate({
+                                                name: selectedFunnel.item.name,
+                                                description: 'description' in selectedFunnel.item ? selectedFunnel.item.description : '',
+                                                steps: selectedFunnel.item.steps,
+                                            })}
+                                        />
                                     </div>
-
-                                    {/* Avg time to complete */}
-                                    <div className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
-                                        <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                                            <Clock className="w-3.5 h-3.5 text-blue-400" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-zinc-500 font-medium">Avg. Time</p>
-                                            <p className="text-xs text-white font-semibold">{funnel.avgTimeToComplete}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Completions */}
-                                    <div className="flex items-center gap-2.5 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-lg p-3">
-                                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-zinc-500 font-medium">Completions</p>
-                                            <p className="text-xs text-white font-semibold tabular-nums">
-                                                {funnel.completions.toLocaleString()} / {funnel.totalEntries.toLocaleString()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                                ) : null}
                             </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
-    );
-}
-
-// ─── Create Funnel Form (collapsed) ───
-
-function CreateFunnelForm({ onClose, onCreated }: { onClose: () => void; onCreated: (funnel: CustomFunnel) => void }) {
-    const [name, setName] = useState('');
-    const [steps, setSteps] = useState(['', '']);
-
-    const canSubmit = name.trim().length > 0 && steps.filter(s => s.trim()).length >= 2;
-
-    function handleSubmit() {
-        if (!canSubmit) return;
-        const funnel: CustomFunnel = {
-            id: `funnel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            name: name.trim(),
-            steps: steps.map(s => s.trim()).filter(Boolean),
-        };
-        const existing = loadFunnels();
-        saveFunnels([...existing, funnel]);
-        onCreated(funnel);
-        onClose();
-    }
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-        >
-            <div className="premium-card p-5 sm:p-6">
-                <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <h3 className="text-sm font-semibold text-white">Create New Funnel</h3>
+                        )}
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] transition">
-                        <X className="w-4 h-4 text-zinc-500" />
-                    </button>
                 </div>
+            </AnalyticsSubpagePanel>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-[11px] text-zinc-500 font-medium mb-1.5">Funnel Name</label>
-                        <input
-                            type="text"
-                            placeholder="e.g., Purchase Funnel"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
+            {analyticsLoading && !data ? (
+                <AnalyticsSubpageLoadingState title="Funnel analytics" />
+            ) : analyticsError || !data ? (
+                <AnalyticsSubpageEmptyState
+                    title="Funnel analytics are temporarily unavailable"
+                    description="We couldn't compute the latest funnel view right now. Try again in a moment."
+                />
+            ) : (
+                <>
+                    <AnalyticsSubpageMetricGrid>
+                        <AnalyticsSubpageMetricCard
+                            label="Total Entries"
+                            value={formatCompactNumber(data.summary.totalEntries)}
+                            icon={Users}
+                            tone="cyan"
                         />
-                    </div>
+                        <AnalyticsSubpageMetricCard
+                            label="Completions"
+                            value={formatCompactNumber(data.summary.completions)}
+                            icon={CheckCircle2}
+                            tone="emerald"
+                            trend={data.summary.completionChange}
+                        />
+                        <AnalyticsSubpageMetricCard
+                            label="Overall Rate"
+                            value={formatPercent(data.summary.overallRate, 1)}
+                            icon={GitBranch}
+                            tone="mixed"
+                        />
+                        <AnalyticsSubpageMetricCard
+                            label="Avg Completion Session"
+                            value={formatDuration(data.summary.avgCompletionSessionDuration)}
+                            icon={Clock3}
+                            tone="amber"
+                        />
+                    </AnalyticsSubpageMetricGrid>
 
-                    <div>
-                        <label className="block text-[11px] text-zinc-500 font-medium mb-2">Funnel Steps</label>
-                        <div className="space-y-2">
-                            {steps.map((step, i) => (
-                                <div key={i} className="flex items-center gap-2">
-                                    <div className={`w-6 h-6 rounded-md bg-gradient-to-br ${stepColor(i, steps.length)} flex items-center justify-center flex-shrink-0`}>
-                                        <span className="text-[8px] font-bold text-white">{i + 1}</span>
+                    <AnalyticsSubpagePanel
+                        title="Completion trend"
+                    >
+                        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+                            <div className="rounded-[24px] border border-white/[0.06] bg-[#050505] p-4 sm:p-5">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[11px] font-semibold text-zinc-500">Entries vs completions</p>
+                                        <p className="mt-1 text-sm text-zinc-400">Top-of-funnel volume vs final-step wins.</p>
                                     </div>
-                                    <input
-                                        type="text"
-                                        placeholder={`Step ${i + 1} — page path (e.g. /pricing)`}
-                                        value={step}
-                                        onChange={(e) => {
-                                            const newSteps = [...steps];
-                                            newSteps[i] = e.target.value;
-                                            setSteps(newSteps);
-                                        }}
-                                        className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition"
-                                    />
-                                    {steps.length > 2 && (
-                                        <button
-                                            onClick={() => setSteps(steps.filter((_, idx) => idx !== i))}
-                                            className="p-1.5 rounded-lg hover:bg-red-500/10 transition"
-                                        >
-                                            <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
-                                        </button>
-                                    )}
-                                    {i < steps.length - 1 && (
-                                        <ArrowRight className="w-3 h-3 text-zinc-700 flex-shrink-0 hidden sm:block" />
-                                    )}
+                                    <AnalyticsSubpageBadge label={`${data.definition.steps.length} steps`} tone="cyan" />
                                 </div>
+                                <div className="h-[320px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={data.trend} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="funnelEntriesGradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#1FBED7" stopOpacity={0.22} />
+                                                    <stop offset="100%" stopColor="#1FBED7" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                tickFormatter={formatAxisDate}
+                                                tick={{ fontSize: 11, fill: '#71717a' }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                minTickGap={24}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11, fill: '#71717a' }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                width={44}
+                                            />
+                                            <Tooltip content={<FunnelTrendTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.22)', strokeWidth: 1 }} />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="entries"
+                                                name="Entries"
+                                                stroke="#1FBED7"
+                                                fill="url(#funnelEntriesGradient)"
+                                                strokeWidth={2.5}
+                                                dot={false}
+                                                activeDot={{ r: 5, fill: '#1FBED7', stroke: '#050505', strokeWidth: 2 }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="completions"
+                                                name="Completions"
+                                                stroke="#33CF96"
+                                                fillOpacity={0}
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{ r: 4, fill: '#33CF96', stroke: '#050505', strokeWidth: 2 }}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <AnalyticsInsightList
+                                    items={[
+                                        {
+                                            label: 'Biggest leak',
+                                            value: data.biggestDrop.rate > 0
+                                                ? `${data.biggestDrop.from} → ${data.biggestDrop.to}`
+                                                : 'No major leak detected',
+                                            note: data.biggestDrop.rate > 0
+                                                ? `${formatPercent(data.biggestDrop.rate, 1)} drop between adjacent steps`
+                                                : 'No material leak in the current range.',
+                                        },
+                                        {
+                                            label: 'Entry volume',
+                                            value: formatCompactNumber(data.summary.totalEntries),
+                                            note: `${data.definition.steps[0]} is the current entry step.`,
+                                        },
+                                        {
+                                            label: 'Completion rate',
+                                            value: formatPercent(data.summary.overallRate, 1),
+                                            note: `${formatCompactNumber(data.summary.completions)} completions from ${formatCompactNumber(data.summary.totalEntries)} entries in the selected range.`,
+                                        },
+                                    ]}
+                                />
+                            </div>
+                        </div>
+                    </AnalyticsSubpagePanel>
+
+                    <AnalyticsSubpagePanel
+                        title="Step breakdown"
+                    >
+                        <div className="space-y-3">
+                            {data.steps.map((step, index) => (
+                                <FunnelStepCard
+                                    key={`${step.name}-${index}`}
+                                    index={index}
+                                    step={step}
+                                    isLast={index === data.steps.length - 1}
+                                />
                             ))}
                         </div>
-                        <button
-                            onClick={() => setSteps([...steps, ''])}
-                            className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-emerald-400 transition"
-                        >
-                            <Plus className="w-3 h-3" />
-                            Add Step
-                        </button>
-                    </div>
-                </div>
+                    </AnalyticsSubpagePanel>
 
-                <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-white/[0.06]">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition rounded-lg hover:bg-white/[0.04]"
+                    <AnalyticsSubpagePanel
+                        title="Step table"
                     >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={!canSubmit}
-                        className={`px-5 py-2 text-xs font-semibold text-white rounded-lg transition shadow-lg ${
-                            canSubmit
-                                ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20'
-                                : 'bg-zinc-700 cursor-not-allowed shadow-none'
-                        }`}
-                    >
-                        Create Funnel
-                    </button>
-                </div>
-            </div>
-        </motion.div>
-    );
-}
+                        <AnalyticsTable
+                            data={stepTableRows}
+                            showSearch={false}
+                            defaultSort={{ key: 'count', dir: 'desc' }}
+                            columns={[
+                                {
+                                    key: 'name',
+                                    label: 'Step',
+                                    sortable: true,
+                                    getValue: (item) => item.name,
+                                    render: (item) => <span className="text-xs font-medium text-zinc-200">{item.name}</span>,
+                                },
+                                {
+                                    key: 'count',
+                                    label: 'Users',
+                                    align: 'right',
+                                    sortable: true,
+                                    getValue: (item) => item.count,
+                                    render: (item) => <span className="text-xs font-semibold text-white">{formatCompactNumber(item.count)}</span>,
+                                },
+                                {
+                                    key: 'percentOfTotal',
+                                    label: '% of entry',
+                                    align: 'right',
+                                    sortable: true,
+                                    getValue: (item) => item.percentOfTotal,
+                                    render: (item) => <span className="text-xs text-cyan-300">{item.percentOfTotal.toFixed(0)}%</span>,
+                                },
+                                {
+                                    key: 'dropFromPrevious',
+                                    label: 'Drop-off',
+                                    align: 'right',
+                                    sortable: true,
+                                    getValue: (item) => item.dropFromPrevious,
+                                    render: (item, index) => (
+                                        <span className="text-xs text-zinc-400">
+                                            {index === 0 ? '—' : `${item.dropFromPrevious.toFixed(1)}%`}
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'avgDuration',
+                                    label: 'Avg session',
+                                    align: 'right',
+                                    sortable: true,
+                                    getValue: (item) => item.avgDuration,
+                                    render: (item) => <span className="text-xs text-zinc-400">{formatDuration(item.avgDuration)}</span>,
+                                },
+                            ]}
+                        />
+                    </AnalyticsSubpagePanel>
 
-// ─── Main Page ───
-
-export default function FunnelsPage() {
-    const { selectedProperty, range } = useAnalyticsContext();
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [customFunnels, setCustomFunnels] = useState<CustomFunnel[]>([]);
-    const [selectedFunnelId, setSelectedFunnelId] = useState<string | null>(null);
-
-    // Load saved funnels from localStorage on mount
-    useEffect(() => {
-        const saved = loadFunnels();
-        setCustomFunnels(saved);
-        if (saved.length > 0 && !selectedFunnelId) {
-            setSelectedFunnelId(saved[0].id);
-        }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const selectedFunnel = customFunnels.find(f => f.id === selectedFunnelId);
-
-    // Build the SWR key: if a custom funnel is selected, pass its steps; otherwise auto-detect
-    const stepsParam = selectedFunnel ? selectedFunnel.steps.join(',') : '';
-    const swrKey = selectedProperty
-        ? `/api/analytics/funnels?propertyId=${selectedProperty}&range=${range}${stepsParam ? `&steps=${stepsParam}` : ''}`
-        : null;
-
-    const { data, isLoading, error, mutate } = useSWR(swrKey, fetcher);
-
-    const handleFunnelCreated = useCallback((funnel: CustomFunnel) => {
-        const updated = loadFunnels(); // re-read to include the just-saved one
-        setCustomFunnels(updated);
-        setSelectedFunnelId(funnel.id);
-        mutate();
-    }, [mutate]);
-
-    const handleDeleteFunnel = useCallback((funnelId: string) => {
-        const updated = customFunnels.filter(f => f.id !== funnelId);
-        saveFunnels(updated);
-        setCustomFunnels(updated);
-        if (selectedFunnelId === funnelId) {
-            setSelectedFunnelId(updated.length > 0 ? updated[0].id : null);
-        }
-        mutate();
-    }, [customFunnels, selectedFunnelId, mutate]);
-
-    const handleSelectFunnel = useCallback((funnelId: string) => {
-        setSelectedFunnelId(funnelId);
-    }, []);
-
-    if (isLoading && !data) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <GitBranch className="w-6 h-6 text-red-400" />
-                </div>
-                <p className="text-red-400 text-sm font-medium">Failed to load funnels</p>
-            </div>
-        );
-    }
-
-    // Merge API response funnels with selected funnel name
-    const apiFunnels = (data?.funnels || []).map((f: any) => ({
-        ...f,
-        name: selectedFunnel ? selectedFunnel.name : f.name,
-        description: selectedFunnel
-            ? `Steps: ${selectedFunnel.steps.join(' → ')}`
-            : f.description,
-    }));
-
-    const funnels = apiFunnels;
-    const totalCompletions = funnels.reduce((s: number, f: any) => s + f.completions, 0);
-    const totalEntries = funnels.reduce((s: number, f: any) => s + f.totalEntries, 0);
-    const avgConversion = totalEntries > 0 ? ((totalCompletions / totalEntries) * 100).toFixed(1) : '0';
-
-    return (
-        <div className="space-y-6">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between"
-            >
-                <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <GitBranch className="w-5 h-5 text-emerald-400" />
-                        Funnels
-                    </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                        Visualize user journeys and identify drop-off points
-                    </p>
-                </div>
-                <button
-                    onClick={() => setShowCreateForm(!showCreateForm)}
-                    className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 hover:border-emerald-500/30 transition group"
-                >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-90 transition-transform duration-300" />
-                    Create Funnel
-                </button>
-            </motion.div>
-
-            {/* ─── Create Funnel Form (collapsed) ─── */}
-            <AnimatePresence>
-                {showCreateForm && (
-                    <CreateFunnelForm
-                        onClose={() => setShowCreateForm(false)}
-                        onCreated={handleFunnelCreated}
-                    />
-                )}
-            </AnimatePresence>
-
-            {/* ─── Saved Funnels Selector ─── */}
-            {customFunnels.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.03 }}
-                >
-                    <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Saved Funnels</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {/* Auto-detect option (no custom steps) */}
-                        <button
-                            onClick={() => setSelectedFunnelId(null)}
-                            className={`group flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition ${
-                                !selectedFunnelId
-                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                    : 'bg-white/[0.03] border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15]'
-                            }`}
-                        >
-                            <Zap className="w-3 h-3" />
-                            Auto-detect
-                        </button>
-                        {customFunnels.map(cf => (
-                            <div key={cf.id} className="flex items-center gap-0">
-                                <button
-                                    onClick={() => handleSelectFunnel(cf.id)}
-                                    className={`flex items-center gap-2 px-3 py-2 rounded-l-lg border border-r-0 text-xs font-medium transition ${
-                                        selectedFunnelId === cf.id
-                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                            : 'bg-white/[0.03] border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.15]'
-                                    }`}
-                                >
-                                    <GitBranch className="w-3 h-3" />
-                                    {cf.name}
-                                    <span className="text-[10px] text-zinc-600 font-normal">{cf.steps.length} steps</span>
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteFunnel(cf.id)}
-                                    className={`px-2 py-2 rounded-r-lg border text-xs transition ${
-                                        selectedFunnelId === cf.id
-                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-red-400/60 hover:text-red-400 hover:bg-red-500/10'
-                                            : 'bg-white/[0.03] border-white/[0.08] text-zinc-600 hover:text-red-400 hover:bg-red-500/10'
-                                    }`}
-                                    title="Delete funnel"
-                                >
-                                    <Trash2 className="w-3 h-3" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
-
-            {/* ─── Summary Stats ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-            >
-                {[
-                    { label: 'Saved Funnels', value: customFunnels.length || funnels.length, icon: GitBranch, color: 'emerald' },
-                    { label: 'Total Entries', value: totalEntries.toLocaleString(), icon: Users, color: 'blue' },
-                    { label: 'Completions', value: totalCompletions.toLocaleString(), icon: CheckCircle2, color: 'violet' },
-                    { label: 'Avg. Conversion', value: `${avgConversion}%`, icon: Percent, color: 'pink' },
-                ].map((stat, i) => (
-                    <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.05 + i * 0.04 }}
-                        className="premium-card p-3 sm:p-4"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className={`w-6 h-6 rounded-md bg-${stat.color}-500/10 flex items-center justify-center`}>
-                                <stat.icon className={`w-3 h-3 text-${stat.color}-400`} />
-                            </div>
-                            <span className="text-[10px] text-zinc-500 font-medium">{stat.label}</span>
+                    {deletingId ? (
+                        <div className="flex items-center justify-end">
+                            <AnalyticsSubpageBadge label={`Deleting ${deletingId}`} tone="amber" />
                         </div>
-                        <p className="text-lg sm:text-xl font-bold text-white tabular-nums">{stat.value}</p>
-                    </motion.div>
-                ))}
-            </motion.div>
-
-            {/* ─── Funnel Sections ─── */}
-            <div className="space-y-4">
-                {funnels.map((funnel: any, i: number) => (
-                    <FunnelSection key={funnel.id || i} funnel={funnel} index={i} />
-                ))}
-            </div>
-
-            {/* ─── Empty state ─── */}
-            {funnels.length === 0 && (
-                <div className="premium-card p-12 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
-                        <GitBranch className="w-8 h-8 text-zinc-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-white mb-1">No funnels yet</h3>
-                    <p className="text-xs text-zinc-500 mb-4 max-w-sm mx-auto">
-                        Create your first funnel to start tracking user journeys and identifying conversion bottlenecks.
-                    </p>
-                    <button
-                        onClick={() => setShowCreateForm(true)}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition shadow-lg shadow-emerald-500/20"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        Create Your First Funnel
-                    </button>
-                </div>
+                    ) : null}
+                </>
             )}
-        </div>
+        </AnalyticsSubpageShell>
     );
 }

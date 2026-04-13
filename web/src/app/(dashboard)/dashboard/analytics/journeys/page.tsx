@@ -1,14 +1,24 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink } from 'd3-sankey';
+import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 import { motion } from 'framer-motion';
 import {
     Route, LogIn, LogOut, TrendingUp, Clock,
-    Footprints, Loader2, BarChart3, SlidersHorizontal,
+    Footprints, BarChart3,
     Filter, X,
 } from 'lucide-react';
 import useSWR from 'swr';
+import {
+    AnalyticsInsightList,
+    AnalyticsSubpageBadge,
+    AnalyticsSubpageEmptyState,
+    AnalyticsSubpageLoadingState,
+    AnalyticsSubpageMetricCard,
+    AnalyticsSubpageMetricGrid,
+    AnalyticsSubpagePanel,
+    AnalyticsSubpageShell,
+} from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { useAnalyticsContext } from '../layout';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -54,6 +64,50 @@ interface SankeyLinkExtra {
     source: number;
     target: number;
     value: number;
+}
+
+interface SankeyChartNode extends SankeyNodeExtra {
+    x0: number;
+    x1: number;
+    y0: number;
+    y1: number;
+    index: number;
+    value?: number;
+}
+
+interface SankeyChartLink {
+    source: SankeyChartNode;
+    target: SankeyChartNode;
+    value: number;
+    width: number;
+}
+
+interface JourneyOverview {
+    avgPathLength: number;
+    avgTimeOnSite: number;
+    bounceRate: number;
+    mostCommonPath: string;
+}
+
+interface LandingPageRow {
+    page: string;
+    entries: number;
+    percentage: number;
+    avgPagesAfter: number;
+}
+
+interface ExitPageRow {
+    page: string;
+    exits: number;
+    percentage: number;
+    avgSessionDuration: number;
+}
+
+interface JourneyResponse {
+    overview: JourneyOverview;
+    journeys: Journey[];
+    landingPages: LandingPageRow[];
+    exitPages: ExitPageRow[];
 }
 
 // ─── Sankey Diagram Component ───
@@ -106,7 +160,7 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
             return s({
                 nodes: nodes.map(d => ({ ...d })),
                 links: links.map(d => ({ ...d })),
-            });
+            }) as { nodes: SankeyChartNode[]; links: SankeyChartLink[] };
         } catch {
             return null;
         }
@@ -121,15 +175,15 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
     }
 
     // Determine max step for column headers
-    const maxStep = Math.max(...sankeyData.nodes.map((n: any) => n.step ?? 0));
+    const maxStep = Math.max(...sankeyData.nodes.map((n) => n.step ?? 0));
 
     // Compute column x positions for step headers
     const stepPositions: { step: number; x: number }[] = [];
     for (let s = 0; s <= maxStep; s++) {
-        const nodesInStep = sankeyData.nodes.filter((n: any) => n.step === s);
+        const nodesInStep = sankeyData.nodes.filter((n) => n.step === s);
         if (nodesInStep.length > 0) {
-            const x0 = (nodesInStep[0] as any).x0 ?? 0;
-            const x1 = (nodesInStep[0] as any).x1 ?? 0;
+            const x0 = nodesInStep[0].x0 ?? 0;
+            const x1 = nodesInStep[0].x1 ?? 0;
             stepPositions.push({ step: s, x: (x0 + x1) / 2 });
         }
     }
@@ -141,7 +195,7 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
                 {stepPositions.map(({ step, x }) => (
                     <div
                         key={step}
-                        className="absolute text-[10px] font-semibold text-zinc-500 uppercase tracking-wider"
+                        className="absolute text-[11px] font-semibold text-zinc-500"
                         style={{ left: x, transform: 'translateX(-50%)' }}
                     >
                         Step {step + 1}
@@ -152,12 +206,12 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
             <svg width={width} height={height} className="overflow-visible">
                 {/* Links */}
                 <g>
-                    {sankeyData.links.map((link: any, i: number) => {
-                        const sourceNode = link.source as any;
+                    {sankeyData.links.map((link, i) => {
+                        const sourceNode = link.source;
                         const isHighlighted = hoveredLink === i ||
                             hoveredNode === sourceNode.index ||
-                            hoveredNode === (link.target as any).index;
-                        const isExit = (link.target as any).name === 'EXIT';
+                            hoveredNode === link.target.index;
+                        const isExit = link.target.name === 'EXIT';
 
                         return (
                             <motion.path
@@ -175,7 +229,7 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
                                     setTooltip({
                                         x: e.clientX,
                                         y: e.clientY,
-                                        content: `${sourceNode.name} → ${(link.target as any).name}: ${link.value.toLocaleString()} users`,
+                                        content: `${sourceNode.name} → ${link.target.name}: ${link.value.toLocaleString()} users`,
                                     });
                                 }}
                                 onMouseMove={(e) => {
@@ -193,7 +247,7 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
 
                 {/* Nodes */}
                 <g>
-                    {sankeyData.nodes.map((node: any, i: number) => {
+                    {sankeyData.nodes.map((node, i) => {
                         const nodeHeight = Math.max(2, (node.y1 ?? 0) - (node.y0 ?? 0));
                         const isExit = node.name === 'EXIT';
                         const isHovered = hoveredNode === i;
@@ -263,29 +317,6 @@ function SankeyDiagram({ journeys, width, height }: { journeys: Journey[]; width
     );
 }
 
-// ─── Overview Stat Card ───
-
-function OverviewCard({ label, value, icon: Icon, color, delay }: {
-    label: string; value: string; icon: any; color: string; delay: number;
-}) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay, duration: 0.35 }}
-            className="premium-card p-3 sm:p-4"
-        >
-            <div className="flex items-center gap-2 mb-2">
-                <div className={`w-6 h-6 rounded-md bg-${color}-500/10 flex items-center justify-center`}>
-                    <Icon className={`w-3 h-3 text-${color}-400`} />
-                </div>
-                <span className="text-[10px] text-zinc-500 font-medium">{label}</span>
-            </div>
-            <p className="text-lg sm:text-xl font-bold text-white tabular-nums">{value}</p>
-        </motion.div>
-    );
-}
-
 // ─── Slider Control ───
 
 function SliderControl({ label, value, onChange, min, max, step = 1 }: {
@@ -325,7 +356,7 @@ function StepFilterInput({ step, value, onChange, onClear }: {
 }) {
     return (
         <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-2.5 py-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[10px] font-semibold text-zinc-500 whitespace-nowrap">
                 Step {step}
             </span>
             <input
@@ -346,7 +377,7 @@ function StepFilterInput({ step, value, onChange, onClear }: {
 
 // ─── Landing Pages Table ───
 
-function LandingPagesSection({ pages }: { pages: any[] }) {
+function LandingPagesSection({ pages }: { pages: LandingPageRow[] }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -367,10 +398,10 @@ function LandingPagesSection({ pages }: { pages: any[] }) {
             <div className="p-4 sm:p-5 pt-3 sm:pt-4">
                 {/* Header */}
                 <div className="grid grid-cols-12 gap-2 px-3 pb-2 border-b border-white/[0.06]">
-                    <span className="col-span-5 text-[10px] text-zinc-600 font-medium uppercase tracking-wider">Page</span>
-                    <span className="col-span-2 text-[10px] text-zinc-600 font-medium uppercase tracking-wider text-right">Entries</span>
-                    <span className="col-span-2 text-[10px] text-zinc-600 font-medium uppercase tracking-wider text-right">Share</span>
-                    <span className="col-span-3 text-[10px] text-zinc-600 font-medium uppercase tracking-wider text-right">Avg Pages After</span>
+                    <span className="col-span-5 text-[11px] text-zinc-500 font-semibold">Page</span>
+                    <span className="col-span-2 text-[11px] text-zinc-500 font-semibold text-right">Entries</span>
+                    <span className="col-span-2 text-[11px] text-zinc-500 font-semibold text-right">Share</span>
+                    <span className="col-span-3 text-[11px] text-zinc-500 font-semibold text-right">Avg Pages After</span>
                 </div>
 
                 {/* Rows */}
@@ -412,7 +443,7 @@ function LandingPagesSection({ pages }: { pages: any[] }) {
 
 // ─── Exit Pages Table ───
 
-function ExitPagesSection({ pages }: { pages: any[] }) {
+function ExitPagesSection({ pages }: { pages: ExitPageRow[] }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -433,10 +464,10 @@ function ExitPagesSection({ pages }: { pages: any[] }) {
             <div className="p-4 sm:p-5 pt-3 sm:pt-4">
                 {/* Header */}
                 <div className="grid grid-cols-12 gap-2 px-3 pb-2 border-b border-white/[0.06]">
-                    <span className="col-span-5 text-[10px] text-zinc-600 font-medium uppercase tracking-wider">Page</span>
-                    <span className="col-span-2 text-[10px] text-zinc-600 font-medium uppercase tracking-wider text-right">Exits</span>
-                    <span className="col-span-2 text-[10px] text-zinc-600 font-medium uppercase tracking-wider text-right">Share</span>
-                    <span className="col-span-3 text-[10px] text-zinc-600 font-medium uppercase tracking-wider text-right">Avg Session</span>
+                    <span className="col-span-5 text-[11px] text-zinc-500 font-semibold">Page</span>
+                    <span className="col-span-2 text-[11px] text-zinc-500 font-semibold text-right">Exits</span>
+                    <span className="col-span-2 text-[11px] text-zinc-500 font-semibold text-right">Share</span>
+                    <span className="col-span-3 text-[11px] text-zinc-500 font-semibold text-right">Avg Session</span>
                 </div>
 
                 {/* Rows */}
@@ -480,7 +511,7 @@ function ExitPagesSection({ pages }: { pages: any[] }) {
 
 export default function JourneysPage() {
     const { selectedProperty, range } = useAnalyticsContext();
-    const { data, isLoading, error } = useSWR(
+    const { data, isLoading, error } = useSWR<JourneyResponse>(
         selectedProperty ? `/api/analytics/journeys?propertyId=${selectedProperty}&range=${range}` : null,
         fetcher
     );
@@ -556,23 +587,17 @@ export default function JourneysPage() {
     // ─── Loading ───
 
     if (isLoading && !data) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-            </div>
-        );
+        return <AnalyticsSubpageLoadingState title="Journeys" />;
     }
 
     // ─── Error ───
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <Route className="w-6 h-6 text-red-400" />
-                </div>
-                <p className="text-red-400 text-sm font-medium">Failed to load journey data</p>
-            </div>
+            <AnalyticsSubpageEmptyState
+                title="Journey data is temporarily unavailable"
+                description="We couldn't load the latest path exploration view right now. Try again in a moment."
+            />
         );
     }
 
@@ -582,85 +607,64 @@ export default function JourneysPage() {
     const journeys: Journey[] = data?.journeys || [];
 
     return (
-        <div className="space-y-6">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between"
-            >
-                <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Route className="w-5 h-5 text-emerald-400" />
-                        User Journeys
-                    </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                        Sankey flow of how users navigate through your site
-                    </p>
+        <AnalyticsSubpageShell
+            eyebrow="Journeys"
+            title="Journeys"
+            description="Path exploration, entries, and exits."
+            actions={(
+                <div className="flex items-center gap-3">
+                    <AnalyticsSubpageBadge label={`${filteredJourneys.length} visible journeys`} tone="emerald" />
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+                            showFilters || activeFilterCount > 0
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
+                        }`}
+                    >
+                        <Filter className="h-3.5 w-3.5" />
+                        Filters
+                        {activeFilterCount > 0 ? (
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500/20 text-[9px] font-bold">
+                                {activeFilterCount}
+                            </span>
+                        ) : null}
+                    </button>
                 </div>
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border transition ${
-                        showFilters || activeFilterCount > 0
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.12]'
-                    }`}
-                >
-                    <Filter className="w-3 h-3" />
-                    Filters
-                    {activeFilterCount > 0 && (
-                        <span className="ml-1 w-4 h-4 rounded-full bg-emerald-500/20 text-[9px] font-bold flex items-center justify-center">
-                            {activeFilterCount}
-                        </span>
-                    )}
-                </button>
-            </motion.div>
-
-            {/* ─── Overview Cards ─── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <OverviewCard
+            )}
+        >
+            <AnalyticsSubpageMetricGrid>
+                <AnalyticsSubpageMetricCard
                     label="Avg Path Length"
                     value={`${overview?.avgPathLength ?? 0} pages`}
                     icon={Footprints}
-                    color="emerald"
-                    delay={0.05}
+                    tone="emerald"
                 />
-                <OverviewCard
+                <AnalyticsSubpageMetricCard
                     label="Avg Time on Site"
                     value={formatDuration(overview?.avgTimeOnSite ?? 0)}
                     icon={Clock}
-                    color="blue"
-                    delay={0.09}
+                    tone="cyan"
                 />
-                <OverviewCard
+                <AnalyticsSubpageMetricCard
                     label="Bounce Rate"
                     value={`${overview?.bounceRate ?? 0}%`}
                     icon={TrendingUp}
-                    color="pink"
-                    delay={0.13}
+                    tone="mixed"
                 />
-                <OverviewCard
+                <AnalyticsSubpageMetricCard
                     label="Most Common Path"
                     value={overview?.mostCommonPath ?? '-'}
                     icon={BarChart3}
-                    color="violet"
-                    delay={0.17}
+                    tone="amber"
                 />
-            </div>
+            </AnalyticsSubpageMetricGrid>
 
-            {/* ─── Controls Panel ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="premium-card p-4 sm:p-5"
+            <AnalyticsSubpagePanel
+                title="Flow controls"
+                action={<AnalyticsSubpageBadge label={`Max ${stepCount} steps`} tone="mixed" />}
             >
-                <div className="flex items-center gap-2 mb-4">
-                    <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
-                    <h3 className="text-sm font-bold text-white">Flow Controls</h3>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <SliderControl
                         label="Max Steps"
                         value={stepCount}
@@ -678,112 +682,104 @@ export default function JourneysPage() {
                     />
                 </div>
 
-                {/* Step Filters (collapsible) */}
-                {showFilters && (
+                {showFilters ? (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         transition={{ duration: 0.25 }}
                         className="overflow-hidden"
                     >
-                        <div className="border-t border-white/[0.06] pt-4">
-                            <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-3">
-                                Path Filters
+                        <div className="mt-4 border-t border-white/[0.06] pt-4">
+                            <p className="mb-3 text-[11px] font-semibold text-zinc-500">
+                                Step filters
                             </p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                                 {Array.from({ length: stepCount }, (_, i) => (
                                     <StepFilterInput
                                         key={i}
                                         step={i + 1}
                                         value={stepFilters[i] || ''}
-                                        onChange={v => updateStepFilter(i, v)}
+                                        onChange={(value) => updateStepFilter(i, value)}
                                         onClear={() => clearStepFilter(i)}
                                     />
                                 ))}
                             </div>
                         </div>
                     </motion.div>
-                )}
-            </motion.div>
+                ) : null}
+            </AnalyticsSubpagePanel>
 
-            {/* ─── Sankey Diagram ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
-                className="premium-card p-4 sm:p-5"
-                ref={containerRef}
+            <AnalyticsSubpagePanel
+                title="Path explorer"
+                className="overflow-hidden"
             >
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-emerald-500/10 flex items-center justify-center">
-                            <Route className="w-3 h-3 text-emerald-400" />
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Flow Visualization</h3>
-                        <span className="text-[10px] text-zinc-600 ml-1">
-                            {filteredJourneys.length} journey{filteredJourneys.length !== 1 ? 's' : ''}
-                        </span>
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+                    <div ref={containerRef} className="min-w-0">
+                        {filteredJourneys.length > 0 ? (
+                            <div className="overflow-x-auto -mx-2 px-2">
+                                <SankeyDiagram
+                                    journeys={filteredJourneys}
+                                    width={Math.max(600, containerWidth - 40)}
+                                    height={diagramHeight}
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-white/[0.1] bg-white/[0.02] p-6 text-center">
+                                <Route className="h-8 w-8 text-zinc-600" />
+                                <p className="text-sm text-zinc-400">No journeys match the current filters.</p>
+                                <button
+                                    onClick={() => {
+                                        setStepFilters({});
+                                        setStepCount(4);
+                                        setMaxJourneys(50);
+                                    }}
+                                    className="text-xs font-medium text-emerald-400 transition hover:text-emerald-300"
+                                >
+                                    Reset filters
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Legend */}
-                    <div className="hidden sm:flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-8 h-1.5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-400/40" />
-                            <span className="text-[10px] text-zinc-500">High traffic</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-8 h-1.5 rounded-full bg-gradient-to-r from-red-400 to-red-400/40" />
-                            <span className="text-[10px] text-zinc-500">Exit flow</span>
-                        </div>
-                    </div>
-                </div>
-
-                {filteredJourneys.length > 0 ? (
-                    <div className="overflow-x-auto -mx-2 px-2">
-                        <SankeyDiagram
-                            journeys={filteredJourneys}
-                            width={Math.max(600, containerWidth - 40)}
-                            height={diagramHeight}
+                    <div className="space-y-4">
+                        <AnalyticsInsightList
+                            items={[
+                                {
+                                    label: 'Most common path',
+                                    value: overview?.mostCommonPath ?? 'No path data',
+                                    note: 'Use this as the baseline route to compare against the rest of the explorer.',
+                                },
+                                {
+                                    label: 'Top landing page',
+                                    value: landingPages[0]?.page || 'No landing data',
+                                    note: landingPages[0]
+                                        ? `${landingPages[0].entries.toLocaleString()} entries • ${landingPages[0].percentage}% share`
+                                        : 'No landing page breakdown is available yet.',
+                                },
+                                {
+                                    label: 'Top exit page',
+                                    value: exitPages[0]?.page || 'No exit data',
+                                    note: exitPages[0]
+                                        ? `${exitPages[0].exits.toLocaleString()} exits • ${exitPages[0].percentage}% share`
+                                        : 'No exit page breakdown is available yet.',
+                                },
+                            ]}
                         />
                     </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-white/[0.04] flex items-center justify-center">
-                            <Route className="w-6 h-6 text-zinc-600" />
-                        </div>
-                        <p className="text-sm text-zinc-500">No journeys match the current filters</p>
-                        <button
-                            onClick={() => {
-                                setStepFilters({});
-                                setStepCount(4);
-                                setMaxJourneys(50);
-                            }}
-                            className="text-[11px] text-emerald-400 hover:text-emerald-300 transition"
-                        >
-                            Reset filters
-                        </button>
-                    </div>
-                )}
-            </motion.div>
+                </div>
+            </AnalyticsSubpagePanel>
 
-            {/* ─── Landing & Exit Pages ─── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <LandingPagesSection pages={landingPages} />
                 <ExitPagesSection pages={exitPages} />
             </div>
 
-            {/* ─── Empty state (no data at all) ─── */}
-            {journeys.length === 0 && (
-                <div className="premium-card p-12 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
-                        <Route className="w-8 h-8 text-zinc-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-white mb-1">No journey data yet</h3>
-                    <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                        Journey data will appear once your site has enough traffic for path analysis.
-                    </p>
-                </div>
-            )}
-        </div>
+            {journeys.length === 0 ? (
+                <AnalyticsSubpageEmptyState
+                    title="No journey data yet"
+                    description="Journey analysis will become useful once the property has enough navigation volume to model page-to-page paths."
+                />
+            ) : null}
+        </AnalyticsSubpageShell>
     );
 }

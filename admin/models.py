@@ -227,6 +227,37 @@ class CustomDashboard(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class AnalyticsGoalDefinition(Base):
+    """User-saved goal definitions scoped to a property"""
+    __tablename__ = "analytics_goal_definitions"
+
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    property_id = Column(String(100), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    goal_type = Column(String(50), nullable=False, default="page_visit")
+    rule_json = Column(Text, nullable=False, default='{}')
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AnalyticsFunnelDefinition(Base):
+    """User-saved funnel definitions scoped to a property"""
+    __tablename__ = "analytics_funnel_definitions"
+
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    property_id = Column(String(100), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    steps_json = Column(Text, nullable=False, default='[]')
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class LeaderboardEntry(Base):
     """Public leaderboard entries — opt-in verified traffic sharing"""
     __tablename__ = "leaderboard_entries"
