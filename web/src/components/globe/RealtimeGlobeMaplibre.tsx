@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getGlobeAvatarUrl } from '@/lib/globeUtils';
 
 // ─── Types ───
 export interface GlobeVisitor {
@@ -20,10 +21,6 @@ export interface GlobeVisitor {
     page?: string;
     estValue?: string;
     confidence?: number;
-}
-
-function getAvatarUrl(seed: string): string {
-    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
 }
 
 export interface RealtimeMapboxProps {
@@ -457,7 +454,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         const sz = isMobile ? 44 : 60;
         const inner = isMobile ? 40 : 56;
         const warmthColor = getWarmthColor(v.warmth);
-        const avatarUrl = getAvatarUrl(v.name);
+        const avatarUrl = getGlobeAvatarUrl(v.name);
 
         const el = document.createElement('div');
         el.style.cssText = `width:${sz}px;height:${sz}px;cursor:pointer;z-index:10;`;
@@ -519,7 +516,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:12px;">
                         <div style="position:relative;flex-shrink:0;">
                             <div style="width:48px;height:48px;border-radius:50%;background:${v.avatarColor};border:2.5px solid ${warmthHex}50;overflow:hidden;box-shadow:0 0 16px ${warmthHex}30;">
-                                <img src="${getAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='17px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
+                                <img src="${getGlobeAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='17px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
                             </div>
                             <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid #13131D;box-shadow:0 0 6px ${warmthHex}80;"></div>
                         </div>

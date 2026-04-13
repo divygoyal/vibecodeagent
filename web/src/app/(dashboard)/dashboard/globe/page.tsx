@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import {
@@ -15,18 +14,12 @@ import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMapli
 import { useRealtimeData, useContainerStatus, usePropertyList } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import {
-    ADJECTIVES, ANIMALS, AVATAR_COLORS, COUNTRY_COORDS, CITY_COORDS,
-    hashStr, predictWarmth, getWarmthDot, makeName,
+    AVATAR_COLORS, hashStr, getGlobeAvatarUrl, getWarmthDot,
     convertCitiesToGlobeVisitors, convertToActivityFeed,
     type GlobeVisitor, type ActivityFeedItem,
 } from '@/lib/globeUtils';
 
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
-
-// ─── DiceBear avatar URL (matching globe markers) ───
-function getAvatarUrl(seed: string): string {
-    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
-}
 
 // ─── Demo visitors spread across the world ───
 const DEMO_VISITORS: GlobeVisitor[] = [
@@ -47,11 +40,21 @@ const DEMO_VISITORS: GlobeVisitor[] = [
 // ─── Demo activity feed items ───
 type DemoActivityItem = ActivityFeedItem;
 
+function withDemoAvatar(item: Omit<DemoActivityItem, 'avatarSeed' | 'avatarColor' | 'avatarInitial'>): DemoActivityItem {
+    const avatarSeed = item.name;
+    return {
+        ...item,
+        avatarSeed,
+        avatarColor: AVATAR_COLORS[hashStr(avatarSeed) % AVATAR_COLORS.length],
+        avatarInitial: item.name.charAt(0).toUpperCase(),
+    };
+}
+
 const DEMO_ACTIVITY: DemoActivityItem[] = [
-    { id: 'a1', name: 'moss tiger', country: 'United States', page: '/dashboard/analytics', event: 'visited', timestamp: Date.now() - 8000, warmth: 0.7, estValue: '$2.45', confidence: 82 },
-    { id: 'a2', name: 'ruby wolf', country: 'Japan', page: '/pricing', event: 'visited', timestamp: Date.now() - 24000, warmth: 0.8, estValue: '$3.10', confidence: 88 },
-    { id: 'a3', name: 'coral falcon', country: 'Netherlands', page: '', event: 'exited to', exitUrl: 'github.com/trafficclaw', timestamp: Date.now() - 41000, warmth: 0.65, estValue: '$1.80', confidence: 75 },
-    { id: 'a4', name: 'silver hawk', country: 'Germany', page: '/docs/api', event: 'visited', timestamp: Date.now() - 63000, warmth: 0.7, estValue: '$2.60', confidence: 80 },
+    withDemoAvatar({ id: 'a1', name: 'moss tiger', country: 'United States', page: '/dashboard/analytics', event: 'visited', timestamp: Date.now() - 8000, warmth: 0.7, estValue: '$2.45', confidence: 82 }),
+    withDemoAvatar({ id: 'a2', name: 'ruby wolf', country: 'Japan', page: '/pricing', event: 'visited', timestamp: Date.now() - 24000, warmth: 0.8, estValue: '$3.10', confidence: 88 }),
+    withDemoAvatar({ id: 'a3', name: 'coral falcon', country: 'Netherlands', page: '', event: 'exited to', exitUrl: 'github.com/trafficclaw', timestamp: Date.now() - 41000, warmth: 0.65, estValue: '$1.80', confidence: 75 }),
+    withDemoAvatar({ id: 'a4', name: 'silver hawk', country: 'Germany', page: '/docs/api', event: 'visited', timestamp: Date.now() - 63000, warmth: 0.7, estValue: '$2.60', confidence: 80 }),
 ];
 
 // ─── Demo country breakdown ───
@@ -77,6 +80,35 @@ function getWarmthRing(warmth: number): string {
     if (warmth > 0.4) return '#f97316';
     if (warmth > 0.25) return '#eab308';
     return '#3b82f6';
+}
+
+function ActivityAvatar({ item }: { item: ActivityFeedItem }) {
+    const [failedSeed, setFailedSeed] = useState<string | null>(null);
+    const showFallback = failedSeed === item.avatarSeed;
+
+    return (
+        <div
+            className="w-6 h-6 rounded-full overflow-hidden"
+            style={{
+                background: item.avatarColor,
+                boxShadow: `0 0 0 2px ${getWarmthRing(item.warmth)}`,
+            }}
+        >
+            {showFallback ? (
+                <div className="flex h-full w-full items-center justify-center text-[11px] font-bold text-white">
+                    {item.avatarInitial}
+                </div>
+            ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={getGlobeAvatarUrl(item.avatarSeed)}
+                    alt=""
+                    className="block h-full w-full object-cover"
+                    onError={() => setFailedSeed(item.avatarSeed)}
+                />
+            )}
+        </div>
+    );
 }
 
 // ─── Code block with copy button ───
@@ -615,12 +647,7 @@ export default function GlobeApiPage() {
                                     <div className="flex items-start gap-2.5">
                                         {/* DiceBear avatar with warmth indicator */}
                                         <div className="relative flex-shrink-0 mt-0.5">
-                                            <div
-                                                className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800"
-                                                style={{ boxShadow: `0 0 0 2px ${getWarmthRing(item.warmth)}` }}
-                                            >
-                                                <Image src={getAvatarUrl(item.name)} alt="" width={24} height={24} className="w-full h-full" />
-                                            </div>
+                                            <ActivityAvatar item={item} />
                                             <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#080c18] ${getWarmthDot(item.warmth)}`} />
                                         </div>
 

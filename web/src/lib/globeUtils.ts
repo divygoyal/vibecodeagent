@@ -176,6 +176,19 @@ export function makeName(seed: string): string {
     return `${ADJECTIVES[h % ADJECTIVES.length]} ${ANIMALS[(h >> 4) % ANIMALS.length]}`;
 }
 
+export function getGlobeAvatarUrl(seed: string): string {
+    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent&radius=50`;
+}
+
+function buildAvatarIdentity(seed: string, name: string) {
+    const hash = hashStr(seed);
+    return {
+        avatarSeed: seed,
+        avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
+        avatarInitial: name.charAt(0).toUpperCase(),
+    };
+}
+
 // ─── Activity feed item type ───
 
 export interface ActivityFeedItem {
@@ -189,6 +202,9 @@ export interface ActivityFeedItem {
     warmth: number;
     estValue: string;
     confidence: number;
+    avatarSeed: string;
+    avatarColor: string;
+    avatarInitial: string;
 }
 
 // ─── Convert GA4 byCity data → GlobeVisitor[] ───
@@ -241,13 +257,13 @@ export function convertCitiesToGlobeVisitors(
 
         const seed = `${cityStr}-${countryStr}`;
         const name = makeName(seed);
-        const hash = hashStr(seed);
+        const avatar = buildAvatarIdentity(seed, name);
         const warmth = predictWarmth(countryStr, 'desktop', 0);
 
         visitors.push({
             id: seed, lat, lng, name, country: countryStr,
-            avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
-            avatarInitial: name.charAt(0).toUpperCase(),
+            avatarColor: avatar.avatarColor,
+            avatarInitial: avatar.avatarInitial,
             warmth,
             users: Number(c.users) || 1,
         });
@@ -267,13 +283,13 @@ export function convertCitiesToGlobeVisitors(
 
             const seed = `${countryStr}-country`;
             const name = makeName(seed);
-            const hash = hashStr(seed);
+            const avatar = buildAvatarIdentity(seed, name);
             const warmth = predictWarmth(countryStr, 'desktop', 0);
 
             visitors.push({
                 id: seed, lat: coord[0], lng: coord[1], name, country: countryStr,
-                avatarColor: AVATAR_COLORS[hash % AVATAR_COLORS.length],
-                avatarInitial: name.charAt(0).toUpperCase(),
+                avatarColor: avatar.avatarColor,
+                avatarInitial: avatar.avatarInitial,
                 warmth,
                 users: Number(c.users) || 1,
             });
@@ -297,8 +313,10 @@ export function convertToActivityFeed(
         const feedKey = `${cityStr}-${countryStr}`;
         const count = feedCounts.get(feedKey) || 0;
         feedCounts.set(feedKey, count + 1);
-        const hash = hashStr(`${feedKey}-${count}`);
-        const name = `${ADJECTIVES[hash % ADJECTIVES.length]} ${ANIMALS[(hash >> 4) % ANIMALS.length]}`;
+        const avatarSeed = `${feedKey}-${count}`;
+        const hash = hashStr(avatarSeed);
+        const name = makeName(avatarSeed);
+        const avatar = buildAvatarIdentity(avatarSeed, name);
         const page = String(byPage[i % Math.max(byPage.length, 1)]?.page ?? '/');
         const device = String(byDevice[i % Math.max(byDevice.length, 1)]?.device ?? 'desktop');
         const isExit = i % 8 === 0;
@@ -317,6 +335,9 @@ export function convertToActivityFeed(
             warmth,
             estValue: `$${estVal}`,
             confidence,
+            avatarSeed: avatar.avatarSeed,
+            avatarColor: avatar.avatarColor,
+            avatarInitial: avatar.avatarInitial,
         };
     });
 }

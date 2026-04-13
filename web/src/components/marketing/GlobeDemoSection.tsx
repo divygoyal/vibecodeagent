@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
 import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
-import { getWarmthDot, type ActivityFeedItem, type GlobeVisitor } from '@/lib/globeUtils';
+import { AVATAR_COLORS, getWarmthDot, hashStr, type ActivityFeedItem, type GlobeVisitor } from '@/lib/globeUtils';
 
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
@@ -37,11 +37,21 @@ const DEMO_VISITORS: GlobeVisitor[] = [
 
 const DEMO_COUNTRIES = DEMO_VISITORS.map((visitor) => ({ country: visitor.country, users: 1 }));
 
+function withDemoAvatar(item: Omit<ActivityFeedItem, 'avatarSeed' | 'avatarColor' | 'avatarInitial'>): ActivityFeedItem {
+    const avatarSeed = item.name;
+    return {
+        ...item,
+        avatarSeed,
+        avatarColor: AVATAR_COLORS[hashStr(avatarSeed) % AVATAR_COLORS.length],
+        avatarInitial: item.name.charAt(0).toUpperCase(),
+    };
+}
+
 const DEMO_ACTIVITY: ActivityFeedItem[] = [
-    { id: 'a1', name: 'moss tiger', country: 'United States', page: '/dashboard/analytics', event: 'visited', timestamp: Date.now() - 8000, warmth: 0.7, estValue: '$2.45', confidence: 82 },
-    { id: 'a2', name: 'ruby wolf', country: 'Japan', page: '/pricing', event: 'visited', timestamp: Date.now() - 24000, warmth: 0.8, estValue: '$3.10', confidence: 88 },
-    { id: 'a3', name: 'coral falcon', country: 'Netherlands', page: '', event: 'exited to', exitUrl: 'github.com/trafficclaw', timestamp: Date.now() - 41000, warmth: 0.65, estValue: '$1.80', confidence: 75 },
-    { id: 'a4', name: 'silver hawk', country: 'Germany', page: '/docs/api', event: 'visited', timestamp: Date.now() - 63000, warmth: 0.7, estValue: '$2.60', confidence: 80 },
+    withDemoAvatar({ id: 'a1', name: 'moss tiger', country: 'United States', page: '/dashboard/analytics', event: 'visited', timestamp: Date.now() - 8000, warmth: 0.7, estValue: '$2.45', confidence: 82 }),
+    withDemoAvatar({ id: 'a2', name: 'ruby wolf', country: 'Japan', page: '/pricing', event: 'visited', timestamp: Date.now() - 24000, warmth: 0.8, estValue: '$3.10', confidence: 88 }),
+    withDemoAvatar({ id: 'a3', name: 'coral falcon', country: 'Netherlands', page: '', event: 'exited to', exitUrl: 'github.com/trafficclaw', timestamp: Date.now() - 41000, warmth: 0.65, estValue: '$1.80', confidence: 75 }),
+    withDemoAvatar({ id: 'a4', name: 'silver hawk', country: 'Germany', page: '/docs/api', event: 'visited', timestamp: Date.now() - 63000, warmth: 0.7, estValue: '$2.60', confidence: 80 }),
 ];
 
 function getAvatarUrl(seed: string): string {
