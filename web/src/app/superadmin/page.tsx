@@ -227,17 +227,80 @@ interface UserProfileData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getToken(): string {
+const SUPERADMIN_TOKEN_KEY = 'sa_token'
+const SUPERADMIN_EXPIRY_KEY = 'sa_expires'
+const SUPERADMIN_SESSION_EXPIRED_EVENT = 'trafficclaw:superadmin-session-expired'
+const SUPERADMIN_SESSION_EXPIRED_MESSAGE = 'Your superadmin session expired. Please unlock again.'
+
+function clearSuperadminSessionStorage() {
+    if (typeof window === 'undefined') return
+    sessionStorage.removeItem(SUPERADMIN_TOKEN_KEY)
+    sessionStorage.removeItem(SUPERADMIN_EXPIRY_KEY)
+}
+
+function getStoredSuperadminToken(): string {
     if (typeof window === 'undefined') return ''
-    return sessionStorage.getItem('sa_token') || ''
+    return sessionStorage.getItem(SUPERADMIN_TOKEN_KEY) || ''
+}
+
+function getStoredSuperadminExpiry(): number | null {
+    if (typeof window === 'undefined') return null
+    const raw = sessionStorage.getItem(SUPERADMIN_EXPIRY_KEY)
+    if (!raw) return null
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function isSuperadminSessionExpired(): boolean {
+    const token = getStoredSuperadminToken()
+    if (!token) return false
+    const expiresAt = getStoredSuperadminExpiry()
+    return expiresAt === null || expiresAt <= Date.now()
+}
+
+function expireSuperadminSession(reason = SUPERADMIN_SESSION_EXPIRED_MESSAGE) {
+    if (typeof window === 'undefined') return
+    clearSuperadminSessionStorage()
+    window.dispatchEvent(new CustomEvent(SUPERADMIN_SESSION_EXPIRED_EVENT, { detail: reason }))
+}
+
+function isSuperadminAuthError(message: string): boolean {
+    return (
+        message === 'Unauthorized' ||
+        message === 'Session expired' ||
+        message === SUPERADMIN_SESSION_EXPIRED_MESSAGE
+    )
+}
+
+function getErrorMessage(err: unknown, fallback = 'Request failed'): string {
+    return err instanceof Error && err.message ? err.message : fallback
+}
+
+function requireSuperadminToken(): string {
+    const token = getStoredSuperadminToken()
+    if (!token) {
+        expireSuperadminSession()
+        throw new Error(SUPERADMIN_SESSION_EXPIRED_MESSAGE)
+    }
+
+    if (isSuperadminSessionExpired()) {
+        expireSuperadminSession()
+        throw new Error(SUPERADMIN_SESSION_EXPIRED_MESSAGE)
+    }
+
+    return token
 }
 
 async function apiGet(endpoint: string, id?: string) {
-    const token = getToken()
+    const token = requireSuperadminToken()
     let url = `/api/superadmin?token=${encodeURIComponent(token)}&endpoint=${endpoint}`
     if (id) url += `&id=${encodeURIComponent(id)}`
     const res = await fetch(url)
     if (!res.ok) {
+        if (res.status === 403) {
+            expireSuperadminSession()
+            throw new Error(SUPERADMIN_SESSION_EXPIRED_MESSAGE)
+        }
         const err = await res.json().catch(() => ({ error: 'Request failed' }))
         throw new Error(err.error || 'Request failed')
     }
@@ -245,13 +308,17 @@ async function apiGet(endpoint: string, id?: string) {
 }
 
 async function apiPost(action: string, data: Record<string, unknown> = {}) {
-    const token = getToken()
+    const token = requireSuperadminToken()
     const res = await fetch('/api/superadmin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, action, ...data })
     })
     if (!res.ok) {
+        if (res.status === 403) {
+            expireSuperadminSession()
+            throw new Error(SUPERADMIN_SESSION_EXPIRED_MESSAGE)
+        }
         const err = await res.json().catch(() => ({ error: 'Request failed' }))
         throw new Error(err.error || 'Request failed')
     }
@@ -304,11 +371,41 @@ export default function SuperAdminPage() {
     const [authError, setAuthError] = useState('')
     const [authLoading, setAuthLoading] = useState(false)
 
-    // Check existing token on mount
-    useEffect(() => {
-        const token = getToken()
-        if (token) setAuthenticated(true)
+    const handleSignOut = useCallback((reason = '') => {
+        clearSuperadminSessionStorage()
+        setAuthenticated(false)
+        setPassword('')
+        setShowPassword(false)
+        setAuthLoading(false)
+        setAuthError(reason)
     }, [])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+
+        const handleSessionExpired = (event: Event) => {
+            const reason =
+                event instanceof CustomEvent && typeof event.detail === 'string'
+                    ? event.detail
+                    : SUPERADMIN_SESSION_EXPIRED_MESSAGE
+            handleSignOut(reason)
+        }
+
+        window.addEventListener(SUPERADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired as EventListener)
+
+        const token = getStoredSuperadminToken()
+        if (token) {
+            if (isSuperadminSessionExpired()) {
+                expireSuperadminSession()
+            } else {
+                setAuthenticated(true)
+            }
+        }
+
+        return () => {
+            window.removeEventListener(SUPERADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired as EventListener)
+        }
+    }, [handleSignOut])
 
     const handleAuth = async () => {
         setAuthLoading(true)
@@ -324,21 +421,16 @@ export default function SuperAdminPage() {
                 setAuthError(data.error || 'Authentication failed')
                 return
             }
-            sessionStorage.setItem('sa_token', data.token)
-            sessionStorage.setItem('sa_expires', data.expiresAt.toString())
+            sessionStorage.setItem(SUPERADMIN_TOKEN_KEY, data.token)
+            sessionStorage.setItem(SUPERADMIN_EXPIRY_KEY, data.expiresAt.toString())
             setAuthenticated(true)
+            setShowPassword(false)
+            setPassword('')
         } catch {
             setAuthError('Connection error')
         } finally {
             setAuthLoading(false)
         }
-    }
-
-    const handleSignOut = () => {
-        sessionStorage.removeItem('sa_token')
-        sessionStorage.removeItem('sa_expires')
-        setAuthenticated(false)
-        setPassword('')
     }
 
     if (!authenticated) {
@@ -420,13 +512,11 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             setEvents(Array.isArray(eventsData) ? eventsData : [])
             setQueries(Array.isArray(queriesData) ? queriesData : [])
         } catch (err) {
-            const e = err as Error
-            if (e.message === 'Unauthorized') {
-                sessionStorage.removeItem('sa_token')
-                window.location.reload()
+            const message = getErrorMessage(err)
+            if (isSuperadminAuthError(message)) {
                 return
             }
-            setError(e.message)
+            setError(message)
         } finally {
             setLoading(false)
         }
@@ -645,7 +735,9 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
             const detail: UserProfileData = await apiGet('user-profile', user.github_id)
             setProfileCache(prev => ({ ...prev, [user.github_id]: detail }))
         } catch (err) {
-            setProfileError((err as Error).message || 'Failed to load user profile')
+            const message = getErrorMessage(err, 'Failed to load user profile')
+            if (isSuperadminAuthError(message)) return
+            setProfileError(message)
         } finally {
             setProfileLoadingUserId(current => current === user.github_id ? null : current)
             setProfileRefreshingUserId(current => current === user.github_id ? null : current)
@@ -669,7 +761,10 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                 await loadUserProfile(selectedUser, true)
             }
         } catch (err) {
-            alert((err as Error).message)
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                alert(message)
+            }
         } finally {
             setActionLoading('')
         }
@@ -688,7 +783,10 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
             })
             onRefresh()
         } catch (err) {
-            alert((err as Error).message)
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                alert(message)
+            }
         } finally {
             setActionLoading('')
         }
@@ -1110,6 +1208,11 @@ function matchGscSite(displayName: string, gscSites: SearchConsoleSiteData[]): s
     return gscSites[0]?.site_url || ''
 }
 
+interface GenerateReportOptions {
+    propertyId?: string
+    label?: string
+}
+
 function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, reportLoadingKey, weeklyKey, monthlyKey, onGenerate }: {
     property: GooglePropertyData
     gscSites: SearchConsoleSiteData[]
@@ -1118,7 +1221,7 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
     reportLoadingKey: string | null
     weeklyKey: string
     monthlyKey: string
-    onGenerate: (period: 'weekly' | 'monthly', propertyId: string, siteUrl: string, propertyName?: string) => void
+    onGenerate: (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => void
 }) {
     const [selectedSite, setSelectedSite] = useState(defaultSiteUrl)
     const isLoadingWeekly = reportLoadingKey === weeklyKey
@@ -1152,7 +1255,7 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
                     )}
                     <div className="flex flex-wrap items-center gap-2">
                         <button
-                            onClick={() => onGenerate('weekly', property.property_id, selectedSite, property.display_name)}
+                            onClick={() => onGenerate('weekly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
                             disabled={isAnyLoading}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
@@ -1160,7 +1263,7 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
                             {isLoadingWeekly ? 'Generating...' : 'Weekly'}
                         </button>
                         <button
-                            onClick={() => onGenerate('monthly', property.property_id, selectedSite, property.display_name)}
+                            onClick={() => onGenerate('monthly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
                             disabled={isAnyLoading}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
@@ -1170,8 +1273,51 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
                     </div>
                 </>
             ) : (
-                <p className="text-xs text-amber-400">No Search Console site available — report requires both GA4 and GSC data.</p>
+                <p className="text-xs text-amber-400">No Search Console site available — report generation needs a verified Search Console site.</p>
             )}
+        </div>
+    )
+}
+
+function SearchConsoleReportCard({ site, reportLoadingKey, weeklyKey, monthlyKey, onGenerate }: {
+    site: SearchConsoleSiteData
+    reportLoadingKey: string | null
+    weeklyKey: string
+    monthlyKey: string
+    onGenerate: (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => void
+}) {
+    const siteUrl = site.site_url || ''
+    const isLoadingWeekly = reportLoadingKey === weeklyKey
+    const isLoadingMonthly = reportLoadingKey === monthlyKey
+    const isAnyLoading = !!reportLoadingKey
+
+    return (
+        <div className="rounded-xl border border-white/[0.05] bg-black/25 p-4 space-y-3">
+            <div className="text-sm font-semibold text-white break-all">{siteUrl || 'Unknown site'}</div>
+            <div className="flex flex-wrap gap-2">
+                {site.permission_level ? <SignalPill tone="emerald">{site.permission_level}</SignalPill> : null}
+                {site.site_type ? <SignalPill tone="zinc">{site.site_type}</SignalPill> : null}
+                <SignalPill tone="amber">SEO only</SignalPill>
+            </div>
+            <p className="text-xs text-zinc-500">GA4 property unavailable for this user, so this generates a Search Console-only PDF.</p>
+            <div className="flex flex-wrap items-center gap-2">
+                <button
+                    onClick={() => onGenerate('weekly', siteUrl, { label: siteUrl })}
+                    disabled={isAnyLoading || !siteUrl}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                    {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    {isLoadingWeekly ? 'Generating...' : 'Weekly'}
+                </button>
+                <button
+                    onClick={() => onGenerate('monthly', siteUrl, { label: siteUrl })}
+                    disabled={isAnyLoading || !siteUrl}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                    {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    {isLoadingMonthly ? 'Generating...' : 'Monthly'}
+                </button>
+            </div>
         </div>
     )
 }
@@ -1197,21 +1343,26 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
     const [reportLoadingKey, setReportLoadingKey] = useState<string | null>(null)
     const [reportError, setReportError] = useState('')
 
-    const handleGenerateReport = async (period: 'weekly' | 'monthly', propertyId: string, siteUrl: string, propertyName?: string) => {
+    const handleGenerateReport = async (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => {
         if (!user || reportLoadingKey) return
-        const loadingKey = `${propertyId}:${period}`
+        const propertyId = options?.propertyId
+        const loadingKey = `${propertyId || siteUrl}:${period}`
         setReportLoadingKey(loadingKey)
         setReportError('')
 
         try {
-            const token = getToken()
+            const token = requireSuperadminToken()
             const res = await fetch('/api/report/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, githubId: user.github_id, period, propertyId, siteUrl }),
+                body: JSON.stringify({ token, githubId: user.github_id, period, siteUrl, ...(propertyId ? { propertyId } : {}) }),
             })
 
             if (!res.ok) {
+                if (res.status === 403) {
+                    expireSuperadminSession()
+                    throw new Error(SUPERADMIN_SESSION_EXPIRED_MESSAGE)
+                }
                 const err = await res.json().catch(() => ({ error: 'Report generation failed' }))
                 throw new Error(err.error || 'Report generation failed')
             }
@@ -1220,14 +1371,16 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            const safeName = (propertyName || propertyId).replace(/[^a-zA-Z0-9_-]/g, '_')
+            const safeName = (options?.label || propertyId || siteUrl).replace(/[^a-zA-Z0-9_-]/g, '_')
             a.download = `TrafficClaw_${period}_${safeName}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
             URL.revokeObjectURL(url)
         } catch (err) {
-            setReportError((err as Error).message)
+            const message = getErrorMessage(err, 'Report generation failed')
+            if (isSuperadminAuthError(message)) return
+            setReportError(message)
         } finally {
             setReportLoadingKey(null)
         }
@@ -1382,15 +1535,34 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                             </div>
                                             <div className="space-y-3">
                                                 <div className="text-xs uppercase tracking-wider text-zinc-500">Search Console Sites</div>
-                                                {profile.google_inventory.gsc_sites.length === 0 ? <EmptyState title="No sites returned" description="The live Search Console request returned no verified sites." /> : profile.google_inventory.gsc_sites.map(site => (
-                                                    <div key={site.site_url || `site-${site.permission_level || 'unknown'}`} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                        <div className="text-sm font-semibold text-white break-all">{site.site_url || 'Unknown site'}</div>
-                                                        <div className="mt-2 flex flex-wrap gap-2">
-                                                            {site.permission_level ? <SignalPill tone="emerald">{site.permission_level}</SignalPill> : null}
-                                                            {site.site_type ? <SignalPill tone="zinc">{site.site_type}</SignalPill> : null}
-                                                        </div>
+                                                {profile.google_inventory.ga_properties.length === 0 && profile.google_inventory.gsc_sites.length > 0 ? (
+                                                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm text-cyan-100">
+                                                        GA4 properties are unavailable for this user. Reports below will use Search Console data only.
                                                     </div>
-                                                ))}
+                                                ) : null}
+                                                {profile.google_inventory.gsc_sites.length === 0 ? <EmptyState title="No sites returned" description="The live Search Console request returned no verified sites." /> : profile.google_inventory.gsc_sites.map(site => {
+                                                    const siteKey = site.site_url || `site-${site.permission_level || 'unknown'}`
+                                                    const weeklyKey = `${siteKey}:weekly`
+                                                    const monthlyKey = `${siteKey}:monthly`
+                                                    return profile.google_inventory.ga_properties.length === 0 ? (
+                                                        <SearchConsoleReportCard
+                                                            key={siteKey}
+                                                            site={site}
+                                                            reportLoadingKey={reportLoadingKey}
+                                                            weeklyKey={weeklyKey}
+                                                            monthlyKey={monthlyKey}
+                                                            onGenerate={handleGenerateReport}
+                                                        />
+                                                    ) : (
+                                                        <div key={siteKey} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
+                                                            <div className="text-sm font-semibold text-white break-all">{site.site_url || 'Unknown site'}</div>
+                                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                                {site.permission_level ? <SignalPill tone="emerald">{site.permission_level}</SignalPill> : null}
+                                                                {site.site_type ? <SignalPill tone="zinc">{site.site_type}</SignalPill> : null}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -1534,7 +1706,10 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
             await apiPost('update-query-status', { queryId, status })
             onRefresh()
         } catch (err) {
-            alert((err as Error).message)
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                alert(message)
+            }
         } finally {
             setActionLoading('')
         }
@@ -1547,7 +1722,10 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
             setDeleteTarget(null)
             onRefresh()
         } catch (err) {
-            alert((err as Error).message)
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                alert(message)
+            }
         } finally {
             setActionLoading('')
         }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { createSuperadminToken, verifySuperadminToken } from '@/lib/superadminToken'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,9 +13,6 @@ const PASSWORD_SALT = process.env.NEXTAUTH_SECRET || ''
 const PASSWORD_HASH = SUPERADMIN_PASSWORD && PASSWORD_SALT
     ? crypto.createHmac('sha256', PASSWORD_SALT).update(SUPERADMIN_PASSWORD).digest('hex')
     : ''
-
-// Token expiry: 24 hours in milliseconds
-const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000
 
 function normalizeUser(user: Record<string, unknown>) {
     const rawId = user.github_id ?? user.email ?? user.id ?? ''
@@ -48,46 +46,6 @@ function normalizeUser(user: Record<string, unknown>) {
     }
 }
 
-function createToken(): { token: string; expiresAt: number } {
-    const secret = process.env.NEXTAUTH_SECRET || ''
-    const timestamp = Date.now().toString()
-    const nonce = crypto.randomBytes(16).toString('hex')
-    const hmac = crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}`).digest('hex')
-    const token = `${timestamp}.${nonce}.${hmac}`
-    const expiresAt = Date.now() + TOKEN_EXPIRY_MS
-    return { token, expiresAt }
-}
-
-function verifyToken(token: string): boolean {
-    if (!token) return false
-    const secret = process.env.NEXTAUTH_SECRET || ''
-    const parts = token.split('.')
-    if (parts.length !== 3) return false
-
-    const [timestamp, nonce, hmac] = parts
-    const expectedHmac = crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}`).digest('hex')
-
-    let hmacBuf: Buffer, expectedBuf: Buffer
-    try {
-        hmacBuf = Buffer.from(hmac, 'hex')
-        expectedBuf = Buffer.from(expectedHmac, 'hex')
-        if (hmacBuf.length !== expectedBuf.length) return false
-    } catch {
-        return false
-    }
-
-    if (!crypto.timingSafeEqual(hmacBuf, expectedBuf)) {
-        return false
-    }
-
-    const tokenAge = Date.now() - parseInt(timestamp, 10)
-    if (tokenAge > TOKEN_EXPIRY_MS || tokenAge < 0) {
-        return false
-    }
-
-    return true
-}
-
 function verifyPassword(password: string): boolean {
     if (!PASSWORD_HASH || !PASSWORD_SALT) return false // No password or salt configured
     const hash = crypto.createHmac('sha256', PASSWORD_SALT).update(password).digest('hex')
@@ -99,7 +57,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const token = searchParams.get('token') || ''
 
-    if (!verifyToken(token)) {
+    if (!verifySuperadminToken(token)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -196,13 +154,13 @@ export async function POST(req: Request) {
             if (!password || !verifyPassword(password)) {
                 return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
             }
-            const { token, expiresAt } = createToken()
+            const { token, expiresAt } = createSuperadminToken()
             return NextResponse.json({ token, expiresAt })
         }
 
         // All other actions require a valid token
         const { token, githubId } = body
-        if (!verifyToken(token)) {
+        if (!verifySuperadminToken(token)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 

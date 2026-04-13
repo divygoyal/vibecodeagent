@@ -228,7 +228,26 @@ function PageFooter() {
     );
 }
 
-function KPICard({ value, label, delta, sparkData, invertDelta }: { value: string; label: string; delta: number; sparkData?: number[]; invertDelta?: boolean }) {
+function AvailabilityNotice({ title, message }: { title: string; message: string }) {
+    return (
+        <View style={[s.card, { backgroundColor: C.amberLight, borderLeftWidth: 3, borderLeftColor: C.amber, marginBottom: 8 }]}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.amber, marginBottom: 3 }}>{title}</Text>
+            <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.4 }}>{message}</Text>
+        </View>
+    );
+}
+
+function KPICard({ value, label, delta, sparkData, invertDelta, unavailable, unavailableNote }: { value: string; label: string; delta: number; sparkData?: number[]; invertDelta?: boolean; unavailable?: boolean; unavailableNote?: string }) {
+    if (unavailable) {
+        return (
+            <View style={s.kpiCard}>
+                <Text style={[s.kpiValue, { color: C.textMuted }]}>N/A</Text>
+                <Text style={s.kpiLabel}>{label}</Text>
+                <Text style={[s.kpiDelta, { color: C.textLight }]}>{unavailableNote || 'Unavailable'}</Text>
+            </View>
+        );
+    }
+
     const displayDelta = invertDelta ? -delta : delta;
     const deltaColor = displayDelta > 0 ? C.emerald : displayDelta < 0 ? C.red : C.textMuted;
     return (
@@ -292,7 +311,7 @@ interface ReportProps {
 }
 
 // Page 1: Cover
-function CoverPage({ siteUrl, period }: { siteUrl: string; period: ReportPeriod }) {
+function CoverPage({ siteUrl, period, hasGa4 }: { siteUrl: string; period: ReportPeriod; hasGa4: boolean }) {
     const periodLabel = period.type === 'weekly' ? 'Weekly Report' : 'Monthly Report';
     return (
         <Page size="A4" style={[s.page, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -304,6 +323,12 @@ function CoverPage({ siteUrl, period }: { siteUrl: string; period: ReportPeriod 
             <View style={{ width: 200, height: 1, backgroundColor: C.border, marginBottom: 40 }} />
             <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: C.text, marginBottom: 8 }}>{siteUrl}</Text>
             <View style={[s.badge, s.badgeGrowing, { marginBottom: 16 }]}><Text>{periodLabel}</Text></View>
+            {!hasGa4 && (
+                <View style={{ backgroundColor: C.amberLight, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 16 }}>
+                    <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.amber, textAlign: 'center' as const }}>Search Console-only report</Text>
+                    <Text style={{ fontSize: 7, color: C.text, textAlign: 'center' as const, marginTop: 2 }}>GA4 was not connected, so this PDF focuses on SEO visibility and page performance.</Text>
+                </View>
+            )}
             <Text style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>{period.startDate} - {period.endDate}</Text>
             <Text style={{ fontSize: 8, color: C.textLight }}>Generated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
             <Text style={{ fontSize: 7, color: C.textLight, marginTop: 30 }}>Comprehensive analysis with actionable fix prompts</Text>
@@ -330,7 +355,14 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
                 <Text style={s.sectionTitle}>1. Executive Summary</Text>
                 <HealthBadge status={es.healthStatus} />
             </View>
-            <Text style={s.sectionSubtitle}>AI-generated deep analysis of your site performance</Text>
+            <Text style={s.sectionSubtitle}>{analysis.hasGa4 ? 'AI-generated deep analysis of your site performance' : 'AI-generated SEO analysis based on Search Console data only'}</Text>
+
+            {!analysis.hasGa4 && (
+                <AvailabilityNotice
+                    title="GA4 not connected"
+                    message="This report uses Search Console data only. Traffic, engagement, bounce rate, device mix, and other GA4 behavior metrics are intentionally marked unavailable."
+                />
+            )}
 
             {analysis.criticalAlerts.length > 0 && (
                 <View style={{ marginBottom: 10 }}>
@@ -351,10 +383,10 @@ function ExecutiveSummaryPage({ analysis, gemini, period, siteUrl }: ReportProps
             <Text style={s.narrative}>{es.narrative}</Text>
 
             <View style={s.kpiRow}>
-                <KPICard value={kpi.users.toLocaleString()} label="Users" delta={kpi.usersDelta} sparkData={sessionData} />
+                <KPICard value={kpi.users.toLocaleString()} label="Users" delta={kpi.usersDelta} sparkData={sessionData} unavailable={!analysis.hasGa4} unavailableNote="GA4 unavailable" />
                 <KPICard value={kpi.clicks.toLocaleString()} label="Organic Clicks" delta={kpi.clicksDelta} sparkData={clickData} />
                 <KPICard value={kpi.avgPosition.toString()} label="Avg Position" delta={kpi.avgPositionDelta} invertDelta />
-                <KPICard value={`${(kpi.bounceRate * 100).toFixed(0)}%`} label="Bounce Rate" delta={Math.round(kpi.bounceRateDelta * 100)} invertDelta />
+                <KPICard value={`${(kpi.bounceRate * 100).toFixed(0)}%`} label="Bounce Rate" delta={Math.round(kpi.bounceRateDelta * 100)} invertDelta unavailable={!analysis.hasGa4} unavailableNote="GA4 unavailable" />
             </View>
 
             <View style={s.card}>
@@ -391,14 +423,14 @@ function PerformanceScorecardPage({ analysis, siteUrl, period }: ReportProps) {
     const impressionData = analysis.dailyImpressions.map(d => d.impressions);
 
     const metrics = [
-        { label: 'Users', value: kpi.users.toLocaleString(), delta: kpi.usersDelta, spark: sessionData },
-        { label: 'Sessions', value: kpi.sessions.toLocaleString(), delta: kpi.sessionsDelta, spark: sessionData },
+        { label: 'Users', value: kpi.users.toLocaleString(), delta: kpi.usersDelta, spark: sessionData, unavailable: !analysis.hasGa4 },
+        { label: 'Sessions', value: kpi.sessions.toLocaleString(), delta: kpi.sessionsDelta, spark: sessionData, unavailable: !analysis.hasGa4 },
         { label: 'Organic Clicks', value: kpi.clicks.toLocaleString(), delta: kpi.clicksDelta, spark: clickData },
         { label: 'Impressions', value: kpi.impressions.toLocaleString(), delta: kpi.impressionsDelta, spark: impressionData },
         { label: 'Avg Position', value: kpi.avgPosition.toString(), delta: kpi.avgPositionDelta, invert: true, spark: [] },
-        { label: 'Bounce Rate', value: `${(kpi.bounceRate * 100).toFixed(1)}%`, delta: Math.round(kpi.bounceRateDelta * 100), invert: true, spark: [] },
-        { label: 'Session Duration', value: `${kpi.avgSessionDuration}s`, delta: 0, spark: [] },
-        { label: 'New User Ratio', value: `${kpi.newUserRatio}%`, delta: 0, spark: [] },
+        { label: 'Bounce Rate', value: `${(kpi.bounceRate * 100).toFixed(1)}%`, delta: Math.round(kpi.bounceRateDelta * 100), invert: true, spark: [], unavailable: !analysis.hasGa4 },
+        { label: 'Session Duration', value: `${kpi.avgSessionDuration}s`, delta: 0, spark: [], unavailable: !analysis.hasGa4 },
+        { label: 'New User Ratio', value: `${kpi.newUserRatio}%`, delta: 0, spark: [], unavailable: !analysis.hasGa4 },
     ];
 
     return (
@@ -406,21 +438,28 @@ function PerformanceScorecardPage({ analysis, siteUrl, period }: ReportProps) {
             <View style={s.accentSidebar} />
             <PageHeader siteUrl={siteUrl} />
             <Text style={s.sectionTitle}>2. Performance Scorecard</Text>
-            <Text style={s.sectionSubtitle}>Complete KPI dashboard — {period.startDate} to {period.endDate}</Text>
+            <Text style={s.sectionSubtitle}>{analysis.hasGa4 ? `Complete KPI dashboard — ${period.startDate} to ${period.endDate}` : `Search Console scorecard — ${period.startDate} to ${period.endDate}`}</Text>
 
             {[0, 1].map(row => (
                 <View key={row} style={s.kpiRow}>
                     {metrics.slice(row * 4, row * 4 + 4).map(m => (
-                        <KPICard key={m.label} value={m.value} label={m.label} delta={m.delta} sparkData={m.spark.length > 1 ? m.spark : undefined} invertDelta={m.invert} />
+                        <KPICard key={m.label} value={m.value} label={m.label} delta={m.delta} sparkData={m.spark.length > 1 ? m.spark : undefined} invertDelta={m.invert} unavailable={m.unavailable} unavailableNote="GA4 unavailable" />
                     ))}
                 </View>
             ))}
 
             {/* Session trend chart */}
-            <View style={s.card}>
-                <Text style={s.cardTitle}>Daily Sessions Trend</Text>
-                <DailyBarChart data={analysis.dailySessions as unknown as Array<Record<string, unknown>>} valueKey="sessions" anomalyDates={analysis.anomalies.map(a => a.date)} />
-            </View>
+            {analysis.hasGa4 ? (
+                <View style={s.card}>
+                    <Text style={s.cardTitle}>Daily Sessions Trend</Text>
+                    <DailyBarChart data={analysis.dailySessions as unknown as Array<Record<string, unknown>>} valueKey="sessions" anomalyDates={analysis.anomalies.map(a => a.date)} />
+                </View>
+            ) : (
+                <AvailabilityNotice
+                    title="Session trend unavailable"
+                    message="Daily session charts require GA4. This Search Console-only report keeps the SEO trendline below and omits traffic charts intentionally."
+                />
+            )}
 
             {/* Clicks trend chart */}
             <View style={s.card}>
@@ -439,9 +478,14 @@ function AnomalyDeepDivePage({ analysis, gemini, siteUrl }: ReportProps) {
             <View style={s.accentSidebar} />
             <PageHeader siteUrl={siteUrl} />
             <Text style={s.sectionTitle}>3. Anomaly Deep Dive</Text>
-            <Text style={s.sectionSubtitle}>Root cause analysis for unusual traffic patterns</Text>
+            <Text style={s.sectionSubtitle}>{analysis.hasGa4 ? 'Root cause analysis for unusual traffic patterns' : 'Traffic anomaly analysis requires GA4 session data'}</Text>
 
-            {analysis.anomalies.length === 0 ? (
+            {!analysis.hasGa4 ? (
+                <AvailabilityNotice
+                    title="Anomaly analysis unavailable"
+                    message="This section normally analyzes daily session anomalies from GA4. Because GA4 is not connected, this report focuses on Search Console movements and omits traffic anomaly claims."
+                />
+            ) : analysis.anomalies.length === 0 ? (
                 <View style={s.card}>
                     <Text style={s.cardTitle}>No Statistical Anomalies</Text>
                     <Text style={{ fontSize: 8, color: C.textMuted }}>
@@ -787,7 +831,7 @@ function TopPagesPage({ analysis, gemini, siteUrl }: ReportProps) {
             <View style={s.accentSidebar} />
             <PageHeader siteUrl={siteUrl} />
             <Text style={s.sectionTitle}>8. Top Pages Performance</Text>
-            <Text style={s.sectionSubtitle}>Page-level grading based on clicks, CTR, position, and bounce rate</Text>
+            <Text style={s.sectionSubtitle}>{analysis.hasGa4 ? 'Page-level grading based on clicks, CTR, position, and bounce rate' : 'Page-level grading based on search performance; GA4 behavior metrics are unavailable'}</Text>
 
             <View style={s.tableHeader}>
                 <Text style={[s.tableHeaderCell, { width: '5%' }]}>Gr</Text>
@@ -807,8 +851,8 @@ function TopPagesPage({ analysis, gemini, siteUrl }: ReportProps) {
                     <Text style={[s.tableCell, { width: '10%', color: p.clickDelta >= 0 ? C.emerald : C.red }]}>{p.clickDelta >= 0 ? '+' : ''}{p.clickDelta}</Text>
                     <Text style={[s.tableCell, { width: '10%' }]}>{p.position}</Text>
                     <Text style={[s.tableCell, { width: '10%' }]}>{p.ctr}%</Text>
-                    <Text style={[s.tableCell, { width: '10%' }]}>{p.bounceRate}%</Text>
-                    <Text style={[s.tableCell, { width: '12%' }]}>{p.sessions}</Text>
+                    <Text style={[s.tableCell, { width: '10%' }]}>{p.bounceRate === null ? 'N/A' : `${p.bounceRate}%`}</Text>
+                    <Text style={[s.tableCell, { width: '12%' }]}>{p.sessions === null ? 'N/A' : p.sessions}</Text>
                 </View>
             ))}
 
@@ -836,65 +880,74 @@ function TrafficDNAPage({ analysis, gemini, period, siteUrl }: ReportProps) {
             <View style={s.accentSidebar} />
             <PageHeader siteUrl={siteUrl} />
             <Text style={s.sectionTitle}>9. Traffic Composition</Text>
-            <Text style={s.sectionSubtitle}>How your traffic sources and audience are shifting</Text>
+            <Text style={s.sectionSubtitle}>{analysis.hasGa4 ? 'How your traffic sources and audience are shifting' : 'Traffic composition requires GA4 and is not included in this Search Console-only report'}</Text>
 
-            <View style={s.card}>
-                <Text style={s.cardTitle}>Channel Mix (current vs previous)</Text>
-                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <View style={{ width: 8, height: 5, backgroundColor: C.border, borderRadius: 2 }} />
-                        <Text style={{ fontSize: 6, color: C.textMuted }}>Previous</Text>
+            {analysis.hasGa4 ? (
+                <>
+                    <View style={s.card}>
+                        <Text style={s.cardTitle}>Channel Mix (current vs previous)</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <View style={{ width: 8, height: 5, backgroundColor: C.border, borderRadius: 2 }} />
+                                <Text style={{ fontSize: 6, color: C.textMuted }}>Previous</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <View style={{ width: 8, height: 5, backgroundColor: C.emerald, borderRadius: 2 }} />
+                                <Text style={{ fontSize: 6, color: C.textMuted }}>Current</Text>
+                            </View>
+                        </View>
+                        {dna.channels.slice(0, 6).map(ch => (
+                            <HorizontalBar key={ch.channel} label={ch.channel} current={ch.currentShare} prev={ch.prevShare} maxVal={maxChannelShare} width={380} />
+                        ))}
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <View style={{ width: 8, height: 5, backgroundColor: C.emerald, borderRadius: 2 }} />
-                        <Text style={{ fontSize: 6, color: C.textMuted }}>Current</Text>
-                    </View>
-                </View>
-                {dna.channels.slice(0, 6).map(ch => (
-                    <HorizontalBar key={ch.channel} label={ch.channel} current={ch.currentShare} prev={ch.prevShare} maxVal={maxChannelShare} width={380} />
-                ))}
-            </View>
 
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={[s.card, { flex: 1 }]}>
-                    <Text style={s.cardTitle}>Device Split</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <DonutChart segments={donutSegments} size={60} />
-                        <View>
-                            {dna.devices.map((d, i) => (
-                                <View key={d.device} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-                                    <View style={{ width: 7, height: 7, borderRadius: 3, backgroundColor: deviceColors[i % deviceColors.length] }} />
-                                    <Text style={{ fontSize: 7, color: C.text }}>{d.device} {d.currentShare}%</Text>
-                                    <Text style={{ fontSize: 6, color: d.shareDelta > 0 ? C.emerald : d.shareDelta < 0 ? C.red : C.textMuted }}>
-                                        ({d.shareDelta > 0 ? '+' : ''}{d.shareDelta}pp)
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={[s.card, { flex: 1 }]}>
+                            <Text style={s.cardTitle}>Device Split</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <DonutChart segments={donutSegments} size={60} />
+                                <View>
+                                    {dna.devices.map((d, i) => (
+                                        <View key={d.device} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                                            <View style={{ width: 7, height: 7, borderRadius: 3, backgroundColor: deviceColors[i % deviceColors.length] }} />
+                                            <Text style={{ fontSize: 7, color: C.text }}>{d.device} {d.currentShare}%</Text>
+                                            <Text style={{ fontSize: 6, color: d.shareDelta > 0 ? C.emerald : d.shareDelta < 0 ? C.red : C.textMuted }}>
+                                                ({d.shareDelta > 0 ? '+' : ''}{d.shareDelta}pp)
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={[s.card, { flex: 1 }]}>
+                            <Text style={s.cardTitle}>Top Countries</Text>
+                            {dna.countries.map(c => (
+                                <View key={c.country} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                                    <Text style={{ fontSize: 7, color: C.text, width: '40%' }}>{c.country}</Text>
+                                    <Text style={{ fontSize: 7, color: C.textMuted }}>{c.currentShare}%</Text>
+                                    <Text style={{ fontSize: 6, color: c.shareDelta > 0 ? C.emerald : c.shareDelta < 0 ? C.red : C.textMuted }}>
+                                        {c.shareDelta > 0 ? '+' : ''}{c.shareDelta}pp
                                     </Text>
                                 </View>
                             ))}
                         </View>
                     </View>
-                </View>
 
-                <View style={[s.card, { flex: 1 }]}>
-                    <Text style={s.cardTitle}>Top Countries</Text>
-                    {dna.countries.map(c => (
-                        <View key={c.country} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                            <Text style={{ fontSize: 7, color: C.text, width: '40%' }}>{c.country}</Text>
-                            <Text style={{ fontSize: 7, color: C.textMuted }}>{c.currentShare}%</Text>
-                            <Text style={{ fontSize: 6, color: c.shareDelta > 0 ? C.emerald : c.shareDelta < 0 ? C.red : C.textMuted }}>
-                                {c.shareDelta > 0 ? '+' : ''}{c.shareDelta}pp
+                    {dna.topPageShare > 25 && (
+                        <View style={s.warningBox}>
+                            <Text style={s.warningTitle}>Concentration Risk</Text>
+                            <Text style={{ fontSize: 7, color: C.text }}>
+                                {dna.topPage} drives {dna.topPageShare}% of sessions. Losing rankings on this page could cost ~{Math.round(analysis.kpis.sessions * dna.topPageShare / 100)} sessions/{period.type === 'weekly' ? 'week' : 'month'}.
                             </Text>
                         </View>
-                    ))}
-                </View>
-            </View>
-
-            {dna.topPageShare > 25 && (
-                <View style={s.warningBox}>
-                    <Text style={s.warningTitle}>Concentration Risk</Text>
-                    <Text style={{ fontSize: 7, color: C.text }}>
-                        {dna.topPage} drives {dna.topPageShare}% of sessions. Losing rankings on this page could cost ~{Math.round(analysis.kpis.sessions * dna.topPageShare / 100)} sessions/{period.type === 'weekly' ? 'week' : 'month'}.
-                    </Text>
-                </View>
+                    )}
+                </>
+            ) : (
+                <AvailabilityNotice
+                    title="Traffic composition unavailable"
+                    message="Channel mix, device split, country mix, and concentration-risk analysis are GA4 features. They are intentionally omitted here because this PDF was generated in Search Console-only mode."
+                />
             )}
 
             <View style={[s.card, { marginTop: 4 }]}>
@@ -1023,7 +1076,7 @@ function ActionPlanPage({ analysis, gemini, period, siteUrl }: ReportProps) {
 }
 
 // Page 14: Methodology Notes
-function MethodologyPage({ siteUrl }: ReportProps) {
+function MethodologyPage({ analysis, siteUrl }: ReportProps) {
     return (
         <Page size="A4" style={s.page}>
             <View style={s.accentSidebar} />
@@ -1034,14 +1087,18 @@ function MethodologyPage({ siteUrl }: ReportProps) {
             <View style={s.card}>
                 <Text style={[s.cardTitle, { fontSize: 9 }]}>Data Sources</Text>
                 <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.5 }}>
-                    All data is pulled directly from your Google Analytics 4 (GA4) and Google Search Console (GSC) accounts via their official APIs. No data is estimated or scraped from third-party tools.
+                    {analysis.hasGa4
+                        ? 'All data is pulled directly from your Google Analytics 4 (GA4) and Google Search Console (GSC) accounts via their official APIs. No data is estimated or scraped from third-party tools.'
+                        : 'This PDF uses Google Search Console (GSC) data directly from the official API. GA4 was not connected for this user, so traffic and engagement metrics are marked unavailable rather than estimated.'}
                 </Text>
             </View>
 
             <View style={s.card}>
                 <Text style={[s.cardTitle, { fontSize: 9 }]}>Anomaly Detection</Text>
                 <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.5 }}>
-                    Anomalies are detected using z-score analysis on daily session data. Days with z-scores exceeding 1.5 standard deviations are flagged. Severity is &quot;critical&quot; at 2.5+ and &quot;warning&quot; at 1.5-2.5.
+                    {analysis.hasGa4
+                        ? 'Anomalies are detected using z-score analysis on daily session data. Days with z-scores exceeding 1.5 standard deviations are flagged. Severity is &quot;critical&quot; at 2.5+ and &quot;warning&quot; at 1.5-2.5.'
+                        : 'Traffic anomaly detection is only available when GA4 session data is connected. Search Console-only reports omit anomaly scoring rather than substituting zero values.'}
                 </Text>
             </View>
 
@@ -1069,7 +1126,9 @@ function MethodologyPage({ siteUrl }: ReportProps) {
             <View style={s.card}>
                 <Text style={[s.cardTitle, { fontSize: 9 }]}>Page Grades</Text>
                 <Text style={{ fontSize: 7, color: C.text, lineHeight: 1.5 }}>
-                    Pages are graded A-F based on a composite score of: position (top 3 = 3pts, top 10 = 2pts, top 20 = 1pt), CTR (10%+ = 3pts, 5%+ = 2pts, 2%+ = 1pt), click trend (positive = 2pts), and bounce rate (under 40% = 2pts, under 60% = 1pt).
+                    {analysis.hasGa4
+                        ? 'Pages are graded A-F based on a composite score of: position (top 3 = 3pts, top 10 = 2pts, top 20 = 1pt), CTR (10%+ = 3pts, 5%+ = 2pts, 2%+ = 1pt), click trend (positive = 2pts), and bounce rate (under 40% = 2pts, under 60% = 1pt).'
+                        : 'Pages are graded A-F using search performance only: position, CTR, and click trend. Bounce rate and session metrics are excluded when GA4 is unavailable so missing data does not inflate scores.'}
                 </Text>
             </View>
 
@@ -1128,7 +1187,7 @@ export function ReportDocument({ analysis, gemini, period, siteUrl }: ReportDocu
             author="TrafficClaw"
             subject={`Analytics Report for ${period.startDate} to ${period.endDate}`}
         >
-            <CoverPage siteUrl={siteUrl} period={period} />
+            <CoverPage siteUrl={siteUrl} period={period} hasGa4={analysis.hasGa4} />
             <ExecutiveSummaryPage {...rp} />
             <PerformanceScorecardPage {...rp} />
             <AnomalyDeepDivePage {...rp} />

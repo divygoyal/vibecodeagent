@@ -132,8 +132,8 @@ export interface PageGrade {
     position: number;
     clickDelta: number;
     positionDelta: number;
-    bounceRate: number;
-    sessions: number;
+    bounceRate: number | null;
+    sessions: number | null;
 }
 
 export interface FixPrompt {
@@ -160,6 +160,8 @@ export interface NewLostKeyword {
 }
 
 export interface ReportAnalysis {
+    reportMode: ReportRawData['reportMode'];
+    hasGa4: boolean;
     kpis: KPISummary;
     anomalies: AnomalyDay[];
     criticalAlerts: CriticalAlert[];
@@ -266,6 +268,8 @@ function computeKPIs(data: ReportRawData): KPISummary {
 // ─── Anomaly Detection ───
 
 function detectAnomalies(data: ReportRawData): AnomalyDay[] {
+    if (!data.hasGa4) return [];
+
     const { ga4, gsc } = data;
     const anomalies: AnomalyDay[] = [];
 
@@ -404,6 +408,17 @@ function computeKeywordVelocity(data: ReportRawData): ReportAnalysis['keywordVel
 // ─── Traffic DNA ───
 
 function computeTrafficDNA(data: ReportRawData): TrafficDNA {
+    if (!data.hasGa4) {
+        return {
+            channels: [],
+            devices: [],
+            countries: [],
+            topPageShare: 0,
+            topPage: '/',
+            newUserRatio: 0,
+        };
+    }
+
     const { ga4 } = data;
 
     const totalSessionsCurrent = sum(ga4.channelsCurrent.map(c => c.sessions));
@@ -579,6 +594,7 @@ function computePageGrades(data: ReportRawData): PageGrade[] {
     const ga4Map = new Map(data.ga4.pagesCurrent.map(p => [p.page, p]));
     const prevMap = new Map(data.gsc.pagesPrev.map(p => [p.page, p]));
     const grades: PageGrade[] = [];
+    const hasGa4 = data.hasGa4;
 
     for (const page of data.gsc.pagesCurrent.slice(0, 20)) {
         const prev = prevMap.get(page.page);
@@ -587,7 +603,7 @@ function computePageGrades(data: ReportRawData): PageGrade[] {
         const clickDelta = prev ? page.clicks - prev.clicks : 0;
         const positionDelta = prev ? Math.round((page.position - prev.position) * 10) / 10 : 0;
         const ctrPct = Math.round(page.ctr * 10000) / 100;
-        const bounceRate = ga4Page?.bounceRate ?? 0;
+        const bounceRate = typeof ga4Page?.bounceRate === 'number' ? ga4Page.bounceRate : null;
 
         // Grade based on composite score
         let score = 0;
@@ -602,15 +618,25 @@ function computePageGrades(data: ReportRawData): PageGrade[] {
         if (clickDelta > 0) score += 2;
         else if (clickDelta === 0) score += 1;
 
-        if (bounceRate < 0.4) score += 2;
-        else if (bounceRate < 0.6) score += 1;
+        if (bounceRate !== null) {
+            if (bounceRate < 0.4) score += 2;
+            else if (bounceRate < 0.6) score += 1;
+        }
 
         let grade: PageGrade['grade'];
-        if (score >= 9) grade = 'A';
-        else if (score >= 7) grade = 'B';
-        else if (score >= 5) grade = 'C';
-        else if (score >= 3) grade = 'D';
-        else grade = 'F';
+        if (hasGa4) {
+            if (score >= 9) grade = 'A';
+            else if (score >= 7) grade = 'B';
+            else if (score >= 5) grade = 'C';
+            else if (score >= 3) grade = 'D';
+            else grade = 'F';
+        } else {
+            if (score >= 7) grade = 'A';
+            else if (score >= 5) grade = 'B';
+            else if (score >= 4) grade = 'C';
+            else if (score >= 2) grade = 'D';
+            else grade = 'F';
+        }
 
         grades.push({
             page: truncatePath(page.page),
@@ -621,8 +647,8 @@ function computePageGrades(data: ReportRawData): PageGrade[] {
             position: Math.round(page.position * 10) / 10,
             clickDelta,
             positionDelta,
-            bounceRate: Math.round(bounceRate * 100),
-            sessions: ga4Page?.sessions ?? 0,
+            bounceRate: bounceRate === null ? null : Math.round(bounceRate * 100),
+            sessions: typeof ga4Page?.sessions === 'number' ? ga4Page.sessions : null,
         });
     }
 
@@ -693,6 +719,7 @@ function computeFixPrompts(
 
 function computeCriticalAlerts(kpis: KPISummary, data: ReportRawData): CriticalAlert[] {
     const alerts: CriticalAlert[] = [];
+    const hasGa4 = data.hasGa4;
 
     if (kpis.clicksDelta <= -50) {
         alerts.push({ severity: 'critical', title: 'Organic Click Collapse', detail: `Organic clicks dropped ${Math.abs(kpis.clicksDelta)}% (${kpis.clicks} this period vs previous). This signals a severe loss in search visibility requiring immediate investigation.`, metric: `${kpis.clicks} clicks (${kpis.clicksDelta}%)` });
@@ -700,7 +727,7 @@ function computeCriticalAlerts(kpis: KPISummary, data: ReportRawData): CriticalA
         alerts.push({ severity: 'danger', title: 'Significant Organic Decline', detail: `Organic clicks fell ${Math.abs(kpis.clicksDelta)}%. Check for ranking losses, algorithm updates, or technical issues.`, metric: `${kpis.clicks} clicks (${kpis.clicksDelta}%)` });
     }
 
-    if (kpis.clicks < 10 && kpis.sessions > 100) {
+    if (hasGa4 && kpis.clicks < 10 && kpis.sessions > 100) {
         const ratio = kpis.sessions > 0 ? Math.round((kpis.clicks / kpis.sessions) * 100) : 0;
         alerts.push({ severity: 'critical', title: 'Near-Zero Organic Visibility', detail: `Only ${kpis.clicks} organic click(s) despite ${kpis.sessions.toLocaleString()} sessions. Organic makes up just ${ratio}% of traffic — the site is almost invisible in search results.`, metric: `${kpis.clicks} organic clicks / ${kpis.sessions.toLocaleString()} sessions` });
     }
@@ -722,11 +749,11 @@ function computeCriticalAlerts(kpis: KPISummary, data: ReportRawData): CriticalA
         }
     }
 
-    if (kpis.newUserRatio >= 90 && kpis.sessions > 200) {
+    if (hasGa4 && kpis.newUserRatio >= 90 && kpis.sessions > 200) {
         alerts.push({ severity: 'warning', title: 'No Returning Visitors', detail: `${kpis.newUserRatio}% of visitors are new — almost no one returns. This suggests low content stickiness or missing email capture / engagement loops.`, metric: `${kpis.newUserRatio}% new user ratio` });
     }
 
-    if (kpis.bounceRate > 0.7 && kpis.sessions > 100) {
+    if (hasGa4 && kpis.bounceRate > 0.7 && kpis.sessions > 100) {
         alerts.push({ severity: 'warning', title: 'High Bounce Rate', detail: `Bounce rate is ${(kpis.bounceRate * 100).toFixed(0)}% — more than 70% of visitors leave after one page. Check page load speed, content relevance, and mobile UX.`, metric: `${(kpis.bounceRate * 100).toFixed(0)}% bounce rate` });
     }
 
@@ -759,6 +786,8 @@ export function analyzeReportData(data: ReportRawData): ReportAnalysis {
     const criticalAlerts = computeCriticalAlerts(kpis, data);
 
     return {
+        reportMode: data.reportMode,
+        hasGa4: data.hasGa4,
         kpis,
         anomalies: detectAnomalies(data),
         criticalAlerts,
@@ -769,7 +798,7 @@ export function analyzeReportData(data: ReportRawData): ReportAnalysis {
         opportunities,
         pageGrades,
         fixPrompts,
-        dailySessions: data.ga4.dailyCurrent.map(d => ({ date: d.date, sessions: d.sessions })),
+        dailySessions: data.hasGa4 ? data.ga4.dailyCurrent.map(d => ({ date: d.date, sessions: d.sessions })) : [],
         dailyClicks: data.gsc.dailyCurrent.map(d => ({ date: d.date, clicks: d.clicks })),
         dailyImpressions: data.gsc.dailyCurrent.map(d => ({ date: d.date, impressions: d.impressions })),
         totalRevenueEstimate: Math.round(totalRevenueEstimate),

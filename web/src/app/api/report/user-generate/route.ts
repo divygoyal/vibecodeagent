@@ -4,7 +4,7 @@
  * User-facing PDF report generation endpoint.
  * Authenticated via NextAuth session (no superadmin token required).
  *
- * Body: { period: 'weekly' | 'monthly', propertyId, siteUrl }
+ * Body: { period: 'weekly' | 'monthly', propertyId?, siteUrl }
  * Returns: PDF file as application/pdf
  */
 
@@ -44,13 +44,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!propertyId || !siteUrl) {
-      const missing = [
-        !propertyId && 'GA4 property',
-        !siteUrl && 'Search Console site',
-      ].filter(Boolean).join(' and ');
+    if (propertyId && !siteUrl) {
       return NextResponse.json(
-        { error: `Report requires both GA4 and Search Console. Missing: ${missing}` },
+        { error: 'Report requires a Search Console site when a GA4 property is provided.' },
+        { status: 400 },
+      );
+    }
+
+    if (!siteUrl) {
+      return NextResponse.json(
+        { error: 'Report requires a Search Console site.' },
         { status: 400 },
       );
     }

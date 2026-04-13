@@ -5,47 +5,25 @@
  * Intended to be called from the superadmin panel.
  *
  * Body: { token, githubId, period: 'weekly' | 'monthly', propertyId?, siteUrl? }
- * When propertyId/siteUrl are provided they are used directly (per-property reports).
- * When omitted the first available GA4 property and GSC site are auto-selected.
+ * When propertyId/siteUrl are provided they are used directly.
+ * When propertyId is omitted, the first available GA4 property is preferred and the route falls back to Search Console-only mode if none exist.
+ * When siteUrl is omitted, the first available GSC site is auto-selected.
  * Returns: PDF file as application/pdf
  */
 
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { fetchReportData, computePeriod } from '@/lib/reportDataFetcher';
 import { analyzeReportData } from '@/lib/reportAnalysis';
 import { synthesizeWithGemini } from '@/lib/reportGeminiSynth';
 import { generateReportPdf } from '@/lib/reportPdfGenerate';
 import { getValidAccessToken } from '@/lib/googleApi';
+import { verifySuperadminToken } from '@/lib/superadminToken';
 
 export const maxDuration = 180;
 export const dynamic = 'force-dynamic';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
-
-function verifyToken(token: string): boolean {
-    if (!token) return false;
-    const secret = process.env.NEXTAUTH_SECRET || '';
-    const parts = token.split('.');
-    if (parts.length !== 2) return false;
-
-    const [timestamp, hmac] = parts;
-    const expectedHmac = crypto.createHmac('sha256', secret).update(timestamp).digest('hex');
-
-    try {
-        if (!crypto.timingSafeEqual(Buffer.from(hmac, 'hex'), Buffer.from(expectedHmac, 'hex'))) {
-            return false;
-        }
-    } catch {
-        return false;
-    }
-
-    const tokenAge = Date.now() - parseInt(timestamp, 10);
-    return !(tokenAge > TOKEN_EXPIRY_MS || tokenAge < 0);
-}
-
 export async function POST(req: Request) {
     const t0 = Date.now();
 
@@ -59,7 +37,7 @@ export async function POST(req: Request) {
             siteUrl: explicitSiteUrl,
         } = body;
 
-        if (!verifyToken(token)) {
+        if (!verifySuperadminToken(token)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
@@ -89,6 +67,13 @@ export async function POST(req: Request) {
         let propertyId = explicitPropertyId as string | undefined;
         let siteUrl = explicitSiteUrl as string | undefined;
 
+        if (propertyId && !siteUrl) {
+            return NextResponse.json(
+                { error: 'Report requires a Search Console site when a GA4 property is provided.' },
+                { status: 400 }
+            );
+        }
+
         if (!propertyId || !siteUrl) {
             const profileRes = await fetch(`${ADMIN_API_URL}/api/users/${encodedId}/profile`, {
                 headers: { 'X-API-Key': ADMIN_API_KEY },
@@ -116,13 +101,9 @@ export async function POST(req: Request) {
             }
         }
 
-        if (!propertyId || !siteUrl) {
-            const missing = [
-                !propertyId && 'GA4 property',
-                !siteUrl && 'Search Console site',
-            ].filter(Boolean).join(' and ');
+        if (!siteUrl) {
             return NextResponse.json(
-                { error: `Report requires both GA4 and Search Console. Missing: ${missing}` },
+                { error: 'Report requires a Search Console site. No verified Search Console property is available for this user.' },
                 { status: 400 }
             );
         }

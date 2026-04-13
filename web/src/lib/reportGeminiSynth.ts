@@ -135,37 +135,20 @@ function fmtChannels(raw: ReportRawData): string {
 function buildPrompt1(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: string, raw: ReportRawData): string {
     const periodLabel = period.type === 'weekly' ? 'week' : 'month';
     const kpi = analysis.kpis;
-
-    return `You are a senior SEO analyst writing an in-depth ${periodLabel}ly diagnostic for ${siteUrl}.
-Period: ${period.startDate} to ${period.endDate} vs previous ${periodLabel} (${period.prevStartDate} to ${period.prevEndDate}).
-
-YOUR JOB: Find EVERY problem, anomaly, and risk in this data. Be SPECIFIC with dates, numbers, and root causes. Give VERDICTS, not generic advice. If data is sparse, explain what that means and what the user should do about it.
-
-## KPIs (current vs previous)
-- Users: ${kpi.users} (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%)
+    const ga4Availability = raw.hasGa4
+        ? 'GA4 traffic data is available for this report.'
+        : 'GA4 traffic data is unavailable for this report. This is a Search Console-only report. Do not describe users, sessions, bounce rate, pageviews, device mix, country mix, traffic channels, or traffic anomalies as measured values.';
+    const ga4Kpis = raw.hasGa4
+        ? `- Users: ${kpi.users} (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%)
 - Sessions: ${kpi.sessions} (${kpi.sessionsDelta > 0 ? '+' : ''}${kpi.sessionsDelta}%)
-- Organic Clicks: ${kpi.clicks} (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%)
-- Impressions: ${kpi.impressions} (${kpi.impressionsDelta > 0 ? '+' : ''}${kpi.impressionsDelta}%)
-- Avg Position: ${kpi.avgPosition} (delta ${kpi.avgPositionDelta > 0 ? '+' : ''}${kpi.avgPositionDelta})
 - Bounce Rate: ${(kpi.bounceRate * 100).toFixed(1)}% (delta ${(kpi.bounceRateDelta * 100).toFixed(1)}pp)
 - New User Ratio: ${kpi.newUserRatio}%
 - Avg Session Duration: ${kpi.avgSessionDuration}s
-- Pageviews: ${kpi.pageviews} (${kpi.pageviewsDelta > 0 ? '+' : ''}${kpi.pageviewsDelta}%)
-
-## Critical Alerts (auto-detected)
-${analysis.criticalAlerts.length === 0 ? 'None detected by automated system.' : analysis.criticalAlerts.map(a => `- [${a.severity.toUpperCase()}] ${a.title}: ${a.detail}`).join('\n')}
-
-## Daily GA4 Metrics
+- Pageviews: ${kpi.pageviews} (${kpi.pageviewsDelta > 0 ? '+' : ''}${kpi.pageviewsDelta}%)`
+        : '- GA4 metrics unavailable for this report';
+    const ga4Sections = raw.hasGa4
+        ? `## Daily GA4 Metrics
 ${fmtDailyGA4(raw)}
-
-## Daily GSC Metrics
-${fmtDailyGSC(raw)}
-
-## All Search Queries (current vs previous)
-${fmtQueries(raw)}
-
-## All Pages in Search (current vs previous)
-${fmtPages(raw)}
 
 ## Channel Mix
 ${fmtChannels(raw)}
@@ -179,7 +162,38 @@ ${analysis.trafficDNA.countries.map(c => `${c.country}: ${c.currentShare}% (${c.
 ## Anomaly Days (z-score > 1.5)
 ${analysis.anomalies.length === 0 ? 'No statistically significant session anomalies (stddev-based).' : analysis.anomalies.map(a =>
         `- ${a.dayName} ${a.date}: ${a.actual} sessions vs ~${a.expected} expected (${a.deviationPercent > 0 ? '+' : ''}${a.deviationPercent}%, ${a.severity})`
-    ).join('\n')}
+    ).join('\n')}`
+        : `## GA4-Dependent Sections
+Unavailable because Google Analytics 4 is not connected for this user. Explain that traffic composition and session-anomaly analysis are not part of this report.`;
+
+    return `You are a senior SEO analyst writing an in-depth ${periodLabel}ly diagnostic for ${siteUrl}.
+Period: ${period.startDate} to ${period.endDate} vs previous ${periodLabel} (${period.prevStartDate} to ${period.prevEndDate}).
+Report mode: ${raw.reportMode === 'gsc_only' ? 'Search Console-only' : 'GA4 + Search Console'}.
+
+YOUR JOB: Find EVERY problem, anomaly, and risk in this data. Be SPECIFIC with dates, numbers, and root causes. Give VERDICTS, not generic advice. If data is sparse, explain what that means and what the user should do about it.
+${ga4Availability}
+
+## Traffic KPIs
+${ga4Kpis}
+
+## Search KPIs (current vs previous)
+- Organic Clicks: ${kpi.clicks} (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%)
+- Impressions: ${kpi.impressions} (${kpi.impressionsDelta > 0 ? '+' : ''}${kpi.impressionsDelta}%)
+- Avg Position: ${kpi.avgPosition} (delta ${kpi.avgPositionDelta > 0 ? '+' : ''}${kpi.avgPositionDelta})
+
+## Critical Alerts (auto-detected)
+${analysis.criticalAlerts.length === 0 ? 'None detected by automated system.' : analysis.criticalAlerts.map(a => `- [${a.severity.toUpperCase()}] ${a.title}: ${a.detail}`).join('\n')}
+
+## Daily GSC Metrics
+${fmtDailyGSC(raw)}
+
+## All Search Queries (current vs previous)
+${fmtQueries(raw)}
+
+## All Pages in Search (current vs previous)
+${fmtPages(raw)}
+
+${ga4Sections}
 
 Respond with ONLY valid JSON (no markdown fences):
 {
@@ -197,7 +211,7 @@ Respond with ONLY valid JSON (no markdown fences):
       "impact": "Precise traffic impact with numbers",
       "howToFix": "3-4 specific actionable steps"
     }`).join(',')}],
-  "trafficDNAInterpretation": "6-8 sentences: deep analysis of traffic sources, what the channel mix reveals about the business, risks (over-reliance on one channel), the device split implications, and geographic opportunities",
+  "trafficDNAInterpretation": "6-8 sentences. If GA4 is available, analyze traffic sources, device mix, and geographic opportunities. If GA4 is unavailable, explicitly say traffic composition is unavailable and explain the operational implication without inventing values.",
   "criticalProblems": [
     {"title": "Problem title", "explanation": "3-4 sentences with evidence from the data", "fix": "3-4 specific numbered steps to fix this"}
   ]
@@ -219,8 +233,10 @@ function buildPrompt2(analysis: ReportAnalysis, period: ReportPeriod, siteUrl: s
 
     return `You are a senior SEO strategist creating a detailed action plan for ${siteUrl}.
 Period: ${period.startDate} to ${period.endDate} (${periodLabel}ly report).
+Report mode: ${raw.reportMode === 'gsc_only' ? 'Search Console-only' : 'GA4 + Search Console'}.
 
 CRITICAL: Every recommendation must be SPECIFIC and ACTIONABLE. Include real numbers and URLs. No generic advice like "improve content quality."
+${raw.hasGa4 ? 'GA4 behavior metrics are available when needed for page context.' : 'GA4 behavior metrics are unavailable. Base recommendations on Search Console data only and do not invent session or bounce-rate evidence.'}
 
 ## Accelerating Keywords
 ${accel.length === 0 ? 'None detected.' : accel.map(k => `- "${k.query}": pos ${k.prevPosition}->${k.currentPosition}, clicks ${k.prevClicks}->${k.currentClicks}, CTR ${k.actualCtr}% (expected ${k.expectedCtr}%), gap ${k.ctrGap}pp`).join('\n')}
@@ -402,24 +418,33 @@ async function callGemini(prompt: string, label: string): Promise<unknown> {
 // ─── Data-Driven Fallback ───
 
 function fallbackOutput(analysis: ReportAnalysis, period: ReportPeriod): GeminiReportOutput {
-    const kpi = analysis.kpis;
-    const periodLabel = period.type === 'weekly' ? 'week' : 'month';
+  const kpi = analysis.kpis;
+  const periodLabel = period.type === 'weekly' ? 'week' : 'month';
+  const isGscOnly = !analysis.hasGa4;
 
     let healthStatus: GeminiReportOutput['executiveSummary']['healthStatus'] = 'stable';
     if (kpi.clicksDelta > 10 && kpi.sessionsDelta > 5) healthStatus = 'growing';
     else if (kpi.clicksDelta < -20 || kpi.impressionsDelta < -30) healthStatus = 'declining';
     else if (kpi.clicksDelta < -5 || kpi.avgPositionDelta > 2 || kpi.clicks < 10) healthStatus = 'at_risk';
 
-    const highlights: string[] = [];
-    if (kpi.clicksDelta !== 0) highlights.push(`Organic clicks ${kpi.clicksDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.clicksDelta)}% (${kpi.clicks} total)`);
-    if (kpi.impressionsDelta !== 0) highlights.push(`Impressions ${kpi.impressionsDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.impressionsDelta)}% (${kpi.impressions} total)`);
+  const highlights: string[] = [];
+  if (kpi.clicksDelta !== 0) highlights.push(`Organic clicks ${kpi.clicksDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.clicksDelta)}% (${kpi.clicks} total)`);
+  if (kpi.impressionsDelta !== 0) highlights.push(`Impressions ${kpi.impressionsDelta >= 0 ? 'up' : 'down'} ${Math.abs(kpi.impressionsDelta)}% (${kpi.impressions} total)`);
+  if (isGscOnly) {
+    highlights.push('This PDF uses Search Console data only because GA4 is not connected for this user');
+  } else {
     highlights.push(`${kpi.users.toLocaleString()} users, ${kpi.sessions.toLocaleString()} sessions this ${periodLabel}`);
     if (kpi.clicks < 10 && kpi.sessions > 100) highlights.push(`Only ${kpi.clicks} organic click(s) despite ${kpi.sessions.toLocaleString()} sessions — organic visibility is critically low`);
     if (kpi.newUserRatio >= 85) highlights.push(`${kpi.newUserRatio}% new user ratio — almost no returning visitors`);
+  }
 
-    const narrative = analysis.criticalAlerts.length > 0
-        ? `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited with ${kpi.sessions.toLocaleString()} sessions, but the organic performance is alarming: only ${kpi.clicks} organic click(s) (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%) from ${kpi.impressions} impressions. ${analysis.criticalAlerts[0].detail} Average position is ${kpi.avgPosition} with a ${(kpi.bounceRate * 100).toFixed(0)}% bounce rate. Immediate action is needed to address the organic visibility crisis.`
-        : `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%) with ${kpi.clicks.toLocaleString()} organic clicks (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%). Average position: ${kpi.avgPosition}. Bounce rate: ${(kpi.bounceRate * 100).toFixed(1)}%.`;
+  const narrative = isGscOnly
+      ? analysis.criticalAlerts.length > 0
+          ? `This ${periodLabel}, the report uses Search Console data only because GA4 is not connected. Organic performance shows ${kpi.clicks.toLocaleString()} click(s) (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%) from ${kpi.impressions.toLocaleString()} impressions (${kpi.impressionsDelta > 0 ? '+' : ''}${kpi.impressionsDelta}%). Average position is ${kpi.avgPosition}. ${analysis.criticalAlerts[0].detail} Focus on search visibility, indexing, and page-level keyword performance until GA4 is connected.`
+          : `This ${periodLabel}, the report uses Search Console data only because GA4 is not connected. Organic search delivered ${kpi.clicks.toLocaleString()} click(s) (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%) from ${kpi.impressions.toLocaleString()} impressions (${kpi.impressionsDelta > 0 ? '+' : ''}${kpi.impressionsDelta}%). Average position is ${kpi.avgPosition}. The clearest next steps come from keyword movement, page performance, and search visibility trends.`
+      : analysis.criticalAlerts.length > 0
+          ? `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited with ${kpi.sessions.toLocaleString()} sessions, but the organic performance is alarming: only ${kpi.clicks} organic click(s) (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%) from ${kpi.impressions} impressions. ${analysis.criticalAlerts[0].detail} Average position is ${kpi.avgPosition} with a ${(kpi.bounceRate * 100).toFixed(0)}% bounce rate. Immediate action is needed to address the organic visibility crisis.`
+          : `This ${periodLabel}, ${kpi.users.toLocaleString()} users visited (${kpi.usersDelta > 0 ? '+' : ''}${kpi.usersDelta}%) with ${kpi.clicks.toLocaleString()} organic clicks (${kpi.clicksDelta > 0 ? '+' : ''}${kpi.clicksDelta}%). Average position: ${kpi.avgPosition}. Bounce rate: ${(kpi.bounceRate * 100).toFixed(1)}%.`;
 
     const criticalProblems = analysis.criticalAlerts.map(a => ({
         title: a.title,
@@ -430,9 +455,11 @@ function fallbackOutput(analysis: ReportAnalysis, period: ReportPeriod): GeminiR
     }));
 
     return {
-        executiveSummary: { healthStatus, narrative, highlights, oneAction: analysis.criticalAlerts.length > 0 ? `Address: ${analysis.criticalAlerts[0].title}` : 'Focus on the top declining keywords and refresh their landing pages.', oneActionWhy: analysis.criticalAlerts.length > 0 ? analysis.criticalAlerts[0].detail : 'Recovering declining keywords is faster than ranking for new ones.', oneActionImpact: `Could recover ${Math.abs(analysis.keywordVelocity.decelerating.reduce((s, k) => s + k.clickDelta, 0))} lost clicks.` },
-        anomalyExplanations: analysis.anomalies.map(a => ({ date: a.date, rootCause: `Sessions were ${a.deviationPercent > 0 ? 'higher' : 'lower'} than expected (${a.actual} vs ~${a.expected}). This ${a.severity} anomaly represents a ${Math.abs(a.deviationPercent)}% deviation from the mean.`, impact: `${Math.abs(a.actual - a.expected)} sessions ${a.deviationPercent > 0 ? 'gained' : 'lost'} on ${a.dayName}.`, howToFix: a.deviationPercent < 0 ? '1. Check for technical issues or server downtime. 2. Review if any pages lost rankings on this day. 3. Verify no crawl errors in Search Console.' : '1. Identify the traffic source driving the spike. 2. Analyze which pages received extra traffic. 3. Create more content on similar topics.' })),
-        trafficDNAInterpretation: `Your top channel is ${analysis.trafficDNA.channels[0]?.channel || 'Direct'} at ${analysis.trafficDNA.channels[0]?.currentShare || 0}% of traffic. ${analysis.trafficDNA.devices[0]?.device || 'Desktop'} leads device usage at ${analysis.trafficDNA.devices[0]?.currentShare || 0}%. ${kpi.clicks < 10 && kpi.sessions > 100 ? `The massive disconnect between ${kpi.sessions.toLocaleString()} GA4 sessions and only ${kpi.clicks} organic clicks indicates the site relies almost entirely on non-organic traffic sources. Building organic visibility should be the primary strategic objective.` : ''}`,
+      executiveSummary: { healthStatus, narrative, highlights, oneAction: analysis.criticalAlerts.length > 0 ? `Address: ${analysis.criticalAlerts[0].title}` : 'Focus on the top declining keywords and refresh their landing pages.', oneActionWhy: analysis.criticalAlerts.length > 0 ? analysis.criticalAlerts[0].detail : 'Recovering declining keywords is faster than ranking for new ones.', oneActionImpact: `Could recover ${Math.abs(analysis.keywordVelocity.decelerating.reduce((s, k) => s + k.clickDelta, 0))} lost clicks.` },
+      anomalyExplanations: analysis.anomalies.map(a => ({ date: a.date, rootCause: `Sessions were ${a.deviationPercent > 0 ? 'higher' : 'lower'} than expected (${a.actual} vs ~${a.expected}). This ${a.severity} anomaly represents a ${Math.abs(a.deviationPercent)}% deviation from the mean.`, impact: `${Math.abs(a.actual - a.expected)} sessions ${a.deviationPercent > 0 ? 'gained' : 'lost'} on ${a.dayName}.`, howToFix: a.deviationPercent < 0 ? '1. Check for technical issues or server downtime. 2. Review if any pages lost rankings on this day. 3. Verify no crawl errors in Search Console.' : '1. Identify the traffic source driving the spike. 2. Analyze which pages received extra traffic. 3. Create more content on similar topics.' })),
+        trafficDNAInterpretation: isGscOnly
+            ? 'Traffic composition is unavailable because GA4 is not connected for this user. This report focuses on Search Console signals such as impressions, clicks, average position, page-level decay, and keyword opportunities until GA4 is connected.'
+            : `Your top channel is ${analysis.trafficDNA.channels[0]?.channel || 'Direct'} at ${analysis.trafficDNA.channels[0]?.currentShare || 0}% of traffic. ${analysis.trafficDNA.devices[0]?.device || 'Desktop'} leads device usage at ${analysis.trafficDNA.devices[0]?.currentShare || 0}%. ${kpi.clicks < 10 && kpi.sessions > 100 ? `The massive disconnect between ${kpi.sessions.toLocaleString()} GA4 sessions and only ${kpi.clicks} organic clicks indicates the site relies almost entirely on non-organic traffic sources. Building organic visibility should be the primary strategic objective.` : ''}`,
         criticalProblems,
         keywordAccelCommentary: analysis.keywordVelocity.accelerating.length > 0 ? `${analysis.keywordVelocity.accelerating.length} keywords gaining momentum.` : `No keywords showed acceleration. ${analysis.keywordVelocity.newKeywords.length > 0 ? `However, ${analysis.keywordVelocity.newKeywords.length} new keyword(s) appeared this period.` : 'The site needs to build keyword authority through new content and optimization.'}`,
         keywordDecelCommentary: analysis.keywordVelocity.decelerating.length > 0 ? `${analysis.keywordVelocity.decelerating.length} keywords losing momentum — requires attention.` : `No keywords showed deceleration. ${analysis.keywordVelocity.lostKeywords.length > 0 ? `However, ${analysis.keywordVelocity.lostKeywords.length} keyword(s) disappeared entirely.` : ''}`,
@@ -448,7 +475,7 @@ function fallbackOutput(analysis: ReportAnalysis, period: ReportPeriod): GeminiR
             ? [{ action: `Investigate and address: ${analysis.criticalAlerts[0].title}`, effort: 'medium' as const, impact: 'high' as const }, { action: 'Verify all important pages are indexed in Google Search Console', effort: 'low' as const, impact: 'high' as const }, { action: 'Check for crawl errors and fix any 404s or server errors', effort: 'low' as const, impact: 'medium' as const }]
             : [{ action: 'Refresh top 3 decaying pages', effort: 'medium' as const, impact: 'high' as const }, { action: 'Fix meta descriptions for CTR underperformers', effort: 'low' as const, impact: 'medium' as const }, { action: 'Add internal links to striking distance keywords', effort: 'low' as const, impact: 'medium' as const }],
         actionPlanThisMonth: [{ action: analysis.criticalAlerts.length > 0 ? 'Build a content strategy targeting 10+ relevant keywords' : 'Resolve keyword cannibalization (top 3 groups)', effort: 'high' as const, impact: 'high' as const }, { action: 'Create content targeting top 5 keyword opportunities', effort: 'high' as const, impact: 'high' as const }, { action: 'Build internal linking structure across all key pages', effort: 'medium' as const, impact: 'medium' as const }],
-        pageOptimizations: analysis.pageGrades.filter(p => p.grade === 'D' || p.grade === 'F').slice(0, 3).map(p => ({ page: p.page, issues: `Grade ${p.grade}: position ${p.position}, CTR ${p.ctr}%, bounce ${p.bounceRate}%.`, fixes: `1. Rewrite title tag for better CTR. 2. Improve content depth. 3. Add structured data.` })),
+        pageOptimizations: analysis.pageGrades.filter(p => p.grade === 'D' || p.grade === 'F').slice(0, 3).map(p => ({ page: p.page, issues: `Grade ${p.grade}: position ${p.position}, CTR ${p.ctr}%${p.bounceRate === null ? ', GA4 behavior metrics unavailable.' : `, bounce ${p.bounceRate}%.`}`, fixes: `1. Rewrite title tag for better CTR. 2. Improve content depth. 3. Add structured data.` })),
     };
 }
 
