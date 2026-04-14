@@ -140,6 +140,9 @@ export default function DashboardLayout({
     const shellRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-xl';
     const shellCompactRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-lg';
     const shellBadgeRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-full';
+    const brandAccentColor = '#7AD9DA';
+    const sidebarActiveItemClasses = 'border border-[#14C4E1]/24 bg-[linear-gradient(180deg,rgba(20,196,225,0.16),rgba(7,48,60,0.16))] text-[#7AD9DA] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_14px_28px_rgba(5,24,34,0.24)]';
+    const sidebarInactiveItemClasses = 'border border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04] hover:border-white/[0.06]';
     const { credits, plan: userPlan, subscriptionCancelled } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -170,6 +173,15 @@ export default function DashboardLayout({
     const [showWelcome, setShowWelcome] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [range, setRange] = useState('30d');
+    useEffect(() => {
+        if (!mobileOpen) {
+            setSiteDropdownOpen(false);
+        }
+    }, [mobileOpen]);
+
+    useEffect(() => {
+        setSiteDropdownOpen(false);
+    }, [pathname]);
 
     // Load user-scoped selections and chat history once session is available
     useEffect(() => {
@@ -498,16 +510,25 @@ export default function DashboardLayout({
             <a href="#main-content" className="skip-to-content">Skip to content</a>
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
-                className={`hidden lg:flex flex-col border-r border-[var(--card-border)] bg-[var(--sidebar-bg)] transition-all duration-300 sticky top-0 h-screen overflow-y-auto ${collapsed ? 'w-[68px]' : 'w-[240px]'
+                className={`relative hidden lg:flex flex-col border-r border-white/[0.06] bg-[linear-gradient(180deg,#04070c_0%,#050913_16%,#020306_100%)] shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)] transition-all duration-300 sticky top-0 h-screen overflow-y-auto overflow-x-visible ${collapsed ? 'w-[68px]' : 'w-[248px]'
                     }`}
             >
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(20,196,225,0.16),transparent_64%),radial-gradient(circle_at_top_right,rgba(122,217,218,0.1),transparent_48%)]" />
+                {siteDropdownOpen && (
+                    <button
+                        type="button"
+                        className="fixed inset-0 z-[60] hidden cursor-default bg-transparent lg:block"
+                        onClick={() => setSiteDropdownOpen(false)}
+                        aria-label="Close site selector"
+                    />
+                )}
                 {/* Logo */}
-                <div className="h-16 flex items-center px-4 border-b border-[var(--divider)]">
+                <div className="relative z-10 h-16 flex items-center px-4 border-b border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]">
                     <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
                         <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className={`${shellCompactRadiusClass} flex-shrink-0`} />
                         {!collapsed && (
                             <span className="text-base font-bold text-[var(--text-primary)] whitespace-nowrap">
-                                Traffic<span className="text-emerald-400">Claw</span>
+                                Traffic<span style={{ color: brandAccentColor }}>Claw</span>
                             </span>
                         )}
                     </Link>
@@ -515,15 +536,15 @@ export default function DashboardLayout({
 
                 {/* Site selector */}
                 {gscSites.length > 0 && (
-                    <div className="px-2 pt-3 pb-1">
+                    <div className={`relative px-2.5 pt-3 pb-1.5 ${siteDropdownOpen ? 'z-[80]' : 'z-10'}`}>
                         <div className="relative">
                             <button
                                 onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.08] ${shellCompactRadiusClass} hover:bg-white/[0.06] hover:border-white/[0.12] transition ${collapsed ? 'justify-center' : ''}`}
+                                className={`relative z-[90] w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-zinc-300 bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] border border-white/[0.08] shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${shellCompactRadiusClass} hover:border-[#14C4E1]/24 hover:bg-[linear-gradient(180deg,rgba(16,24,34,0.94),rgba(8,13,20,0.96))] transition ${collapsed ? 'justify-center' : ''}`}
                                 aria-label="Switch site"
                             >
-                                <div className={`w-4 h-4 ${isOverviewRoute ? 'rounded-none' : 'rounded'} bg-emerald-500/20 flex items-center justify-center flex-shrink-0`}>
-                                    <Globe className="w-2.5 h-2.5 text-emerald-400" />
+                                <div className={`w-4 h-4 ${isOverviewRoute ? 'rounded-none' : 'rounded'} bg-[#14C4E1]/14 flex items-center justify-center flex-shrink-0`}>
+                                    <Globe className="w-2.5 h-2.5 text-[#7AD9DA]" />
                                 </div>
                                 {!collapsed && (
                                     <>
@@ -533,9 +554,7 @@ export default function DashboardLayout({
                                 )}
                             </button>
                             {siteDropdownOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setSiteDropdownOpen(false)} />
-                                    <div className={`absolute ${collapsed ? 'left-full ml-1 top-0' : 'left-0 right-0 mt-1'} z-50 bg-[#0a0a0f] border border-white/[0.1] ${shellRadiusClass} shadow-2xl shadow-black/40 py-1.5 min-w-[200px] max-h-[260px] overflow-y-auto`}>
+                                <div className={`absolute ${collapsed ? 'left-full ml-2 top-0' : 'left-0 right-0 mt-2'} z-[95] bg-[linear-gradient(180deg,#09131c_0%,#040912_100%)] border border-[#14C4E1]/20 ${shellRadiusClass} shadow-[0_26px_60px_rgba(0,0,0,0.48)] py-1.5 min-w-[220px] max-h-[260px] overflow-y-auto backdrop-blur-xl`}>
                                         <div className="px-3 pb-1.5 pt-0.5">
                                             <span className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">Sites</span>
                                         </div>
@@ -548,24 +567,23 @@ export default function DashboardLayout({
                                                     key={url}
                                                     onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
                                                     className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2.5 transition ${
-                                                        isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                                        isSelected ? 'text-[#7AD9DA] bg-[#14C4E1]/[0.10]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                                     }`}
                                                 >
                                                     <Globe className="w-3 h-3 flex-shrink-0" />
                                                     <span className="truncate">{label}</span>
-                                                    {isSelected && <span className={`w-1.5 h-1.5 ${shellBadgeRadiusClass} bg-emerald-400 ml-auto flex-shrink-0`} />}
+                                                    {isSelected && <span className={`w-1.5 h-1.5 ${shellBadgeRadiusClass} bg-[#7AD9DA] ml-auto flex-shrink-0`} />}
                                                 </button>
                                             );
                                         })}
-                                    </div>
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>
                 )}
 
                 {/* Grouped nav items */}
-                <nav className="flex-1 py-2 px-2 overflow-y-auto" aria-label="Main navigation">
+                <nav className={`relative z-10 flex-1 py-2 px-2.5 overflow-y-auto transition-opacity duration-200 ${siteDropdownOpen ? 'pointer-events-none opacity-35' : ''}`} aria-label="Main navigation">
                     {sidebarGroups.map((group, gi) => (
                         <div key={gi} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--divider)]' : ''}>
                             {group.label && !collapsed && (
@@ -581,12 +599,12 @@ export default function DashboardLayout({
                                         <Link
                                             key={item.href}
                                             href={item.href}
-                                            className={`flex items-center gap-3 px-3 py-2 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isActive
-                                                ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                                : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                            className={`flex items-center gap-3 px-3 py-2.5 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isActive
+                                                ? sidebarActiveItemClasses
+                                                : sidebarInactiveItemClasses
                                             }`}
                                         >
-                                            <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                                            <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-[#7AD9DA]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
                                             {!collapsed && <span className="truncate">{item.label}</span>}
                                         </Link>
                                     );
@@ -597,19 +615,19 @@ export default function DashboardLayout({
                 </nav>
 
                 {/* Bottom section: Settings + Credits + User + Collapse */}
-                <div className="border-t border-[var(--divider)] p-2 space-y-1">
+                <div className={`relative z-10 border-t border-[var(--divider)] p-2.5 space-y-1.5 transition-opacity duration-200 ${siteDropdownOpen ? 'pointer-events-none opacity-35' : ''}`}>
                     {/* Settings link */}
                     {(() => {
                         const isSettingsActive = pathname.startsWith('/dashboard/settings');
                         return (
                             <Link
                                 href="/dashboard/settings"
-                                className={`flex items-center gap-3 px-3 py-2 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isSettingsActive
-                                    ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                className={`flex items-center gap-3 px-3 py-2.5 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isSettingsActive
+                                    ? sidebarActiveItemClasses
+                                    : sidebarInactiveItemClasses
                                 }`}
                             >
-                                <Settings className={`w-[18px] h-[18px] flex-shrink-0 ${isSettingsActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                                <Settings className={`w-[18px] h-[18px] flex-shrink-0 ${isSettingsActive ? 'text-[#7AD9DA]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
                                 {!collapsed && <span className="truncate">Settings</span>}
                             </Link>
                         );
@@ -623,17 +641,17 @@ export default function DashboardLayout({
                                 ? 'bg-red-500/[0.08] border-red-500/[0.15]'
                                 : credits < 50
                                     ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
-                                    : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
+                                    : 'bg-[#14C4E1]/[0.08] border-[#14C4E1]/[0.18]'
                             }`}
                         >
-                            <Coins className={`w-3.5 h-3.5 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`} />
-                            <span className={`text-[11px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{credits} msgs</span>
+                            <Coins className={`w-3.5 h-3.5 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`} />
+                            <span className={`text-[11px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`}>{credits} msgs</span>
                         </Link>
                     )}
 
                     {/* User profile */}
                     {session?.user && !collapsed && (
-                        <div className="flex items-center gap-3 px-2 py-2">
+                        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-2.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                             <Link href="/dashboard/plan" className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer">
                                 {session.user.image && (
                                     <Image
@@ -651,7 +669,7 @@ export default function DashboardLayout({
                                             className={`text-[8px] px-1.5 py-0.5 ${shellBadgeRadiusClass} font-bold uppercase tracking-wider leading-none ${
                                                 subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                                 : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
-                                                : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
+                                                : userPlan === 'growth' ? 'bg-gradient-to-r from-[#7AD9DA] to-cyan-400 text-[#041015]'
                                                 : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
                                                 : 'bg-zinc-700 text-zinc-400'
                                             }`}
@@ -677,7 +695,7 @@ export default function DashboardLayout({
 
                     <button
                         onClick={() => setCollapsed(!collapsed)}
-                        className={`w-full flex items-center justify-center py-2 text-zinc-600 hover:text-zinc-400 transition-colors ${shellCompactRadiusClass} hover:bg-white/[0.04]`}
+                        className={`w-full flex items-center justify-center py-2.5 text-zinc-600 hover:text-[#7AD9DA] transition-colors ${shellCompactRadiusClass} border border-transparent hover:bg-white/[0.04] hover:border-white/[0.06]`}
                     >
                         {collapsed ? (
                             <ChevronRight className="w-4 h-4" />
@@ -840,25 +858,34 @@ export default function DashboardLayout({
                 <>
                     {/* Full-screen overlay — tap anywhere to dismiss */}
                     <div
-                        className="fixed inset-0 bg-black/60 z-50 lg:hidden cursor-pointer"
+                        className="fixed inset-0 bg-[#02050b]/72 backdrop-blur-sm z-50 lg:hidden cursor-pointer"
                         onClick={() => setMobileOpen(false)}
                         aria-label="Close navigation"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setMobileOpen(false); }}
                     />
-                    <div className="fixed left-0 top-0 bottom-0 w-[280px] max-w-[85vw] bg-[var(--sidebar-bg)] border-r border-[var(--card-border)] z-50 lg:hidden flex flex-col">
+                    <div className="fixed left-0 top-0 bottom-0 z-50 flex w-[296px] max-w-[88vw] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[linear-gradient(180deg,#050914_0%,#060b12_18%,#020306_100%)] shadow-[0_30px_70px_rgba(0,0,0,0.45)] lg:hidden">
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(20,196,225,0.18),transparent_64%),radial-gradient(circle_at_top_right,rgba(122,217,218,0.1),transparent_48%)]" />
+                        {siteDropdownOpen && (
+                            <button
+                                type="button"
+                                className="absolute inset-0 z-40 cursor-default bg-[#040914]/78 backdrop-blur-[2px]"
+                                onClick={() => setSiteDropdownOpen(false)}
+                                aria-label="Close site selector"
+                            />
+                        )}
                         {/* Header with logo and close */}
-                        <div className="h-14 flex items-center justify-between px-4 border-b border-[var(--divider)]">
+                        <div className="relative z-10 flex h-16 items-center justify-between border-b border-white/[0.06] px-4 pt-[env(safe-area-inset-top,0px)]">
                             <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
                                 <Image src="/icon.svg" alt="TrafficClaw" width={28} height={28} className="rounded-lg" />
                                 <span className="text-sm font-bold text-[var(--text-primary)]">
-                                    Traffic<span className="text-emerald-400">Claw</span>
+                                    Traffic<span style={{ color: brandAccentColor }}>Claw</span>
                                 </span>
                             </Link>
                             <button
                                 onClick={() => setMobileOpen(false)}
-                                className="text-zinc-400 w-10 h-10 flex items-center justify-center -mr-2 rounded-lg hover:text-white hover:bg-white/[0.06] transition-colors active:bg-white/[0.1]"
+                                className="text-zinc-400 w-10 h-10 flex items-center justify-center -mr-2 rounded-xl border border-transparent hover:border-white/[0.08] hover:text-white hover:bg-white/[0.06] transition-colors active:bg-white/[0.1]"
                                 aria-label="Close navigation menu"
                             >
                                 <X className="w-5 h-5" />
@@ -867,18 +894,20 @@ export default function DashboardLayout({
 
                         {/* Mobile site selector — shown when multiple sites */}
                         {gscSites.length > 1 && (
-                            <div className="px-3 pt-3 pb-1">
+                            <div className={`relative px-3 pt-3 pb-1.5 ${siteDropdownOpen ? 'z-[80]' : 'z-10'}`}>
                                 <label className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-1 mb-1.5 block">Site</label>
                                 <button
                                     onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] transition"
+                                    className="relative z-[90] w-full flex items-center gap-2.5 px-3 py-3 text-xs text-zinc-300 bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] border border-white/[0.08] rounded-2xl shadow-[0_10px_24px_rgba(0,0,0,0.18)] hover:border-[#14C4E1]/24 hover:bg-[linear-gradient(180deg,rgba(16,24,34,0.94),rgba(8,13,20,0.96))] transition"
                                 >
-                                    <Globe className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#14C4E1]/12">
+                                        <Globe className="w-3.5 h-3.5 text-[#7AD9DA] flex-shrink-0" />
+                                    </div>
                                     <span className="flex-1 text-left truncate">{displaySiteUrl ? formatSiteLabel(displaySiteUrl) : 'Select site'}</span>
                                     <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
                                 {siteDropdownOpen && (
-                                    <div className="mt-1 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl py-1 max-h-[200px] overflow-y-auto">
+                                    <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[95] rounded-2xl bg-[linear-gradient(180deg,#09131d_0%,#040913_100%)] border border-[#14C4E1]/18 shadow-[0_24px_50px_rgba(0,0,0,0.45)] py-1.5 max-h-[220px] overflow-y-auto backdrop-blur-xl">
                                         {typedSites.map((site) => {
                                             const url = site.siteUrl;
                                             const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
@@ -888,12 +917,12 @@ export default function DashboardLayout({
                                                     key={url}
                                                     onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
                                                     className={`w-full text-left px-3 py-2.5 text-xs flex items-center gap-2 min-h-[44px] transition ${
-                                                        isSelected ? 'text-emerald-400 bg-emerald-500/[0.08]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                                                        isSelected ? 'text-[#7AD9DA] bg-[#14C4E1]/[0.10]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                                                     }`}
                                                 >
                                                     <Globe className="w-3 h-3 flex-shrink-0" />
                                                     <span className="truncate">{label}</span>
-                                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto flex-shrink-0" />}
+                                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#7AD9DA] ml-auto flex-shrink-0" />}
                                                 </button>
                                             );
                                         })}
@@ -902,128 +931,130 @@ export default function DashboardLayout({
                             </div>
                         )}
 
-                        {/* Mobile date range picker */}
-                        <MobileDatePicker range={range} setRange={setRange} />
+                        <div className={`relative z-10 flex min-h-0 flex-1 flex-col transition-opacity duration-200 ${siteDropdownOpen ? 'pointer-events-none opacity-35' : ''}`}>
+                            {/* Mobile date range picker */}
+                            <MobileDatePicker range={range} setRange={setRange} />
 
-                        {/* Divider before nav */}
-                        <div className="mx-3 mt-2 border-t border-[var(--divider)]" />
+                            {/* Divider before nav */}
+                            <div className="mx-3 mt-2 border-t border-[var(--divider)]" />
 
-                        {/* Grouped navigation items */}
-                        <nav className="flex-1 py-2 px-2 overflow-y-auto">
-                            {sidebarGroups.map((group, gi) => (
-                                <div key={gi} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--divider)]' : ''}>
-                                    {group.label && (
-                                        <div className="px-3 pb-1 pt-0.5">
-                                            <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">{group.label}</span>
-                                        </div>
-                                    )}
-                                    <div className="space-y-0.5">
-                                        {group.items.map((item) => {
-                                            const isActive = pathname === item.href ||
-                                                (item.href !== '/dashboard' && pathname.startsWith(item.href));
-                                            return (
-                                                <Link
-                                                    key={item.href}
-                                                    href={item.href}
-                                                    onClick={() => setMobileOpen(false)}
-                                                    className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${isActive
-                                                        ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08]'
-                                                    }`}
-                                                >
-                                                    <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : 'text-zinc-500'}`} />
-                                                    <span>{item.label}</span>
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                            {/* Settings in mobile nav */}
-                            <div className="mt-2 pt-2 border-t border-[var(--divider)]">
-                                <Link
-                                    href="/dashboard/settings"
-                                    onClick={() => setMobileOpen(false)}
-                                    className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${pathname.startsWith('/dashboard/settings')
-                                        ? 'bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15]'
-                                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08]'
-                                    }`}
-                                >
-                                    <Settings className={`w-5 h-5 ${pathname.startsWith('/dashboard/settings') ? 'text-emerald-400' : 'text-zinc-500'}`} />
-                                    <span>Settings</span>
-                                </Link>
-                            </div>
-                        </nav>
-
-                        {/* Credits display in mobile sidebar */}
-                        {credits !== null && (
-                            <div className="border-t border-[var(--divider)] px-3 py-3">
-                                <Link
-                                    href="/dashboard/plan"
-                                    onClick={() => setMobileOpen(false)}
-                                    className={`flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-lg border hover:opacity-80 transition-opacity ${credits < 20
-                                    ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                                    : credits < 50
-                                        ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
-                                        : 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
-                                    }`}>
-                                    <Coins className={`w-4 h-4 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`} />
-                                    <span className={`text-xs font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{credits} messages</span>
-                                    {userPlan === 'free' && (
-                                        <Sparkles className="w-3 h-3 text-amber-400/70 ml-auto" />
-                                    )}
-                                </Link>
-                            </div>
-                        )}
-
-                        {/* User profile and sign out */}
-                        {session?.user && (
-                            <div className="border-t border-[var(--divider)] p-3">
-                                <div className="flex items-center gap-3 px-2 py-2">
-                                    <Link href="/dashboard/plan" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
-                                        {session.user.image && (
-                                            <Image src={session.user.image} alt="" width={32} height={32} className="w-8 h-8 rounded-full" />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
-                                                {session.user.name}
-                                                <span
-                                                    className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
-                                                        subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                                        : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
-                                                        : userPlan === 'growth' ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black'
-                                                        : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
-                                                        : 'bg-zinc-700 text-zinc-400'
-                                                    }`}
-                                                >
-                                                    {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
-                                                </span>
+                            {/* Grouped navigation items */}
+                            <nav className="relative z-10 flex-1 py-2 px-3 overflow-y-auto">
+                                {sidebarGroups.map((group, gi) => (
+                                    <div key={gi} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--divider)]' : ''}>
+                                        {group.label && (
+                                            <div className="px-3 pb-1 pt-0.5">
+                                                <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">{group.label}</span>
                                             </div>
+                                        )}
+                                        <div className="space-y-0.5">
+                                            {group.items.map((item) => {
+                                                const isActive = pathname === item.href ||
+                                                    (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                                                return (
+                                                    <Link
+                                                        key={item.href}
+                                                        href={item.href}
+                                                        onClick={() => setMobileOpen(false)}
+                                                        className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-2xl text-sm font-medium transition-all active:scale-[0.98] ${isActive
+                                                            ? sidebarActiveItemClasses
+                                                            : sidebarInactiveItemClasses + ' active:bg-white/[0.08]'
+                                                        }`}
+                                                    >
+                                                        <item.icon className={`w-5 h-5 ${isActive ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
+                                                        <span>{item.label}</span>
+                                                    </Link>
+                                                );
+                                            })}
                                         </div>
-                                    </Link>
-                                    <button
-                                        onClick={handleSignOut}
-                                        className="text-zinc-600 hover:text-zinc-400 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/[0.06] transition-colors"
-                                        aria-label="Sign out"
+                                    </div>
+                                ))}
+                                {/* Settings in mobile nav */}
+                                <div className="mt-2 pt-2 border-t border-[var(--divider)]">
+                                    <Link
+                                        href="/dashboard/settings"
+                                        onClick={() => setMobileOpen(false)}
+                                        className={`flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-2xl text-sm font-medium transition-all active:scale-[0.98] ${pathname.startsWith('/dashboard/settings')
+                                            ? sidebarActiveItemClasses
+                                            : sidebarInactiveItemClasses + ' active:bg-white/[0.08]'
+                                        }`}
                                     >
-                                        <LogOut className="w-4 h-4" />
-                                    </button>
+                                        <Settings className={`w-5 h-5 ${pathname.startsWith('/dashboard/settings') ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
+                                        <span>Settings</span>
+                                    </Link>
                                 </div>
-                                {/* Mobile upgrade hint */}
-                                {userPlan !== 'pro' && (
+                            </nav>
+
+                            {/* Credits display in mobile sidebar */}
+                            {credits !== null && (
+                                <div className="border-t border-[var(--divider)] px-3 py-3">
                                     <Link
                                         href="/dashboard/plan"
                                         onClick={() => setMobileOpen(false)}
-                                        className="mt-2 flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg bg-gradient-to-r from-violet-500/[0.06] to-purple-500/[0.06] border border-violet-500/[0.1] hover:border-violet-500/[0.2] transition-all active:scale-[0.98]"
-                                    >
-                                        <Sparkles className="w-3.5 h-3.5 text-violet-400" />
-                                        <span className="text-xs text-zinc-400">
-                                            {userPlan === 'free' ? 'Upgrade to Pro' : 'Upgrade plan'}
-                                        </span>
+                                        className={`flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-lg border hover:opacity-80 transition-opacity ${credits < 20
+                                        ? 'bg-red-500/[0.08] border-red-500/[0.15]'
+                                        : credits < 50
+                                            ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
+                                            : 'bg-[#14C4E1]/[0.08] border-[#14C4E1]/[0.18]'
+                                        }`}>
+                                        <Coins className={`w-4 h-4 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`} />
+                                        <span className={`text-xs font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`}>{credits} messages</span>
+                                        {userPlan === 'free' && (
+                                            <Sparkles className="w-3 h-3 text-amber-400/70 ml-auto" />
+                                        )}
                                     </Link>
-                                )}
-                            </div>
-                        )}
+                                </div>
+                            )}
+
+                            {/* User profile and sign out */}
+                            {session?.user && (
+                                <div className="border-t border-[var(--divider)] p-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
+                                    <div className="flex items-center gap-3 rounded-[22px] border border-white/[0.06] bg-white/[0.02] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                                        <Link href="/dashboard/plan" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                                            {session.user.image && (
+                                                <Image src={session.user.image} alt="" width={32} height={32} className="w-8 h-8 rounded-full" />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-medium text-zinc-300 truncate flex items-center gap-1.5">
+                                                    {session.user.name}
+                                                    <span
+                                                        className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider leading-none ${
+                                                            subscriptionCancelled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                            : userPlan === 'pro' ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white'
+                                                            : userPlan === 'growth' ? 'bg-gradient-to-r from-[#7AD9DA] to-cyan-400 text-[#041015]'
+                                                            : userPlan === 'starter' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white'
+                                                            : 'bg-zinc-700 text-zinc-400'
+                                                        }`}
+                                                    >
+                                                        {subscriptionCancelled ? 'Ending' : userPlan === 'free' ? 'Free' : userPlan === 'starter' ? 'Starter' : userPlan === 'growth' ? 'Growth' : userPlan === 'pro' ? 'Pro' : 'Free'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                        <button
+                                            onClick={handleSignOut}
+                                            className="text-zinc-600 hover:text-zinc-400 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/[0.06] transition-colors"
+                                            aria-label="Sign out"
+                                        >
+                                            <LogOut className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    {/* Mobile upgrade hint */}
+                                    {userPlan !== 'pro' && (
+                                        <Link
+                                            href="/dashboard/plan"
+                                            onClick={() => setMobileOpen(false)}
+                                            className="mt-2 flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg bg-gradient-to-r from-violet-500/[0.06] to-purple-500/[0.06] border border-violet-500/[0.1] hover:border-violet-500/[0.2] transition-all active:scale-[0.98]"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                                            <span className="text-xs text-zinc-400">
+                                                {userPlan === 'free' ? 'Upgrade to Pro' : 'Upgrade plan'}
+                                            </span>
+                                        </Link>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </>
             )}

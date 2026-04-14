@@ -37,6 +37,8 @@ export function LogoIcon({ size = 36, className = '' }: { size?: number; classNa
     );
 }
 
+const CLAW_BRAND_ACCENT = '#7AD9DA';
+
 export function Logo({
     size = 'md',
     iconOnly = false,
@@ -60,7 +62,7 @@ export function Logo({
             {!iconOnly && (
                 <span className={`${s.text} font-extrabold tracking-tight`}>
                     <span className="text-white">Traffic</span>
-                    <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Claw</span>
+                    <span style={{ color: CLAW_BRAND_ACCENT }}>Claw</span>
                 </span>
             )}
         </div>

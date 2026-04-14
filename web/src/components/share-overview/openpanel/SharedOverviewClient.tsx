@@ -10,6 +10,7 @@ import {
     Bar,
     BarChart,
     CartesianGrid,
+    Cell,
     ComposedChart,
     Line,
     LineChart,
@@ -72,8 +73,12 @@ const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr:
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
 const CHART_COLORS = ['#3ba974', '#60a5fa', '#f59e0b', '#a78bfa', '#f87171', '#2dd4bf', '#fb7185', '#facc15'];
-const OVERVIEW_CHART_GREEN = '#33CF96';
-const OVERVIEW_SKY_ACCENT = '#1FBED7';
+const OVERVIEW_PRIMARY_ACCENT = '#14C4E1';
+const OVERVIEW_PRIMARY_ACCENT_ACTIVE = '#14C4E1';
+const OVERVIEW_PRIMARY_ACCENT_PREVIEW = '#14C4E1';
+const OVERVIEW_PRIMARY_GLOW = 'rgba(20,196,225,0.22)';
+const OVERVIEW_COMPARISON_ACCENT = '#FFFFFF';
+const TALL_MINI_BAR_METRICS = new Set(['avg_session_duration', 'new_users']);
 const INTERVAL_OPTIONS = [
     { value: 'hour', label: 'Hour' },
     { value: 'day', label: 'Day' },
@@ -319,6 +324,10 @@ function formatMetricValue(value: number, unit: string) {
     return shortNumber(value);
 }
 
+function alternatingBarColor(index: number) {
+    return index % 2 === 0 ? OVERVIEW_PRIMARY_ACCENT : OVERVIEW_COMPARISON_ACCENT;
+}
+
 function diffDirection(current: number, previous: number, invert = false) {
     if (!previous) return null;
     const raw = ((current - previous) / previous) * 100;
@@ -330,8 +339,8 @@ function diffDirection(current: number, previous: number, invert = false) {
 function metricTone(diff: ReturnType<typeof diffDirection>, active: boolean, previewed: boolean) {
     if (diff?.positive) {
         return {
-            solid: active ? '#86F5C5' : previewed ? '#66E8AF' : OVERVIEW_CHART_GREEN,
-            muted: 'rgba(51,207,150,0.22)',
+            solid: active ? OVERVIEW_PRIMARY_ACCENT_ACTIVE : previewed ? OVERVIEW_PRIMARY_ACCENT_PREVIEW : OVERVIEW_PRIMARY_ACCENT,
+            muted: OVERVIEW_PRIMARY_GLOW,
         };
     }
 
@@ -1513,14 +1522,14 @@ function LiveNowPill({
     return (
         <DashboardHoverSurface
             as="div"
-            tone="emerald"
+            tone="cyan"
             className={cx(
-                'flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-sm',
+                'flex items-center gap-2 rounded-[14px] border border-[#14C4E1]/18 bg-[linear-gradient(180deg,rgba(11,18,28,0.96),rgba(6,11,18,0.96))] text-sm shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
                 compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2',
             )}
         >
-            <span className={cx('relative rounded-full', compact ? 'h-2 w-2' : 'h-2.5 w-2.5', activeUsers > 0 ? 'bg-emerald-400' : 'bg-zinc-600')}>
-                {activeUsers > 0 ? <span className="absolute inset-0 rounded-full bg-emerald-400 opacity-60 animate-ping" /> : null}
+            <span className={cx('relative rounded-full', compact ? 'h-2 w-2' : 'h-2.5 w-2.5', activeUsers > 0 ? 'bg-[#14C4E1]' : 'bg-zinc-600')}>
+                {activeUsers > 0 ? <span className="absolute inset-0 rounded-full bg-[#14C4E1] opacity-60 animate-ping" /> : null}
             </span>
             <span className={cx('font-mono text-zinc-100', compact ? 'text-[12px]' : '')}>{shortNumber(activeUsers)}</span>
             <span className="text-zinc-500">live now</span>
@@ -1606,6 +1615,9 @@ function MetricCard({
     const trendLabel = formatTrendChange(trendChange);
     const TrendIcon = trendChange !== null && trendChange < 0 ? ChevronDown : ChevronUp;
     const hoverDateLabel = hoveredPoint ? formatDateLabel(hoveredPoint.date, interval) : null;
+    const useTallMiniBars = TALL_MINI_BAR_METRICS.has(metric.key);
+    const miniChartFrameClass = useTallMiniBars ? 'h-[64px] sm:h-[72px]' : 'h-[36px] sm:h-[40px]';
+    const miniChartBarClass = useTallMiniBars ? 'h-[60px] sm:h-[68px]' : 'h-[30px]';
     const trendBadgeStyle =
         trendChange === null
             ? {
@@ -1618,12 +1630,12 @@ function MetricCard({
             }
             : trendChange >= 0
                 ? {
-                    color: '#8CF6C8',
-                    borderColor: 'rgba(96,255,191,0.32)',
+                    color: '#BAE7FF',
+                    borderColor: 'rgba(56,189,248,0.32)',
                     background:
-                        'linear-gradient(180deg, rgba(51,207,150,0.24) 0%, rgba(9,25,19,0.94) 100%)',
+                        'linear-gradient(180deg, rgba(56,189,248,0.22) 0%, rgba(7,18,32,0.94) 100%)',
                     boxShadow:
-                        'inset 0 1px 0 rgba(255,255,255,0.07), 0 0 0 1px rgba(51,207,150,0.06), 0 12px 28px rgba(6,35,26,0.34)',
+                        'inset 0 1px 0 rgba(255,255,255,0.07), 0 0 0 1px rgba(56,189,248,0.06), 0 12px 28px rgba(6,24,46,0.34)',
                 }
                 : {
                     color: '#FFB1BD',
@@ -1687,20 +1699,20 @@ function MetricCard({
             data-active={active ? 'true' : 'false'}
             className={cx(
                 'group relative min-h-[134px] border-b border-r border-white/[0.08] text-left transition-all duration-200 sm:min-h-[140px] md:min-h-[148px]',
-                'bg-[linear-gradient(180deg,rgba(12,17,22,0.96),rgba(6,10,14,0.92))]',
-                'hover:bg-[linear-gradient(180deg,rgba(16,22,28,0.98),rgba(8,12,16,0.94))]',
+                'bg-[linear-gradient(180deg,rgba(8,14,24,0.98),rgba(4,9,18,0.94))]',
+                'hover:bg-[linear-gradient(180deg,rgba(11,21,36,0.98),rgba(6,12,22,0.96))]',
                 '[&:nth-child(2n)]:border-r-0 md:[&:nth-child(2n)]:border-r md:[&:nth-child(4n)]:border-r-0',
                 active
-                    ? 'shadow-[inset_0_0_0_1px_rgba(51,207,150,0.34),0_18px_36px_rgba(0,0,0,0.22)]'
+                    ? 'shadow-[inset_0_0_0_1px_rgba(56,189,248,0.34),0_18px_36px_rgba(0,0,0,0.26)]'
                     : cardHovered
-                        ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_12px_28px_rgba(0,0,0,0.16)]'
+                        ? 'shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14),0_12px_28px_rgba(3,10,20,0.2)]'
                         : '',
             )}
         >
             <div
                 className={cx(
                     'pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/0 to-transparent opacity-0 transition',
-                    active ? 'via-[#33CF96]/90 opacity-100' : cardHovered ? 'via-white/40 opacity-100' : '',
+                    active ? 'via-sky-300/85 opacity-100' : cardHovered ? 'via-sky-200/35 opacity-100' : '',
                 )}
             />
             <div
@@ -1710,7 +1722,7 @@ function MetricCard({
                 )}
                 style={{
                     background:
-                        `radial-gradient(120% 140% at 0% 0%, rgba(31,190,215,0.12), transparent 52%), radial-gradient(120% 140% at 100% 0%, ${tone.muted}, transparent 54%)`,
+                        `radial-gradient(120% 140% at 0% 0%, rgba(59,130,246,0.12), transparent 50%), radial-gradient(120% 140% at 100% 0%, ${tone.muted}, transparent 54%)`,
                 }}
             />
             <div className="relative z-10 flex h-full flex-col px-3 pb-3 pt-3.5 sm:px-4 sm:pb-3.5 sm:pt-4">
@@ -1739,7 +1751,7 @@ function MetricCard({
                 <div className="mt-3 border-t border-white/[0.04] pt-2">
                     <div
                         ref={miniChartHoverRef}
-                        className="relative h-[36px] opacity-95 transition duration-200 group-hover:opacity-100 sm:h-[40px]"
+                        className={`relative ${miniChartFrameClass} opacity-95 transition duration-200 group-hover:opacity-100`}
                         onMouseEnter={(event) => {
                             updateHoverIndex(event.clientX, event.clientY);
                         }}
@@ -1753,7 +1765,7 @@ function MetricCard({
                     >
                         {hoveredPoint && hoverLabelPosition ? (
                             <div
-                                className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-full border border-white/[0.1] bg-[#05080a]/96 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-200 shadow-[0_12px_24px_rgba(0,0,0,0.34)] backdrop-blur-md"
+                                className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-full border border-white/[0.1] bg-[#08111d]/96 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-200 shadow-[0_12px_24px_rgba(0,0,0,0.34)] backdrop-blur-md"
                                 style={{
                                     left: hoverLabelPosition.left,
                                     top: hoverLabelPosition.top,
@@ -1762,11 +1774,15 @@ function MetricCard({
                                 {hoverDateLabel}
                             </div>
                         ) : null}
-                        <div className="pointer-events-none absolute inset-x-0 bottom-[1px] h-[30px]">
+                        <div className={`pointer-events-none absolute inset-x-0 bottom-[1px] ${miniChartBarClass}`}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={miniSeries}>
                                     <Tooltip content={() => null} cursor={false} />
-                                    <Bar dataKey="current" radius={[1.5, 1.5, 0, 0]} fill={tone.solid} fillOpacity={1} isAnimationActive={false} />
+                                    <Bar dataKey="current" radius={[1.5, 1.5, 0, 0]} fill={OVERVIEW_PRIMARY_ACCENT} fillOpacity={1} isAnimationActive={false}>
+                                        {miniSeries.map((_, index) => (
+                                            <Cell key={`mini-bar-${metric.key}-${index}`} fill={alternatingBarColor(index)} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -1789,13 +1805,13 @@ function ShareDashboardButton({
             type="button"
             onClick={onClick}
             className={cx(
-                'dashboard-hover-action relative isolate inline-flex items-center justify-center gap-2 overflow-hidden rounded-[14px] border border-emerald-400/24 bg-[linear-gradient(135deg,rgba(8,18,14,0.98),rgba(10,32,24,0.96))] font-medium text-emerald-50 shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-emerald-300/36 hover:text-white',
+                'dashboard-hover-action relative isolate inline-flex items-center justify-center gap-2 overflow-hidden rounded-[14px] border border-[#14C4E1]/26 bg-[linear-gradient(135deg,rgba(7,20,28,0.98),rgba(7,53,63,0.96))] font-medium text-[#EAFDFF] shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[#7AD9DA]/38 hover:text-white',
                 compact ? 'h-10 w-full px-3 text-[12px]' : 'h-10 px-4 text-sm',
             )}
         >
-            <span className="absolute inset-0 rounded-[14px] bg-[radial-gradient(circle_at_top_left,rgba(31,190,215,0.16),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(51,207,150,0.18),transparent_46%)] opacity-90" />
+            <span className="absolute inset-0 rounded-[14px] bg-[radial-gradient(circle_at_top_left,rgba(20,196,225,0.22),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(122,217,218,0.18),transparent_46%)] opacity-90" />
             <span className="relative inline-flex items-center gap-2">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/18 bg-emerald-400/12 text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#7AD9DA]/20 bg-[#14C4E1]/12 text-[#B8F5FF] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                     <Share2 className="h-3.5 w-3.5" />
                 </span>
                 <span>Share dashboard</span>
@@ -1818,8 +1834,8 @@ function LiveMetricTile({
     const liveLabel = hasBreakdown ? 'Sessions last 30 min' : 'Active users right now';
 
     return (
-        <div className={cx('relative col-span-2 min-h-[112px] border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(16,185,129,0.06),rgba(15,23,32,0.3))] px-3 pb-3 pt-3 text-left sm:px-4 sm:pb-3 sm:pt-3.5 md:col-span-1', className)}>
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/65 to-transparent" />
+        <div className={cx('relative col-span-2 min-h-[112px] border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.42))] px-3 pb-3 pt-3 text-left sm:px-4 sm:pb-3 sm:pt-3.5 md:col-span-1', className)}>
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/65 to-transparent" />
             <div className="relative z-10 flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1873,13 +1889,17 @@ function LiveMetricTile({
                                             );
                                         }}
                                     />
-                                    <Bar dataKey="sessionCount" fill="#45c48c" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                                    <Bar dataKey="sessionCount" fill={OVERVIEW_PRIMARY_ACCENT} radius={[2, 2, 0, 0]} isAnimationActive={false}>
+                                        {data.minuteCounts.map((_, index) => (
+                                            <Cell key={`live-bar-${index}`} fill={alternatingBarColor(index)} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     ) : (
                         <div className="flex h-[56px] items-end">
-                            <div className="inline-flex items-center rounded-md border border-emerald-400/15 bg-emerald-400/[0.08] px-2.5 py-1.5 text-[11px] text-emerald-100/80">
+                            <div className="inline-flex items-center rounded-md border border-sky-400/15 bg-sky-400/[0.08] px-2.5 py-1.5 text-[11px] text-sky-100/80">
                                 Fast realtime summary
                             </div>
                         </div>
@@ -2176,8 +2196,8 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
         ? liveData.minuteCounts.reduce((sum, item) => sum + item.sessionCount, 0)
         : liveData?.activeUsers || 0;
     const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
-    const activeMetricColor = OVERVIEW_CHART_GREEN;
-    const previousMetricColor = OVERVIEW_SKY_ACCENT;
+    const activeMetricColor = OVERVIEW_PRIMARY_ACCENT;
+    const previousMetricColor = OVERVIEW_COMPARISON_ACCENT;
     const chartHelperText = pageScoped
         ? 'Page-scoped filters applied • Some session-level cards stay limited.'
         : `Compared with previous period • ${getRangeLabel(range)}`;
@@ -2186,11 +2206,11 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
         <div className="col-span-6">
             <DashboardHoverSurface
                 as="section"
-                tone="mixed"
-                className="relative overflow-hidden rounded-[14px] border border-white/[0.14] bg-[#040608] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_22px_70px_rgba(0,0,0,0.34)]"
+                tone="cyan"
+                className="relative overflow-hidden rounded-[14px] border border-white/[0.14] bg-[#030712] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_22px_70px_rgba(0,0,0,0.34)]"
                 style={{
                     backgroundImage:
-                        'radial-gradient(120% 110% at 0% 0%, rgba(51,207,150,0.12), transparent 44%), radial-gradient(90% 90% at 100% 0%, rgba(31,190,215,0.1), transparent 34%)',
+                        'radial-gradient(120% 110% at 0% 0%, rgba(59,130,246,0.16), transparent 44%), radial-gradient(90% 90% at 100% 0%, rgba(56,189,248,0.12), transparent 34%)',
                 }}
             >
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_30%)]" />
@@ -2212,7 +2232,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
                         <LiveMetricTile data={liveData} total={displayedLiveTotal} className="col-span-2 md:col-span-1" />
                     </div>
 
-                    <div className="border-t border-white/[0.10] bg-[#020406]/96 px-3 pb-4 pt-3.5 sm:px-5 sm:pb-6 sm:pt-4">
+                    <div className="border-t border-white/[0.10] bg-[#020611]/96 px-3 pb-4 pt-3.5 sm:px-5 sm:pb-6 sm:pt-4">
                         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <div>
                                 <div className="text-[10px] uppercase tracking-[0.26em] text-zinc-500">Selected Metric</div>
@@ -2282,7 +2302,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
                                                 const tooltipTone = metricTone(tooltipDiff, true, true);
 
                                                 return (
-                                                    <div className="rounded-[16px] border border-white/[0.08] bg-[#05080a]/96 px-3.5 py-3 text-xs shadow-[0_20px_40px_rgba(0,0,0,0.46)] backdrop-blur-xl">
+                                                    <div className="rounded-[16px] border border-white/[0.08] bg-[#07101a]/96 px-3.5 py-3 text-xs shadow-[0_20px_40px_rgba(0,0,0,0.46)] backdrop-blur-xl">
                                                         <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500">
                                                             {formatDateLabel(label || '', interval)}
                                                         </div>
@@ -2323,7 +2343,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
                                             strokeOpacity={0.88}
                                             strokeWidth={2.1}
                                             dot={false}
-                                            activeDot={{ r: 5, fill: '#05080a', stroke: '#d9e2ec', strokeWidth: 2.2 }}
+                                            activeDot={{ r: 5, fill: '#07101a', stroke: '#d6e8ff', strokeWidth: 2.2 }}
                                             isAnimationActive={false}
                                         />
                                         <Area
@@ -2349,7 +2369,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
                                             dataKey={displayedMetric.key}
                                             stroke={activeMetricColor}
                                             strokeWidth={2.9}
-                                            activeDot={{ r: 5.5, fill: activeMetricColor, stroke: '#e8fff6', strokeWidth: 2.2 }}
+                                            activeDot={{ r: 5.5, fill: activeMetricColor, stroke: '#e0f2fe', strokeWidth: 2.2 }}
                                             dot={false}
                                             isAnimationActive={false}
                                         />
