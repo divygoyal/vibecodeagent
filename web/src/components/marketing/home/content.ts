@@ -1,7 +1,7 @@
 const ANALYTICS_EMBED_URL =
-    'http://localhost:3000/share/875bfda58a1282260e9b89d86092ef28?embed=true';
+    'https://trafficclaw.com/share/486f673c661417f6f38faf83add644ad?embed=true';
 
-const ANALYTICS_DISPLAY_URL = 'trafficclaw.com/share/live';
+const ANALYTICS_DISPLAY_URL = 'trafficclaw.com/share/486f673c661417f6f38faf83add644ad';
 
 export const MARKETING_SIGN_IN_URL = '/api/auth/signin/google?callbackUrl=%2Fdashboard';
 
