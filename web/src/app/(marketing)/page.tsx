@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
-import HomeClient from './HomeClient';
+
+import LandingHomepage from '@/components/marketing/home/LandingHomepage';
 
 export const metadata: Metadata = {
-    title: 'TrafficClaw — AI for Google Analytics & Search Console',
+    title: 'Ditch your Google Analytics | TrafficClaw',
     description:
-        'Connect your Google Analytics & Search Console to AI. Ask why traffic dropped, which keywords to fix, and get step-by-step verdicts backed by your real data. Free to start.',
+        'Ditch your Google Analytics and switch to TrafficClaw for AI traffic chat, live dashboards, embeddable mentions, and a premium realtime globe.',
     alternates: { canonical: '/' },
     openGraph: {
-        title: 'TrafficClaw — AI for Google Analytics & Search Console',
+        title: 'Ditch your Google Analytics | TrafficClaw',
         description:
-            'GA4 is confusing. Connect your Google Analytics & Search Console to AI — ask anything about your traffic and get actionable verdicts in seconds.',
+            'AI traffic chat, live shareable dashboards, embeddable mention feeds, and a realtime globe built for growth teams.',
         url: '/',
     },
 };
@@ -49,7 +50,7 @@ export default function HomePage() {
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewSchema) }}
             />
-            <HomeClient />
+            <LandingHomepage />
         </>
     );
 }
