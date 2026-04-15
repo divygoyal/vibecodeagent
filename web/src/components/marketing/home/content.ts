@@ -31,74 +31,155 @@ export const HOMEPAGE_CONTENT = {
     aiChat: {
         number: '01',
         eyebrow: 'AI traffic chat',
-        title: 'Talk to your traffic instead of hunting through reports.',
+        title: 'Just ask. Your traffic data will answer.',
         description:
-            'Ask why traffic dropped, what pages are growing, what changed this week, and what to ship next. TrafficClaw translates raw analytics into decisions in plain English.',
-        videoSrc: '/home/ai-chat-demo.mp4',
+            "Stop hunting through reports and dashboards. Ask plain-English questions and instantly know what's happening with your traffic — and what to do about it.",
+        videoSrc: '/home/ai-chat-final.mp4',
         posterSrc: '/home/ai-chat-demo-poster.jpg',
         frameLabel: 'trafficclaw.com/dashboard/ai-chat',
         frameMeta: 'Reason 1',
         highlights: [
-            'Ask plain-English questions about traffic, pages, winners, losses, and next steps.',
-            'Get immediate explanations instead of clicking through tabs, filters, and date ranges.',
-            'Turn analytics into actions your whole team can understand and ship against.',
+            {
+                title: 'Ask anything',
+                text: 'Traffic, pages, sources, sessions — in plain English.',
+            },
+            {
+                title: 'Instant answers',
+                text: 'No dashboards, exports, or SQL needed.',
+            },
+            {
+                title: 'Clear next steps',
+                text: 'Know what happened and what to fix.',
+            },
         ],
     },
     globe: {
         number: '02',
         eyebrow: 'Realtime globe',
-        title: 'Turn live traffic into a product demo people actually want to watch.',
+        title: 'Live interactive globe',
         description:
-            'Show active visitors moving across the world, share a premium live-demo link, and make your traffic feel alive instead of buried in a static dashboard.',
+            'A rotating 3D globe that maps every active visitor in real time. Embed it on your landing page, share it with clients, or run it live on a big screen during your launch.',
         videoSrc: '/home/globe-demo.mp4',
+        videoClassName: 'scale-[1.25]',
         frameLabel: 'trafficclaw.com/globe/live',
         frameMeta: 'Reason 2',
         demoHref:
             'https://trafficclaw.com/embed/513732772?token=a220a20c719ad0fb1c5f58e735eb7e48624aa8362005096514c4881155473a45',
         ctaLabel: 'View live demo',
         highlights: [
-            'Cinematic realtime traffic visualisation that feels like a premium product surface.',
-            'Perfect for public landing pages, client views, launches, and live revenue moments.',
-            'A stronger live demo than another screenshot, export, or analytics paragraph.',
+            {
+                title: 'Cinematic quality',
+                text: 'Looks premium, works out of the box.',
+            },
+            {
+                title: 'Embeddable anywhere',
+                text: 'Landing pages, decks, client portals.',
+            },
+            {
+                title: 'Live, not static',
+                text: 'Visitors appear the moment they land.',
+            },
         ],
     },
     compactReasons: [
         {
             number: '03',
-            kind: 'dashboard',
-            eyebrow: 'Shareable dashboards',
-            title: 'Send one clean live link instead of another export.',
+            kind: 'mention',
+            icon: 'x',
+            eyebrow: 'X mention embeds',
+            title: 'Boost conversions with live, real-time X mentions',
             description:
-                'Open a live dashboard for teammates, clients, or prospects without making them learn Google Analytics first.',
-            previewLabel: 'Live share URL',
-            previewValue: ANALYTICS_DISPLAY_URL,
-            chips: ['Shareable link', 'Embeddable', 'Client-friendly'],
-            href: ANALYTICS_EMBED_URL,
-            ctaLabel: 'Open live dashboard',
+                'Instantly turn your best X mentions into convincing social proof.',
+            imageSrc: '/home/twittor2new.png',
+            previewLabel: 'AUTO-UPDATING FEED',
+            previewValue: 'SHOWING 4 OF 3',
+            chips: ['No-code embed'],
+            buttonLabel: 'Get your embed',
+            buttonTheme: 'green'
         },
         {
             number: '04',
             kind: 'mention',
-            eyebrow: 'X mention embeds',
-            title: 'Turn social proof into a website section in minutes.',
+            icon: 'reddit',
+            eyebrow: 'Reddit mention embeds',
+            title: 'Increase trust with Reddit discussion embeds',
             description:
-                'Monitor fresh X mentions, curate the good ones, and publish them with a direct iframe URL that is ready for your site.',
-            imageSrc: '/home/x-mentions.png',
-            previewLabel: 'Direct iframe URL',
-            previewValue: '<iframe src="https://trafficclaw.com/embed/x/mentions" />',
-            chips: ['Live mention monitoring', 'Embeddable widget'],
+                'Show real customer conversations and turn community buzz into trust signals.',
+            imageSrc: '/home/redditpost2new.png',
+            previewLabel: 'CURATED, LIVE BUZZ',
+            previewValue: '22D AGO',
+            chips: ['No-code embed'],
+            buttonLabel: 'Create your feed',
+            buttonTheme: 'orange'
         },
         {
             number: '05',
-            kind: 'mention',
-            eyebrow: 'Reddit mention embeds',
-            title: 'Pull community discussion straight into your product story.',
+            kind: 'seo',
+            eyebrow: 'Autonomous AI Agent',
+            title: 'Meet your dedicated SEO Bot.',
             description:
-                'Track fresh Reddit threads about your brand and expose them as a clean website-ready frame your team can drop in anywhere.',
-            imageSrc: '/home/reddit-mentions.png',
-            previewLabel: 'Embeddable thread feed',
-            previewValue: '<iframe src="https://trafficclaw.com/embed/reddit/mentions" />',
-            chips: ['Community signal', 'Direct frame URL'],
+                'Imagine having an SEO expert constantly analyzing your site. Our AI bot runs auto keyword research, builds smart internal links, and detects content decay before traffic drops.',
+            previewLabel: 'SEO Bot Active',
+            previewValue: 'ANALYZING SITE HEALTH...',
+            chips: ['Keyword discovery', 'Link building', 'Decay alerts'],
+            href: '/features/seo-bot',
+            ctaLabel: 'Activate SEO Bot',
+            features: [
+                {
+                    label: 'AI Blog Writer',
+                    description: 'Generate SEO-optimized blog posts with headings, meta tags, and schema markup.',
+                    actionText: 'Click to use',
+                    actionColor: 'text-[#8EE68E]',
+                    iconColor: 'text-[#8EE68E]',
+                    iconBg: 'bg-[#8EE68E]/10 border-[#8EE68E]/20',
+                    iconType: 'pen'
+                },
+                {
+                    label: 'Auto Keyword Research',
+                    description: 'AI finds untapped keyword opportunities by analyzing competitors and search trends.',
+                    actionText: 'Click to use',
+                    actionColor: 'text-[#FFD700]',
+                    iconColor: 'text-[#FFD700]',
+                    iconBg: 'bg-[#FFD700]/10 border-[#FFD700]/20',
+                    iconType: 'brain'
+                },
+                {
+                    label: 'AI Smart Linking',
+                    description: 'Discover and suggest internal links between your pages to build topical authority.',
+                    actionText: 'Click to use',
+                    actionColor: 'text-[#14C4E1]',
+                    iconColor: 'text-[#14C4E1]',
+                    iconBg: 'bg-[#14C4E1]/10 border-[#14C4E1]/20',
+                    iconType: 'link'
+                },
+                {
+                    label: 'Content Decay Detector',
+                    description: 'Monitors your top-performing pages and alerts when traffic declines to refresh content.',
+                    actionText: '2 pages decaying',
+                    actionColor: 'text-[#FF6B6B]',
+                    iconColor: 'text-[#FF6B6B]',
+                    iconBg: 'bg-[#FF6B6B]/10 border-[#FF6B6B]/20',
+                    iconType: 'activity'
+                },
+                {
+                    label: 'Cannibalization Scanner',
+                    description: 'Detects when multiple pages compete for the same keywords, splitting ranking power.',
+                    actionText: 'Get Analysis',
+                    actionColor: 'text-[#8EE68E]',
+                    iconColor: 'text-[#FFBD2E]',
+                    iconBg: 'bg-[#FFBD2E]/10 border-[#FFBD2E]/20',
+                    iconType: 'layers'
+                },
+                {
+                    label: 'Core Web Vitals',
+                    description: 'Check LCP, FID, CLS for any page to ensure search engines love your technical performance.',
+                    actionText: 'Open Audit Tool',
+                    actionColor: 'text-[#14C4E1]',
+                    iconColor: 'text-[#14C4E1]',
+                    iconBg: 'bg-[#14C4E1]/10 border-[#14C4E1]/20',
+                    iconType: 'cpu'
+                }
+            ]
         },
     ],
     proof: {

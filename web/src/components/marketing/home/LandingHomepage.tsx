@@ -8,6 +8,12 @@ import {
     Code2,
     Globe,
     Sparkles,
+    Pen,
+    Brain,
+    Link2,
+    Activity,
+    Layers,
+    Cpu
 } from 'lucide-react';
 
 import DeferredEmbed from './DeferredEmbed';
@@ -19,6 +25,7 @@ import {
     type HomepageCompactReason,
     type HomepageProofCard,
 } from './content';
+import { JourneyLine, JourneyNode } from './JourneyTimeline';
 
 type FeaturedReason = {
     number: string;
@@ -27,9 +34,10 @@ type FeaturedReason = {
     description: string;
     videoSrc: string;
     posterSrc?: string;
+    videoClassName?: string;
     frameLabel: string;
     frameMeta: string;
-    highlights: readonly string[];
+    highlights: readonly string[] | readonly { title: string; text: string }[];
 };
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -172,54 +180,67 @@ function FeaturedReasonCard({
             className="overflow-hidden rounded-[36px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.08),transparent_36%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-4 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-5 lg:p-6"
         >
             <div
-                className={`grid gap-8 lg:items-center xl:gap-10 ${reverse ? 'lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]' : 'lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]'}`}
+                className={`grid gap-10 lg:items-center xl:gap-16 ${reverse ? 'lg:grid-cols-2' : 'lg:grid-cols-2'}`}
             >
-                <div className={`space-y-6 ${reverse ? 'lg:order-2' : ''}`}>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center rounded-full border border-[#14C4E1]/22 bg-[#06131d] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[#dff9ff]">
+                <div className={`relative z-10 space-y-6 ${reverse ? 'lg:order-2' : ''}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center rounded-full border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#dff9ff] shadow-[0_0_12px_rgba(20,196,225,0.15)] transition-colors hover:bg-[#14C4E1]/20">
                             Reason {reason.number}
                         </span>
-                        <SectionLabel>{reason.eyebrow}</SectionLabel>
+                        <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.02] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-300 transition-colors hover:bg-white/[0.05]">
+                            {reason.eyebrow}
+                        </span>
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="max-w-[12ch] text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl lg:text-[3.2rem] lg:leading-[1.02]">
+                        <h3 className="text-balance max-w-[16ch] text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-[3rem] lg:leading-[1.05]">
                             {reason.title}
                         </h3>
-                        <p className="max-w-2xl text-base leading-7 text-zinc-400">{reason.description}</p>
+                        <p className="max-w-xl text-base leading-7 text-zinc-400">{reason.description}</p>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        {reason.highlights.map((item) => (
-                            <div
-                                key={item}
-                                className="rounded-[24px] border border-white/[0.08] bg-white/[0.025] px-4 py-4 text-sm leading-6 text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
-                            >
-                                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-[#09131b] text-[#7AD9DA]">
-                                    {icon}
+                    <div className="flex flex-col gap-4 mt-8">
+                        {reason.highlights.map((item, index) => {
+                            const isObj = typeof item === 'object';
+                            const key = isObj ? (item as any).title : item;
+                            
+                            return (
+                                <div key={key} className="flex items-start gap-4">
+                                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#14C4E1]/20 bg-[#14C4E1]/10 text-[#7AD9DA] shadow-[0_0_12px_rgba(20,196,225,0.1)]">
+                                        {icon}
+                                    </div>
+                                    {isObj ? (
+                                        <div className="space-y-1">
+                                            <div className="text-[15px] font-semibold text-white">{(item as any).title}</div>
+                                            <div className="text-[14px] leading-relaxed text-zinc-400">{(item as any).text}</div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-[14px] leading-relaxed text-zinc-300">{item as string}</div>
+                                    )}
                                 </div>
-                                <span>{item}</span>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {ctaHref && ctaLabel ? (
-                        <GradientButton href={ctaHref} secondary={newTab} newTab={newTab}>
-                            {ctaLabel}
-                            <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
-                        </GradientButton>
+                        <div className="pt-2">
+                            <GradientButton href={ctaHref} secondary={newTab} newTab={newTab}>
+                                {ctaLabel}
+                                <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
+                            </GradientButton>
+                        </div>
                     ) : null}
                 </div>
 
-                <div className={reverse ? 'lg:order-1' : ''}>
+                <div className={`relative z-0 ${reverse ? 'lg:order-1' : ''}`}>
                     <LazyVideoFrame
                         src={reason.videoSrc}
                         title={videoTitle}
                         posterSrc={reason.posterSrc}
                         chromeLabel={reason.frameLabel}
                         chromeMeta={reason.frameMeta}
-                        className="h-[380px] sm:h-[440px] lg:h-[560px]"
-                        videoClassName="object-contain"
+                        className="w-full shadow-[0_34px_100px_rgba(0,0,0,0.4)]"
+                        videoClassName={`object-contain ${reason.videoClassName || ''}`}
                     >
                         <VideoFallback
                             icon={icon}
@@ -235,7 +256,186 @@ function FeaturedReasonCard({
     );
 }
 
+function XLogo({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 24.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+    );
+}
+
+function RedditLogo({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+            <path d="M24 11.779c0-1.459-1.192-2.645-2.657-2.645-.715 0-1.363.286-1.84.746-1.81-1.191-4.259-1.949-6.971-2.046l1.483-4.669 4.016.941-.006.058c0 1.193.975 2.163 2.174 2.163 1.198 0 2.172-.97 2.172-2.163s-.975-2.164-2.172-2.164c-.92 0-1.704.574-2.021 1.379l-4.329-1.015c-.189-.046-.381.063-.44.249l-1.654 5.207c-2.838.034-5.409.798-7.3 2.025-.474-.438-1.103-.712-1.799-.712-1.465 0-2.656 1.187-2.656 2.646 0 .97.533 1.811 1.317 2.271-.052.282-.086.567-.086.857 0 3.911 4.808 7.093 10.719 7.093s10.72-3.182 10.72-7.093c0-.274-.029-.544-.075-.81.832-.447 1.405-1.312 1.405-2.318zm-17.224 1.816c0-.868.71-1.575 1.582-1.575.872 0 1.581.707 1.581 1.575s-.709 1.574-1.581 1.574-1.582-.706-1.582-1.574zm9.061 4.669c-1.25.864-2.909 1.107-5.111 1.107-2.203 0-3.864-.247-5.11-1.107-.245-.168-.309-.499-.143-.746.166-.247.497-.311.744-.143 1.05.72 2.503.957 4.509.957 2.008 0 3.46-.237 4.512-.957.247-.168.579-.104.745.143.167.245.103.578-.146.746zm-2.02-3.095c-.872 0-1.582-.706-1.582-1.574 0-.868.709-1.575 1.582-1.575s1.581.707 1.581 1.575c0 .868-.709 1.574-1.581 1.574z" />
+        </svg>
+    );
+}
+
+function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'mention' } }) {
+    const isX = card.icon === 'x';
+    const isReddit = card.icon === 'reddit';
+
+    return (
+        <article className="flex h-full flex-col items-center overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#020202] p-6 text-center shadow-[0_34px_90px_rgba(0,0,0,0.6)] sm:p-8">
+            <div className="mb-6">
+                {isX && <XLogo className="h-10 w-10 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]" />}
+                {isReddit && <RedditLogo className="h-11 w-11 text-[#ff4500] drop-shadow-[0_0_16px_rgba(255,69,0,0.4)]" />}
+            </div>
+
+            <h3 className="mb-4 text-balance text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+                {card.title}
+            </h3>
+            
+            <p className="mb-10 text-balance text-[15px] leading-relaxed text-zinc-400">
+                {card.description}
+            </p>
+
+            <div className="relative mb-10 w-full overflow-hidden rounded-[20px] border border-white/[0.04] bg-[#050505] shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
+                <Image
+                    src={card.imageSrc}
+                    alt={card.title}
+                    width={1000}
+                    height={700}
+                    className="w-full h-auto object-cover"
+                />
+            </div>
+
+            <div className="mt-auto flex flex-col items-center gap-4">
+                <button
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold transition-all hover:scale-105 ${
+                        isX
+                            ? 'bg-[#14C4E1]/15 text-[#7AD9DA] shadow-[0_0_24px_rgba(20,196,225,0.3)] hover:bg-[#14C4E1]/25'
+                            : 'bg-[#b63013] text-[#ffebe5] shadow-[0_0_24px_rgba(182,48,19,0.5)] hover:bg-[#d83c18]'
+                    }`}
+                >
+                    {card.buttonLabel}
+                    <span>&rarr;</span>
+                </button>
+
+                <div className="flex items-center gap-2 text-[12px] uppercase tracking-[0.15em] text-zinc-500">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
+                        <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    No-code embed
+                </div>
+            </div>
+        </article>
+    );
+}
+
+function SeoReasonCard({ card }: { card: HomepageCompactReason & { kind: 'seo' } }) {
+    return (
+        <article className="relative flex w-full flex-col overflow-hidden rounded-[36px] bg-[linear-gradient(180deg,rgba(12,14,16,0.95),rgba(4,5,6,1))] border border-white/[0.06] shadow-[0_44px_100px_rgba(0,0,0,0.8)] p-6 sm:p-10 lg:flex-row lg:items-center lg:gap-16 lg:p-12">
+            
+            <div className="absolute -left-[20%] top-[10%] -z-10 h-[600px] w-[600px] bg-[radial-gradient(circle_at_center,rgba(20,196,225,0.12),transparent_60%)] blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 w-full lg:w-[45%] text-left">
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7AD9DA]">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {card.eyebrow}
+                </div>
+                
+                <h3 className="mb-6 text-balance text-4xl font-semibold tracking-[-0.04em] text-white lg:text-[44px] lg:leading-[1.1]">
+                    {card.title}
+                </h3>
+                
+                <p className="mb-10 text-[16px] leading-relaxed text-zinc-400">
+                    {card.description}
+                </p>
+
+                <div className="mb-10 flex flex-wrap gap-2">
+                    {card.chips.map((chip) => (
+                        <span key={chip} className="rounded-full border border-white/[0.06] bg-[#0A0D10]/50 px-4 py-2 text-xs font-medium text-zinc-300">
+                            {chip}
+                        </span>
+                    ))}
+                </div>
+
+                {'href' in card && 'ctaLabel' in card ? (
+                    <GradientButton href={card.href} newTab>
+                        {card.ctaLabel}
+                        <ArrowRight className="h-4 w-4" />
+                    </GradientButton>
+                ) : null}
+            </div>
+
+            <div className="relative z-10 mt-12 w-full lg:mt-0 lg:w-[55%]">
+                <div className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0A0D10]/80 shadow-[inset_0_1px_rgba(255,255,255,0.1),0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
+                    
+                    <div 
+                        className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+                        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} 
+                    />
+
+                    <div className="p-2 sm:p-3 relative z-10">
+                        <div className="flex items-center justify-between rounded-t-[20px] bg-black/60 px-5 py-4 border border-white/[0.04]">
+                            <div className="flex gap-2">
+                                <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F56] border border-black/20" />
+                                <div className="h-2.5 w-2.5 rounded-full bg-[#FFBD2E] border border-black/20" />
+                                <div className="h-2.5 w-2.5 rounded-full bg-[#27C93F] border border-black/20" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8EE68E] uppercase">{card.previewLabel}</span>
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8EE68E] shadow-[0_0_8px_rgba(142,230,142,0.8)]" />
+                            </div>
+                        </div>
+
+                        <div className="relative bg-black/40 p-4 sm:p-5 rounded-b-[20px] border-x border-b border-white/[0.04]">
+                            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 mt-4">
+                                {card.features?.map((feature: any, index: number) => {
+                                    let Icon: any = Bot;
+                                    if (feature.iconType === 'pen') Icon = Pen;
+                                    else if (feature.iconType === 'brain') Icon = Brain;
+                                    else if (feature.iconType === 'link') Icon = Link2;
+                                    else if (feature.iconType === 'activity') Icon = Activity;
+                                    else if (feature.iconType === 'layers') Icon = Layers;
+                                    else if (feature.iconType === 'cpu') Icon = Cpu;
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-[#12161A] to-[#0A0D10] p-3.5 shadow-[inset_0_1px_rgba(255,255,255,0.05),0_4px_20px_rgba(0,0,0,0.5)] transition-all duration-500 hover:-translate-y-1 hover:border-white/[0.15] hover:shadow-[0_12px_40px_rgba(20,196,225,0.15)] hover:from-[#181D22] hover:to-[#0A0D10] cursor-pointer"
+                                        >
+                                            <div className="absolute inset-0 z-[-1] opacity-0 transition-opacity duration-700 group-hover:opacity-100 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.05),transparent_60%)] pointer-events-none" />
+
+                                            <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.1] shadow-xl ${feature.iconBg} bg-[#050608]`}>
+                                                <div className="absolute inset-0 rounded-[14px] bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+                                                <Icon className={`h-5 w-5 ${feature.iconColor} drop-shadow-[0_0_8px_currentColor] group-hover:scale-110 transition-transform duration-300`} />
+                                            </div>
+
+                                            <div className="flex flex-col gap-0.5">
+                                                <h4 className="text-[14px] font-bold tracking-wide text-white group-hover:text-[#14C4E1] transition-colors">{feature.label}</h4>
+                                                <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500 opacity-60">
+                                                    SEO Tool
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-1">
+                                                <ArrowRight className="h-4 w-4 text-[#14C4E1]" />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="absolute left-1/2 top-1/2 -z-10 h-full w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle_at_center,#14C4E1_0%,transparent_60%)] opacity-20 blur-[80px] pointer-events-none" />
+            </div>
+        </article>
+    );
+}
+
 function CompactReasonCard({ card }: { card: HomepageCompactReason }) {
+    if (card.kind === 'mention') {
+        return <MentionReasonCard card={card} />;
+    }
+    if (card.kind === 'seo') {
+        return <SeoReasonCard card={card} />;
+    }
+
     return (
         <article className="flex h-full flex-col overflow-hidden rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,10,12,0.98),rgba(4,5,6,1))] p-5 shadow-[0_34px_90px_rgba(0,0,0,0.4)] sm:p-6">
             <div className="flex flex-wrap items-center gap-3">
@@ -250,59 +450,19 @@ function CompactReasonCard({ card }: { card: HomepageCompactReason }) {
                 <p className="text-sm leading-7 text-zinc-400">{card.description}</p>
             </div>
 
-            {card.kind === 'dashboard' ? (
-                <div className="mt-6 rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.018))] p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{card.previewLabel}</span>
-                        <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[#dff9ff]">
-                            Live
-                        </span>
-                    </div>
-
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#05070a] px-4 py-3 font-mono text-xs text-[#dff9ff]">
-                        {card.previewValue}
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        {['Traffic', 'Pages', 'Realtime'].map((label, index) => (
-                            <div
-                                key={label}
-                                className="rounded-2xl border border-white/[0.08] bg-black/35 p-3"
-                            >
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</div>
-                                <div className="mt-3 h-16 rounded-[18px] bg-[linear-gradient(180deg,rgba(20,196,225,0.18),rgba(255,255,255,0.03))]" />
-                                <div
-                                    className="mt-3 h-1.5 rounded-full bg-[#14C4E1]/55"
-                                    style={{ width: `${68 + index * 12}%` }}
-                                />
-                            </div>
-                        ))}
-                    </div>
+            <div className="mt-6 rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.018))] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{card.previewLabel}</span>
+                    <span className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[#8EE68E]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#8EE68E] animate-pulse" />
+                        Live
+                    </span>
                 </div>
-            ) : (
-                <div className="mt-6 space-y-4">
-                    <div className="relative aspect-[16/10] overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#020202]">
-                        <Image
-                            src={card.imageSrc}
-                            alt={card.title}
-                            fill
-                            sizes="(max-width: 1024px) 100vw, 33vw"
-                            className="object-contain object-top"
-                        />
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_56%,rgba(0,0,0,0.52)_100%)]" />
-                    </div>
 
-                    <div className="rounded-[24px] border border-white/[0.08] bg-black/45 p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                            <Code2 className="h-4 w-4 text-[#7AD9DA]" />
-                            <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{card.previewLabel}</span>
-                        </div>
-                        <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#05070a] px-4 py-3 font-mono text-xs text-[#dff9ff]">
-                            {card.previewValue}
-                        </div>
-                    </div>
+                <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#05070a] px-4 py-3 font-mono text-xs text-[#dff9ff]">
+                    <span className="text-[#7AD9DA]">{card.previewValue}</span>
                 </div>
-            )}
+            </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
                 {card.chips.map((chip) => (
@@ -315,7 +475,7 @@ function CompactReasonCard({ card }: { card: HomepageCompactReason }) {
                 ))}
             </div>
 
-            {card.kind === 'dashboard' ? (
+            {'href' in card && 'ctaLabel' in card ? (
                 <div className="mt-6">
                     <GradientButton href={card.href} secondary newTab>
                         {card.ctaLabel}
@@ -441,31 +601,37 @@ export default function LandingHomepage() {
                         </div>
                     </div>
 
-                    <div className="mt-14 space-y-8 lg:space-y-10">
-                        <FeaturedReasonCard
-                            reason={HOMEPAGE_CONTENT.aiChat}
-                            icon={<Bot className="h-4 w-4" />}
-                            videoTitle="TrafficClaw AI chat demo"
-                            fallbackEyebrow="AI chat"
-                            id="ai-chat"
-                        />
+                    <JourneyLine>
+                        <JourneyNode number={1}>
+                            <FeaturedReasonCard
+                                reason={HOMEPAGE_CONTENT.aiChat}
+                                icon={<Bot className="h-4 w-4" />}
+                                videoTitle="TrafficClaw AI chat demo"
+                                fallbackEyebrow="AI chat"
+                                id="ai-chat"
+                            />
+                        </JourneyNode>
 
-                        <FeaturedReasonCard
-                            reason={HOMEPAGE_CONTENT.globe}
-                            icon={<Globe className="h-4 w-4" />}
-                            videoTitle="TrafficClaw realtime globe demo"
-                            fallbackEyebrow="Live globe"
-                            id="globe"
-                            reverse
-                            ctaHref={HOMEPAGE_CONTENT.globe.demoHref}
-                            ctaLabel={HOMEPAGE_CONTENT.globe.ctaLabel}
-                            newTab
-                        />
-                    </div>
+                        <JourneyNode number={2}>
+                            <FeaturedReasonCard
+                                reason={HOMEPAGE_CONTENT.globe}
+                                icon={<Globe className="h-4 w-4" />}
+                                videoTitle="TrafficClaw realtime globe demo"
+                                fallbackEyebrow="Live globe"
+                                id="globe"
+                                reverse
+                                ctaHref={HOMEPAGE_CONTENT.globe.demoHref}
+                                ctaLabel={HOMEPAGE_CONTENT.globe.ctaLabel}
+                                newTab
+                            />
+                        </JourneyNode>
+                    </JourneyLine>
 
-                    <div id="mentions" className="mt-10 grid gap-6 lg:grid-cols-3">
+                    <div id="mentions" className="mt-10 grid gap-6 lg:grid-cols-2">
                         {HOMEPAGE_CONTENT.compactReasons.map((card) => (
-                            <CompactReasonCard key={card.number} card={card} />
+                            <div key={card.number} className={card.kind === 'seo' ? 'lg:col-span-2' : ''}>
+                                <CompactReasonCard card={card} />
+                            </div>
                         ))}
                     </div>
 

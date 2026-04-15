@@ -75,7 +75,7 @@ export default function LazyVideoFrame({
                     className={`relative mt-3 flex-1 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_38%),linear-gradient(180deg,#050608_0%,#020304_100%)] ${viewportClassName}`}
                 >
                     {mounted ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(180deg,rgba(4,6,9,0.64),rgba(2,3,4,0.92))] p-3 sm:p-4">
+                        <div className="relative flex items-center justify-center bg-[linear-gradient(180deg,rgba(4,6,9,0.64),rgba(2,3,4,0.92))] p-1">
                             <video
                                 autoPlay
                                 loop
@@ -84,13 +84,13 @@ export default function LazyVideoFrame({
                                 preload="metadata"
                                 poster={posterSrc}
                                 aria-label={title}
-                                className={`h-full w-full bg-[#020304] ${videoClassName}`}
+                                className={`w-full h-auto block rounded-[20px] bg-[#020304] ${videoClassName}`}
                             >
                                 <source src={src} type="video/mp4" />
                             </video>
                         </div>
                     ) : (
-                        <div className="absolute inset-0">
+                        <div className="relative p-1">
                             {children}
                         </div>
                     )}
