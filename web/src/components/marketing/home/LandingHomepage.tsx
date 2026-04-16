@@ -432,59 +432,7 @@ function CompactReasonCard({ card }: { card: HomepageCompactReason }) {
     if (card.kind === 'mention') {
         return <MentionReasonCard card={card} />;
     }
-    if (card.kind === 'seo') {
-        return <SeoReasonCard card={card} />;
-    }
-
-    return (
-        <article className="flex h-full flex-col overflow-hidden rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,10,12,0.98),rgba(4,5,6,1))] p-5 shadow-[0_34px_90px_rgba(0,0,0,0.4)] sm:p-6">
-            <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center rounded-full border border-[#14C4E1]/22 bg-[#06131d] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[#dff9ff]">
-                    Reason {card.number}
-                </span>
-                <span className="text-[11px] uppercase tracking-[0.2em] text-[#7AD9DA]">{card.eyebrow}</span>
-            </div>
-
-            <div className="mt-5 space-y-3">
-                <h3 className="text-2xl font-semibold tracking-[-0.04em] text-white">{card.title}</h3>
-                <p className="text-sm leading-7 text-zinc-400">{card.description}</p>
-            </div>
-
-            <div className="mt-6 rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.018))] p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{card.previewLabel}</span>
-                    <span className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[#8EE68E]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#8EE68E] animate-pulse" />
-                        Live
-                    </span>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#05070a] px-4 py-3 font-mono text-xs text-[#dff9ff]">
-                    <span className="text-[#7AD9DA]">{card.previewValue}</span>
-                </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-2">
-                {card.chips.map((chip) => (
-                    <span
-                        key={chip}
-                        className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-zinc-300"
-                    >
-                        {chip}
-                    </span>
-                ))}
-            </div>
-
-            {'href' in card && 'ctaLabel' in card ? (
-                <div className="mt-6">
-                    <GradientButton href={card.href} secondary newTab>
-                        {card.ctaLabel}
-                        <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
-                    </GradientButton>
-                </div>
-            ) : null}
-        </article>
-    );
+    return <SeoReasonCard card={card} />;
 }
 
 function ProofCard({ card }: { card: HomepageProofCard }) {
