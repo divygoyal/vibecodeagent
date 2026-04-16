@@ -5,15 +5,18 @@ import {
     ArrowRight,
     ArrowUpRight,
     Bot,
-    Code2,
     Globe,
     Sparkles,
     Pen,
     Brain,
     Link2,
     Activity,
+    Eye,
     Layers,
-    Cpu
+    Cpu,
+    Timer,
+    UserPlus,
+    type LucideIcon,
 } from 'lucide-react';
 
 import DeferredEmbed from './DeferredEmbed';
@@ -40,6 +43,62 @@ type FeaturedReason = {
     frameMeta: string;
     highlights: readonly string[] | readonly { title: string; text: string }[];
 };
+
+type HighlightItem = FeaturedReason['highlights'][number];
+type HighlightObject = Extract<HighlightItem, { title: string; text: string }>;
+type SeoReason = Extract<HomepageCompactReason, { kind: 'seo' }>;
+type SeoFeature = NonNullable<SeoReason['features']>[number];
+type HeroFallbackMetric = {
+    label: string;
+    value: string;
+    change: string;
+    bars: readonly number[];
+    icon: LucideIcon;
+};
+
+const SEO_FEATURE_ICONS: Record<SeoFeature['iconType'], LucideIcon> = {
+    pen: Pen,
+    brain: Brain,
+    link: Link2,
+    activity: Activity,
+    layers: Layers,
+    cpu: Cpu,
+};
+
+const HERO_FALLBACK_METRICS: readonly HeroFallbackMetric[] = [
+    {
+        label: 'Sessions',
+        value: '86.6K',
+        change: '+284.4%',
+        bars: [18, 18, 28, 30, 30, 18, 24, 38, 48, 36, 44, 52],
+        icon: Activity,
+    },
+    {
+        label: 'Pageviews',
+        value: '180.0K',
+        change: '+221.7%',
+        bars: [16, 12, 32, 34, 34, 18, 26, 44, 48, 46, 56],
+        icon: Eye,
+    },
+    {
+        label: 'Session Duration',
+        value: '3m 45s',
+        change: '+5.0%',
+        bars: [44, 78, 38, 30, 26, 28, 22, 24, 26, 24, 30],
+        icon: Timer,
+    },
+    {
+        label: 'New Users',
+        value: '61.4K',
+        change: '+386.4%',
+        bars: [14, 10, 34, 28, 36, 16, 32, 54, 52, 42, 66],
+        icon: UserPlus,
+    },
+] as const;
+
+function isHighlightObject(item: HighlightItem): item is HighlightObject {
+    return typeof item === 'object';
+}
 
 function SectionLabel({ children }: { children: ReactNode }) {
     return (
@@ -70,7 +129,7 @@ function GradientButton({
             href={href}
             target={newTab ? '_blank' : undefined}
             rel={newTab ? 'noreferrer' : undefined}
-            className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition-all duration-200 ${className}`}
+            className={`inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full px-5 text-center text-sm font-semibold transition-all duration-200 sm:w-auto ${className}`}
         >
             {children}
         </Link>
@@ -79,21 +138,63 @@ function GradientButton({
 
 function HeroFrameFallback() {
     return (
-        <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_32%),linear-gradient(180deg,#050608_0%,#020305_45%,#010101_100%)]">
-            <div className="absolute inset-x-5 top-5 h-12 rounded-2xl border border-white/[0.08] bg-white/[0.03]" />
-            <div className="absolute bottom-5 left-5 right-[34%] top-24 rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]" />
-            <div className="absolute right-5 top-24 bottom-[44%] w-[28%] rounded-[24px] border border-white/[0.08] bg-white/[0.03]" />
-            <div className="absolute right-5 bottom-5 top-[62%] w-[28%] rounded-[24px] border border-white/[0.08] bg-white/[0.03]" />
-            <div className="absolute left-10 top-36 flex items-end gap-2">
-                {[0, 1, 2, 3, 4].map((bar) => (
-                    <div
-                        key={bar}
-                        className="w-12 rounded-full bg-[linear-gradient(180deg,rgba(20,196,225,0.85),rgba(255,255,255,0.24))]"
-                        style={{ height: `${80 + bar * 22}px` }}
-                    />
-                ))}
+        <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(82,226,245,0.14),transparent_28%),linear-gradient(180deg,#030609_0%,#020406_45%,#010203_100%)] p-3 sm:p-4">
+            <div
+                className="absolute inset-0 opacity-35"
+                style={{
+                    backgroundImage:
+                        'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+                    backgroundSize: '24px 24px',
+                }}
+            />
+            <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_70%)]" />
+
+            <div className="relative grid h-full grid-cols-2 gap-3 sm:gap-4">
+                {HERO_FALLBACK_METRICS.map((metric) => {
+                    const Icon = metric.icon;
+
+                    return (
+                        <div
+                            key={metric.label}
+                            className="relative min-w-0 overflow-hidden rounded-[22px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(10,14,20,0.96),rgba(4,7,11,0.98))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_24px_50px_rgba(0,0,0,0.42)] sm:p-5"
+                        >
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(82,226,245,0.08),transparent_34%)]" />
+                            <div className="relative flex h-full flex-col">
+                                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-400 sm:text-[11px]">
+                                            <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                                            <span className="truncate">{metric.label}</span>
+                                        </div>
+                                        <div className="mt-2 text-[1.45rem] font-semibold tracking-[-0.06em] text-white sm:mt-3 sm:text-[2.35rem]">
+                                            {metric.value}
+                                        </div>
+                                    </div>
+
+                                    <span className="shrink-0 rounded-full border border-emerald-400/15 bg-emerald-500/12 px-2 py-1 text-[9px] font-semibold text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.12)] sm:px-2.5 sm:text-[10px]">
+                                        {metric.change}
+                                    </span>
+                                </div>
+
+                                <div className="mt-auto pt-3 sm:pt-5">
+                                    <div className="flex h-14 items-end gap-1 sm:h-16 sm:gap-1.5">
+                                        {metric.bars.map((barHeight, index) => (
+                                            <span
+                                                key={`${metric.label}-${index}`}
+                                                className="block h-full flex-1 rounded-[4px] bg-[linear-gradient(180deg,#5ee8f5_0%,#22d3ee_38%,#0f6d86_100%)] shadow-[0_0_18px_rgba(82,226,245,0.2)]"
+                                                style={{
+                                                    height: `${barHeight}%`,
+                                                    opacity: index < 2 ? 0.45 : 1,
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
-            <div className="absolute bottom-12 left-10 right-[39%] h-20 rounded-[24px] border border-white/[0.06] bg-white/[0.02]" />
         </div>
     );
 }
@@ -181,9 +282,9 @@ function FeaturedReasonCard({
             className="overflow-hidden rounded-[36px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.08),transparent_36%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-4 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-5 lg:p-6"
         >
             <div
-                className={`grid gap-10 lg:items-center xl:gap-16 ${reverse ? 'lg:grid-cols-2' : 'lg:grid-cols-2'}`}
+                className={`grid gap-8 lg:items-center xl:gap-16 ${reverse ? 'lg:grid-cols-2' : 'lg:grid-cols-2'}`}
             >
-                <div className={`relative z-10 space-y-6 ${reverse ? 'lg:order-2' : ''}`}>
+                <div className={`relative z-10 min-w-0 space-y-6 ${reverse ? 'lg:order-2' : ''}`}>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center rounded-full border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#dff9ff] shadow-[0_0_12px_rgba(20,196,225,0.15)] transition-colors hover:bg-[#14C4E1]/20">
                             Reason {reason.number}
@@ -194,16 +295,16 @@ function FeaturedReasonCard({
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-balance max-w-[16ch] text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-[3rem] lg:leading-[1.05]">
+                        <h3 className="text-balance max-w-[16ch] text-[1.9rem] font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-[3rem] lg:leading-[1.05]">
                             {reason.title}
                         </h3>
-                        <p className="max-w-xl text-base leading-7 text-zinc-400">{reason.description}</p>
+                        <p className="max-w-xl text-[15px] leading-7 text-zinc-400 sm:text-base">{reason.description}</p>
                     </div>
 
                     <div className="flex flex-col gap-4 mt-8">
-                        {reason.highlights.map((item, index) => {
-                            const isObj = typeof item === 'object';
-                            const key = isObj ? (item as any).title : item;
+                        {reason.highlights.map((item) => {
+                            const isObj = isHighlightObject(item);
+                            const key = isObj ? item.title : item;
                             
                             return (
                                 <div key={key} className="flex items-start gap-4">
@@ -211,12 +312,12 @@ function FeaturedReasonCard({
                                         {icon}
                                     </div>
                                     {isObj ? (
-                                        <div className="space-y-1">
-                                            <div className="text-[15px] font-semibold text-white">{(item as any).title}</div>
-                                            <div className="text-[14px] leading-relaxed text-zinc-400">{(item as any).text}</div>
+                                        <div className="min-w-0 space-y-1">
+                                            <div className="text-[15px] font-semibold text-white">{item.title}</div>
+                                            <div className="text-[14px] leading-relaxed text-zinc-400">{item.text}</div>
                                         </div>
                                     ) : (
-                                        <div className="text-[14px] leading-relaxed text-zinc-300">{item as string}</div>
+                                        <div className="min-w-0 text-[14px] leading-relaxed text-zinc-300">{item}</div>
                                     )}
                                 </div>
                             );
@@ -233,7 +334,7 @@ function FeaturedReasonCard({
                     ) : null}
                 </div>
 
-                <div className={`relative z-0 ${reverse ? 'lg:order-1' : ''}`}>
+                <div className={`relative z-0 min-w-0 ${reverse ? 'lg:order-1' : ''}`}>
                     <LazyVideoFrame
                         src={reason.videoSrc}
                         title={videoTitle}
@@ -278,21 +379,21 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
     const isReddit = card.icon === 'reddit';
 
     return (
-        <article className="flex h-full flex-col items-center overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#020202] p-6 text-center shadow-[0_34px_90px_rgba(0,0,0,0.6)] sm:p-8">
-            <div className="mb-6">
+        <article className="flex h-full flex-col items-center overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#020202] p-5 text-center shadow-[0_34px_90px_rgba(0,0,0,0.6)] sm:p-8">
+            <div className="mb-5 sm:mb-6">
                 {isX && <XLogo className="h-10 w-10 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]" />}
                 {isReddit && <RedditLogo className="h-11 w-11 text-[#ff4500] drop-shadow-[0_0_16px_rgba(255,69,0,0.4)]" />}
             </div>
 
-            <h3 className="mb-4 text-balance text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+            <h3 className="mb-4 text-balance text-[1.9rem] font-semibold tracking-[-0.04em] text-white sm:text-4xl">
                 {card.title}
             </h3>
             
-            <p className="mb-10 text-balance text-[15px] leading-relaxed text-zinc-400">
+            <p className="mb-8 text-balance text-[15px] leading-relaxed text-zinc-400 sm:mb-10">
                 {card.description}
             </p>
 
-            <div className="relative mb-10 w-full overflow-hidden rounded-[20px] border border-white/[0.04] bg-[#050505] shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
+            <div className="relative mb-8 w-full overflow-hidden rounded-[20px] border border-white/[0.04] bg-[#050505] shadow-[0_20px_60px_rgba(0,0,0,0.8)] sm:mb-10">
                 <Image
                     src={card.imageSrc}
                     alt={card.title}
@@ -302,9 +403,9 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
                 />
             </div>
 
-            <div className="mt-auto flex flex-col items-center gap-4">
+            <div className="mt-auto flex w-full flex-col items-center gap-4">
                 <button
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold transition-all hover:scale-105 ${
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold transition-all sm:w-auto hover:scale-105 ${
                         isX
                             ? 'bg-[#14C4E1]/15 text-[#7AD9DA] shadow-[0_0_24px_rgba(20,196,225,0.3)] hover:bg-[#14C4E1]/25'
                             : 'bg-[#b63013] text-[#ffebe5] shadow-[0_0_24px_rgba(182,48,19,0.5)] hover:bg-[#d83c18]'
@@ -331,13 +432,13 @@ function SeoReasonCard({ card }: { card: HomepageCompactReason & { kind: 'seo' }
             
             <div className="absolute -left-[20%] top-[10%] -z-10 h-[600px] w-[600px] bg-[radial-gradient(circle_at_center,rgba(20,196,225,0.12),transparent_60%)] blur-3xl pointer-events-none" />
 
-            <div className="relative z-10 w-full lg:w-[45%] text-left">
+            <div className="relative z-10 min-w-0 w-full text-left lg:w-[45%]">
                 <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7AD9DA]">
                     <Sparkles className="h-3.5 w-3.5" />
                     {card.eyebrow}
                 </div>
                 
-                <h3 className="mb-6 text-balance text-4xl font-semibold tracking-[-0.04em] text-white lg:text-[44px] lg:leading-[1.1]">
+                <h3 className="mb-6 text-balance text-[2rem] font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-[44px] lg:leading-[1.1]">
                     {card.title}
                 </h3>
                 
@@ -361,7 +462,7 @@ function SeoReasonCard({ card }: { card: HomepageCompactReason & { kind: 'seo' }
                 ) : null}
             </div>
 
-            <div className="relative z-10 mt-12 w-full lg:mt-0 lg:w-[55%]">
+            <div className="relative z-10 mt-10 min-w-0 w-full lg:mt-0 lg:w-[55%]">
                 <div className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0A0D10]/80 shadow-[inset_0_1px_rgba(255,255,255,0.1),0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
                     
                     <div 
@@ -369,29 +470,23 @@ function SeoReasonCard({ card }: { card: HomepageCompactReason & { kind: 'seo' }
                         style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} 
                     />
 
-                    <div className="p-2 sm:p-3 relative z-10">
-                        <div className="flex items-center justify-between rounded-t-[20px] bg-black/60 px-5 py-4 border border-white/[0.04]">
+                    <div className="relative z-10 p-2 sm:p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-[20px] border border-white/[0.04] bg-black/60 px-3 py-3 sm:px-5 sm:py-4">
                             <div className="flex gap-2">
                                 <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F56] border border-black/20" />
                                 <div className="h-2.5 w-2.5 rounded-full bg-[#FFBD2E] border border-black/20" />
                                 <div className="h-2.5 w-2.5 rounded-full bg-[#27C93F] border border-black/20" />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8EE68E] uppercase">{card.previewLabel}</span>
+                            <div className="min-w-0 flex items-center gap-2">
+                                <span className="truncate text-[10px] font-bold uppercase tracking-[0.2em] text-[#8EE68E]">{card.previewLabel}</span>
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8EE68E] shadow-[0_0_8px_rgba(142,230,142,0.8)]" />
                             </div>
                         </div>
 
                         <div className="relative bg-black/40 p-4 sm:p-5 rounded-b-[20px] border-x border-b border-white/[0.04]">
                             <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 mt-4">
-                                {card.features?.map((feature: any, index: number) => {
-                                    let Icon: any = Bot;
-                                    if (feature.iconType === 'pen') Icon = Pen;
-                                    else if (feature.iconType === 'brain') Icon = Brain;
-                                    else if (feature.iconType === 'link') Icon = Link2;
-                                    else if (feature.iconType === 'activity') Icon = Activity;
-                                    else if (feature.iconType === 'layers') Icon = Layers;
-                                    else if (feature.iconType === 'cpu') Icon = Cpu;
+                                {card.features?.map((feature, index) => {
+                                    const Icon = SEO_FEATURE_ICONS[feature.iconType] ?? Bot;
 
                                     return (
                                         <div
@@ -405,7 +500,7 @@ function SeoReasonCard({ card }: { card: HomepageCompactReason & { kind: 'seo' }
                                                 <Icon className={`h-5 w-5 ${feature.iconColor} drop-shadow-[0_0_8px_currentColor] group-hover:scale-110 transition-transform duration-300`} />
                                             </div>
 
-                                            <div className="flex flex-col gap-0.5">
+                                            <div className="min-w-0 flex flex-col gap-0.5">
                                                 <h4 className="text-[14px] font-bold tracking-wide text-white group-hover:text-[#14C4E1] transition-colors">{feature.label}</h4>
                                                 <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500 opacity-60">
                                                     SEO Tool
@@ -461,7 +556,7 @@ function ProofCard({ card }: { card: HomepageProofCard }) {
 
 export default function LandingHomepage() {
     return (
-        <div className="relative overflow-hidden bg-[#010101] text-white">
+        <div className="relative overflow-x-clip bg-[#010101] text-white">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_18%),linear-gradient(180deg,#030303_0%,#010101_24%,#000000_100%)]" />
             <div
                 className="pointer-events-none absolute inset-0 opacity-40"
@@ -477,23 +572,23 @@ export default function LandingHomepage() {
                     <HeroGalaxy />
                 </div>
 
-                <div className="relative mx-auto max-w-[1380px] px-4 pb-16 pt-28 sm:px-6 sm:pb-20 lg:px-8 lg:pb-24 lg:pt-36">
+                <div className="relative mx-auto max-w-[1380px] px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8 lg:pb-24 lg:pt-36">
                     <div className="mx-auto max-w-[1040px] text-center">
-                        <h1 className="text-5xl font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
+                        <h1 className="text-[2.8rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
                             {HOMEPAGE_CONTENT.hero.title}
                         </h1>
                     </div>
 
-                    <div className="mx-auto mt-10 max-w-[1280px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012))] p-3 shadow-[0_44px_140px_rgba(0,0,0,0.54)]">
+                    <div className="mx-auto mt-8 max-w-[1280px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012))] p-2 shadow-[0_44px_140px_rgba(0,0,0,0.54)] sm:mt-10 sm:rounded-[34px] sm:p-3">
                         <div className="rounded-[28px] border border-white/[0.08] bg-[#030406]">
-                            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-3 sm:px-4">
                                 <div className="flex items-center gap-2">
                                     <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
                                     <span className="h-2.5 w-2.5 rounded-full bg-white/16" />
                                     <span className="h-2.5 w-2.5 rounded-full bg-[#14C4E1]/60" />
                                 </div>
-                                <div className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[11px] text-zinc-400">
-                                    {HOMEPAGE_CONTENT.analyticsDisplayUrl}
+                                <div className="min-w-0 max-w-full rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[11px] text-zinc-400 sm:max-w-[320px]">
+                                    <span className="block truncate">{HOMEPAGE_CONTENT.analyticsDisplayUrl}</span>
                                 </div>
                             </div>
 
@@ -504,7 +599,7 @@ export default function LandingHomepage() {
                                 interactive={false}
                                 openHref={HOMEPAGE_CONTENT.analyticsEmbedUrl}
                                 openLabel="Open live dashboard"
-                                className="h-[400px] sm:h-[520px] lg:h-[760px]"
+                                className="h-[300px] min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]"
                             >
                                 <HeroFrameFallback />
                             </DeferredEmbed>
@@ -528,10 +623,10 @@ export default function LandingHomepage() {
                 <div className="mx-auto max-w-[1380px] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
                     <div className="mx-auto max-w-[980px] text-center">
                         <SectionLabel>{HOMEPAGE_CONTENT.reasonsIntro.eyebrow}</SectionLabel>
-                        <h2 className="mt-5 text-4xl font-semibold tracking-[-0.06em] text-white sm:text-5xl lg:text-[4.2rem] lg:leading-[0.98]">
+                        <h2 className="mt-5 text-[2.2rem] font-semibold tracking-[-0.06em] text-white sm:text-5xl lg:text-[4.2rem] lg:leading-[0.98]">
                             {HOMEPAGE_CONTENT.reasonsIntro.title}
                         </h2>
-                        <p className="mt-5 text-lg leading-8 text-[#d8dde6]">
+                        <p className="mt-5 text-base leading-7 text-[#d8dde6] sm:text-lg sm:leading-8">
                             {HOMEPAGE_CONTENT.reasonsIntro.description}
                         </p>
                         <p className="mx-auto mt-4 max-w-3xl text-base leading-7 text-zinc-400">
@@ -576,7 +671,7 @@ export default function LandingHomepage() {
                         </JourneyNode>
                     </JourneyLine>
 
-                    <div id="mentions" className="mt-10 grid gap-6 lg:grid-cols-2">
+                    <div id="mentions" className="mt-10 grid gap-4 sm:gap-6 lg:grid-cols-2">
                         {HOMEPAGE_CONTENT.compactReasons.map((card) => (
                             <div key={card.number} className={card.kind === 'seo' ? 'lg:col-span-2' : ''}>
                                 <CompactReasonCard card={card} />

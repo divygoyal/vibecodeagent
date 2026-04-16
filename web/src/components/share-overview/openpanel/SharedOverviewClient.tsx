@@ -198,6 +198,14 @@ type LiveVisitorsResponse = {
     activeUsers: number;
 };
 type LiveOverviewResponse = LiveResponse | LiveVisitorsResponse;
+type LiveMiniBarPoint = {
+    minute: string;
+    sessionCount: number;
+    visitorCount: number;
+    timestamp: number;
+    time: string;
+    referrers: Array<{ referrer: string; count: number }>;
+};
 
 function hasLiveBreakdown(data?: LiveOverviewResponse): data is LiveResponse {
     return Boolean(data && 'minuteCounts' in data);
@@ -224,6 +232,8 @@ const LIVE_DATA_POLL_INTERVAL_MS = 15_000;
 const LIVE_RECONCILE_INTERVAL_MS = 60_000;
 const OVERVIEW_QUERY_STALE_MS = 30_000;
 const OVERVIEW_TABLE_ROW_LIMIT = 15;
+const OVERVIEW_MINI_BAR_COUNT = 14;
+const OVERVIEW_LIVE_BAR_COUNT = 12;
 const FILTER_OPERATOR_OPTIONS: Array<{ value: ShareOverviewFilterOperator; label: string; needsValue: boolean }> = [
     { value: 'is', label: 'is', needsValue: true },
     { value: 'isNot', label: 'is not', needsValue: true },
@@ -324,8 +334,138 @@ function formatMetricValue(value: number, unit: string) {
     return shortNumber(value);
 }
 
-function alternatingBarColor(index: number) {
-    return index % 2 === 0 ? OVERVIEW_PRIMARY_ACCENT : OVERVIEW_COMPARISON_ACCENT;
+function bucketItems<T>(items: T[], targetCount: number) {
+    if (items.length <= targetCount) {
+        return items.map((item) => [item]);
+    }
+
+    return Array.from({ length: targetCount }, (_, bucketIndex) => {
+        const start = Math.floor((bucketIndex * items.length) / targetCount);
+        const end = Math.floor(((bucketIndex + 1) * items.length) / targetCount);
+        return items.slice(start, Math.max(start + 1, end));
+    }).filter((bucket) => bucket.length > 0);
+}
+
+function average(values: number[]) {
+    if (!values.length) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function aggregateMetricMiniSeries(
+    data: StatsSeriesPoint[],
+    metricKey: string,
+    targetCount = OVERVIEW_MINI_BAR_COUNT,
+) {
+    const points = data.map((point) => ({
+        current: getMetricSeriesValue(point, metricKey),
+        previous: getMetricSeriesValue(point, `prev_${metricKey}`),
+        date: String(point.date),
+    }));
+
+    return bucketItems(points, targetCount).map((bucket) => {
+        const lastPoint = bucket[bucket.length - 1];
+        return {
+            current: average(bucket.map((point) => point.current)),
+            previous: average(bucket.map((point) => point.previous)),
+            date: lastPoint.date,
+        };
+    });
+}
+
+function aggregateLiveMiniSeries(
+    data: LiveResponse['minuteCounts'],
+    targetCount = OVERVIEW_LIVE_BAR_COUNT,
+): LiveMiniBarPoint[] {
+    return bucketItems(data, targetCount).map((bucket) => {
+        const firstPoint = bucket[0];
+        const lastPoint = bucket[bucket.length - 1];
+        const referrerTotals = new Map<string, number>();
+
+        bucket.forEach((point) => {
+            point.referrers.forEach((referrer) => {
+                referrerTotals.set(referrer.referrer, (referrerTotals.get(referrer.referrer) || 0) + referrer.count);
+            });
+        });
+
+        return {
+            minute: lastPoint.minute,
+            sessionCount: Math.round(average(bucket.map((point) => point.sessionCount))),
+            visitorCount: Math.round(average(bucket.map((point) => point.visitorCount))),
+            timestamp: lastPoint.timestamp,
+            time:
+                firstPoint.time === lastPoint.time
+                    ? lastPoint.time
+                    : `${firstPoint.time} - ${lastPoint.time}`,
+            referrers: Array.from(referrerTotals.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([referrer, count]) => ({ referrer, count })),
+        };
+    });
+}
+
+function miniBarColor(index: number, total: number) {
+    if (total <= 1) return '#58CBFF';
+
+    const progress = index / Math.max(total - 1, 1);
+
+    if (progress >= 0.82) {
+        return index % 2 === 0 ? '#7BE1FF' : '#5CCEFF';
+    }
+
+    if (progress >= 0.56) {
+        return index % 2 === 0 ? '#5CCEFF' : '#3CB7F6';
+    }
+
+    return index % 2 === 0 ? '#2896D8' : '#34A7E8';
+}
+
+type MiniBarShapeProps = {
+    fill?: string;
+    height?: number;
+    width?: number;
+    x?: number;
+    y?: number;
+};
+
+function MiniBarShape({
+    fill = OVERVIEW_PRIMARY_ACCENT,
+    height = 0,
+    width = 0,
+    x = 0,
+    y = 0,
+}: MiniBarShapeProps) {
+    if (width <= 0 || height <= 0) return null;
+
+    const adjustedHeight = Math.max(height, 4);
+    const adjustedY = y - (adjustedHeight - height);
+    const visualWidth = Math.max(Math.min(width - 2, 12), 8);
+    const visualX = x + (width - visualWidth) / 2;
+    const radius = Math.min(visualWidth / 2, 6);
+    const highlightHeight = Math.max(Math.min(adjustedHeight * 0.42, adjustedHeight), 4);
+
+    return (
+        <g>
+            <rect
+                x={visualX}
+                y={adjustedY}
+                width={visualWidth}
+                height={adjustedHeight}
+                rx={radius}
+                fill={fill}
+                opacity={0.96}
+            />
+            <rect
+                x={visualX}
+                y={adjustedY}
+                width={visualWidth}
+                height={highlightHeight}
+                rx={radius}
+                fill="#ffffff"
+                opacity={0.08}
+            />
+        </g>
+    );
 }
 
 function diffDirection(current: number, previous: number, invert = false) {
@@ -1596,12 +1736,7 @@ function MetricCard({
     const [hoverLabelPosition, setHoverLabelPosition] = useState<{ left: number; top: number } | null>(null);
     const miniChartHoverRef = useRef<HTMLDivElement | null>(null);
     const miniSeries = useMemo(
-        () =>
-            data.map((point) => ({
-                current: getMetricSeriesValue(point, metric.key),
-                previous: getMetricSeriesValue(point, `prev_${metric.key}`),
-                date: String(point.date),
-            })),
+        () => aggregateMetricMiniSeries(data, metric.key),
         [data, metric.key],
     );
     const hoveredPoint = currentIndex === null ? null : miniSeries[currentIndex] || null;
@@ -1616,8 +1751,8 @@ function MetricCard({
     const TrendIcon = trendChange !== null && trendChange < 0 ? ChevronDown : ChevronUp;
     const hoverDateLabel = hoveredPoint ? formatDateLabel(hoveredPoint.date, interval) : null;
     const useTallMiniBars = TALL_MINI_BAR_METRICS.has(metric.key);
-    const miniChartFrameClass = useTallMiniBars ? 'h-[64px] sm:h-[72px]' : 'h-[36px] sm:h-[40px]';
-    const miniChartBarClass = useTallMiniBars ? 'h-[60px] sm:h-[68px]' : 'h-[30px]';
+    const miniChartFrameClass = useTallMiniBars ? 'h-[76px] sm:h-[84px]' : 'h-[48px] sm:h-[54px]';
+    const miniChartBarClass = useTallMiniBars ? 'h-[70px] sm:h-[78px]' : 'h-[42px] sm:h-[46px]';
     const trendBadgeStyle =
         trendChange === null
             ? {
@@ -1776,11 +1911,20 @@ function MetricCard({
                         ) : null}
                         <div className={`pointer-events-none absolute inset-x-0 bottom-[1px] ${miniChartBarClass}`}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={miniSeries}>
+                                <BarChart data={miniSeries} barCategoryGap="36%" barGap={0}>
                                     <Tooltip content={() => null} cursor={false} />
-                                    <Bar dataKey="current" radius={[1.5, 1.5, 0, 0]} fill={OVERVIEW_PRIMARY_ACCENT} fillOpacity={1} isAnimationActive={false}>
+                                    <Bar
+                                        dataKey="current"
+                                        fill={OVERVIEW_PRIMARY_ACCENT}
+                                        fillOpacity={1}
+                                        isAnimationActive={false}
+                                        shape={<MiniBarShape />}
+                                        minPointSize={5}
+                                        maxBarSize={12}
+                                        barSize={10}
+                                    >
                                         {miniSeries.map((_, index) => (
-                                            <Cell key={`mini-bar-${metric.key}-${index}`} fill={alternatingBarColor(index)} />
+                                            <Cell key={`mini-bar-${metric.key}-${index}`} fill={miniBarColor(index, miniSeries.length)} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -1831,6 +1975,10 @@ function LiveMetricTile({
 }) {
     const hasBreakdown = hasLiveBreakdown(data);
     const topReferrers = hasBreakdown ? data.referrers.slice(0, 2) : [];
+    const liveMiniSeries = useMemo(
+        () => (hasBreakdown ? aggregateLiveMiniSeries(data.minuteCounts) : []),
+        [data, hasBreakdown],
+    );
     const liveLabel = hasBreakdown ? 'Sessions last 30 min' : 'Active users right now';
 
     return (
@@ -1862,12 +2010,12 @@ function LiveMetricTile({
                     {hasBreakdown ? (
                         <div className="h-[56px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={data.minuteCounts}>
+                                <BarChart data={liveMiniSeries} barCategoryGap="40%" barGap={0}>
                                     <Tooltip
                                         cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) return null;
-                                            const row = payload[0]?.payload as LiveResponse['minuteCounts'][number];
+                                            const row = payload[0]?.payload as LiveMiniBarPoint;
                                             return (
                                                 <div className="rounded-lg border border-white/[0.08] bg-[#0f141a]/95 px-3 py-2 text-xs shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md">
                                                     <div className="mb-1 text-zinc-500">{row.time}</div>
@@ -1889,9 +2037,17 @@ function LiveMetricTile({
                                             );
                                         }}
                                     />
-                                    <Bar dataKey="sessionCount" fill={OVERVIEW_PRIMARY_ACCENT} radius={[2, 2, 0, 0]} isAnimationActive={false}>
-                                        {data.minuteCounts.map((_, index) => (
-                                            <Cell key={`live-bar-${index}`} fill={alternatingBarColor(index)} />
+                                    <Bar
+                                        dataKey="sessionCount"
+                                        fill={OVERVIEW_PRIMARY_ACCENT}
+                                        isAnimationActive={false}
+                                        shape={<MiniBarShape />}
+                                        minPointSize={5}
+                                        maxBarSize={12}
+                                        barSize={10}
+                                    >
+                                        {liveMiniSeries.map((_, index) => (
+                                            <Cell key={`live-bar-${index}`} fill={miniBarColor(index, liveMiniSeries.length)} />
                                         ))}
                                     </Bar>
                                 </BarChart>

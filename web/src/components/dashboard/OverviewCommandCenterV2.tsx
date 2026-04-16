@@ -6,10 +6,12 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  BarChart3,
   Bot,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Eye,
   ExternalLink,
   FileDown,
   Radio,
@@ -18,6 +20,7 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
+  Users,
 } from 'lucide-react';
 import {
   CartesianGrid,
@@ -292,21 +295,6 @@ function timeAgo(value?: string | Date | null) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function buildLinePoints(values: number[], width: number, height: number, padding = 6) {
-  if (values.length === 0) return '';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-
-  return values
-    .map((value, index) => {
-      const x = padding + (index * (width - padding * 2)) / Math.max(values.length - 1, 1);
-      const y = height - padding - ((value - min) / range) * (height - padding * 2);
-      return `${x},${y}`;
-    })
-    .join(' ');
-}
-
 function toneStyles(tone: MetricTone) {
   if (tone === 'red') {
     return {
@@ -314,6 +302,10 @@ function toneStyles(tone: MetricTone) {
       border: 'border-red-500/16',
       glow: 'bg-red-500/10',
       line: '#f87171',
+      chip: 'border-red-500/18 bg-red-500/10 text-red-200',
+      iconBg: 'border-red-500/16 bg-red-500/10',
+      barGradient: 'linear-gradient(180deg,#fda4af 0%,#f87171 42%,#7f1d1d 100%)',
+      barShadow: '0 0 18px rgba(248,113,113,0.18)',
     };
   }
   if (tone === 'amber') {
@@ -322,6 +314,10 @@ function toneStyles(tone: MetricTone) {
       border: 'border-amber-500/16',
       glow: 'bg-amber-500/10',
       line: '#fbbf24',
+      chip: 'border-amber-500/18 bg-amber-500/10 text-amber-200',
+      iconBg: 'border-amber-500/16 bg-amber-500/10',
+      barGradient: 'linear-gradient(180deg,#fde68a 0%,#fbbf24 42%,#854d0e 100%)',
+      barShadow: '0 0 18px rgba(251,191,36,0.18)',
     };
   }
   if (tone === 'cyan') {
@@ -330,6 +326,10 @@ function toneStyles(tone: MetricTone) {
       border: 'border-cyan-500/16',
       glow: 'bg-cyan-500/10',
       line: '#22d3ee',
+      chip: 'border-cyan-500/18 bg-cyan-500/10 text-cyan-200',
+      iconBg: 'border-cyan-500/16 bg-cyan-500/10',
+      barGradient: 'linear-gradient(180deg,#67e8f9 0%,#22d3ee 42%,#155e75 100%)',
+      barShadow: '0 0 18px rgba(34,211,238,0.18)',
     };
   }
   return {
@@ -337,7 +337,35 @@ function toneStyles(tone: MetricTone) {
     border: 'border-emerald-500/16',
     glow: 'bg-emerald-500/10',
     line: '#34d399',
+    chip: 'border-emerald-500/18 bg-emerald-500/10 text-emerald-200',
+    iconBg: 'border-emerald-500/16 bg-emerald-500/10',
+    barGradient: 'linear-gradient(180deg,#86efac 0%,#34d399 42%,#065f46 100%)',
+    barShadow: '0 0 18px rgba(52,211,153,0.18)',
   };
+}
+
+function buildMetricBars(values: number[]) {
+  const fallback = [24, 18, 30, 28, 36, 32, 44, 40, 52, 48, 58, 62];
+  const source = values.length > 1 ? values : fallback;
+  const min = Math.min(...source);
+  const max = Math.max(...source);
+  const range = max - min || 1;
+
+  return source.map((value, index) => {
+    const normalized = 22 + ((value - min) / range) * 54;
+    return {
+      height: `${Math.round(normalized)}%`,
+      opacity: index < Math.max(source.length - 4, 1) ? 0.58 : 1,
+    };
+  });
+}
+
+function renderMetricCardIcon(label: string, className: string) {
+  if (label === 'Users') return <Users className={className} />;
+  if (label === 'Page Views') return <Eye className={className} />;
+  if (label === 'Search Clicks') return <Search className={className} />;
+  if (label === 'Avg Position') return <BarChart3 className={className} />;
+  return <Activity className={className} />;
 }
 
 /** Boost tips shown on MetricCard hover tooltip */
@@ -349,12 +377,24 @@ const METRIC_BOOST_TIPS: Record<string, string> = {
 };
 
 function Sparkline({ values, tone }: { values: number[]; tone: MetricTone }) {
-  const points = buildLinePoints(values.length ? values : [0, 0], 220, 50);
   const style = toneStyles(tone);
+  const bars = buildMetricBars(values);
+
   return (
-    <svg aria-hidden="true" className="h-12 w-full" viewBox="0 0 220 50" preserveAspectRatio="none">
-      <polyline fill="none" points={points} stroke={style.line} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-    </svg>
+    <div className="flex h-14 items-end gap-1.5">
+      {bars.map((bar, index) => (
+        <span
+          key={`${tone}-${index}`}
+          className="block h-full flex-1 rounded-[5px]"
+          style={{
+            height: bar.height,
+            opacity: bar.opacity,
+            background: style.barGradient,
+            boxShadow: style.barShadow,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -419,28 +459,34 @@ function MetricCard({
 
   return (
     <div
-      className="dashboard-hover-item group relative h-full cursor-pointer overflow-hidden border border-white/[0.08] bg-[#020508] shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
+      className="dashboard-hover-item group relative h-full cursor-pointer overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,20,0.98),rgba(4,8,12,0.98))] shadow-[0_22px_54px_rgba(0,0,0,0.38)]"
       onClick={() => setFlipped((f) => !f)}
     >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(52,211,153,0.06),transparent_30%)]" />
+
       {/* ─── Static header: always visible ─── */}
-      <div className="flex items-start justify-between gap-4 px-5 pt-5">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</div>
-        <div className={`border ${style.border} ${style.glow} p-2`}>
-          <Activity className={`h-4 w-4 ${style.accent}`} />
+      <div className="relative z-10 flex items-start justify-between gap-4 px-5 pt-5">
+        <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${style.iconBg}`}>
+            {renderMetricCardIcon(label, `h-4 w-4 ${style.accent}`)}
+          </div>
+          <span className="truncate">{label}</span>
+        </div>
+        <div className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${delta !== undefined ? style.chip : 'border-white/[0.08] bg-white/[0.04] text-zinc-400'}`}>
+          {delta !== undefined ? (
+            <>
+              {positive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              <span>{formatSigned(delta, invert)}</span>
+            </>
+          ) : (
+            <span>No comparison</span>
+          )}
         </div>
       </div>
 
       {/* ─── Front face: normal card content (fades out on hover/tap) ─── */}
-      <div className={`px-5 pb-5 pt-2 transition-opacity duration-300 [@media(hover:hover)]:group-hover:opacity-0 ${flipped ? 'opacity-0' : 'opacity-100'}`}>
-        <div className="flex items-end gap-3">
-          <div className="font-mono text-[30px] font-semibold leading-none text-white">{value}</div>
-          {delta !== undefined && (
-            <div className={`mb-1 inline-flex items-center gap-1 text-xs font-medium ${positive ? 'text-emerald-300' : 'text-red-300'}`}>
-              {positive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-              <span>{formatSigned(delta, invert)}</span>
-            </div>
-          )}
-        </div>
+      <div className={`relative z-10 px-5 pb-5 pt-3 transition-opacity duration-300 [@media(hover:hover)]:group-hover:opacity-0 ${flipped ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="font-mono text-[32px] font-semibold leading-none tracking-tight text-white">{value}</div>
         <div className="mt-4">
           <Sparkline values={values} tone={tone} />
         </div>
@@ -448,7 +494,7 @@ function MetricCard({
       </div>
 
       {/* ─── Back face: detail stats (crossfades in on hover/tap) ─── */}
-      <div className={`absolute inset-x-0 bottom-0 top-[52px] flex flex-col justify-between px-5 pb-5 transition-opacity duration-300 [@media(hover:hover)]:group-hover:opacity-100 ${flipped ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute inset-x-0 bottom-0 top-[60px] z-10 flex flex-col justify-between px-5 pb-5 transition-opacity duration-300 [@media(hover:hover)]:group-hover:opacity-100 ${flipped ? 'opacity-100' : 'opacity-0'}`}>
         <div>
           <div className="flex items-end gap-3">
             <div className="font-mono text-[26px] font-semibold tracking-tight text-white">{value}</div>

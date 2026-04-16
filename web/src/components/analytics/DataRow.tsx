@@ -15,6 +15,14 @@ interface DataRowProps {
   barColor?: string;     // custom bar color (hex/rgb), overrides default emerald
 }
 
+function withAlpha(color: string, alpha: string) {
+  if (!color.startsWith('#')) return color;
+  const normalized = color.length === 4
+    ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+    : color;
+  return `${normalized}${alpha}`;
+}
+
 export default function DataRow({
   label,
   value,
@@ -27,6 +35,7 @@ export default function DataRow({
   barColor,
 }: DataRowProps) {
   const ratio = maxPercentage > 0 ? 100 / maxPercentage : 1;
+  const resolvedColor = barColor || '#34d399';
 
   return (
     <div
@@ -38,7 +47,8 @@ export default function DataRow({
         className="data-bar"
         style={{
           width: `${percentage * ratio}%`,
-          ...(barColor ? { background: `${barColor}20` } : {}),
+          background: `linear-gradient(90deg, ${withAlpha(resolvedColor, '38')} 0%, ${withAlpha(resolvedColor, '20')} 68%, rgba(255,255,255,0.02) 100%)`,
+          boxShadow: `inset 0 0 0 1px ${withAlpha(resolvedColor, '18')}`,
         }}
       />
 
@@ -46,7 +56,7 @@ export default function DataRow({
       <div className="relative z-10 flex justify-between items-center text-xs w-full gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {barColor && !icon && (
-            <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ backgroundColor: barColor }} />
+            <span className="w-2 h-2 rounded-[2px] flex-shrink-0 shadow-[0_0_10px_currentColor]" style={{ backgroundColor: barColor, color: barColor }} />
           )}
           {icon}
           <span className="truncate text-zinc-200">{label}</span>

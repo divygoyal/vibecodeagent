@@ -228,6 +228,7 @@ type SourceTab = 'referrers' | 'channels' | 'sources';
 type PageTab = 'pages' | 'entries';
 type TechnologyTab = 'browsers' | 'devices' | 'os';
 type GeographyTab = 'countries' | 'regions' | 'cities' | 'languages';
+type OverviewTone = 'emerald' | 'teal' | 'amber' | 'violet' | 'red';
 
 const RANGE_LABELS: Record<string, string> = {
     today: 'Today',
@@ -323,6 +324,77 @@ function getItemColor(name: string, index: number, colorMap?: Record<string, str
 
 function getMaxPercentage(items: Array<{ percentage: number }>): number {
     return items.reduce((max, item) => Math.max(max, item.percentage), 0) || 100;
+}
+
+function sharedToneStyles(tone: OverviewTone) {
+    if (tone === 'red') {
+        return {
+            accent: 'text-red-300',
+            chip: 'border-red-500/18 bg-red-500/10 text-red-200',
+            iconWrap: 'border-red-500/16 bg-red-500/10',
+            barGradient: 'linear-gradient(180deg,#fda4af 0%,#f87171 42%,#7f1d1d 100%)',
+            barShadow: '0 0 18px rgba(248,113,113,0.18)',
+        };
+    }
+    if (tone === 'amber') {
+        return {
+            accent: 'text-amber-300',
+            chip: 'border-amber-500/18 bg-amber-500/10 text-amber-200',
+            iconWrap: 'border-amber-500/16 bg-amber-500/10',
+            barGradient: 'linear-gradient(180deg,#fde68a 0%,#fbbf24 42%,#854d0e 100%)',
+            barShadow: '0 0 18px rgba(251,191,36,0.18)',
+        };
+    }
+    if (tone === 'violet') {
+        return {
+            accent: 'text-violet-300',
+            chip: 'border-violet-500/18 bg-violet-500/10 text-violet-200',
+            iconWrap: 'border-violet-500/16 bg-violet-500/10',
+            barGradient: 'linear-gradient(180deg,#c4b5fd 0%,#8b5cf6 42%,#4c1d95 100%)',
+            barShadow: '0 0 18px rgba(139,92,246,0.18)',
+        };
+    }
+    if (tone === 'teal') {
+        return {
+            accent: 'text-cyan-300',
+            chip: 'border-cyan-500/18 bg-cyan-500/10 text-cyan-200',
+            iconWrap: 'border-cyan-500/16 bg-cyan-500/10',
+            barGradient: 'linear-gradient(180deg,#67e8f9 0%,#22d3ee 42%,#155e75 100%)',
+            barShadow: '0 0 18px rgba(34,211,238,0.18)',
+        };
+    }
+
+    return {
+        accent: 'text-emerald-300',
+        chip: 'border-emerald-500/18 bg-emerald-500/10 text-emerald-200',
+        iconWrap: 'border-emerald-500/16 bg-emerald-500/10',
+        barGradient: 'linear-gradient(180deg,#86efac 0%,#34d399 42%,#065f46 100%)',
+        barShadow: '0 0 18px rgba(52,211,153,0.18)',
+    };
+}
+
+function inferOverviewTone(label: string): OverviewTone {
+    if (label === 'Users' || label === 'Clicks') return 'emerald';
+    if (label === 'Sessions' || label === 'Page Views' || label === 'Impressions') return 'teal';
+    if (label === 'Bounce Rate' || label === 'Avg. Position') return 'amber';
+    if (label === 'Avg. CTR') return 'violet';
+    return 'teal';
+}
+
+function buildMetricBars(values: number[]) {
+    const fallback = [22, 18, 28, 30, 34, 26, 38, 44, 40, 52, 48, 58];
+    const source = values.length > 1 ? values : fallback;
+    const min = Math.min(...source);
+    const max = Math.max(...source);
+    const range = max - min || 1;
+
+    return source.map((value, index) => {
+        const normalized = 20 + ((value - min) / range) * 56;
+        return {
+            height: `${Math.round(normalized)}%`,
+            opacity: index < Math.max(source.length - 4, 1) ? 0.58 : 1,
+        };
+    });
 }
 
 function getReferrerHref(referrer: string): string | undefined {
@@ -437,22 +509,46 @@ function TrendTooltip({
 
 function ChangeBadge({ value, inverse = false, suffix = '%' }: { value?: number; inverse?: boolean; suffix?: string }) {
     if (value === undefined || value === null) {
-        return <span className="text-[11px] text-zinc-500">No comparison</span>;
+        return <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold text-zinc-400">No comparison</span>;
     }
 
     if (value === 0) {
-        return <span className="text-[11px] text-zinc-500">Flat vs previous</span>;
+        return <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold text-zinc-400">Flat vs previous</span>;
     }
 
     const positive = inverse ? value < 0 : value > 0;
     const Icon = positive ? ArrowUpRight : ArrowDownRight;
-    const tone = positive ? 'text-emerald-400' : 'text-rose-400';
+    const tone = positive
+        ? 'border-emerald-500/18 bg-emerald-500/10 text-emerald-200'
+        : 'border-rose-500/18 bg-rose-500/10 text-rose-200';
 
     return (
-        <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${tone}`}>
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>
             <Icon className="h-3.5 w-3.5" />
-            {Math.abs(value).toFixed(1)}{suffix} vs previous
+            {Math.abs(value).toFixed(1)}{suffix}
         </span>
+    );
+}
+
+function OverviewBars({ values, tone }: { values?: number[]; tone: OverviewTone }) {
+    const style = sharedToneStyles(tone);
+    const bars = buildMetricBars(values || []);
+
+    return (
+        <div className="flex h-14 items-end gap-1.5">
+            {bars.map((bar, index) => (
+                <span
+                    key={`${tone}-${index}`}
+                    className="block h-full flex-1 rounded-[5px]"
+                    style={{
+                        height: bar.height,
+                        opacity: bar.opacity,
+                        background: style.barGradient,
+                        boxShadow: style.barShadow,
+                    }}
+                />
+            ))}
+        </div>
     );
 }
 
@@ -464,6 +560,8 @@ function OverviewCard({
     change,
     changeInverse = false,
     changeSuffix,
+    values,
+    tone,
 }: {
     label: string;
     value: string;
@@ -472,21 +570,30 @@ function OverviewCard({
     change?: number;
     changeInverse?: boolean;
     changeSuffix?: string;
+    values?: number[];
+    tone?: OverviewTone;
 }) {
+    const resolvedTone = tone || inferOverviewTone(label);
+    const style = sharedToneStyles(resolvedTone);
+
     return (
-        <div className="premium-card rounded-2xl p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</p>
-                    <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{value}</p>
+        <div className="premium-card relative overflow-hidden rounded-[24px] p-5">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.08),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(52,211,153,0.06),transparent_28%)]" />
+            <div className="relative">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                            <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${style.iconWrap} ${style.accent}`}>
+                                {icon}
+                            </div>
+                            <span className="truncate">{label}</span>
+                        </div>
+                        <p className="mt-3 text-[2rem] font-semibold tracking-[-0.05em] text-white">{value}</p>
+                    </div>
+                    {change !== undefined ? <ChangeBadge value={change} inverse={changeInverse} suffix={changeSuffix} /> : null}
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300">
-                    {icon}
-                </div>
-            </div>
-            <div className="space-y-2">
-                {change !== undefined ? <ChangeBadge value={change} inverse={changeInverse} suffix={changeSuffix} /> : null}
-                <p className="text-xs text-zinc-500">{helper}</p>
+                <OverviewBars values={values} tone={resolvedTone} />
+                <p className="mt-3 text-xs leading-6 text-zinc-500">{helper}</p>
             </div>
         </div>
     );
@@ -504,7 +611,7 @@ function SignalCard({
     icon: ReactNode;
 }) {
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+        <div className="rounded-[22px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,16,22,0.95),rgba(5,9,13,0.98))] p-4 shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
             <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}</span>
                 <span className="text-zinc-400">{icon}</span>
@@ -548,7 +655,7 @@ function PanelFrame({
                                         onClick={() => onTabChange(tab.value)}
                                         className={`rounded-lg px-3 py-1.5 text-sm transition ${
                                             activeTab === tab.value
-                                                ? 'bg-white/[0.08] font-semibold text-white'
+                                                ? 'border border-cyan-500/18 bg-cyan-500/10 font-semibold text-cyan-100'
                                                 : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300'
                                         }`}
                                     >
@@ -674,6 +781,8 @@ export default function SharedDashboardClient({
                 helper: `${formatNumber(data.kpis.newUsers)} new visitors`,
                 change: data.kpis.changeUsers,
                 icon: <Users className="h-5 w-5" />,
+                values: data.trafficTrend.map((point) => point.users).slice(-12),
+                tone: 'emerald' as const,
             },
             {
                 label: 'Sessions',
@@ -681,6 +790,8 @@ export default function SharedDashboardClient({
                 helper: `${formatNumber(data.kpis.returningUsers)} returning visitors`,
                 change: data.kpis.changeSessions,
                 icon: <Activity className="h-5 w-5" />,
+                values: data.trafficTrend.map((point) => point.sessions).slice(-12),
+                tone: 'teal' as const,
             },
             {
                 label: 'Page Views',
@@ -688,6 +799,8 @@ export default function SharedDashboardClient({
                 helper: `${data.kpis.pagesPerSession.toFixed(1)} pages per session`,
                 change: data.kpis.changePageViews,
                 icon: <Eye className="h-5 w-5" />,
+                values: data.trafficTrend.map((point) => point.views).slice(-12),
+                tone: 'teal' as const,
             },
             {
                 label: 'Bounce Rate',
@@ -697,18 +810,23 @@ export default function SharedDashboardClient({
                 changeInverse: true,
                 changeSuffix: ' pts',
                 icon: <ArrowDownRight className="h-5 w-5" />,
+                values: data.trafficTrend.map((point) => point.bounceRate).slice(-12),
+                tone: 'amber' as const,
             },
             {
                 label: 'Avg. Session',
                 value: formatDuration(data.kpis.avgSessionDuration),
                 helper: 'Average visit duration',
                 icon: <Clock3 className="h-5 w-5" />,
+                tone: 'violet' as const,
             },
             {
                 label: 'Pages / Session',
                 value: data.kpis.pagesPerSession.toFixed(1),
                 helper: 'Average content depth',
                 icon: <FileText className="h-5 w-5" />,
+                values: data.trafficTrend.map((point) => point.views / Math.max(point.sessions || 1, 1)).slice(-12),
+                tone: 'violet' as const,
             },
         ];
     }, [data]);
@@ -1050,6 +1168,8 @@ export default function SharedDashboardClient({
                             change={card.change}
                             changeInverse={card.changeInverse}
                             changeSuffix={card.changeSuffix}
+                            values={card.values}
+                            tone={card.tone}
                         />
                     ))}
                 </section>
@@ -1299,6 +1419,8 @@ export default function SharedDashboardClient({
                             helper="Organic search clicks"
                             change={data.seo.kpis.changeClicks}
                             icon={<Activity className="h-5 w-5" />}
+                            values={data.seo.queries.slice(0, 12).map((query) => query.clicks)}
+                            tone="emerald"
                         />
                         <OverviewCard
                             label="Impressions"
@@ -1306,6 +1428,8 @@ export default function SharedDashboardClient({
                             helper="Search result appearances"
                             change={data.seo.kpis.changeImpressions}
                             icon={<Eye className="h-5 w-5" />}
+                            values={data.seo.queries.slice(0, 12).map((query) => query.impressions)}
+                            tone="teal"
                         />
                         <OverviewCard
                             label="Avg. CTR"
@@ -1313,6 +1437,8 @@ export default function SharedDashboardClient({
                             helper="Click-through rate"
                             change={data.seo.kpis.changeCTR}
                             icon={<ArrowUpRight className="h-5 w-5" />}
+                            values={data.seo.queries.slice(0, 12).map((query) => query.ctr)}
+                            tone="violet"
                         />
                         <OverviewCard
                             label="Avg. Position"
@@ -1322,6 +1448,8 @@ export default function SharedDashboardClient({
                             changeInverse
                             changeSuffix=""
                             icon={<BarChart3 className="h-5 w-5" />}
+                            values={data.seo.queries.slice(0, 12).map((query) => query.position)}
+                            tone="amber"
                         />
                     </div>
 

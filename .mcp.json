@@ -1,8 +1,24 @@
 {
   "mcpServers": {
+    "brevo": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.brevo.com/v1/brevo/mcp",
+        "--header",
+        "Authorization: Bearer ${BREVO_MCP_TOKEN_VIBECODEAGENT}"
+      ],
+      "env": {
+        "BREVO_MCP_TOKEN_VIBECODEAGENT": "${BREVO_MCP_TOKEN_VIBECODEAGENT}"
+      }
+    },
     "dodopayments": {
       "command": "npx",
-      "args": ["-y", "dodopayments-mcp@latest"],
+      "args": [
+        "-y",
+        "dodopayments-mcp@latest"
+      ],
       "env": {
         "DODO_PAYMENTS_API_KEY": "${DODO_PAYMENTS_API_KEY}",
         "DODO_PAYMENTS_WEBHOOK_KEY": "${DODO_PAYMENTS_WEBHOOK_KEY}",

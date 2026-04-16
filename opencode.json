@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "brevo": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "mcp-remote",
+        "https://mcp.brevo.com/v1/brevo/mcp",
+        "--header",
+        "Authorization: Bearer {env:BREVO_MCP_TOKEN_VIBECODEAGENT}"
+      ],
+      "enabled": true,
+      "timeout": 15000
+    }
+  }
+}

@@ -5,8 +5,10 @@ import Link from 'next/link';
 import {
   Activity,
   ArrowRight,
+  BarChart3,
   Bot,
   ChevronRight,
+  Eye,
   ExternalLink,
   Radio,
   RefreshCw,
@@ -15,6 +17,7 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
+  Users,
 } from 'lucide-react';
 import {
   CartesianGrid,
@@ -261,21 +264,6 @@ function timeAgo(value?: string | Date | null) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function buildLinePoints(values: number[], width: number, height: number, padding = 6) {
-  if (values.length === 0) return '';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-
-  return values
-    .map((value, index) => {
-      const x = padding + (index * (width - padding * 2)) / Math.max(values.length - 1, 1);
-      const y = height - padding - ((value - min) / range) * (height - padding * 2);
-      return `${x},${y}`;
-    })
-    .join(' ');
-}
-
 function toneClasses(tone: MetricTone) {
   if (tone === 'red') {
     return {
@@ -284,6 +272,9 @@ function toneClasses(tone: MetricTone) {
       glow: 'bg-red-500/[0.08]',
       fill: '#f87171',
       chip: 'border-red-500/18 bg-red-500/[0.08] text-red-200',
+      iconBg: 'border-red-500/16 bg-red-500/[0.08]',
+      barGradient: 'linear-gradient(180deg,#fda4af 0%,#f87171 42%,#7f1d1d 100%)',
+      barShadow: '0 0 18px rgba(248,113,113,0.18)',
     };
   }
   if (tone === 'amber') {
@@ -293,6 +284,9 @@ function toneClasses(tone: MetricTone) {
       glow: 'bg-amber-500/[0.08]',
       fill: '#fbbf24',
       chip: 'border-amber-500/18 bg-amber-500/[0.08] text-amber-200',
+      iconBg: 'border-amber-500/16 bg-amber-500/[0.08]',
+      barGradient: 'linear-gradient(180deg,#fde68a 0%,#fbbf24 42%,#854d0e 100%)',
+      barShadow: '0 0 18px rgba(251,191,36,0.18)',
     };
   }
   if (tone === 'cyan') {
@@ -302,6 +296,9 @@ function toneClasses(tone: MetricTone) {
       glow: 'bg-cyan-500/[0.08]',
       fill: '#22d3ee',
       chip: 'border-cyan-500/18 bg-cyan-500/[0.08] text-cyan-200',
+      iconBg: 'border-cyan-500/16 bg-cyan-500/[0.08]',
+      barGradient: 'linear-gradient(180deg,#67e8f9 0%,#22d3ee 42%,#155e75 100%)',
+      barShadow: '0 0 18px rgba(34,211,238,0.18)',
     };
   }
   return {
@@ -310,7 +307,34 @@ function toneClasses(tone: MetricTone) {
     glow: 'bg-emerald-500/[0.08]',
     fill: '#34d399',
     chip: 'border-emerald-500/18 bg-emerald-500/[0.08] text-emerald-200',
+    iconBg: 'border-emerald-500/16 bg-emerald-500/[0.08]',
+    barGradient: 'linear-gradient(180deg,#86efac 0%,#34d399 42%,#065f46 100%)',
+    barShadow: '0 0 18px rgba(52,211,153,0.18)',
   };
+}
+
+function buildMetricBars(values: number[]) {
+  const fallback = [24, 18, 30, 28, 36, 32, 44, 40, 52, 48, 58, 62];
+  const source = values.length > 1 ? values : fallback;
+  const min = Math.min(...source);
+  const max = Math.max(...source);
+  const range = max - min || 1;
+
+  return source.map((value, index) => {
+    const normalized = 22 + ((value - min) / range) * 54;
+    return {
+      height: `${Math.round(normalized)}%`,
+      opacity: index < Math.max(source.length - 4, 1) ? 0.58 : 1,
+    };
+  });
+}
+
+function renderMetricCardIcon(label: string, className: string) {
+  if (label === 'Users') return <Users className={className} />;
+  if (label === 'Page Views') return <Eye className={className} />;
+  if (label === 'Search Clicks') return <Search className={className} />;
+  if (label === 'Avg Position') return <BarChart3 className={className} />;
+  return <Activity className={className} />;
 }
 
 function getTimelineIcon(key: string, tone: MetricTone) {
@@ -324,18 +348,23 @@ function getTimelineIcon(key: string, tone: MetricTone) {
 
 function MiniSparkline({ values, tone }: { values: number[]; tone: MetricTone }) {
   const style = toneClasses(tone);
-  const points = buildLinePoints(values.length ? values : [0, 0], 200, 44);
+  const bars = buildMetricBars(values);
+
   return (
-    <svg aria-hidden="true" className="h-11 w-full" viewBox="0 0 200 44" preserveAspectRatio="none">
-      <polyline
-        fill="none"
-        points={points}
-        stroke={style.fill}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2.5"
-      />
-    </svg>
+    <div className="flex h-12 items-end gap-1.5">
+      {bars.map((bar, index) => (
+        <span
+          key={`${tone}-${index}`}
+          className="block h-full flex-1 rounded-[5px]"
+          style={{
+            height: bar.height,
+            opacity: bar.opacity,
+            background: style.barGradient,
+            boxShadow: style.barShadow,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -344,10 +373,16 @@ function MobileMetricCard({ card }: { card: MetricCardModel }) {
   const positive = card.invert ? (card.delta ?? 0) <= 0 : (card.delta ?? 0) >= 0;
 
   return (
-    <article className="w-[calc(100vw-64px)] shrink-0 snap-start rounded-[24px] border border-white/[0.08] bg-[#05090d] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.28)]">
+    <article className="relative w-[calc(100vw-64px)] shrink-0 snap-start overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,20,0.98),rgba(4,8,12,0.98))] p-4 shadow-[0_20px_44px_rgba(0,0,0,0.34)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.08),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(52,211,153,0.06),transparent_30%)]" />
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{card.label}</div>
-        <div className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${tone.chip}`}>
+        <div className="flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${tone.iconBg}`}>
+            {renderMetricCardIcon(card.label, `h-4 w-4 ${tone.accent}`)}
+          </div>
+          <span className="truncate">{card.label}</span>
+        </div>
+        <div className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${card.delta !== undefined ? tone.chip : 'border-white/[0.08] bg-white/[0.04] text-zinc-400'}`}>
           {card.delta !== undefined ? formatSigned(card.delta, card.invert) : 'Stable'}
         </div>
       </div>
@@ -360,7 +395,7 @@ function MobileMetricCard({ card }: { card: MetricCardModel }) {
           </div>
         )}
       </div>
-      <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+      <div className="mt-4 rounded-2xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-3 py-2">
         <MiniSparkline values={card.values} tone={card.tone} />
       </div>
       <p className="mt-4 text-sm leading-6 text-zinc-400">{card.explanation}</p>
