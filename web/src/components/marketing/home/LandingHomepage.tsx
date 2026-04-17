@@ -404,7 +404,7 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
             </div>
 
             <div className="mt-auto flex w-full flex-col items-center gap-4">
-                <button
+                <GoogleAuthButton
                     className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold transition-all sm:w-auto hover:scale-105 ${
                         isX
                             ? 'bg-[#14C4E1]/15 text-[#7AD9DA] shadow-[0_0_24px_rgba(20,196,225,0.3)] hover:bg-[#14C4E1]/25'
@@ -413,7 +413,7 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
                 >
                     {card.buttonLabel}
                     <span>&rarr;</span>
-                </button>
+                </GoogleAuthButton>
 
                 <div className="flex items-center gap-2 text-[12px] uppercase tracking-[0.15em] text-zinc-500">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
@@ -455,10 +455,10 @@ function SeoReasonCard({ card }: { card: HomepageCompactReason & { kind: 'seo' }
                 </div>
 
                 {'href' in card && 'ctaLabel' in card ? (
-                    <GradientButton href={card.href} newTab>
+                    <GoogleAuthButton className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:w-auto">
                         {card.ctaLabel}
                         <ArrowRight className="h-4 w-4" />
-                    </GradientButton>
+                    </GoogleAuthButton>
                 ) : null}
             </div>
 
