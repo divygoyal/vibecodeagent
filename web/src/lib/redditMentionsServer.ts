@@ -16,11 +16,12 @@ type RedditMentionsResult = {
 
 type JsonRecord = Record<string, unknown>;
 
-const SEARCH_LIMIT = 10;
+const SEARCH_LIMIT = 25;
 const MAX_MENTIONS = 18;
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const SEARCH_TIMEOUT_MS = 20_000;
 const serverCache = new Map<string, { data: RedditMentionsResult; timestamp: number }>();
+const inflightMap = new Map<string, Promise<RedditMentionsResult>>();
 
 function isRecord(value: unknown): value is JsonRecord {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -258,6 +259,12 @@ function pickPostId(item: JsonRecord) {
     );
 }
 
+function extractJsonPayload(raw: string): string | null {
+    const start = raw.search(/[\[{]/);
+    if (start === -1) return null;
+    return raw.slice(start).trim();
+}
+
 function normalizePostCandidate(item: unknown, domain: string): RedditMentionPayload | null {
     const node = unwrapNode(item);
     if (!node) return null;
@@ -269,11 +276,12 @@ function normalizePostCandidate(item: unknown, domain: string): RedditMentionPay
     const outboundUrl = permalink || getString(node.url) || '';
     const externalUrl = getString(node.url);
 
-    const matchesDomain = [title, text, outboundUrl, externalUrl].some((value) =>
-        containsDomain(value, domain)
-    );
+    if (!postId || !title || !outboundUrl) {
+        return null;
+    }
 
-    if (!postId || !title || !outboundUrl || !matchesDomain) {
+    const urlMatches = containsDomain(outboundUrl, domain) || containsDomain(externalUrl, domain);
+    if (!urlMatches && !containsDomain(title, domain) && !containsDomain(text, domain)) {
         return null;
     }
 
@@ -318,32 +326,22 @@ function dedupeMentions(mentions: RedditMentionPayload[]) {
     });
 }
 
-function parseSearchPosts(raw: string, domain: string) {
-    const parsed = JSON.parse(raw) as unknown;
-    const data = getEnvelopeData(parsed);
-    const items = getItemsArray(data);
-    return items
-        .map((item) => normalizePostCandidate(item, domain))
-        .filter((item): item is RedditMentionPayload => Boolean(item));
+function parseSearchPosts(raw: string, domain: string): RedditMentionPayload[] {
+    try {
+        const payload = extractJsonPayload(raw);
+        if (!payload) return [];
+        const parsed = JSON.parse(payload) as unknown;
+        const data = getEnvelopeData(parsed);
+        const items = getItemsArray(data);
+        return items
+            .map((item) => normalizePostCandidate(item, domain))
+            .filter((item): item is RedditMentionPayload => Boolean(item));
+    } catch {
+        return [];
+    }
 }
 
-export async function fetchRedditMentionsForDomain(domainInput: string): Promise<RedditMentionsResult> {
-    const canonicalDomain = canonicalizeDomainInput(domainInput);
-    if (!canonicalDomain) {
-        return {
-            canonicalDomain: '',
-            mentions: [],
-            warning: 'Invalid domain',
-        };
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `rm:v1:${canonicalDomain}:${today}`;
-    const cached = getCached(cacheKey);
-    if (cached) {
-        return cached;
-    }
-
+async function runAndCacheReddit(cacheKey: string, canonicalDomain: string): Promise<RedditMentionsResult> {
     try {
         const searchRaw = await runRdtSearch(canonicalDomain);
         const mentions = parseSearchPosts(searchRaw, canonicalDomain);
@@ -384,7 +382,31 @@ export async function fetchRedditMentionsForDomain(domainInput: string): Promise
         return {
             canonicalDomain,
             mentions: [],
-            error: 'Failed to fetch Reddit mentions',
+            warning: 'Reddit mentions temporarily unavailable — please try again later.',
         };
     }
+}
+
+export async function fetchRedditMentionsForDomain(domainInput: string): Promise<RedditMentionsResult> {
+    const canonicalDomain = canonicalizeDomainInput(domainInput);
+    if (!canonicalDomain) {
+        return {
+            canonicalDomain: '',
+            mentions: [],
+            warning: 'Invalid domain',
+        };
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const cacheKey = `rm:v1:${canonicalDomain}:${today}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const inflight = inflightMap.get(cacheKey);
+    if (inflight) return inflight;
+
+    const promise = runAndCacheReddit(cacheKey, canonicalDomain);
+    inflightMap.set(cacheKey, promise);
+    promise.finally(() => inflightMap.delete(cacheKey));
+    return promise;
 }

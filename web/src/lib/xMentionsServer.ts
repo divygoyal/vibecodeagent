@@ -54,8 +54,10 @@ export type XMentionsResult = {
 };
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
+const MAX_RAW_FETCH = 30;
 const MAX_NORMALIZED_MENTIONS = 18;
 const serverCache = new Map<string, { data: XMentionsResult; timestamp: number }>();
+const inflightMap = new Map<string, Promise<XMentionsResult>>();
 
 async function resolveTwitterBinAsync(): Promise<string> {
     if (process.env.TWITTER_CLI_PATH) return process.env.TWITTER_CLI_PATH;
@@ -113,8 +115,8 @@ async function runTwitterSearch(domain: string): Promise<string> {
         };
 
         exec(
-            `"${bin}" search "${domain}" --json --max ${MAX_NORMALIZED_MENTIONS}`,
-            { env, timeout: 15000, maxBuffer: 1024 * 1024 },
+            `"${bin}" search "${domain}" --json --max ${MAX_RAW_FETCH}`,
+            { env, timeout: 15000, maxBuffer: 2 * 1024 * 1024 },
             (error, stdout, stderr) => {
                 if (error) {
                     const errMsg = (stderr || error.message || '').toLowerCase();
@@ -204,28 +206,19 @@ function normalizeMentions(parsed: TwitterResponse): XMentionPayload[] {
                 authorHandle: t.quotedTweet.author?.screenName || 'unknown',
             } : null,
         }))
-        .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
+        .sort((a, b) => {
+            const now = Date.now();
+            const ageA_h = (now - toTimestamp(a.createdAt)) / 3_600_000;
+            const ageB_h = (now - toTimestamp(b.createdAt)) / 3_600_000;
+            const engA = Math.min(a.likes + a.retweets * 2, 500);
+            const engB = Math.min(b.likes + b.retweets * 2, 500);
+            const scoreA = engA / Math.pow(ageA_h + 2, 1.2);
+            const scoreB = engB / Math.pow(ageB_h + 2, 1.2);
+            return scoreB - scoreA;
+        });
 }
 
-export async function fetchXMentionsForDomain(domainInput: string): Promise<XMentionsResult> {
-    const canonicalDomain = canonicalizeDomainInput(domainInput);
-    if (!canonicalDomain) {
-        return { canonicalDomain: '', mentions: [], warning: 'Invalid domain' };
-    }
-
-    if (!process.env.TWITTER_AUTH_TOKEN || !process.env.TWITTER_CT0) {
-        return {
-            canonicalDomain,
-            mentions: [],
-            warning: 'X integration unavailable — no credentials configured',
-        };
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `xm:v7:x:${canonicalDomain}:${today}`;
-    const cached = getCached(cacheKey);
-    if (cached) return cached;
-
+async function runAndCacheX(cacheKey: string, canonicalDomain: string): Promise<XMentionsResult> {
     try {
         const raw = await runTwitterSearch(canonicalDomain);
         let parsed: TwitterResponse;
@@ -235,7 +228,7 @@ export async function fetchXMentionsForDomain(domainInput: string): Promise<XMen
             return {
                 canonicalDomain,
                 mentions: [],
-                error: 'Failed to parse X response',
+                warning: 'X mentions temporarily unavailable — parse error.',
             };
         }
 
@@ -249,19 +242,12 @@ export async function fetchXMentionsForDomain(domainInput: string): Promise<XMen
                 };
             }
 
-            const result = {
-                canonicalDomain,
-                mentions: [],
-                warning: 'No results from X',
-            };
+            const result = { canonicalDomain, mentions: [], warning: 'No results from X' };
             setCache(cacheKey, result);
             return result;
         }
 
-        const result = {
-            canonicalDomain,
-            mentions: normalizeMentions(parsed),
-        };
+        const result = { canonicalDomain, mentions: normalizeMentions(parsed) };
         setCache(cacheKey, result);
         return result;
     } catch (error) {
@@ -286,7 +272,35 @@ export async function fetchXMentionsForDomain(domainInput: string): Promise<XMen
         return {
             canonicalDomain,
             mentions: [],
-            error: 'Failed to fetch X mentions',
+            warning: 'X mentions temporarily unavailable — please try again later.',
         };
     }
+}
+
+export async function fetchXMentionsForDomain(domainInput: string): Promise<XMentionsResult> {
+    const canonicalDomain = canonicalizeDomainInput(domainInput);
+    if (!canonicalDomain) {
+        return { canonicalDomain: '', mentions: [], warning: 'Invalid domain' };
+    }
+
+    if (!process.env.TWITTER_AUTH_TOKEN || !process.env.TWITTER_CT0) {
+        return {
+            canonicalDomain,
+            mentions: [],
+            warning: 'X integration unavailable — no credentials configured',
+        };
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const cacheKey = `xm:v7:x:${canonicalDomain}:${today}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const inflight = inflightMap.get(cacheKey);
+    if (inflight) return inflight;
+
+    const promise = runAndCacheX(cacheKey, canonicalDomain);
+    inflightMap.set(cacheKey, promise);
+    promise.finally(() => inflightMap.delete(cacheKey));
+    return promise;
 }

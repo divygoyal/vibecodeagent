@@ -21,20 +21,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ mentions: [], warning: 'Invalid domain' }, { status: 200 });
         }
 
-        return NextResponse.json(
-            {
-                canonicalDomain: result.canonicalDomain,
-                mentions: result.mentions,
-                warning: result.warning,
-                error: result.error,
-            },
-            { status: result.error === 'Failed to fetch Reddit mentions' ? 500 : 200 }
-        );
+        return NextResponse.json({
+            canonicalDomain: result.canonicalDomain,
+            mentions: result.mentions,
+            warning: result.warning,
+            error: result.error,
+        });
     } catch (error) {
         console.error('[reddit-mentions] Error:', error);
-        return NextResponse.json(
-            { mentions: [], error: 'Failed to fetch Reddit mentions' },
-            { status: 500 }
-        );
+        return NextResponse.json({ mentions: [], warning: 'Reddit mentions temporarily unavailable.' });
     }
 }
