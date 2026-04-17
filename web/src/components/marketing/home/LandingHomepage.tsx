@@ -22,9 +22,9 @@ import {
 import DeferredEmbed from './DeferredEmbed';
 import HeroGalaxy from './HeroGalaxy';
 import LazyVideoFrame from './LazyVideoFrame';
+import GoogleAuthButton from '@/components/marketing/GoogleAuthButton';
 import {
     HOMEPAGE_CONTENT,
-    MARKETING_SIGN_IN_URL,
     type HomepageCompactReason,
     type HomepageProofCard,
 } from './content';
@@ -601,10 +601,12 @@ export default function LandingHomepage() {
                     </div>
 
                     <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                        <GradientButton href={MARKETING_SIGN_IN_URL}>
+                        <GoogleAuthButton
+                            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:w-auto"
+                        >
                             {HOMEPAGE_CONTENT.hero.primaryCta}
                             <ArrowRight className="h-4 w-4" />
-                        </GradientButton>
+                        </GoogleAuthButton>
                         <GradientButton href={HOMEPAGE_CONTENT.analyticsEmbedUrl} secondary newTab>
                             {HOMEPAGE_CONTENT.hero.secondaryCta}
                             <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
@@ -707,10 +709,12 @@ export default function LandingHomepage() {
                                         {HOMEPAGE_CONTENT.cta.description}
                                     </p>
                                     <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                                        <GradientButton href={MARKETING_SIGN_IN_URL}>
+                                        <GoogleAuthButton
+                                            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:w-auto"
+                                        >
                                             Start free
                                             <ArrowRight className="h-4 w-4" />
-                                        </GradientButton>
+                                        </GoogleAuthButton>
                                         <GradientButton href={HOMEPAGE_CONTENT.analyticsEmbedUrl} secondary newTab>
                                             Open live dashboard
                                             <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />

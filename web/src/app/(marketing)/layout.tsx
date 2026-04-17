@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import { ArrowRight, Menu, X } from 'lucide-react';
 
-import { MARKETING_SIGN_IN_URL } from '@/components/marketing/home/content';
+import GoogleAuthButton from '@/components/marketing/GoogleAuthButton';
 
 function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -74,13 +74,12 @@ function Navbar() {
                             >
                                 Sign In
                             </button>
-                            <Link
-                                href={MARKETING_SIGN_IN_URL}
+                            <GoogleAuthButton
                                 className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#14C4E1]/24 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-4 text-sm font-semibold text-[#031017] transition hover:brightness-105"
                             >
                                 Start Free
                                 <ArrowRight className="h-4 w-4" />
-                            </Link>
+                            </GoogleAuthButton>
                         </>
                     )}
                 </div>
@@ -108,14 +107,13 @@ function Navbar() {
                                 {link.label}
                             </a>
                         ))}
-                        <Link
-                            href={MARKETING_SIGN_IN_URL}
+                        <GoogleAuthButton
                             onClick={() => setMobileOpen(false)}
                             className="mt-2 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full border border-[#14C4E1]/24 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-4 text-sm font-semibold text-[#031017]"
                         >
                             Start Free
                             <ArrowRight className="h-4 w-4" />
-                        </Link>
+                        </GoogleAuthButton>
                     </div>
                 </div>
             ) : null}
