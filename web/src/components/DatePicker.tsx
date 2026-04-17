@@ -243,25 +243,28 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
 /** Mobile-friendly date picker rendered as pill buttons */
 export function MobileDatePicker({ range, setRange }: DatePickerProps) {
     return (
-        <div className="px-3 pt-2 pb-1">
-            <label className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-1 mb-1.5 block">Date Range</label>
-            <div className="flex flex-wrap gap-1.5">
-                {PRESETS.map((item) => {
-                    if ('separator' in item) return null;
-                    return (
-                        <button
-                            key={item.value}
-                            onClick={() => setRange(item.value)}
-                            className={`px-2.5 py-1.5 text-[11px] rounded-lg border transition min-h-[32px] ${
-                                range === item.value
-                                    ? 'text-emerald-400 bg-emerald-500/[0.1] border-emerald-500/[0.15]'
-                                    : 'text-zinc-400 bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]'
-                            }`}
-                        >
-                            {item.label}
-                        </button>
-                    );
-                })}
+        <div className="px-3 pt-2 pb-0.5">
+            <label className="mb-1.5 block px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Date Range</label>
+            <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex w-max gap-1.5 pb-1 pr-2">
+                    {PRESETS.map((item) => {
+                        if ('separator' in item) return null;
+                        return (
+                            <button
+                                key={item.value}
+                                type="button"
+                                onClick={() => setRange(item.value)}
+                                className={`min-h-[32px] shrink-0 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-[11px] transition ${
+                                    range === item.value
+                                        ? 'border-emerald-500/[0.15] bg-emerald-500/[0.1] text-emerald-400'
+                                        : 'border-white/[0.06] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06]'
+                                }`}
+                            >
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
