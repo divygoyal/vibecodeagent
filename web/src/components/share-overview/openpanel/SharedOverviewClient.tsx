@@ -1833,7 +1833,7 @@ function MetricCard({
             aria-pressed={active}
             data-active={active ? 'true' : 'false'}
             className={cx(
-                'group relative min-h-[134px] border-b border-r border-white/[0.08] text-left transition-all duration-200 sm:min-h-[140px] md:min-h-[148px]',
+                'group relative min-h-[134px] overflow-hidden border-b border-r border-white/[0.08] text-left transition-all duration-200 sm:min-h-[140px] md:min-h-[148px]',
                 'bg-[linear-gradient(180deg,rgba(8,14,24,0.98),rgba(4,9,18,0.94))]',
                 'hover:bg-[linear-gradient(180deg,rgba(11,21,36,0.98),rgba(6,12,22,0.96))]',
                 '[&:nth-child(2n)]:border-r-0 md:[&:nth-child(2n)]:border-r md:[&:nth-child(4n)]:border-r-0',
@@ -1869,12 +1869,12 @@ function MetricCard({
                                 {metric.label}
                             </span>
                         </div>
-                        <div className="mt-5 flex items-start justify-between gap-3">
-                            <div className={cx('font-mono font-bold leading-[0.96] tracking-[-0.045em] text-zinc-50', primary ? 'text-[24px] sm:text-[30px]' : 'text-[22px] sm:text-[26px]')}>
+                        <div className="mt-5 flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                            <div className={cx('min-w-0 font-mono font-bold leading-[0.96] tracking-[-0.045em] text-zinc-50', primary ? 'text-[22px] sm:text-[30px]' : 'text-[20px] sm:text-[26px]')}>
                                 {formatMetricValue(displayedCurrent, metric.unit)}
                             </div>
                             <span
-                                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold tracking-[-0.01em] backdrop-blur-sm sm:px-3 sm:py-1.5 sm:text-[11px]"
+                                className="inline-flex max-w-full self-start shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold tracking-[-0.01em] backdrop-blur-sm sm:px-3 sm:py-1.5 sm:text-[11px]"
                                 style={trendBadgeStyle}
                             >
                                 {trendChange !== null ? <TrendIcon className="h-3.5 w-3.5" /> : null}
