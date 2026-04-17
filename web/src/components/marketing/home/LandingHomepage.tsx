@@ -581,14 +581,11 @@ export default function LandingHomepage() {
 
                     <div className="mx-auto mt-8 max-w-[1280px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012))] p-2 shadow-[0_44px_140px_rgba(0,0,0,0.54)] sm:mt-10 sm:rounded-[34px] sm:p-3">
                         <div className="rounded-[28px] border border-white/[0.08] bg-[#030406]">
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-3 sm:px-4">
+                            <div className="flex items-center border-b border-white/[0.06] px-3 py-3 sm:px-4">
                                 <div className="flex items-center gap-2">
                                     <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
                                     <span className="h-2.5 w-2.5 rounded-full bg-white/16" />
                                     <span className="h-2.5 w-2.5 rounded-full bg-[#14C4E1]/60" />
-                                </div>
-                                <div className="min-w-0 max-w-full rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[11px] text-zinc-400 sm:max-w-[320px]">
-                                    <span className="block truncate">{HOMEPAGE_CONTENT.analyticsDisplayUrl}</span>
                                 </div>
                             </div>
 
@@ -596,9 +593,6 @@ export default function LandingHomepage() {
                                 src={HOMEPAGE_CONTENT.analyticsEmbedUrl}
                                 title="TrafficClaw shared analytics dashboard"
                                 mountStrategy="idle"
-                                interactive={false}
-                                openHref={HOMEPAGE_CONTENT.analyticsEmbedUrl}
-                                openLabel="Open live dashboard"
                                 className="h-[300px] min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]"
                             >
                                 <HeroFrameFallback />

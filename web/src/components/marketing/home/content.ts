@@ -1,8 +1,6 @@
 const ANALYTICS_EMBED_URL =
     'https://trafficclaw.com/share/486f673c661417f6f38faf83add644ad?embed=true';
 
-const ANALYTICS_DISPLAY_URL = 'trafficclaw.com/share/486f673c661417f6f38faf83add644ad';
-
 export const MARKETING_SIGN_IN_URL = '/api/auth/signin/google?callbackUrl=%2Fdashboard';
 
 export const HOMEPAGE_CONTENT = {
@@ -12,7 +10,6 @@ export const HOMEPAGE_CONTENT = {
         secondaryCta: 'Open live dashboard',
     },
     analyticsEmbedUrl: ANALYTICS_EMBED_URL,
-    analyticsDisplayUrl: ANALYTICS_DISPLAY_URL,
     reasonsIntro: {
         eyebrow: '5+1 reasons',
         title: 'Why TrafficClaw is the best Google Analytics alternative?',
