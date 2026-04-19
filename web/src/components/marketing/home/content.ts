@@ -6,7 +6,7 @@ export const MARKETING_SIGN_IN_URL = '/api/auth/signin/google?callbackUrl=%2Fdas
 export const HOMEPAGE_CONTENT = {
     hero: {
         title: 'Ditch your Google Analytics',
-        primaryCta: 'Start free',
+        primaryCta: 'Start with Google',
         secondaryCta: 'Open live dashboard',
     },
     analyticsEmbedUrl: ANALYTICS_EMBED_URL,
@@ -92,7 +92,8 @@ export const HOMEPAGE_CONTENT = {
             previewValue: 'SHOWING 4 OF 3',
             chips: ['No-code embed'],
             buttonLabel: 'Get your embed',
-            buttonTheme: 'green'
+            buttonTheme: 'green',
+            href: '/x',
         },
         {
             number: '04',
@@ -107,7 +108,8 @@ export const HOMEPAGE_CONTENT = {
             previewValue: '22D AGO',
             chips: ['No-code embed'],
             buttonLabel: 'Create your feed',
-            buttonTheme: 'orange'
+            buttonTheme: 'orange',
+            href: '/reddit',
         },
         {
             number: '05',

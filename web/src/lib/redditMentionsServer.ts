@@ -1,27 +1,47 @@
 import 'server-only';
 
-import { exec } from 'child_process';
-import { existsSync, readdirSync } from 'fs';
-import { join } from 'path';
-
 import { canonicalizeDomainInput } from '@/lib/xMentionsShared';
 import { type RedditMentionPayload } from '@/lib/redditMentionsShared';
 
-type RedditMentionsResult = {
+export type RedditMentionsResult = {
     canonicalDomain: string;
     mentions: RedditMentionPayload[];
     warning?: string;
     error?: string;
 };
 
+type CacheEntry = {
+    data: RedditMentionsResult;
+    expiresAt: number;
+};
+
 type JsonRecord = Record<string, unknown>;
+
+type RedditSource = 'domain' | 'search';
+
+type SourceOutcome = {
+    source: RedditSource;
+    mentions: RedditMentionPayload[];
+    failed: boolean;
+    timedOut: boolean;
+    blocked: boolean;
+};
 
 const SEARCH_LIMIT = 25;
 const MAX_MENTIONS = 18;
-const CACHE_TTL = 24 * 60 * 60 * 1000;
-const SEARCH_TIMEOUT_MS = 20_000;
-const serverCache = new Map<string, { data: RedditMentionsResult; timestamp: number }>();
+const SUCCESS_CACHE_TTL = 24 * 60 * 60 * 1000;
+const DEGRADED_CACHE_TTL = 10 * 60 * 1000;
+const UPSTREAM_TIMEOUT_MS = 8_000;
+const REDDIT_BASE_URL = 'https://www.reddit.com';
+const REDDIT_USER_AGENT = 'TrafficClaw/1.0 (+https://trafficclaw.com)';
+
+const serverCache = new Map<string, CacheEntry>();
 const inflightMap = new Map<string, Promise<RedditMentionsResult>>();
+
+function getCacheKey(canonicalDomain: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `rm:v2:${canonicalDomain}:${today}`;
+}
 
 function isRecord(value: unknown): value is JsonRecord {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -70,133 +90,28 @@ function normalizeRedditPermalink(value: unknown): string | null {
         return permalink;
     }
 
-    return `https://www.reddit.com${permalink.startsWith('/') ? permalink : `/${permalink}`}`;
+    return `${REDDIT_BASE_URL}${permalink.startsWith('/') ? permalink : `/${permalink}`}`;
 }
 
 function containsDomain(value: string | null, domain: string) {
     return Boolean(value && value.toLowerCase().includes(domain));
 }
 
-function listNestedScriptCandidates(rootPath: string, executableNames: string[]) {
-    if (!existsSync(rootPath)) return [];
-
-    try {
-        return readdirSync(rootPath, { withFileTypes: true })
-            .filter((entry) => entry.isDirectory())
-            .flatMap((entry) =>
-                executableNames.map((name) => join(rootPath, entry.name, 'Scripts', name))
-            );
-    } catch {
-        return [];
-    }
-}
-
-function resolveRdtBinSync() {
-    if (process.env.RDT_CLI_PATH) return process.env.RDT_CLI_PATH;
-
-    const candidates = ['/usr/local/bin/rdt', '/usr/bin/rdt'];
-
-    if (process.platform === 'win32') {
-        const executableNames = ['rdt.exe', 'rdt.cmd', 'rdt.bat'];
-        const localAppData = process.env.LOCALAPPDATA;
-        const appData = process.env.APPDATA;
-
-        if (localAppData) {
-            candidates.push(
-                ...listNestedScriptCandidates(join(localAppData, 'Python'), executableNames),
-                ...listNestedScriptCandidates(join(localAppData, 'Programs', 'Python'), executableNames)
-            );
-        }
-
-        if (appData) {
-            candidates.push(...listNestedScriptCandidates(join(appData, 'Python'), executableNames));
-        }
-    }
-
-    const resolved = candidates.find((candidate) => existsSync(candidate));
-    if (resolved) {
-        return resolved;
-    }
-
-    return process.platform === 'win32' ? 'rdt.exe' : 'rdt';
-}
-
 function getCached(key: string): RedditMentionsResult | null {
     const entry = serverCache.get(key);
     if (!entry) return null;
-    if (Date.now() - entry.timestamp > CACHE_TTL) {
+    if (Date.now() >= entry.expiresAt) {
         serverCache.delete(key);
         return null;
     }
     return entry.data;
 }
 
-function setCache(key: string, data: RedditMentionsResult) {
+function setCache(key: string, data: RedditMentionsResult, ttl: number) {
     serverCache.set(key, {
         data,
-        timestamp: Date.now(),
+        expiresAt: Date.now() + ttl,
     });
-}
-
-function getExecEnv() {
-    const proxy = process.env.REDDIT_PROXY_URL?.trim();
-    return {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-        ...(proxy ? {
-            HTTP_PROXY: proxy,
-            HTTPS_PROXY: proxy,
-            http_proxy: proxy,
-            https_proxy: proxy,
-        } : {}),
-    };
-}
-
-function runRdtCommand(command: string, timeout: number) {
-    return new Promise<string>((resolve, reject) => {
-        exec(
-            command,
-            {
-                env: getExecEnv(),
-                timeout,
-                maxBuffer: 3 * 1024 * 1024,
-            },
-            (error, stdout, stderr) => {
-                if (error) {
-                    const message = `${stderr || ''} ${error.message || ''}`.trim().toLowerCase();
-                    if (
-                        message.includes('not recognized') ||
-                        message.includes('enoent') ||
-                        message.includes('not found')
-                    ) {
-                        reject(new Error('RDT_NOT_INSTALLED'));
-                        return;
-                    }
-                    if (error.killed || message.includes('timed out') || message.includes('etimedout')) {
-                        reject(new Error('RDT_TIMEOUT'));
-                        return;
-                    }
-                    if (message.includes('403') || message.includes('forbidden') || message.includes('blocked')) {
-                        reject(new Error('REDDIT_BLOCKED'));
-                        return;
-                    }
-                    reject(new Error(stderr || error.message || 'Unknown rdt error'));
-                    return;
-                }
-
-                resolve(stdout);
-            }
-        );
-    });
-}
-
-async function runRdtSearch(domain: string) {
-    const bin = resolveRdtBinSync();
-    return runRdtCommand(
-        `"${bin}" search "${domain}" -n ${SEARCH_LIMIT} --json --compact`,
-        SEARCH_TIMEOUT_MS
-    );
 }
 
 function getEnvelopeData(parsed: unknown): unknown {
@@ -259,12 +174,6 @@ function pickPostId(item: JsonRecord) {
     );
 }
 
-function extractJsonPayload(raw: string): string | null {
-    const start = raw.search(/[\[{]/);
-    if (start === -1) return null;
-    return raw.slice(start).trim();
-}
-
 function normalizePostCandidate(item: unknown, domain: string): RedditMentionPayload | null {
     const node = unwrapNode(item);
     if (!node) return null;
@@ -273,10 +182,10 @@ function normalizePostCandidate(item: unknown, domain: string): RedditMentionPay
     const title = getString(node.title) || getString(node.link_title) || '';
     const text = getString(node.selftext) || getString(node.body) || getString(node.text) || '';
     const permalink = normalizeRedditPermalink(node.permalink);
-    const outboundUrl = permalink || getString(node.url) || '';
     const externalUrl = getString(node.url);
+    const outboundUrl = permalink || externalUrl || '';
 
-    if (!postId || !title || !outboundUrl) {
+    if (!postId || !title || !permalink || !outboundUrl) {
         return null;
     }
 
@@ -298,10 +207,18 @@ function normalizePostCandidate(item: unknown, domain: string): RedditMentionPay
         score: getNumber(node.score),
         commentCount: getNumber(node.num_comments ?? node.comment_count),
         createdAt: toIsoString(node.created_utc ?? node.created_at ?? node.created),
-        permalink: outboundUrl,
+        permalink,
         outboundUrl,
         externalUrl,
     };
+}
+
+function parseListingPosts(payload: unknown, domain: string): RedditMentionPayload[] {
+    const data = getEnvelopeData(payload);
+    const items = getItemsArray(data);
+    return items
+        .map((item) => normalizePostCandidate(item, domain))
+        .filter((item): item is RedditMentionPayload => Boolean(item));
 }
 
 function sortMentions(mentions: RedditMentionPayload[]) {
@@ -316,75 +233,153 @@ function sortMentions(mentions: RedditMentionPayload[]) {
 }
 
 function dedupeMentions(mentions: RedditMentionPayload[]) {
-    const seen = new Set<string>();
+    const seenKeys = new Set<string>();
     return mentions.filter((mention) => {
-        if (seen.has(mention.id)) {
+        const keys = [
+            mention.postId ? `post:${mention.postId}` : null,
+            mention.permalink ? `permalink:${mention.permalink.toLowerCase()}` : null,
+        ].filter((key): key is string => Boolean(key));
+
+        if (keys.some((key) => seenKeys.has(key))) {
             return false;
         }
-        seen.add(mention.id);
+
+        keys.forEach((key) => seenKeys.add(key));
         return true;
     });
 }
 
-function parseSearchPosts(raw: string, domain: string): RedditMentionPayload[] {
+function createTimeoutController() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+    return { controller, timeoutId };
+}
+
+async function fetchRedditListing(url: string) {
+    const { controller, timeoutId } = createTimeoutController();
+
     try {
-        const payload = extractJsonPayload(raw);
-        if (!payload) return [];
-        const parsed = JSON.parse(payload) as unknown;
-        const data = getEnvelopeData(parsed);
-        const items = getItemsArray(data);
-        return items
-            .map((item) => normalizePostCandidate(item, domain))
-            .filter((item): item is RedditMentionPayload => Boolean(item));
-    } catch {
-        return [];
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: {
+                Accept: 'application/json',
+                'User-Agent': REDDIT_USER_AGENT,
+            },
+            signal: controller.signal,
+        });
+
+        if (!response.ok) {
+            if (response.status === 403 || response.status === 429) {
+                throw new Error('REDDIT_BLOCKED');
+            }
+
+            throw new Error(`REDDIT_HTTP_${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw new Error('REDDIT_TIMEOUT');
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
-async function runAndCacheReddit(cacheKey: string, canonicalDomain: string): Promise<RedditMentionsResult> {
+async function fetchDomainMentions(domain: string): Promise<SourceOutcome> {
+    const url = `${REDDIT_BASE_URL}/domain/${encodeURIComponent(domain)}/new.json?limit=${SEARCH_LIMIT}`;
+
     try {
-        const searchRaw = await runRdtSearch(canonicalDomain);
-        const mentions = parseSearchPosts(searchRaw, canonicalDomain);
-        const result: RedditMentionsResult = {
-            canonicalDomain,
-            mentions: sortMentions(dedupeMentions(mentions)).slice(0, MAX_MENTIONS),
+        const payload = await fetchRedditListing(url);
+        return {
+            source: 'domain',
+            mentions: parseListingPosts(payload, domain),
+            failed: false,
+            timedOut: false,
+            blocked: false,
         };
-        setCache(cacheKey, result);
-        return result;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-
-        if (message === 'RDT_NOT_INSTALLED') {
-            return {
-                canonicalDomain,
-                mentions: [],
-                warning: 'Reddit integration unavailable — install rdt-cli in this app runtime or set RDT_CLI_PATH.',
-            };
-        }
-
-        if (message === 'RDT_TIMEOUT') {
-            return {
-                canonicalDomain,
-                mentions: [],
-                warning: 'Reddit search timed out — mentions will load on the next refresh.',
-            };
-        }
-
-        if (message === 'REDDIT_BLOCKED') {
-            return {
-                canonicalDomain,
-                mentions: [],
-                warning: 'Reddit blocked this server right now — add REDDIT_PROXY_URL and try again.',
-            };
-        }
-
-        console.error('[reddit-mentions] Error:', error);
         return {
-            canonicalDomain,
+            source: 'domain',
             mentions: [],
-            warning: 'Reddit mentions temporarily unavailable — please try again later.',
+            failed: true,
+            timedOut: message === 'REDDIT_TIMEOUT',
+            blocked: message === 'REDDIT_BLOCKED',
         };
     }
+}
+
+async function fetchSearchMentions(domain: string): Promise<SourceOutcome> {
+    const url = new URL('/search.json', REDDIT_BASE_URL);
+    url.searchParams.set('q', domain);
+    url.searchParams.set('sort', 'new');
+    url.searchParams.set('limit', String(SEARCH_LIMIT));
+    url.searchParams.set('type', 'link');
+
+    try {
+        const payload = await fetchRedditListing(url.toString());
+        return {
+            source: 'search',
+            mentions: parseListingPosts(payload, domain),
+            failed: false,
+            timedOut: false,
+            blocked: false,
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+            source: 'search',
+            mentions: [],
+            failed: true,
+            timedOut: message === 'REDDIT_TIMEOUT',
+            blocked: message === 'REDDIT_BLOCKED',
+        };
+    }
+}
+
+function getAggregateWarning(outcomes: SourceOutcome[], mentionCount: number) {
+    const failed = outcomes.filter((outcome) => outcome.failed);
+    if (failed.length === 0) {
+        return undefined;
+    }
+
+    if (failed.every((outcome) => outcome.blocked)) {
+        return 'Reddit blocked this server right now — please try again later.';
+    }
+
+    if (failed.every((outcome) => outcome.timedOut)) {
+        return mentionCount > 0
+            ? 'Some Reddit results were slow — showing partial mentions.'
+            : 'Reddit search timed out — mentions will load on the next refresh.';
+    }
+
+    return mentionCount > 0
+        ? 'Some Reddit results were unavailable — showing partial mentions.'
+        : 'Reddit mentions temporarily unavailable — please try again later.';
+}
+
+async function runAndCacheReddit(cacheKey: string, canonicalDomain: string): Promise<RedditMentionsResult> {
+    const outcomes = await Promise.all([
+        fetchDomainMentions(canonicalDomain),
+        fetchSearchMentions(canonicalDomain),
+    ]);
+
+    const mentions = sortMentions(
+        dedupeMentions(outcomes.flatMap((outcome) => outcome.mentions))
+    ).slice(0, MAX_MENTIONS);
+    const warning = getAggregateWarning(outcomes, mentions.length);
+
+    const result: RedditMentionsResult = {
+        canonicalDomain,
+        mentions,
+        warning,
+    };
+
+    const ttl = warning ? DEGRADED_CACHE_TTL : SUCCESS_CACHE_TTL;
+    setCache(cacheKey, result, ttl);
+    return result;
 }
 
 export async function fetchRedditMentionsForDomain(domainInput: string): Promise<RedditMentionsResult> {
@@ -397,8 +392,7 @@ export async function fetchRedditMentionsForDomain(domainInput: string): Promise
         };
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `rm:v1:${canonicalDomain}:${today}`;
+    const cacheKey = getCacheKey(canonicalDomain);
     const cached = getCached(cacheKey);
     if (cached) return cached;
 
@@ -409,4 +403,13 @@ export async function fetchRedditMentionsForDomain(domainInput: string): Promise
     inflightMap.set(cacheKey, promise);
     promise.finally(() => inflightMap.delete(cacheKey));
     return promise;
+}
+
+export function peekCachedRedditMentionsForDomain(domainInput: string): RedditMentionsResult | null {
+    const canonicalDomain = canonicalizeDomainInput(domainInput);
+    if (!canonicalDomain) {
+        return null;
+    }
+
+    return getCached(getCacheKey(canonicalDomain));
 }

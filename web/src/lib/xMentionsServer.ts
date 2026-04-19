@@ -58,26 +58,76 @@ const MAX_RAW_FETCH = 30;
 const MAX_NORMALIZED_MENTIONS = 18;
 const serverCache = new Map<string, { data: XMentionsResult; timestamp: number }>();
 const inflightMap = new Map<string, Promise<XMentionsResult>>();
+const COMMON_TOP_LEVEL_DOMAINS = new Set(['com', 'net', 'org', 'co', 'io']);
 
-async function resolveTwitterBinAsync(): Promise<string> {
+function getCacheKey(canonicalDomain: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `xm:v7:x:${canonicalDomain}:${today}`;
+}
+
+function buildTwitterSearchQuery(canonicalDomain: string) {
+    const labels = canonicalDomain.split('.').filter(Boolean);
+    const topLevelDomain = labels[labels.length - 1] || '';
+    const humanizedDomain = canonicalDomain.replace(/[.-]+/g, ' ').trim();
+    const queries = [`"${canonicalDomain}"`];
+
+    if (
+        humanizedDomain &&
+        humanizedDomain.toLowerCase() !== canonicalDomain &&
+        !COMMON_TOP_LEVEL_DOMAINS.has(topLevelDomain)
+    ) {
+        queries.push(`"${humanizedDomain}"`);
+    }
+
+    return queries.join(' OR ');
+}
+
+async function resolveTwitterBinAsync(): Promise<string | null> {
     if (process.env.TWITTER_CLI_PATH) return process.env.TWITTER_CLI_PATH;
     if (existsSync('/usr/local/bin/twitter')) return '/usr/local/bin/twitter';
     if (existsSync('/usr/bin/twitter')) return '/usr/bin/twitter';
 
-    return new Promise((resolve) => {
-        exec(
-            "python3 -c \"import shutil; print(shutil.which('twitter') or '')\"",
-            { timeout: 5000 },
-            (err, stdout) => {
-                const resolved = stdout?.toString().trim();
-                resolve(!err && resolved ? resolved : 'twitter');
-            }
-        );
-    });
+    const resolveFromCommand = (command: string, transform?: (stdout: string) => string | null) =>
+        new Promise<string | null>((resolve) => {
+            exec(command, { timeout: 5000 }, (err, stdout) => {
+                if (err) {
+                    resolve(null);
+                    return;
+                }
+
+                const raw = stdout?.toString().trim();
+                if (!raw) {
+                    resolve(null);
+                    return;
+                }
+
+                resolve(transform ? transform(raw) : raw);
+            });
+        });
+
+    const fromPython3 = await resolveFromCommand(
+        "python3 -c \"import shutil; print(shutil.which('twitter') or '')\"",
+    );
+    if (fromPython3) {
+        return fromPython3;
+    }
+
+    const fromPython = await resolveFromCommand(
+        "python -c \"import shutil; print(shutil.which('twitter') or '')\"",
+    );
+    if (fromPython) {
+        return fromPython;
+    }
+
+    if (process.platform === 'win32') {
+        return resolveFromCommand('where twitter', (stdout) => stdout.split(/\r?\n/)[0]?.trim() || null);
+    }
+
+    return resolveFromCommand('command -v twitter');
 }
 
-let twitterBinPromise: Promise<string> | null = null;
-function getTwitterBinAsync(): Promise<string> {
+let twitterBinPromise: Promise<string | null> | null = null;
+function getTwitterBinAsync(): Promise<string | null> {
     if (!twitterBinPromise) {
         twitterBinPromise = resolveTwitterBinAsync();
     }
@@ -103,8 +153,12 @@ function toTimestamp(value?: string): number {
     return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-async function runTwitterSearch(domain: string): Promise<string> {
+async function runTwitterSearch(query: string): Promise<string> {
     const bin = await getTwitterBinAsync();
+    if (!bin) {
+        throw new Error('TWITTER_CLI_MISSING');
+    }
+
     return new Promise((resolve, reject) => {
         const authToken = process.env.TWITTER_AUTH_TOKEN || '';
         const ct0 = process.env.TWITTER_CT0 || '';
@@ -115,7 +169,7 @@ async function runTwitterSearch(domain: string): Promise<string> {
         };
 
         exec(
-            `"${bin}" search "${domain}" --json --max ${MAX_RAW_FETCH}`,
+            `"${bin}" search "${query}" --json --max ${MAX_RAW_FETCH}`,
             { env, timeout: 15000, maxBuffer: 2 * 1024 * 1024 },
             (error, stdout, stderr) => {
                 if (error) {
@@ -137,7 +191,23 @@ async function runTwitterSearch(domain: string): Promise<string> {
     });
 }
 
-function normalizeMentions(parsed: TwitterResponse): XMentionPayload[] {
+function isRelevantTweet(tweet: TwitterTweet, canonicalDomain: string) {
+    const text = (tweet.text || '').toLowerCase();
+    const urls = (tweet.urls || []).map((url) => url.toLowerCase());
+    const humanizedDomain = canonicalDomain.replace(/[.-]+/g, ' ').trim().toLowerCase();
+
+    if (text.includes(canonicalDomain) || urls.some((url) => url.includes(canonicalDomain))) {
+        return true;
+    }
+
+    if (humanizedDomain && humanizedDomain !== canonicalDomain && text.includes(humanizedDomain)) {
+        return true;
+    }
+
+    return false;
+}
+
+function normalizeMentions(parsed: TwitterResponse, canonicalDomain: string): XMentionPayload[] {
     const normalizeText = (text: string): string =>
         text.toLowerCase()
             .replace(/https?:\/\/\S+/g, '')
@@ -168,6 +238,7 @@ function normalizeMentions(parsed: TwitterResponse): XMentionPayload[] {
         })
         .filter((t) => {
             if (t.isRetweet) return false;
+            if (!isRelevantTweet(t, canonicalDomain)) return false;
             if (resultIds.has(t.id)) return false;
             if (t.quotedTweet && seenIds.has(t.quotedTweet.id)) return false;
             const norm = normalizeText(t.text);
@@ -220,7 +291,7 @@ function normalizeMentions(parsed: TwitterResponse): XMentionPayload[] {
 
 async function runAndCacheX(cacheKey: string, canonicalDomain: string): Promise<XMentionsResult> {
     try {
-        const raw = await runTwitterSearch(canonicalDomain);
+        const raw = await runTwitterSearch(buildTwitterSearchQuery(canonicalDomain));
         let parsed: TwitterResponse;
         try {
             parsed = JSON.parse(raw) as TwitterResponse;
@@ -247,7 +318,7 @@ async function runAndCacheX(cacheKey: string, canonicalDomain: string): Promise<
             return result;
         }
 
-        const result = { canonicalDomain, mentions: normalizeMentions(parsed) };
+        const result = { canonicalDomain, mentions: normalizeMentions(parsed, canonicalDomain) };
         setCache(cacheKey, result);
         return result;
     } catch (error) {
@@ -258,6 +329,14 @@ async function runAndCacheX(cacheKey: string, canonicalDomain: string): Promise<
                 canonicalDomain,
                 mentions: [],
                 error: 'X authentication expired — admin needs to refresh cookies',
+            };
+        }
+
+        if (msg === 'TWITTER_CLI_MISSING') {
+            return {
+                canonicalDomain,
+                mentions: [],
+                warning: 'Live X lookup is not configured on this server yet.',
             };
         }
 
@@ -291,8 +370,7 @@ export async function fetchXMentionsForDomain(domainInput: string): Promise<XMen
         };
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `xm:v7:x:${canonicalDomain}:${today}`;
+    const cacheKey = getCacheKey(canonicalDomain);
     const cached = getCached(cacheKey);
     if (cached) return cached;
 
@@ -303,4 +381,13 @@ export async function fetchXMentionsForDomain(domainInput: string): Promise<XMen
     inflightMap.set(cacheKey, promise);
     promise.finally(() => inflightMap.delete(cacheKey));
     return promise;
+}
+
+export function peekCachedXMentionsForDomain(domainInput: string): XMentionsResult | null {
+    const canonicalDomain = canonicalizeDomainInput(domainInput);
+    if (!canonicalDomain) {
+        return null;
+    }
+
+    return getCached(getCacheKey(canonicalDomain));
 }

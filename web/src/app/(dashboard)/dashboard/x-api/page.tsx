@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     ArrowRight,
     Check,
@@ -92,6 +93,9 @@ function CodeBlock({ code }: { code: string }) {
 }
 
 export default function XApiPage() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const hydratedDomainRef = useRef<string | null>(null);
     const [appOrigin, setAppOrigin] = useState('https://trafficclaw.com');
     const [domainInput, setDomainInput] = useState('');
     const [demoState, setDemoState] = useState<DemoState>({ status: 'loading', mentions: [] });
@@ -181,6 +185,29 @@ export default function XApiPage() {
     useEffect(() => {
         void loadTokens();
     }, [loadTokens]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const nextParams = new URLSearchParams(window.location.search);
+        const carriedDomain = canonicalizeDomainInput(nextParams.get('domain') || '');
+        if (!carriedDomain || hydratedDomainRef.current === carriedDomain) {
+            return;
+        }
+
+        hydratedDomainRef.current = carriedDomain;
+        setCurrentWidget(null);
+        setLatestPreview(null);
+        setDomainInput(carriedDomain);
+        setFormError(null);
+        setNotice(`Carried ${carriedDomain} from your public preview. Generate a new widget to get its embed code.`);
+
+        nextParams.delete('domain');
+        const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
+        router.replace(nextUrl, { scroll: false });
+    }, [pathname, router]);
 
     useEffect(() => {
         let cancelled = false;

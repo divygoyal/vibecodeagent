@@ -25,6 +25,7 @@ import LazyVideoFrame from './LazyVideoFrame';
 import GoogleAuthButton from '@/components/marketing/GoogleAuthButton';
 import {
     HOMEPAGE_CONTENT,
+    MARKETING_SIGN_IN_URL,
     type HomepageCompactReason,
     type HomepageProofCard,
 } from './content';
@@ -106,6 +107,35 @@ function SectionLabel({ children }: { children: ReactNode }) {
             <span className="h-1.5 w-1.5 rounded-full bg-[#14C4E1]" />
             {children}
         </div>
+    );
+}
+
+function GoogleGMark({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 18 18" aria-hidden="true" className={className}>
+            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62Z" />
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18Z" />
+            <path fill="#FBBC05" d="M3.97 10.71A5.41 5.41 0 0 1 3.69 9c0-.59.1-1.16.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3.01-2.33Z" />
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.43 1.33l2.57-2.57C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
+        </svg>
+    );
+}
+
+function GoogleStartButton({
+    className,
+    label = 'Start with Google',
+    showArrow = true,
+}: {
+    className: string;
+    label?: string;
+    showArrow?: boolean;
+}) {
+    return (
+        <GoogleAuthButton className={className}>
+            <GoogleGMark className="h-4 w-4 shrink-0" />
+            {label}
+            {showArrow ? <ArrowRight className="h-4 w-4" /> : null}
+        </GoogleAuthButton>
     );
 }
 
@@ -404,7 +434,8 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
             </div>
 
             <div className="mt-auto flex w-full flex-col items-center gap-4">
-                <GoogleAuthButton
+                <Link
+                    href={card.href}
                     className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold transition-all sm:w-auto hover:scale-105 ${
                         isX
                             ? 'bg-[#14C4E1]/15 text-[#7AD9DA] shadow-[0_0_24px_rgba(20,196,225,0.3)] hover:bg-[#14C4E1]/25'
@@ -413,7 +444,7 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
                 >
                     {card.buttonLabel}
                     <span>&rarr;</span>
-                </GoogleAuthButton>
+                </Link>
 
                 <div className="flex items-center gap-2 text-[12px] uppercase tracking-[0.15em] text-zinc-500">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
@@ -601,12 +632,23 @@ export default function LandingHomepage() {
                     </div>
 
                     <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                        <GoogleAuthButton
-                            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:w-auto"
-                        >
-                            {HOMEPAGE_CONTENT.hero.primaryCta}
-                            <ArrowRight className="h-4 w-4" />
-                        </GoogleAuthButton>
+                        <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 sm:w-auto sm:grid-cols-1">
+                            <Link
+                                href={MARKETING_SIGN_IN_URL}
+                                className="inline-flex min-h-[48px] min-w-0 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.03] px-4 text-center text-sm font-semibold text-white transition-all duration-200 hover:border-white/[0.18] hover:bg-white/[0.05] sm:hidden"
+                            >
+                                Sign In
+                            </Link>
+                            <GoogleStartButton
+                                className="inline-flex min-h-[48px] min-w-0 w-full items-center justify-center gap-1.5 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-3 text-center text-[13px] font-semibold leading-tight text-[#031017] transition-all duration-200 hover:brightness-105 sm:hidden"
+                                label="Continue with Google"
+                                showArrow={false}
+                            />
+                            <GoogleStartButton
+                                className="hidden min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:inline-flex sm:w-auto"
+                                label={HOMEPAGE_CONTENT.hero.primaryCta}
+                            />
+                        </div>
                         <GradientButton href={HOMEPAGE_CONTENT.analyticsEmbedUrl} secondary newTab>
                             {HOMEPAGE_CONTENT.hero.secondaryCta}
                             <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
@@ -709,12 +751,9 @@ export default function LandingHomepage() {
                                         {HOMEPAGE_CONTENT.cta.description}
                                     </p>
                                     <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                                        <GoogleAuthButton
+                                        <GoogleStartButton
                                             className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:w-auto"
-                                        >
-                                            Start free
-                                            <ArrowRight className="h-4 w-4" />
-                                        </GoogleAuthButton>
+                                        />
                                         <GradientButton href={HOMEPAGE_CONTENT.analyticsEmbedUrl} secondary newTab>
                                             Open live dashboard
                                             <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
