@@ -237,14 +237,19 @@ function buildBoardSelections(
     return selections;
 }
 
-function buildGoalAnalyticsUrl(propertyId: string, range: string, selection: GoalSelection) {
+function buildGoalAnalyticsUrl(propertyId: string | undefined, range: string, selection: GoalSelection, demoMode = false) {
     const params = new URLSearchParams({
-        propertyId,
         range,
         type: selection.item.type,
         target: selection.item.target,
         name: selection.item.name,
     });
+    if (propertyId) {
+        params.set('propertyId', propertyId);
+    }
+    if (demoMode) {
+        params.set('demo', '1');
+    }
 
     const description = 'description' in selection.item ? selection.item.description || '' : selection.item.description;
     if (description) {
@@ -396,6 +401,7 @@ export default function GoalsPage() {
         hasGoogleConnection,
         ga4Availability,
         propertyInventoryError,
+        isDemoWorkspace,
     } = useAnalyticsContext();
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [selectorOpen, setSelectorOpen] = useState(false);
@@ -403,10 +409,15 @@ export default function GoalsPage() {
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
+    const canManageGoals = !isDemoWorkspace && !!selectedProperty;
 
     const { data: definitionsResponse, error: definitionsError, isLoading: definitionsLoading, mutate: mutateDefinitions } = useSWR<GoalDefinitionsResponse>(
-        selectedProperty && hasGoogleConnection
-            ? `/api/analytics/goals/definitions?propertyId=${encodeURIComponent(selectedProperty)}&range=${encodeURIComponent(range)}`
+        (selectedProperty || isDemoWorkspace) && hasGoogleConnection
+            ? `/api/analytics/goals/definitions?${new URLSearchParams({
+                ...(selectedProperty ? { propertyId: selectedProperty } : {}),
+                range,
+                ...(isDemoWorkspace ? { demo: '1' } : {}),
+            }).toString()}`
             : null,
         fetchJson,
     );
@@ -450,13 +461,13 @@ export default function GoalsPage() {
         isLoading: boardLoading,
         mutate: mutateBoard,
     } = useSWR<GoalBoardEntry[]>(
-        selectedProperty && boardSelections.length
-            ? ['goal-board', selectedProperty, range, boardSelections.map((selection) => selection.key).join('|')]
+        (selectedProperty || isDemoWorkspace) && boardSelections.length
+            ? ['goal-board', selectedProperty || 'demo', range, isDemoWorkspace ? 'demo' : 'real', boardSelections.map((selection) => selection.key).join('|')]
             : null,
         async () => {
             const results = await Promise.all(boardSelections.map(async (selection, index) => {
                 try {
-                    const data = await fetchJson<GoalAnalyticsResponse>(buildGoalAnalyticsUrl(selectedProperty, range, selection));
+                    const data = await fetchJson<GoalAnalyticsResponse>(buildGoalAnalyticsUrl(selectedProperty || undefined, range, selection, isDemoWorkspace));
                     return {
                         key: selection.key,
                         selection,
@@ -551,6 +562,7 @@ export default function GoalsPage() {
     }, [board, selectedEntry]);
 
     const openCreate = () => {
+        if (!canManageGoals) return;
         const starter = currentSelection?.kind === 'suggestion' ? currentSelection.item : suggestions[0];
         setActionError(null);
         setEditorState({
@@ -566,6 +578,7 @@ export default function GoalsPage() {
     };
 
     const openEdit = (definition: GoalDefinition) => {
+        if (!canManageGoals) return;
         setActionError(null);
         setEditorState({
             open: true,
@@ -587,7 +600,7 @@ export default function GoalsPage() {
     };
 
     const handleSave = async () => {
-        if (!selectedProperty) return;
+        if (!selectedProperty || !canManageGoals) return;
         const name = editorState.values.name.trim();
         const target = editorState.values.target.trim();
 
@@ -642,6 +655,7 @@ export default function GoalsPage() {
     };
 
     const handleDelete = async (definition: GoalDefinition) => {
+        if (!canManageGoals) return;
         const confirmed = window.confirm(`Delete "${definition.name}"?`);
         if (!confirmed) return;
 
@@ -669,7 +683,7 @@ export default function GoalsPage() {
         );
     }
 
-    if (!selectedProperty) {
+    if (!selectedProperty && !isDemoWorkspace) {
         return (
             <AnalyticsSubpageEmptyState
                 title={ga4AvailabilityCopy.title}
@@ -696,18 +710,22 @@ export default function GoalsPage() {
             <div className="rounded-[24px] border border-white/[0.08] bg-[#090b0d] px-6 py-12 text-center shadow-[0_24px_72px_rgba(0,0,0,0.22)]">
                 <p className="text-lg font-semibold tracking-[-0.02em] text-white">No goals available</p>
                 <p className="mx-auto mt-2 max-w-lg text-sm font-medium text-zinc-500">
-                    Create a goal to start tracking conversion performance.
+                    {isDemoWorkspace
+                        ? 'Demo mode is read-only. Connect your own GA4 property to create and manage goals.'
+                        : 'Create a goal to start tracking conversion performance.'}
                 </p>
-                <div className="mt-5">
-                    <button
-                        type="button"
-                        onClick={openCreate}
-                        className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.12] px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400/30 hover:bg-emerald-500/[0.18]"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create goal
-                    </button>
-                </div>
+                {canManageGoals ? (
+                    <div className="mt-5">
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.12] px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400/30 hover:bg-emerald-500/[0.18]"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create goal
+                        </button>
+                    </div>
+                ) : null}
             </div>
         );
     }
@@ -732,14 +750,20 @@ export default function GoalsPage() {
                         Last 30 Days
                         <ChevronDown className="h-4 w-4" />
                     </button>
-                    <button
-                        type="button"
-                        onClick={openCreate}
-                        className="flex items-center gap-2 rounded-xl border border-[#37E6C7]/30 bg-[#37E6C7]/10 px-4 py-2 text-[13px] font-medium text-[#37E6C7] transition hover:bg-[#37E6C7]/20"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create Goal
-                    </button>
+                    {canManageGoals ? (
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="flex items-center gap-2 rounded-xl border border-[#37E6C7]/30 bg-[#37E6C7]/10 px-4 py-2 text-[13px] font-medium text-[#37E6C7] transition hover:bg-[#37E6C7]/20"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create Goal
+                        </button>
+                    ) : (
+                        <span className="rounded-xl border border-amber-500/20 bg-amber-500/[0.08] px-4 py-2 text-[13px] font-medium text-amber-200">
+                            Demo goals are read-only
+                        </span>
+                    )}
                 </div>
             </section>
 
@@ -849,28 +873,30 @@ export default function GoalsPage() {
                                                         {formatSignedPercent(entry.data.summary.change)}
                                                     </td>
                                                     <td className="border-b border-white/[0.04] px-1 py-4 text-right">
-                                                        <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    openEdit(entry.data.definition);
-                                                                }}
-                                                                className="rounded-md p-1.5 text-zinc-500 hover:bg-white/[0.05] hover:text-white"
-                                                            >
-                                                                <PencilLine className="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    void handleDelete(entry.data.definition);
-                                                                }}
-                                                                className="rounded-md p-1.5 text-zinc-500 hover:bg-white/[0.05] hover:text-rose-400"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </div>
+                                                        {canManageGoals ? (
+                                                            <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        openEdit(entry.data.definition);
+                                                                    }}
+                                                                    className="rounded-md p-1.5 text-zinc-500 hover:bg-white/[0.05] hover:text-white"
+                                                                >
+                                                                    <PencilLine className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        void handleDelete(entry.data.definition);
+                                                                    }}
+                                                                    className="rounded-md p-1.5 text-zinc-500 hover:bg-white/[0.05] hover:text-rose-400"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        ) : null}
                                                     </td>
                                                 </tr>
                                             );

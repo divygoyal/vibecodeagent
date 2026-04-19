@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { signIn } from 'next-auth/react';
 import {
     Share2, Music, History, Maximize2, Navigation, Monitor, Smartphone, Tablet,
     ExternalLink, Copy, Check, Code2, Zap, Globe,
-    ChevronRight, ChevronUp, ChevronDown, BookOpen, Server, Palette, DollarSign, Shield, AlertTriangle
+    ChevronRight, ChevronUp, ChevronDown, BookOpen, Server, Palette, DollarSign, Shield
 } from 'lucide-react';
 import { CountryFlag } from '@/components/analytics/AnalyticsIcons';
+import DemoModeBanner from '@/components/DemoModeBanner';
 import type { RealtimeMapboxHandle } from '@/components/globe/RealtimeGlobeMaplibre';
 import { useRealtimeData, useContainerStatus, usePropertyList } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
@@ -338,12 +338,12 @@ export default function GlobeApiPage() {
     const mapRef = useRef<RealtimeMapboxHandle>(null);
 
     // ─── Real GA4 data hooks ───
-    const { selectedProperty } = useRegistration();
+    const { selectedProperty, isDemoWorkspace, demoDomainLabel } = useRegistration();
     const { hasGoogleConnection } = useContainerStatus();
     const { properties, isLoading: propsLoading } = usePropertyList(hasGoogleConnection);
     const propertyToUse = selectedProperty || (properties.length > 0 ? properties[0].property : '');
-    const showNoPropertiesBanner = hasGoogleConnection && !propsLoading && properties.length === 0;
-    const { data: realtimeData } = useRealtimeData(propertyToUse, hasGoogleConnection);
+    const showGa4UnavailableState = hasGoogleConnection && !propsLoading && properties.length === 0 && !isDemoWorkspace;
+    const { data: realtimeData } = useRealtimeData(propertyToUse, hasGoogleConnection && (isDemoWorkspace || !!propertyToUse), isDemoWorkspace);
 
     // ─── Data extraction (real GA4 or empty) ───
     const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : 0;
@@ -351,7 +351,7 @@ export default function GlobeApiPage() {
     const byCity: any[] = Array.isArray(realtimeData?.byCity) ? realtimeData.byCity : [];
     const byDevice: any[] = Array.isArray(realtimeData?.byDevice) ? realtimeData.byDevice : [];
     const byPage: any[] = Array.isArray(realtimeData?.byPage) ? realtimeData.byPage : [];
-    const hasRealData = hasGoogleConnection && !!realtimeData && activeUsers > 0;
+    const hasRealData = hasGoogleConnection && !isDemoWorkspace && !!realtimeData && activeUsers > 0;
 
     // ─── Globe visitors from real data ───
     const realGlobeVisitors = useMemo<GlobeVisitor[]>(() => {
@@ -380,11 +380,12 @@ export default function GlobeApiPage() {
     }, [activeUsers]);
 
     // ─── Select real or demo data ───
-    const displayVisitors = hasRealData ? realGlobeVisitors : DEMO_VISITORS;
-    const displayActivity = hasRealData ? realActivityFeed : DEMO_ACTIVITY;
-    const displayCountries = hasRealData ? realCountries : DEMO_COUNTRIES;
-    const displayActiveUsers = hasRealData ? activeUsers : DEMO_VISITORS.length;
-    const displayEstValue = hasRealData ? estTotalValue : 1;
+    const showDemoData = isDemoWorkspace;
+    const displayVisitors = hasRealData ? realGlobeVisitors : showDemoData ? DEMO_VISITORS : [];
+    const displayActivity = hasRealData ? realActivityFeed : showDemoData ? DEMO_ACTIVITY : [];
+    const displayCountries = hasRealData ? realCountries : showDemoData ? DEMO_COUNTRIES : [];
+    const displayActiveUsers = hasRealData ? activeUsers : showDemoData ? DEMO_VISITORS.length : 0;
+    const displayEstValue = hasRealData ? estTotalValue : showDemoData ? 1 : 0;
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -449,41 +450,18 @@ export default function GlobeApiPage() {
             </div>
 
             {/* ─── No-Properties Banner ─── */}
-            {showNoPropertiesBanner && (
-                <div className="relative overflow-hidden bg-gradient-to-r from-amber-500/[0.1] via-amber-500/[0.06] to-orange-500/[0.08] border border-amber-500/25 rounded-2xl p-4 sm:p-5">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-orange-500 rounded-l-2xl" />
-                    <div className="flex items-start gap-3 sm:gap-4 pl-2">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/10">
-                            <AlertTriangle className="w-5 h-5 text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center flex-wrap gap-2 mb-1">
-                                <h3 className="text-sm sm:text-base font-bold text-white">Showing Demo Data</h3>
-                                <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-[10px] font-bold text-amber-400 uppercase tracking-wider">Demo Mode</span>
-                            </div>
-                            <p className="text-[13px] text-zinc-300 mb-3">
-                                Your Google account doesn&apos;t have any GA4 properties. Connect a different account to see live visitor data.
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2.5">
-                                <button
-                                    onClick={() => signIn('google', { callbackUrl: '/dashboard/globe' }, { prompt: 'select_account consent' })}
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-amber-500/20"
-                                >
-                                    Connect Different Account
-                                </button>
-                                <a
-                                    href="https://analytics.google.com"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-amber-400/70 hover:text-amber-300 font-medium transition"
-                                >
-                                    Set up GA4 &rarr;
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+            {isDemoWorkspace ? (
+                <DemoModeBanner
+                    description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
+                    secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+                />
+            ) : null}
+
+            {showGa4UnavailableState ? (
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 text-sm text-zinc-300">
+                    Connect a Google Analytics property to see your live globe data here.
                 </div>
-            )}
+            ) : null}
 
             {/* ══════════════════════════════════════════════════════ */}
             {/* ─── SECTION 1: LIVE DEMO ─── */}

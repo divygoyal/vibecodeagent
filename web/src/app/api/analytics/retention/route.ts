@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
+import { isDemoRequest } from '@/lib/demoWorkspace';
+import { getDemoRetentionData } from '@/lib/demoWorkspaceData';
 import { getValidAccessToken, fetchGoogleTokensFromDb, fetchRetentionCohorts } from '@/lib/googleApi';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -149,8 +151,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const mode = (searchParams.get('mode') || 'daily') as 'daily' | 'weekly' | 'monthly';
     const propertyId = searchParams.get('propertyId') || '';
+    const demoMode = isDemoRequest(searchParams);
 
     const isProduction = !!ADMIN_API_KEY;
+
+    if (demoMode) {
+        return NextResponse.json(getDemoRetentionData(mode), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
+    }
 
     // In production, use real GA4 data
     if (isProduction) {

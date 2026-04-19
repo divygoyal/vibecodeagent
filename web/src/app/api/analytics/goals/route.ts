@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache';
 import { getAnalyticsOverviewContext } from '@/lib/analyticsOverviewServer';
+import { getDemoGoalAnalytics } from '@/lib/demoWorkspaceData';
 import { buildGoalSuggestions, fetchGoalDefinitionAnalytics } from '@/lib/analyticsSubpageServer';
 import type { GoalDefinition, GoalDefinitionType } from '@/lib/analyticsDefinitions';
 
@@ -8,16 +9,21 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
     const context = await getAnalyticsOverviewContext(req);
-    if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
-        return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
-    }
-
     const searchParams = new URL(req.url).searchParams;
     const range = searchParams.get('range') || '30d';
     let type = searchParams.get('type') as GoalDefinitionType | null;
     let target = searchParams.get('target');
     const name = searchParams.get('name') || '';
     const description = searchParams.get('description') || '';
+
+    if (context.isDemoWorkspace) {
+        return NextResponse.json(getDemoGoalAnalytics({ type, target, name, description }), {
+            headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' },
+        });
+    }
+    if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
+        return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
+    }
 
     if (!type || !target) {
         const suggestions = await buildGoalSuggestions(context.accessToken, context.propertyId, range);

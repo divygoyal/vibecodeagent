@@ -13,6 +13,7 @@ import dynamic from 'next/dynamic';
 
 import { useRegistration } from '../layout';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import DemoModeBanner from '@/components/DemoModeBanner';
 import { AnalyticsSubpageEmptyState } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { getGa4AvailabilityCopy } from '@/lib/dashboardSelection';
 import { useContainerStatus } from '@/lib/useDashboardData';
@@ -44,6 +45,8 @@ export const AnalyticsContext = React.createContext<{
     hasGa4Properties: boolean;
     ga4Availability: 'available' | 'site_unmatched' | 'inventory_empty' | 'inventory_error';
     propertyInventoryError: string | null;
+    isDemoWorkspace: boolean;
+    demoDomainLabel: string;
     openShareDashboard: () => void;
 }>({
     selectedProperty: '',
@@ -55,6 +58,8 @@ export const AnalyticsContext = React.createContext<{
     hasGa4Properties: false,
     ga4Availability: 'inventory_empty',
     propertyInventoryError: null,
+    isDemoWorkspace: false,
+    demoDomainLabel: '',
     openShareDashboard: () => {},
 });
 
@@ -77,6 +82,8 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
         propertyInventoryError,
         siteInventoryError,
         propertyInventoryLoading,
+        isDemoWorkspace,
+        demoDomainLabel,
     } = useRegistration();
     const { filters, clearFilter, clearAll, compareMode, setCompareMode, advancedFilters, removeAdvancedFilter } = useFilterStore();
     const [shareOpen, setShareOpen] = useState(false);
@@ -93,8 +100,8 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
         [filters],
     );
     const activeFilterCount = simpleFilterCount + advancedFilters.length;
-    const showGa4LoadingState = requiresGa4 && propertyInventoryLoading && !resolvedPropertyId;
-    const showGa4UnavailableState = requiresGa4 && !propertyInventoryLoading && ga4Availability !== 'available';
+    const showGa4LoadingState = requiresGa4 && propertyInventoryLoading && !resolvedPropertyId && !isDemoWorkspace;
+    const showGa4UnavailableState = requiresGa4 && !propertyInventoryLoading && ga4Availability !== 'available' && !isDemoWorkspace;
 
     // Not connected state
     if (!containerLoading && !hasGoogleConnection) {
@@ -113,6 +120,8 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                 hasGa4Properties,
                 ga4Availability,
                 propertyInventoryError,
+                isDemoWorkspace,
+                demoDomainLabel,
                 openShareDashboard: () => setShareOpen(true),
             }}
         >
@@ -289,6 +298,14 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
 
                 {/* ─── Page content ─── */}
                 <div className="pt-2 sm:pt-3">
+                    {isDemoWorkspace ? (
+                        <div className="pb-3">
+                            <DemoModeBanner
+                                description="You’re viewing demo data because this Google account does not have any Google Analytics or Search Console properties yet."
+                                secondaryDescription={`${demoDomainLabel} is being used as the demo workspace so you can explore the dashboard before connecting your own property.`}
+                            />
+                        </div>
+                    ) : null}
                     {(containerLoading || showGa4LoadingState) ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />

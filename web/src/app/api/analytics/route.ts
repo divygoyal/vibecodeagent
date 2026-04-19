@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next"
 import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
+import { isDemoRequest } from '@/lib/demoWorkspace'
+import { getDemoAnalyticsDashboard } from '@/lib/demoWorkspaceData'
 import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -238,6 +240,7 @@ export async function GET(req: Request) {
     const sectionParam = searchParams.get('section') || 'all'
     const range = VALID_RANGES.has(rangeParam) ? rangeParam : '30d'
     const section = VALID_SECTIONS.has(sectionParam) ? sectionParam : 'all'
+    const demoMode = isDemoRequest(searchParams)
 
     const isProduction = !!ADMIN_API_KEY
 
@@ -249,6 +252,12 @@ export async function GET(req: Request) {
 
     if (isProduction && !session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (session?.user && demoMode) {
+        return NextResponse.json(getDemoAnalyticsDashboard(section, range), {
+            headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' },
+        })
     }
 
     try {

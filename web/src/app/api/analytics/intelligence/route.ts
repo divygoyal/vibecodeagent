@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache';
 import { getAnalyticsOverviewContext } from '@/lib/analyticsOverviewServer';
+import { getDemoAnalyticsIntelligence } from '@/lib/demoWorkspaceData';
 import { fetchAnalyticsIntelligenceData } from '@/lib/analyticsIntelligenceServer';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
     const context = await getAnalyticsOverviewContext(req);
+    if (context.isDemoWorkspace) {
+        return NextResponse.json(getDemoAnalyticsIntelligence(), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
+    }
     if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
         return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
     }

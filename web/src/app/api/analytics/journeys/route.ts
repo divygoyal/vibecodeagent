@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
+import { isDemoRequest } from '@/lib/demoWorkspace';
+import { getDemoJourneysData } from '@/lib/demoWorkspaceData';
 import { getValidAccessToken, fetchGoogleTokensFromDb, fetchJourneyData } from '@/lib/googleApi';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -59,7 +61,12 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const propertyId = searchParams.get('propertyId') || '';
+    const demoMode = isDemoRequest(searchParams);
     const isProduction = !!ADMIN_API_KEY;
+
+    if (demoMode) {
+        return NextResponse.json(getDemoJourneysData(), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
+    }
 
     if (isProduction) {
         // @ts-expect-error - id added in callbacks

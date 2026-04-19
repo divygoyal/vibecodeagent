@@ -6,19 +6,22 @@ import {
     parseOverviewRequest,
     SHARE_OVERVIEW_CACHE_TTL,
 } from '@/lib/analyticsOverviewServer';
+import { getDemoOverviewTopGeneric } from '@/lib/demoWorkspaceData';
 import { fetchShareOverviewTopGeneric } from '@/lib/shareOverviewData';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
     const context = await getAnalyticsOverviewContext(req);
-    if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
-        return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
-    }
-
     const request = parseOverviewRequest(req);
     if (!request.column) {
         return NextResponse.json({ error: 'column parameter required' }, { status: 400 });
+    }
+    if (context.isDemoWorkspace) {
+        return NextResponse.json(getDemoOverviewTopGeneric(request.column), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
+    }
+    if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
+        return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
     }
 
     const limit = request.limit ? parseInt(request.limit, 10) : undefined;

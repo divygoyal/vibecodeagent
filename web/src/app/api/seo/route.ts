@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next"
 import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
+import { isDemoRequest } from '@/lib/demoWorkspace'
+import { getDemoSeoDashboard } from '@/lib/demoWorkspaceData'
 import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -152,12 +154,22 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const section = searchParams.get('section') || 'all'
     const range = searchParams.get('range') || '30d'
+    const demoMode = isDemoRequest(searchParams)
 
     const isProduction = !!ADMIN_API_KEY
 
     const session = await getServerSession(authOptions)
     if (isProduction && !session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (session?.user && demoMode) {
+        if (searchParams.get('mode') === 'list') {
+            return NextResponse.json([])
+        }
+        return NextResponse.json(getDemoSeoDashboard(section, range), {
+            headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' },
+        })
     }
 
     try {

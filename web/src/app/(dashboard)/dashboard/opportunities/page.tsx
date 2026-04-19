@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Target, Zap, AlertTriangle, Loader2, Search } from 'lucide-react';
+import DemoModeBanner from '@/components/DemoModeBanner';
+import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { useContainerStatus, useSiteList } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
@@ -80,14 +82,16 @@ function OpportunitiesPageInner() {
 
   const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
   const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-  const { selectedSite, setSelectedSite } = useRegistration();
+  const { selectedSite, setSelectedSite, isDemoWorkspace, demoDomainLabel } = useRegistration();
 
   // Auto-select first site
   useEffect(() => {
-    if (sites.length > 0 && !selectedSite) {
+    if (!isDemoWorkspace && sites.length > 0 && !selectedSite) {
       setSelectedSite(sites[0].siteUrl);
     }
-  }, [sites, selectedSite, setSelectedSite]);
+  }, [isDemoWorkspace, sites, selectedSite, setSelectedSite]);
+
+  const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
 
   // Update URL params when tab changes
   const handleTabChange = (tab: TabKey) => {
@@ -98,8 +102,8 @@ function OpportunitiesPageInner() {
   };
 
   // Fetch opportunities data
-  const swrKey = selectedSite && hasGoogleConnection
-    ? `/api/seo/opportunities?siteUrl=${encodeURIComponent(selectedSite)}&timeframe=${timeframe}`
+  const swrKey = activeSite && hasGoogleConnection
+    ? `/api/seo/opportunities?siteUrl=${encodeURIComponent(activeSite)}&timeframe=${timeframe}${isDemoWorkspace ? '&demo=1' : ''}`
     : null;
 
   const { data, error, isLoading } = useSWR(swrKey, fetcher, {
@@ -128,7 +132,7 @@ function OpportunitiesPageInner() {
   }
 
   // No site selected
-  if (!selectedSite) {
+  if (!activeSite) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <EmptyState
@@ -142,6 +146,13 @@ function OpportunitiesPageInner() {
 
   return (
     <div className="space-y-6">
+      {isDemoWorkspace ? (
+        <DemoModeBanner
+          description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
+          secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+        />
+      ) : null}
+
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -213,20 +224,20 @@ function OpportunitiesPageInner() {
           {activeTab === 'striking' && (
             <StrikingDistanceWidget
               queries={data.queries || []}
-              siteUrl={selectedSite}
+              siteUrl={activeSite}
             />
           )}
           {activeTab === 'ctr' && (
             <CtrOptimizationLab
               queryPages={data.queryPages || []}
-              siteUrl={selectedSite}
+              siteUrl={activeSite}
             />
           )}
           {activeTab === 'decay' && (
             <SilentDecayMonitor
               queries={data.queries || []}
               comparisonQueries={data.comparisonQueries || []}
-              siteUrl={selectedSite}
+              siteUrl={activeSite}
             />
           )}
         </>

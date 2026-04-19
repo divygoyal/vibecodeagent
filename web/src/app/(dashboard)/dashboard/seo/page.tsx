@@ -17,6 +17,8 @@ import {
     FileText, Layers, Activity, Shield, Clock, Cpu, ScanSearch
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import DemoModeBanner from '@/components/DemoModeBanner';
+import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { exportSeoData } from '@/lib/exportUtils';
 import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
@@ -125,7 +127,7 @@ export default function SEOPage() {
 
     // 1. Fetch Sites (only when Google connected)
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-    const { selectedSite, setSelectedSite, range } = useRegistration();
+    const { selectedSite, setSelectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
@@ -168,13 +170,15 @@ export default function SEOPage() {
 
     // Auto-select first site
     useEffect(() => {
-        if (sites.length > 0 && !selectedSite) {
+        if (!isDemoWorkspace && sites.length > 0 && !selectedSite) {
             setSelectedSite(sites[0].siteUrl);
         }
-    }, [sites, selectedSite, setSelectedSite]);
+    }, [isDemoWorkspace, sites, selectedSite, setSelectedSite]);
+
+    const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
 
     // 2. Fetch SEO Data (only when Google connected)
-    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite, hasGoogleConnection, range);
+    const { data: seoData, isLoading, isError } = useSeoData('all', activeSite, hasGoogleConnection && (isDemoWorkspace || !!activeSite), range, isDemoWorkspace);
 
     // Show connect prompt if Google not connected
     if (!containerLoading && !hasGoogleConnection) {
@@ -255,6 +259,13 @@ export default function SEOPage() {
 
     return (
         <div className="space-y-6 p-4 sm:p-6">
+            {isDemoWorkspace ? (
+                <DemoModeBanner
+                    description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
+                    secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+                />
+            ) : null}
+
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -488,7 +499,7 @@ export default function SEOPage() {
                                 <h4 className="text-sm font-semibold text-white flex items-center gap-2"><Brain className="w-4 h-4 text-amber-400" /> Auto Keyword Research</h4>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <input value={kwSiteUrl} onChange={e => setKwSiteUrl(e.target.value)} placeholder="Your site URL (e.g. example.com)" className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/30" />
-                                    <button onClick={() => runTool('keywords', { siteUrl: kwSiteUrl || selectedSite, currentKeywords: queries.slice(0, 5).map((q: any) => q.query).join(', ') })} disabled={toolLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2 whitespace-nowrap">
+                                    <button onClick={() => runTool('keywords', { siteUrl: kwSiteUrl || activeSite, currentKeywords: queries.slice(0, 5).map((q: any) => q.query).join(', ') })} disabled={toolLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition flex items-center gap-2 whitespace-nowrap">
                                         {toolLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Find Keywords
                                     </button>
                                 </div>
@@ -886,9 +897,9 @@ export default function SEOPage() {
             )}
 
             {/* Mobile Gap Analysis */}
-            {selectedSite && (
+            {activeSite && (
                 <div className="mt-8">
-                    <MobileGapWidget siteUrl={selectedSite} />
+                    <MobileGapWidget siteUrl={activeSite} />
                 </div>
             )}
 
@@ -931,7 +942,7 @@ export default function SEOPage() {
                         </div>
                         <div className="space-y-2">
                             <button
-                                onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(selectedSite.replace('sc-domain:', 'https://'))}`)}
+                                onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(activeSite.replace('sc-domain:', 'https://'))}`)}
                                 className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-emerald-500/20 hover:bg-emerald-500/[0.04] transition-all text-left group"
                             >
                                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition">
@@ -978,13 +989,13 @@ export default function SEOPage() {
                 isOpen={!!selectedKeyword}
                 onClose={() => setSelectedKeyword(null)}
                 keyword={selectedKeyword}
-                siteUrl={selectedSite || null}
+                siteUrl={activeSite || null}
             />
             <PageDetailDrawer
                 isOpen={!!selectedPageUrl}
                 onClose={() => setSelectedPageUrl(null)}
                 pageUrl={selectedPageUrl}
-                siteUrl={selectedSite || null}
+                siteUrl={activeSite || null}
             />
         </div>
     );

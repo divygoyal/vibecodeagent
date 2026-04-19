@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { isDemoRequest } from '@/lib/demoWorkspace';
+import { getDemoPerformanceData } from '@/lib/demoWorkspaceData';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,6 +159,7 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const siteUrl = searchParams.get('siteUrl') || 'https://trafficclaw.com';
+    const demoMode = isDemoRequest(searchParams);
     // Normalize to origin (remove trailing paths)
     let origin: string;
     try {
@@ -164,6 +167,10 @@ export async function GET(req: Request) {
         origin = u.origin;
     } catch {
         origin = `https://${siteUrl.replace(/^sc-domain:/, '')}`;
+    }
+
+    if (demoMode) {
+        return NextResponse.json(getDemoPerformanceData(origin), { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=120' } });
     }
 
     try {

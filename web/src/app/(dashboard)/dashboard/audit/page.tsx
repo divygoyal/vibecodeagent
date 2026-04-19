@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -10,7 +10,10 @@ import {
     Target, Hash, Layers, ArrowUpDown, Type, ScrollText
 } from 'lucide-react';
 import type { AuditReport, AuditIssue, Severity } from '@/lib/siteAudit';
+import DemoModeBanner from '@/components/DemoModeBanner';
+import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { useContainerStatus, useSiteList, useAnalyticsData, usePropertyList } from '@/lib/useDashboardData';
+import { useRegistration } from '../layout';
 import FixWithBotButton from '@/components/FixWithBotButton';
 
 // ════════════════════════════════════════════════════════════════
@@ -604,6 +607,8 @@ function AuditPageInner() {
     const [filter, setFilter] = useState<FilterMode>('all');
     const [copied, setCopied] = useState(false);
     const searchParams = useSearchParams();
+    const demoAuditTriggeredRef = useRef(false);
+    const { isDemoWorkspace, demoDomainLabel } = useRegistration();
 
     // ─── Share report ───
     const shareReport = useCallback(() => {
@@ -638,21 +643,24 @@ function AuditPageInner() {
     useEffect(() => {
         if (properties.length > 0 && !selectedProp) setSelectedProp(properties[0].property);
     }, [properties, selectedProp]);
-    const { data: analyticsData } = useAnalyticsData('all', selectedProp, hasGoogleConnection);
+    const { data: analyticsData } = useAnalyticsData('all', selectedProp || undefined, hasGoogleConnection && (isDemoWorkspace || !!selectedProp), '30d', isDemoWorkspace);
     const userPages: string[] = (analyticsData?.pages || []).slice(0, 8).map((p: any) => p.page);
-    const userSiteUrl = sites.length > 0 ? sites[0].siteUrl.replace('sc-domain:', 'https://') : '';
+    const userSiteUrl = isDemoWorkspace
+        ? DEMO_SITE_URL
+        : sites.length > 0 ? sites[0].siteUrl.replace('sc-domain:', 'https://') : '';
 
     // ─── Run audit ───
-    const runAudit = useCallback(async () => {
-        if (!url.trim()) return;
+    const runAudit = useCallback(async (overrideUrl?: string) => {
+        const auditTarget = (overrideUrl ?? url).trim();
+        if (!auditTarget) return;
         setLoading(true);
         setError('');
         setReport(null);
         try {
-            const res = await fetch('/api/audit', {
+            const res = await fetch(`/api/audit${isDemoWorkspace ? '?demo=1' : ''}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: url.trim() }),
+                body: JSON.stringify({ url: auditTarget }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Audit failed');
@@ -662,7 +670,18 @@ function AuditPageInner() {
         } finally {
             setLoading(false);
         }
-    }, [url]);
+    }, [isDemoWorkspace, url]);
+
+    const handleRunAudit = useCallback(() => {
+        void runAudit();
+    }, [runAudit]);
+
+    useEffect(() => {
+        if (!isDemoWorkspace || demoAuditTriggeredRef.current || loading || report) return;
+        demoAuditTriggeredRef.current = true;
+        setUrl(DEMO_SITE_URL);
+        void runAudit(DEMO_SITE_URL);
+    }, [isDemoWorkspace, loading, report, runAudit]);
 
     // ─── Group & sort issues ───
     const { groupedIssues, sortedCategories } = useMemo(() => {
@@ -697,6 +716,13 @@ function AuditPageInner() {
                 </p>
             </motion.div>
 
+            {isDemoWorkspace ? (
+                <DemoModeBanner
+                    description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
+                    secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+                />
+            ) : null}
+
             {/* ════════════════════════════════════════ */}
             {/* ─── URL INPUT ─── */}
             {/* ════════════════════════════════════════ */}
@@ -708,7 +734,7 @@ function AuditPageInner() {
                             type="text"
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && !loading && runAudit()}
+                            onKeyDown={(e) => e.key === 'Enter' && !loading && void runAudit()}
                             placeholder="Enter URL to audit (e.g. example.com)"
                             aria-label="URL to audit"
                             className="w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-emerald-500/30 focus:ring-2 focus:ring-emerald-500/20 transition-all"
@@ -716,7 +742,7 @@ function AuditPageInner() {
                     </div>
                     <button
                         data-audit-btn
-                        onClick={runAudit}
+                        onClick={handleRunAudit}
                         disabled={loading || !url.trim()}
                         className="px-6 py-3 min-h-[44px] bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 disabled:hover:from-emerald-500 disabled:hover:to-cyan-500 text-black font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 w-full sm:w-auto"
                     >
@@ -964,7 +990,7 @@ function AuditPageInner() {
                                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                                 {copied ? 'Copied!' : 'Share'}
                             </button>
-                            <button onClick={runAudit} className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
+                            <button onClick={handleRunAudit} className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg hover:bg-white/[0.06] transition-colors">
                                 <RotateCcw className="w-3.5 h-3.5" /> Re-audit
                             </button>
                         </div>
@@ -992,7 +1018,7 @@ function AuditPageInner() {
                     {/* ─── QUICK RE-AUDIT ─── */}
                     <div className="section-divider my-6" />
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
-                        <button onClick={runAudit} className="flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20">
+                        <button onClick={handleRunAudit} className="flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20">
                             <RotateCcw className="w-4 h-4" /> Re-Audit This Page
                         </button>
                         <button onClick={() => { setReport(null); setUrl(''); }} className="flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] w-full sm:w-auto bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] font-medium text-sm rounded-xl hover:bg-white/[0.08] transition">

@@ -219,6 +219,7 @@ type OverviewRuntime = {
     apiBasePath: string;
     baseParams?: Record<string, string | undefined>;
     siteUrl?: string;
+    demoMode?: boolean;
     views: number;
     embedMode?: boolean;
     initialRange?: string;
@@ -3746,6 +3747,7 @@ export default function SharedOverviewClient({
     token,
     propertyId,
     siteUrl,
+    demoMode = false,
     views = 0,
     initialRange,
     onRangeChange,
@@ -3756,6 +3758,7 @@ export default function SharedOverviewClient({
     token?: string;
     propertyId?: string;
     siteUrl?: string;
+    demoMode?: boolean;
     views?: number;
     initialRange?: string;
     onRangeChange?: (value: string) => void;
@@ -3775,16 +3778,17 @@ export default function SharedOverviewClient({
     }));
     const runtime = useMemo<OverviewRuntime | null>(() => {
         if (mode === 'dashboard') {
-            if (!propertyId) {
+            if (!propertyId && !demoMode) {
                 return null;
             }
 
             return {
                 mode,
-                queryKey: propertyId,
+                queryKey: propertyId || 'demo-workspace',
                 apiBasePath: '/api/analytics/overview',
-                baseParams: { propertyId },
+                baseParams: { propertyId, demo: demoMode ? '1' : undefined },
                 siteUrl,
+                demoMode,
                 views,
                 embedMode: false,
                 initialRange,
@@ -3805,7 +3809,7 @@ export default function SharedOverviewClient({
             views,
             embedMode,
         };
-    }, [embedMode, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
+    }, [demoMode, embedMode, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
 
     if (!runtime) {
         return null;

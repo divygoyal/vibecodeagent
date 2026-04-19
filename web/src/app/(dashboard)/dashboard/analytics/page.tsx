@@ -19,13 +19,14 @@ export default function AnalyticsPage() {
         hasGoogleConnection,
         ga4Availability,
         propertyInventoryError,
+        isDemoWorkspace,
         openShareDashboard,
     } = useAnalyticsContext();
     const [intelligenceEnabled, setIntelligenceEnabled] = useState(false);
     const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
 
     useEffect(() => {
-        if (!selectedProperty || !hasGoogleConnection || intelligenceEnabled) {
+        if ((!selectedProperty && !isDemoWorkspace) || !hasGoogleConnection || intelligenceEnabled) {
             return;
         }
 
@@ -40,9 +41,10 @@ export default function AnalyticsPage() {
         selectedProperty,
         hasGoogleConnection && intelligenceEnabled,
         range,
+        isDemoWorkspace,
     );
 
-    if (!selectedProperty) {
+    if (!selectedProperty && !isDemoWorkspace) {
         return (
             <AnalyticsSubpageEmptyState
                 title={ga4AvailabilityCopy.title}
@@ -55,11 +57,12 @@ export default function AnalyticsPage() {
         <div className="space-y-4">
             <SharedOverviewClient
                 mode="dashboard"
-                propertyId={selectedProperty}
+                propertyId={selectedProperty || undefined}
                 siteUrl={selectedSite || undefined}
                 initialRange={range}
                 onRangeChange={setRange}
                 onShareDashboard={openShareDashboard}
+                demoMode={isDemoWorkspace}
             />
 
             {analyticsData?.kpis ? (

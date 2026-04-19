@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import {
-    AlertTriangle, Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Search, Sparkles, Target, TrendingDown
+    AlertTriangle, Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Search, Sparkles, Target, TrendingDown, Lock
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import DemoModeBanner from '@/components/DemoModeBanner';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
@@ -102,7 +103,12 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
 });
 
 export default function AIChat() {
-    const { selectedSite, setSelectedSite } = useRegistration();
+    const {
+        selectedSite,
+        setSelectedSite,
+        hasGa4Properties,
+        propertyInventoryLoading,
+    } = useRegistration();
     const { hasGoogleConnection } = useContainerStatus();
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
@@ -142,6 +148,7 @@ export default function AIChat() {
     const { data: seoData } = useSeoData('all', selectedSite, hasGoogleConnection && !!selectedSite);
     const dataReady = !!(analyticsData || seoData) || !hasGoogleConnection;
     const snapshot = useMemo(() => buildSnapshot(analyticsData, seoData), [analyticsData, seoData]);
+    const showGa4LockedState = !propertyInventoryLoading && !hasGa4Properties;
 
     // Refs for stable callbacks
     const messagesRef = useRef(messages);
@@ -242,13 +249,15 @@ export default function AIChat() {
             clearTimeout(ttfbTimeout);
 
             if (!res.ok) {
-                if (res.status === 402) {
+                if (res.status === 402 || res.status === 409) {
                     const errorData = await res.json().catch(() => ({}));
                     setMessages(prev => {
                         const updated = [...prev];
                         updated[updated.length - 1] = {
                             ...updated[updated.length - 1],
-                            content: errorData.response || "You've run out of messages. Get more credits to continue."
+                            content: errorData.response || (res.status === 402
+                                ? "You've run out of messages. Get more credits to continue."
+                                : 'AI Chat is unavailable because this account does not have any Google Analytics property connected yet.')
                         };
                         return updated;
                     });
@@ -350,6 +359,30 @@ export default function AIChat() {
     const siteLabel = selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Select site';
     const lastMsg = messages[messages.length - 1];
     const showEmpty = messages.length === 0;
+
+    if (showGa4LockedState) {
+        return (
+            <div className="space-y-6">
+                <DemoModeBanner
+                    title="AI Chat Unavailable"
+                    badgeLabel="GA4 Required"
+                    description="AI Chat is unavailable because this account does not have any Google Analytics property connected yet."
+                    secondaryDescription="Connect a different Google account or create a GA4 property to use AI Chat with your own analytics data."
+                />
+                <div className="rounded-[28px] border border-white/[0.08] bg-[#05070a] p-8 shadow-[0_28px_80px_rgba(0,0,0,0.32)]">
+                    <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-white/[0.08] bg-white/[0.04]">
+                            <Lock className="h-7 w-7 text-amber-300" />
+                        </div>
+                        <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white">Connect GA4 to unlock AI Chat</h1>
+                        <p className="mt-3 max-w-xl text-sm leading-7 text-zinc-400">
+                            TrafficClaw AI needs a real Google Analytics property before it can answer questions, inspect conversion leaks, or generate action plans from your own numbers.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-black">

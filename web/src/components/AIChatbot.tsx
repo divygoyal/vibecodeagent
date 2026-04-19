@@ -135,7 +135,8 @@ export default function AIChatbot() {
     // ── Self-sufficient data fetching: chatbot loads its own data for selected site ──
     const { hasGoogleConnection } = useContainerStatus();
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
-    const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
+    const { properties: ga4Properties, isLoading: propertiesLoading } = usePropertyList(hasGoogleConnection);
+    const hasRealGa4Property = ga4Properties.length > 0;
 
     // Derive combined site list from SWR hooks
     const allSites = useMemo<SiteOption[]>(() => {
@@ -300,20 +301,27 @@ export default function AIChatbot() {
             clearTimeout(ttfbTimeout); // Response started, cancel TTFB timeout
 
             if (!res.ok) {
-                if (res.status === 402) {
+                if (res.status === 402 || res.status === 409) {
                     try {
                         const errorData = await res.json();
-                        const creditMsg = errorData.response || `⚡ You've run out of messages! **1 credit = 1 message.**\n\nGet more to continue using TrafficClaw AI.`;
+                        const creditMsg = errorData.response || (res.status === 402
+                            ? `⚡ You've run out of messages! **1 credit = 1 message.**\n\nGet more to continue using TrafficClaw AI.`
+                            : 'AI Chat is unavailable because this account does not have any Google Analytics property connected yet.');
                         setMessages(prev => {
                             const updated = [...prev];
                             updated[updated.length - 1] = { ...updated[updated.length - 1], content: creditMsg };
                             return updated;
                         });
-                        if (errorData.credits !== undefined) setCredits(errorData.credits);
+                        if (res.status === 402 && errorData.credits !== undefined) setCredits(errorData.credits);
                     } catch {
                         setMessages(prev => {
                             const updated = [...prev];
-                            updated[updated.length - 1] = { ...updated[updated.length - 1], content: '⚡ **Out of messages!** Please purchase more to continue.' };
+                            updated[updated.length - 1] = {
+                                ...updated[updated.length - 1],
+                                content: res.status === 402
+                                    ? '⚡ **Out of messages!** Please purchase more to continue.'
+                                    : 'AI Chat is unavailable because this account does not have any Google Analytics property connected yet.',
+                            };
                             return updated;
                         });
                     }
@@ -503,6 +511,10 @@ export default function AIChatbot() {
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
     }, [isOpen]);
+
+    if (!hasGoogleConnection || (!propertiesLoading && !hasRealGa4Property)) {
+        return null;
+    }
 
     // ─── Floating button (closed state) ───
     if (!isOpen) {

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { isDemoRequest } from '@/lib/demoWorkspace'
+import { getDemoAuditReport } from '@/lib/demoWorkspaceData'
 import { runSiteAudit } from '@/lib/siteAudit'
 import { isBlockedUrl } from '@/lib/urlValidation'
 
@@ -14,6 +16,7 @@ export async function POST(req: Request) {
     }
 
     try {
+        const demoMode = isDemoRequest(req)
         const { url } = await req.json()
 
         if (!url || typeof url !== 'string') {
@@ -22,6 +25,10 @@ export async function POST(req: Request) {
 
         if (url.length > 2000) {
             return NextResponse.json({ error: "URL too long" }, { status: 400 })
+        }
+
+        if (demoMode) {
+            return NextResponse.json(getDemoAuditReport(url.trim() || undefined))
         }
 
         // Basic URL validation

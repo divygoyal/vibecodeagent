@@ -415,14 +415,19 @@ function FunnelStepCard({
 }
 
 export default function FunnelsPage() {
-    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const { selectedProperty, range, hasGoogleConnection, isDemoWorkspace } = useAnalyticsContext();
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [editor, setEditor] = useState<FunnelEditorState>(EMPTY_EDITOR);
     const [saving, setSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const canManageFunnels = !isDemoWorkspace && !!selectedProperty;
 
-    const definitionsKey = selectedProperty && hasGoogleConnection
-        ? `/api/analytics/funnels/definitions?propertyId=${encodeURIComponent(selectedProperty)}&range=${encodeURIComponent(range)}`
+    const definitionsKey = (selectedProperty || isDemoWorkspace) && hasGoogleConnection
+        ? `/api/analytics/funnels/definitions?${new URLSearchParams({
+            ...(selectedProperty ? { propertyId: selectedProperty } : {}),
+            range,
+            ...(isDemoWorkspace ? { demo: '1' } : {}),
+        }).toString()}`
         : null;
 
     const {
@@ -454,21 +459,26 @@ export default function FunnelsPage() {
     }, [definitions, selectedFunnel, selectedKey, suggestions]);
 
     const funnelQuery = useMemo(() => {
-        if (!selectedProperty || !selectedFunnel) return null;
+        if ((!selectedProperty && !isDemoWorkspace) || !selectedFunnel) return null;
 
         const params = new URLSearchParams({
-            propertyId: selectedProperty,
             range,
             steps: selectedFunnel.item.steps.join(','),
             name: selectedFunnel.item.name,
         });
+        if (selectedProperty) {
+            params.set('propertyId', selectedProperty);
+        }
+        if (isDemoWorkspace) {
+            params.set('demo', '1');
+        }
 
         if ('description' in selectedFunnel.item && selectedFunnel.item.description) {
             params.set('description', selectedFunnel.item.description);
         }
 
         return `/api/analytics/funnels?${params.toString()}`;
-    }, [range, selectedFunnel, selectedProperty]);
+    }, [isDemoWorkspace, range, selectedFunnel, selectedProperty]);
 
     const {
         data,
@@ -479,6 +489,7 @@ export default function FunnelsPage() {
     });
 
     const openCreate = (prefill?: Partial<FunnelEditorState['values']>) => {
+        if (!canManageFunnels) return;
         setEditor({
             open: true,
             mode: 'create',
@@ -491,6 +502,7 @@ export default function FunnelsPage() {
     };
 
     const openEdit = (definition: FunnelDefinition) => {
+        if (!canManageFunnels) return;
         setEditor({
             open: true,
             mode: 'edit',
@@ -506,7 +518,7 @@ export default function FunnelsPage() {
     const closeEditor = () => setEditor(EMPTY_EDITOR);
 
     const submitEditor = async () => {
-        if (!selectedProperty) return;
+        if (!selectedProperty || !canManageFunnels) return;
 
         try {
             setSaving(true);
@@ -542,6 +554,7 @@ export default function FunnelsPage() {
     };
 
     const deleteFunnel = async (definition: FunnelDefinition) => {
+        if (!canManageFunnels) return;
         try {
             setDeletingId(definition.id);
             await fetchJson(`/api/analytics/funnels/definitions/${definition.id}`, {
@@ -560,7 +573,7 @@ export default function FunnelsPage() {
         return <AnalyticsSubpageLoadingState title="Funnels" />;
     }
 
-    if (!selectedProperty || (!selectedFunnel && !definitionsLoading)) {
+    if ((!selectedProperty && !isDemoWorkspace) || (!selectedFunnel && !definitionsLoading)) {
         return (
             <AnalyticsSubpageEmptyState
                 title="No funnel context available"
@@ -585,14 +598,18 @@ export default function FunnelsPage() {
                             tone={selectedFunnel.kind === 'saved' ? 'cyan' : 'amber'}
                         />
                     ) : null}
-                    <button
-                        type="button"
-                        onClick={() => openCreate()}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#37E6C7]/25 bg-[#37E6C7]/10 px-4 py-2 text-xs font-semibold text-[#37E6C7] transition hover:bg-[#37E6C7]/20"
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        New funnel
-                    </button>
+                    {canManageFunnels ? (
+                        <button
+                            type="button"
+                            onClick={() => openCreate()}
+                            className="inline-flex items-center gap-2 rounded-xl border border-[#37E6C7]/25 bg-[#37E6C7]/10 px-4 py-2 text-xs font-semibold text-[#37E6C7] transition hover:bg-[#37E6C7]/20"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            New funnel
+                        </button>
+                    ) : (
+                        <AnalyticsSubpageBadge label="Demo funnels are read-only" tone="amber" />
+                    )}
                 </div>
             )}
         >
@@ -615,8 +632,8 @@ export default function FunnelsPage() {
                                         subtitle={definition.description || definition.steps.join(' → ')}
                                         selected={selectedKey === `saved:${definition.id}`}
                                         onClick={() => setSelectedKey(`saved:${definition.id}`)}
-                                        onEdit={() => openEdit(definition)}
-                                        onDelete={() => deleteFunnel(definition)}
+                                        onEdit={canManageFunnels ? () => openEdit(definition) : undefined}
+                                        onDelete={canManageFunnels ? () => deleteFunnel(definition) : undefined}
                                         badge={<AnalyticsSubpageBadge label={`${definition.steps.length} steps`} tone="cyan" />}
                                     />
                                 )) : (
@@ -640,11 +657,11 @@ export default function FunnelsPage() {
                                         subtitle={suggestion.description}
                                         selected={selectedKey === `suggestion:${index}`}
                                         onClick={() => setSelectedKey(`suggestion:${index}`)}
-                                        onEdit={() => openCreate({
+                                        onEdit={canManageFunnels ? () => openCreate({
                                             name: suggestion.name,
                                             description: suggestion.description,
                                             steps: suggestion.steps,
-                                        })}
+                                        }) : undefined}
                                         badge={<AnalyticsSubpageBadge label={`${suggestion.steps.length} steps`} tone="amber" />}
                                     />
                                 )) : (
@@ -696,7 +713,7 @@ export default function FunnelsPage() {
                                     ))}
                                 </div>
 
-                                {starterSelection ? (
+                                {starterSelection && canManageFunnels ? (
                                     <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
                                         <AnalyticsSectionLink
                                             label="Save starter as funnel"

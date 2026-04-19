@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
+import { isDemoRequest } from '@/lib/demoWorkspace';
+import { getDemoOpportunitiesData } from '@/lib/demoWorkspaceData';
 import { getValidAccessToken, fetchGoogleTokensFromDb } from '@/lib/googleApi';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -16,8 +18,13 @@ export async function GET(req: NextRequest) {
 
   const siteUrl = req.nextUrl.searchParams.get('siteUrl');
   const timeframe = req.nextUrl.searchParams.get('timeframe') || '28d';
+  const demoMode = isDemoRequest(req.nextUrl.searchParams);
   if (!siteUrl) {
     return NextResponse.json({ error: 'Missing siteUrl' }, { status: 400 });
+  }
+
+  if (demoMode) {
+    return NextResponse.json(getDemoOpportunitiesData());
   }
 
   try {

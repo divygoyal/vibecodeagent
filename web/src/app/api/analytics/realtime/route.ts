@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
+import { isDemoRequest } from '@/lib/demoWorkspace';
+import { getDemoRealtimeData } from '@/lib/demoWorkspaceData';
 import { getValidAccessToken, fetchGoogleTokensFromDb, fetchRealtimeVisitors } from '@/lib/googleApi';
 import { cachedFetch } from '@/lib/apiCache';
 
@@ -22,9 +24,15 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const propertyId = searchParams.get('property');
+        const demoMode = isDemoRequest(searchParams);
+        const realtimePropertyId = propertyId ?? undefined;
 
-        if (!propertyId) {
+        if (!realtimePropertyId && !demoMode) {
             return NextResponse.json({ error: 'property parameter required' }, { status: 400 });
+        }
+
+        if (demoMode) {
+            return NextResponse.json(getDemoRealtimeData(), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
         }
 
         const isProduction = !!ADMIN_API_KEY;
@@ -56,9 +64,9 @@ export async function GET(req: Request) {
 
             // Shared cache: same key as embed API so dashboard + embed don't double-fetch
             const data = await cachedFetch(
-                `realtime:${propertyId}`,
+                `realtime:${realtimePropertyId}`,
                 15_000, // 15s TTL for dashboard (more frequent than embed's 60s)
-                () => fetchRealtimeVisitors(token, propertyId)
+                () => fetchRealtimeVisitors(token, realtimePropertyId as string)
             );
 
             return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });

@@ -10,6 +10,7 @@ import {
     AnalyticsSubpageEmptyState,
     AnalyticsSubpageLoadingState,
 } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { useAnalyticsContext } from '../layout';
 
 interface MetricSnapshot {
@@ -502,10 +503,14 @@ function PerformanceTable<T>({
 }
 
 export default function PerformancePage() {
-    const { selectedSite, hasGoogleConnection } = useAnalyticsContext();
+    const { selectedSite, hasGoogleConnection, isDemoWorkspace } = useAnalyticsContext();
+    const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
 
-    const query = selectedSite && hasGoogleConnection
-        ? `/api/analytics/performance?siteUrl=${encodeURIComponent(selectedSite)}`
+    const query = activeSite && hasGoogleConnection
+        ? `/api/analytics/performance?${new URLSearchParams({
+            siteUrl: activeSite,
+            ...(isDemoWorkspace ? { demo: '1' } : {}),
+        }).toString()}`
         : null;
 
     const { data, error, isLoading } = useSWR<PerformanceResponse>(query, fetchJson, {
@@ -523,7 +528,7 @@ export default function PerformancePage() {
         return <AnalyticsSubpageLoadingState title="Performance" />;
     }
 
-    if (!selectedSite) {
+    if (!activeSite) {
         return (
             <AnalyticsSubpageEmptyState
                 title="No Search Console site selected"

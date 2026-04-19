@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { cachedFetch } from '@/lib/apiCache';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { DEMO_PROPERTY_ID, isDemoRequest } from '@/lib/demoWorkspace';
 import { parseOverviewRequest, SHARE_OVERVIEW_CACHE_TTL } from '@/lib/shareOverviewServer';
 
 const ANALYTICS_OVERVIEW_CONTEXT_TTL = 15_000;
@@ -37,16 +38,19 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
     userId: string | null;
     propertyId: string | null;
     accessToken: string | null;
+    isDemoWorkspace: boolean;
     error?: NextResponse;
 }> {
     const searchParams = new URL(req.url).searchParams;
+    const demoMode = isDemoRequest(searchParams);
     const propertyId = searchParams.get('propertyId');
 
-    if (!propertyId) {
+    if (!demoMode && !propertyId) {
         return {
             userId: null,
             propertyId: null,
             accessToken: null,
+            isDemoWorkspace: false,
             error: createAnalyticsOverviewError('propertyId parameter required', 400),
         };
     }
@@ -59,7 +63,7 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
     const cookieHeader = req.headers.get('cookie') || 'no-cookie';
 
     return cachedFetch(
-        `analytics-overview:context:${propertyId}:${cookieHeader}`,
+        `analytics-overview:context:${demoMode ? DEMO_PROPERTY_ID : propertyId}:${cookieHeader}`,
         ANALYTICS_OVERVIEW_CONTEXT_TTL,
         async () => {
             const [session, jwt] = await Promise.all([
@@ -71,9 +75,19 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
             if (!userId) {
                 return {
                     userId: null,
-                    propertyId,
+                    propertyId: demoMode ? DEMO_PROPERTY_ID : propertyId,
                     accessToken: null,
+                    isDemoWorkspace: false,
                     error: createAnalyticsOverviewError('Unauthorized', 401),
+                };
+            }
+
+            if (demoMode) {
+                return {
+                    userId,
+                    propertyId: DEMO_PROPERTY_ID,
+                    accessToken: 'demo-mode',
+                    isDemoWorkspace: true,
                 };
             }
 
@@ -93,6 +107,7 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
                     userId,
                     propertyId,
                     accessToken: null,
+                    isDemoWorkspace: false,
                     error: createAnalyticsOverviewError('Google not connected', 400),
                 };
             }
@@ -103,12 +118,14 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
                     userId,
                     propertyId,
                     accessToken,
+                    isDemoWorkspace: false,
                 };
             } catch {
                 return {
                     userId,
                     propertyId,
                     accessToken: null,
+                    isDemoWorkspace: false,
                     error: createAnalyticsOverviewError('Analytics data is temporarily unavailable', 503),
                 };
             }

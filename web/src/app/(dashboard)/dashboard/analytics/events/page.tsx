@@ -101,13 +101,14 @@ function EventTooltip({
 }
 
 export default function EventsPage() {
-    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const { selectedProperty, range, hasGoogleConnection, isDemoWorkspace } = useAnalyticsContext();
     const { data, isLoading } = useAnalyticsSubpageData<EventsResponse>(
         '/api/analytics/events',
         selectedProperty,
         range,
         hasGoogleConnection,
         180_000,
+        isDemoWorkspace,
     );
 
     if (isLoading && !data) {

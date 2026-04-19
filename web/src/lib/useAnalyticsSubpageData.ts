@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+import { DEMO_QUERY_PARAM, DEMO_QUERY_VALUE } from '@/lib/demoWorkspace';
 
 async function fetcher<T>(url: string): Promise<T> {
     const response = await fetch(url);
@@ -23,12 +24,14 @@ export function useAnalyticsSubpageData<T>(
     range: string,
     enabled = true,
     dedupingInterval = 60_000,
+    demoMode = false,
 ) {
     const params = new URLSearchParams();
     if (propertyId) params.set('propertyId', propertyId);
     if (range) params.set('range', range);
+    if (demoMode) params.set(DEMO_QUERY_PARAM, DEMO_QUERY_VALUE);
 
-    const key = enabled && propertyId ? `${path}?${params.toString()}` : null;
+    const key = enabled && (demoMode || !!propertyId) ? `${path}?${params.toString()}` : null;
     const { data, error, isLoading, mutate } = useSWR<T>(key, fetcher, {
         revalidateOnFocus: false,
         dedupingInterval,

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
 import { useSession } from 'next-auth/react';
+import { DEMO_QUERY_PARAM, DEMO_QUERY_VALUE } from '@/lib/demoWorkspace';
 
 type FetcherErrorInfo = {
     error?: string;
@@ -125,9 +126,13 @@ export function useGitHubData() {
     };
 }
 
-export function useAnalyticsData(section: string, propertyId?: string, enabled = true, range = '30d') {
-    const query = propertyId ? `&propertyId=${propertyId}` : '';
-    const url = (section && enabled) ? `/api/analytics?section=${section}${query}&range=${range}` : null;
+export function useAnalyticsData(section: string, propertyId?: string, enabled = true, range = '30d', demoMode = false) {
+    const params = new URLSearchParams();
+    params.set('section', section);
+    params.set('range', range);
+    if (propertyId) params.set('propertyId', propertyId);
+    if (demoMode) params.set(DEMO_QUERY_PARAM, DEMO_QUERY_VALUE);
+    const url = (section && enabled && (demoMode || !!propertyId)) ? `/api/analytics?${params.toString()}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 60000,
     });
@@ -140,12 +145,13 @@ export function useAnalyticsData(section: string, propertyId?: string, enabled =
     };
 }
 
-export function useSeoData(section: string, siteUrl?: string, enabled = true, range = '30d') {
+export function useSeoData(section: string, siteUrl?: string, enabled = true, range = '30d', demoMode = false) {
     const params = new URLSearchParams();
     params.set('section', section);
     if (siteUrl) params.set('siteUrl', siteUrl);
     if (range) params.set('range', range);
-    const url = (section && enabled) ? `/api/seo?${params.toString()}` : null;
+    if (demoMode) params.set(DEMO_QUERY_PARAM, DEMO_QUERY_VALUE);
+    const url = (section && enabled && (demoMode || !!siteUrl)) ? `/api/seo?${params.toString()}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 60000,
     });
@@ -158,11 +164,12 @@ export function useSeoData(section: string, siteUrl?: string, enabled = true, ra
     };
 }
 
-export function useGoalsData(propertyId?: string, enabled = true, range = '30d') {
+export function useGoalsData(propertyId?: string, enabled = true, range = '30d', demoMode = false) {
     const params = new URLSearchParams();
     if (propertyId) params.set('propertyId', propertyId);
     if (range) params.set('range', range);
-    const url = (propertyId && enabled) ? `/api/analytics/goals?${params.toString()}` : null;
+    if (demoMode) params.set(DEMO_QUERY_PARAM, DEMO_QUERY_VALUE);
+    const url = (enabled && (demoMode || !!propertyId)) ? `/api/analytics/goals?${params.toString()}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 300000,
         errorRetryCount: 1,
@@ -210,8 +217,11 @@ export function useSiteList(enabled = true) {
     };
 }
 
-export function useRealtimeData(propertyId?: string, enabled = true) {
-    const url = (propertyId && enabled) ? `/api/analytics/realtime?property=${propertyId}` : null;
+export function useRealtimeData(propertyId?: string, enabled = true, demoMode = false) {
+    const params = new URLSearchParams();
+    if (propertyId) params.set('property', propertyId);
+    if (demoMode) params.set(DEMO_QUERY_PARAM, DEMO_QUERY_VALUE);
+    const url = (enabled && (demoMode || !!propertyId)) ? `/api/analytics/realtime?${params.toString()}` : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR(url, {
         dedupingInterval: 10000,
         refreshInterval: 15000, // Auto-refresh every 15s for real-time feel

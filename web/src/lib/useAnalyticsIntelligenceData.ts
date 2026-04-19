@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
 import type { AnalyticsIntelligenceData } from '@/lib/analyticsIntelligenceServer';
+import { DEMO_QUERY_PARAM, DEMO_QUERY_VALUE } from '@/lib/demoWorkspace';
 
 type FetchErrorInfo = {
     error?: string;
@@ -62,9 +63,13 @@ function useRegisteredSWR<T>(url: string | null) {
     return useSWR<T, FetchError>(canFetch ? url : null, fetcher, swrOptions);
 }
 
-export function useAnalyticsIntelligenceData(propertyId?: string, enabled = true, range = '30d') {
-    const url = (propertyId && enabled)
-        ? `/api/analytics/intelligence?propertyId=${encodeURIComponent(propertyId)}&range=${range}`
+export function useAnalyticsIntelligenceData(propertyId?: string, enabled = true, range = '30d', demoMode = false) {
+    const params = new URLSearchParams();
+    if (propertyId) params.set('propertyId', propertyId);
+    params.set('range', range);
+    if (demoMode) params.set(DEMO_QUERY_PARAM, DEMO_QUERY_VALUE);
+    const url = (enabled && (demoMode || !!propertyId))
+        ? `/api/analytics/intelligence?${params.toString()}`
         : null;
     const { data, error, isLoading, mutate } = useRegisteredSWR<AnalyticsIntelligenceData>(url);
 

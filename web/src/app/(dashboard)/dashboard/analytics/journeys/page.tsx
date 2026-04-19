@@ -511,10 +511,16 @@ function ExitPagesSection({ pages }: { pages: ExitPageRow[] }) {
 // ─── Main Page ───
 
 export default function JourneysPage() {
-    const { selectedProperty, selectedSite, range, ga4Availability, propertyInventoryError } = useAnalyticsContext();
+    const { selectedProperty, selectedSite, range, ga4Availability, propertyInventoryError, isDemoWorkspace } = useAnalyticsContext();
     const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
     const { data, isLoading, error } = useSWR<JourneyResponse>(
-        selectedProperty ? `/api/analytics/journeys?propertyId=${selectedProperty}&range=${range}` : null,
+        selectedProperty || isDemoWorkspace
+            ? `/api/analytics/journeys?${new URLSearchParams({
+                ...(selectedProperty ? { propertyId: selectedProperty } : {}),
+                range,
+                ...(isDemoWorkspace ? { demo: '1' } : {}),
+            }).toString()}`
+            : null,
         fetcher
     );
 
@@ -603,7 +609,7 @@ export default function JourneysPage() {
         );
     }
 
-    if (!selectedProperty) {
+    if (!selectedProperty && !isDemoWorkspace) {
         return (
             <AnalyticsSubpageEmptyState
                 title={ga4AvailabilityCopy.title}

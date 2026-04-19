@@ -112,13 +112,14 @@ function ChartTooltip({
 }
 
 export default function PagesPage() {
-    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const { selectedProperty, range, hasGoogleConnection, isDemoWorkspace } = useAnalyticsContext();
     const { data, isLoading } = useAnalyticsSubpageData<PagesResponse>(
         '/api/analytics/pages',
         selectedProperty,
         range,
         hasGoogleConnection,
         180_000,
+        isDemoWorkspace,
     );
 
     if (isLoading && !data) {

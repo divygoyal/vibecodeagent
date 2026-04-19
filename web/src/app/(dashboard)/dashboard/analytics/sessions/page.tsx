@@ -98,13 +98,14 @@ function ChartTooltip({
 }
 
 export default function SessionsPage() {
-    const { selectedProperty, range, hasGoogleConnection } = useAnalyticsContext();
+    const { selectedProperty, range, hasGoogleConnection, isDemoWorkspace } = useAnalyticsContext();
     const { data, isLoading } = useAnalyticsSubpageData<SessionsResponse>(
         '/api/analytics/sessions',
         selectedProperty,
         range,
         hasGoogleConnection,
         180_000,
+        isDemoWorkspace,
     );
 
     if (isLoading && !data) {

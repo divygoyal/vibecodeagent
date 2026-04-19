@@ -375,11 +375,17 @@ function RetentionCurve({
 // ─── Main Page ───
 
 export default function RetentionPage() {
-    const { selectedProperty, selectedSite, ga4Availability, propertyInventoryError } = useAnalyticsContext();
+    const { selectedProperty, selectedSite, ga4Availability, propertyInventoryError, isDemoWorkspace } = useAnalyticsContext();
     const [mode, setMode] = useState<RetentionMode>('daily');
     const ga4AvailabilityCopy = getGa4AvailabilityCopy(ga4Availability, selectedSite, propertyInventoryError);
     const { data, isLoading, error } = useSWR<RetentionResponse>(
-        selectedProperty ? `/api/analytics/retention?propertyId=${selectedProperty}&mode=${mode}` : null,
+        selectedProperty || isDemoWorkspace
+            ? `/api/analytics/retention?${new URLSearchParams({
+                ...(selectedProperty ? { propertyId: selectedProperty } : {}),
+                mode,
+                ...(isDemoWorkspace ? { demo: '1' } : {}),
+            }).toString()}`
+            : null,
         fetcher,
         { keepPreviousData: true }
     );
@@ -427,7 +433,7 @@ export default function RetentionPage() {
         );
     }
 
-    if (!selectedProperty) {
+    if (!selectedProperty && !isDemoWorkspace) {
         return (
             <AnalyticsSubpageEmptyState
                 title={ga4AvailabilityCopy.title}

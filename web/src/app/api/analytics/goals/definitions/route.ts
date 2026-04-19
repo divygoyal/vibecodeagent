@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache';
 import { getAnalyticsOverviewContext } from '@/lib/analyticsOverviewServer';
+import { isDemoRequest } from '@/lib/demoWorkspace';
+import { getDemoGoalDefinitions } from '@/lib/demoWorkspaceData';
 import { buildGoalSuggestions } from '@/lib/analyticsSubpageServer';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +18,10 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions) as Session;
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (isDemoRequest(req)) {
+        return NextResponse.json(getDemoGoalDefinitions(), { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } });
     }
 
     const searchParams = new URL(req.url).searchParams;
@@ -51,6 +57,10 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions) as Session;
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (isDemoRequest(req)) {
+        return NextResponse.json({ error: 'Goal creation is disabled while demo data is active' }, { status: 403 });
     }
 
     if (!ADMIN_API_KEY) {

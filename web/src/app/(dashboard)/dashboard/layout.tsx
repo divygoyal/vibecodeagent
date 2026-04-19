@@ -25,6 +25,7 @@ import {
     formatSiteLabel,
     resolveDashboardSelection,
 } from '@/lib/dashboardSelection';
+import { DEMO_DOMAIN_LABEL } from '@/lib/demoWorkspace';
 import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
 import { useChatStore } from '@/stores/chatStore';
@@ -56,6 +57,8 @@ interface RegistrationContextType {
     siteInventoryError: string | null;
     propertyInventoryLoading: boolean;
     siteInventoryLoading: boolean;
+    isDemoWorkspace: boolean;
+    demoDomainLabel: string;
     range: string;
     setRange: (v: string) => void;
 }
@@ -77,6 +80,8 @@ const RegistrationContext = createContext<RegistrationContextType>({
     siteInventoryError: null,
     propertyInventoryLoading: false,
     siteInventoryLoading: false,
+    isDemoWorkspace: false,
+    demoDomainLabel: DEMO_DOMAIN_LABEL,
     range: '30d',
     setRange: () => { },
 });
@@ -277,6 +282,13 @@ export default function DashboardLayout({
         hasGa4Properties,
         ga4Availability,
     } = selection;
+    const isDemoWorkspace = hasGoogleConnection
+        && !siteInventoryLoading
+        && !propertyInventoryLoading
+        && !siteInventoryError
+        && !propertyInventoryError
+        && typedSites.length === 0
+        && typedProperties.length === 0;
     const displaySiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
 
     useEffect(() => {
@@ -826,6 +838,8 @@ export default function DashboardLayout({
                             siteInventoryError,
                             propertyInventoryLoading,
                             siteInventoryLoading,
+                            isDemoWorkspace,
+                            demoDomainLabel: DEMO_DOMAIN_LABEL,
                             range,
                             setRange,
                         }}>

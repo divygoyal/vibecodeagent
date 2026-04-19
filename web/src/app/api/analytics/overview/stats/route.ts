@@ -6,17 +6,23 @@ import {
     parseOverviewRequest,
     SHARE_OVERVIEW_CACHE_TTL,
 } from '@/lib/analyticsOverviewServer';
+import { getDemoOverviewStats } from '@/lib/demoWorkspaceData';
 import { fetchShareOverviewStats } from '@/lib/shareOverviewData';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
     const context = await getAnalyticsOverviewContext(req);
+    const request = parseOverviewRequest(req);
+    if (context.isDemoWorkspace) {
+        return NextResponse.json(
+            getDemoOverviewStats(request.range, (request.interval as 'hour' | 'day' | 'week' | 'month') || 'day'),
+            { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } },
+        );
+    }
     if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
         return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
     }
-
-    const request = parseOverviewRequest(req);
     const cacheKey = buildAnalyticsOverviewCacheKey('stats', context.userId, context.propertyId, [
         request.range,
         request.interval,

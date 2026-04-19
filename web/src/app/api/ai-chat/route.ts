@@ -268,26 +268,52 @@ export async function POST(req: NextRequest) {
             googleRefreshToken = dbTokens.refreshToken;
         }
 
+        const ga4RequiredResponse = {
+            error: 'ga4_required',
+            response: 'AI Chat is unavailable because this account does not have any Google Analytics property connected yet. Connect a different Google account or create a GA4 property to continue.',
+        };
+
+        if (!googleAccessToken && !googleRefreshToken) {
+            return new Response(JSON.stringify(ga4RequiredResponse), {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        let validGoogleToken = '';
+        let cachedSites: any[] = [];
+        let cachedGa4Properties: any[] = [];
+
+        try {
+            validGoogleToken = await getValidAccessToken(googleAccessToken, googleRefreshToken);
+            const cacheKey = `sites:${userId}`;
+            [cachedSites, cachedGa4Properties] = await Promise.all([
+                getCachedOrFetch(`${cacheKey}:gsc`, () => listSearchConsoleSites(validGoogleToken).catch(() => [])),
+                getCachedOrFetch(`${cacheKey}:ga4`, () => listAnalyticsProperties(validGoogleToken).catch(() => [])),
+            ]);
+        } catch {
+            return new Response(JSON.stringify(ga4RequiredResponse), {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        if (!cachedGa4Properties.length) {
+            return new Response(JSON.stringify(ga4RequiredResponse), {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
         // ── Get Available Sites Context (only on first message — subsequent messages have it in history) ──
         let availableSitesContext = '';
         const isFirstMessage = !history?.length;
-        if (isFirstMessage && (googleAccessToken || googleRefreshToken)) {
-            try {
-                const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
-                const cacheKey = `sites:${userId}`;
-                const [sites, ga4Properties] = await Promise.all([
-                    getCachedOrFetch(`${cacheKey}:gsc`, () => listSearchConsoleSites(token).catch(() => [])),
-                    getCachedOrFetch(`${cacheKey}:ga4`, () => listAnalyticsProperties(token).catch(() => [])),
-                ]);
-
-                if (sites && sites.length > 0) {
-                    availableSitesContext = `\n[SITES: ${sites.map((s: any) => s.siteUrl).join(', ')}]`;
-                }
-                if (ga4Properties && ga4Properties.length > 0) {
-                    availableSitesContext += `\n[GA4: ${ga4Properties.map((p: any) => `${p.property}(${p.displayName || ''})`).join(', ')}]`;
-                }
-            } catch {
-                // Site/property list fetch failed — continue without context
+        if (isFirstMessage) {
+            if (cachedSites.length > 0) {
+                availableSitesContext = `\n[SITES: ${cachedSites.map((s: any) => s.siteUrl).join(', ')}]`;
+            }
+            if (cachedGa4Properties.length > 0) {
+                availableSitesContext += `\n[GA4: ${cachedGa4Properties.map((p: any) => `${p.property}(${p.displayName || ''})`).join(', ')}]`;
             }
         }
 

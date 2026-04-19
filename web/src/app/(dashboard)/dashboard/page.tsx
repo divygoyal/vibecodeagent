@@ -22,10 +22,12 @@ import {
 } from 'lucide-react';
 
 import { formatSiteLabel } from '@/lib/dashboardSelection';
+import { DEMO_DOMAIN_LABEL, DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { useContainerStatus, useAnalyticsData, useSeoData, useSiteList, usePropertyList, useRealtimeData, useGoalsData } from '@/lib/useDashboardData';
 import { computeAlerts, computeOpportunities } from '@/lib/alertEngine';
 import { getDashboardBriefing } from '@/lib/dashboardBriefing';
 import { useRegistration } from './layout';
+import DemoModeBanner from '@/components/DemoModeBanner';
 import { ConnectGoogleState } from '@/components/EmptyState';
 import OverviewCommandCenter from '@/components/dashboard/OverviewCommandCenterV2';
 import MobileOverviewAppShell from '@/components/dashboard/MobileOverviewAppShell';
@@ -149,16 +151,18 @@ type GoalsResponse = {
 
 export default function DashboardOverview() {
   const { data: session } = useSession();
-  const {
-    registrationError,
-    retryRegistration,
-    selectedSite,
-    resolvedSiteUrl,
-    resolvedPropertyId,
-    propertyInventoryError,
-    siteInventoryError,
-    range,
-  } = useRegistration();
+    const {
+        registrationError,
+        retryRegistration,
+        selectedSite,
+        resolvedSiteUrl,
+        resolvedPropertyId,
+        propertyInventoryError,
+        siteInventoryError,
+        isDemoWorkspace,
+        demoDomainLabel,
+        range,
+    } = useRegistration();
 
   useKeyboardShortcuts();
 
@@ -175,7 +179,7 @@ export default function DashboardOverview() {
   const botRunning = botStatus?.status === 'running';
   const { sites, isLoading: sitesLoading, error: sitesRequestError, refresh: refreshSites } = useSiteList(hasGoogleConnection);
   const { properties, isLoading: propsLoading, error: propsRequestError, refresh: refreshProperties } = usePropertyList(hasGoogleConnection);
-  const activeSiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
+  const activeSiteUrl = isDemoWorkspace ? DEMO_SITE_URL : (resolvedSiteUrl || (siteInventoryError ? selectedSite : ''));
   const reportPropertyId = resolvedPropertyId;
   const isSeoOnlyReport = !reportPropertyId;
 
@@ -184,12 +188,12 @@ export default function DashboardOverview() {
     setFunnelCompleted(localStorage.getItem('tc-funnel-completed') === 'true');
   }, []);
   const hasCachedSite = !!activeSiteUrl;
-  const canFetchSeoData = hasGoogleConnection || hasCachedSite;
-  const canFetchAnalyticsData = canFetchSeoData && !!resolvedPropertyId;
+  const canFetchSeoData = hasGoogleConnection && (isDemoWorkspace || hasCachedSite);
+  const canFetchAnalyticsData = canFetchSeoData && (isDemoWorkspace || !!resolvedPropertyId);
 
-  const { data: analyticsData, isLoading: analyticsLoading, refresh: refreshAnalytics } = useAnalyticsData('all', resolvedPropertyId, canFetchAnalyticsData, range);
-  const { data: seoData, isLoading: seoLoading, refresh: refreshSeo } = useSeoData('all', activeSiteUrl, canFetchSeoData, range);
-  const { data: goalsData } = useGoalsData(resolvedPropertyId, canFetchAnalyticsData, range);
+  const { data: analyticsData, isLoading: analyticsLoading, refresh: refreshAnalytics } = useAnalyticsData('all', resolvedPropertyId, canFetchAnalyticsData, range, isDemoWorkspace);
+  const { data: seoData, isLoading: seoLoading, refresh: refreshSeo } = useSeoData('all', activeSiteUrl, canFetchSeoData, range, isDemoWorkspace);
+  const { data: goalsData } = useGoalsData(resolvedPropertyId, canFetchAnalyticsData, range, isDemoWorkspace);
 
   const analyticsDashboardData = analyticsData as DashboardAnalyticsData | undefined;
   const seoDashboardData = seoData as DashboardSeoData | undefined;
@@ -206,7 +210,7 @@ export default function DashboardOverview() {
   );
   const hasData = !!(analyticsKPIs || seoKPIs);
 
-  const { data: realtimeData } = useRealtimeData(resolvedPropertyId, canFetchAnalyticsData && hasData);
+  const { data: realtimeData } = useRealtimeData(resolvedPropertyId, canFetchAnalyticsData && hasData, isDemoWorkspace);
   const activeUsers = typeof realtimeData?.activeUsers === 'number' ? realtimeData.activeUsers : null;
   const isLive = botRunning && botStatus?.telegramStatus === 'connected';
 
@@ -217,7 +221,7 @@ export default function DashboardOverview() {
   const showConnectGoogle = !containerLoading ? !hasGoogleConnection : !sessionHasGoogleToken;
   const inventoryError = propertyInventoryError || siteInventoryError || (propsRequestError instanceof Error ? propsRequestError.message : null) || (sitesRequestError instanceof Error ? sitesRequestError.message : null);
   const isCheckingData = hasGoogleConnection && !containerLoading && !inventoryError && (sitesLoading || propsLoading);
-  const isEmptyShell = hasGoogleConnection && !containerLoading && !sitesLoading && !propsLoading && !inventoryError && sites.length === 0 && properties.length === 0;
+  const isEmptyShell = hasGoogleConnection && !containerLoading && !sitesLoading && !propsLoading && !inventoryError && sites.length === 0 && properties.length === 0 && !isDemoWorkspace;
 
   // Track how many times data has finished loading (loading transition true->false with data present)
   const loadCountRef = useRef(0);
@@ -229,7 +233,7 @@ export default function DashboardOverview() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const lastUpdated = useMemo(() => (loadCountRef.current > 0 ? new Date() : null), [loadCountRef.current]);
 
-  const selectedSiteLabel = activeSiteUrl ? formatSiteLabel(activeSiteUrl) : '';
+  const selectedSiteLabel = isDemoWorkspace ? demoDomainLabel : (activeSiteUrl ? formatSiteLabel(activeSiteUrl) : '');
 
   // Personalized greeting
   const firstName = session?.user?.name?.split(' ')[0] || '';
@@ -468,6 +472,13 @@ export default function DashboardOverview() {
             </button>
           </div>
         </div>
+      )}
+
+      {isDemoWorkspace && (
+        <DemoModeBanner
+          description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
+          secondaryDescription={`${demoDomainLabel || DEMO_DOMAIN_LABEL} is being used as the demo workspace so you can explore overview, analytics, SEO, and audit screens.`}
+        />
       )}
 
       {/* Connect Google empty state */}
