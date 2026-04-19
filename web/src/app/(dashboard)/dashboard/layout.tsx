@@ -114,8 +114,8 @@ const sidebarGroups: SidebarGroup[] = [
         { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
     { label: 'Social APIs', items: [
-        { icon: Sparkles, label: 'X (Twitter) API', href: '/dashboard/x-api' },
-        { icon: MessageCircle, label: 'Reddit API', href: '/dashboard/reddit-api' },
+        { icon: Sparkles, label: 'X mentions', href: '/dashboard/x-api' },
+        { icon: MessageCircle, label: 'Reddit mentions', href: '/dashboard/reddit-api' },
     ]},
     { label: 'SEO & Growth', items: [
         { icon: Search, label: 'SEO', href: '/dashboard/seo' },
