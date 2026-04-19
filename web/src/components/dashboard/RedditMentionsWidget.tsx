@@ -168,7 +168,7 @@ export function RedditMentionsProvider({ domain, children }: RedditMentionsProvi
           error?: string | null;
         };
 
-        if (!Array.isArray(parsed.mentions) || parsed.mentions.length === 0) return null;
+        if (!Array.isArray(parsed.mentions)) return null;
         return {
           mentions: sortMentionsByNewest(dedupMentions(parsed.mentions)),
           warning: parsed.warning || null,
@@ -214,7 +214,7 @@ export function RedditMentionsProvider({ domain, children }: RedditMentionsProvi
         setError(nextError);
         setWarning(nextWarning);
 
-        if (nextMentions.length > 0) {
+        if (!nextError) {
           try {
             localStorage.setItem(
               cacheKey,

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ mentions: [], warning: 'Invalid domain' }, { status: 200 });
         }
 
-        const cached = peekCachedRedditMentionsForDomain(canonicalDomain);
+        const cached = await peekCachedRedditMentionsForDomain(canonicalDomain);
         if (cached) {
             return NextResponse.json(cached);
         }
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const result = await fetchRedditMentionsForDomain(canonicalDomain);
+        const result = await fetchRedditMentionsForDomain(canonicalDomain, { source: 'public' });
         return NextResponse.json(result);
     } catch (error) {
         console.error('[public-reddit-mentions] Error:', error);

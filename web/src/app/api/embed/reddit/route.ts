@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
         const config = normalizeXWidgetConfig(validationData.config);
         const candidateLimit = 18;
-        const result = await fetchRedditMentionsForDomain(validationData.domain);
+        const result = await fetchRedditMentionsForDomain(validationData.domain, { source: 'embed' });
 
         return NextResponse.json({
             token,

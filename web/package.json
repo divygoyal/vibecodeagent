@@ -20,6 +20,7 @@
     "@types/d3-sankey": "^0.12.5",
     "@types/d3-shape": "^3.1.8",
     "@types/jszip": "^3.4.0",
+    "@upstash/redis": "^1.37.0",
     "cheerio": "^1.2.0",
     "cobe": "^0.6.5",
     "d3-sankey": "^0.12.3",

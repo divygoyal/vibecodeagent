@@ -15,7 +15,9 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const { domain } = body as { domain?: string };
-        const result = await fetchRedditMentionsForDomain(typeof domain === 'string' ? domain : '');
+        const result = await fetchRedditMentionsForDomain(typeof domain === 'string' ? domain : '', {
+            source: 'dashboard',
+        });
 
         if (!result.canonicalDomain && result.warning === 'Invalid domain') {
             return NextResponse.json({ mentions: [], warning: 'Invalid domain' }, { status: 200 });

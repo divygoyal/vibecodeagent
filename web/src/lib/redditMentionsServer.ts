@@ -1,7 +1,14 @@
 import 'server-only';
 
-import { canonicalizeDomainInput } from '@/lib/xMentionsShared';
+import {
+    getRedditMentionsCache,
+    isRedditMentionsRedisEnabled,
+    releaseRedditMentionsLock,
+    setRedditMentionsCache,
+    tryAcquireRedditMentionsLock,
+} from '@/lib/redditMentionsCache';
 import { type RedditMentionPayload } from '@/lib/redditMentionsShared';
+import { canonicalizeDomainInput } from '@/lib/xMentionsShared';
 
 export type RedditMentionsResult = {
     canonicalDomain: string;
@@ -10,8 +17,19 @@ export type RedditMentionsResult = {
     error?: string;
 };
 
+export type RedditMentionsRequestSource = 'dashboard' | 'public' | 'embed' | 'unknown';
+
+type RedditFetchOutcome = 'success' | 'empty' | 'blocked' | 'timeout' | 'error';
+type CacheStatus = 'hit' | 'miss' | 'lock-wait';
+type CacheLayer = 'local' | 'redis';
+
+type CachedRedditMentionsResult = RedditMentionsResult & {
+    outcome: RedditFetchOutcome;
+    cachedAt: string;
+};
+
 type CacheEntry = {
-    data: RedditMentionsResult;
+    data: CachedRedditMentionsResult;
     expiresAt: number;
 };
 
@@ -22,16 +40,19 @@ type RedditSource = 'domain' | 'search';
 type SourceOutcome = {
     source: RedditSource;
     mentions: RedditMentionPayload[];
-    failed: boolean;
-    timedOut: boolean;
-    blocked: boolean;
+    status: 'success' | 'blocked' | 'timeout' | 'error';
 };
 
 const SEARCH_LIMIT = 25;
 const MAX_MENTIONS = 18;
-const SUCCESS_CACHE_TTL = 24 * 60 * 60 * 1000;
-const DEGRADED_CACHE_TTL = 10 * 60 * 1000;
+const MIN_DOMAIN_RESULTS_BEFORE_SKIP_SEARCH = 6;
+const SUCCESS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const BLOCKED_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const TRANSIENT_CACHE_TTL_MS = 30 * 60 * 1000;
 const UPSTREAM_TIMEOUT_MS = 8_000;
+const LOCK_TTL_SECONDS = 20;
+const LOCK_WAIT_TIMEOUT_MS = 5_000;
+const LOCK_POLL_INTERVAL_MS = 250;
 const REDDIT_BASE_URL = 'https://www.reddit.com';
 const REDDIT_USER_AGENT = 'TrafficClaw/1.0 (+https://trafficclaw.com)';
 
@@ -40,7 +61,12 @@ const inflightMap = new Map<string, Promise<RedditMentionsResult>>();
 
 function getCacheKey(canonicalDomain: string) {
     const today = new Date().toISOString().slice(0, 10);
-    return `rm:v2:${canonicalDomain}:${today}`;
+    return `rm:v3:${canonicalDomain}:${today}`;
+}
+
+function getLockKey(canonicalDomain: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `rm:v3:lock:${canonicalDomain}:${today}`;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -97,7 +123,25 @@ function containsDomain(value: string | null, domain: string) {
     return Boolean(value && value.toLowerCase().includes(domain));
 }
 
-function getCached(key: string): RedditMentionsResult | null {
+function getTtlMsForOutcome(outcome: RedditFetchOutcome) {
+    switch (outcome) {
+        case 'blocked':
+            return BLOCKED_CACHE_TTL_MS;
+        case 'timeout':
+        case 'error':
+            return TRANSIENT_CACHE_TTL_MS;
+        case 'success':
+        case 'empty':
+        default:
+            return SUCCESS_CACHE_TTL_MS;
+    }
+}
+
+function getTtlSecondsForOutcome(outcome: RedditFetchOutcome) {
+    return Math.ceil(getTtlMsForOutcome(outcome) / 1000);
+}
+
+function getLocalCached(key: string): CachedRedditMentionsResult | null {
     const entry = serverCache.get(key);
     if (!entry) return null;
     if (Date.now() >= entry.expiresAt) {
@@ -107,10 +151,10 @@ function getCached(key: string): RedditMentionsResult | null {
     return entry.data;
 }
 
-function setCache(key: string, data: RedditMentionsResult, ttl: number) {
+function setLocalCache(key: string, data: CachedRedditMentionsResult) {
     serverCache.set(key, {
         data,
-        expiresAt: Date.now() + ttl,
+        expiresAt: Date.now() + getTtlMsForOutcome(data.outcome),
     });
 }
 
@@ -255,6 +299,99 @@ function createTimeoutController() {
     return { controller, timeoutId };
 }
 
+function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function stripCachedResult(result: CachedRedditMentionsResult): RedditMentionsResult {
+    return {
+        canonicalDomain: result.canonicalDomain,
+        mentions: result.mentions,
+        warning: result.warning,
+        error: result.error,
+    };
+}
+
+function toCachedResult(result: RedditMentionsResult, outcome: RedditFetchOutcome): CachedRedditMentionsResult {
+    return {
+        ...result,
+        outcome,
+        cachedAt: new Date().toISOString(),
+    };
+}
+
+function normalizeOutcome(value: unknown): RedditFetchOutcome {
+    switch (value) {
+        case 'success':
+        case 'empty':
+        case 'blocked':
+        case 'timeout':
+        case 'error':
+            return value;
+        default:
+            return 'error';
+    }
+}
+
+function parseCachedResult(value: unknown): CachedRedditMentionsResult | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    const canonicalDomain = getString(value.canonicalDomain);
+    const cachedAt = getString(value.cachedAt);
+    if (!canonicalDomain || !cachedAt || !Array.isArray(value.mentions)) {
+        return null;
+    }
+
+    return {
+        canonicalDomain,
+        mentions: value.mentions as RedditMentionPayload[],
+        warning: getString(value.warning) || undefined,
+        error: getString(value.error) || undefined,
+        outcome: normalizeOutcome(value.outcome),
+        cachedAt,
+    };
+}
+
+async function readCachedResult(key: string): Promise<{ value: CachedRedditMentionsResult; layer: CacheLayer } | null> {
+    const local = getLocalCached(key);
+    if (local) {
+        return { value: local, layer: 'local' };
+    }
+
+    const shared = parseCachedResult(await getRedditMentionsCache<unknown>(key));
+    if (!shared) {
+        return null;
+    }
+
+    setLocalCache(key, shared);
+    return { value: shared, layer: 'redis' };
+}
+
+async function waitForCachedResult(key: string) {
+    const startedAt = Date.now();
+    while ((Date.now() - startedAt) < LOCK_WAIT_TIMEOUT_MS) {
+        const cached = await readCachedResult(key);
+        if (cached) {
+            return cached;
+        }
+        await sleep(LOCK_POLL_INTERVAL_MS);
+    }
+    return null;
+}
+
+function logRedditFetch(params: {
+    domain: string;
+    routeSource: RedditMentionsRequestSource;
+    cacheStatus: CacheStatus;
+    outcome: RedditFetchOutcome;
+    mentionCount: number;
+    cacheLayer?: CacheLayer;
+}) {
+    console.info('[reddit-mentions]', params);
+}
+
 async function fetchRedditListing(url: string) {
     const { controller, timeoutId } = createTimeoutController();
 
@@ -295,18 +432,18 @@ async function fetchDomainMentions(domain: string): Promise<SourceOutcome> {
         return {
             source: 'domain',
             mentions: parseListingPosts(payload, domain),
-            failed: false,
-            timedOut: false,
-            blocked: false,
+            status: 'success',
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
             source: 'domain',
             mentions: [],
-            failed: true,
-            timedOut: message === 'REDDIT_TIMEOUT',
-            blocked: message === 'REDDIT_BLOCKED',
+            status: message === 'REDDIT_BLOCKED'
+                ? 'blocked'
+                : message === 'REDDIT_TIMEOUT'
+                    ? 'timeout'
+                    : 'error',
         };
     }
 }
@@ -323,33 +460,33 @@ async function fetchSearchMentions(domain: string): Promise<SourceOutcome> {
         return {
             source: 'search',
             mentions: parseListingPosts(payload, domain),
-            failed: false,
-            timedOut: false,
-            blocked: false,
+            status: 'success',
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
             source: 'search',
             mentions: [],
-            failed: true,
-            timedOut: message === 'REDDIT_TIMEOUT',
-            blocked: message === 'REDDIT_BLOCKED',
+            status: message === 'REDDIT_BLOCKED'
+                ? 'blocked'
+                : message === 'REDDIT_TIMEOUT'
+                    ? 'timeout'
+                    : 'error',
         };
     }
 }
 
 function getAggregateWarning(outcomes: SourceOutcome[], mentionCount: number) {
-    const failed = outcomes.filter((outcome) => outcome.failed);
+    const failed = outcomes.filter((outcome) => outcome.status !== 'success');
     if (failed.length === 0) {
         return undefined;
     }
 
-    if (failed.every((outcome) => outcome.blocked)) {
+    if (failed.every((outcome) => outcome.status === 'blocked')) {
         return 'Reddit blocked this server right now — please try again later.';
     }
 
-    if (failed.every((outcome) => outcome.timedOut)) {
+    if (failed.every((outcome) => outcome.status === 'timeout')) {
         return mentionCount > 0
             ? 'Some Reddit results were slow — showing partial mentions.'
             : 'Reddit search timed out — mentions will load on the next refresh.';
@@ -360,29 +497,115 @@ function getAggregateWarning(outcomes: SourceOutcome[], mentionCount: number) {
         : 'Reddit mentions temporarily unavailable — please try again later.';
 }
 
-async function runAndCacheReddit(cacheKey: string, canonicalDomain: string): Promise<RedditMentionsResult> {
-    const outcomes = await Promise.all([
-        fetchDomainMentions(canonicalDomain),
-        fetchSearchMentions(canonicalDomain),
-    ]);
+function getAggregateOutcome(outcomes: SourceOutcome[], mentionCount: number): RedditFetchOutcome {
+    const failed = outcomes.filter((outcome) => outcome.status !== 'success');
+    if (failed.length === 0) {
+        return mentionCount > 0 ? 'success' : 'empty';
+    }
 
-    const mentions = sortMentions(
-        dedupeMentions(outcomes.flatMap((outcome) => outcome.mentions))
-    ).slice(0, MAX_MENTIONS);
-    const warning = getAggregateWarning(outcomes, mentions.length);
+    if (
+        failed.some((outcome) => outcome.status === 'blocked') &&
+        !failed.some((outcome) => outcome.status === 'timeout' || outcome.status === 'error')
+    ) {
+        return 'blocked';
+    }
 
-    const result: RedditMentionsResult = {
-        canonicalDomain,
-        mentions,
-        warning,
-    };
+    if (failed.some((outcome) => outcome.status === 'timeout')) {
+        return 'timeout';
+    }
 
-    const ttl = warning ? DEGRADED_CACHE_TTL : SUCCESS_CACHE_TTL;
-    setCache(cacheKey, result, ttl);
-    return result;
+    return 'error';
 }
 
-export async function fetchRedditMentionsForDomain(domainInput: string): Promise<RedditMentionsResult> {
+async function runRedditLookup(canonicalDomain: string) {
+    const outcomes: SourceOutcome[] = [];
+    const domainOutcome = await fetchDomainMentions(canonicalDomain);
+    outcomes.push(domainOutcome);
+
+    if (
+        domainOutcome.status !== 'success' ||
+        domainOutcome.mentions.length < MIN_DOMAIN_RESULTS_BEFORE_SKIP_SEARCH
+    ) {
+        outcomes.push(await fetchSearchMentions(canonicalDomain));
+    }
+
+    const mentions = sortMentions(
+        dedupeMentions(outcomes.flatMap((outcome) => outcome.mentions)),
+    ).slice(0, MAX_MENTIONS);
+    const warning = getAggregateWarning(outcomes, mentions.length);
+    const outcome = getAggregateOutcome(outcomes, mentions.length);
+
+    return toCachedResult(
+        {
+            canonicalDomain,
+            mentions,
+            warning,
+        },
+        outcome,
+    );
+}
+
+async function persistCachedResult(cacheKey: string, result: CachedRedditMentionsResult) {
+    setLocalCache(cacheKey, result);
+    await setRedditMentionsCache(cacheKey, result, getTtlSecondsForOutcome(result.outcome));
+}
+
+async function fetchFreshRedditMentions(
+    cacheKey: string,
+    lockKey: string,
+    canonicalDomain: string,
+    routeSource: RedditMentionsRequestSource,
+) {
+    let cacheStatus: CacheStatus = 'miss';
+    let hasLock = false;
+
+    if (isRedditMentionsRedisEnabled()) {
+        hasLock = await tryAcquireRedditMentionsLock(lockKey, LOCK_TTL_SECONDS);
+
+        if (!hasLock) {
+            cacheStatus = 'lock-wait';
+            const waited = await waitForCachedResult(cacheKey);
+            if (waited) {
+                const result = stripCachedResult(waited.value);
+                logRedditFetch({
+                    domain: canonicalDomain,
+                    routeSource,
+                    cacheStatus,
+                    cacheLayer: waited.layer,
+                    outcome: waited.value.outcome,
+                    mentionCount: result.mentions.length,
+                });
+                return result;
+            }
+
+            hasLock = await tryAcquireRedditMentionsLock(lockKey, LOCK_TTL_SECONDS);
+        }
+    }
+
+    try {
+        const fresh = await runRedditLookup(canonicalDomain);
+        await persistCachedResult(cacheKey, fresh);
+
+        logRedditFetch({
+            domain: canonicalDomain,
+            routeSource,
+            cacheStatus,
+            outcome: fresh.outcome,
+            mentionCount: fresh.mentions.length,
+        });
+
+        return stripCachedResult(fresh);
+    } finally {
+        if (hasLock) {
+            await releaseRedditMentionsLock(lockKey);
+        }
+    }
+}
+
+export async function fetchRedditMentionsForDomain(
+    domainInput: string,
+    options: { source?: RedditMentionsRequestSource } = {},
+): Promise<RedditMentionsResult> {
     const canonicalDomain = canonicalizeDomainInput(domainInput);
     if (!canonicalDomain) {
         return {
@@ -392,24 +615,47 @@ export async function fetchRedditMentionsForDomain(domainInput: string): Promise
         };
     }
 
+    const routeSource = options.source || 'unknown';
     const cacheKey = getCacheKey(canonicalDomain);
-    const cached = getCached(cacheKey);
-    if (cached) return cached;
+    const lockKey = getLockKey(canonicalDomain);
+
+    const cached = await readCachedResult(cacheKey);
+    if (cached) {
+        const result = stripCachedResult(cached.value);
+        logRedditFetch({
+            domain: canonicalDomain,
+            routeSource,
+            cacheStatus: 'hit',
+            cacheLayer: cached.layer,
+            outcome: cached.value.outcome,
+            mentionCount: result.mentions.length,
+        });
+        return result;
+    }
 
     const inflight = inflightMap.get(cacheKey);
-    if (inflight) return inflight;
+    if (inflight) {
+        return inflight;
+    }
 
-    const promise = runAndCacheReddit(cacheKey, canonicalDomain);
+    const promise = fetchFreshRedditMentions(cacheKey, lockKey, canonicalDomain, routeSource);
     inflightMap.set(cacheKey, promise);
-    promise.finally(() => inflightMap.delete(cacheKey));
+
+    promise.finally(() => {
+        if (inflightMap.get(cacheKey) === promise) {
+            inflightMap.delete(cacheKey);
+        }
+    });
+
     return promise;
 }
 
-export function peekCachedRedditMentionsForDomain(domainInput: string): RedditMentionsResult | null {
+export async function peekCachedRedditMentionsForDomain(domainInput: string): Promise<RedditMentionsResult | null> {
     const canonicalDomain = canonicalizeDomainInput(domainInput);
     if (!canonicalDomain) {
         return null;
     }
 
-    return getCached(getCacheKey(canonicalDomain));
+    const cached = await readCachedResult(getCacheKey(canonicalDomain));
+    return cached ? stripCachedResult(cached.value) : null;
 }
