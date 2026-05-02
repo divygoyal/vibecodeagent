@@ -569,6 +569,33 @@ class GoogleAnalytics {
     }
 }
 
+// Multi-tenant token resolver. When the CLI receives `--client-id <github_id>`,
+// the plugin fetches that client's stored Google OAuth tokens from the admin
+// API at runtime instead of using the container-owner's env-injected tokens.
+// Lets one OpenClaw container query data for any client whose Google account
+// is connected on the platform, without granting cross-account access in Google.
+async function fetchClientTokens(clientId) {
+    const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) {
+        throw new Error('ADMIN_API_KEY env var is not set inside this container; --client-id mode unavailable.');
+    }
+    const url = `${adminUrl}/api/users/${encodeURIComponent(clientId)}/oauth/google`;
+    const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Admin API returned ${res.status} fetching tokens for client ${clientId}: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    if (!data.access_token && !data.refresh_token) {
+        throw new Error(`Client ${clientId} has no Google OAuth tokens stored.`);
+    }
+    return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+    };
+}
+
 // CLI Handling Logic
 if (require.main === module) {
     (async () => {
@@ -576,7 +603,18 @@ if (require.main === module) {
         const command = args[0];
 
         try {
-            const plugin = new GoogleAnalytics();
+            // Extract --client-id (anywhere in args) and resolve its tokens
+            // before dispatching to a command. The flag pair is removed from
+            // args so the per-command parsers don't see it.
+            let clientConfig = {};
+            const ciIdx = args.indexOf('--client-id');
+            if (ciIdx !== -1 && ciIdx + 1 < args.length) {
+                const clientId = args[ciIdx + 1];
+                args.splice(ciIdx, 2);
+                clientConfig = await fetchClientTokens(clientId);
+            }
+
+            const plugin = new GoogleAnalytics(clientConfig);
 
             if (command === 'list-properties') {
                 const options = {};
@@ -590,7 +628,7 @@ if (require.main === module) {
                         i++;
                     }
                 }
-                const plugin = new GoogleAnalytics(options);
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 console.log(await plugin.listProperties());
 
             } else if (command === 'list-properties-json') {
@@ -605,7 +643,7 @@ if (require.main === module) {
                         i++;
                     }
                 }
-                const plugin = new GoogleAnalytics(options);
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 try {
                     const props = await plugin.listProperties(true);
                     console.log(JSON.stringify(props));
@@ -661,7 +699,7 @@ if (require.main === module) {
                         }
                     }
                 }
-                const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig }); // Pass options (incl. accessToken) to constructor
                 console.log(await plugin.realtime(propertyId, options));
 
             } else if (command === 'dashboard-json') {
@@ -709,7 +747,7 @@ if (require.main === module) {
                 // Therefore, no change is made to this specific block.
 
                 const range = args[2] && !args[2].startsWith('--') ? args[2] : '30d'; // Handle positional range if present,
-                const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig }); // Pass options (incl. accessToken) to constructor
                 try {
                     const result = await plugin.dashboardJson(propertyId, range);
                     console.log(JSON.stringify(result));

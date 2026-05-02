@@ -54,3 +54,15 @@ inspect-url sc-domain:example.com https://example.com/my-page
 
 ## Search Types
 `web`, `image`, `video`, `news`, `discover`, `googleNews`
+
+## Multi-tenant: `--client-id <github_id>`
+Adds support for querying Search Console data on behalf of a different platform user (a "client") rather than using this container's baked-in Google account.
+
+Pass `--client-id <github_id>` on any command. The plugin fetches that client's stored Google OAuth tokens from the admin API at runtime and uses those for the Google call. The client's verified sites become accessible without anyone granting cross-account access in Google.
+
+```
+list-sites --client-id 114835151932310912436
+query sc-domain:example.com --client-id 114835151932310912436 --dimensions query --limit 50
+```
+
+When `--client-id` is omitted the plugin behaves as before (uses `OPENCLAW_CONNECTIONS` env tokens).

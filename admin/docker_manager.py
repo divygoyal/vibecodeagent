@@ -795,7 +795,12 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             "OPENCLAW_CONNECTIONS": connections_json,
             # OAuth Keys (Required for refresh token flow)
             "GOOGLE_CLIENT_ID": settings.GOOGLE_CLIENT_ID or "",
-            "GOOGLE_CLIENT_SECRET": settings.GOOGLE_CLIENT_SECRET or ""
+            "GOOGLE_CLIENT_SECRET": settings.GOOGLE_CLIENT_SECRET or "",
+            # Admin API access — lets multi-tenant plugin commands like
+            # `--client-id <github_id>` fetch that client's stored OAuth tokens
+            # at runtime instead of using this container's baked-in tokens.
+            "ADMIN_API_URL": "http://admin-api:8000",
+            "ADMIN_API_KEY": settings.ADMIN_API_KEY or "",
         }
         
         # Legacy compat: maintain GITHUB_TOKEN/ID env vars if present in connections

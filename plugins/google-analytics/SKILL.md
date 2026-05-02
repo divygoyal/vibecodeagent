@@ -45,4 +45,16 @@ realtime 123456789 --dimensions country --metrics activeUsers
 `date`, `country`, `city`, `deviceCategory`, `browser`, `operatingSystem`, `pagePath`, `pageTitle`, `sessionSource`, `sessionMedium`, `sessionCampaignName`, `newVsReturning`, `language`
 
 ## Common Metrics
-`activeUsers`, `sessions`, `screenPageViews`, `bounceRate`, `averageSessionDuration`, `conversions`, `totalRevenue`, `engagedSessions`, `engagementRate`, `eventCount`, `newUsers`
+`activeUsers`, `sessions`, `screenPageViews`, `bounceRate`, `averageSessionDuration`, `conversions`, `totalRevenue`, `engagedSessions`, `totalUsers`, `eventCount`, `newUsers`
+
+## Multi-tenant: `--client-id <github_id>`
+Adds support for querying GA4 data on behalf of a different platform user (a "client") rather than using this container's baked-in Google account.
+
+Pass `--client-id <github_id>` on any command. The plugin fetches that client's stored Google OAuth tokens from the admin API at runtime and uses those for the Google call. The client's properties become accessible without anyone granting cross-account access in Google.
+
+```
+list-properties --client-id 114835151932310912436
+query 123456789 --client-id 114835151932310912436 --dimensions country --metrics activeUsers
+```
+
+When `--client-id` is omitted the plugin behaves as before (uses `OPENCLAW_CONNECTIONS` env tokens).

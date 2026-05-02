@@ -450,6 +450,31 @@ class GoogleSearchConsole {
     }
 }
 
+// Multi-tenant token resolver. When the CLI receives `--client-id <github_id>`,
+// the plugin fetches that client's stored Google OAuth tokens from the admin
+// API at runtime instead of using the container-owner's env-injected tokens.
+async function fetchClientTokens(clientId) {
+    const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) {
+        throw new Error('ADMIN_API_KEY env var is not set inside this container; --client-id mode unavailable.');
+    }
+    const url = `${adminUrl}/api/users/${encodeURIComponent(clientId)}/oauth/google`;
+    const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Admin API returned ${res.status} fetching tokens for client ${clientId}: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    if (!data.access_token && !data.refresh_token) {
+        throw new Error(`Client ${clientId} has no Google OAuth tokens stored.`);
+    }
+    return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+    };
+}
+
 // CLI Handling
 if (require.main === module) {
     (async () => {
@@ -483,16 +508,27 @@ if (require.main === module) {
         }
 
         try {
-            const plugin = new GoogleSearchConsole();
+            // Extract --client-id (anywhere in args) and resolve its tokens
+            // before dispatching. Removed from args so per-command parsers
+            // don't see it.
+            let clientConfig = {};
+            const ciIdx = args.indexOf('--client-id');
+            if (ciIdx !== -1 && ciIdx + 1 < args.length) {
+                const clientId = args[ciIdx + 1];
+                args.splice(ciIdx, 2);
+                clientConfig = await fetchClientTokens(clientId);
+            }
+
+            const plugin = new GoogleSearchConsole(clientConfig);
 
             if (command === 'list-sites') {
                 const options = parseOptions(1);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.listSites());
 
             } else if (command === 'list-sites-json') {
                 const options = parseOptions(1);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 try {
                     const sites = await plugin.listSites(true);
                     console.log(JSON.stringify(sites));
@@ -504,14 +540,14 @@ if (require.main === module) {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
                 const options = parseOptions(2);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.query(siteUrl, options));
 
             } else if (command === 'list-sitemaps') {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
                 const options = parseOptions(2);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.listSitemaps(siteUrl));
 
             } else if (command === 'inspect-url') {
@@ -522,7 +558,7 @@ if (require.main === module) {
                     process.exit(1);
                 }
                 const options = parseOptions(3);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.inspectUrl(siteUrl, inspectionUrl));
 
             } else if (command === 'dashboard-json') {
@@ -532,7 +568,7 @@ if (require.main === module) {
                 // Parse options specifically for dashboard-json to catch auth tokens
                 const options = parseOptions(2);
 
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
 
                 try {
                     const result = await plugin.dashboardJson(siteUrl);
