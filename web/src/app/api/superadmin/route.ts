@@ -200,6 +200,41 @@ export async function POST(req: Request) {
             return NextResponse.json(await res.json())
         }
 
+        if (action === 'update-settings') {
+            if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
+            const params = (body.params ?? {}) as Record<string, unknown>
+            const allowedKeys = ['bot_engine', 'telegram_bot_token', 'gemini_api_key'] as const
+            const payload: Record<string, unknown> = {}
+            for (const k of allowedKeys) {
+                if (k in params && params[k] !== undefined) payload[k] = params[k]
+            }
+            if (Object.keys(payload).length === 0) {
+                return NextResponse.json({ error: 'No supported settings provided' }, { status: 400 })
+            }
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': ADMIN_API_KEY
+                },
+                body: JSON.stringify(payload)
+            })
+            return NextResponse.json(await res.json())
+        }
+
+        if (action === 'destroy-container') {
+            if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
+            const res = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(githubId)}/container`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': ADMIN_API_KEY
+                },
+                body: JSON.stringify({ action: 'destroy' })
+            })
+            return NextResponse.json(await res.json())
+        }
+
         if (action === 'add-credits') {
             if (!githubId) return NextResponse.json({ error: 'Missing githubId' }, { status: 400 })
             const { params } = body

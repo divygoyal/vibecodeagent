@@ -1342,6 +1342,13 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
 }) {
     const [reportLoadingKey, setReportLoadingKey] = useState<string | null>(null)
     const [reportError, setReportError] = useState('')
+    const [tokenInput, setTokenInput] = useState('')
+    const [showToken, setShowToken] = useState(false)
+
+    useEffect(() => {
+        setTokenInput('')
+        setShowToken(false)
+    }, [user?.github_id])
 
     const handleGenerateReport = async (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => {
         if (!user || reportLoadingKey) return
@@ -1448,6 +1455,78 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                     )}
                                     <button onClick={() => onAction('restart', user.github_id)} disabled={actionLoading === `restart-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-40 transition-colors"><RotateCw className="w-4 h-4" />Restart</button>
                                     <button onClick={onDelete} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"><Trash2 className="w-4 h-4" />Delete</button>
+                                </div>
+                            </div>
+                        </DrawerSection>
+
+                        <DrawerSection icon={Bot} title="Container Setup">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Bot engine</label>
+                                    <select
+                                        value={user.bot_engine || profile?.container.engine || 'openclaw'}
+                                        onChange={(e) => onAction('update-settings', user.github_id, { bot_engine: e.target.value })}
+                                        disabled={actionLoading === `update-settings-${user.github_id}`}
+                                        className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 disabled:opacity-50"
+                                    >
+                                        <option value="openclaw">OpenClaw</option>
+                                        <option value="nanobot">Nanobot</option>
+                                    </select>
+                                    <p className="mt-1 text-xs text-zinc-500">After changing engine, Destroy the existing container then Start to apply.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Telegram bot token</label>
+                                    <div className="flex items-stretch gap-2">
+                                        <div className="relative flex-1">
+                                            <input
+                                                type={showToken ? 'text' : 'password'}
+                                                value={tokenInput}
+                                                onChange={(e) => setTokenInput(e.target.value)}
+                                                placeholder="Paste token from @BotFather (1234567:ABC...)"
+                                                className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowToken(s => !s)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                                            >
+                                                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const v = tokenInput.trim()
+                                                if (!v) return
+                                                onAction('update-settings', user.github_id, { telegram_bot_token: v })
+                                                setTokenInput('')
+                                            }}
+                                            disabled={!tokenInput.trim() || actionLoading === `update-settings-${user.github_id}`}
+                                            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {actionLoading === `update-settings-${user.github_id}` ? 'Saving...' : 'Save'}
+                                        </button>
+                                    </div>
+                                    <p className="mt-1 text-xs text-zinc-500">Saving triggers a container sync with the new token. Current bot: {profile?.container.bot_username ? `@${profile.container.bot_username}` : '(none)'}</p>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-medium text-white">Destroy container</div>
+                                        <div className="text-xs text-zinc-500">Stops and removes the Docker container only. Keeps the User row, OAuth tokens, credits, and data directory intact.</div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm('Destroy this container? The user record, OAuth tokens, and data are preserved — only the running Docker container is removed.')) {
+                                                onAction('destroy-container', user.github_id)
+                                            }
+                                        }}
+                                        disabled={actionLoading === `destroy-container-${user.github_id}`}
+                                        className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 disabled:opacity-50 transition-colors shrink-0"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        {actionLoading === `destroy-container-${user.github_id}` ? 'Destroying...' : 'Destroy'}
+                                    </button>
                                 </div>
                             </div>
                         </DrawerSection>

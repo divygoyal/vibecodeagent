@@ -245,7 +245,7 @@ class UserUpdate(BaseModel):
 
 
 class ContainerAction(BaseModel):
-    action: str  # start, stop, restart, delete
+    action: str  # start, stop, restart, destroy
 
 
 class UserResponse(BaseModel):
@@ -1585,15 +1585,25 @@ async def container_action(
     elif action.action == "restart":
         result = docker_manager.restart_container(target_id)
         status = "running"
+    elif action.action == "destroy":
+        # Remove the docker container only — keep User row, OAuth, credits, data dir intact.
+        # Treat "container not found" as success: the goal is "no container running".
+        result = docker_manager.delete_container(target_id, remove_data=False)
+        if not result["success"] and "not found" in (result.get("error") or "").lower():
+            result = {"success": True, "status": "already_removed"}
+        status = "not_provisioned"
+        if result["success"]:
+            user.container_id = None
+            # Keep container_port + container_name so re-provisioning lands in the same slot.
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
-    
+
     if result["success"]:
         user.container_status = status
         await db.commit()
         if action.action != "start" or "container_id" not in result:
             await log_container_event(db, user.id, user.container_id, action.action)
-    
+
     return result
 
 
