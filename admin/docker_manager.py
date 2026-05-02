@@ -93,6 +93,34 @@ class DockerManager:
     def _get_user_data_dir(self, user_identifier: str) -> str:
         """Get host path for user's data directory"""
         return f"{self.base_dir}/{user_identifier}"
+
+    def _get_admin_network_info(self):
+        """Return (network_name, admin_ip) for the running admin-api container.
+
+        Per-user clawbot containers default to the docker bridge and can't
+        resolve `admin-api` over Coolify's project network, which breaks the
+        multi-tenant plugin's call back to the admin API. We pin both the
+        target network and admin's IP so token fetches work regardless of how
+        DNS aliases are wired up.
+        """
+        try:
+            for c in self.client.containers.list():
+                labels = c.labels or {}
+                name = (c.name or "").lower()
+                is_admin = (
+                    labels.get("com.docker.compose.service") == "admin-api"
+                    or "admin" in name and "clawbot" not in name
+                )
+                if not is_admin:
+                    continue
+                networks = c.attrs.get("NetworkSettings", {}).get("Networks", {})
+                for net_name, net_info in networks.items():
+                    ip = (net_info or {}).get("IPAddress")
+                    if ip:
+                        return net_name, ip
+        except Exception as e:
+            logger.warning(f"_get_admin_network_info failed: {e}")
+        return None, None
     
     def _ensure_user_dir(self, user_identifier: str) -> str:
         """Create user data directory if not exists with proper permissions"""
@@ -799,9 +827,24 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             # Admin API access — lets multi-tenant plugin commands like
             # `--client-id <github_id>` fetch that client's stored OAuth tokens
             # at runtime instead of using this container's baked-in tokens.
+            # The URL is rewritten below to the admin container's IP on
+            # whichever docker network admin-api is on, since per-user clawbot
+            # containers default to the bridge network and cannot resolve the
+            # `admin-api` hostname registered in the Coolify-managed network.
             "ADMIN_API_URL": "http://admin-api:8000",
             "ADMIN_API_KEY": settings.ADMIN_API_KEY or "",
         }
+
+        # Detect the network admin-api is reachable on so the new container
+        # can call back to it. We attach the new container to that same network
+        # AND override ADMIN_API_URL with admin's IP so DNS-alias quirks across
+        # Coolify versions don't matter.
+        admin_network, admin_ip = self._get_admin_network_info()
+        if admin_ip:
+            env["ADMIN_API_URL"] = f"http://{admin_ip}:8000"
+            logger.info(f"Detected admin-api at {admin_ip} on network {admin_network}; new container will join that network.")
+        else:
+            logger.warning("Could not detect admin-api network; --client-id mode will fail with 'fetch failed' from inside this container.")
         
         # Legacy compat: maintain GITHUB_TOKEN/ID env vars if present in connections
         if connections and "github" in connections:
@@ -830,8 +873,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             volumes_config[nanobot_skills_path] = {"bind": "/data/.nanobot/workspace/skills", "mode": "rw"}
 
         try:
-            container = self.client.containers.run(
-                image_name,
+            run_kwargs = dict(
                 name=container_name,
                 detach=True,
                 restart_policy={"Name": "on-failure", "MaximumRetryCount": 3},
@@ -846,6 +888,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                     "clawbot.created": datetime.utcnow().isoformat()
                 }
             )
+            if admin_network:
+                run_kwargs["network"] = admin_network
+            container = self.client.containers.run(image_name, **run_kwargs)
             
             return {
                 "success": True,
