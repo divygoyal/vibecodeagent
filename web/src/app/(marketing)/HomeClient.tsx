@@ -78,7 +78,7 @@ function Hero() {
 
                     <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 justify-center lg:justify-start pt-2 sm:pt-4">
                         <button
-                            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                            onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                             className="group px-5 sm:px-8 min-h-[44px] h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
                         >
                             Try Free — 10 AI Messages Included
@@ -982,7 +982,7 @@ function AIChatDemo() {
                         Real response from TrafficClaw AI · Powered by your live Google Search Console data
                     </p>
                     <button
-                        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                        onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                         className="group inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300"
                     >
                         Try This With Your Own Data
@@ -1778,7 +1778,7 @@ function FinalCTA() {
                             No credit card required · 10 free AI messages · Cancel anytime
                         </p>
                         <button
-                            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                            onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                             className="group px-6 sm:px-10 py-3 sm:py-4 min-h-[44px] text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] transition-all duration-300"
                         >
                             Start Free — Connect with Google
@@ -1812,7 +1812,7 @@ function StickyMobileCTA() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-black/90 backdrop-blur-xl border-t border-white/[0.06] px-4 py-3 safe-area-bottom">
             <button
-                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                 className="w-full py-3 min-h-[44px] text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl flex items-center justify-center gap-2"
             >
                 Start Free — No Credit Card

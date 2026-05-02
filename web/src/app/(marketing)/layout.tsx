@@ -19,6 +19,7 @@ function Navbar() {
     const isPublicMentionsRoute = pathname === '/x' || pathname === '/reddit';
     const dashboardHref = pathname === '/reddit' ? '/dashboard/reddit-api' : '/dashboard/x-api';
     const resolvedDashboardHref = isPublicMentionsRoute ? dashboardHref : '/dashboard';
+    const signInCallbackUrl = isPublicMentionsRoute ? dashboardHref : '/dashboard/analytics';
     const resolvedPrimaryLabel = isPublicMentionsRoute ? 'Open builder' : isHomepage ? 'Start with Google' : 'Start Free';
     const resolvedSessionLabel = isPublicMentionsRoute ? 'Open builder' : 'Dashboard';
     const publicMentionsCtaClassName =
@@ -86,7 +87,7 @@ function Navbar() {
                     ) : (
                         isPublicMentionsRoute ? (
                             <GoogleAuthButton
-                                callbackUrl={resolvedDashboardHref}
+                                callbackUrl={signInCallbackUrl}
                                 className={publicMentionsCtaClassName}
                             >
                                 {resolvedPrimaryLabel}
@@ -95,14 +96,14 @@ function Navbar() {
                         ) : (
                             <>
                                 <button
-                                    onClick={() => signIn('google', { callbackUrl: resolvedDashboardHref })}
+                                    onClick={() => signIn('google', { callbackUrl: signInCallbackUrl })}
                                     className="px-4 py-2 text-sm text-zinc-400 transition-colors hover:text-white"
                                 >
                                     Sign In
                                 </button>
                                 {isHomepage ? null : (
                                     <GoogleAuthButton
-                                        callbackUrl={resolvedDashboardHref}
+                                        callbackUrl={signInCallbackUrl}
                                         className={defaultCtaClassName}
                                     >
                                         {resolvedPrimaryLabel}
@@ -126,13 +127,13 @@ function Navbar() {
                     ) : (
                         <div className="flex items-center gap-1.5 md:hidden">
                             <button
-                                onClick={() => signIn('google', { callbackUrl: resolvedDashboardHref })}
+                                onClick={() => signIn('google', { callbackUrl: signInCallbackUrl })}
                                 className={publicMentionsSignInClassName}
                             >
                                 Sign In
                             </button>
                             <GoogleAuthButton
-                                callbackUrl={resolvedDashboardHref}
+                                callbackUrl={signInCallbackUrl}
                                 className={publicMentionsCtaClassName}
                             >
                                 {resolvedPrimaryLabel}
@@ -179,7 +180,7 @@ function Navbar() {
                                 <button
                                     onClick={() => {
                                         setMobileOpen(false);
-                                        void signIn('google', { callbackUrl: resolvedDashboardHref });
+                                        void signIn('google', { callbackUrl: signInCallbackUrl });
                                     }}
                                     className="text-left text-sm text-zinc-300 transition-colors hover:text-white"
                                 >
@@ -187,7 +188,7 @@ function Navbar() {
                                 </button>
                                 {isHomepage ? null : (
                                     <GoogleAuthButton
-                                        callbackUrl={resolvedDashboardHref}
+                                        callbackUrl={signInCallbackUrl}
                                         onClick={() => setMobileOpen(false)}
                                         className={`${defaultCtaClassName} mt-2 min-h-[46px] justify-center`}
                                     >

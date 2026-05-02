@@ -13,7 +13,7 @@ interface GoogleAuthButtonProps {
 export default function GoogleAuthButton({
     children,
     className,
-    callbackUrl = '/dashboard',
+    callbackUrl = '/dashboard/analytics',
     onClick,
 }: GoogleAuthButtonProps) {
     const handleClick: MouseEventHandler<HTMLButtonElement> = (event) => {

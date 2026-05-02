@@ -13,9 +13,9 @@ const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), 
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import Image from 'next/image';
 import {
-    LayoutDashboard, Bot, BarChart3, Search, Settings, ScanSearch,
+    LayoutDashboard, Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
-    Book, Newspaper, Coins, MessageCircle, MessageSquare,
+    Coins, MessageCircle, MessageSquare,
     ChevronDown, Bell, Globe, Sparkles, Target, type LucideIcon
 } from 'lucide-react';
 import {
@@ -114,22 +114,17 @@ const sidebarGroups: SidebarGroup[] = [
         { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
         { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
     ]},
-    { label: 'Analytics', items: [
+    { label: 'Analysis', items: [
         { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
-        { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
+        { icon: Search, label: 'SEO', href: '/dashboard/seo' },
     ]},
     { label: 'Social APIs', items: [
         { icon: Sparkles, label: 'X mentions', href: '/dashboard/x-api' },
         { icon: MessageCircle, label: 'Reddit mentions', href: '/dashboard/reddit-api' },
+        { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
-    { label: 'SEO & Growth', items: [
-        { icon: Search, label: 'SEO', href: '/dashboard/seo' },
+    { label: 'Growth', items: [
         { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
-        { icon: ScanSearch, label: 'Audit', href: '/dashboard/audit' },
-    ]},
-    { label: 'Resources', items: [
-        { icon: Book, label: 'Docs', href: '/dashboard/docs' },
-        { icon: Newspaper, label: 'Blog', href: '/dashboard/blog' },
     ]},
 ];
 

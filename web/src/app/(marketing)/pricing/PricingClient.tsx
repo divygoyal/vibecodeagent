@@ -320,7 +320,7 @@ export default function PricingClient() {
                             Explore the full dashboard, run audits, and see your data.
                         </p>
                         <button
-                            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                            onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                             className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all text-sm"
                         >
                             Get Started Free <ArrowRight className="w-4 h-4" />

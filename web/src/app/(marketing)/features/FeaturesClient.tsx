@@ -302,7 +302,7 @@ export default function FeaturesClient() {
                         <p className="text-zinc-400 mb-8">Start free with 10 AI messages. No credit card required.</p>
                         <div className="flex items-center justify-center gap-4 flex-wrap">
                             <button
-                                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                                onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                                 className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-semibold rounded-xl hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all text-sm btn-press"
                             >
                                 Get Started Free <ArrowRight className="w-4 h-4" />
