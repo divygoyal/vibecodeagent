@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -188,6 +188,22 @@ function VerifiedPill({ status }: { status: string | undefined }) {
 }
 
 export default function LeaderboardPage() {
+    return (
+        <Suspense fallback={<LeaderboardLoadingFallback />}>
+            <LeaderboardPageInner />
+        </Suspense>
+    );
+}
+
+function LeaderboardLoadingFallback() {
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-pulse text-sm text-zinc-500">Loading leaderboard…</div>
+        </div>
+    );
+}
+
+function LeaderboardPageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { data: session } = useSession();
