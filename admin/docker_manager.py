@@ -97,19 +97,66 @@ class DockerManager:
     def _get_admin_network_info(self):
         """Return (network_name, admin_ip) for the running admin-api container.
 
+        Coolify gives containers random hash names so name-based lookup misses
+        them. Instead we identify admin-api as *ourselves*: this code runs
+        inside admin-api, so /proc/self/cgroup or the hostname resolves to
+        admin's own container ID, which gives us its network attachment
+        directly.
+
         Per-user clawbot containers default to the docker bridge and can't
         resolve `admin-api` over Coolify's project network, which breaks the
-        multi-tenant plugin's call back to the admin API. We pin both the
-        target network and admin's IP so token fetches work regardless of how
-        DNS aliases are wired up.
+        multi-tenant plugin's call back to the admin API. Pinning both the
+        target network and admin's IP lets token fetches work regardless of
+        how Coolify wires up DNS aliases for that network.
         """
+        candidate_ids = []
+
+        # Primary: read our container ID from /proc/self/cgroup. Works on
+        # cgroup v1 (lines like `12:cpu:/docker/<id>`) and v2 (`0::/docker/<id>`
+        # or `0::/system.slice/docker-<id>.scope`).
+        try:
+            with open("/proc/self/cgroup", "r") as fh:
+                for line in fh:
+                    line = line.strip()
+                    for chunk in line.split("/"):
+                        for piece in chunk.split("-"):
+                            piece = piece.replace(".scope", "")
+                            if len(piece) >= 12 and all(c in "0123456789abcdef" for c in piece.lower()):
+                                candidate_ids.append(piece)
+        except Exception:
+            pass
+
+        # Secondary: hostname is the short container ID by default.
+        try:
+            import socket
+            hn = socket.gethostname().strip()
+            if hn and len(hn) >= 12:
+                candidate_ids.append(hn)
+        except Exception:
+            pass
+
+        for cid in candidate_ids:
+            try:
+                container = self.client.containers.get(cid)
+            except Exception:
+                continue
+            networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
+            for net_name, net_info in networks.items():
+                ip = (net_info or {}).get("IPAddress")
+                if ip:
+                    return net_name, ip
+
+        # Tertiary fallback: scan containers for compose-service or coolify
+        # labels matching admin-api. Won't help on Coolify-hash names but is
+        # cheap insurance for non-Coolify deploys.
         try:
             for c in self.client.containers.list():
                 labels = c.labels or {}
                 name = (c.name or "").lower()
                 is_admin = (
                     labels.get("com.docker.compose.service") == "admin-api"
-                    or "admin" in name and "clawbot" not in name
+                    or ("admin" in name and "clawbot" not in name)
+                    or labels.get("coolify.name", "").lower().startswith("trafficclaw-admin")
                 )
                 if not is_admin:
                     continue
@@ -119,7 +166,8 @@ class DockerManager:
                     if ip:
                         return net_name, ip
         except Exception as e:
-            logger.warning(f"_get_admin_network_info failed: {e}")
+            logger.warning(f"_get_admin_network_info scan failed: {e}")
+
         return None, None
     
     def _ensure_user_dir(self, user_identifier: str) -> str:
