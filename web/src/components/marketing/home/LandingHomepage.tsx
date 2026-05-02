@@ -608,6 +608,12 @@ export default function LandingHomepage() {
                         <h1 className="text-[2.8rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
                             {HOMEPAGE_CONTENT.hero.title}
                         </h1>
+                        <div className="mt-8 flex justify-center sm:mt-10">
+                            <GoogleStartButton
+                                className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-7 text-center text-[15px] font-semibold text-[#031017] shadow-[0_18px_50px_rgba(20,196,225,0.28)] transition-all duration-200 hover:brightness-105"
+                                label={HOMEPAGE_CONTENT.hero.primaryCta}
+                            />
+                        </div>
                     </div>
 
                     <div className="mx-auto mt-8 max-w-[1280px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012))] p-2 shadow-[0_44px_140px_rgba(0,0,0,0.54)] sm:mt-10 sm:rounded-[34px] sm:p-3">
