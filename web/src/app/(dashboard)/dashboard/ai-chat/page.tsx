@@ -86,6 +86,14 @@ const TOOL_LABELS: Record<string, string> = {
     generate_meta_tags: 'Generating tags',
     run_realtime_report: 'Checking live visitors',
     get_custom_dimensions: 'Loading custom tracking',
+    list_user_repos: 'Listing GitHub repos',
+    get_repo_health: 'Checking repo health',
+    search_repo_code: 'Searching code',
+    get_recent_commits: 'Reading recent commits',
+    get_pull_requests: 'Reviewing pull requests',
+    get_repo_issues: 'Checking GitHub issues',
+    get_workflow_runs: 'Checking CI runs',
+    get_file_contents: 'Reading file from GitHub',
 };
 
 /* ─── Thinking Indicator (Gemini-style) ─── */

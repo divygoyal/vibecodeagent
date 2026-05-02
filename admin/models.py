@@ -6,6 +6,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from datetime import datetime
 
+from security.token_crypto import EncryptedToken
+
 Base = declarative_base()
 
 
@@ -69,13 +71,13 @@ class OAuthConnection(Base):
     provider = Column(String(50), nullable=False)  # github, google, wordpress
     provider_account_id = Column(String(255), nullable=False)  # ID from provider
     
-    # Tokens
-    access_token = Column(Text)
-    refresh_token = Column(Text)
+    # Tokens (encrypted at rest via EncryptedToken TypeDecorator — see admin/security/token_crypto.py)
+    access_token = Column(EncryptedToken)
+    refresh_token = Column(EncryptedToken)
     expires_at = Column(Integer)  # Unix timestamp
     token_type = Column(String(50))
     scope = Column(Text)
-    id_token = Column(Text)
+    id_token = Column(EncryptedToken)
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)

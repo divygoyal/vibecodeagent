@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
 import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken, listAnalyticsProperties } from '@/lib/googleApi';
+import { fetchGithubTokenFromDb } from '@/lib/githubApi';
 import { GoogleGenAI } from '@google/genai';
 
 export const maxDuration = 300;
@@ -70,7 +71,13 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════════════════════════════
 const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.
 
-RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 8. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES].
+RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 8. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES]. 5) GitHub tools: only use if [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise — never mention GitHub when [GitHub:not_connected].
+
+CROSS-SOURCE DIAGNOSIS PLAYBOOK (when symptom = traffic drop, ranking loss, indexing/structured-data error, conversion drop, CTR cliff):
+1. Confirm in GA4/GSC and pinpoint the START DATE of the change.
+2. If [GitHub:connected]: list_user_repos (skip if user already named a repo) → get_recent_commits with since=<startDate-3d> and path filter on the affected page → if relevant, get_pull_requests or get_file_contents on the changed file.
+3. State the link explicitly: "Drop began {date}; PR #{n} merged {date} touched {path} — likely cause." Cite SHA + PR# in the answer.
+4. Budget: max 5 GitHub calls per conversation. Prefer get_repo_health BEFORE search/list when scoping a new repo.
 
 CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
 REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
@@ -222,11 +229,12 @@ export async function POST(req: NextRequest) {
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
 
-        // ── Parallel pre-flight: credits + JWT token + DB tokens (all at once) ──
-        const [creditResult, jwt, dbTokens] = await Promise.all([
+        // ── Parallel pre-flight: credits + JWT token + DB tokens (Google + GitHub) ──
+        const [creditResult, jwt, dbTokens, dbGithubToken] = await Promise.all([
             (ADMIN_API_KEY && userId) ? getUserCredits(String(userId)) : Promise.resolve(null),
             getToken({ req: req as any }),
             fetchGoogleTokensFromDb(String(userId)).catch(() => null),
+            userId ? fetchGithubTokenFromDb(String(userId)).catch(() => null) : Promise.resolve(null),
         ]);
 
         // Credit gate
@@ -267,6 +275,13 @@ export async function POST(req: NextRequest) {
             googleAccessToken = dbTokens.accessToken;
             googleRefreshToken = dbTokens.refreshToken;
         }
+
+        // ── Get User's GitHub Token (JWT first, DB fallback). No refresh — GitHub OAuth tokens don't expire. ──
+        const githubAccessToken =
+            ((jwt as any)?.githubAccessToken as string | undefined) ||
+            dbGithubToken ||
+            undefined;
+        const githubConnected = !!githubAccessToken;
 
         const ga4RequiredResponse = {
             error: 'ga4_required',
@@ -319,7 +334,10 @@ export async function POST(req: NextRequest) {
 
         // User message with injected data context
         const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
-        const contextBlock = dataContext ? `${siteTag}${dataContext}${availableSitesContext}\n---\n${message}` : `${siteTag}${availableSitesContext}\n${message}`;
+        const githubTag = `[GitHub:${githubConnected ? 'connected' : 'not_connected'}]`;
+        const contextBlock = dataContext
+            ? `${siteTag}${githubTag}${dataContext}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],
@@ -364,8 +382,15 @@ CRITICAL SYSTEM CONTEXT:
                     let keepGoing = true;
                     let loopCount = 0;
                     let gscCallCount = 0;
+                    let githubCallCount = 0;
                     const MAX_GSC_CALLS = 8;
+                    const MAX_GITHUB_CALLS = 5;
                     const MAX_LOOPS = 8;
+                    const GITHUB_TOOL_NAMES = new Set([
+                        'list_user_repos', 'get_repo_health', 'search_repo_code',
+                        'get_recent_commits', 'get_pull_requests', 'get_repo_issues',
+                        'get_workflow_runs', 'get_file_contents',
+                    ]);
 
                     while (keepGoing && loopCount < MAX_LOOPS) {
                         // Check if client disconnected
@@ -440,6 +465,11 @@ CRITICAL SYSTEM CONTEXT:
                                         continue;
                                     }
 
+                                    // Hard limit: max 5 GitHub calls per conversation (token budget)
+                                    if (GITHUB_TOOL_NAMES.has(toolName) && githubCallCount >= MAX_GITHUB_CALLS) {
+                                        continue;
+                                    }
+
                                     // Dedupe
                                     const isDup = pendingFunctionCalls.some(
                                         (p: any) => p.functionCall.name === toolName && JSON.stringify(p.functionCall.args) === JSON.stringify(fc.args)
@@ -447,6 +477,7 @@ CRITICAL SYSTEM CONTEXT:
 
                                     if (!isDup) {
                                         if (toolName === 'get_search_performance') gscCallCount++;
+                                        if (GITHUB_TOOL_NAMES.has(toolName)) githubCallCount++;
                                         pendingFunctionCalls.push(part);
                                         controller.enqueue(encodeSSE({
                                             type: 'tool_start',
@@ -474,7 +505,9 @@ CRITICAL SYSTEM CONTEXT:
                                 try {
                                     const toolResult = await executeAiChatTool(fcName, fcArgs, {
                                         googleAccessToken,
-                                        googleRefreshToken
+                                        googleRefreshToken,
+                                        githubAccessToken,
+                                        userId: userId ? String(userId) : undefined,
                                     });
 
                                     controller.enqueue(encodeSSE({

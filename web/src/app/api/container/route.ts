@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
 // ============= Mock data for dev mode =============
 
 function getMockContainerStatus() {
+  // Dev-mode mock: Google is faked as connected so the dashboard renders;
+  // GitHub starts disconnected so the Connect GitHub flow can be tested locally.
   return {
     status: 'running',
     health: 'healthy',
@@ -19,7 +21,6 @@ function getMockContainerStatus() {
     botUsername: 'TrafficClawDevBot',
     telegramBotToken: '',
     connectedProviders: [
-      { provider: 'github', connected: true },
       { provider: 'google', connected: true },
     ],
   };

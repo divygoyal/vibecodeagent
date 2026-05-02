@@ -1,14 +1,17 @@
 'use client';
 
-import { useSession, signOut } from 'next-auth/react';
-import { useState } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-    User, Mail, LogOut,
+    User, Mail, LogOut, Github, Plug,
     CheckCircle2, ChevronRight, Gift, Copy, Check, CreditCard
 } from 'lucide-react';
 import Link from 'next/link';
 import { BellRing } from 'lucide-react';
 import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } from '@/lib/pushNotifications';
+import { useContainerStatus } from '@/lib/useDashboardData';
+import { toast } from 'sonner';
 import LeaderboardOptIn from './LeaderboardOptIn';
 
 function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: string }) {
@@ -28,6 +31,41 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
 
 export default function SettingsPage() {
     const { data: session } = useSession();
+    const { hasGoogleConnection, hasGithubConnection, refresh: refreshContainer } = useContainerStatus();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // After NextAuth redirects back from a provider OAuth flow, persist the new
+    // tokens to the admin DB so the chatbot can use them on subsequent requests.
+    useEffect(() => {
+        const connected = searchParams.get('connected');
+        if (connected !== 'github' && connected !== 'google') return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/auth/register-provider', { method: 'POST' });
+                if (!cancelled) {
+                    if (res.ok) {
+                        toast.success(connected === 'github' ? 'GitHub connected' : 'Google connected');
+                        refreshContainer();
+                    } else {
+                        toast.error(`Failed to register ${connected} connection.`);
+                    }
+                }
+            } catch {
+                if (!cancelled) toast.error(`Failed to register ${connected} connection.`);
+            } finally {
+                if (!cancelled) {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete('connected');
+                    const qs = params.toString();
+                    router.replace(`/dashboard/settings${qs ? `?${qs}` : ''}`);
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [searchParams, router, refreshContainer]);
 
     const [notifications, setNotifications] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -120,6 +158,33 @@ export default function SettingsPage() {
                 <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
             </Link>
 
+            {/* Connections */}
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
+                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <Plug className="w-3.5 h-3.5" />
+                    Connections
+                </h2>
+                <p className="text-xs text-zinc-500 mb-4">
+                    Connect your data sources so the AI chatbot can diagnose issues across SEO, analytics, and your codebase in a single conversation.
+                </p>
+                <div className="space-y-1">
+                    <ServiceRow
+                        name="Google (Analytics + Search Console)"
+                        description="Lets the AI read GA4 traffic and GSC search performance"
+                        icon={<span className="text-base">📊</span>}
+                        connected={hasGoogleConnection}
+                        onConnect={() => signIn('google', { callbackUrl: '/dashboard/settings?connected=google' }, { prompt: 'select_account consent' })}
+                    />
+                    <ServiceRow
+                        name="GitHub"
+                        description="Lets the AI read your repos, recent commits, PRs, issues, and CI runs to correlate code changes with traffic events"
+                        icon={<Github className="w-4 h-4 text-white" />}
+                        connected={hasGithubConnection}
+                        onConnect={() => signIn('github', { callbackUrl: '/dashboard/settings?connected=github' }, { prompt: 'consent' })}
+                    />
+                </div>
+            </div>
+
             {/* Referral Program */}
             <ReferralSection email={session?.user?.email || ''} />
 
@@ -176,27 +241,34 @@ export default function SettingsPage() {
     );
 }
 
-function ServiceRow({ name, description, connected, icon }: {
+function ServiceRow({ name, description, connected, icon, onConnect }: {
     name: string;
     description: string;
     connected: boolean;
-    icon: string;
+    icon: React.ReactNode;
+    onConnect?: () => void;
 }) {
     return (
-        <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.02] transition">
-            <div className="flex items-center gap-3">
-                <span className="text-lg">{icon}</span>
-                <div>
-                    <div className="text-sm font-medium text-white">{name}</div>
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/[0.02] transition">
+            <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
+                    {icon}
+                </div>
+                <div className="min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{name}</div>
                     <div className="text-xs text-zinc-500">{description}</div>
                 </div>
             </div>
             {connected ? (
-                <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shrink-0">
                     <CheckCircle2 className="w-2.5 h-2.5" /> Connected
                 </span>
             ) : (
-                <button className="text-xs text-zinc-400 hover:text-white transition flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1]">
+                <button
+                    onClick={onConnect}
+                    disabled={!onConnect}
+                    className="text-xs text-zinc-300 hover:text-white transition flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/[0.08] hover:border-white/[0.16] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                >
                     Connect <ChevronRight className="w-3 h-3" />
                 </button>
             )}

@@ -41,6 +41,9 @@ services:
       - DEFAULT_CPU_LIMIT=${DEFAULT_CPU_LIMIT:-0.25}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_SECRET}
+      - OAUTH_TOKEN_ENC_KEY=${OAUTH_TOKEN_ENC_KEY}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for container management
       - ./admin/data:/app/data                      # Persistent database

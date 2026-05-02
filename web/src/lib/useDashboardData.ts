@@ -17,6 +17,7 @@ type FetcherError = Error & {
 
 type SessionUser = {
     googleAccessToken?: string;
+    githubAccessToken?: string;
 };
 
 const fetcher = async (url: string) => {
@@ -89,16 +90,22 @@ export function useContainerStatus() {
     const adminHasGoogle = data?.connectedProviders?.some(
         (c: { provider: string }) => c.provider === 'google'
     ) || false;
+    const adminHasGithub = data?.connectedProviders?.some(
+        (c: { provider: string }) => c.provider === 'github'
+    ) || false;
 
     // Bug #5 fix: ALSO check from the current NextAuth session (JWT has the token)
     // This handles the case where admin DB hasn't synced yet
     const sessionHasGoogle = !!(session?.user as SessionUser | undefined)?.googleAccessToken;
+    const sessionHasGithub = !!(session?.user as SessionUser | undefined)?.githubAccessToken;
 
     const hasGoogleConnection = adminHasGoogle || sessionHasGoogle;
+    const hasGithubConnection = adminHasGithub || sessionHasGithub;
 
     return {
         botStatus: data,
         hasGoogleConnection,
+        hasGithubConnection,
         isLoading,
         isError: error,
         refresh: mutate

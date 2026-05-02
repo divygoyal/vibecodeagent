@@ -1,6 +1,17 @@
 // AI Chat Tools Definition & Executor
 // These tools are injected into the Gemini API so the AI can "call" them to perform deep diagnosis.
 import { getValidAccessToken, runFlexibleGAReport, runFlexibleRealtimeReport, getPropertyMetadata } from '@/lib/googleApi';
+import {
+    getValidGithubToken,
+    listUserRepos,
+    searchRepoCode,
+    getRepoIssues,
+    getPullRequests,
+    getRecentCommits,
+    getWorkflowRuns,
+    getFileContents,
+    getRepoHealth,
+} from '@/lib/githubApi';
 
 export const AI_CHAT_TOOL_DECLARATIONS = [
     {
@@ -438,11 +449,264 @@ WHEN TO USE:
             required: ['propertyId'],
         },
     },
+    // ═══════════════════════════════════════════════════════════════
+    // GITHUB TOOLS — connect codebase signals to SEO/analytics symptoms
+    // ═══════════════════════════════════════════════════════════════
+    {
+        name: 'list_user_repos',
+        description: `List the user's GitHub repositories. Use ONCE at the start of a repo investigation to discover the right repo to drill into.
+
+WHEN TO USE:
+- "What repos do I have?" / "Show my repositories"
+- First step of any cross-source diagnosis when the user hasn't named a specific repo
+- BEFORE calling other GitHub tools that require a repo name
+
+EFFICIENCY: Call once per conversation. The result is enough to pick the right repo for follow-up calls.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                sort: {
+                    type: 'STRING' as const,
+                    enum: ['updated', 'pushed', 'created', 'full_name'],
+                    description: 'Sort order. Default "updated" (most recently active first).',
+                },
+                per_page: {
+                    type: 'INTEGER' as const,
+                    description: 'Max repos to fetch. Default 30, max 100.',
+                },
+            },
+            required: [],
+        },
+    },
+    {
+        name: 'get_repo_health',
+        description: `One-shot summary of a repo: open issues, open PRs, last commit, languages, default branch. Use this BEFORE deeper GitHub calls to scope the problem cheaply.
+
+WHEN TO USE:
+- "What's the state of repo X?" / "Give me a health check on X"
+- As the FIRST GitHub call after picking a repo from list_user_repos
+- Before deciding whether to look at issues, PRs, commits, or workflows
+
+EFFICIENCY: One call returns enough metadata to know whether the repo is active, what it's written in, and where to dig next. Always cheaper than guessing wrong and burning two calls on the wrong tool.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo" (e.g. "trafficclaw/web") or full GitHub URL.',
+                },
+            },
+            required: ['repo'],
+        },
+    },
+    {
+        name: 'search_repo_code',
+        description: `Search code across the user's repos for a string or symbol. Use to find WHERE a feature/page/template/error string lives in the codebase.
+
+WHEN TO USE:
+- "Where is the sitemap generated?" → query="sitemap.xml" or "generateSitemap"
+- "Where do we render the pricing page?" → query="/pricing" repo="..."
+- After GSC reports a structured-data error → query="application/ld+json" repo="..."
+- To locate the file before calling get_file_contents
+
+EFFICIENCY: Always set repo= to scope the search. Without repo=, GitHub code search is slower and noisier.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                query: {
+                    type: 'STRING' as const,
+                    description: 'Search string. GitHub code-search syntax supported (e.g. "language:ts useEffect").',
+                },
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo" to scope the search to a single repo (strongly recommended).',
+                },
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'get_recent_commits',
+        description: `List recent commits, optionally filtered by date range and path. The PRIMARY tool for correlating analytics events (traffic drops, ranking losses, error spikes) with code changes.
+
+WHEN TO USE:
+- "What changed under /app/pricing in the last 14 days?" → path="app/pricing" since="14daysAgo"
+- "Did anything ship between Apr 20 and May 1?" → since/until
+- Cross-source diagnosis: confirm a GA4/GSC drop date, then call this with since=<dropDate - 3d> and path filter
+
+EFFICIENCY: One call with both since/until AND path is far more useful than two unscoped calls. Always cite the SHA and date in the final answer.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo".',
+                },
+                since: {
+                    type: 'STRING' as const,
+                    description: 'ISO 8601 timestamp lower bound (e.g. "2026-04-15T00:00:00Z").',
+                },
+                until: {
+                    type: 'STRING' as const,
+                    description: 'ISO 8601 timestamp upper bound.',
+                },
+                path: {
+                    type: 'STRING' as const,
+                    description: 'Restrict to commits touching this file or directory (e.g. "app/pricing").',
+                },
+                per_page: {
+                    type: 'INTEGER' as const,
+                    description: 'Max commits to fetch. Default 30, max 100.',
+                },
+            },
+            required: ['repo'],
+        },
+    },
+    {
+        name: 'get_pull_requests',
+        description: `List PRs in a repo (open/closed/merged). Use to see what shipped in a window or to find a PR mentioned in a deploy.
+
+WHEN TO USE:
+- "What PRs merged last week?" → state="closed", filter merged_at in your head
+- "Show open PRs" → state="open"
+- After get_recent_commits surfaces interesting commits, call this to get the PR context
+
+EFFICIENCY: state="closed" returns merged + closed-without-merge — check merged_at to differentiate. Use since= to scope the window.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo".',
+                },
+                state: {
+                    type: 'STRING' as const,
+                    enum: ['open', 'closed', 'all'],
+                    description: 'PR state filter. Default "all".',
+                },
+                since: {
+                    type: 'STRING' as const,
+                    description: 'ISO 8601 timestamp; only return PRs updated on/after this. Filter applied client-side.',
+                },
+                per_page: {
+                    type: 'INTEGER' as const,
+                    description: 'Max PRs to fetch. Default 30, max 100.',
+                },
+            },
+            required: ['repo'],
+        },
+    },
+    {
+        name: 'get_repo_issues',
+        description: `List issues in a repo. Use to surface user-reported bugs that match a symptom the user is asking about.
+
+WHEN TO USE:
+- "Are there any open bugs about checkout?" → labels="bug", filter title client-side
+- "What issues mention slow page load?" → state="all" then read titles
+- After identifying a likely root cause from commits/PRs, check if anyone already filed an issue
+
+EFFICIENCY: Filter with labels= when possible. Returns only issues (PRs are excluded — use get_pull_requests for those).`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo".',
+                },
+                state: {
+                    type: 'STRING' as const,
+                    enum: ['open', 'closed', 'all'],
+                    description: 'Issue state. Default "open".',
+                },
+                labels: {
+                    type: 'STRING' as const,
+                    description: 'Comma-separated label filter (e.g. "bug,critical").',
+                },
+                since: {
+                    type: 'STRING' as const,
+                    description: 'ISO 8601 timestamp; only return issues updated on/after this.',
+                },
+                per_page: {
+                    type: 'INTEGER' as const,
+                    description: 'Max issues to fetch. Default 30, max 100.',
+                },
+            },
+            required: ['repo'],
+        },
+    },
+    {
+        name: 'get_workflow_runs',
+        description: `List recent GitHub Actions workflow runs (CI/CD). Use to diagnose deploy failures or to confirm a deploy actually happened around a given date.
+
+WHEN TO USE:
+- "Why did the last deploy fail?" → status="completed", check conclusion
+- "Did a deploy go out on May 1?" → branch="main", filter created_at
+- After get_recent_commits identifies a suspect commit, check if its workflow run failed
+
+EFFICIENCY: Filter with status= and branch= aggressively. The result includes conclusion (success/failure/cancelled) so you can pick the failed runs to investigate further.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo".',
+                },
+                status: {
+                    type: 'STRING' as const,
+                    enum: ['completed', 'in_progress', 'queued', 'failure', 'success', 'cancelled'],
+                    description: 'Workflow run status filter.',
+                },
+                branch: {
+                    type: 'STRING' as const,
+                    description: 'Branch name to filter on (e.g. "main").',
+                },
+                per_page: {
+                    type: 'INTEGER' as const,
+                    description: 'Max runs to fetch. Default 20, max 100.',
+                },
+            },
+            required: ['repo'],
+        },
+    },
+    {
+        name: 'get_file_contents',
+        description: `Read the contents of a specific file in a repo. Use AFTER search_repo_code or get_recent_commits has located the file you want to read.
+
+WHEN TO USE:
+- "Show me robots.txt" → path="robots.txt"
+- "Read the schema generator" → path="<path from search_repo_code>"
+- "What does next.config.js look like?" → path="next.config.js"
+
+CONSTRAINTS:
+- Files larger than 100KB are rejected — use search_repo_code to find specific lines first.
+- Returns up to 6000 chars of content. If truncated, drill into the relevant section.
+- Never call this on >2 files in one conversation. Pick the most likely file.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: {
+                    type: 'STRING' as const,
+                    description: 'Repo as "owner/repo".',
+                },
+                path: {
+                    type: 'STRING' as const,
+                    description: 'Path within the repo (e.g. "next.config.js" or "app/pricing/page.tsx").',
+                },
+                ref: {
+                    type: 'STRING' as const,
+                    description: 'Optional branch, tag, or commit SHA. Defaults to default branch.',
+                },
+            },
+            required: ['repo', 'path'],
+        },
+    },
 ];
 
 export interface GscContext {
     googleAccessToken?: string;
     googleRefreshToken?: string;
+    githubAccessToken?: string;
+    userId?: string;
 }
 
 /**
@@ -1279,5 +1543,61 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
     }
 
-    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, run_ga4_report, run_page_audit, generate_content_strategy, analyze_keyword_clusters, compare_time_periods, find_cannibalization, suggest_internal_links, generate_meta_tags, run_realtime_report, get_custom_dimensions` };
+    // ═══════════════════════════════════════════════════════════════
+    // GITHUB TOOL EXECUTORS
+    // ═══════════════════════════════════════════════════════════════
+    const GITHUB_TOOLS = new Set([
+        'list_user_repos',
+        'get_repo_health',
+        'search_repo_code',
+        'get_recent_commits',
+        'get_pull_requests',
+        'get_repo_issues',
+        'get_workflow_runs',
+        'get_file_contents',
+    ]);
+
+    if (GITHUB_TOOLS.has(name)) {
+        const token = await getValidGithubToken(gscContext?.githubAccessToken, gscContext?.userId);
+        if (!token) {
+            return {
+                error: 'github_not_connected',
+                response: 'GitHub is not connected for this account. Ask the user to click "Connect GitHub" in Settings, then retry.',
+            };
+        }
+
+        try {
+            switch (name) {
+                case 'list_user_repos':
+                    return forwardGithubResult(await listUserRepos(token, args));
+                case 'get_repo_health':
+                    return forwardGithubResult(await getRepoHealth(token, args as { repo: string }));
+                case 'search_repo_code':
+                    return forwardGithubResult(await searchRepoCode(token, args as { query: string; repo?: string }));
+                case 'get_recent_commits':
+                    return forwardGithubResult(await getRecentCommits(token, args as any));
+                case 'get_pull_requests':
+                    return forwardGithubResult(await getPullRequests(token, args as any));
+                case 'get_repo_issues':
+                    return forwardGithubResult(await getRepoIssues(token, args as any));
+                case 'get_workflow_runs':
+                    return forwardGithubResult(await getWorkflowRuns(token, args as any));
+                case 'get_file_contents':
+                    return forwardGithubResult(await getFileContents(token, args as { repo: string; path: string; ref?: string }));
+            }
+        } catch (e: any) {
+            return { error: 'github_tool_failed', response: e?.message || 'GitHub tool execution failed.' };
+        }
+    }
+
+    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, run_ga4_report, run_page_audit, generate_content_strategy, analyze_keyword_clusters, compare_time_periods, find_cannibalization, suggest_internal_links, generate_meta_tags, run_realtime_report, get_custom_dimensions, list_user_repos, get_repo_health, search_repo_code, get_recent_commits, get_pull_requests, get_repo_issues, get_workflow_runs, get_file_contents` };
+}
+
+// Normalize the GithubResult discriminated union into the {result, error} shape
+// the chat route already understands.
+function forwardGithubResult(r: any) {
+    if (r && typeof r === 'object' && 'error' in r) {
+        return { error: r.error, response: r.message || r.error };
+    }
+    return { result: r?.data ?? r };
 }

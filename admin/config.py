@@ -42,7 +42,14 @@ class Settings(BaseSettings):
     # OAuth Credentials (injected into containers)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
-    
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+
+    # OAuth token encryption-at-rest (Fernet key, base64). Generate:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # If unset, oauth_connections tokens are stored plaintext (dev mode).
+    OAUTH_TOKEN_ENC_KEY: Optional[str] = None
+
     # Alerts
     TELEGRAM_ADMIN_BOT_TOKEN: Optional[str] = None
     TELEGRAM_ADMIN_CHAT_ID: Optional[str] = None

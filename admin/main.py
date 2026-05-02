@@ -81,11 +81,24 @@ async def lifespan(app: FastAPI):
     import os
     os.makedirs("data", exist_ok=True)
     await init_db()
-    
+
+    # Auto-encrypt any pre-existing plaintext OAuth tokens.
+    # Idempotent — skips rows that are already Fernet ciphertext.
+    try:
+        from migrations.encrypt_oauth_tokens import run as run_encrypt_migration
+        result = await run_encrypt_migration(engine)
+        if result.get("status") == "ok" and result.get("encrypted_fields", 0) > 0:
+            print(
+                f"[startup] Encrypted {result['encrypted_fields']} OAuth token field(s) "
+                f"across {result['updated_rows']} row(s)."
+            )
+    except Exception as exc:
+        print(f"[startup] OAuth token encryption migration failed: {exc}")
+
     # Auto-sync orphaned containers to DB
     async with async_session() as session:
         await sync_orphaned_users(session)
-        
+
     yield
     # Shutdown
     pass
