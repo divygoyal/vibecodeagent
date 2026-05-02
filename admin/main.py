@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Any, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import json
 import docker
 import logging
@@ -19,11 +19,11 @@ from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update, delete, text
+from sqlalchemy import select, update, delete, text, func
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition
 from docker_manager import docker_manager
 
 
@@ -52,6 +52,19 @@ async def init_db():
             )
         except Exception:
             pass
+
+        # Leaderboard v2 columns (010_add_leaderboard_v2.sql).
+        # Base.metadata.create_all already creates leaderboard_stats_history; ALTER is needed
+        # only for the new columns on the existing leaderboard_entries table.
+        for col, col_def in [
+            ("verified_host", "VARCHAR(255)"),
+            ("verification_status", "VARCHAR(20) DEFAULT 'pending'"),
+            ("primary_country", "VARCHAR(2)"),
+        ]:
+            try:
+                await conn.execute(text(f"ALTER TABLE leaderboard_entries ADD COLUMN {col} {col_def}"))
+            except Exception:
+                pass
 
 
 async def get_db():
@@ -2583,6 +2596,8 @@ class LeaderboardJoinRequest(BaseModel):
     looking_for: Optional[List[str]] = None
     twitter_handle: Optional[str] = None
     ga_property_id: Optional[str] = None
+    verification_status: Optional[str] = None  # verified | host_mismatch | pending | failed
+    verified_host: Optional[str] = None
 
 
 class LeaderboardUpdateRequest(BaseModel):
@@ -2614,6 +2629,15 @@ async def get_leaderboard_entry_detail(
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
+    # Fetch up to 30 days of history for the sparkline.
+    history_result = await db.execute(
+        select(LeaderboardStatsHistory)
+        .where(LeaderboardStatsHistory.entry_id == entry.id)
+        .order_by(LeaderboardStatsHistory.recorded_on.desc())
+        .limit(30)
+    )
+    history_rows = list(reversed(history_result.scalars().all()))
+
     return {
         "id": entry.id,
         "startup_name": entry.startup_name,
@@ -2631,8 +2655,20 @@ async def get_leaderboard_entry_detail(
         "avg_session_duration": entry.avg_session_duration,
         "visitor_trend": entry.visitor_trend,
         "is_verified": entry.is_verified,
+        "verification_status": entry.verification_status or ("verified" if entry.is_verified else "pending"),
+        "verified_host": entry.verified_host,
+        "primary_country": entry.primary_country,
         "last_refreshed": entry.last_refreshed.isoformat() if entry.last_refreshed else None,
         "created_at": entry.created_at.isoformat() if entry.created_at else None,
+        "history": [
+            {
+                "recorded_on": h.recorded_on.isoformat() if h.recorded_on else None,
+                "monthly_visitors": h.monthly_visitors,
+                "rank_overall": h.rank_overall,
+                "rank_in_category": h.rank_in_category,
+            }
+            for h in history_rows
+        ],
     }
 
 
@@ -2641,48 +2677,83 @@ async def list_leaderboard(
     sort: str = "traffic",
     category: Optional[str] = None,
     mrr: Optional[str] = None,
+    country: Optional[str] = None,
+    q: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 25,
     db: AsyncSession = Depends(get_db),
 ):
-    """Public endpoint — list all active leaderboard entries."""
-    query = select(LeaderboardEntry).where(LeaderboardEntry.is_active == True)
+    """Public endpoint — list active leaderboard entries with filters, search and pagination.
+
+    Returns `{ entries, total, page, pageSize }`. Sort modes:
+        traffic     — by monthly_visitors desc (default)
+        engagement  — by engagement_rate desc
+        movers      — by visitor_trend desc (positive growth first)
+        newest      — by created_at desc
+    """
+    page = max(page, 1)
+    page_size = max(min(page_size, 100), 1)
+
+    base = select(LeaderboardEntry).where(LeaderboardEntry.is_active == True)
 
     if category and category != "all":
-        query = query.where(LeaderboardEntry.category == category)
+        base = base.where(LeaderboardEntry.category == category)
     if mrr and mrr != "all":
-        query = query.where(LeaderboardEntry.mrr_range == mrr)
+        base = base.where(LeaderboardEntry.mrr_range == mrr)
+    if country and country != "all":
+        base = base.where(LeaderboardEntry.primary_country == country.upper())
+    if q:
+        like = f"%{q.strip().lower()}%"
+        base = base.where(
+            (func.lower(LeaderboardEntry.startup_name).like(like))
+            | (func.lower(LeaderboardEntry.description).like(like))
+        )
 
     if sort == "engagement":
-        query = query.order_by(LeaderboardEntry.engagement_rate.desc())
+        ordered = base.order_by(LeaderboardEntry.engagement_rate.desc())
+    elif sort == "movers":
+        ordered = base.order_by(LeaderboardEntry.visitor_trend.desc())
     elif sort == "newest":
-        query = query.order_by(LeaderboardEntry.created_at.desc())
-    else:  # "traffic" default
-        query = query.order_by(LeaderboardEntry.monthly_visitors.desc())
+        ordered = base.order_by(LeaderboardEntry.created_at.desc())
+    else:
+        ordered = base.order_by(LeaderboardEntry.monthly_visitors.desc())
 
-    result = await db.execute(query)
+    count_result = await db.execute(select(func.count()).select_from(base.subquery()))
+    total = count_result.scalar_one() or 0
+
+    paginated = ordered.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(paginated)
     entries = result.scalars().all()
 
-    return [
-        {
-            "id": e.id,
-            "startup_name": e.startup_name,
-            "description": e.description,
-            "website_url": e.website_url,
-            "logo_url": e.logo_url,
-            "category": e.category,
-            "mrr_range": e.mrr_range,
-            "looking_for": json.loads(e.looking_for) if e.looking_for else [],
-            "twitter_handle": e.twitter_handle,
-            "monthly_visitors": e.monthly_visitors,
-            "monthly_pageviews": e.monthly_pageviews,
-            "engagement_rate": e.engagement_rate,
-            "bounce_rate": e.bounce_rate,
-            "visitor_trend": e.visitor_trend,
-            "is_verified": e.is_verified,
-            "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
-            "created_at": e.created_at.isoformat() if e.created_at else None,
-        }
-        for e in entries
-    ]
+    return {
+        "entries": [
+            {
+                "id": e.id,
+                "startup_name": e.startup_name,
+                "description": e.description,
+                "website_url": e.website_url,
+                "logo_url": e.logo_url,
+                "category": e.category,
+                "mrr_range": e.mrr_range,
+                "looking_for": json.loads(e.looking_for) if e.looking_for else [],
+                "twitter_handle": e.twitter_handle,
+                "monthly_visitors": e.monthly_visitors,
+                "monthly_pageviews": e.monthly_pageviews,
+                "engagement_rate": e.engagement_rate,
+                "bounce_rate": e.bounce_rate,
+                "visitor_trend": e.visitor_trend,
+                "is_verified": e.is_verified,
+                "verification_status": e.verification_status or ("verified" if e.is_verified else "pending"),
+                "primary_country": e.primary_country,
+                "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in entries
+        ],
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+    }
 
 
 @app.post("/api/leaderboard/{identifier}/join")
@@ -2713,6 +2784,10 @@ async def join_leaderboard_for_user(
         if data.looking_for is not None: entry.looking_for = json.dumps(data.looking_for)
         if data.twitter_handle is not None: entry.twitter_handle = data.twitter_handle
         if data.ga_property_id is not None: entry.ga_property_id = data.ga_property_id
+        if data.verification_status is not None:
+            entry.verification_status = data.verification_status
+            entry.is_verified = data.verification_status == "verified"
+        if data.verified_host is not None: entry.verified_host = data.verified_host
         entry.is_active = True
         entry.updated_at = datetime.utcnow()
     else:
@@ -2727,6 +2802,9 @@ async def join_leaderboard_for_user(
             looking_for=json.dumps(data.looking_for or []),
             twitter_handle=data.twitter_handle,
             ga_property_id=data.ga_property_id,
+            verification_status=data.verification_status or "pending",
+            verified_host=data.verified_host,
+            is_verified=(data.verification_status == "verified"),
         )
         db.add(entry)
 
@@ -2856,6 +2934,7 @@ async def refresh_leaderboard_stats(
                 "user_id": entry.user_id,
                 "entry_id": entry.id,
                 "ga_property_id": entry.ga_property_id,
+                "website_url": entry.website_url,
                 "access_token": oauth.access_token,
                 "refresh_token": oauth.refresh_token,
             })
@@ -2870,7 +2949,11 @@ async def update_leaderboard_stats(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
-    """Update GA4 stats for a leaderboard entry (called by cron after fetching GA4 data)."""
+    """Update GA4 stats for a leaderboard entry (called by cron after fetching GA4 data).
+
+    Also writes a daily snapshot to leaderboard_stats_history (idempotent on (entry_id, recorded_on))
+    so the per-entry sparkline and weekly-mover rail have data to draw on.
+    """
     result = await db.execute(
         select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id)
     )
@@ -2890,9 +2973,44 @@ async def update_leaderboard_stats(
         entry.avg_session_duration = stats["avg_session_duration"]
     if "visitor_trend" in stats:
         entry.visitor_trend = stats["visitor_trend"]
+    if "primary_country" in stats:
+        entry.primary_country = stats["primary_country"]
+    if "verification_status" in stats:
+        entry.verification_status = stats["verification_status"]
+        entry.is_verified = stats["verification_status"] == "verified"
+    if "verified_host" in stats:
+        entry.verified_host = stats["verified_host"]
 
-    entry.is_verified = True
+    # Default verification flag stays in sync with status; if no status sent, mark as verified
+    # only when we have actual GA4 numbers to back the listing.
+    if "verification_status" not in stats and entry.monthly_visitors and entry.monthly_visitors > 0:
+        entry.is_verified = entry.verification_status == "verified" or entry.is_verified
     entry.last_refreshed = datetime.utcnow()
+
+    # Upsert today's history snapshot. (entry_id, recorded_on) is unique so re-runs of the cron
+    # on the same UTC day overwrite rather than duplicating.
+    today = date.today()
+    history_lookup = await db.execute(
+        select(LeaderboardStatsHistory).where(
+            LeaderboardStatsHistory.entry_id == entry.id,
+            LeaderboardStatsHistory.recorded_on == today,
+        )
+    )
+    history = history_lookup.scalar_one_or_none()
+    if history is None:
+        history = LeaderboardStatsHistory(entry_id=entry.id, recorded_on=today)
+        db.add(history)
+    history.monthly_visitors = entry.monthly_visitors or 0
+    history.monthly_pageviews = entry.monthly_pageviews or 0
+    history.engagement_rate = entry.engagement_rate or 0.0
+    history.bounce_rate = entry.bounce_rate or 0.0
+    history.avg_session_duration = entry.avg_session_duration or 0.0
+    history.visitor_trend = entry.visitor_trend or 0.0
+    if "rank_overall" in stats:
+        history.rank_overall = stats["rank_overall"]
+    if "rank_in_category" in stats:
+        history.rank_in_category = stats["rank_in_category"]
+
     await db.commit()
     return {"success": True}
 

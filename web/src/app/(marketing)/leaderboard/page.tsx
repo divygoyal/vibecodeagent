@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import {
-    Trophy, TrendingUp, Sparkles, Clock, ShieldCheck,
-    ExternalLink, ArrowUpRight, ArrowDownRight, Search,
-    ChevronDown, Users, Eye, Zap, Filter
+    Trophy, Sparkles, Clock, ShieldCheck,
+    ExternalLink, ArrowUpRight, ArrowDownRight, Search as SearchIcon,
+    ChevronDown, ChevronLeft, ChevronRight, Users, Zap,
+    AlertTriangle, Flame,
 } from 'lucide-react';
 
 interface LeaderboardEntry {
@@ -26,8 +28,17 @@ interface LeaderboardEntry {
     bounce_rate: number;
     visitor_trend: number;
     is_verified: boolean;
+    verification_status?: string;
+    primary_country?: string | null;
     last_refreshed: string | null;
     created_at: string | null;
+}
+
+interface LeaderboardListResponse {
+    entries: LeaderboardEntry[];
+    total: number;
+    page: number;
+    pageSize: number;
 }
 
 const CATEGORIES = [
@@ -49,9 +60,23 @@ const MRR_RANGES = [
     { value: '$10K+', label: '$10K+' },
 ];
 
+const COUNTRIES = [
+    { value: 'all', label: 'All Countries' },
+    { value: 'US', label: 'United States' },
+    { value: 'GB', label: 'United Kingdom' },
+    { value: 'IN', label: 'India' },
+    { value: 'CA', label: 'Canada' },
+    { value: 'DE', label: 'Germany' },
+    { value: 'FR', label: 'France' },
+    { value: 'AU', label: 'Australia' },
+    { value: 'BR', label: 'Brazil' },
+    { value: 'JP', label: 'Japan' },
+];
+
 const SORT_TABS = [
     { value: 'traffic', label: 'Traffic', icon: Users },
     { value: 'engagement', label: 'Engagement', icon: Zap },
+    { value: 'movers', label: 'Movers', icon: Flame },
     { value: 'newest', label: 'Newest', icon: Clock },
 ];
 
@@ -60,6 +85,8 @@ const LOOKING_FOR_COLORS: Record<string, string> = {
     visibility: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
     buyer: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
 };
+
+const PAGE_SIZE = 25;
 
 function formatNumber(n: number): string {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -77,6 +104,7 @@ function RankBadge({ rank }: { rank: number }) {
 function LogoIcon({ name, url }: { name: string; url: string | null }) {
     if (url) {
         return (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
                 src={url}
                 alt={name}
@@ -100,48 +128,175 @@ function LogoIcon({ name, url }: { name: string; url: string | null }) {
     );
 }
 
+function MoversRail({ entries }: { entries: LeaderboardEntry[] }) {
+    if (entries.length === 0) return null;
+    return (
+        <section aria-label="Top movers this week" className="mb-10">
+            <div className="flex items-end justify-between mb-3">
+                <div>
+                    <div className="flex items-center gap-2 text-amber-400 mb-1">
+                        <Flame className="w-4 h-4" />
+                        <span className="text-[10px] font-semibold uppercase tracking-wider">Movers this week</span>
+                    </div>
+                    <h2 className="text-lg font-semibold text-white">Biggest 30-day visitor gains</h2>
+                </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {entries.map((entry) => (
+                    <Link
+                        key={entry.id}
+                        href={`/leaderboard/${entry.id}`}
+                        className="group bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 hover:bg-white/[0.04] hover:border-emerald-500/30 transition-all"
+                    >
+                        <div className="flex items-center gap-2.5 mb-2">
+                            <LogoIcon name={entry.startup_name} url={entry.logo_url} />
+                            <div className="min-w-0 flex-1">
+                                <div className="text-xs font-semibold text-white truncate">{entry.startup_name}</div>
+                                <div className="text-[10px] text-zinc-600 truncate">{entry.category || 'Startup'}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-end justify-between">
+                            <span className="text-base font-bold text-white">{formatNumber(entry.monthly_visitors)}</span>
+                            <span className="flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400">
+                                <ArrowUpRight className="w-3 h-3" />
+                                {Math.abs(entry.visitor_trend).toFixed(1)}%
+                            </span>
+                        </div>
+                    </Link>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function VerifiedPill({ status }: { status: string | undefined }) {
+    if (status === 'verified') {
+        return (
+            <span title="GA4 property and claimed website host match" className="inline-flex items-center gap-0.5 text-emerald-400">
+                <ShieldCheck className="w-3.5 h-3.5" />
+            </span>
+        );
+    }
+    if (status === 'host_mismatch' || status === 'no_web_stream') {
+        return (
+            <span title="GA4 property does not match the claimed website" className="inline-flex items-center gap-0.5 text-amber-400">
+                <AlertTriangle className="w-3.5 h-3.5" />
+            </span>
+        );
+    }
+    return null;
+}
+
 export default function LeaderboardPage() {
-    const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [sort, setSort] = useState('traffic');
-    const [category, setCategory] = useState('all');
-    const [mrr, setMrr] = useState('all');
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const { data: session } = useSession();
 
+    const sort = searchParams.get('sort') || 'traffic';
+    const category = searchParams.get('category') || 'all';
+    const mrr = searchParams.get('mrr') || 'all';
+    const country = searchParams.get('country') || 'all';
+    const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
+    const q = searchParams.get('q') || '';
+
+    const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+    const [total, setTotal] = useState(0);
+    const [movers, setMovers] = useState<LeaderboardEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchInput, setSearchInput] = useState(q);
+
+    const updateParams = useCallback(
+        (next: Record<string, string | undefined>) => {
+            const params = new URLSearchParams(searchParams.toString());
+            for (const [key, value] of Object.entries(next)) {
+                if (value === undefined || value === '' || value === 'all') {
+                    params.delete(key);
+                } else {
+                    params.set(key, value);
+                }
+            }
+            const queryString = params.toString();
+            router.replace(queryString ? `/leaderboard?${queryString}` : '/leaderboard', { scroll: false });
+        },
+        [router, searchParams],
+    );
+
+    // Debounced search input → URL
     useEffect(() => {
-        fetchEntries();
-    }, [sort, category, mrr]);
+        const trimmed = searchInput.trim();
+        if (trimmed === q) return;
+        const handle = setTimeout(() => {
+            updateParams({ q: trimmed || undefined, page: '1' });
+        }, 300);
+        return () => clearTimeout(handle);
+    }, [searchInput, q, updateParams]);
 
-    async function fetchEntries() {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams({ sort });
-            if (category !== 'all') params.set('category', category);
-            if (mrr !== 'all') params.set('mrr', mrr);
-
-            const res = await fetch(`/api/leaderboard?${params}`);
-            const data = await res.json();
-            setEntries(Array.isArray(data) ? data : []);
-        } catch {
-            console.error('Failed to fetch leaderboard');
-            setEntries([]);
-        } finally {
-            setLoading(false);
+    // Fetch list whenever URL params change
+    useEffect(() => {
+        let cancelled = false;
+        async function fetchEntries() {
+            setLoading(true);
+            try {
+                const params = new URLSearchParams({
+                    sort,
+                    page: String(page),
+                    page_size: String(PAGE_SIZE),
+                });
+                if (category !== 'all') params.set('category', category);
+                if (mrr !== 'all') params.set('mrr', mrr);
+                if (country !== 'all') params.set('country', country);
+                if (q) params.set('q', q);
+                const res = await fetch(`/api/leaderboard?${params}`);
+                if (!res.ok) throw new Error(String(res.status));
+                const data = (await res.json()) as LeaderboardListResponse;
+                if (cancelled) return;
+                setEntries(data.entries || []);
+                setTotal(data.total || 0);
+            } catch {
+                if (cancelled) return;
+                setEntries([]);
+                setTotal(0);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
         }
-    }
+        fetchEntries();
+        return () => {
+            cancelled = true;
+        };
+    }, [sort, category, mrr, country, q, page]);
+
+    // Movers rail — fetched once (and on category change so per-category pages still feel relevant).
+    const moversFetchedFor = useRef<string>('');
+    useEffect(() => {
+        const key = category;
+        if (moversFetchedFor.current === key) return;
+        moversFetchedFor.current = key;
+        const params = new URLSearchParams({ sort: 'movers', page: '1', page_size: '5' });
+        if (category !== 'all') params.set('category', category);
+        fetch(`/api/leaderboard?${params}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data: LeaderboardListResponse | null) => {
+                if (!data) return;
+                setMovers((data.entries || []).filter((e) => e.visitor_trend > 0));
+            })
+            .catch(() => {});
+    }, [category]);
+
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const baseRank = (page - 1) * PAGE_SIZE;
+
+    const joinHref = '/leaderboard/join';
 
     return (
         <div className="min-h-screen">
-            {/* Hero Section */}
             <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-20 overflow-hidden">
-                {/* Background effects */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/[0.04] rounded-full blur-[120px]" />
                     <div className="absolute top-1/3 right-1/4 w-[300px] h-[300px] bg-cyan-500/[0.03] rounded-full blur-[100px]" />
                 </div>
 
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative">
-                    {/* Badge */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -149,10 +304,9 @@ export default function LeaderboardPage() {
                         className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] mb-6"
                     >
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-xs font-medium text-emerald-400">Verified via Google Analytics</span>
+                        <span className="text-xs font-medium text-emerald-400">Verified via Google Analytics + domain match</span>
                     </motion.div>
 
-                    {/* Heading */}
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -166,17 +320,15 @@ export default function LeaderboardPage() {
                         </span>
                     </motion.h1>
 
-                    {/* Subtitle */}
                     <motion.p
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className="mt-4 text-base sm:text-lg text-zinc-400 max-w-xl mx-auto"
                     >
-                        Real analytics from real startups. All traffic verified via Google Analytics OAuth.
+                        Real analytics from real startups. Every listing is verified against the Google Analytics property that owns the domain.
                     </motion.p>
 
-                    {/* CTA + Stats */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -185,14 +337,14 @@ export default function LeaderboardPage() {
                     >
                         {session ? (
                             <Link
-                                href="/dashboard/settings"
+                                href={joinHref}
                                 className="px-6 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-all shadow-lg shadow-emerald-500/20"
                             >
                                 + Add Your Startup
                             </Link>
                         ) : (
                             <button
-                                onClick={() => signIn('google', { callbackUrl: '/dashboard/settings' })}
+                                onClick={() => signIn('google', { callbackUrl: joinHref })}
                                 className="px-6 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-all shadow-lg shadow-emerald-500/20"
                             >
                                 + Add Your Startup (it&apos;s free)
@@ -200,7 +352,6 @@ export default function LeaderboardPage() {
                         )}
                     </motion.div>
 
-                    {/* Value Props */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -223,63 +374,52 @@ export default function LeaderboardPage() {
                 </div>
             </section>
 
-            {/* Leaderboard Section */}
             <section className="max-w-5xl mx-auto px-4 sm:px-6 pb-24">
-                {/* Filter Bar */}
+                <MoversRail entries={movers} />
+
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: 0.5 }}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6"
+                    className="flex flex-col gap-3 mb-6"
                 >
-                    {/* Filters */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div className="relative">
-                            <select
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 pr-8 text-xs text-zinc-300 cursor-pointer hover:bg-white/[0.06] transition focus:outline-none focus:border-emerald-500/30"
-                            >
-                                {CATEGORIES.map(c => (
-                                    <option key={c.value} value={c.value}>{c.label}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500 pointer-events-none" />
-                        </div>
-
-                        <div className="relative">
-                            <select
-                                value={mrr}
-                                onChange={(e) => setMrr(e.target.value)}
-                                className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 pr-8 text-xs text-zinc-300 cursor-pointer hover:bg-white/[0.06] transition focus:outline-none focus:border-emerald-500/30"
-                            >
-                                {MRR_RANGES.map(m => (
-                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500 pointer-events-none" />
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                            <input
+                                type="search"
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                placeholder="Search startups by name or description..."
+                                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30"
+                            />
                         </div>
                     </div>
 
-                    {/* Sort Tabs */}
-                    <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5">
-                        {SORT_TABS.map(tab => (
-                            <button
-                                key={tab.value}
-                                onClick={() => setSort(tab.value)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                                    sort === tab.value
-                                        ? 'bg-white/[0.08] text-white'
-                                        : 'text-zinc-500 hover:text-zinc-300'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <FilterSelect value={category} onChange={(v) => updateParams({ category: v, page: '1' })} options={CATEGORIES} />
+                            <FilterSelect value={mrr} onChange={(v) => updateParams({ mrr: v, page: '1' })} options={MRR_RANGES} />
+                            <FilterSelect value={country} onChange={(v) => updateParams({ country: v, page: '1' })} options={COUNTRIES} />
+                        </div>
+
+                        <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5">
+                            {SORT_TABS.map((tab) => (
+                                <button
+                                    key={tab.value}
+                                    onClick={() => updateParams({ sort: tab.value, page: '1' })}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                        sort === tab.value ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'
+                                    }`}
+                                >
+                                    <tab.icon className="w-3.5 h-3.5" />
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </motion.div>
 
-                {/* Table Header */}
                 <div className="hidden sm:grid grid-cols-[48px_1fr_140px_100px] gap-4 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border-b border-white/[0.04]">
                     <span>#</span>
                     <span>Startup</span>
@@ -287,11 +427,9 @@ export default function LeaderboardPage() {
                     <span className="text-right">Engagement</span>
                 </div>
 
-                {/* Entries */}
                 <div className="space-y-2 mt-2">
                     <AnimatePresence mode="popLayout">
                         {loading ? (
-                            // Skeleton
                             [...Array(5)].map((_, i) => (
                                 <motion.div
                                     key={`skel-${i}`}
@@ -319,12 +457,16 @@ export default function LeaderboardPage() {
                                 <div className="w-16 h-16 rounded-2xl bg-emerald-500/[0.08] flex items-center justify-center mx-auto mb-4">
                                     <Trophy className="w-7 h-7 text-emerald-400" />
                                 </div>
-                                <h3 className="text-lg font-semibold text-white mb-2">Be the first on the leaderboard!</h3>
+                                <h3 className="text-lg font-semibold text-white mb-2">
+                                    {q ? `No startups match "${q}"` : 'Be the first on the leaderboard!'}
+                                </h3>
                                 <p className="text-sm text-zinc-500 mb-6 max-w-sm mx-auto">
-                                    Connect your Google Analytics and share your verified traffic to appear here.
+                                    {q
+                                        ? 'Try a different search or clear filters.'
+                                        : 'Connect your Google Analytics and share your verified traffic to appear here.'}
                                 </p>
                                 <button
-                                    onClick={() => signIn('google', { callbackUrl: '/dashboard/settings' })}
+                                    onClick={() => (session ? router.push(joinHref) : signIn('google', { callbackUrl: joinHref }))}
                                     className="px-5 py-2.5 text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-all"
                                 >
                                     + Add Your Startup
@@ -337,20 +479,18 @@ export default function LeaderboardPage() {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                                    transition={{ duration: 0.3, delay: index * 0.03 }}
                                     className="group relative bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all cursor-pointer"
-                                    onClick={() => window.location.href = `/leaderboard/${entry.id}`}
+                                    onClick={() => router.push(`/leaderboard/${entry.id}`)}
                                 >
                                     <div className="grid grid-cols-1 sm:grid-cols-[48px_1fr_140px_100px] gap-3 sm:gap-4 items-center">
-                                        {/* Rank */}
                                         <div className="hidden sm:flex items-center justify-center">
-                                            <RankBadge rank={index + 1} />
+                                            <RankBadge rank={baseRank + index + 1} />
                                         </div>
 
-                                        {/* Startup Info */}
                                         <div className="flex items-start sm:items-center gap-3">
                                             <div className="flex sm:hidden items-center justify-center w-6">
-                                                <RankBadge rank={index + 1} />
+                                                <RankBadge rank={baseRank + index + 1} />
                                             </div>
                                             <LogoIcon name={entry.startup_name} url={entry.logo_url} />
                                             <div className="flex-1 min-w-0">
@@ -358,12 +498,11 @@ export default function LeaderboardPage() {
                                                     <h3 className="text-sm font-semibold text-white truncate">
                                                         {entry.startup_name}
                                                     </h3>
-                                                    {entry.is_verified && (
-                                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                                                    )}
+                                                    <VerifiedPill status={entry.verification_status} />
                                                     {entry.website_url && (
                                                         <a
                                                             href={entry.website_url}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="text-zinc-600 hover:text-zinc-400 transition"
@@ -388,7 +527,12 @@ export default function LeaderboardPage() {
                                                             {entry.category}
                                                         </span>
                                                     )}
-                                                    {entry.looking_for?.map(tag => (
+                                                    {entry.primary_country && (
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+                                                            {entry.primary_country}
+                                                        </span>
+                                                    )}
+                                                    {entry.looking_for?.map((tag) => (
                                                         <span
                                                             key={tag}
                                                             className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
@@ -401,6 +545,7 @@ export default function LeaderboardPage() {
                                                     {entry.twitter_handle && (
                                                         <a
                                                             href={`https://x.com/${entry.twitter_handle.replace('@', '')}`}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.06] hover:text-cyan-400 hover:border-cyan-500/20 transition"
@@ -412,7 +557,6 @@ export default function LeaderboardPage() {
                                             </div>
                                         </div>
 
-                                        {/* Monthly Visitors */}
                                         <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0.5 pl-9 sm:pl-0">
                                             <span className="text-lg sm:text-xl font-bold text-white">
                                                 {formatNumber(entry.monthly_visitors)}
@@ -436,7 +580,6 @@ export default function LeaderboardPage() {
                                             </div>
                                         </div>
 
-                                        {/* Engagement */}
                                         <div className="hidden sm:flex flex-col items-end gap-0.5">
                                             <span className="text-lg font-bold text-white">
                                                 {entry.engagement_rate}%
@@ -450,22 +593,45 @@ export default function LeaderboardPage() {
                     </AnimatePresence>
                 </div>
 
-                {/* Bottom CTA */}
+                {!loading && totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-6 px-1">
+                        <span className="text-xs text-zinc-500">
+                            Showing {baseRank + 1}–{Math.min(baseRank + entries.length, total)} of {total}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                disabled={page <= 1}
+                                onClick={() => updateParams({ page: String(page - 1) })}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                                Previous
+                            </button>
+                            <span className="text-xs text-zinc-500">
+                                Page {page} of {totalPages}
+                            </span>
+                            <button
+                                disabled={page >= totalPages}
+                                onClick={() => updateParams({ page: String(page + 1) })}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                            >
+                                Next
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {!loading && entries.length > 0 && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: 0.8 }}
+                        transition={{ delay: 0.4 }}
                         className="text-center mt-12 pb-8"
                     >
-                        <p className="text-sm text-zinc-500 mb-4">
-                            Want to see your startup here?
-                        </p>
+                        <p className="text-sm text-zinc-500 mb-4">Want to see your startup here?</p>
                         <button
-                            onClick={() => session
-                                ? window.location.href = '/dashboard/settings'
-                                : signIn('google', { callbackUrl: '/dashboard/settings' })
-                            }
+                            onClick={() => (session ? router.push(joinHref) : signIn('google', { callbackUrl: joinHref }))}
                             className="px-6 py-3 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-all shadow-lg shadow-emerald-500/20"
                         >
                             + Add Your Startup — It&apos;s Free
@@ -473,6 +639,33 @@ export default function LeaderboardPage() {
                     </motion.div>
                 )}
             </section>
+        </div>
+    );
+}
+
+function FilterSelect({
+    value,
+    onChange,
+    options,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    options: { value: string; label: string }[];
+}) {
+    return (
+        <div className="relative">
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 pr-8 text-xs text-zinc-300 cursor-pointer hover:bg-white/[0.06] transition focus:outline-none focus:border-emerald-500/30"
+            >
+                {options.map((o) => (
+                    <option key={o.value} value={o.value}>
+                        {o.label}
+                    </option>
+                ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500 pointer-events-none" />
         </div>
     );
 }

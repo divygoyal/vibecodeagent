@@ -791,6 +791,7 @@ export default function LandingHomepage() {
                         <Link href="/pricing" className="transition hover:text-white">Pricing</Link>
                         <Link href="/contact" className="transition hover:text-white">Contact</Link>
                         <Link href="/features" className="transition hover:text-white">Features</Link>
+                        <Link href="/leaderboard" className="transition hover:text-white">Leaderboard</Link>
                         <Link href="/privacy" className="transition hover:text-white">Privacy</Link>
                     </div>
                 </div>

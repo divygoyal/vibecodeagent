@@ -93,11 +93,31 @@ services:
       - ADMIN_API_URL=http://admin-api:8000
       - ADMIN_API_KEY=${ADMIN_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CRON_SECRET=${CRON_SECRET}
     networks:
       - clawbot-network
     depends_on:
       admin-api:
         condition: service_healthy
+
+  # ============= Leaderboard Refresh Cron =============
+  # Self-contained scheduled task that hits /api/cron/leaderboard-refresh on the web service
+  # once per day at 03:00 UTC. No external scheduler required.
+  leaderboard-cron:
+    image: alpine:3.19
+    container_name: clawbot-leaderboard-cron
+    restart: always
+    depends_on:
+      - web
+    environment:
+      - WEB_BASE_URL=http://web:3000
+      - CRON_SECRET=${CRON_SECRET}
+    volumes:
+      - ./scripts/leaderboard-refresh-cron.sh:/usr/local/bin/leaderboard-refresh.sh:ro
+      - ./scripts/leaderboard-cron-entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - clawbot-network
 
   # ============= Nginx Reverse Proxy =============
   nginx:

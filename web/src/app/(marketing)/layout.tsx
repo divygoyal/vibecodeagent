@@ -42,6 +42,7 @@ function Navbar() {
             { label: 'AI Chat', href: '/#ai-chat' },
             { label: 'Globe', href: '/#globe' },
             { label: 'Mentions', href: '/#mentions' },
+            { label: 'Leaderboard', href: '/leaderboard' },
             { label: 'Proof', href: '/#proof' },
         ];
 

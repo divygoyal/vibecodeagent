@@ -2,10 +2,43 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getValidAccessToken } from '@/lib/googleApi';
+import { verifyPropertyDomain } from '@/lib/leaderboardVerify';
+import { isBlockedUrl } from '@/lib/urlValidation';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
+
+type JoinRateEntry = { timestamps: number[] };
+const JOIN_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const JOIN_RATE_MAX = 3;
+const joinRateStore = new Map<string, JoinRateEntry>();
+
+function consumeJoinRate(userId: string): { allowed: boolean; retryAfterSeconds: number } {
+    const now = Date.now();
+    const windowStart = now - JOIN_RATE_WINDOW_MS;
+    const recent = (joinRateStore.get(userId)?.timestamps || []).filter((t) => t > windowStart);
+    if (recent.length >= JOIN_RATE_MAX) {
+        const retry = Math.max(recent[0] + JOIN_RATE_WINDOW_MS - now, 1000);
+        joinRateStore.set(userId, { timestamps: recent });
+        return { allowed: false, retryAfterSeconds: Math.ceil(retry / 1000) };
+    }
+    recent.push(now);
+    joinRateStore.set(userId, { timestamps: recent });
+    return { allowed: true, retryAfterSeconds: 0 };
+}
+
+// Match ASCII control chars (NUL through US, plus DEL) and replace with spaces.
+const CONTROL_CHARS_RE = new RegExp('[\\u0000-\\u001F\\u007F]', 'g');
+
+function sanitizeDescription(input: unknown): string | null {
+    if (typeof input !== 'string') return null;
+    const stripped = input.replace(CONTROL_CHARS_RE, ' ').trim();
+    return stripped.slice(0, 200);
+}
+
+
+const SPAM_TERMS = /(viagra|crypto-?(moon|pump)|free-?bitcoin|adult-?cam|porn-?hub)/i;
 
 export const dynamic = 'force-dynamic';
 
@@ -133,11 +166,71 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
     }
 
+    const rate = consumeJoinRate(String(userId));
+    if (!rate.allowed) {
+        return NextResponse.json(
+            { error: 'Too many join requests. Try again in a bit.', retryAfterSeconds: rate.retryAfterSeconds },
+            { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } },
+        );
+    }
+
     try {
-        const body = await req.json();
+        const rawBody = await req.json();
+
+        // Validate URL fields and sanitize description before sending to admin.
+        const websiteUrl: string | undefined = typeof rawBody.website_url === 'string' && rawBody.website_url.trim()
+            ? rawBody.website_url.trim()
+            : undefined;
+        const logoUrl: string | undefined = typeof rawBody.logo_url === 'string' && rawBody.logo_url.trim()
+            ? rawBody.logo_url.trim()
+            : undefined;
+
+        if (websiteUrl && isBlockedUrl(websiteUrl)) {
+            return NextResponse.json({ error: 'Website URL must be a public http(s) URL.' }, { status: 400 });
+        }
+        if (logoUrl && isBlockedUrl(logoUrl)) {
+            return NextResponse.json({ error: 'Logo URL must be a public http(s) URL.' }, { status: 400 });
+        }
+
+        const description = sanitizeDescription(rawBody.description);
+        if (description && SPAM_TERMS.test(description)) {
+            return NextResponse.json({ error: 'Description rejected by content filter.' }, { status: 400 });
+        }
+
+        // Domain-match verification: GA4 property's web stream defaultUri must match website host.
+        let verificationStatus: 'verified' | 'host_mismatch' | 'no_web_stream' | 'no_website_url' | 'failed' | 'pending' = 'pending';
+        let verifiedHost: string | null = null;
+        if (rawBody.ga_property_id && websiteUrl && googleAccessToken) {
+            const verify = await verifyPropertyDomain(
+                rawBody.ga_property_id,
+                websiteUrl,
+                googleAccessToken,
+                googleRefreshToken,
+            );
+            verificationStatus = verify.status;
+            if (verify.ok) {
+                verifiedHost = verify.matchedHost;
+            } else if (verify.status === 'host_mismatch' || verify.status === 'no_web_stream') {
+                // Hard-block obvious mismatches so users can't claim a domain they don't track.
+                return NextResponse.json(
+                    { error: verify.reason, status: verify.status, expectedHost: verify.expectedHost, actualHosts: verify.actualHosts },
+                    { status: 400 },
+                );
+            }
+            // 'failed' (transient API error) or 'no_website_url' fall through with status persisted.
+        }
+
+        const body = {
+            ...rawBody,
+            description,
+            website_url: websiteUrl,
+            logo_url: logoUrl,
+            verification_status: verificationStatus,
+            verified_host: verifiedHost,
+        };
 
         const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}/join`;
-        console.log(`[Leaderboard Join] POST ${adminUrl} for user ${userId}`);
+        console.log(`[Leaderboard Join] POST ${adminUrl} for user ${userId} (verification=${verificationStatus})`);
 
         const res = await fetch(adminUrl, {
             method: 'POST',
@@ -176,7 +269,11 @@ export async function POST(req: Request) {
             console.log(`[Leaderboard Join] Skipping stats fetch: success=${data.success}, id=${data.id}, ga_property=${body.ga_property_id}, hasGoogleToken=${!!googleAccessToken}`);
         }
 
-        return NextResponse.json({ ...data, stats });
+        return NextResponse.json({
+            ...data,
+            stats,
+            verification: { status: verificationStatus, verifiedHost },
+        });
     } catch (err) {
         console.error('Leaderboard join error:', err);
         return NextResponse.json({ error: 'Failed to join leaderboard', detail: String(err) }, { status: 500 });

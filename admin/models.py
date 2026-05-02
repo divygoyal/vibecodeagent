@@ -1,7 +1,7 @@
 """
 Database Models
 """
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean, Text, Float, JSON, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from datetime import datetime
@@ -284,9 +284,33 @@ class LeaderboardEntry(Base):
     avg_session_duration = Column(Float, default=0.0)
     visitor_trend = Column(Float, default=0.0)  # % change vs prev month
 
+    # Verification (GA4 property defaultUri vs claimed website_url host)
+    verified_host = Column(String(255))
+    verification_status = Column(String(20), default='pending')  # verified | host_mismatch | pending | failed
+    primary_country = Column(String(2))  # ISO-2 from GA4 top-country during refresh
+
     # Meta
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     last_refreshed = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LeaderboardStatsHistory(Base):
+    """Per-day snapshot of a leaderboard entry's stats — powers sparkline + weekly digest."""
+    __tablename__ = "leaderboard_stats_history"
+
+    id = Column(Integer, primary_key=True)
+    entry_id = Column(Integer, nullable=False, index=True)
+    recorded_on = Column(Date, nullable=False, index=True)
+    monthly_visitors = Column(Integer, default=0)
+    monthly_pageviews = Column(Integer, default=0)
+    engagement_rate = Column(Float, default=0.0)
+    bounce_rate = Column(Float, default=0.0)
+    avg_session_duration = Column(Float, default=0.0)
+    visitor_trend = Column(Float, default=0.0)
+    rank_overall = Column(Integer)
+    rank_in_category = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint('entry_id', 'recorded_on', name='uq_leaderboard_history_day'),)

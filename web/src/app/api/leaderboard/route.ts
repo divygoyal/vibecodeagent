@@ -67,21 +67,34 @@ function generateMockLeaderboard() {
     ];
 }
 
+type LeaderboardListResponse = {
+    entries: ReturnType<typeof generateMockLeaderboard>;
+    total: number;
+    page: number;
+    pageSize: number;
+};
+
 /**
  * Public endpoint — fetch leaderboard entries.
- * No auth required (proxies to admin API's public GET /api/leaderboard).
- * Falls back to mock data in local dev when admin API is unavailable.
+ * Proxies to admin API's public GET /api/leaderboard. Falls back to mock data in local dev
+ * when admin API is unavailable. Always returns the paginated `{ entries, total, page, pageSize }` shape.
  */
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const sort = searchParams.get('sort') || 'traffic';
     const category = searchParams.get('category') || '';
     const mrr = searchParams.get('mrr') || '';
+    const country = searchParams.get('country') || '';
+    const q = searchParams.get('q') || '';
+    const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(searchParams.get('page_size') || '25', 10) || 25, 1), 100);
 
     try {
-        const params = new URLSearchParams({ sort });
+        const params = new URLSearchParams({ sort, page: String(page), page_size: String(pageSize) });
         if (category) params.set('category', category);
         if (mrr) params.set('mrr', mrr);
+        if (country) params.set('country', country);
+        if (q) params.set('q', q);
 
         const res = await fetch(`${ADMIN_API_URL}/api/leaderboard?${params}`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
@@ -93,35 +106,44 @@ export async function GET(req: Request) {
         }
 
         const data = await res.json();
-        return NextResponse.json(data);
+        // Backwards compat: if the admin returns a bare array (older deploys), wrap it.
+        if (Array.isArray(data)) {
+            return NextResponse.json({ entries: data, total: data.length, page: 1, pageSize: data.length });
+        }
+        return NextResponse.json(data as LeaderboardListResponse);
     } catch {
-        // In production, return empty array if admin API is down
         if (process.env.NODE_ENV === 'production') {
             console.error('[Leaderboard] Admin API unavailable in production');
-            return NextResponse.json([]);
+            return NextResponse.json({ entries: [], total: 0, page: 1, pageSize });
         }
 
-        // In dev mode, return mock data for UI testing
         console.log('[Leaderboard] Admin API unavailable, returning mock data (dev mode)');
         let mockData = generateMockLeaderboard();
 
-        // Apply filters on mock data
-        if (category && category !== 'all') {
-            mockData = mockData.filter(e => e.category === category);
-        }
-        if (mrr && mrr !== 'all') {
-            mockData = mockData.filter(e => e.mrr_range === mrr);
+        if (category && category !== 'all') mockData = mockData.filter((e) => e.category === category);
+        if (mrr && mrr !== 'all') mockData = mockData.filter((e) => e.mrr_range === mrr);
+        if (q) {
+            const needle = q.toLowerCase();
+            mockData = mockData.filter(
+                (e) =>
+                    (e.startup_name || '').toLowerCase().includes(needle) ||
+                    (e.description || '').toLowerCase().includes(needle),
+            );
         }
 
-        // Apply sort
         if (sort === 'engagement') {
             mockData.sort((a, b) => b.engagement_rate - a.engagement_rate);
+        } else if (sort === 'movers') {
+            mockData.sort((a, b) => b.visitor_trend - a.visitor_trend);
         } else if (sort === 'newest') {
             mockData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         } else {
             mockData.sort((a, b) => b.monthly_visitors - a.monthly_visitors);
         }
 
-        return NextResponse.json(mockData);
+        const total = mockData.length;
+        const start = (page - 1) * pageSize;
+        const paginated = mockData.slice(start, start + pageSize);
+        return NextResponse.json({ entries: paginated, total, page, pageSize });
     }
 }
