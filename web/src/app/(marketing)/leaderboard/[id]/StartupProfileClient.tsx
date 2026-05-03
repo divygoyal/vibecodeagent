@@ -4,11 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
     ShieldCheck, ShieldAlert, ExternalLink, ArrowUpRight, ArrowDownRight,
-    Users, Eye, Zap, Timer, TrendingUp, ArrowLeft, Copy, Check,
-    Twitter, Globe, ChevronDown,
+    Users, Eye, Zap, Timer, ArrowLeft, Copy, Check,
+    Twitter, Globe, ChevronDown, Sparkles,
 } from 'lucide-react';
 import {
-    LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+    XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart,
 } from 'recharts';
 
 export interface StartupProfileData {
@@ -53,24 +53,54 @@ function formatDuration(seconds: number): string {
     return `${mins}m ${secs}s`;
 }
 
+function PremiumBackdrop() {
+    return (
+        <>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_18%),linear-gradient(180deg,#030303_0%,#010101_24%,#000000_100%)]" />
+            <div
+                className="pointer-events-none absolute inset-0 opacity-40"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(circle at 18% 16%, rgba(255,255,255,0.26) 0 1px, transparent 1.5px), radial-gradient(circle at 72% 24%, rgba(255,255,255,0.18) 0 1px, transparent 1.5px), radial-gradient(circle at 58% 62%, rgba(255,255,255,0.14) 0 1px, transparent 1.5px), radial-gradient(circle at 86% 52%, rgba(255,255,255,0.16) 0 1px, transparent 1.5px)',
+                    backgroundSize: '320px 320px, 420px 420px, 520px 520px, 640px 640px',
+                }}
+            />
+            <div className="pointer-events-none absolute left-1/2 top-[8%] h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(20,196,225,0.16),transparent_60%)] blur-[120px]" />
+        </>
+    );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-[#7AD9DA]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#14C4E1]" />
+            {children}
+        </div>
+    );
+}
+
 function LogoIcon({ name, url, size = 'lg' }: { name: string; url: string | null; size?: 'sm' | 'lg' }) {
-    const sizeClass = size === 'lg' ? 'w-16 h-16 text-2xl rounded-2xl' : 'w-10 h-10 text-base rounded-xl';
+    const sizeClass = size === 'lg' ? 'h-20 w-20 rounded-2xl text-3xl' : 'h-10 w-10 rounded-xl text-base';
     if (url) {
         return (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={name} className={`${sizeClass} object-cover ring-1 ring-white/10`} />
+            <img
+                src={url}
+                alt={name}
+                className={`${sizeClass} object-cover ring-1 ring-white/10 shadow-[0_24px_60px_rgba(0,0,0,0.45)]`}
+            />
         );
     }
     const initial = name.charAt(0).toUpperCase();
-    const colors = [
-        'from-emerald-500 to-cyan-500',
+    const palettes = [
+        'from-[#14C4E1] to-[#7AD9DA]',
         'from-purple-500 to-pink-500',
-        'from-amber-500 to-orange-500',
+        'from-amber-400 to-orange-500',
         'from-blue-500 to-indigo-500',
         'from-rose-500 to-red-500',
     ];
     return (
-        <div className={`${sizeClass} bg-gradient-to-br ${colors[name.length % colors.length]} flex items-center justify-center text-white font-bold shadow-lg`}>
+        <div className={`${sizeClass} flex items-center justify-center bg-gradient-to-br ${palettes[name.length % palettes.length]} text-white font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_24px_60px_rgba(0,0,0,0.45)]`}>
             {initial}
         </div>
     );
@@ -85,37 +115,37 @@ function CopyButton({ text, label }: { text: string; label: string }) {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.08] transition text-zinc-400 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:bg-white/[0.06] hover:text-white"
         >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="h-3.5 w-3.5 text-[#7AD9DA]" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? 'Copied!' : label}
         </button>
     );
 }
 
 const LOOKING_FOR_COLORS: Record<string, string> = {
-    partner: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    visibility: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    buyer: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    partner: 'bg-[#14C4E1]/10 text-[#7AD9DA] border-[#14C4E1]/22',
+    visibility: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+    buyer: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
 };
 
 function VerificationBadge({ status }: { status?: string }) {
     if (status === 'verified') {
         return (
-            <span title="GA4 property and website host match — verified daily" className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full text-[10px] font-medium border border-emerald-500/15">
-                <ShieldCheck className="w-3 h-3" /> Verified
+            <span title="GA4 property and website host match — verified daily" className="inline-flex items-center gap-1.5 rounded-full border border-[#14C4E1]/30 bg-[linear-gradient(135deg,rgba(20,196,225,0.18),rgba(122,217,218,0.06))] px-3 py-1 text-[11px] font-semibold text-[#dff9ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <ShieldCheck className="h-3 w-3" /> Verified
             </span>
         );
     }
     if (status === 'host_mismatch' || status === 'no_web_stream') {
         return (
-            <span title="GA4 property does not match the claimed website — not verified" className="flex items-center gap-1 bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full text-[10px] font-medium border border-amber-500/20">
-                <ShieldAlert className="w-3 h-3" /> Unverified
+            <span title="GA4 property does not match the claimed website" className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-3 py-1 text-[11px] font-semibold text-amber-200">
+                <ShieldAlert className="h-3 w-3" /> Unverified
             </span>
         );
     }
     return (
-        <span title="Verification still pending" className="flex items-center gap-1 bg-white/[0.04] text-zinc-400 px-2.5 py-1 rounded-full text-[10px] font-medium border border-white/[0.06]">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-zinc-400">
             Pending
         </span>
     );
@@ -124,41 +154,45 @@ function VerificationBadge({ status }: { status?: string }) {
 function VisitorSparkline({ history }: { history: StartupProfileData['history'] }) {
     if (!history || history.length < 2) {
         return (
-            <div className="text-[11px] text-zinc-600 italic py-6 text-center">
+            <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] text-center text-[12px] italic text-zinc-500">
                 Visitor history fills in after the daily refresh.
             </div>
         );
     }
-    const data = history.map((h) => ({
-        date: h.recorded_on,
-        visitors: h.monthly_visitors,
-    }));
+    const data = history.map((h) => ({ date: h.recorded_on, visitors: h.monthly_visitors }));
     return (
-        <div className="h-24 -mx-2">
+        <div className="h-32 -mx-2">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
+                    <defs>
+                        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#14C4E1" stopOpacity={0.45} />
+                            <stop offset="100%" stopColor="#14C4E1" stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
                     <XAxis dataKey="date" hide />
                     <YAxis hide domain={['auto', 'auto']} />
                     <Tooltip
                         contentStyle={{
-                            background: '#0b1014',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: 8,
+                            background: '#04070d',
+                            border: '1px solid rgba(20,196,225,0.3)',
+                            borderRadius: 12,
                             fontSize: 11,
+                            boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
                         }}
                         labelStyle={{ color: '#94a3b8' }}
-                        itemStyle={{ color: '#34d399' }}
+                        itemStyle={{ color: '#7AD9DA' }}
                         formatter={(value: number | undefined) => [formatNumber(value ?? 0), 'Visitors']}
                     />
-                    <Line
+                    <Area
                         type="monotone"
                         dataKey="visitors"
-                        stroke="#34d399"
+                        stroke="#7AD9DA"
                         strokeWidth={2}
-                        dot={false}
+                        fill="url(#sparkFill)"
                         isAnimationActive={false}
                     />
-                </LineChart>
+                </AreaChart>
             </ResponsiveContainer>
         </div>
     );
@@ -167,7 +201,8 @@ function VisitorSparkline({ history }: { history: StartupProfileData['history'] 
 export default function StartupProfileClient({ entry, profileUrl }: { entry: StartupProfileData; profileUrl: string }) {
     const [showBadge, setShowBadge] = useState(false);
 
-    const minimalBadgeUrl = `${profileUrl.replace(/\/leaderboard\/\d+$/, '')}/api/badges/${entry.id}`;
+    const baseOrigin = profileUrl.replace(/\/leaderboard\/\d+$/, '');
+    const minimalBadgeUrl = `${baseOrigin}/api/badges/${entry.id}`;
     const rankBadgeUrl = `${minimalBadgeUrl}?variant=rank`;
     const htmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${minimalBadgeUrl}" alt="Verified on TrafficClaw" height="48" />\n</a>`;
     const rankHtmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${rankBadgeUrl}" alt="${entry.startup_name} — TrafficClaw rank" height="48" />\n</a>`;
@@ -175,42 +210,47 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
     const tweetText = `Just got verified on TrafficClaw! Check out ${entry.startup_name}'s real traffic stats ${profileUrl}`;
 
     return (
-        <div className="min-h-screen">
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/[0.03] rounded-full blur-[120px]" />
-            </div>
+        <div className="relative min-h-screen overflow-x-clip bg-[#010101] text-white">
+            <PremiumBackdrop />
 
-            <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-28 sm:pt-36 pb-24">
+            <div className="relative mx-auto max-w-[1080px] px-4 pb-24 pt-24 sm:px-6 sm:pt-32 lg:px-8">
                 <Link
                     href="/leaderboard"
-                    className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition mb-8"
+                    className="inline-flex items-center gap-1.5 text-xs text-zinc-500 transition hover:text-[#7AD9DA]"
                 >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft className="h-3.5 w-3.5" />
                     Back to leaderboard
                 </Link>
 
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 sm:p-8 mb-6">
-                    <div className="flex flex-col sm:flex-row items-start gap-5">
+                {/* Hero card */}
+                <div className="mt-6 overflow-hidden rounded-[32px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.1),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-10">
+                    <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                         <LogoIcon name={entry.startup_name} url={entry.logo_url} size="lg" />
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-white">{entry.startup_name}</h1>
+                        <div className="min-w-0 flex-1">
+                            <div className="mb-3 flex flex-wrap items-center gap-2">
+                                <SectionLabel>{entry.category || 'Startup'}</SectionLabel>
                                 <VerificationBadge status={entry.verification_status} />
                             </div>
+                            <h1 className="text-balance text-3xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
+                                {entry.startup_name}
+                            </h1>
                             {entry.description && (
-                                <p className="text-sm text-zinc-400 mb-3 max-w-lg">{entry.description}</p>
+                                <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">
+                                    {entry.description}
+                                </p>
                             )}
-                            <div className="flex items-center gap-2 flex-wrap">
+
+                            <div className="mt-5 flex flex-wrap items-center gap-2">
                                 {entry.website_url && (
                                     <a
                                         href={entry.website_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-cyan-400 transition"
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-300 transition hover:border-[#14C4E1]/35 hover:text-[#dff9ff]"
                                     >
-                                        <Globe className="w-3.5 h-3.5" />
+                                        <Globe className="h-3.5 w-3.5" />
                                         {entry.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                                        <ExternalLink className="w-3 h-3" />
+                                        <ExternalLink className="h-3 w-3" />
                                     </a>
                                 )}
                                 {entry.twitter_handle && (
@@ -218,34 +258,27 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                                         href={`https://x.com/${entry.twitter_handle.replace('@', '')}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-cyan-400 transition"
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-300 transition hover:border-[#14C4E1]/35 hover:text-[#dff9ff]"
                                     >
-                                        <Twitter className="w-3.5 h-3.5" />
+                                        <Twitter className="h-3.5 w-3.5" />
                                         @{entry.twitter_handle.replace('@', '')}
                                     </a>
                                 )}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                                {entry.category && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
-                                        {entry.category}
-                                    </span>
-                                )}
                                 {entry.mrr_range && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-medium">
-                                        MRR: {entry.mrr_range}
+                                    <span className="rounded-full border border-[#14C4E1]/22 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#dff9ff]">
+                                        MRR · {entry.mrr_range}
                                     </span>
                                 )}
                                 {entry.primary_country && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+                                    <span className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-400">
                                         {entry.primary_country}
                                     </span>
                                 )}
                                 {entry.looking_for?.map((tag) => (
                                     <span
                                         key={tag}
-                                        className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
-                                            LOOKING_FOR_COLORS[tag] || 'bg-white/[0.04] text-zinc-400 border-white/[0.06]'
+                                        className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                                            LOOKING_FOR_COLORS[tag] || 'border-white/[0.08] bg-white/[0.02] text-zinc-400'
                                         }`}
                                     >
                                         🎯 {tag}
@@ -256,135 +289,147 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    <StatCard
-                        icon={<Users className="w-4 h-4 text-emerald-400" />}
-                        label="Monthly Visitors"
+                {/* Stat tiles */}
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                    <StatTile
+                        icon={<Users className="h-4 w-4 text-[#7AD9DA]" />}
+                        accent="cyan"
+                        label="Monthly visitors"
                         value={formatNumber(entry.monthly_visitors)}
                         trend={entry.visitor_trend}
                     />
-                    <StatCard
-                        icon={<Eye className="w-4 h-4 text-cyan-400" />}
+                    <StatTile
+                        icon={<Eye className="h-4 w-4 text-[#7AD9DA]" />}
+                        accent="cyan"
                         label="Pageviews"
                         value={formatNumber(entry.monthly_pageviews)}
                     />
-                    <StatCard
-                        icon={<Zap className="w-4 h-4 text-amber-400" />}
+                    <StatTile
+                        icon={<Zap className="h-4 w-4 text-amber-300" />}
+                        accent="amber"
                         label="Engagement"
                         value={`${entry.engagement_rate}%`}
                     />
-                    <StatCard
-                        icon={<Timer className="w-4 h-4 text-purple-400" />}
-                        label="Avg Session"
+                    <StatTile
+                        icon={<Timer className="h-4 w-4 text-purple-300" />}
+                        accent="purple"
+                        label="Avg session"
                         value={formatDuration(entry.avg_session_duration)}
                     />
                 </div>
 
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 mb-6">
-                    <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
-                        Visitor history (30 days)
-                    </h2>
-                    <VisitorSparkline history={entry.history} />
-                </div>
-
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 mb-6">
-                    <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
-                        Traffic Details
-                    </h2>
-                    <div className="space-y-3">
-                        <DetailRow label="Monthly Visitors" value={entry.monthly_visitors.toLocaleString()} />
-                        <DetailRow label="Monthly Pageviews" value={entry.monthly_pageviews.toLocaleString()} />
-                        <DetailRow label="Engagement Rate" value={`${entry.engagement_rate}%`} />
-                        <DetailRow label="Bounce Rate" value={`${entry.bounce_rate}%`} />
-                        <DetailRow label="Avg Session Duration" value={formatDuration(entry.avg_session_duration)} />
-                        <DetailRow
-                            label="30-day Trend"
-                            value={`${entry.visitor_trend > 0 ? '+' : ''}${entry.visitor_trend}%`}
-                            highlight={entry.visitor_trend > 0 ? 'green' : entry.visitor_trend < 0 ? 'red' : undefined}
-                        />
+                {/* Visitor history */}
+                <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                    <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_36%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
+                        <div className="mb-4 flex items-end justify-between">
+                            <div className="space-y-2">
+                                <SectionLabel>Visitor history</SectionLabel>
+                                <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Last 30 days</h2>
+                            </div>
+                            {entry.visitor_trend !== 0 && (
+                                <span
+                                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${
+                                        entry.visitor_trend > 0
+                                            ? 'border-emerald-400/22 bg-emerald-500/10 text-emerald-300'
+                                            : 'border-red-400/22 bg-red-500/10 text-red-300'
+                                    }`}
+                                >
+                                    {entry.visitor_trend > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                    {Math.abs(entry.visitor_trend)}% / 30d
+                                </span>
+                            )}
+                        </div>
+                        <VisitorSparkline history={entry.history} />
                     </div>
-                    {entry.last_refreshed && (
-                        <p className="text-[10px] text-zinc-600 mt-4 pt-3 border-t border-white/[0.04]">
-                            Last verified: {new Date(entry.last_refreshed).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        </p>
-                    )}
-                    {entry.created_at && (
-                        <p className="text-[10px] text-zinc-600 mt-1">
-                            First joined: {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        </p>
-                    )}
+
+                    <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
+                        <SectionLabel>Traffic details</SectionLabel>
+                        <div className="mt-5 space-y-1.5">
+                            <DetailRow label="Monthly visitors" value={entry.monthly_visitors.toLocaleString()} />
+                            <DetailRow label="Monthly pageviews" value={entry.monthly_pageviews.toLocaleString()} />
+                            <DetailRow label="Engagement rate" value={`${entry.engagement_rate}%`} />
+                            <DetailRow label="Bounce rate" value={`${entry.bounce_rate}%`} />
+                            <DetailRow label="Avg session" value={formatDuration(entry.avg_session_duration)} />
+                            <DetailRow
+                                label="30-day trend"
+                                value={`${entry.visitor_trend > 0 ? '+' : ''}${entry.visitor_trend}%`}
+                                tone={entry.visitor_trend > 0 ? 'green' : entry.visitor_trend < 0 ? 'red' : undefined}
+                            />
+                        </div>
+                        <div className="mt-5 space-y-1 border-t border-white/[0.04] pt-4">
+                            {entry.last_refreshed && (
+                                <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-600">
+                                    Last refresh ·{' '}
+                                    <span className="text-zinc-400">
+                                        {new Date(entry.last_refreshed).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                </p>
+                            )}
+                            {entry.created_at && (
+                                <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-600">
+                                    First listed ·{' '}
+                                    <span className="text-zinc-400">
+                                        {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                </p>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-                    <h2 className="text-sm font-semibold text-white mb-4">Share this listing</h2>
-
-                    <div className="flex items-center gap-3 mb-6">
-                        <a
-                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
-                        >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                            Share on X
-                        </a>
-                        <CopyButton text={profileUrl} label="Copy Link" />
+                {/* Share + embed */}
+                <div className="mt-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <SectionLabel>Share</SectionLabel>
+                            <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">Show off your verified traffic</h2>
+                            <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-400">
+                                Drop a badge on your site or share the listing — every click sends a backlink to your verified profile.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <a
+                                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-4 py-2 text-xs font-semibold text-[#031017] shadow-[0_14px_32px_rgba(20,196,225,0.22)] transition hover:brightness-105"
+                            >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                                Share on X
+                            </a>
+                            <CopyButton text={profileUrl} label="Copy link" />
+                        </div>
                     </div>
 
                     <button
                         onClick={() => setShowBadge(!showBadge)}
-                        className="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-white transition mb-4"
+                        className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:text-white"
                     >
-                        <span className="font-mono">&lt;/&gt;</span>
-                        Embed Badge
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showBadge ? 'rotate-180' : ''}`} />
+                        <Sparkles className="h-3.5 w-3.5 text-[#7AD9DA]" />
+                        Embed badge
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showBadge ? 'rotate-180' : ''}`} />
                     </button>
 
                     {showBadge && (
-                        <div className="space-y-4 animate-in fade-in duration-300">
-                            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-xl p-4 flex flex-col items-center gap-3">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={minimalBadgeUrl} alt="Verified on TrafficClaw" height={48} />
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={rankBadgeUrl} alt={`${entry.startup_name} — TrafficClaw category rank`} height={48} />
-                                <span className="text-[10px] text-zinc-600">Two variants. The rank badge updates automatically as your placement changes.</span>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">HTML — minimal</span>
-                                    <CopyButton text={htmlEmbed} label="Copy HTML" />
+                        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                            <div className="rounded-2xl border border-white/[0.06] bg-[#04070d]/80 p-5">
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7AD9DA]">Live preview</div>
+                                <div className="mt-4 flex flex-col items-center gap-3">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={minimalBadgeUrl} alt="Verified on TrafficClaw" height={48} />
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={rankBadgeUrl} alt={`${entry.startup_name} — TrafficClaw category rank`} height={48} />
                                 </div>
-                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-3 text-[11px] text-zinc-400 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                                    {htmlEmbed}
-                                </pre>
+                                <p className="mt-4 text-center text-[10px] text-zinc-500">
+                                    Both badges refresh hourly. The rank-aware variant updates automatically as your placement changes.
+                                </p>
                             </div>
 
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">HTML — rank-aware</span>
-                                    <CopyButton text={rankHtmlEmbed} label="Copy HTML" />
-                                </div>
-                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-3 text-[11px] text-zinc-400 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                                    {rankHtmlEmbed}
-                                </pre>
+                            <div className="space-y-4">
+                                <SnippetBlock label="HTML — minimal" code={htmlEmbed} />
+                                <SnippetBlock label="HTML — rank-aware" code={rankHtmlEmbed} />
+                                <SnippetBlock label="Markdown" code={markdownEmbed} />
                             </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Markdown</span>
-                                    <CopyButton text={markdownEmbed} label="Copy Markdown" />
-                                </div>
-                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-3 text-[11px] text-zinc-400 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                                    {markdownEmbed}
-                                </pre>
-                            </div>
-
-                            <p className="text-[10px] text-zinc-600 text-center">
-                                When someone clicks this badge, it links back to this verified listing.
-                            </p>
                         </div>
                     )}
                 </div>
@@ -393,38 +438,76 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
     );
 }
 
-function StatCard({ icon, label, value, trend }: { icon: React.ReactNode; label: string; value: string; trend?: number }) {
+function StatTile({
+    icon,
+    accent,
+    label,
+    value,
+    trend,
+}: {
+    icon: React.ReactNode;
+    accent: 'cyan' | 'amber' | 'purple';
+    label: string;
+    value: string;
+    trend?: number;
+}) {
+    const ringColor = accent === 'amber' ? 'rgba(251,191,36,0.18)' : accent === 'purple' ? 'rgba(168,85,247,0.18)' : 'rgba(20,196,225,0.18)';
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-                {icon}
-                <span className="text-[10px] text-zinc-500 font-medium">{label}</span>
-            </div>
-            <div className="flex items-end gap-2">
-                <span className="text-xl font-bold text-white">{value}</span>
-                {trend !== undefined && trend !== 0 && (
-                    <span className={`flex items-center gap-0.5 text-[10px] font-medium mb-0.5 ${
-                        trend > 0 ? 'text-emerald-400' : 'text-red-400'
-                    }`}>
-                        {trend > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {Math.abs(trend)}%
+        <div
+            className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-[linear-gradient(180deg,rgba(10,14,20,0.96),rgba(4,7,11,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_24px_50px_rgba(0,0,0,0.42)]"
+            style={{ boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 24px 50px rgba(0,0,0,0.42), 0 0 0 1px ${ringColor} inset` }}
+        >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(82,226,245,0.06),transparent_36%)]" />
+            <div className="relative">
+                <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03]">
+                        {icon}
                     </span>
-                )}
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{label}</span>
+                </div>
+                <div className="mt-3 flex items-end gap-2">
+                    <span className="text-[1.85rem] font-semibold tracking-[-0.04em] text-white sm:text-[2rem]">{value}</span>
+                    {trend !== undefined && trend !== 0 && (
+                        <span
+                            className={`mb-1 inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                trend > 0 ? 'border-emerald-400/22 bg-emerald-500/10 text-emerald-300' : 'border-red-400/22 bg-red-500/10 text-red-300'
+                            }`}
+                        >
+                            {trend > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                            {Math.abs(trend)}%
+                        </span>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
-function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: 'green' | 'red' }) {
+function DetailRow({ label, value, tone }: { label: string; value: string; tone?: 'green' | 'red' }) {
     return (
-        <div className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
-            <span className="text-xs text-zinc-500">{label}</span>
-            <span className={`text-sm font-semibold ${
-                highlight === 'green' ? 'text-emerald-400' :
-                highlight === 'red' ? 'text-red-400' : 'text-white'
-            }`}>
+        <div className="flex items-center justify-between border-b border-white/[0.04] py-2.5 last:border-b-0">
+            <span className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">{label}</span>
+            <span
+                className={`text-sm font-semibold tabular-nums ${
+                    tone === 'green' ? 'text-emerald-300' : tone === 'red' ? 'text-red-300' : 'text-white'
+                }`}
+            >
                 {value}
             </span>
+        </div>
+    );
+}
+
+function SnippetBlock({ label, code }: { label: string; code: string }) {
+    return (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#04070d]/80 p-4">
+            <div className="mb-2 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{label}</span>
+                <CopyButton text={code} label="Copy" />
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-black/40 p-3 text-[11px] leading-5 text-zinc-300 font-mono">
+                {code}
+            </pre>
         </div>
     );
 }

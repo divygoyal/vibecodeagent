@@ -2,89 +2,122 @@
 
 import Link from 'next/link';
 import { useSession, signIn } from 'next-auth/react';
-import { ArrowLeft, ShieldCheck, Sparkles, Clock, Trophy, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Sparkles, Clock, Trophy, Loader2, ArrowRight } from 'lucide-react';
 import LeaderboardOptIn from '@/app/(dashboard)/dashboard/settings/LeaderboardOptIn';
 
-export default function LeaderboardJoinPage() {
-    const { data: session, status } = useSession();
-
+function PremiumBackdrop() {
     return (
-        <div className="min-h-screen relative">
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/[0.04] rounded-full blur-[120px]" />
-                <div className="absolute top-1/3 right-1/4 w-[300px] h-[300px] bg-cyan-500/[0.03] rounded-full blur-[100px]" />
-            </div>
+        <>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_18%),linear-gradient(180deg,#030303_0%,#010101_24%,#000000_100%)]" />
+            <div
+                className="pointer-events-none absolute inset-0 opacity-40"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(circle at 18% 16%, rgba(255,255,255,0.26) 0 1px, transparent 1.5px), radial-gradient(circle at 72% 24%, rgba(255,255,255,0.18) 0 1px, transparent 1.5px), radial-gradient(circle at 58% 62%, rgba(255,255,255,0.14) 0 1px, transparent 1.5px), radial-gradient(circle at 86% 52%, rgba(255,255,255,0.16) 0 1px, transparent 1.5px)',
+                    backgroundSize: '320px 320px, 420px 420px, 520px 520px, 640px 640px',
+                }}
+            />
+            <div className="pointer-events-none absolute left-1/2 top-[8%] h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(20,196,225,0.18),transparent_60%)] blur-[120px]" />
+        </>
+    );
+}
 
-            <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-28 sm:pt-36 pb-24">
-                <Link
-                    href="/leaderboard"
-                    className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition mb-8"
-                >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Back to leaderboard
-                </Link>
-
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15] mb-5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-xs font-medium text-emerald-400">Verified via Google Analytics + domain match</span>
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-                        Add your startup
-                        <br />
-                        <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-                            to the leaderboard
-                        </span>
-                    </h1>
-                    <p className="mt-4 text-sm sm:text-base text-zinc-400 max-w-md mx-auto">
-                        Connect Google Analytics, confirm the property tracks your domain, and you&apos;re live. Free for everyone.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 mb-8">
-                    <Perk icon={<ShieldCheck className="w-4 h-4 text-emerald-400" />} title="Verified" sub="GA4 + domain match" />
-                    <Perk icon={<Sparkles className="w-4 h-4 text-cyan-400" />} title="Free backlink" sub="Embed badge on your site" />
-                    <Perk icon={<Clock className="w-4 h-4 text-amber-400" />} title="60 seconds" sub="One-click sign in" />
-                </div>
-
-                {status === 'loading' && (
-                    <div className="flex items-center justify-center gap-2 py-12 text-zinc-500">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm">Checking session...</span>
-                    </div>
-                )}
-
-                {status === 'unauthenticated' && (
-                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/[0.08] flex items-center justify-center mx-auto mb-4">
-                            <Trophy className="w-6 h-6 text-emerald-400" />
-                        </div>
-                        <h2 className="text-base font-semibold text-white mb-2">Sign in to continue</h2>
-                        <p className="text-sm text-zinc-500 mb-6 max-w-sm mx-auto">
-                            We use your Google account to read GA4 metrics for your property — no other writes, no spam, no data shared.
-                        </p>
-                        <button
-                            onClick={() => signIn('google', { callbackUrl: '/leaderboard/join' })}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition shadow-lg shadow-emerald-500/20"
-                        >
-                            Continue with Google
-                        </button>
-                    </div>
-                )}
-
-                {status === 'authenticated' && session?.user && (
-                    <LeaderboardOptIn />
-                )}
-            </div>
+function SectionLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-[#7AD9DA]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#14C4E1]" />
+            {children}
         </div>
     );
 }
 
 function Perk({ icon, title, sub }: { icon: React.ReactNode; title: string; sub: string }) {
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">{icon}<span className="text-xs font-semibold text-white">{title}</span></div>
-            <span className="text-[10px] text-zinc-500">{sub}</span>
+        <div className="rounded-2xl border border-white/[0.07] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_44%),linear-gradient(180deg,rgba(10,14,20,0.96),rgba(4,7,11,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_38px_rgba(0,0,0,0.32)]">
+            <div className="flex items-center gap-2 text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03]">
+                    {icon}
+                </span>
+                <span className="text-sm font-semibold tracking-[-0.01em]">{title}</span>
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-zinc-500">{sub}</p>
+        </div>
+    );
+}
+
+export default function LeaderboardJoinPage() {
+    const { data: session, status } = useSession();
+
+    return (
+        <div className="relative min-h-screen overflow-x-clip bg-[#010101] text-white">
+            <PremiumBackdrop />
+
+            <div className="relative mx-auto max-w-[860px] px-4 pb-24 pt-24 sm:px-6 sm:pt-32 lg:px-8">
+                <Link
+                    href="/leaderboard"
+                    className="inline-flex items-center gap-1.5 text-xs text-zinc-500 transition hover:text-[#7AD9DA]"
+                >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Back to leaderboard
+                </Link>
+
+                <div className="mt-8 text-center">
+                    <div className="flex justify-center">
+                        <SectionLabel>Verified · GA4 + Domain Match</SectionLabel>
+                    </div>
+                    <h1 className="mt-6 text-balance text-4xl font-semibold tracking-[-0.06em] text-white sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
+                        <span className="text-white">Add your startup</span>
+                        <br />
+                        <span className="bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_50%,#dff9ff_100%)] bg-clip-text text-transparent">
+                            to the leaderboard
+                        </span>
+                    </h1>
+                    <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#d8dde6] sm:text-base sm:leading-8">
+                        Connect Google Analytics, we match the property against your domain, and you&apos;re live in under a minute.
+                        Every listing is free and gets a real backlink.
+                    </p>
+                </div>
+
+                <div className="mt-9 grid grid-cols-3 gap-3">
+                    <Perk icon={<ShieldCheck className="h-3.5 w-3.5 text-[#7AD9DA]" />} title="Verified" sub="GA4 OAuth + domain host match" />
+                    <Perk icon={<Sparkles className="h-3.5 w-3.5 text-[#7AD9DA]" />} title="Free backlink" sub="Embed badge on your site, gets DR juice" />
+                    <Perk icon={<Clock className="h-3.5 w-3.5 text-amber-300" />} title="60 seconds" sub="One-click sign in, instant listing" />
+                </div>
+
+                <div className="mt-10">
+                    {status === 'loading' && (
+                        <div className="flex items-center justify-center gap-2 rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] py-16 text-zinc-500 shadow-[0_40px_120px_rgba(0,0,0,0.48)]">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Checking session…</span>
+                        </div>
+                    )}
+
+                    {status === 'unauthenticated' && (
+                        <div className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.08),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-12">
+                            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#14C4E1]/24 bg-[#14C4E1]/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                                <Trophy className="h-7 w-7 text-[#7AD9DA]" />
+                            </div>
+                            <h2 className="text-xl font-semibold tracking-[-0.03em] text-white sm:text-2xl">Sign in to continue</h2>
+                            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-400">
+                                Read-only Google scopes only — we use your GA4 access to verify the property, never to write or share data.
+                            </p>
+                            <button
+                                onClick={() => signIn('google', { callbackUrl: '/leaderboard/join' })}
+                                className="mt-7 inline-flex min-h-[48px] items-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-6 text-[14px] font-semibold text-[#031017] shadow-[0_18px_50px_rgba(20,196,225,0.28)] transition hover:brightness-105"
+                            >
+                                Continue with Google
+                                <ArrowRight className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
+
+                    {status === 'authenticated' && session?.user && (
+                        <div className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-1 shadow-[0_40px_120px_rgba(0,0,0,0.48)]">
+                            <LeaderboardOptIn />
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
