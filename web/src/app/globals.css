@@ -4,6 +4,57 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* ── AI chat empty-state cosmic background ───────────────────────────── */
+@keyframes tc-twinkle {
+  0%, 100% { opacity: var(--tw-opacity-min, 0.15); transform: scale(0.85); }
+  50%      { opacity: var(--tw-opacity-max, 0.95); transform: scale(1.05); }
+}
+.tc-star {
+  position: absolute;
+  border-radius: 9999px;
+  background: #ffffff;
+  animation: tc-twinkle var(--twinkle-dur, 4s) ease-in-out infinite;
+  animation-delay: var(--twinkle-delay, 0s);
+  will-change: opacity, transform;
+}
+
+@keyframes tc-shoot {
+  0%   { transform: translate3d(0, 0, 0) rotate(var(--shoot-angle, 18deg)); opacity: 0; }
+  6%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translate3d(var(--shoot-x, 120vw), var(--shoot-y, 60vh), 0) rotate(var(--shoot-angle, 18deg)); opacity: 0; }
+}
+.tc-shooting-star {
+  position: absolute;
+  width: 140px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 60%, rgba(122,217,218,0.9) 100%);
+  border-radius: 9999px;
+  filter: drop-shadow(0 0 6px rgba(122,217,218,0.6));
+  opacity: 0;
+  animation: tc-shoot var(--shoot-dur, 7s) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  animation-delay: var(--shoot-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@keyframes tc-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50%      { opacity: 1;    transform: scale(1.04); }
+}
+.tc-breathe {
+  animation: tc-breathe 6s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+@keyframes tc-spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.tc-spin-slow {
+  animation: tc-spin-slow 18s linear infinite;
+  will-change: transform;
+}
+
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

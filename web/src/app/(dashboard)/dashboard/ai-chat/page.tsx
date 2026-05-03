@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
+import { motion } from 'framer-motion';
 import {
     Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles, Lock, Github
 } from 'lucide-react';
@@ -79,6 +80,93 @@ function ConnectorIcon({ name, className = 'h-4 w-4' }: { name: ConnectorName; c
                 </svg>
             );
     }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ *  Cosmic background — twinkling stars + shooting stars (Grok-vibe)
+ * ───────────────────────────────────────────────────────────────────── */
+
+type Star = { id: number; x: number; y: number; size: number; opMin: number; opMax: number; dur: number; delay: number };
+
+const StarField = memo(function StarField() {
+    // Generated client-side to avoid SSR hydration mismatch from Math.random().
+    const [stars, setStars] = useState<Star[]>([]);
+    useEffect(() => {
+        setStars(
+            Array.from({ length: 110 }, (_, i) => ({
+                id: i,
+                x: Math.random() * 100,
+                y: Math.random() * 100,
+                size: Math.random() * 1.6 + 0.4,
+                opMin: Math.random() * 0.15 + 0.05,
+                opMax: Math.random() * 0.55 + 0.4,
+                dur: Math.random() * 4 + 3,
+                delay: Math.random() * 6,
+            })),
+        );
+    }, []);
+
+    const shootingStars: Array<CSSProperties & { ['--shoot-x']?: string; ['--shoot-y']?: string; ['--shoot-angle']?: string; ['--shoot-dur']?: string; ['--shoot-delay']?: string }> = [
+        { top: '12%', left: '-180px', ['--shoot-x']: '120vw', ['--shoot-y']: '40vh', ['--shoot-angle']: '20deg', ['--shoot-dur']: '7s', ['--shoot-delay']: '0s' } as any,
+        { top: '34%', left: '-180px', ['--shoot-x']: '120vw', ['--shoot-y']: '22vh', ['--shoot-angle']: '12deg', ['--shoot-dur']: '9s', ['--shoot-delay']: '4.5s' } as any,
+        { top: '64%', left: '-180px', ['--shoot-x']: '120vw', ['--shoot-y']: '12vh', ['--shoot-angle']: '8deg',  ['--shoot-dur']: '11s', ['--shoot-delay']: '8.5s' } as any,
+    ];
+
+    return (
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+            {stars.map((s) => (
+                <span
+                    key={s.id}
+                    className="tc-star"
+                    style={{
+                        left: `${s.x}%`,
+                        top: `${s.y}%`,
+                        width: `${s.size}px`,
+                        height: `${s.size}px`,
+                        ['--tw-opacity-min' as any]: s.opMin,
+                        ['--tw-opacity-max' as any]: s.opMax,
+                        ['--twinkle-dur' as any]: `${s.dur}s`,
+                        ['--twinkle-delay' as any]: `${s.delay}s`,
+                    } as CSSProperties}
+                />
+            ))}
+            {shootingStars.map((style, i) => (
+                <span key={i} className="tc-shooting-star" style={style as CSSProperties} />
+            ))}
+        </div>
+    );
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+ *  ConnectorOrb — 3D revolve-on-hover sphere for the left rail
+ * ───────────────────────────────────────────────────────────────────── */
+function ConnectorOrb({ name, connected }: { name: ConnectorName; connected: boolean }) {
+    const tooltip = `${CONNECTOR_LABELS[name]} · ${connected ? 'Connected' : 'Click to connect'}`;
+    const orb = (
+        <motion.div
+            whileHover={{ rotateY: 360, scale: 1.08 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            style={{ transformStyle: 'preserve-3d' }}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full
+                       border border-white/[0.08] bg-gradient-to-b from-[#11161d] to-[#06090d]
+                       shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-2px_4px_rgba(0,0,0,0.5),0_4px_14px_rgba(0,0,0,0.45)]"
+        >
+            <ConnectorIcon name={name} className={`h-4 w-4 ${connected ? 'text-zinc-100' : 'text-zinc-500'}`} />
+            <span
+                aria-hidden
+                className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-[#050608] ${
+                    connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]' : 'bg-zinc-700'
+                }`}
+            />
+        </motion.div>
+    );
+    return connected ? (
+        <div title={tooltip} style={{ perspective: 800 }}>{orb}</div>
+    ) : (
+        <Link href="/dashboard/settings" title={tooltip} aria-label={tooltip} style={{ perspective: 800 }}>
+            {orb}
+        </Link>
+    );
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -422,50 +510,38 @@ export default function AIChat() {
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
                     <div className="relative min-h-full overflow-hidden bg-[#050608]">
-                        {/* Single soft radial — barely visible, gives the input area "weight" */}
+                        {/* Cosmic background: stars + shooting stars */}
+                        <StarField />
+
+                        {/* Breathing radial halos — focal weight at the input area */}
                         <div aria-hidden className="pointer-events-none absolute inset-0">
-                            <div className="absolute left-1/2 top-[52%] h-[520px] w-[860px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(122,217,218,0.07),transparent_65%)] blur-3xl" />
-                            <div className="absolute left-1/2 top-[52%] h-[280px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(52,211,153,0.04),transparent_70%)] blur-2xl" />
+                            <div className="tc-breathe absolute left-1/2 top-[52%] h-[560px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(122,217,218,0.10),transparent_65%)] blur-3xl" />
+                            <div className="tc-breathe absolute left-1/2 top-[52%] h-[300px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(52,211,153,0.08),transparent_70%)] blur-2xl" style={{ animationDelay: '2.5s' }} />
                         </div>
 
-                        {/* Connector status — small icon cluster with count, top-right */}
-                        <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
-                            <div className="flex items-center gap-2.5">
-                                <span className="hidden text-[11px] text-zinc-500 sm:inline">
-                                    {connectedCount} of {connectors.length} sources connected
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                    {connectors.map((c) => {
-                                        const tooltip = `${CONNECTOR_LABELS[c.name]} · ${c.connected ? 'Connected' : 'Click to connect'}`;
-                                        const inner = (
-                                            <>
-                                                <ConnectorIcon name={c.name} className={`h-4 w-4 ${c.connected ? 'text-zinc-200' : 'text-zinc-500'}`} />
-                                                <span
-                                                    aria-hidden
-                                                    className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${c.connected ? 'bg-emerald-400' : 'bg-zinc-700'}`}
-                                                />
-                                            </>
-                                        );
-                                        const base = 'relative flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-[#0a0d12] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors';
-                                        return c.connected ? (
-                                            <div key={c.name} className={`${base} cursor-default`} title={tooltip}>
-                                                {inner}
-                                            </div>
-                                        ) : (
-                                            <Link
-                                                key={c.name}
-                                                href="/dashboard/settings"
-                                                className={`${base} hover:border-white/[0.14] hover:bg-[#0e1218]`}
-                                                title={tooltip}
-                                                aria-label={tooltip}
-                                            >
-                                                {inner}
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                        {/* Connector rail — vertical, LEFT edge of chat area (md+) */}
+                        <div className="absolute left-3 top-1/2 z-10 hidden -translate-y-1/2 flex-col items-center gap-3 md:flex lg:left-5">
+                            {connectors.map((c) => (
+                                <ConnectorOrb key={c.name} name={c.name} connected={c.connected} />
+                            ))}
+                            <div className="mt-1 h-px w-6 bg-white/[0.06]" />
+                            <Link
+                                href="/dashboard/settings"
+                                className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500 transition-colors hover:text-zinc-300"
+                                title="Manage connections"
+                            >
+                                {connectedCount}/{connectors.length}
+                            </Link>
                         </div>
+
+                        {/* Mobile-only status link — replaces the rail on small screens */}
+                        <Link
+                            href="/dashboard/settings"
+                            className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#0a0d12]/80 px-3 py-1.5 text-[11px] text-zinc-400 backdrop-blur md:hidden"
+                        >
+                            <span className={`h-1.5 w-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
+                            {connectedCount}/{connectors.length} sources
+                        </Link>
 
                         {/* Centered hero */}
                         <div className="relative flex min-h-full flex-col items-center justify-center px-4 pb-16 pt-24 sm:px-8 sm:pt-20">
@@ -475,19 +551,30 @@ export default function AIChat() {
                                         Good {timeOfDay}, {firstName}
                                     </div>
                                 )}
-                                <h1 className="text-[34px] font-semibold tracking-tight text-zinc-100 sm:text-[42px]">
+                                <h1 className="bg-[linear-gradient(180deg,#ffffff_0%,#cbd5e1_100%)] bg-clip-text text-[34px] font-semibold tracking-tight text-transparent sm:text-[44px]">
                                     How can I help today?
                                 </h1>
                             </div>
 
-                            {/* The hero input — elevated, weighted, distinctly highlighted */}
-                            <div className="mt-10 w-full max-w-3xl">
+                            {/* The hero input — elevated + slow-rotating conic halo for energy */}
+                            <div className="relative mt-10 w-full max-w-3xl">
+                                {/* Slow-rotating conic gradient — focal energy without being a marketing glow */}
+                                <div aria-hidden className="pointer-events-none absolute -inset-3 overflow-hidden rounded-[28px]">
+                                    <div
+                                        className="tc-spin-slow absolute inset-0 rounded-[28px] opacity-70 blur-2xl"
+                                        style={{
+                                            background:
+                                                'conic-gradient(from 0deg, rgba(34,211,238,0.22) 0%, transparent 28%, rgba(52,211,153,0.22) 55%, transparent 82%, rgba(34,211,238,0.22) 100%)',
+                                        }}
+                                    />
+                                </div>
+
                                 <div
-                                    className="rounded-2xl border border-white/[0.08] bg-[#0d1117]
+                                    className="relative rounded-2xl border border-white/[0.08] bg-[#0d1117]
                                                shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_rgba(0,0,0,0.5)]
                                                transition-[border-color,box-shadow] duration-200
                                                focus-within:border-[#7AD9DA]/55
-                                               focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_rgba(0,0,0,0.5),0_0_0_4px_rgba(122,217,218,0.08)]"
+                                               focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_rgba(0,0,0,0.5),0_0_0_4px_rgba(122,217,218,0.10)]"
                                 >
                                     <textarea
                                         ref={textareaRef}
