@@ -102,6 +102,14 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[startup] OAuth token encryption migration failed: {exc}")
 
+    # GitHub App configuration diagnostics — prints the shape of the private
+    # key env var so operators can verify Coolify stored it correctly.
+    try:
+        from security.github_app_jwt import log_diagnostics as github_app_log_diagnostics
+        github_app_log_diagnostics()
+    except Exception as exc:
+        print(f"[startup] GitHub App diagnostic failed: {exc}")
+
     # Auto-sync orphaned containers to DB
     async with async_session() as session:
         await sync_orphaned_users(session)

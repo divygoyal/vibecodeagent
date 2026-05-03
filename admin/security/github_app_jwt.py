@@ -31,6 +31,29 @@ def is_configured() -> bool:
     return bool(settings.GITHUB_APP_ID and settings.GITHUB_APP_PRIVATE_KEY)
 
 
+def log_diagnostics() -> None:
+    """One-shot log of what we actually see in the env. Helpful when JWT sign
+    fails and the operator needs to verify Coolify stored the key correctly."""
+    raw = settings.GITHUB_APP_PRIVATE_KEY or ""
+    if not raw:
+        logger.warning("[github-app] PRIVATE_KEY env is EMPTY.")
+        return
+    # Visible-newline preview so we can tell newlines from backslash-n
+    head = raw[:60].replace("\n", "⏎").replace("\r", "␍")
+    tail = raw[-60:].replace("\n", "⏎").replace("\r", "␍")
+    logger.warning(
+        "[github-app] PRIVATE_KEY len=%d, has_BEGIN=%s, has_END=%s, has_real_newline=%s, "
+        "has_literal_backslash_n=%s, head=%r, tail=%r",
+        len(raw),
+        "BEGIN" in raw,
+        "END" in raw,
+        "\n" in raw,
+        "\\n" in raw,
+        head,
+        tail,
+    )
+
+
 def _normalize_pem(raw: str) -> str:
     """Repair common ways an RSA private key gets mangled in .env / Coolify env vars.
 
@@ -105,4 +128,6 @@ def generate_app_jwt() -> Optional[str]:
             "contains the FULL .pem including the BEGIN/END lines and real newlines.",
             exc,
         )
+        # Re-emit the diagnostic so the operator sees what we actually got.
+        log_diagnostics()
         return None
