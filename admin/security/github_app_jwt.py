@@ -59,20 +59,27 @@ def _normalize_pem(raw: str) -> str:
 
     Cases handled:
       1. Already-clean multi-line PEM → returned unchanged.
-      2. Literal \\n sequences (operator pasted via shell with escaped newlines)
-         → converted to real newlines.
-      3. Single-line glue (Coolify single-line env input ate the line breaks)
-         → headers/footers split out and base64 body re-wrapped at 64 chars.
+      2. Double-escaped \\\\n (3 chars: \\, \\, n) — happens when the operator
+         pasted `\\n` in a shell that itself escapes the backslash, then
+         Coolify stores the doubly-escaped value. We unwrap before single-escape.
+      3. Single-escaped \\n (2 chars: \\, n) — operator typed literal \\n.
+      4. Single-line glue (Coolify ate ALL line breaks AND no backslash-n
+         escaping happened) — re-wrap base64 body at 64 chars.
     """
     if not raw:
         return raw
     key = raw.strip()
 
-    # Case 2: literal \n → real newlines
-    if "\\n" in key and "\n" not in key:
-        key = key.replace("\\n", "\n")
+    # Case 2: double-escaped \\n (3-char sequence: backslash, backslash, n).
+    # We use raw strings here for clarity — r"\\n" is the 3-char literal `\\n`.
+    if "\n" not in key and r"\\n" in key:
+        key = key.replace(r"\\n", "\n")
 
-    # Case 3: still no real newlines but contains BEGIN/END headers → re-wrap
+    # Case 3: single-escaped \n (2-char sequence: backslash, n).
+    if "\n" not in key and r"\n" in key:
+        key = key.replace(r"\n", "\n")
+
+    # Case 4: still no real newlines but contains BEGIN/END headers → re-wrap
     if "\n" not in key and "BEGIN" in key and "END" in key:
         m = re.match(r"^(-----BEGIN [A-Z 0-9]+KEY-----)\s*(.*?)\s*(-----END [A-Z 0-9]+KEY-----)\s*$", key)
         if m:
