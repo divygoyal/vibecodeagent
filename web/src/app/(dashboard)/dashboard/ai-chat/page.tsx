@@ -603,6 +603,9 @@ export default function AIChat() {
         return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
     }, []);
 
+    // Optimistic per-orb status — declared early so the connectors useMemo below can read its derived values.
+    const [optimisticOverride, setOptimisticOverride] = useState<{ github?: boolean; google?: boolean }>({});
+
     // Effective connection state = SWR truth || optimistic override (until SWR catches up).
     const effectiveGithub = optimisticOverride.github !== undefined ? optimisticOverride.github : hasGithubConnection;
     const effectiveGoogle = optimisticOverride.google !== undefined ? optimisticOverride.google : hasGoogleConnection;
@@ -632,10 +635,6 @@ export default function AIChat() {
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, [openConnector]);
-
-    // Optimistic per-orb status so the dot flips instantly on connect/disconnect,
-    // even before SWR refetches /api/github-app/installations.
-    const [optimisticOverride, setOptimisticOverride] = useState<{ github?: boolean; google?: boolean }>({});
 
     // Auto-clear optimistic flag once SWR confirms the same value (or after 8s ceiling).
     useEffect(() => {
