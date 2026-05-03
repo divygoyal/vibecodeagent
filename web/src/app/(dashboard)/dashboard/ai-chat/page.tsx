@@ -1072,26 +1072,31 @@ export default function AIChat() {
                             </div>
                             <div ref={mobileRailRef} className="relative z-20 flex w-full flex-wrap items-center justify-center gap-2.5 px-2">
                                 {connectors.map((c) => (
-                                    <div key={c.name} className="relative z-20 shrink-0">
-                                        <ConnectorPill
-                                            name={c.name}
-                                            connected={c.connected}
-                                            isOpen={openConnector === c.name}
-                                            onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
-                                        />
-                                        <AnimatePresence>
-                                            {openConnector === c.name && (
-                                                <ConnectorCard
-                                                    placement="below"
-                                                    name={c.name}
-                                                    connected={c.connected}
-                                                    onClose={() => setOpenConnector(null)}
-                                                    onDisconnected={handleProviderConnected}
-                                                />
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
+                                    <ConnectorPill
+                                        key={c.name}
+                                        name={c.name}
+                                        connected={c.connected}
+                                        isOpen={openConnector === c.name}
+                                        onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
+                                    />
                                 ))}
+                                {/* Card rendered ONCE at row level — centered below the whole pills row
+                                    so leftmost/rightmost pills don't push it off-screen. */}
+                                <AnimatePresence>
+                                    {openConnector && (() => {
+                                        const active = connectors.find(c => c.name === openConnector);
+                                        if (!active) return null;
+                                        return (
+                                            <ConnectorCard
+                                                placement="below"
+                                                name={active.name}
+                                                connected={active.connected}
+                                                onClose={() => setOpenConnector(null)}
+                                                onDisconnected={handleProviderConnected}
+                                            />
+                                        );
+                                    })()}
+                                </AnimatePresence>
                             </div>
                         </div>
                             <div className="text-center">
