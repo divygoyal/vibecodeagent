@@ -6,11 +6,12 @@ import {
   LayoutDashboard, Calendar, RefreshCw, AlertCircle, Clock, Eye,
   FileDown, Loader2,
 } from 'lucide-react';
-import type { DashboardLayout, DashboardFilter, DateRange } from '@/types/dashboard';
+import type { DashboardLayout, DashboardFilter, DateRange, LayoutDensity } from '@/types/dashboard';
 import { getThemeCSS } from '@/lib/dashboardBuilder';
 import { usePublicWidgetData } from '@/lib/useWidgetData';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import { createFilterId, isFilterableDimension } from '@/lib/dashboardFilterEngine';
+import { getWidgetSection } from '@/lib/widgetSections';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
 import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
 
@@ -24,6 +25,17 @@ const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
 ];
 
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+const DENSITY_PADDING: Record<LayoutDensity, string> = {
+  compact: 'p-2',
+  normal: 'p-4',
+  spacious: 'p-8',
+};
+const DENSITY_OUTER: Record<LayoutDensity, string> = {
+  compact: 'px-3 pt-4 pb-2',
+  normal: 'px-6 pt-8 pb-4',
+  spacious: 'px-10 pt-12 pb-6',
+};
 
 // ── Page ──
 
@@ -181,6 +193,14 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
   }
 
   const themeCSS = getThemeCSS(dashboard.theme);
+  const density: LayoutDensity =
+    dashboard.theme.layoutDensity === 'compact' || dashboard.theme.layoutDensity === 'spacious'
+      ? dashboard.theme.layoutDensity
+      : 'normal';
+  const sectionVisibility = dashboard.theme.sectionVisibility;
+  const visibleWidgets = sectionVisibility
+    ? dashboard.widgets.filter((w) => sectionVisibility[getWidgetSection(w)] !== false)
+    : dashboard.widgets;
 
   // ── Embed mode: minimal chrome ──
   if (isEmbed) {
@@ -193,14 +213,14 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
           fontFamily: 'var(--db-font)',
         } as React.CSSProperties}
       >
-        <div className="p-4">
+        <div className={DENSITY_PADDING[density]}>
           <ActiveFiltersBar
             filters={activeFilters}
             onRemove={removeFilter}
             onClearAll={clearAllFilters}
           />
           <DashboardGrid
-            widgets={dashboard.widgets}
+            widgets={visibleWidgets}
             gridLayouts={dashboard.gridLayouts}
             widgetData={widgetData ?? undefined}
             isLoading={dataLoading && !widgetData}
@@ -235,7 +255,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
       style={{ ...themeCSS, backgroundColor: 'var(--db-bg)', fontFamily: 'var(--db-font)' } as React.CSSProperties}
     >
       {/* Header */}
-      <div className="max-w-7xl mx-auto px-6 pt-8 pb-4">
+      <div className={`max-w-7xl mx-auto ${DENSITY_OUTER[density]}`}>
         <div className={`flex items-center gap-3 mb-2 ${
           dashboard.theme.logoPosition === 'top-center' ? 'justify-center' :
           dashboard.theme.logoPosition === 'top-right' ? 'justify-end' : 'justify-start'
@@ -339,14 +359,18 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
       </div>
 
       {/* Grid */}
-      <div className="max-w-7xl mx-auto px-6 pb-12">
+      <div
+        className={`max-w-7xl mx-auto pb-12 ${
+          density === 'compact' ? 'px-3' : density === 'spacious' ? 'px-10' : 'px-6'
+        }`}
+      >
         <ActiveFiltersBar
           filters={activeFilters}
           onRemove={removeFilter}
           onClearAll={clearAllFilters}
         />
         <DashboardGrid
-          widgets={dashboard.widgets}
+          widgets={visibleWidgets}
           gridLayouts={dashboard.gridLayouts}
           widgetData={widgetData ?? undefined}
           isLoading={dataLoading && !widgetData}

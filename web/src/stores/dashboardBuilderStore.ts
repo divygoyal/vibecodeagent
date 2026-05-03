@@ -14,6 +14,8 @@ import type {
   LayoutItem,
   DashboardFilter,
   WidgetInteraction,
+  LayoutDensity,
+  DashboardSectionVisibility,
 } from '@/types/dashboard';
 import {
   createWidget,
@@ -72,6 +74,8 @@ interface DashboardBuilderState {
   // Actions — Theme
   updateTheme: (updates: Partial<DashboardTheme>) => void;
   applyPreset: (preset: DashboardTheme['preset']) => void;
+  setLayoutDensity: (density: LayoutDensity) => void;
+  setSectionVisibility: (updates: Partial<DashboardSectionVisibility>) => void;
 
   // Actions — Persistence
   save: () => Promise<void>;
@@ -281,6 +285,33 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
     const theme = THEME_PRESETS[preset];
     if (!theme) return;
     set({ theme: { ...theme }, isDirty: true });
+  },
+
+  setLayoutDensity: (density) => {
+    const state = get();
+    set({
+      theme: { ...state.theme, layoutDensity: density },
+      isDirty: true,
+    });
+  },
+
+  setSectionVisibility: (updates) => {
+    const state = get();
+    const current = state.theme.sectionVisibility ?? {
+      traffic: true,
+      sources: true,
+      pages: true,
+      geo: true,
+      technology: true,
+      seo: true,
+    };
+    set({
+      theme: {
+        ...state.theme,
+        sectionVisibility: { ...current, ...updates },
+      },
+      isDirty: true,
+    });
   },
 
   // ─── Persistence ─────────────────────────────────────────
