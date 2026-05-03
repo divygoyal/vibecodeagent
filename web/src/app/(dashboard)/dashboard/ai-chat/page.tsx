@@ -251,7 +251,7 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
 /* ─────────────────────────────────────────────────────────────────────
  *  ConnectorCard — popover next to the orb with native Connect button
  * ───────────────────────────────────────────────────────────────────── */
-function ConnectorCard({ name, connected, onClose, onDisconnected, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; onDisconnected?: () => void; placement?: 'right' | 'below' }) {
+function ConnectorCard({ name, connected, onClose, onDisconnected, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; onDisconnected?: (provider?: 'github' | 'google', connected?: boolean) => void; placement?: 'right' | 'below' }) {
     const isComingSoon = COMING_SOON.has(name);
     const targetProvider = nativeProviderFor(name);
     const [disconnecting, setDisconnecting] = useState(false);
@@ -276,7 +276,7 @@ function ConnectorCard({ name, connected, onClose, onDisconnected, placement = '
             const res = await fetch('/api/github-app/disconnect', { method: 'POST' });
             if (res.ok) {
                 toast.success('GitHub disconnected. To fully revoke access, also uninstall on github.com/settings/installations.');
-                onDisconnected?.();
+                onDisconnected?.('github', false);
                 onClose();
             } else {
                 toast.error('Failed to disconnect GitHub.');
@@ -450,7 +450,7 @@ function RepoPicker({
  *  ProviderConnectionCallback — handles ?connected=... after OAuth redirect
  *  Lives in its own component so useSearchParams is isolated under <Suspense>.
  * ───────────────────────────────────────────────────────────────────── */
-function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }) {
+function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 'github' | 'google', connected?: boolean) => void }) {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -470,7 +470,7 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }
                 if (!cancelled) {
                     if (res.ok) {
                         toast.success(connected === 'github' ? 'GitHub connected' : 'Google connected');
-                        onConnected();
+                        onConnected(connected, true);
                     } else {
                         toast.error(`Failed to register ${connected} connection.`);
                     }
@@ -495,17 +495,19 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }
         if (!installed) return;
         if (installed === 'ok') {
             toast.success('GitHub App installed');
-            onConnected();
+            onConnected('github', true);
         } else if (installed === 'invalid_state') {
             toast.error('Install link expired — please retry from Settings.');
         } else if (installed === 'admin_failed' || installed === 'admin_misconfigured') {
-            toast.error('Server failed to record the install. Try again or contact support.');
+            const why = searchParams.get('why');
+            toast.error(why ? `Install failed: ${why}` : 'Server failed to record the install.');
         } else {
             toast.error('GitHub App install failed.');
         }
         const params = new URLSearchParams(searchParams.toString());
         params.delete('installed');
         params.delete('action');
+        params.delete('why');
         const qs = params.toString();
         router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
     }, [searchParams, router, onConnected]);
@@ -565,13 +567,16 @@ export default function AIChat() {
         return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
     }, []);
 
+    // Effective connection state = SWR truth || optimistic override (until SWR catches up).
+    const effectiveGithub = optimisticOverride.github !== undefined ? optimisticOverride.github : hasGithubConnection;
+    const effectiveGoogle = optimisticOverride.google !== undefined ? optimisticOverride.google : hasGoogleConnection;
     const connectors: { name: ConnectorName; connected: boolean }[] = useMemo(() => ([
-        { name: 'github', connected: hasGithubConnection },
+        { name: 'github', connected: effectiveGithub },
         { name: 'wordpress', connected: false },
         { name: 'vercel', connected: false },
-        { name: 'ga4', connected: hasGoogleConnection },
-        { name: 'gsc', connected: hasGoogleConnection },
-    ]), [hasGithubConnection, hasGoogleConnection]);
+        { name: 'ga4', connected: effectiveGoogle },
+        { name: 'gsc', connected: effectiveGoogle },
+    ]), [effectiveGithub, effectiveGoogle]);
     const connectedCount = useMemo(() => connectors.filter(c => c.connected).length, [connectors]);
 
     // Connector card — open one at a time, close on outside click.
@@ -592,7 +597,32 @@ export default function AIChat() {
         return () => document.removeEventListener('mousedown', handler);
     }, [openConnector]);
 
-    const handleProviderConnected = useCallback(() => {
+    // Optimistic per-orb status so the dot flips instantly on connect/disconnect,
+    // even before SWR refetches /api/github-app/installations.
+    const [optimisticOverride, setOptimisticOverride] = useState<{ github?: boolean; google?: boolean }>({});
+
+    // Auto-clear optimistic flag once SWR confirms the same value (or after 8s ceiling).
+    useEffect(() => {
+        if (optimisticOverride.github !== undefined && hasGithubConnection === optimisticOverride.github) {
+            setOptimisticOverride(prev => ({ ...prev, github: undefined }));
+        }
+        if (optimisticOverride.google !== undefined && hasGoogleConnection === optimisticOverride.google) {
+            setOptimisticOverride(prev => ({ ...prev, google: undefined }));
+        }
+    }, [hasGithubConnection, hasGoogleConnection, optimisticOverride.github, optimisticOverride.google]);
+
+    useEffect(() => {
+        if (optimisticOverride.github === undefined && optimisticOverride.google === undefined) return;
+        const t = setTimeout(() => setOptimisticOverride({}), 8000);
+        return () => clearTimeout(t);
+    }, [optimisticOverride.github, optimisticOverride.google]);
+
+    const handleProviderConnected = useCallback((provider?: 'github' | 'google', connected: boolean = true) => {
+        if (provider === 'github') {
+            setOptimisticOverride(prev => ({ ...prev, github: connected }));
+        } else if (provider === 'google') {
+            setOptimisticOverride(prev => ({ ...prev, google: connected }));
+        }
         refreshContainer();
         setOpenConnector(null);
     }, [refreshContainer]);
