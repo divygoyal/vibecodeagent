@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     User, Mail, LogOut, Github, Plug,
@@ -29,14 +29,12 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
 }
 
 
-export default function SettingsPage() {
-    const { data: session } = useSession();
-    const { hasGoogleConnection, hasGithubConnection, refresh: refreshContainer } = useContainerStatus();
+// Isolated child so the useSearchParams() Suspense bailout doesn't disable
+// static rendering for the entire settings page (Next.js 16 prerender requirement).
+function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }) {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // After NextAuth redirects back from a provider OAuth flow, persist the new
-    // tokens to the admin DB so the chatbot can use them on subsequent requests.
     useEffect(() => {
         const connected = searchParams.get('connected');
         if (connected !== 'github' && connected !== 'google') return;
@@ -48,7 +46,7 @@ export default function SettingsPage() {
                 if (!cancelled) {
                     if (res.ok) {
                         toast.success(connected === 'github' ? 'GitHub connected' : 'Google connected');
-                        refreshContainer();
+                        onConnected();
                     } else {
                         toast.error(`Failed to register ${connected} connection.`);
                     }
@@ -65,7 +63,14 @@ export default function SettingsPage() {
             }
         })();
         return () => { cancelled = true; };
-    }, [searchParams, router, refreshContainer]);
+    }, [searchParams, router, onConnected]);
+
+    return null;
+}
+
+export default function SettingsPage() {
+    const { data: session } = useSession();
+    const { hasGoogleConnection, hasGithubConnection, refresh: refreshContainer } = useContainerStatus();
 
     const [notifications, setNotifications] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -89,6 +94,9 @@ export default function SettingsPage() {
 
     return (
         <div className="space-y-6 max-w-2xl">
+            <Suspense fallback={null}>
+                <ProviderConnectionCallback onConnected={refreshContainer} />
+            </Suspense>
             <div>
                 <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
                 <p className="text-sm text-zinc-500">
