@@ -494,11 +494,18 @@ function RepoPicker({
 function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 'github' | 'google', connected?: boolean) => void }) {
     const router = useRouter();
     const searchParams = useSearchParams();
+    // One-shot guards — prevent re-firing toasts when searchParams or onConnected
+    // identity changes mid-render, or when React enters a recovery loop after an
+    // unrelated hydration error.
+    const handledOAuthRef = useRef(false);
+    const handledInstallRef = useRef(false);
 
     // Handle ?connected=github|google (legacy NextAuth OAuth callback path).
     useEffect(() => {
+        if (handledOAuthRef.current) return;
         const connected = searchParams.get('connected');
         if (connected !== 'github' && connected !== 'google') return;
+        handledOAuthRef.current = true;
 
         let cancelled = false;
         (async () => {
@@ -532,8 +539,11 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 
 
     // Handle ?installed=ok|error|invalid_state|... (Phase 2 GitHub App install callback).
     useEffect(() => {
+        if (handledInstallRef.current) return;
         const installed = searchParams.get('installed');
         if (!installed) return;
+        handledInstallRef.current = true;
+
         if (installed === 'ok') {
             toast.success('GitHub App installed');
             onConnected('github', true);
@@ -603,9 +613,15 @@ export default function AIChat() {
     const { hasGoogleConnection, hasGithubConnection, refresh: refreshContainer } = useContainerStatus();
     const { data: session } = useSession();
     const firstName = useMemo(() => session?.user?.name?.trim().split(/\s+/)[0] ?? '', [session?.user?.name]);
-    const timeOfDay = useMemo(() => {
+
+    // timeOfDay must be computed CLIENT-SIDE only — `new Date().getHours()` returns
+    // the server's UTC hour during SSR and the client's local hour after hydration.
+    // If they differ ("morning" vs "evening"), React throws hydration error #418
+    // → recovery loop → error #185 → blank page. Defer to useEffect after mount.
+    const [timeOfDay, setTimeOfDay] = useState<string | null>(null);
+    useEffect(() => {
         const h = new Date().getHours();
-        return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+        setTimeOfDay(h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening');
     }, []);
 
     // Optimistic per-orb status — declared early so the connectors useMemo below can read its derived values.
@@ -1079,7 +1095,7 @@ export default function AIChat() {
                             </div>
                         </div>
                             <div className="text-center">
-                                {firstName && (
+                                {firstName && timeOfDay && (
                                     <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
                                         Good {timeOfDay}, {firstName}
                                     </div>
