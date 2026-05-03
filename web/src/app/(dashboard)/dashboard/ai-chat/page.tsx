@@ -231,6 +231,17 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
                     }`}
                 />
             </motion.span>
+
+            {/* Hover label — hides while the click-card is open */}
+            <motion.span
+                aria-hidden
+                initial={false}
+                animate={{ opacity: hovered && !isOpen ? 1 : 0, y: hovered && !isOpen ? 0 : -3 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="pointer-events-none absolute left-1/2 top-full z-40 mt-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#0d1117] px-2 py-1 text-[11px] font-medium text-zinc-100 shadow-[0_8px_20px_rgba(0,0,0,0.55)]"
+            >
+                {CONNECTOR_LABELS[name]}
+            </motion.span>
         </button>
     );
 }
