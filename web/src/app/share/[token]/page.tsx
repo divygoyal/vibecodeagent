@@ -60,6 +60,7 @@ export default async function SharedDashboardPage({
                 siteUrl={share.siteUrl}
                 views={share.views}
                 embedMode={isEmbed}
+                config={share.config}
             />
         );
     }

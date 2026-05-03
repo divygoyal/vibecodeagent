@@ -57,6 +57,8 @@ function createPersistentShareError() {
 }
 
 function getCreateConfig(config?: ShareConfig | null) {
+    // Spread defaults, then incoming config so Studio fields (sectionOrder/visibility/theme/branding/defaults)
+    // are preserved. Layout mode falls back to openpanel_overview.
     return {
         ...OVERVIEW_SHARE_CONFIG,
         ...config,
@@ -293,6 +295,88 @@ export async function POST(req: Request) {
         return NextResponse.json({ share: shareData });
     } catch (err) {
         console.error('Create share error:', err);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
+/**
+ * PATCH /api/share?token=xxx — Update an existing share's config
+ * Body: { config: ShareConfig }
+ * Authenticated endpoint; verifies the share belongs to the session user.
+ */
+export async function PATCH(req: Request) {
+    try {
+        const session = await getServerSession(authOptions) as Session;
+        if (!session?.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const token = searchParams.get('token');
+        if (!token) {
+            return NextResponse.json({ error: 'token is required' }, { status: 400 });
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const incomingConfig = (body?.config ?? null) as ShareConfig | null;
+        if (!incomingConfig || typeof incomingConfig !== 'object') {
+            return NextResponse.json({ error: 'config is required' }, { status: 400 });
+        }
+
+        const userId = session.user.id;
+        const existing = await getShareData(token, { incrementView: false });
+        if (!existing) {
+            return NextResponse.json({ error: 'Share not found' }, { status: 404 });
+        }
+        if (existing.userId !== userId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // Merge: keep existing umami fields and layoutMode unless caller explicitly overrides them.
+        const merged: ShareConfig = {
+            ...existing.config,
+            ...incomingConfig,
+            layoutMode: incomingConfig.layoutMode ?? existing.config.layoutMode,
+            shareProvider: incomingConfig.shareProvider ?? existing.config.shareProvider,
+            umamiWebsiteId: incomingConfig.umamiWebsiteId ?? existing.config.umamiWebsiteId,
+            umamiShareId: incomingConfig.umamiShareId ?? existing.config.umamiShareId,
+            umamiShareUrl: incomingConfig.umamiShareUrl ?? existing.config.umamiShareUrl,
+            umamiEnabledAt: incomingConfig.umamiEnabledAt ?? existing.config.umamiEnabledAt,
+        };
+        const normalized = normalizeShareConfig(merged);
+
+        if (ADMIN_API_KEY) {
+            try {
+                await updateAdminShareConfig({
+                    token,
+                    userId,
+                    siteUrl: existing.siteUrl,
+                    config: normalized,
+                });
+            } catch (error) {
+                console.error('PATCH share config admin error:', error);
+                return NextResponse.json(
+                    { error: 'Failed to update share config' },
+                    { status: 502 },
+                );
+            }
+            const refreshed = await getShareData(token, { incrementView: false });
+            return NextResponse.json({ share: refreshed });
+        }
+
+        if (!ALLOW_IN_MEMORY_SHARES) {
+            return createPersistentShareError();
+        }
+
+        const stored = inMemoryShares.get(token);
+        if (!stored) {
+            return NextResponse.json({ error: 'Share not found' }, { status: 404 });
+        }
+        const updated: ShareData = { ...stored, config: normalized };
+        inMemoryShares.set(token, updated);
+        return NextResponse.json({ share: updated });
+    } catch (err) {
+        console.error('Update share config error:', err);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

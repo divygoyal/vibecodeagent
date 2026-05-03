@@ -68,6 +68,12 @@ import {
     type ShareOverviewFilter,
     type ShareOverviewFilterOperator,
 } from '@/lib/shareOverviewFilters';
+import {
+    DEFAULT_SHARE_ACCENT,
+    DEFAULT_SECTION_ORDER,
+    type NormalizedShareConfig,
+    type ShareSectionId,
+} from '@/lib/shareTypes';
 
 const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr: false });
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
@@ -225,6 +231,7 @@ type OverviewRuntime = {
     initialRange?: string;
     onRangeChange?: (value: string) => void;
     onShareDashboard?: () => void;
+    config?: NormalizedShareConfig | null;
 };
 
 const OverviewRuntimeContext = createContext<OverviewRuntime | null>(null);
@@ -2353,7 +2360,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
         ? liveData.minuteCounts.reduce((sum, item) => sum + item.sessionCount, 0)
         : liveData?.activeUsers || 0;
     const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
-    const activeMetricColor = OVERVIEW_PRIMARY_ACCENT;
+    const activeMetricColor = runtime.config?.theme.accentColor || OVERVIEW_PRIMARY_ACCENT;
     const previousMetricColor = OVERVIEW_COMPARISON_ACCENT;
     const chartHelperText = pageScoped
         ? 'Page-scoped filters applied • Some session-level cards stay limited.'
@@ -3556,17 +3563,29 @@ function ShareOverviewPage() {
         setRange,
         interval,
         setInterval,
+        setMetric,
         filters,
         eventNames,
         removeFilter,
         removeEventName,
         upsertFilter,
         setEventNames,
+        getFilterValues,
     } = useShareOverviewState();
     const [filtersOpen, setFiltersOpen] = useState(false);
     const didHydrateRangeRef = useRef(false);
+    const didSeedDefaultsRef = useRef(false);
     const handleRangeChange = (value: string) => setRange(value as ShareOverviewRange);
     const activeFilterCount = filters.length + eventNames.length;
+
+    /* Resolve accent + branding + section settings from share config (share mode only). */
+    const accentColor = runtime.config?.theme.accentColor || DEFAULT_SHARE_ACCENT;
+    const branding = runtime.config?.branding ?? null;
+    const showWatermark = branding?.showWatermark ?? true;
+    const sectionOrder: ShareSectionId[] = runtime.config?.sectionOrder?.length
+        ? runtime.config.sectionOrder
+        : DEFAULT_SECTION_ORDER;
+    const sectionVisibility = runtime.config?.sectionVisibility ?? null;
 
     useEffect(() => {
         if (runtime.mode !== 'dashboard' || didHydrateRangeRef.current) {
@@ -3579,6 +3598,31 @@ function ShareOverviewPage() {
             setRange(runtime.initialRange as ShareOverviewRange);
         }
     }, [range, runtime.initialRange, runtime.mode, searchParams, setRange]);
+
+    /* Seed Studio-defined defaults (range / interval / metric / filter) once on first mount,
+     * only when the visitor has no URL params for them yet. */
+    useEffect(() => {
+        if (runtime.mode !== 'share' || didSeedDefaultsRef.current) return;
+        const cfgDefaults = runtime.config?.defaults;
+        if (!cfgDefaults) return;
+        didSeedDefaultsRef.current = true;
+
+        if (cfgDefaults.range && !searchParams.has('range') && !searchParams.has('start') && !searchParams.has('end')) {
+            setRange(cfgDefaults.range as ShareOverviewRange);
+        }
+        if (cfgDefaults.interval && cfgDefaults.interval !== 'auto' && !searchParams.has('overrideInterval') && !searchParams.has('interval')) {
+            setInterval(cfgDefaults.interval);
+        }
+        if (typeof cfgDefaults.metricIndex === 'number' && cfgDefaults.metricIndex >= 0 && !searchParams.has('metric')) {
+            setMetric(cfgDefaults.metricIndex);
+        }
+        if (cfgDefaults.filter && !searchParams.has('f') && !searchParams.has('filters')) {
+            const dim = cfgDefaults.filter.dimension as ShareOverviewFilter['name'];
+            if (SHARE_OVERVIEW_FILTER_NAMES.includes(dim) && !getFilterValues(dim).includes(cfgDefaults.filter.value)) {
+                upsertFilter({ name: dim, operator: 'is', value: [cfgDefaults.filter.value] });
+            }
+        }
+    }, [runtime.mode, runtime.config, searchParams, setRange, setInterval, setMetric, upsertFilter, getFilterValues]);
 
     useEffect(() => {
         if (runtime.mode === 'dashboard' && runtime.onRangeChange) {
@@ -3668,6 +3712,33 @@ function ShareOverviewPage() {
         </div>
     );
 
+    /* Render registry — each section block is keyed by ShareSectionId. */
+    const renderSection = (id: ShareSectionId) => {
+        switch (id) {
+            case 'metrics':
+                return <OverviewMetrics key={id} liveData={liveQuery.data} />;
+            case 'sources':
+                return <TopSourcesWidget key={id} />;
+            case 'geo':
+                return <TopGeoTableWidget key={id} />;
+            case 'devices':
+                return <TopDevicesWidget key={id} />;
+            case 'pages':
+                return <TopPagesWidget key={id} />;
+            case 'events':
+                return runtime.mode === 'share' ? <TopEventsWidget key={id} token={runtime.queryKey} /> : null;
+            case 'liveGeo':
+                return runtime.mode === 'share'
+                    ? <TopGeoMapWidget key={id} liveData={liveQuery.data as LiveResponse | undefined} loading={liveQuery.isLoading} error={liveQuery.error || null} />
+                    : null;
+            default:
+                return null;
+        }
+    };
+
+    const isVisible = (id: ShareSectionId) =>
+        sectionVisibility ? sectionVisibility[id] !== false : true;
+
     const contentGrid = (
         <div className={cx(
             runtime.mode === 'share'
@@ -3676,28 +3747,52 @@ function ShareOverviewPage() {
                     : 'mx-auto grid max-w-7xl grid-cols-6 gap-3 p-3 sm:gap-4 sm:p-4'
                 : 'grid grid-cols-6 gap-3 pt-4 sm:gap-4',
         )}>
-            <OverviewMetrics liveData={liveQuery.data} />
-            <TopSourcesWidget />
-            <TopGeoTableWidget />
-            <TopDevicesWidget />
-            <TopPagesWidget />
-            {runtime.mode === 'share' ? <TopEventsWidget token={runtime.queryKey} /> : null}
-            {runtime.mode === 'share' ? <TopGeoMapWidget liveData={liveQuery.data as LiveResponse | undefined} loading={liveQuery.isLoading} error={liveQuery.error || null} /> : null}
+            {sectionOrder.map((id) => (isVisible(id) ? renderSection(id) : null))}
         </div>
     );
+
+    /* Apply Studio accent color via CSS variable for descendants that use var(--share-accent). */
+    const accentStyle: React.CSSProperties & Record<string, string> = {
+        ['--share-accent' as string]: accentColor,
+    };
+
+    const watermarkFooter = runtime.mode === 'share' && showWatermark ? (
+        <div className={cx('text-center', isEmbeddedShare ? 'pb-4' : 'pb-8')}>
+            <a
+                href="https://trafficclaw.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+                Built with TrafficClaw
+            </a>
+        </div>
+    ) : null;
 
     return (
         <>
             {runtime.mode === 'share' ? (
-                <div className="min-h-screen overflow-x-hidden bg-[#080b0e] text-zinc-100">
+                <div
+                    className="min-h-screen overflow-x-hidden bg-[#080b0e] text-zinc-100"
+                    style={accentStyle}
+                >
                     {isEmbeddedShare ? null : (
                         <div className="border-b border-white/[0.06] bg-[#07090c]">
                             <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                                 <div className="min-w-0">
                                     <div className="mb-1 flex items-center gap-3">
-                                        <Logo size="sm" className="shrink-0" />
+                                        {branding?.logoUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={branding.logoUrl}
+                                                alt={branding.companyName || 'Logo'}
+                                                className="h-7 w-auto shrink-0 object-contain"
+                                            />
+                                        ) : (
+                                            <Logo size="sm" className="shrink-0" />
+                                        )}
                                         <span className="dashboard-hover-chip inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-100">
-                                            Shared analytics
+                                            {branding?.companyName || 'Shared analytics'}
                                         </span>
                                     </div>
                                     {runtime.siteUrl ? <div className="truncate text-xs text-zinc-500">Analytics for <span className="font-mono text-zinc-300">{runtime.siteUrl}</span></div> : null}
@@ -3721,10 +3816,11 @@ function ShareOverviewPage() {
                             setEventNames={setEventNames}
                         />
                         {contentGrid}
+                        {watermarkFooter}
                     </div>
                 </div>
             ) : (
-                <div className="space-y-4 text-zinc-100">
+                <div className="space-y-4 text-zinc-100" style={accentStyle}>
                     {controls}
                     <FilterEditorModal
                         open={filtersOpen}
@@ -3753,6 +3849,7 @@ export default function SharedOverviewClient({
     onRangeChange,
     onShareDashboard,
     embedMode = false,
+    config = null,
 }: {
     mode?: SharedOverviewMode;
     token?: string;
@@ -3764,6 +3861,7 @@ export default function SharedOverviewClient({
     onRangeChange?: (value: string) => void;
     onShareDashboard?: () => void;
     embedMode?: boolean;
+    config?: NormalizedShareConfig | null;
 }) {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
@@ -3794,6 +3892,7 @@ export default function SharedOverviewClient({
                 initialRange,
                 onRangeChange,
                 onShareDashboard,
+                config: null,
             };
         }
 
@@ -3808,8 +3907,9 @@ export default function SharedOverviewClient({
             siteUrl,
             views,
             embedMode,
+            config,
         };
-    }, [demoMode, embedMode, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
+    }, [config, demoMode, embedMode, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
 
     if (!runtime) {
         return null;

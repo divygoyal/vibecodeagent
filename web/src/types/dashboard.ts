@@ -44,8 +44,6 @@ export interface DataFilter {
   value: string;
 }
 
-export type WidgetSection = 'traffic' | 'sources' | 'pages' | 'geo' | 'technology' | 'seo';
-
 export interface WidgetConfig {
   id: string;
   type: WidgetType;
@@ -65,10 +63,6 @@ export interface WidgetConfig {
 
   // Text widget content
   content?: string;
-
-  // Optional section tag — used by Share Studio to bulk-toggle widget visibility.
-  // Inferred from dataSource+dimension when absent.
-  section?: WidgetSection;
 }
 
 // ── Layout Types ──────────────────────────────────────────────
@@ -85,26 +79,6 @@ export type ThemePreset = 'default' | 'light' | 'midnight' | 'ocean' | 'forest' 
 
 export type BorderRadius = 'none' | 'sm' | 'md' | 'lg' | 'full';
 
-export type LayoutDensity = 'compact' | 'normal' | 'spacious';
-
-export interface DashboardSectionVisibility {
-  traffic: boolean;
-  sources: boolean;
-  pages: boolean;
-  geo: boolean;
-  technology: boolean;
-  seo: boolean;
-}
-
-export const DEFAULT_SECTION_VISIBILITY: DashboardSectionVisibility = {
-  traffic: true,
-  sources: true,
-  pages: true,
-  geo: true,
-  technology: true,
-  seo: true,
-};
-
 export interface DashboardTheme {
   preset: ThemePreset;
 
@@ -116,10 +90,6 @@ export interface DashboardTheme {
   textColor?: string;
   fontFamily?: string;
   borderRadius?: BorderRadius;
-
-  // Layout
-  layoutDensity?: LayoutDensity;
-  sectionVisibility?: DashboardSectionVisibility;
 
   // Branding
   logoUrl?: string;
