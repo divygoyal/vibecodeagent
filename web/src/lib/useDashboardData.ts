@@ -85,6 +85,10 @@ function useImmediateSWR<T = any>(url: string | null, options = {}) {
 export function useContainerStatus() {
     const { data, error, isLoading, mutate } = useImmediateSWR('/api/container');
     const { data: session } = useSession();
+    const appInstallationsQuery = useImmediateSWR<{ installations: { installation_id: number }[] }>(
+        '/api/github-app/installations',
+        { dedupingInterval: 60_000, errorRetryCount: 0 }
+    );
 
     // Bug #5 fix: Check from admin DB providers
     const adminHasGoogle = data?.connectedProviders?.some(
@@ -99,8 +103,11 @@ export function useContainerStatus() {
     const sessionHasGoogle = !!(session?.user as SessionUser | undefined)?.googleAccessToken;
     const sessionHasGithub = !!(session?.user as SessionUser | undefined)?.githubAccessToken;
 
+    // Phase 2: GitHub App installations are a separate connection source
+    const hasAppInstallation = (appInstallationsQuery.data?.installations?.length ?? 0) > 0;
+
     const hasGoogleConnection = adminHasGoogle || sessionHasGoogle;
-    const hasGithubConnection = adminHasGithub || sessionHasGithub;
+    const hasGithubConnection = adminHasGithub || sessionHasGithub || hasAppInstallation;
 
     return {
         botStatus: data,
@@ -108,7 +115,10 @@ export function useContainerStatus() {
         hasGithubConnection,
         isLoading,
         isError: error,
-        refresh: mutate
+        refresh: () => {
+            mutate();
+            appInstallationsQuery.mutate();
+        }
     };
 }
 

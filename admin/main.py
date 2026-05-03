@@ -2028,22 +2028,48 @@ async def delete_all_user_github_app_installations(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
-    """Convenience: disconnect ALL of the user's installations in one call —
-    used by the chat-page Disconnect button which doesn't track ids client-side."""
+    """Full GitHub disconnect — removes BOTH the user's GitHub App installation rows
+    AND any legacy OAuthConnection(provider='github') rows. Without removing the
+    OAuth row, the UI's connected-state check (which still reads connected_providers
+    from /api/users/{id}) would keep showing GitHub as connected after a Disconnect
+    click.
+
+    Does NOT uninstall the App on GitHub itself — user must do that at
+    https://github.com/settings/installations to revoke actual repo access."""
     user = await get_user_by_identifier(db, github_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # 1. Remove App installation rows + invalidate cached tokens
     result = await db.execute(
         select(GitHubAppInstallation).where(GitHubAppInstallation.user_id == user.id)
     )
-    rows = result.scalars().all()
-    removed = 0
-    for row in rows:
+    installations = result.scalars().all()
+    installations_removed = 0
+    for row in installations:
         github_app_invalidate_token(row.installation_id)
         await db.delete(row)
-        removed += 1
+        installations_removed += 1
+
+    # 2. Remove legacy OAuth GitHub connection row(s)
+    oauth_result = await db.execute(
+        select(OAuthConnection).where(
+            OAuthConnection.user_id == user.id,
+            OAuthConnection.provider == "github",
+        )
+    )
+    oauth_rows = oauth_result.scalars().all()
+    oauth_removed = 0
+    for row in oauth_rows:
+        await db.delete(row)
+        oauth_removed += 1
+
     await db.commit()
-    return {"status": "disconnected", "removed": removed}
+    return {
+        "status": "disconnected",
+        "installations_removed": installations_removed,
+        "oauth_removed": oauth_removed,
+    }
 
 
 @app.get("/api/users/{github_id}/github-app/token")
