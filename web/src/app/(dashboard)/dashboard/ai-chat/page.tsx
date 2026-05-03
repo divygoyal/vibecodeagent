@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import Link from 'next/link';
 import {
-    AlertTriangle, Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Search, Sparkles, Target, TrendingDown, Lock
+    Globe, ChevronDown, Loader2, ArrowUp, ArrowRight, RotateCcw, Search, Sparkles, Target, TrendingDown, Lightbulb, Lock,
+    Github
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import DemoModeBanner from '@/components/DemoModeBanner';
@@ -22,56 +24,100 @@ type DashboardPropertyOption = {
     property?: string;
 };
 
-type SignalChip = {
+type ActionChip = {
     label: string;
     prompt: string;
     mode?: 'briefing';
     icon: LucideIcon;
-    tone: 'amber' | 'cyan' | 'emerald';
 };
 
 const BRIEFING_PROMPT = 'Give me my morning briefing — what changed overnight and what should I focus on today?';
 
-const SIGNAL_CHIPS: SignalChip[] = [
+const ACTION_CHIPS: ActionChip[] = [
     {
-        label: 'Traffic anomaly detected',
-        prompt: BRIEFING_PROMPT,
-        mode: 'briefing',
-        icon: AlertTriangle,
-        tone: 'amber',
-    },
-    {
-        label: 'Pages lost conversions',
-        prompt: 'Which pages lost conversions recently, and what changed on them?',
+        label: 'Traffic drop',
+        prompt: 'Why did my traffic drop recently? Pinpoint the date, the affected pages, and the most likely cause.',
         icon: TrendingDown,
-        tone: 'cyan',
     },
     {
-        label: 'Best opportunities this month',
+        label: 'SEO issues',
+        prompt: 'Find the biggest SEO issues hurting my traffic right now and rank them by revenue impact.',
+        icon: Search,
+    },
+    {
+        label: 'Top opportunities',
         prompt: 'What should I fix first this month to grow traffic faster?',
         icon: Target,
-        tone: 'emerald',
+    },
+    {
+        label: 'Content ideas',
+        prompt: 'Suggest 5 content ideas based on my existing keywords and gaps in my site.',
+        icon: Lightbulb,
     },
 ] as const;
 
-const PROMPT_GROUPS = [
+type HeroCard = {
+    title: string;
+    description: string;
+    prompt: string;
+    icon: LucideIcon;
+    accent: 'cyan' | 'emerald';
+};
+
+const HERO_CARDS: HeroCard[] = [
     {
-        title: 'Understand performance',
-        prompts: [
-            'Why did traffic drop?',
-            'What changed this month?',
-            'Which channels underperform?',
-        ],
+        title: 'Why did my traffic drop?',
+        description: 'Analyze changes, spot issues, and get actionable recommendations.',
+        prompt: 'Why did my traffic drop recently? Pinpoint the date, the affected pages, and the most likely cause.',
+        icon: TrendingDown,
+        accent: 'cyan',
     },
     {
-        title: 'Find opportunities',
-        prompts: [
-            'Top conversion leaks',
-            'Best pages to improve',
-            'Where can I grow fastest?',
-        ],
+        title: 'What are my top growth opportunities?',
+        description: 'Discover high-impact opportunities to drive more traffic and conversions.',
+        prompt: 'What are my top growth opportunities right now? Rank by expected revenue impact.',
+        icon: Target,
+        accent: 'emerald',
     },
 ] as const;
+
+// ── Brand marks for the connector pills (inline so we don't pull in a brand-icon lib) ──
+const WordpressMark = ({ className = 'h-4 w-4' }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M3 12a9 9 0 0 0 5.2 8.15L4.6 9.65A8.96 8.96 0 0 0 3 12Z" fill="currentColor" />
+        <path d="M19.6 7.7a8.96 8.96 0 0 1 .9 8.7l-3.6-9.85a4 4 0 0 1 2.7 1.15Z" fill="currentColor" opacity="0.85" />
+        <path d="M11 4.4 14 13l-1.7 5.4a9 9 0 0 0 5.6-2.1L13.4 4.5l-2.4-.1Z" fill="currentColor" opacity="0.7" />
+    </svg>
+);
+const VercelMark = ({ className = 'h-4 w-4' }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M12 3 22 20H2L12 3Z" />
+    </svg>
+);
+const Ga4Mark = ({ className = 'h-4 w-4' }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+        <rect x="4" y="11" width="4" height="9" rx="1.5" fill="#F9AB00" />
+        <rect x="10" y="7" width="4" height="13" rx="1.5" fill="#F9AB00" opacity="0.85" />
+        <rect x="16" y="3" width="4" height="17" rx="1.5" fill="#E37400" />
+    </svg>
+);
+const SearchConsoleMark = ({ className = 'h-4 w-4' }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+        <rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M3 10h18" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="14.5" cy="14" r="2" stroke="#22d3ee" strokeWidth="1.6" />
+        <path d="m16 15.5 2 2" stroke="#22d3ee" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+);
+
+type ConnectorPill = {
+    key: string;
+    label: string;
+    Icon: (props: { className?: string }) => React.ReactElement;
+    iconWrapClass: string;
+    connected: boolean;
+};
 
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Searching your data',
@@ -117,7 +163,45 @@ export default function AIChat() {
         hasGa4Properties,
         propertyInventoryLoading,
     } = useRegistration();
-    const { hasGoogleConnection } = useContainerStatus();
+    const { hasGoogleConnection, hasGithubConnection } = useContainerStatus();
+
+    const connectorPills: ConnectorPill[] = useMemo(() => ([
+        {
+            key: 'github',
+            label: 'GitHub',
+            Icon: ({ className }) => <Github className={className ?? 'h-4 w-4'} />,
+            iconWrapClass: 'bg-white/[0.06] text-zinc-100 border-white/[0.08]',
+            connected: hasGithubConnection,
+        },
+        {
+            key: 'wordpress',
+            label: 'WordPress',
+            Icon: WordpressMark,
+            iconWrapClass: 'bg-[#21759b]/15 text-[#5fbcd9] border-[#21759b]/30',
+            connected: false,
+        },
+        {
+            key: 'vercel',
+            label: 'Vercel',
+            Icon: VercelMark,
+            iconWrapClass: 'bg-white/[0.06] text-white border-white/[0.08]',
+            connected: false,
+        },
+        {
+            key: 'ga4',
+            label: 'GA4',
+            Icon: Ga4Mark,
+            iconWrapClass: 'bg-[#F9AB00]/10 border-[#F9AB00]/25',
+            connected: hasGoogleConnection,
+        },
+        {
+            key: 'gsc',
+            label: 'Search Console',
+            Icon: SearchConsoleMark,
+            iconWrapClass: 'bg-white/[0.04] text-zinc-100 border-white/[0.08]',
+            connected: hasGoogleConnection,
+        },
+    ]), [hasGithubConnection, hasGoogleConnection]);
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
@@ -398,145 +482,192 @@ export default function AIChat() {
             {/* ── Messages / Empty State ── */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
-                    <div className="flex min-h-full items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
-                        <section className="relative w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/[0.08] bg-[#03070c] px-5 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.38)] sm:px-8 sm:py-10 lg:px-10">
-                            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_22%,rgba(34,211,238,0.14),transparent_28%),radial-gradient(circle_at_84%_18%,rgba(16,185,129,0.12),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]" />
-                            <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(rgba(34,211,238,0.16) 1px, transparent 1px)', backgroundSize: '18px 18px', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0.95), rgba(0,0,0,0.15))' }} />
-                            <div className="pointer-events-none absolute inset-x-0 top-[26%] h-px bg-[linear-gradient(90deg,transparent,rgba(52,211,153,0.18),transparent)]" />
-                            <div className="pointer-events-none absolute inset-x-0 top-[38%] h-[120px] bg-[radial-gradient(circle_at_center,rgba(52,211,153,0.18),transparent_65%)] blur-3xl" />
+                    <div className="relative min-h-full px-4 pt-6 pb-12 sm:px-6 lg:px-10">
+                        {/* Ambient background glow + subtle grid */}
+                        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_82%_22%,rgba(16,185,129,0.10),transparent_28%),linear-gradient(180deg,#02060a_0%,#000_100%)]" />
+                            <div className="absolute inset-0 opacity-[0.18]" style={{ backgroundImage: 'radial-gradient(rgba(34,211,238,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0))' }} />
+                            <div className="absolute left-1/2 top-[36%] h-[300px] w-[760px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.12),transparent_70%)] blur-3xl" />
+                        </div>
 
-                            <div className="relative">
-                                <div className="flex justify-center">
-                                    <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-300">
-                                        <Sparkles className="h-4 w-4 text-emerald-300" />
-                                        AI Analytics Copilot
-                                    </div>
-                                </div>
-
-                                <div className="mx-auto mt-6 max-w-3xl text-center">
-                                    <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl sm:leading-[1.02]">
-                                        Ask anything about your traffic
-                                    </h1>
-                                    <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">
-                                        Get instant answers on sessions, channels, landing pages, conversion drops,
-                                        and growth opportunities from your analytics and search data.
-                                    </p>
-                                </div>
-
-                                <div className="mt-7 flex flex-wrap justify-center gap-3">
-                                    {SIGNAL_CHIPS.map((chip) => {
-                                        const Icon = chip.icon;
-                                        const chipTone =
-                                            chip.tone === 'amber'
-                                                ? 'border-amber-500/20 bg-amber-500/[0.08] text-amber-100'
-                                                : chip.tone === 'cyan'
-                                                    ? 'border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-100'
-                                                    : 'border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-100';
-
-                                        return (
-                                            <button
-                                                key={chip.label}
-                                                type="button"
-                                                onClick={() => sendMessage(chip.prompt, chip.mode ? { mode: chip.mode } : undefined)}
-                                                disabled={isLoading || !dataReady}
-                                                className={`inline-flex min-h-[44px] items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition-all hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white disabled:opacity-40 ${chipTone}`}
-                                            >
-                                                <Icon className="h-4 w-4" />
-                                                <span>{chip.label}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="mx-auto mt-8 w-full max-w-4xl">
-                                    <div className="absolute left-1/2 mt-6 h-16 w-[75%] -translate-x-1/2 rounded-full bg-[linear-gradient(90deg,rgba(34,211,238,0.12),rgba(52,211,153,0.14),rgba(34,211,238,0.08))] blur-2xl" />
-                                    <div className="relative rounded-[28px] border border-white/[0.08] bg-[#05090e]/95 p-2 shadow-[0_24px_60px_rgba(0,0,0,0.32)]">
-                                        <div className="flex items-center gap-3 rounded-[22px] border border-white/[0.06] bg-[#0a0f14] px-4 py-4 sm:px-5">
-                                            <Search className="h-5 w-5 shrink-0 text-zinc-500" />
-                                            <textarea
-                                                ref={textareaRef}
-                                                value={input}
-                                                onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
-                                                onKeyDown={handleKeyDown}
-                                                placeholder="Ask why traffic dropped, which pages leak conversions, or what to fix first..."
-                                                disabled={isLoading || !dataReady}
-                                                rows={1}
-                                                className="min-h-[28px] flex-1 bg-transparent text-[15px] leading-relaxed text-white placeholder-zinc-500 outline-none resize-none max-h-40 disabled:opacity-40"
-                                            />
-                                            <div className="flex items-center gap-2 pl-2">
-                                                <div className="relative" ref={dropdownRef}>
-                                                    <button
-                                                        onClick={() => setSiteOpen(!siteOpen)}
-                                                        className="inline-flex h-10 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] text-zinc-300 transition-colors hover:border-white/[0.14] hover:bg-white/[0.06]"
-                                                    >
-                                                        <Globe className="h-3.5 w-3.5 text-cyan-300" />
-                                                        <span className="max-w-[120px] truncate">{siteLabel}</span>
-                                                        <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform ${siteOpen ? 'rotate-180' : ''}`} />
-                                                    </button>
-                                                    {siteOpen && normalizedSites.length > 0 && (
-                                                        <div className="absolute bottom-full right-0 z-50 mb-2 max-h-[260px] min-w-[220px] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#11161c] py-1 shadow-2xl shadow-black/70">
-                                                            {normalizedSites.map((site) => {
-                                                                const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                                                const active = site.siteUrl === selectedSite;
-                                                                return (
-                                                                    <button
-                                                                        key={site.siteUrl}
-                                                                        onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
-                                                                        className={`w-full px-4 py-2.5 text-left text-xs transition-colors ${
-                                                                            active
-                                                                                ? 'bg-emerald-500/[0.08] text-emerald-300'
-                                                                                : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
-                                                                        }`}
-                                                                    >
-                                                                        {label}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
+                        <div className="relative mx-auto w-full max-w-6xl">
+                            {/* ── Connector pills row ── */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                                {connectorPills.map((pill) => {
+                                    const ConnectorIcon = pill.Icon;
+                                    const baseClass = 'group flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5 transition-all hover:border-white/[0.16] hover:bg-white/[0.04]';
+                                    const inner = (
+                                        <>
+                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${pill.iconWrapClass}`}>
+                                                <ConnectorIcon className="h-4 w-4" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="truncate text-[13px] font-medium text-white">{pill.label}</div>
+                                                <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
+                                                    <span
+                                                        className={`inline-block h-1.5 w-1.5 rounded-full ${pill.connected ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]' : 'bg-zinc-600'}`}
+                                                    />
+                                                    <span className={pill.connected ? 'text-emerald-300' : 'text-zinc-500'}>
+                                                        {pill.connected ? 'Connected' : 'Connect'}
+                                                    </span>
                                                 </div>
-                                                <button
-                                                    onClick={() => sendMessage()}
-                                                    disabled={!input.trim() || isLoading || !dataReady}
-                                                    className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-700 text-zinc-500 transition-all enabled:bg-[linear-gradient(135deg,#34e1a3_0%,#22d3ee_100%)] enabled:text-[#031014] enabled:shadow-[0_10px_30px_rgba(52,225,163,0.24)] enabled:hover:brightness-105"
-                                                >
-                                                    <ArrowUp className="h-4 w-4" />
-                                                </button>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mx-auto mt-8 grid max-w-4xl gap-4 lg:grid-cols-2">
-                                    {PROMPT_GROUPS.map((group) => (
-                                        <div key={group.title} className="rounded-[24px] border border-white/[0.08] bg-[#070c11]/90 p-4">
-                                            <div className="text-sm font-medium text-zinc-300">{group.title}</div>
-                                            <div className="mt-4 space-y-2">
-                                                {group.prompts.map((prompt) => (
-                                                    <button
-                                                        key={prompt}
-                                                        type="button"
-                                                        onClick={() => sendMessage(prompt)}
-                                                        disabled={isLoading || !dataReady}
-                                                        className="flex min-h-[52px] w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#0b1015] px-4 text-left text-sm text-zinc-200 transition-all hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white disabled:opacity-40"
-                                                    >
-                                                        <span>{prompt}</span>
-                                                        <span className="text-zinc-500">›</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {!dataReady && hasGoogleConnection && (
-                                    <div className="mt-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                        Loading your analytics and search data...
-                                    </div>
-                                )}
+                                        </>
+                                    );
+                                    return pill.connected ? (
+                                        <div key={pill.key} className={baseClass}>{inner}</div>
+                                    ) : (
+                                        <Link key={pill.key} href="/dashboard/settings" className={baseClass}>{inner}</Link>
+                                    );
+                                })}
                             </div>
-                        </section>
+
+                            {/* ── Headline + eyebrow ── */}
+                            <div className="mt-12 flex flex-col items-center text-center">
+                                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/[0.05] px-4 py-1.5">
+                                    <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                                    <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300">AI Growth Copilot</span>
+                                </div>
+
+                                <h1 className="mt-7 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-white sm:text-[56px] sm:leading-[1.05]">
+                                    Ask anything about{' '}
+                                    <span className="bg-[linear-gradient(135deg,#67e8f9_0%,#22d3ee_55%,#0ea5e9_100%)] bg-clip-text text-transparent">your traffic</span>
+                                </h1>
+                                <p className="mt-5 max-w-2xl text-[15px] leading-7 text-zinc-400">
+                                    Get instant insights about traffic, SEO, content, and growth opportunities across your website.
+                                </p>
+                            </div>
+
+                            {/* ── Glow input row ── */}
+                            <div className="relative mx-auto mt-10 w-full max-w-4xl">
+                                <div aria-hidden className="absolute -inset-x-4 -inset-y-3 rounded-[36px] bg-[linear-gradient(90deg,rgba(34,211,238,0.20),rgba(16,185,129,0.18),rgba(34,211,238,0.10))] blur-2xl" />
+                                <div className="relative rounded-[24px] border border-cyan-400/20 bg-[#06090e]/95 p-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+                                    <div className="flex items-center gap-3 rounded-[20px] border border-white/[0.05] bg-[#0a0f14]/80 px-4 py-3.5 sm:px-5">
+                                        <Sparkles className="h-5 w-5 shrink-0 text-cyan-300" />
+                                        <textarea
+                                            ref={textareaRef}
+                                            value={input}
+                                            onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
+                                            onKeyDown={handleKeyDown}
+                                            placeholder="Ask why traffic dropped, find SEO issues, or discover growth opportunities…"
+                                            disabled={isLoading || !dataReady}
+                                            rows={1}
+                                            className="min-h-[28px] flex-1 bg-transparent text-[15px] leading-relaxed text-white placeholder-zinc-500 outline-none resize-none max-h-40 disabled:opacity-40"
+                                        />
+                                        <div className="flex items-center gap-2 pl-2">
+                                            <div className="relative" ref={dropdownRef}>
+                                                <button
+                                                    onClick={() => setSiteOpen(!siteOpen)}
+                                                    className="inline-flex h-10 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 text-[12px] text-zinc-300 transition-colors hover:border-white/[0.14] hover:bg-white/[0.06]"
+                                                >
+                                                    <Globe className="h-3.5 w-3.5 text-cyan-300" />
+                                                    <span className="max-w-[140px] truncate">{siteLabel}</span>
+                                                    <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform ${siteOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                {siteOpen && normalizedSites.length > 0 && (
+                                                    <div className="absolute bottom-full right-0 z-50 mb-2 max-h-[260px] min-w-[220px] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#11161c] py-1 shadow-2xl shadow-black/70">
+                                                        {normalizedSites.map((site) => {
+                                                            const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
+                                                            const active = site.siteUrl === selectedSite;
+                                                            return (
+                                                                <button
+                                                                    key={site.siteUrl}
+                                                                    onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
+                                                                    className={`w-full px-4 py-2.5 text-left text-xs transition-colors ${
+                                                                        active
+                                                                            ? 'bg-emerald-500/[0.08] text-emerald-300'
+                                                                            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
+                                                                    }`}
+                                                                >
+                                                                    {label}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => sendMessage()}
+                                                disabled={!input.trim() || isLoading || !dataReady}
+                                                aria-label="Send"
+                                                className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-800 text-zinc-500 transition-all enabled:bg-[linear-gradient(135deg,#22d3ee_0%,#0ea5e9_100%)] enabled:text-[#031014] enabled:shadow-[0_10px_30px_rgba(34,211,238,0.30)] enabled:hover:brightness-110"
+                                            >
+                                                <ArrowUp className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Action chips ── */}
+                            <div className="mt-8 flex flex-wrap justify-center gap-2.5">
+                                {ACTION_CHIPS.map((chip) => {
+                                    const Icon = chip.icon;
+                                    return (
+                                        <button
+                                            key={chip.label}
+                                            type="button"
+                                            onClick={() => sendMessage(chip.prompt, chip.mode ? { mode: chip.mode } : undefined)}
+                                            disabled={isLoading || !dataReady}
+                                            className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-[13px] text-zinc-200 transition-all hover:border-cyan-400/30 hover:bg-white/[0.04] hover:text-white disabled:opacity-40"
+                                        >
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.04] text-cyan-300">
+                                                <Icon className="h-3 w-3" />
+                                            </span>
+                                            <span>{chip.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* ── Hero suggestion cards ── */}
+                            <div className="mx-auto mt-10 grid max-w-5xl gap-4 lg:grid-cols-2">
+                                {HERO_CARDS.map((card) => {
+                                    const Icon = card.icon;
+                                    const accentBg = card.accent === 'cyan'
+                                        ? 'bg-cyan-500/[0.08] border-cyan-400/20 text-cyan-300'
+                                        : 'bg-emerald-500/[0.08] border-emerald-400/20 text-emerald-300';
+                                    const decorPath = card.accent === 'cyan'
+                                        ? 'M0 70 Q40 60 80 50 T160 35 T260 25 T360 15'
+                                        : 'M0 60 L30 50 L60 65 L90 35 L120 50 L160 30 L210 45 L260 20 L320 35 L380 15';
+                                    return (
+                                        <button
+                                            key={card.title}
+                                            type="button"
+                                            onClick={() => sendMessage(card.prompt)}
+                                            disabled={isLoading || !dataReady}
+                                            className="group relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#070b11]/85 p-6 text-left transition-all hover:border-white/[0.16] hover:bg-[#0a0f15]/90 disabled:opacity-40"
+                                        >
+                                            <div className={`flex h-11 w-11 items-center justify-center rounded-xl border ${accentBg}`}>
+                                                <Icon className="h-5 w-5" />
+                                            </div>
+                                            <div className="mt-5 pr-12">
+                                                <div className="text-[16px] font-semibold text-white">{card.title}</div>
+                                                <div className="mt-2 text-[13px] leading-6 text-zinc-400">{card.description}</div>
+                                            </div>
+                                            {/* Decorative sparkline at bottom-right */}
+                                            <svg
+                                                aria-hidden
+                                                viewBox="0 0 380 80"
+                                                className="pointer-events-none absolute bottom-2 right-2 h-12 w-2/3 opacity-40"
+                                            >
+                                                <path d={decorPath} fill="none" stroke={card.accent === 'cyan' ? '#22d3ee' : '#34d399'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                            <span className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-all group-hover:border-cyan-400/30 group-hover:text-white">
+                                                <ArrowRight className="h-4 w-4" />
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {!dataReady && hasGoogleConnection && (
+                                <div className="mt-10 flex items-center justify-center gap-2 text-xs text-zinc-500">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Loading your analytics and search data…
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     /* ══════ Chat messages: Grok-style full-width ══════ */

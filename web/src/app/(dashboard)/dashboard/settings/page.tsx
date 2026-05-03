@@ -194,6 +194,31 @@ export default function SettingsPage() {
                         connected={hasGithubConnection}
                         onConnect={() => signIn('github', { callbackUrl: '/dashboard/settings?connected=github' }, { prompt: 'consent' })}
                     />
+                    <ServiceRow
+                        name="Vercel"
+                        description="Coming soon — correlate deploys, build failures, and edge logs with traffic events"
+                        icon={
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-white">
+                                <path d="M12 3 22 20H2L12 3Z" />
+                            </svg>
+                        }
+                        connected={false}
+                        comingSoon
+                    />
+                    <ServiceRow
+                        name="WordPress"
+                        description="Coming soon — read posts, drafts, and plugins; correlate publish dates with ranking changes"
+                        icon={
+                            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-[#5fbcd9]">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+                                <path d="M3 12a9 9 0 0 0 5.2 8.15L4.6 9.65A8.96 8.96 0 0 0 3 12Z" fill="currentColor" />
+                                <path d="M19.6 7.7a8.96 8.96 0 0 1 .9 8.7l-3.6-9.85a4 4 0 0 1 2.7 1.15Z" fill="currentColor" opacity="0.85" />
+                                <path d="M11 4.4 14 13l-1.7 5.4a9 9 0 0 0 5.6-2.1L13.4 4.5l-2.4-.1Z" fill="currentColor" opacity="0.7" />
+                            </svg>
+                        }
+                        connected={false}
+                        comingSoon
+                    />
                 </div>
             </div>
 
@@ -253,12 +278,13 @@ export default function SettingsPage() {
     );
 }
 
-function ServiceRow({ name, description, connected, icon, onConnect }: {
+function ServiceRow({ name, description, connected, icon, onConnect, comingSoon }: {
     name: string;
     description: string;
     connected: boolean;
     icon: React.ReactNode;
     onConnect?: () => void;
+    comingSoon?: boolean;
 }) {
     return (
         <div className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/[0.02] transition">
@@ -274,6 +300,10 @@ function ServiceRow({ name, description, connected, icon, onConnect }: {
             {connected ? (
                 <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shrink-0">
                     <CheckCircle2 className="w-2.5 h-2.5" /> Connected
+                </span>
+            ) : comingSoon ? (
+                <span className="text-[10px] bg-white/[0.04] text-zinc-400 px-2 py-0.5 rounded-full font-medium shrink-0 border border-white/[0.06]">
+                    Coming soon
                 </span>
             ) : (
                 <button
