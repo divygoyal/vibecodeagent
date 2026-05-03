@@ -84,6 +84,25 @@ class OAuthConnection(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class GitHubAppInstallation(Base):
+    """A GitHub App installation belonging to a user (the user installed the
+    TrafficClaw GitHub App on their account/org and selected one or more repos).
+    The installation_id is the stable identifier we use to mint short-lived
+    server-to-server tokens via JWT exchange."""
+    __tablename__ = "github_app_installations"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    installation_id = Column(Integer, unique=True, nullable=False, index=True)
+    account_login = Column(String(100), nullable=False)  # GitHub user/org login
+    account_type = Column(String(20))  # User | Organization
+    repository_selection = Column(String(20))  # selected | all
+    repo_count = Column(Integer, default=0)
+    suspended_at = Column(DateTime, nullable=True)
+    installed_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class SiteRepoLink(Base):
     """Maps a user's site (e.g. 'sc-domain:example.com') to a GitHub repo
     so the chatbot knows which repo backs which property. Set either by the

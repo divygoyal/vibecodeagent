@@ -45,6 +45,16 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: Optional[str] = None
     GITHUB_CLIENT_SECRET: Optional[str] = None
 
+    # GitHub App (Phase 2 — selective per-repo access via installation tokens).
+    # App ID + Client ID are NOT secret. Client Secret + Private Key MUST be in
+    # Coolify env vars only — never committed. Slug is the kebab-case App name
+    # used in the install URL (https://github.com/apps/<slug>/installations/new).
+    GITHUB_APP_ID: Optional[str] = None
+    GITHUB_APP_CLIENT_ID: Optional[str] = None
+    GITHUB_APP_CLIENT_SECRET: Optional[str] = None
+    GITHUB_APP_PRIVATE_KEY: Optional[str] = None
+    GITHUB_APP_SLUG: Optional[str] = None
+
     # OAuth token encryption-at-rest (Fernet key, base64). Generate:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     # If unset, oauth_connections tokens are stored plaintext (dev mode).

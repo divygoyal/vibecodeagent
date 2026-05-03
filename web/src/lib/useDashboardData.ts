@@ -355,14 +355,55 @@ export type GithubRepoLite = {
   pushed_at: string;
 };
 
+/**
+ * Repo list for the picker. Prefers the GitHub App installation source (Phase 2 —
+ * selective per-repo access) and falls back to the legacy OAuth-token source.
+ */
 export function useGithubRepos(enabled = true) {
-  const { data, error, isLoading, mutate } = useImmediateSWR<{ repos: GithubRepoLite[]; code?: string }>(
-    enabled ? '/api/github/repos' : null,
+  const appQuery = useImmediateSWR<{ installed: boolean; repos: GithubRepoLite[] }>(
+    enabled ? '/api/github-app/repositories' : null,
+    { dedupingInterval: 300_000, errorRetryCount: 0 }
+  );
+  const useApp = !!appQuery.data?.installed;
+
+  const oauthQuery = useImmediateSWR<{ repos: GithubRepoLite[]; code?: string }>(
+    enabled && !useApp ? '/api/github/repos' : null,
     { dedupingInterval: 600_000, errorRetryCount: 0 }
   );
+
+  const data = useApp ? appQuery.data : oauthQuery.data;
+  const repos = data?.repos || [];
+  const notConnected = !useApp && (oauthQuery.data as { code?: string } | undefined)?.code === 'GITHUB_NOT_CONNECTED';
+
   return {
-    repos: data?.repos || [],
-    notConnected: data?.code === 'GITHUB_NOT_CONNECTED',
+    repos,
+    notConnected,
+    source: useApp ? ('github_app' as const) : ('oauth' as const),
+    isLoading: useApp ? appQuery.isLoading : oauthQuery.isLoading,
+    isError: useApp ? appQuery.error : oauthQuery.error,
+    refresh: () => {
+      appQuery.mutate();
+      oauthQuery.mutate();
+    },
+  };
+}
+
+export type GithubAppInstallation = {
+  installation_id: number;
+  account_login: string;
+  account_type: string;
+  repository_selection: string;
+  repo_count: number;
+  installed_at?: string;
+};
+
+export function useGithubAppInstallations(enabled = true) {
+  const { data, error, isLoading, mutate } = useImmediateSWR<{ installations: GithubAppInstallation[] }>(
+    enabled ? '/api/github-app/installations' : null,
+    { dedupingInterval: 60_000, errorRetryCount: 0 }
+  );
+  return {
+    installations: data?.installations || [],
     isLoading,
     isError: error,
     refresh: mutate,

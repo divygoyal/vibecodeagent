@@ -189,10 +189,10 @@ export default function SettingsPage() {
                     />
                     <ServiceRow
                         name="GitHub"
-                        description="Lets the AI read your repos, recent commits, PRs, issues, and CI runs to correlate code changes with traffic events"
+                        description="Selective per-repo access via the TrafficClaw GitHub App — pick exactly which repos the AI can read"
                         icon={<Github className="w-4 h-4 text-white" />}
                         connected={hasGithubConnection}
-                        onConnect={() => signIn('github', { callbackUrl: '/dashboard/settings?connected=github' }, { prompt: 'consent' })}
+                        onConnect={() => { window.location.href = '/api/auth/github-app/install'; }}
                     />
                     <ServiceRow
                         name="Vercel"

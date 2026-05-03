@@ -73,16 +73,53 @@ export async function fetchGithubTokenFromDb(userId: string): Promise<string | n
 }
 
 /**
- * Resolve a usable GitHub access token. Prefers the JWT-supplied one; falls
- * back to the admin DB. Caches admin lookups per userId for 30 minutes.
+ * Fetch a GitHub App installation token from admin (Phase 2). This is the
+ * preferred source — scoped to the repos the user picked when installing the App.
+ * Returns null if no installation exists or the App is not configured.
+ */
+export async function fetchGithubAppToken(userId: string): Promise<string | null> {
+    if (!ADMIN_API_KEY || !userId) return null;
+    try {
+        const res = await fetch(
+            `${ADMIN_API_URL}/api/users/${encodeURIComponent(userId)}/github-app/token`,
+            {
+                headers: { 'X-API-Key': ADMIN_API_KEY },
+                signal: AbortSignal.timeout(ADMIN_OAUTH_LOOKUP_TIMEOUT_MS),
+            }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.token || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Resolve a usable GitHub access token. Phase 2 preference order:
+ *   1. GitHub App installation token from admin (selective per-repo, server-to-server, ~1h TTL).
+ *   2. JWT-supplied OAuth token (legacy OAuth App with `repo` scope).
+ *   3. OAuth token from admin DB (legacy fallback when JWT lacks it).
+ *
+ * App installation tokens are NOT cached at this layer — admin already caches
+ * them with a 2-min safety margin. We re-fetch on every call to stay current
+ * with the App's expiry semantics.
  */
 export async function getValidGithubToken(
     jwtToken: string | undefined,
     userId: string | undefined
 ): Promise<string | null> {
+    // 1. Prefer GitHub App installation token (Phase 2 — selective access)
+    if (userId) {
+        const appToken = await fetchGithubAppToken(userId);
+        if (appToken) return appToken;
+    }
+
+    // 2. JWT-supplied OAuth token (legacy)
     if (jwtToken) return jwtToken;
     if (!userId) return null;
 
+    // 3. Cached/admin OAuth token (legacy)
     const cached = tokenCache.get(userId);
     if (cached && cached.expiresAt > Date.now()) {
         return cached.token;

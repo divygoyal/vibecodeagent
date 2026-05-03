@@ -23,7 +23,14 @@ from sqlalchemy import select, update, delete, text, func
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation
+from services.github_app_tokens import (
+    get_installation_token as github_app_get_installation_token,
+    fetch_installation_metadata as github_app_fetch_installation_metadata,
+    list_installation_repositories as github_app_list_installation_repositories,
+    invalidate as github_app_invalidate_token,
+)
+from security.github_app_jwt import is_configured as github_app_is_configured
 from docker_manager import docker_manager
 
 
@@ -1837,6 +1844,183 @@ async def exec_plugin(
     except Exception as e:
         print(f"Plugin exec error for {github_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
+
+
+# ============= GitHub App Installations =============
+class GitHubAppInstallRecord(BaseModel):
+    installation_id: int
+
+
+@app.post("/api/users/{github_id}/github-app/install")
+async def record_github_app_install(
+    github_id: str,
+    payload: GitHubAppInstallRecord,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Record a fresh GitHub App installation. Called by /api/auth/callback/github-app
+    after the user finishes the install flow on GitHub.com."""
+    if not github_app_is_configured():
+        raise HTTPException(status_code=503, detail="GitHub App is not configured on the server")
+
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Pull live metadata from GitHub so we know the account login + repo selection.
+    meta = await github_app_fetch_installation_metadata(payload.installation_id)
+    if not meta:
+        raise HTTPException(status_code=502, detail="Failed to fetch installation metadata from GitHub")
+
+    account = meta.get("account") or {}
+    account_login = account.get("login") or "unknown"
+    account_type = account.get("type") or "User"
+    repository_selection = meta.get("repository_selection") or "selected"
+
+    repos = await github_app_list_installation_repositories(payload.installation_id)
+    repo_count = len(repos)
+
+    # Upsert by installation_id (one installation per (App, account) pair on GitHub's side).
+    result = await db.execute(
+        select(GitHubAppInstallation).where(
+            GitHubAppInstallation.installation_id == payload.installation_id
+        )
+    )
+    row = result.scalars().first()
+    now = datetime.utcnow()
+
+    if row:
+        row.user_id = user.id
+        row.account_login = account_login
+        row.account_type = account_type
+        row.repository_selection = repository_selection
+        row.repo_count = repo_count
+        row.suspended_at = None
+        row.updated_at = now
+    else:
+        row = GitHubAppInstallation(
+            user_id=user.id,
+            installation_id=payload.installation_id,
+            account_login=account_login,
+            account_type=account_type,
+            repository_selection=repository_selection,
+            repo_count=repo_count,
+            installed_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+
+    await db.commit()
+    await db.refresh(row)
+    github_app_invalidate_token(payload.installation_id)  # force fresh token next call
+
+    return {
+        "installation_id": row.installation_id,
+        "account_login": row.account_login,
+        "account_type": row.account_type,
+        "repository_selection": row.repository_selection,
+        "repo_count": row.repo_count,
+    }
+
+
+@app.get("/api/users/{github_id}/github-app/installations")
+async def list_user_github_app_installations(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(
+        select(GitHubAppInstallation).where(
+            GitHubAppInstallation.user_id == user.id,
+            GitHubAppInstallation.suspended_at.is_(None),
+        )
+    )
+    rows = result.scalars().all()
+    return {
+        "installations": [
+            {
+                "installation_id": r.installation_id,
+                "account_login": r.account_login,
+                "account_type": r.account_type,
+                "repository_selection": r.repository_selection,
+                "repo_count": r.repo_count,
+                "installed_at": isoformat_or_none(r.installed_at),
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.get("/api/users/{github_id}/github-app/repositories")
+async def list_user_github_app_repositories(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Live-fetch repositories accessible to the user's installation(s).
+    Pulls fresh from GitHub each call (cached upstream by the token cache, not here)."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(
+        select(GitHubAppInstallation).where(
+            GitHubAppInstallation.user_id == user.id,
+            GitHubAppInstallation.suspended_at.is_(None),
+        )
+    )
+    installations = result.scalars().all()
+    if not installations:
+        return {"installed": False, "repos": []}
+
+    repos: list[dict] = []
+    for inst in installations:
+        items = await github_app_list_installation_repositories(inst.installation_id)
+        for r in items:
+            repos.append({
+                "full_name": r.get("full_name"),
+                "private": r.get("private", False),
+                "description": r.get("description"),
+                "language": r.get("language"),
+                "stars": r.get("stargazers_count", 0),
+                "open_issues": r.get("open_issues_count", 0),
+                "default_branch": r.get("default_branch", "main"),
+                "updated_at": r.get("updated_at"),
+                "pushed_at": r.get("pushed_at"),
+            })
+    return {"installed": True, "repos": repos}
+
+
+@app.get("/api/users/{github_id}/github-app/token")
+async def get_user_github_app_token(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Mint (or reuse cached) installation token for the user's primary installation.
+    Returns the short-lived token + expires_at for web callers to use as Bearer."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(
+        select(GitHubAppInstallation).where(
+            GitHubAppInstallation.user_id == user.id,
+            GitHubAppInstallation.suspended_at.is_(None),
+        ).order_by(GitHubAppInstallation.installed_at.desc())
+    )
+    inst = result.scalars().first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="No active GitHub App installation")
+    token = await github_app_get_installation_token(inst.installation_id)
+    if not token:
+        raise HTTPException(status_code=502, detail="Failed to mint installation token")
+    return {
+        "token": token,
+        "installation_id": inst.installation_id,
+        "account_login": inst.account_login,
+    }
 
 
 # ============= Site ↔ Repo Links =============

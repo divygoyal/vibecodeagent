@@ -257,12 +257,14 @@ function ConnectorCard({ name, connected, onClose, placement = 'right' }: { name
 
     const handleConnect = () => {
         if (!targetProvider) return;
-        const callbackUrl = `/dashboard/ai-chat?connected=${targetProvider}`;
         if (targetProvider === 'github') {
-            void signIn('github', { callbackUrl }, { prompt: 'consent' });
-        } else {
-            void signIn('google', { callbackUrl }, { prompt: 'select_account consent' });
+            // Phase 2: prefer GitHub App install (selective per-repo access).
+            // Server-side route handles redirect — falls through to error UI if the App isn't configured.
+            window.location.href = '/api/auth/github-app/install';
+            return;
         }
+        const callbackUrl = `/dashboard/ai-chat?connected=${targetProvider}`;
+        void signIn('google', { callbackUrl }, { prompt: 'select_account consent' });
     };
 
     const statusBadge = connected
@@ -420,6 +422,7 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }
     const router = useRouter();
     const searchParams = useSearchParams();
 
+    // Handle ?connected=github|google (legacy NextAuth OAuth callback path).
     useEffect(() => {
         const connected = searchParams.get('connected');
         if (connected !== 'github' && connected !== 'google') return;
@@ -452,6 +455,27 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }
             }
         })();
         return () => { cancelled = true; };
+    }, [searchParams, router, onConnected]);
+
+    // Handle ?installed=ok|error|invalid_state|... (Phase 2 GitHub App install callback).
+    useEffect(() => {
+        const installed = searchParams.get('installed');
+        if (!installed) return;
+        if (installed === 'ok') {
+            toast.success('GitHub App installed');
+            onConnected();
+        } else if (installed === 'invalid_state') {
+            toast.error('Install link expired — please retry from Settings.');
+        } else if (installed === 'admin_failed' || installed === 'admin_misconfigured') {
+            toast.error('Server failed to record the install. Try again or contact support.');
+        } else {
+            toast.error('GitHub App install failed.');
+        }
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('installed');
+        params.delete('action');
+        const qs = params.toString();
+        router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
     }, [searchParams, router, onConnected]);
 
     return null;
