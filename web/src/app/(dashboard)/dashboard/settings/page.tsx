@@ -42,7 +42,11 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch('/api/auth/register-provider', { method: 'POST' });
+                const res = await fetch('/api/auth/register-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: connected }),
+                });
                 if (!cancelled) {
                     if (res.ok) {
                         toast.success(connected === 'github' ? 'GitHub connected' : 'Google connected');
