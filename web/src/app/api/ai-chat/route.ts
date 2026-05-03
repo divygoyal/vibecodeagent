@@ -71,11 +71,11 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════════════════════════════
 const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.
 
-RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 8. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES]. 5) GitHub tools: only use if [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise — never mention GitHub when [GitHub:not_connected].
+RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 8. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES]. 5) GitHub tools: only use if [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise — never mention GitHub when [GitHub:not_connected]. 6) [Repo: x · {confirmed|auto}] tag = the linked repo for the current site — pass repo=x to ALL GitHub tools, NEVER call list_user_repos. If status=auto, mention once in the first GitHub-related answer: "I'm checking {repo} — confirm by picking it in the dropdown if that's right." If status=confirmed, just use it silently.
 
 CROSS-SOURCE DIAGNOSIS PLAYBOOK (when symptom = traffic drop, ranking loss, indexing/structured-data error, conversion drop, CTR cliff):
 1. Confirm in GA4/GSC and pinpoint the START DATE of the change.
-2. If [GitHub:connected]: list_user_repos (skip if user already named a repo) → get_recent_commits with since=<startDate-3d> and path filter on the affected page → if relevant, get_pull_requests or get_file_contents on the changed file.
+2. If [GitHub:connected] AND [Repo:] set: get_recent_commits with repo=<from tag>, since=<startDate-3d>, path filter on the affected page → if relevant, get_pull_requests or get_file_contents on the changed file.
 3. State the link explicitly: "Drop began {date}; PR #{n} merged {date} touched {path} — likely cause." Cite SHA + PR# in the answer.
 4. Budget: max 5 GitHub calls per conversation. Prefer get_repo_health BEFORE search/list when scoping a new repo.
 
@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { message, selectedSite, analyticsContext, seoContext, history, mode } = body;
+        const { message, selectedSite, selectedRepo, repoIsAuto, analyticsContext, seoContext, history, mode } = body;
 
         if (!message || typeof message !== 'string') {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -335,9 +335,12 @@ export async function POST(req: NextRequest) {
         // User message with injected data context
         const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
         const githubTag = `[GitHub:${githubConnected ? 'connected' : 'not_connected'}]`;
+        const repoTag = (githubConnected && selectedRepo)
+            ? `[Repo: ${selectedRepo} · ${repoIsAuto ? 'auto' : 'confirmed'}]`
+            : '';
         const contextBlock = dataContext
-            ? `${siteTag}${githubTag}${dataContext}${availableSitesContext}\n---\n${message}`
-            : `${siteTag}${githubTag}${availableSitesContext}\n${message}`;
+            ? `${siteTag}${githubTag}${repoTag}${dataContext}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${repoTag}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],

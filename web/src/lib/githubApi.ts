@@ -418,6 +418,88 @@ export async function getFileContents(
     };
 }
 
+// ─── Fuzzy site → repo matching ──────────────────────────────────────────────
+
+type RepoLite = {
+    full_name: string;
+    description?: string | null;
+    language?: string | null;
+    pushed_at?: string | null;
+    [k: string]: unknown;
+};
+
+const STOP_TOKENS = new Set([
+    'www', 'app', 'web', 'site', 'main', 'next', 'app-web', 'monorepo', 'mono',
+    'frontend', 'backend', 'api', 'static', 'docs', 'public', 'private',
+]);
+
+/**
+ * Score how well a repo's name matches a site URL by token overlap.
+ * Returns { repo, score, reason } sorted descending in `findBestRepoMatch`.
+ */
+function scoreRepoForSite(repo: RepoLite, siteTokens: Set<string>, siteHostFull: string): { score: number; reason: string } {
+    const name = repo.full_name.split('/').pop() || repo.full_name;
+    const repoTokens = name.toLowerCase().split(/[-_./]+/).filter(Boolean);
+
+    let score = 0;
+    let matchedDistinct = false;
+    for (const tok of repoTokens) {
+        if (STOP_TOKENS.has(tok) || tok.length < 3) continue;
+        if (siteTokens.has(tok)) {
+            score += 4;
+            matchedDistinct = true;
+        }
+    }
+
+    // Description / homepage often contains the site URL.
+    const descLower = (repo.description || '').toLowerCase();
+    if (siteHostFull && descLower.includes(siteHostFull)) {
+        score += 6;
+    }
+
+    // Recency tiebreaker — repos pushed in the last 30 days get +1.
+    if (repo.pushed_at) {
+        const ageDays = (Date.now() - new Date(repo.pushed_at).getTime()) / (1000 * 60 * 60 * 24);
+        if (ageDays < 30) score += 1;
+    }
+
+    return {
+        score,
+        reason: matchedDistinct ? 'name token overlap' : score > 0 ? 'description match' : 'recency only',
+    };
+}
+
+/** Strip protocol/scheme/path and split into tokens for matching. */
+export function siteToTokens(siteUrl: string): { host: string; tokens: Set<string> } {
+    const cleaned = siteUrl.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const host = cleaned.split('/')[0].toLowerCase();
+    const tokens = new Set(host.split('.').flatMap((p) => p.split(/[-_]+/)).filter((t) => t.length >= 3 && !STOP_TOKENS.has(t)));
+    return { host, tokens };
+}
+
+/**
+ * Pick the best-matching repo for a site URL out of a list.
+ * Returns null if no repo scores above the minimum confidence threshold.
+ */
+export function findBestRepoMatch<T extends RepoLite>(
+    repos: readonly T[],
+    siteUrl: string,
+): { repo: T; score: number; reason: string } | null {
+    if (!repos.length || !siteUrl) return null;
+    const { host, tokens } = siteToTokens(siteUrl);
+    if (!tokens.size) return null;
+
+    let best: { repo: T; score: number; reason: string } | null = null;
+    for (const repo of repos) {
+        const { score, reason } = scoreRepoForSite(repo, tokens, host);
+        if (!best || score > best.score) {
+            best = { repo, score, reason };
+        }
+    }
+    if (!best || best.score < 4) return null;
+    return best;
+}
+
 export async function getRepoLanguages(token: string, args: { repo: string }) {
     const parsed = parseRepo(args.repo);
     if (!parsed) return { error: 'bad_args', message: `Invalid repo "${args.repo}". Use "owner/repo".` };

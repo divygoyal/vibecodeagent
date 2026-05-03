@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink
 from docker_manager import docker_manager
 
 
@@ -1837,6 +1837,99 @@ async def exec_plugin(
     except Exception as e:
         print(f"Plugin exec error for {github_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
+
+
+# ============= Site ↔ Repo Links =============
+class SiteRepoLinkUpsert(BaseModel):
+    site_url: str
+    repo_full_name: str
+    base_path: Optional[str] = None
+    branch: Optional[str] = None
+    confirmed: bool = False  # true when the user explicitly picked, false when auto-matched
+
+
+@app.get("/api/users/{github_id}/site-repo-links")
+async def list_site_repo_links(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List all (site → repo) links the user has saved."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(SiteRepoLink).where(SiteRepoLink.user_id == user.id)
+    )
+    links = result.scalars().all()
+    return {
+        "links": [
+            {
+                "site_url": link.site_url,
+                "repo_full_name": link.repo_full_name,
+                "base_path": link.base_path,
+                "branch": link.branch,
+                "confirmed": link.confirmed_at is not None,
+                "updated_at": isoformat_or_none(link.updated_at),
+            }
+            for link in links
+        ]
+    }
+
+
+@app.post("/api/users/{github_id}/site-repo-links")
+async def upsert_site_repo_link(
+    github_id: str,
+    payload: SiteRepoLinkUpsert,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Upsert a (site → repo) link. confirmed=true marks it as user-validated."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not payload.site_url or not payload.repo_full_name:
+        raise HTTPException(status_code=400, detail="site_url and repo_full_name are required")
+
+    result = await db.execute(
+        select(SiteRepoLink).where(
+            SiteRepoLink.user_id == user.id,
+            SiteRepoLink.site_url == payload.site_url,
+        )
+    )
+    link = result.scalars().first()
+    now = datetime.utcnow()
+
+    if link:
+        link.repo_full_name = payload.repo_full_name
+        link.base_path = payload.base_path
+        link.branch = payload.branch
+        if payload.confirmed:
+            link.confirmed_at = now
+        link.updated_at = now
+    else:
+        link = SiteRepoLink(
+            user_id=user.id,
+            site_url=payload.site_url,
+            repo_full_name=payload.repo_full_name,
+            base_path=payload.base_path,
+            branch=payload.branch,
+            confirmed_at=now if payload.confirmed else None,
+        )
+        db.add(link)
+
+    await db.commit()
+    await db.refresh(link)
+
+    return {
+        "site_url": link.site_url,
+        "repo_full_name": link.repo_full_name,
+        "base_path": link.base_path,
+        "branch": link.branch,
+        "confirmed": link.confirmed_at is not None,
+    }
 
 
 # ============= OAuth Token Retrieval =============

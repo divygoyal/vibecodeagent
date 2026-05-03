@@ -10,7 +10,8 @@ import {
     Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles, Lock, Github, X
 } from 'lucide-react';
 import DemoModeBanner from '@/components/DemoModeBanner';
-import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
+import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData, useSiteRepoLinks, useGithubRepos, type SiteRepoLink, type GithubRepoLite } from '@/lib/useDashboardData';
+import { findBestRepoMatch } from '@/lib/githubApi';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
@@ -344,6 +345,74 @@ function ConnectorCard({ name, connected, onClose, placement = 'right' }: { name
 }
 
 /* ─────────────────────────────────────────────────────────────────────
+ *  RepoPicker — dropdown pill paired with the site picker
+ * ───────────────────────────────────────────────────────────────────── */
+function RepoPicker({
+    innerRef, open, onToggle, selectedRepo, isAuto, repos, githubNotConnected, hasGithubConnection, onPick,
+}: {
+    innerRef: React.RefObject<HTMLDivElement | null>;
+    open: boolean;
+    onToggle: () => void;
+    selectedRepo: string | null;
+    isAuto: boolean;
+    repos: readonly GithubRepoLite[];
+    githubNotConnected: boolean;
+    hasGithubConnection: boolean;
+    onPick: (full: string) => void;
+}) {
+    const repoLabel = selectedRepo ? selectedRepo.split('/').pop() : 'Link repo';
+    const disabled = !hasGithubConnection || githubNotConnected;
+
+    return (
+        <div className="relative" ref={innerRef}>
+            <button
+                type="button"
+                onClick={onToggle}
+                disabled={disabled}
+                title={disabled ? 'Connect GitHub from the orb rail to pick a repo' : selectedRepo || 'Pick a repo'}
+                className={`inline-flex h-9 items-center gap-2 rounded-full border bg-transparent px-3 text-[12px] transition-colors
+                    ${disabled
+                        ? 'border-white/[0.05] text-zinc-600 cursor-not-allowed'
+                        : 'border-white/[0.08] text-zinc-300 hover:border-white/[0.16] hover:bg-white/[0.04] hover:text-zinc-100'}`}
+            >
+                <Github className={`h-3.5 w-3.5 ${disabled ? 'text-zinc-600' : 'text-zinc-400'}`} />
+                <span className="max-w-[120px] truncate">{repoLabel}</span>
+                {isAuto && selectedRepo && (
+                    <span className="rounded-full bg-cyan-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-cyan-300">
+                        auto
+                    </span>
+                )}
+                {!disabled && <ChevronDown className="h-3.5 w-3.5 opacity-60" />}
+            </button>
+            {open && !disabled && (
+                <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[300px] w-[320px] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c0f14] py-1 shadow-2xl shadow-black/70">
+                    {repos.length === 0 ? (
+                        <div className="px-4 py-3 text-xs text-zinc-500">No repos found.</div>
+                    ) : (
+                        repos.map((r) => {
+                            const active = r.full_name === selectedRepo;
+                            return (
+                                <button
+                                    key={r.full_name}
+                                    onClick={() => onPick(r.full_name)}
+                                    className={`block w-full truncate px-4 py-2.5 text-left text-xs transition-colors ${
+                                        active ? 'bg-cyan-500/[0.10] text-cyan-300' : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
+                                    }`}
+                                    title={r.description || r.full_name}
+                                >
+                                    <span className="font-medium">{r.full_name.split('/').pop()}</span>
+                                    <span className="ml-2 text-[10px] text-zinc-600">{r.full_name.split('/')[0]}</span>
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
  *  ProviderConnectionCallback — handles ?connected=... after OAuth redirect
  *  Lives in its own component so useSearchParams is isolated under <Suspense>.
  * ───────────────────────────────────────────────────────────────────── */
@@ -492,6 +561,14 @@ export default function AIChat() {
     const [siteOpen, setSiteOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    // Repo picker (paired with site picker — answers "which repo backs this site")
+    const { links: siteRepoLinks, refresh: refreshSiteRepoLinks } = useSiteRepoLinks();
+    const { repos: githubRepos, notConnected: githubNotConnected } = useGithubRepos(hasGithubConnection);
+    const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+    const [repoIsAuto, setRepoIsAuto] = useState(false);
+    const [repoOpen, setRepoOpen] = useState(false);
+    const repoDropdownRef = useRef<HTMLDivElement>(null);
+
     // Match GA4 property to selected site
     const matchedProperty = useMemo(() => {
         if (!selectedSite || normalizedProperties.length === 0) return normalizedProperties[0];
@@ -562,6 +639,58 @@ export default function AIChat() {
         return () => document.removeEventListener('mousedown', handler);
     }, [siteOpen]);
 
+    useEffect(() => {
+        if (!repoOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (repoDropdownRef.current && !repoDropdownRef.current.contains(e.target as Node)) setRepoOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [repoOpen]);
+
+    // Auto-resolve the linked repo when the user changes site:
+    //  1. Saved (confirmed or auto) link in DB → use it as-is
+    //  2. Else fuzzy-match the user's repos by domain token overlap → mark `auto`
+    //  3. Else clear (user can pick from dropdown)
+    useEffect(() => {
+        if (!selectedSite) {
+            setSelectedRepo(null);
+            setRepoIsAuto(false);
+            return;
+        }
+        const saved = siteRepoLinks.find((l: SiteRepoLink) => l.site_url === selectedSite);
+        if (saved) {
+            setSelectedRepo(saved.repo_full_name);
+            setRepoIsAuto(!saved.confirmed);
+            return;
+        }
+        if (githubRepos.length > 0) {
+            const match = findBestRepoMatch(githubRepos, selectedSite);
+            if (match) {
+                setSelectedRepo(match.repo.full_name);
+                setRepoIsAuto(true);
+                return;
+            }
+        }
+        setSelectedRepo(null);
+        setRepoIsAuto(false);
+    }, [selectedSite, siteRepoLinks, githubRepos]);
+
+    const pickRepo = useCallback(async (repoFullName: string) => {
+        setSelectedRepo(repoFullName);
+        setRepoIsAuto(false);
+        setRepoOpen(false);
+        if (!selectedSite) return;
+        try {
+            const res = await fetch('/api/site-repo-links', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ site_url: selectedSite, repo_full_name: repoFullName, confirmed: true }),
+            });
+            if (res.ok) refreshSiteRepoLinks();
+        } catch { /* swallow — UI is still updated */ }
+    }, [selectedSite, refreshSiteRepoLinks]);
+
     const sendMessage = useCallback(async (text?: string, options?: { mode?: string }) => {
         const messageText = text || input.trim();
         if (!messageText || isLoading) return;
@@ -589,6 +718,8 @@ export default function AIChat() {
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
+                    selectedRepo: selectedRepo,
+                    repoIsAuto: repoIsAuto,
                     analyticsContext: currentAnalytics ? (isFirstUserMessage ? {
                         kpis: currentAnalytics.kpis,
                         topSources: currentAnalytics.sources?.slice(0, 8),
@@ -895,13 +1026,14 @@ export default function AIChat() {
                                         className="w-full resize-none bg-transparent px-6 pt-5 pb-3 text-[15.5px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 caret-cyan-400 outline-none max-h-44 disabled:opacity-40"
                                     />
                                     <div className="flex items-center justify-between gap-2 px-3 pb-3">
+                                        <div className="flex items-center gap-2 min-w-0">
                                         <div className="relative" ref={dropdownRef}>
                                             <button
                                                 onClick={() => setSiteOpen(!siteOpen)}
                                                 className="inline-flex h-9 items-center gap-2 rounded-full border border-white/[0.08] bg-transparent px-3 text-[12px] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.04] hover:text-zinc-100"
                                             >
                                                 <Globe className="h-3.5 w-3.5 text-zinc-400" />
-                                                <span className="max-w-[160px] truncate">{siteLabel}</span>
+                                                <span className="max-w-[140px] truncate">{siteLabel}</span>
                                                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                                             </button>
                                             {siteOpen && normalizedSites.length > 0 && (
@@ -926,11 +1058,23 @@ export default function AIChat() {
                                                 </div>
                                             )}
                                         </div>
+                                        <RepoPicker
+                                            innerRef={repoDropdownRef}
+                                            open={repoOpen}
+                                            onToggle={() => setRepoOpen((v) => !v)}
+                                            selectedRepo={selectedRepo}
+                                            isAuto={repoIsAuto}
+                                            repos={githubRepos}
+                                            githubNotConnected={githubNotConnected}
+                                            hasGithubConnection={hasGithubConnection}
+                                            onPick={pickRepo}
+                                        />
+                                        </div>
                                         <button
                                             onClick={() => sendMessage()}
                                             disabled={!input.trim() || isLoading || !dataReady}
                                             aria-label="Send"
-                                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#22d3ee] text-[#06141a]
+                                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22d3ee] text-[#06141a]
                                                        shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_10px_rgba(34,211,238,0.30)]
                                                        transition-all enabled:hover:brightness-105
                                                        disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
@@ -1045,6 +1189,17 @@ export default function AIChat() {
                                         </div>
                                     )}
                                 </div>
+                                <RepoPicker
+                                    innerRef={repoDropdownRef}
+                                    open={repoOpen}
+                                    onToggle={() => setRepoOpen((v) => !v)}
+                                    selectedRepo={selectedRepo}
+                                    isAuto={repoIsAuto}
+                                    repos={githubRepos}
+                                    githubNotConnected={githubNotConnected}
+                                    hasGithubConnection={hasGithubConnection}
+                                    onPick={pickRepo}
+                                />
                                 {messages.length > 0 && (
                                     <button onClick={clearChat} className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-zinc-800 transition-colors" title="New chat">
                                         <RotateCcw className="w-3.5 h-3.5" />

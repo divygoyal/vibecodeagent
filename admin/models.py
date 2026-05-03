@@ -84,6 +84,24 @@ class OAuthConnection(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class SiteRepoLink(Base):
+    """Maps a user's site (e.g. 'sc-domain:example.com') to a GitHub repo
+    so the chatbot knows which repo backs which property. Set either by the
+    user via the chat dropdown or by auto-match heuristics. confirmed_at is
+    NULL when the link was auto-picked but not yet validated by the user."""
+    __tablename__ = "site_repo_links"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    site_url = Column(String(500), nullable=False, index=True)
+    repo_full_name = Column(String(255), nullable=False)  # "owner/repo"
+    base_path = Column(String(500), nullable=True)  # for monorepos, e.g. "apps/web"
+    branch = Column(String(100), nullable=True)
+    confirmed_at = Column(DateTime, nullable=True)  # null = auto-matched
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class UsageLog(Base):
     """Track daily usage for rate limiting"""
     __tablename__ = "usage_logs"

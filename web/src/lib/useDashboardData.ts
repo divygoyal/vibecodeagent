@@ -320,3 +320,51 @@ export function useMobileGapData(siteUrl: string | null) {
     : null;
   return useRegisteredSWR<{ data: unknown[] }>(url);
 }
+
+export type SiteRepoLink = {
+  site_url: string;
+  repo_full_name: string;
+  base_path: string | null;
+  branch: string | null;
+  confirmed: boolean;
+  updated_at?: string;
+};
+
+export function useSiteRepoLinks() {
+  const { data, error, isLoading, mutate } = useRegisteredSWR<{ links: SiteRepoLink[] }>(
+    '/api/site-repo-links',
+    { dedupingInterval: 60000 }
+  );
+  return {
+    links: data?.links || [],
+    isLoading,
+    isError: error,
+    refresh: mutate,
+  };
+}
+
+export type GithubRepoLite = {
+  full_name: string;
+  private: boolean;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  open_issues: number;
+  default_branch: string;
+  updated_at: string;
+  pushed_at: string;
+};
+
+export function useGithubRepos(enabled = true) {
+  const { data, error, isLoading, mutate } = useImmediateSWR<{ repos: GithubRepoLite[]; code?: string }>(
+    enabled ? '/api/github/repos' : null,
+    { dedupingInterval: 600_000, errorRetryCount: 0 }
+  );
+  return {
+    repos: data?.repos || [],
+    notConnected: data?.code === 'GITHUB_NOT_CONNECTED',
+    isLoading,
+    isError: error,
+    refresh: mutate,
+  };
+}
