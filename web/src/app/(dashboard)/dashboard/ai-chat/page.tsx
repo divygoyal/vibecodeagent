@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import {
@@ -128,6 +128,10 @@ export default function AIChat() {
     const { hasGoogleConnection, hasGithubConnection } = useContainerStatus();
     const { data: session } = useSession();
     const firstName = useMemo(() => session?.user?.name?.trim().split(/\s+/)[0] ?? '', [session?.user?.name]);
+    const timeOfDay = useMemo(() => {
+        const h = new Date().getHours();
+        return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+    }, []);
 
     const connectors: { name: ConnectorName; connected: boolean }[] = useMemo(() => ([
         { name: 'github', connected: hasGithubConnection },
@@ -136,6 +140,7 @@ export default function AIChat() {
         { name: 'ga4', connected: hasGoogleConnection },
         { name: 'gsc', connected: hasGoogleConnection },
     ]), [hasGithubConnection, hasGoogleConnection]);
+    const connectedCount = useMemo(() => connectors.filter(c => c.connected).length, [connectors]);
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
@@ -416,55 +421,73 @@ export default function AIChat() {
             {/* ── Messages / Empty State ── */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
-                    <div className="relative min-h-full bg-black">
-                        {/* Connector status — small icon cluster, top-right */}
+                    <div className="relative min-h-full overflow-hidden bg-[#050608]">
+                        {/* Single soft radial — barely visible, gives the input area "weight" */}
+                        <div aria-hidden className="pointer-events-none absolute inset-0">
+                            <div className="absolute left-1/2 top-[52%] h-[520px] w-[860px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(122,217,218,0.07),transparent_65%)] blur-3xl" />
+                            <div className="absolute left-1/2 top-[52%] h-[280px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(52,211,153,0.04),transparent_70%)] blur-2xl" />
+                        </div>
+
+                        {/* Connector status — small icon cluster with count, top-right */}
                         <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
-                            <div className="flex items-center gap-1.5">
-                                {connectors.map((c) => {
-                                    const tooltip = `${CONNECTOR_LABELS[c.name]} · ${c.connected ? 'Connected' : 'Click to connect'}`;
-                                    const inner = (
-                                        <>
-                                            <ConnectorIcon name={c.name} className="h-4 w-4 text-zinc-300" />
-                                            <span
-                                                aria-hidden
-                                                className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${c.connected ? 'bg-emerald-400' : 'bg-zinc-700'}`}
-                                            />
-                                        </>
-                                    );
-                                    const base = 'relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] transition-colors';
-                                    return c.connected ? (
-                                        <div key={c.name} className={`${base} cursor-default`} title={tooltip}>
-                                            {inner}
-                                        </div>
-                                    ) : (
-                                        <Link
-                                            key={c.name}
-                                            href="/dashboard/settings"
-                                            className={`${base} hover:border-white/[0.14] hover:bg-white/[0.04]`}
-                                            title={tooltip}
-                                            aria-label={tooltip}
-                                        >
-                                            {inner}
-                                        </Link>
-                                    );
-                                })}
+                            <div className="flex items-center gap-2.5">
+                                <span className="hidden text-[11px] text-zinc-500 sm:inline">
+                                    {connectedCount} of {connectors.length} sources connected
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    {connectors.map((c) => {
+                                        const tooltip = `${CONNECTOR_LABELS[c.name]} · ${c.connected ? 'Connected' : 'Click to connect'}`;
+                                        const inner = (
+                                            <>
+                                                <ConnectorIcon name={c.name} className={`h-4 w-4 ${c.connected ? 'text-zinc-200' : 'text-zinc-500'}`} />
+                                                <span
+                                                    aria-hidden
+                                                    className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${c.connected ? 'bg-emerald-400' : 'bg-zinc-700'}`}
+                                                />
+                                            </>
+                                        );
+                                        const base = 'relative flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-[#0a0d12] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors';
+                                        return c.connected ? (
+                                            <div key={c.name} className={`${base} cursor-default`} title={tooltip}>
+                                                {inner}
+                                            </div>
+                                        ) : (
+                                            <Link
+                                                key={c.name}
+                                                href="/dashboard/settings"
+                                                className={`${base} hover:border-white/[0.14] hover:bg-[#0e1218]`}
+                                                title={tooltip}
+                                                aria-label={tooltip}
+                                            >
+                                                {inner}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 
                         {/* Centered hero */}
-                        <div className="flex min-h-full flex-col items-center justify-center px-4 pb-16 pt-24 sm:px-8 sm:pt-20">
-                            <h1 className="text-center text-[28px] font-medium tracking-tight text-zinc-100 sm:text-[34px]">
-                                What can I help with{firstName ? `, ${firstName}` : ''}?
-                            </h1>
+                        <div className="relative flex min-h-full flex-col items-center justify-center px-4 pb-16 pt-24 sm:px-8 sm:pt-20">
+                            <div className="text-center">
+                                {firstName && (
+                                    <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
+                                        Good {timeOfDay}, {firstName}
+                                    </div>
+                                )}
+                                <h1 className="text-[34px] font-semibold tracking-tight text-zinc-100 sm:text-[42px]">
+                                    How can I help today?
+                                </h1>
+                            </div>
 
-                            {/* Single focal input */}
-                            <div className="mt-8 w-full max-w-3xl">
+                            {/* The hero input — elevated, weighted, distinctly highlighted */}
+                            <div className="mt-10 w-full max-w-3xl">
                                 <div
-                                    className="rounded-2xl border bg-[var(--card-bg)] border-[var(--card-border)]
-                                               shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_1px_2px_rgba(0,0,0,0.5)]
+                                    className="rounded-2xl border border-white/[0.08] bg-[#0d1117]
+                                               shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_rgba(0,0,0,0.5)]
                                                transition-[border-color,box-shadow] duration-200
-                                               focus-within:border-[#7AD9DA]/40
-                                               focus-within:shadow-[0_0_0_3px_rgba(122,217,218,0.10),inset_0_1px_0_rgba(255,255,255,0.03)]"
+                                               focus-within:border-[#7AD9DA]/55
+                                               focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_rgba(0,0,0,0.5),0_0_0_4px_rgba(122,217,218,0.08)]"
                                 >
                                     <textarea
                                         ref={textareaRef}
@@ -474,20 +497,20 @@ export default function AIChat() {
                                         placeholder="Ask anything about your traffic…"
                                         disabled={isLoading || !dataReady}
                                         rows={1}
-                                        className="w-full resize-none bg-transparent px-5 pt-4 pb-3 text-[15px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 outline-none max-h-40 disabled:opacity-40"
+                                        className="w-full resize-none bg-transparent px-6 pt-5 pb-3 text-[15.5px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 caret-emerald-400 outline-none max-h-44 disabled:opacity-40"
                                     />
-                                    <div className="flex items-center justify-end gap-2 px-3 pb-3">
+                                    <div className="flex items-center justify-between gap-2 px-3 pb-3">
                                         <div className="relative" ref={dropdownRef}>
                                             <button
                                                 onClick={() => setSiteOpen(!siteOpen)}
-                                                className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--card-border)] bg-transparent px-3 text-[12px] text-zinc-400 transition-colors hover:border-white/[0.14] hover:bg-white/[0.04] hover:text-zinc-200"
+                                                className="inline-flex h-9 items-center gap-2 rounded-full border border-white/[0.08] bg-transparent px-3 text-[12px] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.04] hover:text-zinc-100"
                                             >
-                                                <Globe className="h-3.5 w-3.5" />
-                                                <span className="max-w-[140px] truncate">{siteLabel}</span>
+                                                <Globe className="h-3.5 w-3.5 text-zinc-400" />
+                                                <span className="max-w-[160px] truncate">{siteLabel}</span>
                                                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                                             </button>
                                             {siteOpen && normalizedSites.length > 0 && (
-                                                <div className="absolute bottom-full right-0 z-50 mb-2 max-h-[260px] min-w-[220px] overflow-y-auto rounded-2xl border border-[var(--card-border)] bg-[#0c0f14] py-1 shadow-2xl shadow-black/70">
+                                                <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[260px] min-w-[260px] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c0f14] py-1 shadow-2xl shadow-black/70">
                                                     {normalizedSites.map((site) => {
                                                         const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
                                                         const active = site.siteUrl === selectedSite;
@@ -512,32 +535,41 @@ export default function AIChat() {
                                             onClick={() => sendMessage()}
                                             disabled={!input.trim() || isLoading || !dataReady}
                                             aria-label="Send"
-                                            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-zinc-500 transition-all enabled:bg-[#34d399] enabled:text-zinc-950 enabled:hover:brightness-105 disabled:cursor-not-allowed"
+                                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#34d399] text-zinc-950
+                                                       shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_8px_rgba(52,211,153,0.20)]
+                                                       transition-all enabled:hover:brightness-105
+                                                       disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
                                         >
-                                            <ArrowUp className="h-4 w-4" />
+                                            <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
                                         </button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Suggestion pills — text only, dot separated */}
-                            <div className="mt-6 flex max-w-2xl flex-wrap items-center justify-center gap-x-1.5 gap-y-2 px-4">
-                                {SUGGESTIONS.map((s, i) => (
-                                    <Fragment key={s.label}>
-                                        {i > 0 && <span className="select-none text-zinc-700">·</span>}
-                                        <button
-                                            onClick={() => sendMessage(s.prompt)}
-                                            disabled={isLoading || !dataReady}
-                                            className="rounded-md px-2 py-1 text-[13px] text-zinc-400 transition-colors hover:text-zinc-100 hover:underline underline-offset-4 decoration-zinc-700 disabled:opacity-40"
-                                        >
-                                            {s.label}
-                                        </button>
-                                    </Fragment>
+                            {/* Suggestion buttons — pill-shaped, weighted, no icons */}
+                            <div className="mt-7 flex max-w-3xl flex-wrap items-center justify-center gap-2 px-4">
+                                {SUGGESTIONS.map((s) => (
+                                    <button
+                                        key={s.label}
+                                        onClick={() => sendMessage(s.prompt)}
+                                        disabled={isLoading || !dataReady}
+                                        className="rounded-full border border-white/[0.08] bg-[#0a0d12]/60 px-4 py-2 text-[13px] text-zinc-300
+                                                   shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]
+                                                   transition-all hover:border-white/[0.16] hover:bg-[#0e1218] hover:text-zinc-100
+                                                   disabled:opacity-40"
+                                    >
+                                        {s.label}
+                                    </button>
                                 ))}
                             </div>
 
+                            {/* Footer micro-text */}
+                            <div className="mt-12 max-w-md text-center text-[11px] text-zinc-600">
+                                Powered by Gemini · cross-references GA4{hasGoogleConnection && ', Search Console'}{hasGithubConnection && ', and your GitHub repos'}
+                            </div>
+
                             {!dataReady && hasGoogleConnection && (
-                                <div className="mt-8 flex items-center gap-2 text-xs text-zinc-500">
+                                <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                     Loading your analytics and search data…
                                 </div>
