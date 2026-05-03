@@ -223,30 +223,44 @@ function parseRepo(input: string): { owner: string; repo: string } | null {
 
 // ─── Public helpers (called by aiChatTools) ───────────────────────────────
 
+function trimRepo(repo: any) {
+    return {
+        full_name: repo.full_name,
+        private: repo.private,
+        description: clip(repo.description, 200),
+        language: repo.language,
+        stars: repo.stargazers_count,
+        open_issues: repo.open_issues_count,
+        default_branch: repo.default_branch,
+        updated_at: repo.updated_at,
+        pushed_at: repo.pushed_at,
+    };
+}
+
 export async function listUserRepos(
     token: string,
     opts?: { sort?: 'updated' | 'pushed' | 'created' | 'full_name'; per_page?: number }
 ) {
     const sort = opts?.sort || 'updated';
     const per_page = Math.min(opts?.per_page || 30, 100);
-    const r = await ghFetch<any[]>(
+
+    // Try the installation-scoped endpoint first — works for GitHub App installation
+    // tokens (Phase 2). The shape is { repositories: Repo[] } not a flat array.
+    const installResp = await ghFetch<any>(
+        `/installation/repositories?per_page=${per_page}`,
+        token
+    );
+    if (!isError(installResp) && Array.isArray(installResp.data?.repositories)) {
+        return { data: installResp.data.repositories.map(trimRepo) };
+    }
+
+    // Fall back to user-scoped endpoint — works for legacy OAuth user tokens.
+    const userResp = await ghFetch<any[]>(
         `/user/repos?sort=${sort}&per_page=${per_page}&affiliation=owner,collaborator`,
         token
     );
-    if (isError(r)) return r;
-    return {
-        data: r.data.map((repo) => ({
-            full_name: repo.full_name,
-            private: repo.private,
-            description: clip(repo.description, 200),
-            language: repo.language,
-            stars: repo.stargazers_count,
-            open_issues: repo.open_issues_count,
-            default_branch: repo.default_branch,
-            updated_at: repo.updated_at,
-            pushed_at: repo.pushed_at,
-        })),
-    };
+    if (isError(userResp)) return userResp;
+    return { data: userResp.data.map(trimRepo) };
 }
 
 export async function searchRepoCode(
