@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useMemo } from 'react';
+import { memo, useState, useMemo, type MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -45,12 +45,18 @@ export interface ToolCall {
     args?: any;
     result?: string;
     structuredData?: { dimensions: string[]; rows: any[]; totals?: any };
+    /** A6: streamed seconds-elapsed heartbeat from server for slow tools */
+    elapsedSec?: number;
 }
 
 const TOOL_NAMES: Record<string, string> = {
     get_search_performance: 'Search Performance',
     run_ga4_report: 'GA4 Report',
-    run_page_audit: 'Page Audit',
+    run_page_audit: 'PageSpeed Audit',
+    run_site_audit: 'Site Audit (50+ checks)',
+    inspect_url: 'GSC URL Inspection',
+    cross_source_diagnose: 'Cross-Source Diagnosis',
+    get_alerts: 'Alert Triage',
     calculate_revenue_impact: 'Revenue Impact',
     generate_content_strategy: 'Content Strategy',
     analyze_keyword_clusters: 'Keyword Clusters',
@@ -64,27 +70,62 @@ const TOOL_NAMES: Record<string, string> = {
 
 export function ToolCallCard({ tool }: { tool: ToolCall }) {
     const [expanded, setExpanded] = useState(false);
+    const [copied, setCopied] = useState(false);
     const isDone = !!tool.result;
 
+    // Pretty-print JSON when result is parseable; otherwise show as-is.
+    const displayContent = useMemo(() => {
+        if (!tool.result) return '';
+        if (typeof tool.result !== 'string') {
+            try { return JSON.stringify(tool.result, null, 2); } catch { return String(tool.result); }
+        }
+        const trimmed = tool.result.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { /* not JSON */ }
+        }
+        return tool.result;
+    }, [tool.result]);
+
+    const handleCopy = (e: MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(displayContent);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
+
     return (
-        <div className="my-2 flex items-center gap-2.5 text-sm">
-            {isDone
-                ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                : <Loader2 className="w-4 h-4 text-zinc-500 flex-shrink-0 animate-spin" />}
-            <button
-                onClick={() => isDone && setExpanded(!expanded)}
-                className={`text-zinc-400 ${isDone ? 'hover:text-white cursor-pointer' : ''} transition-colors`}
-            >
-                {TOOL_NAMES[tool.name] || tool.name}
-            </button>
-            {isDone && (expanded
-                ? <ChevronDown className="w-3 h-3 text-zinc-600" />
-                : <ChevronRight className="w-3 h-3 text-zinc-600" />
-            )}
-            {expanded && tool.result && (
-                <div className="w-full mt-1">
-                    <pre className="text-[11px] text-zinc-500 font-mono max-h-32 overflow-y-auto whitespace-pre-wrap bg-[var(--input-bg)] rounded-lg p-3">
-                        {typeof tool.result === 'string' && tool.result.length > 500 ? tool.result.slice(0, 500) + '...' : tool.result}
+        <div className="my-2 text-sm">
+            <div className="flex items-center gap-2.5">
+                {isDone
+                    ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    : <Loader2 className="w-4 h-4 text-zinc-500 flex-shrink-0 animate-spin" />}
+                <button
+                    onClick={() => isDone && setExpanded(!expanded)}
+                    className={`text-zinc-400 ${isDone ? 'hover:text-white cursor-pointer' : ''} transition-colors`}
+                >
+                    {TOOL_NAMES[tool.name] || tool.name}
+                </button>
+                {/* A6: live elapsed-seconds while tool is in flight */}
+                {!isDone && typeof tool.elapsedSec === 'number' && tool.elapsedSec > 0 && (
+                    <span className="text-[10px] text-zinc-600 tabular-nums">{tool.elapsedSec}s</span>
+                )}
+                {isDone && (expanded
+                    ? <ChevronDown className="w-3 h-3 text-zinc-600" />
+                    : <ChevronRight className="w-3 h-3 text-zinc-600" />
+                )}
+            </div>
+            {expanded && displayContent && (
+                <div className="mt-1.5 ml-6 relative">
+                    <button
+                        onClick={handleCopy}
+                        className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-white hover:bg-white/[0.05] transition"
+                        aria-label="Copy result"
+                    >
+                        {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                    </button>
+                    {/* No more 500-char clip — full result is visible, scrollable, copyable. */}
+                    <pre className="text-[11px] text-zinc-400 font-mono max-h-64 overflow-y-auto whitespace-pre-wrap bg-[var(--input-bg)] rounded-lg p-3 pr-16">
+                        {displayContent}
                     </pre>
                 </div>
             )}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe } from 'lucide-react';
+import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import ChatMessageRenderer from './ChatMessageRenderer';
@@ -50,7 +50,11 @@ const THINKING_PHASES = [
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Digging through search data...',
     run_ga4_report: 'Querying your analytics...',
-    run_page_audit: 'Running a health check on pages...',
+    run_page_audit: 'Running PageSpeed Insights...',
+    run_site_audit: 'Auditing 50+ HTML/SEO checks...',
+    inspect_url: 'Asking Google about indexing...',
+    cross_source_diagnose: 'Cross-referencing GA4 + GSC + commits...',
+    get_alerts: 'Triaging anomalies...',
     calculate_revenue_impact: 'Counting potential dollars...',
     generate_content_strategy: 'Cooking up content ideas...',
     analyze_keyword_clusters: 'Clustering your keywords...',
@@ -264,11 +268,10 @@ export default function AIChatbot() {
         setIsLoading(true);
 
         try {
-            // Only inject full data context on the first user message.
-            // Subsequent messages use conversation history — Gemini remembers.
-            const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
-
-            // Hard timeout: abort if no response headers within 60s
+            // A1: Send compressed-but-COMPLETE context every turn — not just first.
+            // Otherwise Gemini hallucinates by turn 5 ("what was my #3 keyword?" → wrong).
+            // Compressed (top 8 queries + top 5 pages + KPIs) ≈ +500 tokens/turn,
+            // still well under context budget.
             const abortController = new AbortController();
             const ttfbTimeout = setTimeout(() => abortController.abort(), 60000);
 
@@ -279,21 +282,20 @@ export default function AIChatbot() {
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
-                    // Full context on first message, reduced KPI-only context on subsequent messages
-                    analyticsContext: currentAnalytics ? (isFirstUserMessage ? {
+                    analyticsContext: currentAnalytics ? {
                         kpis: currentAnalytics.kpis,
-                        topSources: currentAnalytics.sources?.slice(0, 8),
-                        topPages: currentAnalytics.pages?.slice(0, 10),
-                        topCountries: currentAnalytics.countries?.slice(0, 8),
+                        topSources: currentAnalytics.sources?.slice(0, 6),
+                        topPages: currentAnalytics.pages?.slice(0, 5),
+                        topCountries: currentAnalytics.countries?.slice(0, 6),
                         devices: currentAnalytics.devices,
-                        channels: currentAnalytics.channels?.slice(0, 6),
-                    } : { kpis: currentAnalytics.kpis }) : null,
-                    seoContext: currentSeo ? (isFirstUserMessage ? {
+                        channels: currentAnalytics.channels?.slice(0, 5),
+                    } : null,
+                    seoContext: currentSeo ? {
                         kpis: currentSeo.kpis,
-                        topQueries: currentSeo.queries?.slice(0, 15),
-                        topPages: currentSeo.pages?.slice(0, 8),
-                        recommendations: currentSeo.recommendations,
-                    } : { kpis: currentSeo.kpis }) : null,
+                        topQueries: currentSeo.queries?.slice(0, 8),
+                        topPages: currentSeo.pages?.slice(0, 5),
+                        recommendations: currentSeo.recommendations?.slice(0, 3),
+                    } : null,
                     history: currentMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                     mode: options?.mode,
                 }),
@@ -375,6 +377,20 @@ export default function AIChatbot() {
                                 updated[updated.length - 1] = last;
                                 return updated;
                             });
+                        } else if (data.type === 'tool_progress') {
+                            // A6: heartbeat for slow tools — annotate the in-flight tool
+                            // with its elapsed seconds so the UI can show "Running X… (12s)".
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.tools = (last.tools || []).map(t =>
+                                    t.name === data.name && !t.result
+                                        ? ({ ...t, elapsedSec: data.elapsedSec } as any)
+                                        : t
+                                );
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
                         } else if (data.type === 'credits') {
                             setCredits(prev => {
                                 if (prev !== null && data.value < prev) {
@@ -451,24 +467,26 @@ export default function AIChatbot() {
     const sendMessageRef = useRef(sendMessage);
     sendMessageRef.current = sendMessage;
 
-    // ── Daily briefing: auto-send on first open of the day ──
-    const briefingSentRef = useRef(false);
-
+    // A5: Briefing is now opt-in via button (see QUICK_PROMPTS section below).
+    // The auto-fire useEffect was burning a credit before the user typed anything,
+    // and was non-discoverable when it WORKED. Tracking last-shown date so the
+    // button shows "Already viewed today" instead of letting users re-fire it.
+    const [briefingDoneToday, setBriefingDoneToday] = useState(false);
     useEffect(() => {
-        if (!isOpen || briefingSentRef.current || !dataReady || isLoading) return;
-        if (messages.length > 1) return; // Widget starts with 1 welcome message
-        if (!analyticsData && !seoData) return; // Need actual data for briefing
-
         const today = new Date().toISOString().split('T')[0];
-        const lastBriefing = localStorage.getItem('tc-last-briefing-date');
-        if (lastBriefing === today) return;
-
-        briefingSentRef.current = true;
-        localStorage.setItem('tc-last-briefing-date', today);
-        setTimeout(() => {
-            sendMessageRef.current('Give me my morning briefing — what changed overnight and what should I focus on today?', { mode: 'briefing' });
-        }, 500); // Small delay to let widget fully animate open
-    }, [isOpen, dataReady, messages.length, isLoading, analyticsData, seoData]);
+        try {
+            if (localStorage.getItem('tc-last-briefing-date') === today) {
+                setBriefingDoneToday(true);
+            }
+        } catch { /* private mode */ }
+    }, []);
+    const requestBriefing = useCallback(() => {
+        if (briefingDoneToday || isLoading || !dataReady) return;
+        const today = new Date().toISOString().split('T')[0];
+        try { localStorage.setItem('tc-last-briefing-date', today); } catch { /* skip */ }
+        setBriefingDoneToday(true);
+        sendMessageRef.current('Give me my morning briefing — what changed overnight and what should I focus on today?', { mode: 'briefing' });
+    }, [briefingDoneToday, isLoading, dataReady]);
 
     // Listen for external "Ask AI" events (from Intelligence Center)
     useEffect(() => {
@@ -667,6 +685,17 @@ export default function AIChatbot() {
                             </div>
                         )}
                         <div className="flex flex-wrap gap-1.5">
+                            {/* A5: Briefing is now an explicit button — was previously auto-firing
+                                on widget open, which spent a credit before the user typed anything. */}
+                            <button
+                                onClick={requestBriefing}
+                                disabled={!dataReady || briefingDoneToday}
+                                title={briefingDoneToday ? 'Already viewed today' : 'Daily briefing of overnight changes + #1 priority'}
+                                className="text-xs px-3 py-2 sm:text-[11px] sm:px-2.5 sm:py-1.5 rounded-lg bg-amber-500/[0.05] border border-amber-500/[0.20] text-amber-300 hover:bg-amber-500/[0.10] hover:border-amber-500/[0.35] hover:text-amber-200 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-amber-500/[0.05] disabled:hover:border-amber-500/[0.20]"
+                            >
+                                <Sun className="w-3 h-3" />
+                                {briefingDoneToday ? 'Briefing — already viewed' : 'Daily Briefing'}
+                            </button>
                             {QUICK_PROMPTS.map((prompt, i) => (
                                 <button
                                     key={i}

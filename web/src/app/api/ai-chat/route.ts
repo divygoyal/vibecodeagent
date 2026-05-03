@@ -17,13 +17,11 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 // Initialize the official Gemini SDK
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
-// Fallback model chain: try each in order if previous returns 429/503/timeout
-// Timeouts are ceilings (not delays) — fast responses are unaffected
+// A7: Trimmed model fallback chain. The pro-preview is rarely better and slower.
+// 2.5-flash is legacy. Two-step chain saves 36-43s of fallback latency on bad days.
 const CHAT_MODELS = [
     { model: 'gemini-3-flash-preview', timeout: 25000 },
-    { model: 'gemini-3.1-flash-lite-preview', timeout: 20000 },
-    { model: 'gemini-3.1-pro-preview', timeout: 18000 },
-    { model: 'gemini-2.5-flash', timeout: 18000 },
+    { model: 'gemini-3.1-flash-lite-preview', timeout: 15000 },
 ] as const;
 
 function isRetryableError(error: any): boolean {
@@ -71,13 +69,27 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════════════════════════════
 const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.
 
-RULES: 1) Dashboard data first, tools only if needed. 2) Max 1 tool call preferred, max 8. 3) Cite numbers directly. 4) Use EXACT siteUrl from [AVAILABLE SITES]. 5) GitHub tools: only use if [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise — never mention GitHub when [GitHub:not_connected]. 6) [Repo: x · {confirmed|auto}] tag = the linked repo for the current site — pass repo=x to ALL GitHub tools, NEVER call list_user_repos. If status=auto, mention once in the first GitHub-related answer: "I'm checking {repo} — confirm by picking it in the dropdown if that's right." If status=confirmed, just use it silently.
+RULES:
+1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools only when the snapshot is insufficient.
+2) Plan tool use: pick the SMALLEST set that answers the question. Prefer 1 tool call. Hard cap 8.
+3) Cite exact numbers. Never round to "about" — say "12,847 clicks (-23% WoW)".
+4) Use the EXACT siteUrl from [AVAILABLE SITES] / [Site:].
+5) GitHub tools: only when [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise; never mention GitHub when [GitHub:not_connected].
+6) [Repo: x · {confirmed|auto}] = the repo for the current site — pass repo=x to ALL GitHub tools. NEVER call list_user_repos. If status=auto, gently mention once: "I'm checking {repo} — confirm in the dropdown if that's right." If confirmed, use silently.
 
-CROSS-SOURCE DIAGNOSIS PLAYBOOK (when symptom = traffic drop, ranking loss, indexing/structured-data error, conversion drop, CTR cliff):
-1. Confirm in GA4/GSC and pinpoint the START DATE of the change.
-2. If [GitHub:connected] AND [Repo:] set: get_recent_commits with repo=<from tag>, since=<startDate-3d>, path filter on the affected page → if relevant, get_pull_requests or get_file_contents on the changed file.
-3. State the link explicitly: "Drop began {date}; PR #{n} merged {date} touched {path} — likely cause." Cite SHA + PR# in the answer.
-4. Budget: max 5 GitHub calls per conversation. Prefer get_repo_health BEFORE search/list when scoping a new repo.
+TOOL-PICKING DECISION TABLE (use the FIRST match):
+- "What's wrong?" / "Anything broken?" / morning briefing → call get_alerts (instant, no API).
+- "Why did traffic / ranking / CTR drop on /X?" / "What broke?" → call cross_source_diagnose with symptom + pagePath. ONE call returns the verdict.
+- "Is /X indexed?" / "Why isn't this in Google?" → inspect_url. (Cap: 3 per conversation.)
+- HTML/on-page audit ("audit my homepage", "are images missing alt?") → run_site_audit (NOT run_page_audit — that's PageSpeed).
+- Core Web Vitals / "is my site slow" → run_page_audit (PageSpeed).
+- Specific date-range / device / country breakdowns → get_search_performance.
+- GA4 funnel / event / conversion deep-dives → run_ga4_report.
+
+GENERATOR TOOLS (generate_content_strategy / generate_meta_tags / suggest_internal_links / analyze_keyword_clusters / find_cannibalization):
+These return a STRUCTURED PAYLOAD with { task, expectedFormat, inputs }. Read the task, follow the expectedFormat, and use the inputs as your data. DO NOT echo "task" or "expectedFormat" back to the user — that's a planning artifact, not the answer.
+
+INVALID-ARGS HANDLING: if a tool returns { error: 'invalid_args', message: ... }, fix the arg per the message and retry ONCE.
 
 CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
 REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
@@ -327,16 +339,15 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // ── Get Available Sites Context (only on first message — subsequent messages have it in history) ──
+        // A1: [SITES] / [GA4] tags injected on EVERY turn (was first-only).
+        // The model frequently lost track of valid property URLs by turn 4 and
+        // would call get_search_performance with the wrong format.
         let availableSitesContext = '';
-        const isFirstMessage = !history?.length;
-        if (isFirstMessage) {
-            if (cachedSites.length > 0) {
-                availableSitesContext = `\n[SITES: ${cachedSites.map((s: any) => s.siteUrl).join(', ')}]`;
-            }
-            if (cachedGa4Properties.length > 0) {
-                availableSitesContext += `\n[GA4: ${cachedGa4Properties.map((p: any) => `${p.property}(${p.displayName || ''})`).join(', ')}]`;
-            }
+        if (cachedSites.length > 0) {
+            availableSitesContext = `\n[SITES: ${cachedSites.map((s: any) => s.siteUrl).join(', ')}]`;
+        }
+        if (cachedGa4Properties.length > 0) {
+            availableSitesContext += `\n[GA4: ${cachedGa4Properties.map((p: any) => `${p.property}(${p.displayName || ''})`).join(', ')}]`;
         }
 
         // User message with injected data context
@@ -393,8 +404,10 @@ CRITICAL SYSTEM CONTEXT:
                     let loopCount = 0;
                     let gscCallCount = 0;
                     let githubCallCount = 0;
+                    let inspectCallCount = 0; // A9: cap inspect_url at 3/conversation (GSC quota friendliness)
                     const MAX_GSC_CALLS = 8;
                     const MAX_GITHUB_CALLS = 5;
+                    const MAX_INSPECT_CALLS = 3;
                     const MAX_LOOPS = 8;
                     const GITHUB_TOOL_NAMES = new Set([
                         'list_user_repos', 'get_repo_health', 'search_repo_code',
@@ -414,6 +427,12 @@ CRITICAL SYSTEM CONTEXT:
                         // Try models in order, fall back on 429/503/timeout
                         let response: any = null;
                         let lastError: any = null;
+                        // A7: dynamic temperature — bolder verdicts when no tool results
+                        // are pending (the "be bold" prompt), tighter when summarizing data
+                        // (precision over voice). loopCount===1 means initial pass; later loops
+                        // are tool-result summarization.
+                        const isToolResponsePass = loopCount > 1;
+                        const dynamicTemperature = isToolResponsePass ? 0.3 : 0.85;
                         for (const { model, timeout: modelTimeout } of CHAT_MODELS) {
                             try {
                                 response = await ai.models.generateContentStream({
@@ -422,8 +441,8 @@ CRITICAL SYSTEM CONTEXT:
                                     config: {
                                         systemInstruction: finalSystemInstruction,
                                         tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
-                                        temperature: 0.7,
-                                        maxOutputTokens: 2048,
+                                        temperature: dynamicTemperature,
+                                        maxOutputTokens: 3072, // A7: bumped from 2048 — long tables + 3 follow-ups were getting cut
                                         httpOptions: { timeout: modelTimeout },
                                     },
                                 });
@@ -449,16 +468,16 @@ CRITICAL SYSTEM CONTEXT:
                                 controller.close();
                                 return;
                             }
-                            // Stream text chunks
+                            // A6: stream text chunks ALWAYS — including the model's pre-tool
+                            // reasoning (e.g. "I'll start by checking your GSC data for…").
+                            // Previously gated on "no function calls in chunk", which silently
+                            // dropped the most user-visible part: the thinking out loud.
                             if (chunk.text) {
                                 fullText += chunk.text;
-                                // Only stream text if no function calls in this chunk
-                                if (!chunk.functionCalls || chunk.functionCalls.length === 0) {
-                                    controller.enqueue(encodeSSE({
-                                        type: 'text',
-                                        content: chunk.text,
-                                    }));
-                                }
+                                controller.enqueue(encodeSSE({
+                                    type: 'text',
+                                    content: chunk.text,
+                                }));
                             }
 
                             // Collect function call parts from raw candidates
@@ -480,6 +499,11 @@ CRITICAL SYSTEM CONTEXT:
                                         continue;
                                     }
 
+                                    // A9: cap inspect_url to protect GSC URL Inspection daily quota
+                                    if (toolName === 'inspect_url' && inspectCallCount >= MAX_INSPECT_CALLS) {
+                                        continue;
+                                    }
+
                                     // Dedupe
                                     const isDup = pendingFunctionCalls.some(
                                         (p: any) => p.functionCall.name === toolName && JSON.stringify(p.functionCall.args) === JSON.stringify(fc.args)
@@ -488,6 +512,7 @@ CRITICAL SYSTEM CONTEXT:
                                     if (!isDup) {
                                         if (toolName === 'get_search_performance') gscCallCount++;
                                         if (GITHUB_TOOL_NAMES.has(toolName)) githubCallCount++;
+                                        if (toolName === 'inspect_url') inspectCallCount++;
                                         pendingFunctionCalls.push(part);
                                         controller.enqueue(encodeSSE({
                                             type: 'tool_start',
@@ -513,12 +538,32 @@ CRITICAL SYSTEM CONTEXT:
                                 const fcName = part.functionCall.name;
                                 const fcArgs = part.functionCall.args || {};
                                 try {
+                                    const toolStartedAt = Date.now();
+                                    // A6: heartbeat for slow tools so users see progress instead of dead air
+                                    const SLOW_TOOLS = new Set(['run_page_audit', 'run_site_audit', 'inspect_url', 'cross_source_diagnose']);
+                                    let progressTimer: ReturnType<typeof setInterval> | null = null;
+                                    if (SLOW_TOOLS.has(fcName)) {
+                                        progressTimer = setInterval(() => {
+                                            const elapsed = Math.round((Date.now() - toolStartedAt) / 1000);
+                                            try {
+                                                controller.enqueue(encodeSSE({ type: 'tool_progress', name: fcName, elapsedSec: elapsed }));
+                                            } catch { /* controller may be closed */ }
+                                        }, 2500);
+                                    }
+
                                     const toolResult = await executeAiChatTool(fcName, fcArgs, {
                                         googleAccessToken,
                                         googleRefreshToken,
                                         githubAccessToken,
                                         userId: userId ? String(userId) : undefined,
+                                        // A2 / A10: pass dashboard snapshots so get_alerts and
+                                        // cross_source_diagnose can compute deterministically
+                                        // without re-querying APIs.
+                                        seoContext,
+                                        analyticsContext,
                                     });
+
+                                    if (progressTimer) clearInterval(progressTimer);
 
                                     controller.enqueue(encodeSSE({
                                         type: 'tool_result',

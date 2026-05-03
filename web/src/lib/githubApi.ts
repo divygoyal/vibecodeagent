@@ -564,7 +564,10 @@ export async function getRepoHealth(token: string, args: { repo: string }) {
     const parsed = parseRepo(args.repo);
     if (!parsed) return { error: 'bad_args', message: `Invalid repo "${args.repo}". Use "owner/repo".` };
 
-    const [repoR, langsR, openIssuesR, openPrsR, commitsR] = await Promise.all([
+    // allSettled (not Promise.all): one failing endpoint (e.g. languages 403 on a
+    // private repo, or search rate-limited) shouldn't blow up the whole health check.
+    // We fall back to nulls per-field instead.
+    const settled = await Promise.allSettled([
         ghFetch<any>(`/repos/${parsed.owner}/${parsed.repo}`, token),
         ghFetch<Record<string, number>>(`/repos/${parsed.owner}/${parsed.repo}/languages`, token),
         ghFetch<any>(
@@ -577,29 +580,45 @@ export async function getRepoHealth(token: string, args: { repo: string }) {
         ),
         ghFetch<any[]>(`/repos/${parsed.owner}/${parsed.repo}/commits?per_page=1`, token),
     ]);
-
-    if (isError(repoR)) return repoR;
+    // Coerce a settled promise into a successful GithubResult-or-null. Both rejection and
+    // proper-error branches collapse to null so the data extraction below is uniform.
+    const dataOrNull = <T,>(s: PromiseSettledResult<GithubResult<T>>): T | null => {
+        if (s.status !== 'fulfilled') return null;
+        const v = s.value;
+        if ('error' in v) return null;
+        return v.data;
+    };
+    const repoData = dataOrNull(settled[0]);
+    // Repo metadata is the only hard requirement — without it we can't return anything useful.
+    if (!repoData) {
+        const v = settled[0].status === 'fulfilled' ? settled[0].value : { error: 'rejected' as const, message: 'GitHub fetch rejected' };
+        return v;
+    }
+    const langsData = dataOrNull<Record<string, number>>(settled[1]);
+    const issuesData = dataOrNull(settled[2]);
+    const prsData = dataOrNull(settled[3]);
+    const commitsData = dataOrNull<any[]>(settled[4]);
 
     return {
         data: {
-            full_name: repoR.data.full_name,
-            description: clip(repoR.data.description, 200),
-            default_branch: repoR.data.default_branch,
-            stars: repoR.data.stargazers_count,
-            forks: repoR.data.forks_count,
-            open_issues_count: !isError(openIssuesR) ? openIssuesR.data.total_count : repoR.data.open_issues_count,
-            open_prs_count: !isError(openPrsR) ? openPrsR.data.total_count : null,
-            primary_language: repoR.data.language,
-            languages: !isError(langsR) ? langsR.data : null,
+            full_name: repoData.full_name,
+            description: clip(repoData.description, 200),
+            default_branch: repoData.default_branch,
+            stars: repoData.stargazers_count,
+            forks: repoData.forks_count,
+            open_issues_count: issuesData ? issuesData.total_count : repoData.open_issues_count,
+            open_prs_count: prsData ? prsData.total_count : null,
+            primary_language: repoData.language,
+            languages: langsData,
             last_commit:
-                !isError(commitsR) && commitsR.data[0]
+                commitsData && commitsData[0]
                     ? {
-                          sha: commitsR.data[0].sha?.slice(0, 7),
-                          date: commitsR.data[0].commit?.author?.date,
-                          message: clip(commitsR.data[0].commit?.message, 120),
+                          sha: commitsData[0].sha?.slice(0, 7),
+                          date: commitsData[0].commit?.author?.date,
+                          message: clip(commitsData[0].commit?.message, 120),
                       }
                     : null,
-            html_url: repoR.data.html_url,
+            html_url: repoData.html_url,
         },
     };
 }

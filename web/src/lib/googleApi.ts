@@ -875,6 +875,26 @@ export async function listSearchConsoleSites(token: string, signal?: AbortSignal
     return data.siteEntry || [];
 }
 
+/**
+ * GSC URL Inspection API — what Google actually saw when it crawled the URL.
+ * Returns indexing/coverage state, last crawl, robots.txt block status, mobile usability,
+ * AMP and rich-results validation. Quota: 2000/day per property.
+ *
+ * Docs: https://developers.google.com/webmaster-tools/v1/urlInspection.index/inspect
+ */
+export async function inspectGscUrl(
+    token: string,
+    siteUrl: string,
+    inspectionUrl: string,
+    languageCode = 'en-US'
+) {
+    return gaFetch(
+        'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
+        token,
+        { siteUrl, inspectionUrl, languageCode }
+    );
+}
+
 async function runGSCQuery(
     token: string,
     siteUrl: string,

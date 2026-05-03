@@ -1,6 +1,6 @@
 // AI Chat Tools Definition & Executor
 // These tools are injected into the Gemini API so the AI can "call" them to perform deep diagnosis.
-import { getValidAccessToken, runFlexibleGAReport, runFlexibleRealtimeReport, getPropertyMetadata } from '@/lib/googleApi';
+import { getValidAccessToken, runFlexibleGAReport, runFlexibleRealtimeReport, getPropertyMetadata, inspectGscUrl } from '@/lib/googleApi';
 import {
     getValidGithubToken,
     listUserRepos,
@@ -12,6 +12,11 @@ import {
     getFileContents,
     getRepoHealth,
 } from '@/lib/githubApi';
+import { computeAlerts } from '@/lib/alertEngine';
+import { runSiteAudit } from '@/lib/siteAudit';
+
+const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
 export const AI_CHAT_TOOL_DECLARATIONS = [
     {
@@ -700,6 +705,113 @@ CONSTRAINTS:
             required: ['repo', 'path'],
         },
     },
+    // ═══════════════════════════════════════════════════════════════
+    // ANOMALIES, AUDITS, INDEXING, ORCHESTRATION (Phase A additions)
+    // ═══════════════════════════════════════════════════════════════
+    {
+        name: 'get_alerts',
+        description: `Compute structured anomalies (traffic drops, ranking losses, CTR problems, content decay, striking-distance opportunities) from the user's already-loaded GA4 + GSC dashboard data. NO API call — pure deterministic compute on the snapshot.
+
+WHEN TO USE:
+- "What's wrong today?" / "Anything broken?" / "Morning briefing"
+- BEFORE going hunting in get_search_performance — this gives you the ranked problem list cheaply
+- Whenever you need to prioritize what to talk about
+
+EFFICIENCY: 0 API calls, instant. Always cheaper than re-deriving these patterns from raw KPIs in your head.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                severity: {
+                    type: 'STRING' as const,
+                    enum: ['critical', 'warning', 'info', 'all'],
+                    description: 'Filter by severity. Default "all" (returns critical+warning+info, sorted critical-first).',
+                },
+                category: {
+                    type: 'STRING' as const,
+                    enum: ['traffic', 'rankings', 'content', 'opportunities'],
+                    description: 'Optional category filter.',
+                },
+            },
+            required: [],
+        },
+    },
+    {
+        name: 'run_site_audit',
+        description: `Run a full HTML/SEO audit on a URL. Returns 50+ checks: title/meta/canonical, H1 hierarchy, image alt coverage, internal/external link counts, structured data presence, page size, response time, status code, and a 0-100 score.
+
+WHEN TO USE:
+- "Audit my homepage" / "Why is my SEO bad on /pricing"
+- "Check my meta tags" / "Are my images missing alt text?"
+- For HTML/on-page checks ALWAYS prefer this over guessing — it fetches the live page.
+
+DO NOT confuse with run_page_audit (that's PageSpeed Insights for performance/Core Web Vitals).`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                url: {
+                    type: 'STRING' as const,
+                    description: 'Full URL to audit (e.g., https://example.com/pricing).',
+                },
+            },
+            required: ['url'],
+        },
+    },
+    {
+        name: 'inspect_url',
+        description: `Call the Google Search Console URL Inspection API for a single page. Returns Google's authoritative view: indexing status, last crawl time, robots.txt block status, mobile usability, AMP status, and rich-results validation.
+
+WHEN TO USE:
+- "Is /pricing indexed?" / "Why isn't this page showing in Google?"
+- After a structured-data error is suspected — this confirms what Google actually saw
+- Diagnostic step in cross_source_diagnose for symptom=indexing_error
+
+EFFICIENCY: One call. Quota: 2000/day per property. The chat route caps to 3 inspections per conversation.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: {
+                    type: 'STRING' as const,
+                    description: 'GSC site URL (must be a verified property; use the EXACT format from [AVAILABLE SITES]).',
+                },
+                pageUrl: {
+                    type: 'STRING' as const,
+                    description: 'Full URL of the page to inspect (must be on the same property as siteUrl).',
+                },
+            },
+            required: ['siteUrl', 'pageUrl'],
+        },
+    },
+    {
+        name: 'cross_source_diagnose',
+        description: `One-shot orchestrator that diagnoses a symptom by chaining: (1) period comparison to find the change start date, (2) site→repo lookup, (3) recent commits filtered to the affected page in the suspect window, (4) optional URL inspection if symptom is indexing-related. Returns a structured payload with start date, magnitude, suspect commits/PRs, and inspection status.
+
+WHEN TO USE: when the user reports a symptom like "traffic dropped on /pricing", "rankings collapsed", "indexing broken", "CTR cliff" — this is the go-to first call. It saves 4-5 individual tool calls and returns a verdict-ready payload.
+
+DO NOT use it for general questions ("what should I focus on") — use get_alerts for that.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: {
+                    type: 'STRING' as const,
+                    description: 'GSC site URL from [AVAILABLE SITES].',
+                },
+                symptom: {
+                    type: 'STRING' as const,
+                    enum: ['traffic_drop', 'ranking_loss', 'indexing_error', 'ctr_drop'],
+                    description: 'What the user is reporting.',
+                },
+                pagePath: {
+                    type: 'STRING' as const,
+                    description: 'Optional path filter (e.g. "/pricing"). When set, narrows commit search and enables URL inspection.',
+                },
+                lookbackDays: {
+                    type: 'INTEGER' as const,
+                    description: 'How many days back to consider as "recent" for finding the start date. Default 14.',
+                },
+            },
+            required: ['siteUrl', 'symptom'],
+        },
+    },
 ];
 
 export interface GscContext {
@@ -707,6 +819,88 @@ export interface GscContext {
     googleRefreshToken?: string;
     githubAccessToken?: string;
     userId?: string;
+    /** Pre-fetched dashboard SEO data (top queries/pages/kpis/trend). Lets get_alerts and
+     *  cross_source_diagnose run without re-querying GSC just to compute anomalies. */
+    seoContext?: any;
+    /** Pre-fetched dashboard analytics data (kpis/sources/devices/etc.). */
+    analyticsContext?: any;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+ *  Lightweight tool-arg validation (no Zod dependency).
+ *  Returns null on success, or a string describing what's wrong on failure.
+ *  The chat route turns failures into an `invalid_args` tool response
+ *  which Gemini sees on the next loop iteration so it can self-correct.
+ * ──────────────────────────────────────────────────────────────────── */
+type ArgValidator = (args: Record<string, any>) => string | null;
+const ARG_VALIDATORS: Record<string, ArgValidator> = {
+    get_search_performance: (a) => {
+        if (typeof a.siteUrl !== 'string' || !a.siteUrl.trim()) return 'siteUrl (string) is required';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a.startDate || '')) return 'startDate must be YYYY-MM-DD';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a.endDate || '')) return 'endDate must be YYYY-MM-DD';
+        if (!Array.isArray(a.dimensions) || a.dimensions.length === 0) return 'dimensions must be a non-empty array';
+        const allowed = new Set(['date', 'query', 'page', 'country', 'device']);
+        for (const d of a.dimensions) if (!allowed.has(d)) return `dimension "${d}" not in [date,query,page,country,device]`;
+        return null;
+    },
+    run_ga4_report: (a) => {
+        if (typeof a.propertyId !== 'string' || !a.propertyId.trim()) return 'propertyId (string) is required';
+        if (!Array.isArray(a.dimensions) || a.dimensions.length === 0) return 'dimensions must be a non-empty array';
+        if (!Array.isArray(a.metrics) || a.metrics.length === 0) return 'metrics must be a non-empty array';
+        if (typeof a.startDate !== 'string' || !a.startDate) return 'startDate is required';
+        if (typeof a.endDate !== 'string' || !a.endDate) return 'endDate is required';
+        return null;
+    },
+    run_page_audit: (a) => {
+        if (typeof a.url !== 'string' || !/^https?:\/\//.test(a.url)) return 'url must start with http(s)://';
+        return null;
+    },
+    inspect_url: (a) => {
+        if (typeof a.siteUrl !== 'string' || !a.siteUrl) return 'siteUrl (string) is required';
+        if (typeof a.pageUrl !== 'string' || !/^https?:\/\//.test(a.pageUrl)) return 'pageUrl must start with http(s)://';
+        return null;
+    },
+    run_site_audit: (a) => {
+        if (typeof a.url !== 'string' || !a.url) return 'url (string) is required';
+        return null;
+    },
+    cross_source_diagnose: (a) => {
+        if (typeof a.siteUrl !== 'string' || !a.siteUrl) return 'siteUrl is required';
+        const allowed = new Set(['traffic_drop', 'ranking_loss', 'indexing_error', 'ctr_drop']);
+        if (!allowed.has(a.symptom)) return 'symptom must be one of: traffic_drop, ranking_loss, indexing_error, ctr_drop';
+        return null;
+    },
+    get_alerts: () => null, // all params optional
+    compare_time_periods: (a) => {
+        if (typeof a.siteUrl !== 'string') return 'siteUrl is required';
+        for (const k of ['period1Start', 'period1End', 'period2Start', 'period2End']) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(a[k] || '')) return `${k} must be YYYY-MM-DD`;
+        }
+        return null;
+    },
+    find_cannibalization: (a) => {
+        if (typeof a.siteUrl !== 'string') return 'siteUrl is required';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a.startDate || '')) return 'startDate must be YYYY-MM-DD';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a.endDate || '')) return 'endDate must be YYYY-MM-DD';
+        return null;
+    },
+    get_repo_health: (a) => (typeof a.repo !== 'string' || !a.repo ? 'repo (owner/name) is required' : null),
+    search_repo_code: (a) => (typeof a.query !== 'string' || !a.query ? 'query is required' : null),
+    get_recent_commits: (a) => (typeof a.repo !== 'string' || !a.repo ? 'repo is required' : null),
+    get_pull_requests: (a) => (typeof a.repo !== 'string' || !a.repo ? 'repo is required' : null),
+    get_repo_issues: (a) => (typeof a.repo !== 'string' || !a.repo ? 'repo is required' : null),
+    get_workflow_runs: (a) => (typeof a.repo !== 'string' || !a.repo ? 'repo is required' : null),
+    get_file_contents: (a) => {
+        if (typeof a.repo !== 'string' || !a.repo) return 'repo is required';
+        if (typeof a.path !== 'string' || !a.path) return 'path is required';
+        return null;
+    },
+};
+
+export function validateToolArgs(name: string, args: Record<string, any>): string | null {
+    const v = ARG_VALIDATORS[name];
+    if (!v) return null; // no validator → permissive
+    return v(args || {});
 }
 
 /**
@@ -774,6 +968,13 @@ async function queryGSCWithAutoResolve(
 }
 
 export async function executeAiChatTool(name: string, args: Record<string, any>, gscContext?: GscContext) {
+
+    // A11: validate args before doing any work. Failure surfaces as a structured
+    // tool response that Gemini sees and self-corrects on the next loop iteration.
+    const validationError = validateToolArgs(name, args || {});
+    if (validationError) {
+        return { error: 'invalid_args', message: validationError, toolName: name };
+    }
 
     if (name === 'get_search_performance') {
         if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
@@ -1141,53 +1342,68 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
     if (name === 'generate_content_strategy') {
         const { analysisType, topic, existingQueries, existingPages } = args;
 
-        // This tool returns structured analysis context — the AI will then use its reasoning to generate insights
-        const queries = existingQueries ? existingQueries.split(',').map((q: string) => q.trim()) : [];
-        const pages = existingPages ? existingPages.split(',').map((p: string) => p.trim()) : [];
+        // A12: structured payload — model gets a clear task + inputs + expected format,
+        // no more free-form "instructions" prose that the model used to echo back.
+        const queries = existingQueries ? existingQueries.split(',').map((q: string) => q.trim()).filter(Boolean) : [];
+        const pages = existingPages ? existingPages.split(',').map((p: string) => p.trim()).filter(Boolean) : [];
 
-        const result: Record<string, any> = { analysisType, topic };
+        const TASKS: Record<string, { task: string; expectedFormat: string }> = {
+            keyword_gaps: {
+                task: 'Identify keyword/topic gaps the site does NOT yet rank for but logically should, given its existing topical footprint.',
+                expectedFormat: 'Markdown table: | Missing Topic | Suggested Queries (3-5) | Why it matters | Difficulty (Easy/Med/Hard) |',
+            },
+            content_decay: {
+                task: 'For each existing page, estimate decay risk (likely outdated, sliding rankings) and prescribe a refresh priority.',
+                expectedFormat: 'Markdown table: | Page | Decay signal | Refresh priority (P0/P1/P2) | Specific action |',
+            },
+            blog_ideas: {
+                task: 'Propose 5-7 net-new blog post ideas that build on existing topical authority.',
+                expectedFormat: 'Numbered list. Each item: **Title** · target keyword · primary intent · 1-line angle · est. difficulty (Low/Med/High).',
+            },
+            one_thing_today: {
+                task: 'Pick ONE single action with the highest expected impact TODAY across all available signals.',
+                expectedFormat: 'One paragraph: 🎯 [verdict] — [action]. Then 2-3 bullets of evidence with numbers. Then "Expected impact: [revenue/traffic delta]".',
+            },
+            authority_check: {
+                task: `Rate the site's authority on "${topic || '(topic)'}" 0-10 from existing queries and pages.`,
+                expectedFormat: '## Authority: N/10 — [verdict]. Bullets: matched queries, matched pages, semantic gaps. Final: "Should you write more on this? YES/NO because…".',
+            },
+            translation_analysis: {
+                task: 'Recommend whether to translate the site, into which languages, and prioritization.',
+                expectedFormat: 'Markdown table: | Language | Country evidence | Est. traffic gain | Priority |. Then verdict line.',
+            },
+            competitor_analysis: {
+                task: `Compare against competitor "${topic || '(competitor)'}". Note: no live competitor data — reason from your model knowledge plus the user's existing footprint.`,
+                expectedFormat: 'Markdown table: | Their likely strength | User\'s position | Gap | Specific content to create |. Then 1-line verdict.',
+            },
+        };
 
-        switch (analysisType) {
-            case 'keyword_gaps':
-                result.instructions = 'Analyze the existing queries list. Identify TOPIC CLUSTERS that are missing. For each existing high-traffic query, suggest related queries the user SHOULD be targeting but likely isn\'t. Focus on long-tail variations and question-based queries.';
-                result.existingQueryCount = queries.length;
-                result.topQueries = queries.slice(0, 20);
-                break;
-            case 'content_decay':
-                result.instructions = 'Analyze the existing pages list. For each page, assess: is the content likely outdated? Are there queries where position > 15 (decaying)? Recommend content refresh priority.';
-                result.existingPages = pages.slice(0, 15);
-                break;
-            case 'blog_ideas':
-                result.instructions = `Generate 5-7 blog post ideas based on: (1) the user's existing top queries (what they already rank for), (2) semantic gaps (related topics they DON'T have), (3) question-based formats ("How to...", "Why does..."). For each idea, include: title, target keyword, estimated difficulty, and content angle.`;
-                result.topQueries = queries.slice(0, 15);
-                break;
-            case 'one_thing_today':
-                result.instructions = 'Based on ALL available data (GSC + GA4), determine the SINGLE highest-impact action the user can take TODAY. Consider: CTR fixes, striking distance keywords, content decay, technical issues, quick wins. Present ONE clear task with estimated impact.';
-                result.topQueries = queries.slice(0, 10);
-                result.existingPages = pages.slice(0, 10);
-                break;
-            case 'authority_check':
-                result.instructions = `Check if the user has existing authority/rankings related to "${topic || 'the topic'}". Look for: related queries they already rank for, relevant pages, keyword clusters, and semantic proximity. Rate authority 1-10.`;
-                result.topQueries = queries.slice(0, 20);
-                result.existingPages = pages.slice(0, 15);
-                break;
-            case 'translation_analysis':
-                result.instructions = 'Analyze traffic by country/language from the dashboard context. Suggest whether translation would be valuable: which languages, estimated traffic gain, and content prioritization.';
-                break;
-            case 'competitor_analysis':
-                result.instructions = `For the competitor "${topic || 'the competitor'}", use your knowledge to: (1) estimate their likely top keywords, (2) identify content types they likely have that the user doesn't, (3) suggest specific pieces of content to create to compete. Note: this uses AI reasoning, not live data.`;
-                result.topQueries = queries.slice(0, 20);
-                break;
+        const spec = TASKS[analysisType];
+        if (!spec) {
+            return { result: { error: `Unknown analysisType "${analysisType}". Allowed: ${Object.keys(TASKS).join(', ')}` } };
         }
 
-        return { result };
+        return {
+            result: {
+                analysisType,
+                task: spec.task,
+                expectedFormat: spec.expectedFormat,
+                inputs: {
+                    topic: topic || null,
+                    topQueries: queries.slice(0, 20),
+                    topPages: pages.slice(0, 15),
+                    queryCount: queries.length,
+                    pageCount: pages.length,
+                },
+            },
+        };
     }
 
     if (name === 'analyze_keyword_clusters') {
         try {
             const queries = JSON.parse(args.queries || '[]');
             if (!Array.isArray(queries) || queries.length === 0) {
-                return { result: { instructions: 'No queries provided. Pass the top queries from dashboard context as a JSON array.', clusters: [] } };
+                return { result: { task: 'No queries provided — ask the user to share their top queries or let dashboard context populate first.', clusters: [] } };
             }
 
             // Simple semantic clustering by shared words
@@ -1221,9 +1437,11 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                 .sort((a, b) => b.totalClicks - a.totalClicks)
                 .slice(0, 15);
 
+            // A12: structured payload — clear task + format spec, no echoed prose.
             return {
                 result: {
-                    instructions: 'Analyze these keyword clusters. Identify strong clusters to double down on, weak clusters to improve, and missing topic areas. Recommend content strategy per cluster.',
+                    task: 'Identify strong clusters to double down on, weak clusters to improve, and missing topic areas. Prescribe a content move per cluster.',
+                    expectedFormat: 'Markdown table: | Cluster | Strength (clicks·avgPos) | Verdict (Double-down / Improve / Drop) | Next move |. Then 1-2 line summary.',
                     totalQueries: queries.length,
                     clusterCount: result.length,
                     clusters: result,
@@ -1385,9 +1603,10 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
 
             return {
                 result: {
+                    task: 'Resolve each cannibalized keyword: pick canonical target page, decide which pages to redirect/consolidate, and prescribe content changes.',
+                    expectedFormat: 'Markdown table: | Query | Canonical page (winner) | Pages to redirect/merge | Action plan |. Then 1-line summary.',
                     dateRange: `${startDate} to ${endDate}`,
                     cannibalizedKeywords: cannibalized.length,
-                    instructions: 'For each cannibalized keyword, recommend: which page should be the canonical target, which pages should be redirected or consolidated, and suggested content changes.',
                     cannibalized,
                 },
             };
@@ -1401,9 +1620,11 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             const pages = JSON.parse(args.pages || '[]');
             const queries = args.queries ? JSON.parse(args.queries) : [];
 
+            // A12: structured payload — task + format spec, no instructional prose.
             return {
                 result: {
-                    instructions: `Analyze these pages and queries to suggest internal linking opportunities. For each suggestion provide: source page → target page, recommended anchor text, and why this link helps SEO. Focus on: (1) pages with related topics that should link to each other, (2) high-authority pages that should link to weaker pages, (3) pages targeting related queries that could benefit from link equity. Be specific with anchor text suggestions.`,
+                    task: 'Suggest internal linking moves: source → target with anchor text and SEO rationale. Bias toward (a) related-topic links, (b) authority-page → weaker-page link equity flow, (c) related-query consolidation.',
+                    expectedFormat: 'Markdown table: | Source page | Target page | Suggested anchor text | Why |. Limit: 6-10 rows. Skip duplicates.',
                     pageCount: pages.length,
                     queryCount: queries.length,
                     pages: pages.slice(0, 20),
@@ -1417,20 +1638,25 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
 
     if (name === 'generate_meta_tags') {
         const { url, targetKeywords, currentTitle, currentDescription, pageType } = args;
-
+        // A12: structured payload — task + format spec, no echoed prose.
         return {
             result: {
-                instructions: `Generate optimized meta tags for this page. Rules:
-- Title: Max 60 characters, primary keyword near the front, include brand name at end with | separator
-- Description: Max 155 characters, include primary keyword naturally, include a call-to-action, make it compelling for clicks
-- Provide 3 title variations and 2 description variations
-- If current tags are provided, explain what's wrong with them
-- Consider the page type for tone (${pageType || 'general'})`,
-                url,
-                targetKeywords: targetKeywords || 'Not specified — infer from URL and context',
-                currentTitle: currentTitle || 'Not provided',
-                currentDescription: currentDescription || 'Not provided',
-                pageType: pageType || 'other',
+                task: 'Generate optimized title + meta description for this page.',
+                rules: {
+                    titleMaxChars: 60,
+                    descriptionMaxChars: 155,
+                    titleFormat: 'Primary keyword near the front, brand name at end after " | ".',
+                    descriptionFormat: 'Include primary keyword naturally + a CTA. Compelling, not generic.',
+                    pageTypeTone: pageType || 'other',
+                },
+                expectedFormat: '**3 title variations** (numbered, ≤60 chars each) + **2 description variations** (numbered, ≤155 chars each). If currentTitle/currentDescription are present, add a 1-line "What\'s wrong" note.',
+                inputs: {
+                    url,
+                    targetKeywords: targetKeywords || null,
+                    currentTitle: currentTitle || null,
+                    currentDescription: currentDescription || null,
+                    pageType: pageType || 'other',
+                },
             },
         };
     }
@@ -1540,6 +1766,250 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             };
         } catch (e: any) {
             return { error: e.message || 'Failed to fetch property metadata' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // A2 — get_alerts: deterministic anomalies from dashboard snapshot
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'get_alerts') {
+        try {
+            const alerts = computeAlerts(gscContext?.seoContext, gscContext?.analyticsContext);
+            const wantSeverity: string = args.severity || 'all';
+            const wantCategory: string | undefined = args.category;
+            const filtered = alerts.filter((a) => {
+                if (wantSeverity !== 'all' && a.severity !== wantSeverity) return false;
+                if (wantCategory && a.category !== wantCategory) return false;
+                return true;
+            });
+            return {
+                result: {
+                    task: 'Triage these alerts. Lead with the most severe; cite the metric and change %. End with a single 🎯 VERDICT line.',
+                    expectedFormat: 'For each: ## [emoji per severity] Title — N% change. 1-2 line description with the metric. Then "Action: ..."',
+                    counts: {
+                        critical: alerts.filter((a) => a.severity === 'critical').length,
+                        warning: alerts.filter((a) => a.severity === 'warning').length,
+                        info: alerts.filter((a) => a.severity === 'info').length,
+                        success: alerts.filter((a) => a.severity === 'success').length,
+                        total: alerts.length,
+                    },
+                    alerts: filtered.slice(0, 20),
+                    note: filtered.length === 0
+                        ? 'No alerts at this severity/category. Either nothing is wrong, or dashboard data is missing — check the snapshot is loaded.'
+                        : null,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'compute_failed', message: e?.message || 'Failed to compute alerts.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // A8 — run_site_audit: 50+ HTML/SEO checks via siteAudit.ts
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'run_site_audit') {
+        try {
+            const report = await runSiteAudit(args.url);
+            // Trim verbose details — Gemini doesn't need every link/image/script,
+            // it needs ranked issues + the meta block.
+            const topIssues = report.issues
+                .filter((i) => i.severity === 'critical' || i.severity === 'warning')
+                .slice(0, 12);
+            return {
+                result: {
+                    task: 'Triage these audit issues; rank by impact; for each issue give a one-line fix.',
+                    expectedFormat: 'Markdown table: | Severity | Issue | Why it matters | Fix |. Then a "Site Score: N/100 — [verdict]" line.',
+                    url: report.url,
+                    score: report.score,
+                    statusCode: report.statusCode,
+                    responseTimeMs: report.responseTime,
+                    summary: report.summary,
+                    meta: report.meta,
+                    issues: topIssues.map((i) => ({
+                        severity: i.severity,
+                        category: i.category,
+                        title: i.title,
+                        description: i.description,
+                        recommendation: i.recommendation,
+                        value: i.value,
+                    })),
+                    note: report.issues.length > topIssues.length
+                        ? `${report.issues.length - topIssues.length} additional info-level issues omitted for brevity.`
+                        : null,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'audit_failed', message: e?.message || 'Site audit failed.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // A9 — inspect_url: GSC URL Inspection API (indexing/mobile/rich results)
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'inspect_url') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected. Connect it in Integrations settings.' };
+        }
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const data = await inspectGscUrl(token, args.siteUrl, args.pageUrl);
+            const result = data?.inspectionResult || {};
+            return {
+                result: {
+                    task: 'Read this URL inspection. State plainly: is the page indexed? When was it last crawled? Any blockers? Any rich-result errors? End with one verdict line.',
+                    expectedFormat: '🎯 VERDICT line, then a short bulleted breakdown of (1) coverage, (2) crawl, (3) mobile usability, (4) rich results.',
+                    pageUrl: args.pageUrl,
+                    indexStatusResult: result.indexStatusResult || null,
+                    mobileUsabilityResult: result.mobileUsabilityResult || null,
+                    richResultsResult: result.richResultsResult || null,
+                    ampResult: result.ampResult || null,
+                    inspectionResultLink: result.inspectionResultLink || null,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'inspection_failed', message: e?.message || 'GSC URL Inspection API call failed.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // A10 — cross_source_diagnose: one-shot orchestrator
+    //   Internally chains: period-compare → site-repo lookup → recent commits → optional inspection.
+    //   Counts as 1 chat turn but uses up to 4 internal API calls.
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'cross_source_diagnose') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected.' };
+        }
+        try {
+            const lookbackDays = Math.max(7, Math.min(90, args.lookbackDays || 14));
+            const today = new Date();
+            const isoDate = (d: Date) => d.toISOString().split('T')[0];
+            const period2End = isoDate(today);
+            const period2Start = isoDate(new Date(today.getTime() - lookbackDays * 86400_000));
+            const period1End = isoDate(new Date(today.getTime() - lookbackDays * 86400_000 - 86400_000));
+            const period1Start = isoDate(new Date(today.getTime() - lookbackDays * 2 * 86400_000));
+
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+
+            // Step 1: period comparison to find the change magnitude
+            const compareBody = (start: string, end: string) => ({
+                startDate: start,
+                endDate: end,
+                dimensions: args.pagePath ? ['date', 'page'] : ['date'],
+                rowLimit: 200,
+                dataState: 'all' as const,
+            });
+            const [p1, p2] = await Promise.allSettled([
+                queryGSCWithAutoResolve(token, args.siteUrl, compareBody(period1Start, period1End)),
+                queryGSCWithAutoResolve(token, args.siteUrl, compareBody(period2Start, period2End)),
+            ]);
+            const rows1 = p1.status === 'fulfilled' ? (p1.value.data?.rows || []) : [];
+            const rows2 = p2.status === 'fulfilled' ? (p2.value.data?.rows || []) : [];
+
+            // Filter to pagePath if provided (works for [date, page] dimension order)
+            const filterByPath = (rows: any[]) =>
+                args.pagePath ? rows.filter((r: any) => String(r.keys[1] || '').includes(args.pagePath!)) : rows;
+            const r1Filtered = filterByPath(rows1);
+            const r2Filtered = filterByPath(rows2);
+            const sumClicks = (rows: any[]) => rows.reduce((s: number, r: any) => s + (r.clicks || 0), 0);
+            const c1 = sumClicks(r1Filtered);
+            const c2 = sumClicks(r2Filtered);
+            const deltaClicks = c2 - c1;
+            const deltaPct = c1 > 0 ? Math.round((deltaClicks / c1) * 100) : 0;
+
+            // Find the single biggest single-day drop (or rise) within the window
+            const dailyMap = new Map<string, number>();
+            for (const r of r2Filtered) {
+                const date = r.keys[0];
+                dailyMap.set(date, (dailyMap.get(date) || 0) + (r.clicks || 0));
+            }
+            const dailyArr = [...dailyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+            let biggestDrop = { date: period2Start, magnitude: 0 };
+            for (let i = 1; i < dailyArr.length; i++) {
+                const prev = dailyArr[i - 1][1];
+                const curr = dailyArr[i][1];
+                if (prev > 0) {
+                    const drop = prev - curr;
+                    if (drop > biggestDrop.magnitude) {
+                        biggestDrop = { date: dailyArr[i][0], magnitude: drop };
+                    }
+                }
+            }
+            const startDate = biggestDrop.magnitude > 0 ? biggestDrop.date : period2Start;
+
+            // Step 2: site-repo lookup (best-effort; missing is fine)
+            let linkedRepo: string | null = null;
+            try {
+                if (gscContext.userId && ADMIN_API_KEY) {
+                    const linksRes = await fetch(
+                        `${ADMIN_API_URL}/api/users/${encodeURIComponent(gscContext.userId)}/site-repo-links`,
+                        { headers: { 'X-API-Key': ADMIN_API_KEY }, signal: AbortSignal.timeout(5000) }
+                    );
+                    if (linksRes.ok) {
+                        const data = await linksRes.json();
+                        const link = (data.links || []).find((l: any) =>
+                            l.site_url === args.siteUrl ||
+                            l.site_url === args.siteUrl.replace(/^sc-domain:/, 'https://') + '/' ||
+                            String(l.site_url || '').includes(String(args.siteUrl).replace(/^sc-domain:/, ''))
+                        );
+                        if (link) linkedRepo = link.repo_full_name;
+                    }
+                }
+            } catch { /* swallow — repo lookup is best-effort */ }
+
+            // Step 3: recent commits in the suspect window (only if we found a repo and have a token)
+            let suspectCommits: any[] = [];
+            if (linkedRepo) {
+                try {
+                    const ghToken = await getValidGithubToken(gscContext.githubAccessToken, gscContext.userId);
+                    if (ghToken) {
+                        const since = isoDate(new Date(new Date(startDate).getTime() - 3 * 86400_000));
+                        const commitsR = await getRecentCommits(ghToken, {
+                            repo: linkedRepo,
+                            since: `${since}T00:00:00Z`,
+                            until: `${period2End}T23:59:59Z`,
+                            path: args.pagePath || undefined,
+                            per_page: 15,
+                        });
+                        if (!('error' in commitsR)) suspectCommits = commitsR.data || [];
+                    }
+                } catch { /* swallow */ }
+            }
+
+            // Step 4: URL inspection (only for indexing-symptom + a specific pagePath)
+            let indexingStatus: any = null;
+            if (args.symptom === 'indexing_error' && args.pagePath) {
+                try {
+                    const fullUrl = args.pagePath.startsWith('http')
+                        ? args.pagePath
+                        : `${args.siteUrl.replace(/^sc-domain:/, 'https://').replace(/\/$/, '')}${args.pagePath.startsWith('/') ? '' : '/'}${args.pagePath}`;
+                    const inspectData = await inspectGscUrl(token, args.siteUrl, fullUrl);
+                    indexingStatus = inspectData?.inspectionResult?.indexStatusResult || null;
+                } catch { /* swallow */ }
+            }
+
+            return {
+                result: {
+                    task: 'State the verdict in ONE sentence (drop magnitude, suspected start date, suspected cause). Then evidence bullets. Then "Action: …".',
+                    expectedFormat: '🎯 VERDICT — [drop] on [page] starting [date]. Cause: [PR/commit/index]. \\n\\nEvidence:\\n- …\\n\\nAction: …',
+                    siteUrl: args.siteUrl,
+                    symptom: args.symptom,
+                    pagePath: args.pagePath || null,
+                    window: { period1Start, period1End, period2Start, period2End },
+                    magnitude: { period1Clicks: c1, period2Clicks: c2, deltaClicks, deltaPct },
+                    suspectStartDate: startDate,
+                    biggestSingleDayDrop: biggestDrop.magnitude > 0 ? biggestDrop : null,
+                    linkedRepo,
+                    suspectCommits,
+                    indexingStatus,
+                    notes: [
+                        !linkedRepo ? 'No linked repo for this site — set one up to enable commit correlation.' : null,
+                        suspectCommits.length === 0 && linkedRepo ? 'No commits found in the suspect window for this path.' : null,
+                    ].filter(Boolean),
+                },
+            };
+        } catch (e: any) {
+            return { error: 'diagnose_failed', message: e?.message || 'Cross-source diagnosis failed.' };
         }
     }
 
