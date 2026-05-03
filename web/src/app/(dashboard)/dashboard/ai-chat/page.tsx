@@ -153,27 +153,32 @@ const StarField = memo(function StarField() {
  *  Used in the new top-of-hero row. Replaces the vertical rail orbs.
  * ───────────────────────────────────────────────────────────────────── */
 function ConnectorPill({ name, connected, isOpen, onClick }: { name: ConnectorName; connected: boolean; isOpen: boolean; onClick: () => void }) {
-    const tooltip = `${CONNECTOR_LABELS[name]} · ${connected ? 'Connected' : 'Click to connect'}`;
+    const tooltip = `${CONNECTOR_LABELS[name]} · ${connected ? 'Connected · click to manage' : 'Click to connect'}`;
     const active = isOpen;
     return (
         <button
             type="button"
-            onClick={onClick}
+            onClick={(e) => {
+                e.stopPropagation();
+                onClick();
+            }}
             title={tooltip}
             aria-label={tooltip}
             aria-expanded={isOpen}
-            className={`group relative inline-flex h-12 items-center gap-2.5 rounded-full border px-3.5 transition-all
+            data-testid={`connector-pill-${name}`}
+            style={{ pointerEvents: 'auto' }}
+            className={`group relative z-20 inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-full border px-3.5 transition-all duration-150
                 ${active
-                    ? 'border-cyan-400/40 bg-[#0e1218] shadow-[0_0_0_3px_rgba(34,211,238,0.10)]'
-                    : 'border-white/[0.08] bg-[#0a0d12] hover:border-white/[0.18] hover:bg-[#0e1218]'}`}
+                    ? 'border-cyan-400/50 bg-[#0e1218] shadow-[0_0_0_3px_rgba(34,211,238,0.15)]'
+                    : 'border-white/[0.10] bg-[#0a0d12] hover:border-cyan-400/30 hover:bg-[#11161d] hover:scale-[1.03] active:scale-[0.98]'}`}
         >
-            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-gradient-to-b from-[#141a23] to-[#06090d] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+            <span className="pointer-events-none relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-gradient-to-b from-[#141a23] to-[#06090d] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                 <ConnectorIcon name={name} className="h-4 w-4 text-white" />
             </span>
-            <span className="text-[13px] font-medium text-zinc-100">{CONNECTOR_LABELS[name]}</span>
+            <span className="pointer-events-none text-[13px] font-medium text-zinc-100">{CONNECTOR_LABELS[name]}</span>
             <span
                 aria-hidden
-                className={`ml-1 h-2 w-2 shrink-0 rounded-full ${
+                className={`pointer-events-none ml-1 h-2 w-2 shrink-0 rounded-full ${
                     connected
                         ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85),0_0_14px_rgba(52,211,153,0.35)]'
                         : 'bg-zinc-700'
@@ -1045,13 +1050,13 @@ export default function AIChat() {
                         <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-10 sm:px-8 md:pt-12 md:pb-16">
 
                         {/* Connectors strip — horizontal pills row at top of hero */}
-                        <div ref={desktopRailRef} className="mb-10 flex w-full max-w-5xl flex-col items-center gap-3.5">
+                        <div ref={desktopRailRef} className="relative z-20 mb-10 flex w-full max-w-5xl flex-col items-center gap-3.5">
                             <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
                                 {connectedCount} of {connectors.length} sources connected
                             </div>
-                            <div ref={mobileRailRef} className="flex w-full flex-wrap items-center justify-center gap-2.5 overflow-x-auto px-2">
+                            <div ref={mobileRailRef} className="relative z-20 flex w-full flex-wrap items-center justify-center gap-2.5 px-2">
                                 {connectors.map((c) => (
-                                    <div key={c.name} className="relative shrink-0">
+                                    <div key={c.name} className="relative z-20 shrink-0">
                                         <ConnectorPill
                                             name={c.name}
                                             connected={c.connected}
