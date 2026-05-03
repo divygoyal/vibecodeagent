@@ -296,16 +296,27 @@ function ConnectorCard({ name, connected, onClose, onDisconnected, placement = '
     const isComingSoon = COMING_SOON.has(name);
     const targetProvider = nativeProviderFor(name);
     const [disconnecting, setDisconnecting] = useState(false);
+    const [connecting, setConnecting] = useState(false);
 
-    const handleConnect = () => {
-        if (!targetProvider) return;
-        if (targetProvider === 'github') {
-            // Phase 2: prefer GitHub App install (selective per-repo access).
-            // Server-side route handles redirect — falls through to error UI if the App isn't configured.
-            window.location.href = '/api/auth/github-app/install';
-            return;
-        }
-        const callbackUrl = `/dashboard/ai-chat?connected=${targetProvider}`;
+    // Warm TLS to github.com the moment the card opens — by the time the user
+    // hits Connect, the handshake is already done so the redirect lands faster.
+    useEffect(() => {
+        if (connected || isComingSoon || targetProvider !== 'github') return;
+        const link = document.createElement('link');
+        link.rel = 'preconnect';
+        link.href = 'https://github.com';
+        link.crossOrigin = 'anonymous';
+        document.head.appendChild(link);
+        return () => { document.head.removeChild(link); };
+    }, [connected, isComingSoon, targetProvider]);
+
+    // Google still uses signIn() (NextAuth client). GitHub App uses a native
+    // anchor below — JS-triggered window.location.href was racing against
+    // React re-renders and producing "click did nothing" cases.
+    const handleGoogleConnect = () => {
+        if (connecting) return;
+        setConnecting(true);
+        const callbackUrl = `/dashboard/ai-chat?connected=google`;
         void signIn('google', { callbackUrl }, { prompt: 'select_account consent' });
     };
 
@@ -403,15 +414,45 @@ function ConnectorCard({ name, connected, onClose, onDisconnected, placement = '
                     >
                         Coming soon
                     </button>
+                ) : targetProvider === 'github' ? (
+                    // Native anchor → browser starts navigation IMMEDIATELY on click,
+                    // not after a React event-loop turn. setConnecting flips the label
+                    // synchronously so the user sees instant feedback while the
+                    // server-side route + GitHub redirect resolves.
+                    <a
+                        href="/api/auth/github-app/install"
+                        onClick={() => setConnecting(true)}
+                        aria-disabled={connecting}
+                        className={`inline-flex items-center gap-1.5 rounded-full bg-[#22d3ee] px-3.5 py-1.5 text-[12px] font-semibold text-[#06141a]
+                                   shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_8px_rgba(34,211,238,0.30)]
+                                   transition-all hover:brightness-110 ${connecting ? 'pointer-events-none opacity-80' : ''}`}
+                    >
+                        {connecting ? (
+                            <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Opening GitHub…
+                            </>
+                        ) : (
+                            <>Connect GitHub</>
+                        )}
+                    </a>
                 ) : (
                     <button
                         type="button"
-                        onClick={handleConnect}
-                        className="rounded-full bg-[#22d3ee] px-3.5 py-1.5 text-[12px] font-semibold text-[#06141a]
+                        onClick={handleGoogleConnect}
+                        disabled={connecting}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-[#22d3ee] px-3.5 py-1.5 text-[12px] font-semibold text-[#06141a]
                                    shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_8px_rgba(34,211,238,0.30)]
-                                   transition-all hover:brightness-110"
+                                   transition-all hover:brightness-110 disabled:opacity-80 disabled:cursor-not-allowed"
                     >
-                        Connect {CONNECTOR_LABELS[name]}
+                        {connecting ? (
+                            <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Connecting…
+                            </>
+                        ) : (
+                            <>Connect {CONNECTOR_LABELS[name]}</>
+                        )}
                     </button>
                 )}
             </div>
