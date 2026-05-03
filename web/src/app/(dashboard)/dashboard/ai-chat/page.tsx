@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo, memo, type CSSProperties } from 'react';
+import { Suspense, useState, useRef, useEffect, useCallback, useMemo, memo, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
-import { motion } from 'framer-motion';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession, signIn } from 'next-auth/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
-    Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles, Lock, Github
+    Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles, Lock, Github, X
 } from 'lucide-react';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
@@ -42,6 +44,23 @@ const CONNECTOR_LABELS: Record<ConnectorName, string> = {
     ga4: 'Google Analytics',
     gsc: 'Search Console',
 };
+
+const CONNECTOR_DESCRIPTIONS: Record<ConnectorName, string> = {
+    github: 'Read your repos, recent commits, PRs, issues, and CI runs so the AI can correlate code changes with traffic events.',
+    wordpress: 'Read posts, drafts, and plugins. Correlate publish dates with ranking changes.',
+    vercel: 'Correlate deploys, build failures, and edge logs with traffic events.',
+    ga4: 'Read GA4 sessions, events, and conversions to power deep traffic diagnostics.',
+    gsc: 'Read Google Search Console queries, pages, and impressions for SEO analysis.',
+};
+
+const COMING_SOON: ReadonlySet<ConnectorName> = new Set<ConnectorName>(['wordpress', 'vercel']);
+
+// Provider used when initiating OAuth from a connector orb. ga4/gsc both come from Google.
+function nativeProviderFor(name: ConnectorName): 'github' | 'google' | null {
+    if (COMING_SOON.has(name)) return null;
+    if (name === 'github') return 'github';
+    return 'google';
+}
 
 function ConnectorIcon({ name, className = 'h-4 w-4' }: { name: ConnectorName; className?: string }) {
     switch (name) {
@@ -140,35 +159,215 @@ const StarField = memo(function StarField() {
 });
 
 /* ─────────────────────────────────────────────────────────────────────
- *  ConnectorOrb — 3D revolve-on-hover sphere for the left rail
+ *  ConnectorOrb — globe-on-hover sphere with click-to-open card
  * ───────────────────────────────────────────────────────────────────── */
-function ConnectorOrb({ name, connected }: { name: ConnectorName; connected: boolean }) {
-    const tooltip = `${CONNECTOR_LABELS[name]} · ${connected ? 'Connected' : 'Click to connect'}`;
-    const orb = (
-        <motion.div
-            whileHover={{ rotateY: 360, scale: 1.08 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            style={{ transformStyle: 'preserve-3d' }}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full
-                       border border-white/[0.08] bg-gradient-to-b from-[#11161d] to-[#06090d]
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-2px_4px_rgba(0,0,0,0.5),0_4px_14px_rgba(0,0,0,0.45)]"
+function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorName; connected: boolean; isOpen: boolean; onClick: () => void }) {
+    const [hovered, setHovered] = useState(false);
+    const tooltip = `${CONNECTOR_LABELS[name]} · click for details`;
+    const active = hovered || isOpen;
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            onFocus={() => setHovered(true)}
+            onBlur={() => setHovered(false)}
+            title={tooltip}
+            aria-label={tooltip}
+            aria-expanded={isOpen}
+            style={{ perspective: 800 }}
+            className="relative inline-flex h-10 w-10 items-center justify-center outline-none"
         >
-            <ConnectorIcon name={name} className={`h-4 w-4 ${connected ? 'text-zinc-100' : 'text-zinc-500'}`} />
-            <span
+            {/* Atmospheric glow ring — fades in on hover/open */}
+            <motion.span
                 aria-hidden
-                className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-[#050608] ${
-                    connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]' : 'bg-zinc-700'
-                }`}
+                animate={{ opacity: active ? 0.95 : 0, scale: active ? 1.6 : 1 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{
+                    background:
+                        'radial-gradient(circle, rgba(34,211,238,0.45) 0%, rgba(122,217,218,0.18) 38%, transparent 70%)',
+                    filter: 'blur(10px)',
+                }}
             />
+
+            {/* Outer wrapper handles scale (no Y rotation here) */}
+            <motion.span
+                animate={{ scale: active ? 1.32 : 1 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="relative inline-flex h-10 w-10 items-center justify-center"
+            >
+                {/* Inner sphere — continuous rotateY while hovered */}
+                <motion.span
+                    animate={hovered ? { rotateY: 360 } : { rotateY: 0 }}
+                    transition={
+                        hovered
+                            ? { duration: 3.2, repeat: Infinity, ease: 'linear' }
+                            : { duration: 0.6, ease: 'easeOut' }
+                    }
+                    style={{ transformStyle: 'preserve-3d' }}
+                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full
+                               border border-white/[0.08] bg-gradient-to-b from-[#11161d] to-[#06090d]
+                               shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-2px_4px_rgba(0,0,0,0.5),0_4px_14px_rgba(0,0,0,0.45)]"
+                >
+                    <ConnectorIcon name={name} className={`h-4 w-4 ${connected ? 'text-zinc-100' : 'text-zinc-500'}`} />
+                    {/* Sphere lighting — top-left highlight that reads as 3D even at rest */}
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 rounded-full"
+                        style={{
+                            background:
+                                'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16) 0%, transparent 50%)',
+                        }}
+                    />
+                </motion.span>
+
+                {/* Status dot — sits outside the rotating sphere so it stays steady */}
+                <span
+                    aria-hidden
+                    className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-[#050608] ${
+                        connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]' : 'bg-zinc-700'
+                    }`}
+                />
+            </motion.span>
+        </button>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ *  ConnectorCard — popover next to the orb with native Connect button
+ * ───────────────────────────────────────────────────────────────────── */
+function ConnectorCard({ name, connected, onClose }: { name: ConnectorName; connected: boolean; onClose: () => void }) {
+    const isComingSoon = COMING_SOON.has(name);
+    const targetProvider = nativeProviderFor(name);
+
+    const handleConnect = () => {
+        if (!targetProvider) return;
+        const callbackUrl = `/dashboard/ai-chat?connected=${targetProvider}`;
+        if (targetProvider === 'github') {
+            void signIn('github', { callbackUrl }, { prompt: 'consent' });
+        } else {
+            void signIn('google', { callbackUrl }, { prompt: 'select_account consent' });
+        }
+    };
+
+    const statusBadge = connected
+        ? { label: 'Connected', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' }
+        : isComingSoon
+            ? { label: 'Coming soon', className: 'bg-zinc-800 text-zinc-400 border-white/[0.06]' }
+            : { label: 'Not connected', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20' };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: -12, scale: 0.97 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -12, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            role="dialog"
+            aria-label={`${CONNECTOR_LABELS[name]} connection`}
+            className="absolute left-14 top-1/2 z-30 w-[280px] -translate-y-1/2 rounded-2xl border border-white/[0.10] bg-[#0d1117]/98
+                       p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_60px_rgba(0,0,0,0.65)] backdrop-blur"
+        >
+            <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-[#0a0d12]">
+                    <ConnectorIcon name={name} className="h-4 w-4 text-zinc-100" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                        <span className="text-[14px] font-semibold text-white">{CONNECTOR_LABELS[name]}</span>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close"
+                            className="-mr-1 -mt-0.5 rounded-md p-1 text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-zinc-400">{CONNECTOR_DESCRIPTIONS[name]}</p>
+                </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/[0.05] pt-3">
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusBadge.className}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : isComingSoon ? 'bg-zinc-600' : 'bg-amber-400'}`} />
+                    {statusBadge.label}
+                </span>
+                {connected ? (
+                    <Link
+                        href="/dashboard/settings"
+                        className="text-[12px] font-medium text-zinc-300 transition-colors hover:text-white"
+                    >
+                        Manage →
+                    </Link>
+                ) : isComingSoon ? (
+                    <button
+                        type="button"
+                        disabled
+                        className="cursor-not-allowed rounded-full bg-zinc-800 px-3 py-1.5 text-[12px] font-medium text-zinc-500"
+                    >
+                        Coming soon
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={handleConnect}
+                        className="rounded-full bg-[#22d3ee] px-3.5 py-1.5 text-[12px] font-semibold text-[#06141a]
+                                   shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_8px_rgba(34,211,238,0.30)]
+                                   transition-all hover:brightness-110"
+                    >
+                        Connect {CONNECTOR_LABELS[name]}
+                    </button>
+                )}
+            </div>
         </motion.div>
     );
-    return connected ? (
-        <div title={tooltip} style={{ perspective: 800 }}>{orb}</div>
-    ) : (
-        <Link href="/dashboard/settings" title={tooltip} aria-label={tooltip} style={{ perspective: 800 }}>
-            {orb}
-        </Link>
-    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ *  ProviderConnectionCallback — handles ?connected=... after OAuth redirect
+ *  Lives in its own component so useSearchParams is isolated under <Suspense>.
+ * ───────────────────────────────────────────────────────────────────── */
+function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }) {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const connected = searchParams.get('connected');
+        if (connected !== 'github' && connected !== 'google') return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/auth/register-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: connected }),
+                });
+                if (!cancelled) {
+                    if (res.ok) {
+                        toast.success(connected === 'github' ? 'GitHub connected' : 'Google connected');
+                        onConnected();
+                    } else {
+                        toast.error(`Failed to register ${connected} connection.`);
+                    }
+                }
+            } catch {
+                if (!cancelled) toast.error(`Failed to register ${connected} connection.`);
+            } finally {
+                if (!cancelled) {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete('connected');
+                    const qs = params.toString();
+                    router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [searchParams, router, onConnected]);
+
+    return null;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -215,7 +414,7 @@ export default function AIChat() {
         hasGa4Properties,
         propertyInventoryLoading,
     } = useRegistration();
-    const { hasGoogleConnection, hasGithubConnection } = useContainerStatus();
+    const { hasGoogleConnection, hasGithubConnection, refresh: refreshContainer } = useContainerStatus();
     const { data: session } = useSession();
     const firstName = useMemo(() => session?.user?.name?.trim().split(/\s+/)[0] ?? '', [session?.user?.name]);
     const timeOfDay = useMemo(() => {
@@ -231,6 +430,25 @@ export default function AIChat() {
         { name: 'gsc', connected: hasGoogleConnection },
     ]), [hasGithubConnection, hasGoogleConnection]);
     const connectedCount = useMemo(() => connectors.filter(c => c.connected).length, [connectors]);
+
+    // Connector card — open one at a time, close on outside click.
+    const [openConnector, setOpenConnector] = useState<ConnectorName | null>(null);
+    const railRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!openConnector) return;
+        const handler = (e: MouseEvent) => {
+            if (railRef.current && !railRef.current.contains(e.target as Node)) {
+                setOpenConnector(null);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [openConnector]);
+
+    const handleProviderConnected = useCallback(() => {
+        refreshContainer();
+        setOpenConnector(null);
+    }, [refreshContainer]);
     const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
@@ -512,6 +730,11 @@ export default function AIChat() {
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
                     <div className="relative min-h-full overflow-hidden bg-[#050608]">
+                        {/* OAuth callback handler — runs after signIn() redirects back to ?connected=... */}
+                        <Suspense fallback={null}>
+                            <ProviderConnectionCallback onConnected={handleProviderConnected} />
+                        </Suspense>
+
                         {/* Cosmic background: stars + shooting stars */}
                         <StarField />
 
@@ -541,19 +764,31 @@ export default function AIChat() {
                             />
                         </div>
 
-                        {/* Connector rail — vertical, LEFT edge of chat area (md+) */}
-                        <div className="absolute left-3 top-1/2 z-10 hidden -translate-y-1/2 flex-col items-center gap-3 md:flex lg:left-5">
+                        {/* Connector rail — vertical, LEFT edge (md+); each orb opens an in-place ConnectorCard */}
+                        <div ref={railRef} className="absolute left-3 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-center gap-4 md:flex lg:left-5">
                             {connectors.map((c) => (
-                                <ConnectorOrb key={c.name} name={c.name} connected={c.connected} />
+                                <div key={c.name} className="relative">
+                                    <ConnectorOrb
+                                        name={c.name}
+                                        connected={c.connected}
+                                        isOpen={openConnector === c.name}
+                                        onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
+                                    />
+                                    <AnimatePresence>
+                                        {openConnector === c.name && (
+                                            <ConnectorCard
+                                                name={c.name}
+                                                connected={c.connected}
+                                                onClose={() => setOpenConnector(null)}
+                                            />
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             ))}
                             <div className="mt-1 h-px w-6 bg-white/[0.06]" />
-                            <Link
-                                href="/dashboard/settings"
-                                className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500 transition-colors hover:text-zinc-300"
-                                title="Manage connections"
-                            >
+                            <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500" title="Sources connected">
                                 {connectedCount}/{connectors.length}
-                            </Link>
+                            </span>
                         </div>
 
                         {/* Mobile-only status link — replaces the rail on small screens */}
