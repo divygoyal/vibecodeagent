@@ -4,7 +4,7 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
 import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken, listAnalyticsProperties } from '@/lib/googleApi';
-import { fetchGithubTokenFromDb } from '@/lib/githubApi';
+import { fetchGithubTokenFromDb, fetchGithubAppToken } from '@/lib/githubApi';
 import { GoogleGenAI } from '@google/genai';
 
 export const maxDuration = 300;
@@ -229,12 +229,13 @@ export async function POST(req: NextRequest) {
         // @ts-expect-error - id added in callbacks
         const userId = session.user.id;
 
-        // ── Parallel pre-flight: credits + JWT token + DB tokens (Google + GitHub) ──
-        const [creditResult, jwt, dbTokens, dbGithubToken] = await Promise.all([
+        // ── Parallel pre-flight: credits + JWT token + DB tokens (Google + GitHub OAuth + GitHub App) ──
+        const [creditResult, jwt, dbTokens, dbGithubToken, dbGithubAppToken] = await Promise.all([
             (ADMIN_API_KEY && userId) ? getUserCredits(String(userId)) : Promise.resolve(null),
             getToken({ req: req as any }),
             fetchGoogleTokensFromDb(String(userId)).catch(() => null),
             userId ? fetchGithubTokenFromDb(String(userId)).catch(() => null) : Promise.resolve(null),
+            userId ? fetchGithubAppToken(String(userId)).catch(() => null) : Promise.resolve(null),
         ]);
 
         // Credit gate
@@ -276,8 +277,14 @@ export async function POST(req: NextRequest) {
             googleRefreshToken = dbTokens.refreshToken;
         }
 
-        // ── Get User's GitHub Token (JWT first, DB fallback). No refresh — GitHub OAuth tokens don't expire. ──
+        // ── Resolve User's GitHub Token. Phase 2 preference order:
+        //   1. GitHub App installation token (selective per-repo, server-to-server, ~1h TTL)
+        //   2. JWT-supplied OAuth user token (legacy)
+        //   3. Admin DB OAuth token (legacy fallback)
+        // Without checking the App installation source, users on the new flow appear
+        // as [GitHub:not_connected] and the LLM refuses to engage GitHub tools.
         const githubAccessToken =
+            dbGithubAppToken ||
             ((jwt as any)?.githubAccessToken as string | undefined) ||
             dbGithubToken ||
             undefined;
