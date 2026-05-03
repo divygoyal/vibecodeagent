@@ -106,10 +106,12 @@ const StarField = memo(function StarField() {
         );
     }, []);
 
+    // All shooting stars travel diagonally across the UPPER HALF only —
+    // entering from the upper-left, exiting near the right-mid edge.
     const shootingStars: Array<CSSProperties & { ['--shoot-x']?: string; ['--shoot-y']?: string; ['--shoot-angle']?: string; ['--shoot-dur']?: string; ['--shoot-delay']?: string }> = [
-        { top: '12%', left: '-180px', ['--shoot-x']: '120vw', ['--shoot-y']: '40vh', ['--shoot-angle']: '20deg', ['--shoot-dur']: '7s', ['--shoot-delay']: '0s' } as any,
-        { top: '34%', left: '-180px', ['--shoot-x']: '120vw', ['--shoot-y']: '22vh', ['--shoot-angle']: '12deg', ['--shoot-dur']: '9s', ['--shoot-delay']: '4.5s' } as any,
-        { top: '64%', left: '-180px', ['--shoot-x']: '120vw', ['--shoot-y']: '12vh', ['--shoot-angle']: '8deg',  ['--shoot-dur']: '11s', ['--shoot-delay']: '8.5s' } as any,
+        { top: '4%',  left: '-200px', ['--shoot-x']: '118vw', ['--shoot-y']: '40vh', ['--shoot-angle']: '22deg', ['--shoot-dur']: '8s',  ['--shoot-delay']: '0s' } as any,
+        { top: '8%',  left: '-200px', ['--shoot-x']: '118vw', ['--shoot-y']: '36vh', ['--shoot-angle']: '21deg', ['--shoot-dur']: '10s', ['--shoot-delay']: '5s' } as any,
+        { top: '12%', left: '-220px', ['--shoot-x']: '118vw', ['--shoot-y']: '34vh', ['--shoot-angle']: '20deg', ['--shoot-dur']: '12s', ['--shoot-delay']: '10s' } as any,
     ];
 
     return (
@@ -516,7 +518,27 @@ export default function AIChat() {
                         {/* Breathing radial halos — focal weight at the input area */}
                         <div aria-hidden className="pointer-events-none absolute inset-0">
                             <div className="tc-breathe absolute left-1/2 top-[52%] h-[560px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(122,217,218,0.10),transparent_65%)] blur-3xl" />
-                            <div className="tc-breathe absolute left-1/2 top-[52%] h-[300px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(52,211,153,0.08),transparent_70%)] blur-2xl" style={{ animationDelay: '2.5s' }} />
+                            <div className="tc-breathe absolute left-1/2 top-[52%] h-[300px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.08),transparent_70%)] blur-2xl" style={{ animationDelay: '2.5s' }} />
+                        </div>
+
+                        {/* Earth-horizon atmospheric glow — brand teal/cyan at the bottom */}
+                        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] overflow-hidden">
+                            <div
+                                className="absolute -bottom-[260px] left-1/2 h-[520px] w-[180%] -translate-x-1/2 rounded-[50%] blur-3xl"
+                                style={{
+                                    background:
+                                        'radial-gradient(ellipse at center top, rgba(34,211,238,0.28) 0%, rgba(122,217,218,0.16) 28%, rgba(34,211,238,0.06) 55%, transparent 75%)',
+                                }}
+                            />
+                            {/* Thin horizon accent line — subtle planet-curve hint */}
+                            <div
+                                className="absolute bottom-0 left-1/2 h-[2px] w-[70%] -translate-x-1/2 rounded-full opacity-60"
+                                style={{
+                                    background:
+                                        'linear-gradient(90deg, transparent 0%, rgba(122,217,218,0.45) 50%, transparent 100%)',
+                                    filter: 'blur(1.5px)',
+                                }}
+                            />
                         </div>
 
                         {/* Connector rail — vertical, LEFT edge of chat area (md+) */}
@@ -558,13 +580,13 @@ export default function AIChat() {
 
                             {/* The hero input — elevated + slow-rotating conic halo for energy */}
                             <div className="relative mt-10 w-full max-w-3xl">
-                                {/* Slow-rotating conic gradient — focal energy without being a marketing glow */}
+                                {/* Slow-rotating conic gradient — focal energy in brand cyan/teal */}
                                 <div aria-hidden className="pointer-events-none absolute -inset-3 overflow-hidden rounded-[28px]">
                                     <div
                                         className="tc-spin-slow absolute inset-0 rounded-[28px] opacity-70 blur-2xl"
                                         style={{
                                             background:
-                                                'conic-gradient(from 0deg, rgba(34,211,238,0.22) 0%, transparent 28%, rgba(52,211,153,0.22) 55%, transparent 82%, rgba(34,211,238,0.22) 100%)',
+                                                'conic-gradient(from 0deg, rgba(34,211,238,0.24) 0%, transparent 28%, rgba(122,217,218,0.22) 55%, transparent 82%, rgba(34,211,238,0.24) 100%)',
                                         }}
                                     />
                                 </div>
@@ -584,7 +606,7 @@ export default function AIChat() {
                                         placeholder="Ask anything about your traffic…"
                                         disabled={isLoading || !dataReady}
                                         rows={1}
-                                        className="w-full resize-none bg-transparent px-6 pt-5 pb-3 text-[15.5px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 caret-emerald-400 outline-none max-h-44 disabled:opacity-40"
+                                        className="w-full resize-none bg-transparent px-6 pt-5 pb-3 text-[15.5px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 caret-cyan-400 outline-none max-h-44 disabled:opacity-40"
                                     />
                                     <div className="flex items-center justify-between gap-2 px-3 pb-3">
                                         <div className="relative" ref={dropdownRef}>
@@ -622,8 +644,8 @@ export default function AIChat() {
                                             onClick={() => sendMessage()}
                                             disabled={!input.trim() || isLoading || !dataReady}
                                             aria-label="Send"
-                                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#34d399] text-zinc-950
-                                                       shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_8px_rgba(52,211,153,0.20)]
+                                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#22d3ee] text-[#06141a]
+                                                       shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_10px_rgba(34,211,238,0.30)]
                                                        transition-all enabled:hover:brightness-105
                                                        disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
                                         >
