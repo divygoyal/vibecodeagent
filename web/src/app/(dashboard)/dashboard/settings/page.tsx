@@ -193,6 +193,20 @@ export default function SettingsPage() {
                         icon={<Github className="w-4 h-4 text-white" />}
                         connected={hasGithubConnection}
                         onConnect={() => { window.location.href = '/api/auth/github-app/install'; }}
+                        onDisconnect={async () => {
+                            if (!confirm('Disconnect GitHub from TrafficClaw? You can also fully revoke access by uninstalling on github.com/settings/installations.')) return;
+                            try {
+                                const res = await fetch('/api/github-app/disconnect', { method: 'POST' });
+                                if (res.ok) {
+                                    toast.success('GitHub disconnected.');
+                                    refreshContainer();
+                                } else {
+                                    toast.error('Failed to disconnect GitHub.');
+                                }
+                            } catch {
+                                toast.error('Failed to disconnect GitHub.');
+                            }
+                        }}
                     />
                     <ServiceRow
                         name="Vercel"
@@ -278,12 +292,13 @@ export default function SettingsPage() {
     );
 }
 
-function ServiceRow({ name, description, connected, icon, onConnect, comingSoon }: {
+function ServiceRow({ name, description, connected, icon, onConnect, onDisconnect, comingSoon }: {
     name: string;
     description: string;
     connected: boolean;
     icon: React.ReactNode;
     onConnect?: () => void;
+    onDisconnect?: () => void | Promise<void>;
     comingSoon?: boolean;
 }) {
     return (
@@ -298,9 +313,20 @@ function ServiceRow({ name, description, connected, icon, onConnect, comingSoon 
                 </div>
             </div>
             {connected ? (
-                <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shrink-0">
-                    <CheckCircle2 className="w-2.5 h-2.5" /> Connected
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Connected
+                    </span>
+                    {onDisconnect && (
+                        <button
+                            onClick={onDisconnect}
+                            className="text-[11px] text-red-400 hover:text-red-300 transition px-2 py-1 rounded-md border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/[0.06]"
+                            title="Disconnect"
+                        >
+                            Disconnect
+                        </button>
+                    )}
+                </div>
             ) : comingSoon ? (
                 <span className="text-[10px] bg-white/[0.04] text-zinc-400 px-2 py-0.5 rounded-full font-medium shrink-0 border border-white/[0.06]">
                     Coming soon

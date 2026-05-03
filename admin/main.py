@@ -1993,6 +1993,59 @@ async def list_user_github_app_repositories(
     return {"installed": True, "repos": repos}
 
 
+@app.delete("/api/users/{github_id}/github-app/installations/{installation_id}")
+async def delete_user_github_app_installation(
+    github_id: str,
+    installation_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Disconnect a GitHub App installation from the user. Removes our DB row +
+    invalidates the cached token. Does NOT uninstall the App on GitHub itself —
+    user must do that at https://github.com/settings/installations to revoke
+    actual repo access."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(
+        select(GitHubAppInstallation).where(
+            GitHubAppInstallation.user_id == user.id,
+            GitHubAppInstallation.installation_id == installation_id,
+        )
+    )
+    row = result.scalars().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Installation not found for this user")
+    await db.delete(row)
+    await db.commit()
+    github_app_invalidate_token(installation_id)
+    return {"status": "disconnected", "installation_id": installation_id}
+
+
+@app.delete("/api/users/{github_id}/github-app/installations")
+async def delete_all_user_github_app_installations(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Convenience: disconnect ALL of the user's installations in one call —
+    used by the chat-page Disconnect button which doesn't track ids client-side."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(
+        select(GitHubAppInstallation).where(GitHubAppInstallation.user_id == user.id)
+    )
+    rows = result.scalars().all()
+    removed = 0
+    for row in rows:
+        github_app_invalidate_token(row.installation_id)
+        await db.delete(row)
+        removed += 1
+    await db.commit()
+    return {"status": "disconnected", "removed": removed}
+
+
 @app.get("/api/users/{github_id}/github-app/token")
 async def get_user_github_app_token(
     github_id: str,

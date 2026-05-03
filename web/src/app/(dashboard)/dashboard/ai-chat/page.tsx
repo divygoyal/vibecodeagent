@@ -251,9 +251,10 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
 /* ─────────────────────────────────────────────────────────────────────
  *  ConnectorCard — popover next to the orb with native Connect button
  * ───────────────────────────────────────────────────────────────────── */
-function ConnectorCard({ name, connected, onClose, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; placement?: 'right' | 'below' }) {
+function ConnectorCard({ name, connected, onClose, onDisconnected, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; onDisconnected?: () => void; placement?: 'right' | 'below' }) {
     const isComingSoon = COMING_SOON.has(name);
     const targetProvider = nativeProviderFor(name);
+    const [disconnecting, setDisconnecting] = useState(false);
 
     const handleConnect = () => {
         if (!targetProvider) return;
@@ -265,6 +266,26 @@ function ConnectorCard({ name, connected, onClose, placement = 'right' }: { name
         }
         const callbackUrl = `/dashboard/ai-chat?connected=${targetProvider}`;
         void signIn('google', { callbackUrl }, { prompt: 'select_account consent' });
+    };
+
+    const handleDisconnect = async () => {
+        if (name !== 'github') return;
+        if (disconnecting) return;
+        setDisconnecting(true);
+        try {
+            const res = await fetch('/api/github-app/disconnect', { method: 'POST' });
+            if (res.ok) {
+                toast.success('GitHub disconnected. To fully revoke access, also uninstall on github.com/settings/installations.');
+                onDisconnected?.();
+                onClose();
+            } else {
+                toast.error('Failed to disconnect GitHub.');
+            }
+        } catch {
+            toast.error('Failed to disconnect GitHub.');
+        } finally {
+            setDisconnecting(false);
+        }
     };
 
     const statusBadge = connected
@@ -316,12 +337,23 @@ function ConnectorCard({ name, connected, onClose, placement = 'right' }: { name
                     {statusBadge.label}
                 </span>
                 {connected ? (
-                    <Link
-                        href="/dashboard/settings"
-                        className="text-[12px] font-medium text-zinc-300 transition-colors hover:text-white"
-                    >
-                        Manage →
-                    </Link>
+                    name === 'github' ? (
+                        <button
+                            type="button"
+                            onClick={handleDisconnect}
+                            disabled={disconnecting}
+                            className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[12px] font-medium text-red-300 transition-colors hover:bg-red-500/20 hover:text-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                        </button>
+                    ) : (
+                        <Link
+                            href="/dashboard/settings"
+                            className="text-[12px] font-medium text-zinc-300 transition-colors hover:text-white"
+                        >
+                            Manage →
+                        </Link>
+                    )
                 ) : isComingSoon ? (
                     <button
                         type="button"
@@ -972,6 +1004,7 @@ export default function AIChat() {
                                         name={openConnector}
                                         connected={connectors.find(c => c.name === openConnector)?.connected ?? false}
                                         onClose={() => setOpenConnector(null)}
+                                        onDisconnected={handleProviderConnected}
                                     />
                                 )}
                             </AnimatePresence>
@@ -995,6 +1028,7 @@ export default function AIChat() {
                                                 name={c.name}
                                                 connected={c.connected}
                                                 onClose={() => setOpenConnector(null)}
+                                                onDisconnected={handleProviderConnected}
                                             />
                                         )}
                                     </AnimatePresence>
