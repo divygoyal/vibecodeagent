@@ -125,13 +125,6 @@ const StarField = memo(function StarField() {
         );
     }, []);
 
-    // Steep corner-to-corner meteors: enter top-left edge, exit bottom-right.
-    const shootingStars: Array<CSSProperties & { ['--shoot-x']?: string; ['--shoot-y']?: string; ['--shoot-angle']?: string; ['--shoot-dur']?: string; ['--shoot-delay']?: string }> = [
-        { top: '-2%', left: '-200px', ['--shoot-x']: '120vw', ['--shoot-y']: '85vh', ['--shoot-angle']: '38deg', ['--shoot-dur']: '8s',  ['--shoot-delay']: '0s' } as any,
-        { top: '0%',  left: '-220px', ['--shoot-x']: '120vw', ['--shoot-y']: '78vh', ['--shoot-angle']: '36deg', ['--shoot-dur']: '11s', ['--shoot-delay']: '5s' } as any,
-        { top: '6%',  left: '-240px', ['--shoot-x']: '120vw', ['--shoot-y']: '70vh', ['--shoot-angle']: '34deg', ['--shoot-dur']: '13s', ['--shoot-delay']: '10s' } as any,
-    ];
-
     return (
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
             {stars.map((s) => (
@@ -149,9 +142,6 @@ const StarField = memo(function StarField() {
                         ['--twinkle-delay' as any]: `${s.delay}s`,
                     } as CSSProperties}
                 />
-            ))}
-            {shootingStars.map((style, i) => (
-                <span key={i} className="tc-shooting-star" style={style as CSSProperties} />
             ))}
         </div>
     );
@@ -236,7 +226,7 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
                 {/* Status dot — sits outside the rotating sphere so it stays steady */}
                 <span
                     aria-hidden
-                    className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#050608] ${
+                    className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-black ${
                         connected ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85)]' : 'bg-zinc-700'
                     }`}
                 />
@@ -749,7 +739,7 @@ export default function AIChat() {
             {/* ── Messages / Empty State ── */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
-                    <div className="relative min-h-full overflow-hidden bg-[#050608]">
+                    <div className="relative min-h-full overflow-hidden bg-black">
                         {/* OAuth callback handler — runs after signIn() redirects back to ?connected=... */}
                         <Suspense fallback={null}>
                             <ProviderConnectionCallback onConnected={handleProviderConnected} />
