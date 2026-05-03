@@ -125,12 +125,11 @@ const StarField = memo(function StarField() {
         );
     }, []);
 
-    // All shooting stars travel diagonally across the UPPER HALF only —
-    // entering from the upper-left, exiting near the right-mid edge.
+    // Steep corner-to-corner meteors: enter top-left edge, exit bottom-right.
     const shootingStars: Array<CSSProperties & { ['--shoot-x']?: string; ['--shoot-y']?: string; ['--shoot-angle']?: string; ['--shoot-dur']?: string; ['--shoot-delay']?: string }> = [
-        { top: '4%',  left: '-200px', ['--shoot-x']: '118vw', ['--shoot-y']: '40vh', ['--shoot-angle']: '22deg', ['--shoot-dur']: '8s',  ['--shoot-delay']: '0s' } as any,
-        { top: '8%',  left: '-200px', ['--shoot-x']: '118vw', ['--shoot-y']: '36vh', ['--shoot-angle']: '21deg', ['--shoot-dur']: '10s', ['--shoot-delay']: '5s' } as any,
-        { top: '12%', left: '-220px', ['--shoot-x']: '118vw', ['--shoot-y']: '34vh', ['--shoot-angle']: '20deg', ['--shoot-dur']: '12s', ['--shoot-delay']: '10s' } as any,
+        { top: '-2%', left: '-200px', ['--shoot-x']: '120vw', ['--shoot-y']: '85vh', ['--shoot-angle']: '38deg', ['--shoot-dur']: '8s',  ['--shoot-delay']: '0s' } as any,
+        { top: '0%',  left: '-220px', ['--shoot-x']: '120vw', ['--shoot-y']: '78vh', ['--shoot-angle']: '36deg', ['--shoot-dur']: '11s', ['--shoot-delay']: '5s' } as any,
+        { top: '6%',  left: '-240px', ['--shoot-x']: '120vw', ['--shoot-y']: '70vh', ['--shoot-angle']: '34deg', ['--shoot-dur']: '13s', ['--shoot-delay']: '10s' } as any,
     ];
 
     return (
@@ -177,26 +176,37 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
             aria-label={tooltip}
             aria-expanded={isOpen}
             style={{ perspective: 800 }}
-            className="relative inline-flex h-10 w-10 items-center justify-center outline-none"
+            className="relative inline-flex h-12 w-12 items-center justify-center outline-none"
         >
-            {/* Atmospheric glow ring — fades in on hover/open */}
+            {/* Always-on faint glow — signals interactivity at a glance */}
+            <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full opacity-50"
+                style={{
+                    background:
+                        'radial-gradient(circle, rgba(34,211,238,0.18) 0%, transparent 65%)',
+                    filter: 'blur(8px)',
+                }}
+            />
+
+            {/* Atmospheric glow ring — brightens on hover/open */}
             <motion.span
                 aria-hidden
-                animate={{ opacity: active ? 0.95 : 0, scale: active ? 1.6 : 1 }}
+                animate={{ opacity: active ? 1 : 0, scale: active ? 1.7 : 1 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 className="pointer-events-none absolute inset-0 rounded-full"
                 style={{
                     background:
-                        'radial-gradient(circle, rgba(34,211,238,0.45) 0%, rgba(122,217,218,0.18) 38%, transparent 70%)',
-                    filter: 'blur(10px)',
+                        'radial-gradient(circle, rgba(34,211,238,0.55) 0%, rgba(122,217,218,0.22) 38%, transparent 72%)',
+                    filter: 'blur(12px)',
                 }}
             />
 
-            {/* Outer wrapper handles scale (no Y rotation here) */}
+            {/* Outer wrapper handles scale */}
             <motion.span
-                animate={{ scale: active ? 1.32 : 1 }}
+                animate={{ scale: active ? 1.28 : 1 }}
                 transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                className="relative inline-flex h-10 w-10 items-center justify-center"
+                className="relative inline-flex h-12 w-12 items-center justify-center"
             >
                 {/* Inner sphere — continuous rotateY while hovered */}
                 <motion.span
@@ -207,18 +217,18 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
                             : { duration: 0.6, ease: 'easeOut' }
                     }
                     style={{ transformStyle: 'preserve-3d' }}
-                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full
-                               border border-white/[0.08] bg-gradient-to-b from-[#11161d] to-[#06090d]
-                               shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-2px_4px_rgba(0,0,0,0.5),0_4px_14px_rgba(0,0,0,0.45)]"
+                    className="relative inline-flex h-12 w-12 items-center justify-center rounded-full
+                               border border-white/[0.12] bg-gradient-to-b from-[#141a23] to-[#06090d]
+                               shadow-[inset_0_1px_0_rgba(255,255,255,0.10),inset_0_-2px_4px_rgba(0,0,0,0.55),0_6px_16px_rgba(0,0,0,0.5)]"
                 >
-                    <ConnectorIcon name={name} className={`h-4 w-4 ${connected ? 'text-zinc-100' : 'text-zinc-500'}`} />
-                    {/* Sphere lighting — top-left highlight that reads as 3D even at rest */}
+                    <ConnectorIcon name={name} className={`h-[18px] w-[18px] ${connected ? 'text-zinc-100' : 'text-zinc-400'}`} />
+                    {/* Sphere lighting — top-left highlight */}
                     <span
                         aria-hidden
                         className="pointer-events-none absolute inset-0 rounded-full"
                         style={{
                             background:
-                                'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16) 0%, transparent 50%)',
+                                'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.18) 0%, transparent 50%)',
                         }}
                     />
                 </motion.span>
@@ -226,8 +236,8 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
                 {/* Status dot — sits outside the rotating sphere so it stays steady */}
                 <span
                     aria-hidden
-                    className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-[#050608] ${
-                        connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]' : 'bg-zinc-700'
+                    className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#050608] ${
+                        connected ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85)]' : 'bg-zinc-700'
                     }`}
                 />
             </motion.span>
@@ -238,7 +248,7 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
 /* ─────────────────────────────────────────────────────────────────────
  *  ConnectorCard — popover next to the orb with native Connect button
  * ───────────────────────────────────────────────────────────────────── */
-function ConnectorCard({ name, connected, onClose }: { name: ConnectorName; connected: boolean; onClose: () => void }) {
+function ConnectorCard({ name, connected, onClose, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; placement?: 'right' | 'below' }) {
     const isComingSoon = COMING_SOON.has(name);
     const targetProvider = nativeProviderFor(name);
 
@@ -258,16 +268,22 @@ function ConnectorCard({ name, connected, onClose }: { name: ConnectorName; conn
             ? { label: 'Coming soon', className: 'bg-zinc-800 text-zinc-400 border-white/[0.06]' }
             : { label: 'Not connected', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20' };
 
+    const positionClass = placement === 'right'
+        ? 'left-16 top-1/2 -translate-y-1/2'
+        : 'left-1/2 top-[calc(100%+10px)] -translate-x-1/2';
+    const initialOffset = placement === 'right' ? { x: -12, y: '-50%' as const } : { x: '-50%' as const, y: -12 };
+    const animateOffset = placement === 'right' ? { x: 0, y: '-50%' as const } : { x: '-50%' as const, y: 0 };
+
     return (
         <motion.div
-            initial={{ opacity: 0, x: -12, scale: 0.97 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -12, scale: 0.97 }}
+            initial={{ opacity: 0, scale: 0.97, ...initialOffset }}
+            animate={{ opacity: 1, scale: 1, ...animateOffset }}
+            exit={{ opacity: 0, scale: 0.97, ...initialOffset }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             role="dialog"
             aria-label={`${CONNECTOR_LABELS[name]} connection`}
-            className="absolute left-14 top-1/2 z-30 w-[280px] -translate-y-1/2 rounded-2xl border border-white/[0.10] bg-[#0d1117]/98
-                       p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_60px_rgba(0,0,0,0.65)] backdrop-blur"
+            className={`absolute z-30 w-[min(320px,calc(100vw-2rem))] rounded-2xl border border-white/[0.10] bg-[#0d1117]/98
+                       p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_60px_rgba(0,0,0,0.65)] backdrop-blur ${positionClass}`}
         >
             <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-[#0a0d12]">
@@ -433,11 +449,15 @@ export default function AIChat() {
 
     // Connector card — open one at a time, close on outside click.
     const [openConnector, setOpenConnector] = useState<ConnectorName | null>(null);
-    const railRef = useRef<HTMLDivElement>(null);
+    const desktopRailRef = useRef<HTMLDivElement>(null);
+    const mobileRailRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (!openConnector) return;
         const handler = (e: MouseEvent) => {
-            if (railRef.current && !railRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            const inDesktop = desktopRailRef.current?.contains(target);
+            const inMobile = mobileRailRef.current?.contains(target);
+            if (!inDesktop && !inMobile) {
                 setOpenConnector(null);
             }
         };
@@ -764,8 +784,45 @@ export default function AIChat() {
                             />
                         </div>
 
-                        {/* Connector rail — vertical, LEFT edge (md+); each orb opens an in-place ConnectorCard */}
-                        <div ref={railRef} className="absolute left-3 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-center gap-4 md:flex lg:left-5">
+                        {/* Foreground: responsive flex layout (mobile column / desktop row) */}
+                        <div className="relative z-10 flex min-h-full flex-col md:flex-row">
+
+                        {/* MOBILE rail — horizontal strip at top of empty state */}
+                        <div ref={mobileRailRef} className="relative md:hidden border-b border-white/[0.05] bg-black/40 px-4 pb-3 pt-3 backdrop-blur">
+                            <div className="mb-2.5 flex items-center justify-between">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.20em] text-zinc-400">Sources</span>
+                                <span className="inline-flex items-center gap-1.5 text-[10px] text-zinc-500">
+                                    <span className={`h-1.5 w-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
+                                    <span className="text-zinc-300">{connectedCount}</span>/<span>{connectors.length}</span> connected
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3 overflow-x-auto pb-1">
+                                {connectors.map((c) => (
+                                    <div key={c.name} className="shrink-0">
+                                        <ConnectorOrb
+                                            name={c.name}
+                                            connected={c.connected}
+                                            isOpen={openConnector === c.name}
+                                            onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            <AnimatePresence>
+                                {openConnector && (
+                                    <ConnectorCard
+                                        placement="below"
+                                        name={openConnector}
+                                        connected={connectors.find(c => c.name === openConnector)?.connected ?? false}
+                                        onClose={() => setOpenConnector(null)}
+                                    />
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* DESKTOP rail — vertical column on the left */}
+                        <div ref={desktopRailRef} className="hidden md:flex md:w-[88px] md:flex-col md:items-center md:justify-center md:gap-3 md:py-12 md:pl-3 lg:w-[104px] lg:pl-5">
+                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-400">Sources</div>
                             {connectors.map((c) => (
                                 <div key={c.name} className="relative">
                                     <ConnectorOrb
@@ -777,6 +834,7 @@ export default function AIChat() {
                                     <AnimatePresence>
                                         {openConnector === c.name && (
                                             <ConnectorCard
+                                                placement="right"
                                                 name={c.name}
                                                 connected={c.connected}
                                                 onClose={() => setOpenConnector(null)}
@@ -785,23 +843,14 @@ export default function AIChat() {
                                     </AnimatePresence>
                                 </div>
                             ))}
-                            <div className="mt-1 h-px w-6 bg-white/[0.06]" />
-                            <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500" title="Sources connected">
-                                {connectedCount}/{connectors.length}
-                            </span>
+                            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-[#0a0d12] px-2.5 py-1.5">
+                                <span className={`h-1.5 w-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
+                                <span className="text-[10px] font-medium text-zinc-300">{connectedCount}/{connectors.length}</span>
+                            </div>
                         </div>
 
-                        {/* Mobile-only status link — replaces the rail on small screens */}
-                        <Link
-                            href="/dashboard/settings"
-                            className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#0a0d12]/80 px-3 py-1.5 text-[11px] text-zinc-400 backdrop-blur md:hidden"
-                        >
-                            <span className={`h-1.5 w-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
-                            {connectedCount}/{connectors.length} sources
-                        </Link>
-
-                        {/* Centered hero */}
-                        <div className="relative flex min-h-full flex-col items-center justify-center px-4 pb-16 pt-24 sm:px-8 sm:pt-20">
+                        {/* Centered hero — takes remaining width */}
+                        <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-10 sm:px-8 md:pt-12 md:pb-16">
                             <div className="text-center">
                                 {firstName && (
                                     <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
@@ -907,17 +956,13 @@ export default function AIChat() {
                                 ))}
                             </div>
 
-                            {/* Footer micro-text */}
-                            <div className="mt-12 max-w-md text-center text-[11px] text-zinc-600">
-                                Powered by Gemini · cross-references GA4{hasGoogleConnection && ', Search Console'}{hasGithubConnection && ', and your GitHub repos'}
-                            </div>
-
                             {!dataReady && hasGoogleConnection && (
-                                <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
+                                <div className="mt-8 flex items-center gap-2 text-xs text-zinc-500">
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                     Loading your analytics and search data…
                                 </div>
                             )}
+                        </div>
                         </div>
                     </div>
                 ) : (
