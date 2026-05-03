@@ -149,7 +149,43 @@ const StarField = memo(function StarField() {
 });
 
 /* ─────────────────────────────────────────────────────────────────────
+ *  ConnectorPill — horizontal pill (logo + name + status dot)
+ *  Used in the new top-of-hero row. Replaces the vertical rail orbs.
+ * ───────────────────────────────────────────────────────────────────── */
+function ConnectorPill({ name, connected, isOpen, onClick }: { name: ConnectorName; connected: boolean; isOpen: boolean; onClick: () => void }) {
+    const tooltip = `${CONNECTOR_LABELS[name]} · ${connected ? 'Connected' : 'Click to connect'}`;
+    const active = isOpen;
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={tooltip}
+            aria-label={tooltip}
+            aria-expanded={isOpen}
+            className={`group relative inline-flex h-12 items-center gap-2.5 rounded-full border px-3.5 transition-all
+                ${active
+                    ? 'border-cyan-400/40 bg-[#0e1218] shadow-[0_0_0_3px_rgba(34,211,238,0.10)]'
+                    : 'border-white/[0.08] bg-[#0a0d12] hover:border-white/[0.18] hover:bg-[#0e1218]'}`}
+        >
+            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-gradient-to-b from-[#141a23] to-[#06090d] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <ConnectorIcon name={name} className="h-4 w-4 text-white" />
+            </span>
+            <span className="text-[13px] font-medium text-zinc-100">{CONNECTOR_LABELS[name]}</span>
+            <span
+                aria-hidden
+                className={`ml-1 h-2 w-2 shrink-0 rounded-full ${
+                    connected
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85),0_0_14px_rgba(52,211,153,0.35)]'
+                        : 'bg-zinc-700'
+                }`}
+            />
+        </button>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
  *  ConnectorOrb — globe-on-hover sphere with click-to-open card
+ *  (legacy — kept for any code that still references it; new layout uses ConnectorPill)
  * ───────────────────────────────────────────────────────────────────── */
 function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorName; connected: boolean; isOpen: boolean; onClick: () => void }) {
     const [hovered, setHovered] = useState(false);
@@ -1003,75 +1039,41 @@ export default function AIChat() {
                             />
                         </div>
 
-                        {/* Foreground: responsive flex layout (mobile column / desktop row) */}
-                        <div className="relative z-10 flex min-h-full flex-col md:flex-row">
+                        {/* Foreground: single-column layout — connectors strip + hero stack */}
+                        <div className="relative z-10 flex min-h-full flex-col">
 
-                        {/* MOBILE rail — horizontal strip at top of empty state */}
-                        <div ref={mobileRailRef} className="relative md:hidden border-b border-white/[0.05] bg-black/40 px-4 pb-3 pt-3 backdrop-blur">
-                            <div className="mb-2.5 flex items-center justify-between">
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.20em] text-zinc-400">Sources</span>
-                                <span className="inline-flex items-center gap-1.5 text-[10px] text-zinc-500">
-                                    <span className={`h-1.5 w-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
-                                    <span className="text-zinc-300">{connectedCount}</span>/<span>{connectors.length}</span> connected
-                                </span>
+                        {/* Centered hero — connectors strip + headline + input + suggestions */}
+                        <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-10 sm:px-8 md:pt-12 md:pb-16">
+
+                        {/* Connectors strip — horizontal pills row at top of hero */}
+                        <div ref={desktopRailRef} className="mb-10 flex w-full max-w-5xl flex-col items-center gap-3.5">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                                {connectedCount} of {connectors.length} sources connected
                             </div>
-                            <div className="flex items-center gap-3 overflow-x-auto pb-1">
+                            <div ref={mobileRailRef} className="flex w-full flex-wrap items-center justify-center gap-2.5 overflow-x-auto px-2">
                                 {connectors.map((c) => (
-                                    <div key={c.name} className="shrink-0">
-                                        <ConnectorOrb
+                                    <div key={c.name} className="relative shrink-0">
+                                        <ConnectorPill
                                             name={c.name}
                                             connected={c.connected}
                                             isOpen={openConnector === c.name}
                                             onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
                                         />
+                                        <AnimatePresence>
+                                            {openConnector === c.name && (
+                                                <ConnectorCard
+                                                    placement="below"
+                                                    name={c.name}
+                                                    connected={c.connected}
+                                                    onClose={() => setOpenConnector(null)}
+                                                    onDisconnected={handleProviderConnected}
+                                                />
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 ))}
                             </div>
-                            <AnimatePresence>
-                                {openConnector && (
-                                    <ConnectorCard
-                                        placement="below"
-                                        name={openConnector}
-                                        connected={connectors.find(c => c.name === openConnector)?.connected ?? false}
-                                        onClose={() => setOpenConnector(null)}
-                                        onDisconnected={handleProviderConnected}
-                                    />
-                                )}
-                            </AnimatePresence>
                         </div>
-
-                        {/* DESKTOP rail — vertical column on the left */}
-                        <div ref={desktopRailRef} className="hidden md:flex md:w-[88px] md:flex-col md:items-center md:justify-center md:gap-3 md:py-12 md:pl-3 lg:w-[104px] lg:pl-5">
-                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-400">Sources</div>
-                            {connectors.map((c) => (
-                                <div key={c.name} className="relative">
-                                    <ConnectorOrb
-                                        name={c.name}
-                                        connected={c.connected}
-                                        isOpen={openConnector === c.name}
-                                        onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
-                                    />
-                                    <AnimatePresence>
-                                        {openConnector === c.name && (
-                                            <ConnectorCard
-                                                placement="right"
-                                                name={c.name}
-                                                connected={c.connected}
-                                                onClose={() => setOpenConnector(null)}
-                                                onDisconnected={handleProviderConnected}
-                                            />
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            ))}
-                            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-[#0a0d12] px-2.5 py-1.5">
-                                <span className={`h-1.5 w-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
-                                <span className="text-[10px] font-medium text-zinc-300">{connectedCount}/{connectors.length}</span>
-                            </div>
-                        </div>
-
-                        {/* Centered hero — takes remaining width */}
-                        <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-10 sm:px-8 md:pt-12 md:pb-16">
                             <div className="text-center">
                                 {firstName && (
                                     <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
