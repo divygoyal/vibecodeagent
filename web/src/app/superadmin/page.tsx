@@ -6,7 +6,8 @@ import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
     Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
     Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check,
-    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Loader2
+    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Loader2,
+    Trophy, ShieldCheck, ShieldOff
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -152,6 +153,37 @@ interface LeaderboardData {
     last_refreshed?: string | null
     created_at?: string | null
     updated_at?: string | null
+}
+
+interface LeaderboardModerationEntry {
+    id: number
+    is_active: boolean
+    startup_name: string
+    description?: string | null
+    website_url?: string | null
+    logo_url?: string | null
+    category?: string | null
+    mrr_range?: string | null
+    looking_for: string[]
+    twitter_handle?: string | null
+    ga_property_id?: string | null
+    monthly_visitors: number
+    monthly_pageviews: number
+    engagement_rate: number
+    bounce_rate: number
+    visitor_trend: number
+    is_verified: boolean
+    verification_status: string
+    verified_host?: string | null
+    primary_country?: string | null
+    last_refreshed?: string | null
+    created_at?: string | null
+    user?: {
+        id: number
+        github_id?: string | null
+        email?: string | null
+        github_username?: string | null
+    } | null
 }
 
 interface UserProfileEvent {
@@ -488,11 +520,12 @@ export default function SuperAdminPage() {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({ onSignOut }: { onSignOut: () => void }) {
-    const [tab, setTab] = useState<'users' | 'events' | 'system' | 'queries'>('users')
+    const [tab, setTab] = useState<'users' | 'events' | 'system' | 'queries' | 'leaderboard'>('users')
     const [status, setStatus] = useState<StatusData | null>(null)
     const [users, setUsers] = useState<UserData[]>([])
     const [events, setEvents] = useState<EventData[]>([])
     const [queries, setQueries] = useState<QueryData[]>([])
+    const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardModerationEntry[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
@@ -501,16 +534,19 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     const fetchData = useCallback(async () => {
         try {
             setError('')
-            const [statusData, usersData, eventsData, queriesData] = await Promise.all([
+            const [statusData, usersData, eventsData, queriesData, leaderboardData] = await Promise.all([
                 apiGet('status'),
                 apiGet('users'),
                 apiGet('events'),
-                apiGet('queries').catch(() => [])
+                apiGet('queries').catch(() => []),
+                apiGet('leaderboard').catch(() => ({ entries: [] }))
             ])
             setStatus(statusData)
             setUsers(Array.isArray(usersData) ? usersData : [])
             setEvents(Array.isArray(eventsData) ? eventsData : [])
             setQueries(Array.isArray(queriesData) ? queriesData : [])
+            const lbEntries = leaderboardData?.entries
+            setLeaderboardEntries(Array.isArray(lbEntries) ? lbEntries : [])
         } catch (err) {
             const message = getErrorMessage(err)
             if (isSuperadminAuthError(message)) {
@@ -544,9 +580,14 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 
     const newQueryCount = queries.filter(q => q.status === 'new').length
 
+    const pendingLeaderboardCount = leaderboardEntries.filter(
+        (e) => e.is_active && e.verification_status !== 'verified',
+    ).length
+
     const tabs = [
         { key: 'users' as const, label: 'Users', icon: Users, badge: 0 },
         { key: 'queries' as const, label: 'Queries', icon: MessageSquare, badge: newQueryCount },
+        { key: 'leaderboard' as const, label: 'Leaderboard', icon: Trophy, badge: pendingLeaderboardCount },
         { key: 'events' as const, label: 'Events', icon: Clock, badge: 0 },
         { key: 'system' as const, label: 'System', icon: Server, badge: 0 },
     ]
@@ -664,6 +705,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                             />
                         )}
                         {tab === 'queries' && <QueriesTab queries={queries} onRefresh={fetchData} />}
+                        {tab === 'leaderboard' && <LeaderboardTab entries={leaderboardEntries} onRefresh={fetchData} />}
                         {tab === 'events' && <EventsTab events={events} />}
                         {tab === 'system' && <SystemTab status={status} capacity={capacity} />}
                     </motion.div>
@@ -2005,6 +2047,238 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
                 )}
             </AnimatePresence>
         </div>
+    )
+}
+
+// ─── Leaderboard Tab ─────────────────────────────────────────────────────────
+
+function LeaderboardTab({
+    entries,
+    onRefresh,
+}: {
+    entries: LeaderboardModerationEntry[]
+    onRefresh: () => void
+}) {
+    const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'mismatch' | 'inactive'>('all')
+    const [busyId, setBusyId] = useState<number | null>(null)
+    const [actionError, setActionError] = useState('')
+
+    const filtered = entries.filter((e) => {
+        if (filter === 'verified') return e.verification_status === 'verified' && e.is_active
+        if (filter === 'pending') return e.is_active && (e.verification_status === 'pending' || e.verification_status === 'failed')
+        if (filter === 'mismatch') return e.verification_status === 'host_mismatch' || e.verification_status === 'no_web_stream'
+        if (filter === 'inactive') return !e.is_active
+        return true
+    })
+
+    async function moderate(entryId: number, action: 'verify' | 'unverify' | 'activate' | 'deactivate' | 'delete') {
+        if (action === 'delete' && !confirm('Hard-delete this entry and its history? This cannot be undone.')) return
+        setBusyId(entryId)
+        setActionError('')
+        try {
+            await apiPost('leaderboard-moderate', { entryId, leaderboardAction: action })
+            onRefresh()
+        } catch (err) {
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) setActionError(message)
+        } finally {
+            setBusyId(null)
+        }
+    }
+
+    const FILTERS: Array<{ key: typeof filter; label: string; count: number }> = [
+        { key: 'all', label: 'All', count: entries.length },
+        { key: 'verified', label: 'Verified', count: entries.filter((e) => e.verification_status === 'verified' && e.is_active).length },
+        { key: 'pending', label: 'Pending', count: entries.filter((e) => e.is_active && (e.verification_status === 'pending' || e.verification_status === 'failed')).length },
+        { key: 'mismatch', label: 'Mismatch', count: entries.filter((e) => e.verification_status === 'host_mismatch' || e.verification_status === 'no_web_stream').length },
+        { key: 'inactive', label: 'Hidden', count: entries.filter((e) => !e.is_active).length },
+    ]
+
+    return (
+        <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] p-4">
+                <div className="flex flex-wrap gap-2">
+                    {FILTERS.map((f) => (
+                        <button
+                            key={f.key}
+                            onClick={() => setFilter(f.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                filter === f.key
+                                    ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-600/30'
+                                    : 'bg-zinc-800/50 text-zinc-400 border border-white/[0.04] hover:text-white'
+                            }`}
+                        >
+                            {f.label}
+                            <span className="ml-1.5 text-zinc-500">{f.count}</span>
+                        </button>
+                    ))}
+                </div>
+                <button
+                    onClick={onRefresh}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-white/[0.04] text-zinc-400 hover:text-white text-xs"
+                >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                </button>
+            </div>
+
+            {actionError && (
+                <div className="m-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                    {actionError}
+                </div>
+            )}
+
+            {filtered.length === 0 ? (
+                <p className="text-center py-12 text-sm text-zinc-600">No entries match this filter.</p>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-zinc-950/40 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+                            <tr>
+                                <th className="text-left px-4 py-3">Startup</th>
+                                <th className="text-left px-4 py-3">Owner</th>
+                                <th className="text-left px-4 py-3">GA Property</th>
+                                <th className="text-right px-4 py-3">Visitors</th>
+                                <th className="text-left px-4 py-3">Status</th>
+                                <th className="text-right px-4 py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((entry) => (
+                                <tr key={entry.id} className="border-t border-white/[0.04]">
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-zinc-800 text-[10px] font-semibold text-zinc-300">
+                                                #{entry.id}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <div className="truncate font-medium text-white">{entry.startup_name}</div>
+                                                {entry.website_url && (
+                                                    <a
+                                                        href={entry.website_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[11px] text-zinc-500 hover:text-emerald-400"
+                                                    >
+                                                        {entry.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-zinc-400">
+                                        {entry.user ? (
+                                            <div>
+                                                <div className="text-zinc-300">{entry.user.github_username || entry.user.email || '—'}</div>
+                                                <div className="text-[10px] text-zinc-600">{entry.user.github_id || `id:${entry.user.id}`}</div>
+                                            </div>
+                                        ) : (
+                                            <span className="text-zinc-600">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-[11px] font-mono text-zinc-400">
+                                        {entry.ga_property_id || <span className="text-zinc-600">none</span>}
+                                    </td>
+                                    <td className="px-4 py-3 text-right tabular-nums text-zinc-200">
+                                        {formatNumber(entry.monthly_visitors)}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <ModerationStatusPill status={entry.verification_status} isActive={entry.is_active} />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center justify-end gap-1">
+                                            {entry.verification_status !== 'verified' ? (
+                                                <button
+                                                    onClick={() => moderate(entry.id, 'verify')}
+                                                    disabled={busyId === entry.id}
+                                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
+                                                    title="Force verify"
+                                                >
+                                                    <ShieldCheck className="w-3 h-3" /> Verify
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => moderate(entry.id, 'unverify')}
+                                                    disabled={busyId === entry.id}
+                                                    className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+                                                    title="Strip verified"
+                                                >
+                                                    <ShieldOff className="w-3 h-3" /> Unverify
+                                                </button>
+                                            )}
+                                            {entry.is_active ? (
+                                                <button
+                                                    onClick={() => moderate(entry.id, 'deactivate')}
+                                                    disabled={busyId === entry.id}
+                                                    className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-zinc-800/50 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-zinc-700/50 disabled:opacity-50"
+                                                    title="Hide from public board"
+                                                >
+                                                    <EyeOff className="w-3 h-3" /> Hide
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => moderate(entry.id, 'activate')}
+                                                    disabled={busyId === entry.id}
+                                                    className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-zinc-800/50 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-zinc-700/50 disabled:opacity-50"
+                                                    title="Show on public board"
+                                                >
+                                                    <Eye className="w-3 h-3" /> Show
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => moderate(entry.id, 'delete')}
+                                                disabled={busyId === entry.id}
+                                                className="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-[10px] font-medium text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+                                                title="Hard-delete entry + history"
+                                            >
+                                                {busyId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
+
+function ModerationStatusPill({ status, isActive }: { status: string; isActive: boolean }) {
+    if (!isActive) {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-zinc-800/60 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
+                Hidden
+            </span>
+        )
+    }
+    if (status === 'verified') {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                <ShieldCheck className="w-3 h-3" /> Verified
+            </span>
+        )
+    }
+    if (status === 'host_mismatch' || status === 'no_web_stream') {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                <AlertTriangle className="w-3 h-3" /> Mismatch
+            </span>
+        )
+    }
+    if (status === 'failed') {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300">
+                Failed
+            </span>
+        )
+    }
+    return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+            Pending
+        </span>
     )
 }
 

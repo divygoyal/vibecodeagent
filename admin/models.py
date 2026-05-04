@@ -298,11 +298,16 @@ class AnalyticsFunnelDefinition(Base):
 
 
 class LeaderboardEntry(Base):
-    """Public leaderboard entries — opt-in verified traffic sharing"""
+    """Public leaderboard entries — opt-in verified traffic sharing.
+
+    Multi-site: a user can register more than one verified site, so user_id is
+    indexed but NOT unique. Application-level upsert keys off
+    (user_id, ga_property_id) to prevent the same property being listed twice.
+    """
     __tablename__ = "leaderboard_entries"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False, unique=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
 
     # Profile info (user-provided)
     startup_name = Column(String(100), nullable=False)

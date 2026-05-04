@@ -132,13 +132,28 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-function LogoIcon({ name, url }: { name: string; url: string | null }) {
-    if (url) {
+function autoLogoFromHost(websiteUrl: string | null | undefined): string | null {
+    if (!websiteUrl) return null;
+    try {
+        const withScheme = /^https?:\/\//i.test(websiteUrl) ? websiteUrl : `https://${websiteUrl}`;
+        const host = new URL(withScheme).hostname.replace(/^www\./, '');
+        return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128` : null;
+    } catch {
+        return null;
+    }
+}
+
+function LogoIcon({ name, url, websiteUrl }: { name: string; url: string | null; websiteUrl?: string | null }) {
+    const fallback = autoLogoFromHost(websiteUrl);
+    const [errored, setErrored] = useState(false);
+    const resolved = !errored ? (url || fallback) : null;
+    if (resolved) {
         return (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-                src={url}
+                src={resolved}
                 alt={name}
+                onError={() => setErrored(true)}
                 className="h-11 w-11 rounded-xl object-cover ring-1 ring-white/10"
             />
         );
@@ -183,7 +198,7 @@ function MoversRail({ entries }: { entries: LeaderboardEntry[] }) {
                     >
                         <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(122,217,218,0.45),transparent)] opacity-0 transition-opacity group-hover:opacity-100" />
                         <div className="mb-3 flex items-center gap-2.5">
-                            <LogoIcon name={entry.startup_name} url={entry.logo_url} />
+                            <LogoIcon name={entry.startup_name} url={entry.logo_url} websiteUrl={entry.website_url} />
                             <div className="min-w-0 flex-1">
                                 <div className="truncate text-[13px] font-semibold text-white">{entry.startup_name}</div>
                                 <div className="truncate text-[10px] uppercase tracking-[0.18em] text-zinc-500">
@@ -574,7 +589,7 @@ function LeaderboardPageInner() {
                                                     <div className="flex sm:hidden">
                                                         <RankBadge rank={baseRank + index + 1} />
                                                     </div>
-                                                    <LogoIcon name={entry.startup_name} url={entry.logo_url} />
+                                                    <LogoIcon name={entry.startup_name} url={entry.logo_url} websiteUrl={entry.website_url} />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <h3 className="truncate text-[14px] font-semibold tracking-[-0.01em] text-white group-hover:text-[#dff9ff]">

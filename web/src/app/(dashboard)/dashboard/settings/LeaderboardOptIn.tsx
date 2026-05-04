@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    Trophy, ShieldCheck, ExternalLink, ChevronDown, Loader2,
-    CheckCircle2, XCircle, Globe, Twitter, Copy, Check, Code2
+    Trophy, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, Loader2,
+    CheckCircle2, Globe, Twitter, Copy, Check, Code2, Plus, Pencil,
+    Trash2, ArrowLeft,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -34,57 +35,137 @@ interface GAProperty {
     property: string;
 }
 
+interface LeaderboardEntry {
+    id: number;
+    is_active: boolean;
+    startup_name: string;
+    description: string | null;
+    website_url: string | null;
+    logo_url: string | null;
+    category: string | null;
+    mrr_range: string | null;
+    looking_for: string[];
+    twitter_handle: string | null;
+    ga_property_id: string | null;
+    monthly_visitors: number;
+    visitor_trend: number;
+    is_verified: boolean;
+    verification_status: string;
+    verified_host: string | null;
+    last_refreshed: string | null;
+}
+
+type Mode = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; entry: LeaderboardEntry };
+
+const EMPTY_FORM = {
+    startup_name: '',
+    description: '',
+    website_url: '',
+    logo_url: '',
+    category: 'SaaS',
+    mrr_range: '$0-500',
+    looking_for: [] as string[],
+    twitter_handle: '',
+    ga_property_id: '',
+};
+
+function normalizeHost(input: string | null | undefined): string | null {
+    if (!input) return null;
+    try {
+        const url = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+        return new URL(url).hostname.replace(/^www\./, '') || null;
+    } catch {
+        return null;
+    }
+}
+
+function StatusPill({ status }: { status: string }) {
+    if (status === 'verified') {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                <ShieldCheck className="h-3 w-3" /> Verified
+            </span>
+        );
+    }
+    if (status === 'host_mismatch' || status === 'no_web_stream') {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                <ShieldAlert className="h-3 w-3" /> Domain mismatch
+            </span>
+        );
+    }
+    if (status === 'failed') {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-red-400/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                Verification failed
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+            Pending
+        </span>
+    );
+}
+
+function formatNumber(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+    return n.toLocaleString();
+}
+
+function EntryThumb({ entry }: { entry: LeaderboardEntry }) {
+    const [errored, setErrored] = useState(false);
+    const fallbackHost = normalizeHost(entry.website_url);
+    const url = !errored
+        ? entry.logo_url || (fallbackHost ? `https://www.google.com/s2/favicons?domain=${fallbackHost}&sz=128` : null)
+        : null;
+    if (url) {
+        return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+                src={url}
+                alt={entry.startup_name}
+                onError={() => setErrored(true)}
+                className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/10"
+            />
+        );
+    }
+    const initial = entry.startup_name.charAt(0).toUpperCase() || '?';
+    return (
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-sm font-bold text-black">
+            {initial}
+        </div>
+    );
+}
+
 export default function LeaderboardOptIn() {
-    const [status, setStatus] = useState<'loading' | 'idle' | 'joined' | 'error'>('loading');
+    const [loading, setLoading] = useState(true);
+    const [mode, setMode] = useState<Mode>({ kind: 'list' });
     const [saving, setSaving] = useState(false);
-    const [leaving, setLeaving] = useState(false);
-    const [message, setMessage] = useState('');
+    const [removingId, setRemovingId] = useState<number | null>(null);
+    const [message, setMessage] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+    const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
     const [properties, setProperties] = useState<GAProperty[]>([]);
-    const [entryId, setEntryId] = useState<number | null>(null);
-    const [showBadgeEmbed, setShowBadgeEmbed] = useState(false);
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [showBadgeEmbed, setShowBadgeEmbed] = useState<number | null>(null);
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
-    // Form state
-    const [form, setForm] = useState({
-        startup_name: '',
-        description: '',
-        website_url: '',
-        logo_url: '',
-        category: 'SaaS',
-        mrr_range: '$0-500',
-        looking_for: [] as string[],
-        twitter_handle: '',
-        ga_property_id: '',
-    });
-
     useEffect(() => {
-        fetchStatus();
-        fetchProperties();
+        void refreshEntries();
+        void fetchProperties();
     }, []);
 
-    async function fetchStatus() {
+    async function refreshEntries() {
+        setLoading(true);
         try {
-            const res = await fetch('/api/leaderboard/join');
+            const res = await fetch('/api/leaderboard/join', { cache: 'no-store' });
             const data = await res.json();
-            if (data.joined) {
-                setForm({
-                    startup_name: data.startup_name || '',
-                    description: data.description || '',
-                    website_url: data.website_url || '',
-                    logo_url: data.logo_url || '',
-                    category: data.category || 'SaaS',
-                    mrr_range: data.mrr_range || '$0-500',
-                    looking_for: data.looking_for || [],
-                    twitter_handle: data.twitter_handle || '',
-                    ga_property_id: data.ga_property_id || '',
-                });
-                setEntryId(data.id || null);
-                setStatus(data.is_active ? 'joined' : 'idle');
-            } else {
-                setStatus('idle');
-            }
+            setEntries(Array.isArray(data.entries) ? data.entries : []);
         } catch {
-            setStatus('idle');
+            setEntries([]);
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -92,438 +173,536 @@ export default function LeaderboardOptIn() {
         try {
             const res = await fetch('/api/analytics?mode=list');
             const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-                setProperties(data);
-                // Auto-select first property if none selected
-                setForm(prev => ({
-                    ...prev,
-                    ga_property_id: prev.ga_property_id || data[0].property,
-                }));
-            }
+            if (Array.isArray(data) && data.length > 0) setProperties(data);
         } catch {
-            // Not critical
+            // not critical
         }
+    }
+
+    function startCreate() {
+        // Pre-select the first GA property the user has access to so the form
+        // is one-click submittable for the common case.
+        const firstProperty = properties[0]?.property || '';
+        setForm({ ...EMPTY_FORM, ga_property_id: firstProperty });
+        setMessage(null);
+        setMode({ kind: 'create' });
+    }
+
+    function startEdit(entry: LeaderboardEntry) {
+        setForm({
+            startup_name: entry.startup_name || '',
+            description: entry.description || '',
+            website_url: entry.website_url || '',
+            logo_url: entry.logo_url || '',
+            category: entry.category || 'SaaS',
+            mrr_range: entry.mrr_range || '$0-500',
+            looking_for: entry.looking_for || [],
+            twitter_handle: entry.twitter_handle || '',
+            ga_property_id: entry.ga_property_id || '',
+        });
+        setMessage(null);
+        setMode({ kind: 'edit', entry });
+    }
+
+    function backToList() {
+        setMode({ kind: 'list' });
+        setMessage(null);
+    }
+
+    function toggleLookingFor(value: string) {
+        setForm((prev) => ({
+            ...prev,
+            looking_for: prev.looking_for.includes(value)
+                ? prev.looking_for.filter((v) => v !== value)
+                : [...prev.looking_for, value],
+        }));
     }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!form.startup_name.trim()) {
-            setMessage('Startup name is required');
+            setMessage({ tone: 'err', text: 'Startup name is required.' });
+            return;
+        }
+        if (!form.ga_property_id) {
+            setMessage({ tone: 'err', text: 'Pick a Google Analytics property.' });
+            return;
+        }
+        if (!form.website_url.trim()) {
+            setMessage({ tone: 'err', text: 'Add the website URL we should match against the GA4 property.' });
             return;
         }
 
         setSaving(true);
-        setMessage('');
-
+        setMessage(null);
         try {
-            const res = await fetch('/api/leaderboard/join', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form),
-            });
-
-            const data = await res.json();
-            if (data.success) {
-                setEntryId(data.id || null);
-                setStatus('joined');
-                setMessage('🎉 You\'re on the leaderboard!');
+            if (mode.kind === 'edit') {
+                const res = await fetch('/api/leaderboard/join', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...form, entry_id: mode.entry.id }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    setMessage({ tone: 'err', text: data.error || data.detail || 'Failed to save.' });
+                } else {
+                    setMessage({ tone: 'ok', text: 'Listing updated.' });
+                    await refreshEntries();
+                    setMode({ kind: 'list' });
+                }
             } else {
-                setMessage(data.detail || data.error || 'Failed to join leaderboard');
+                const res = await fetch('/api/leaderboard/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(form),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    setMessage({ tone: 'err', text: data.error || data.detail || 'Failed to join leaderboard.' });
+                } else {
+                    setMessage({ tone: 'ok', text: data.verification?.status === 'verified' ? '🎉 You\'re live on the leaderboard!' : 'Listing saved — verification will retry on the daily refresh.' });
+                    await refreshEntries();
+                    setMode({ kind: 'list' });
+                }
             }
         } catch {
-            setMessage('Network error — please try again');
+            setMessage({ tone: 'err', text: 'Network error — please try again.' });
         } finally {
             setSaving(false);
         }
     }
 
-    async function handleLeave() {
-        if (!confirm('Are you sure you want to leave the leaderboard?')) return;
-
-        setLeaving(true);
-        setMessage('');
+    async function handleRemove(entry: LeaderboardEntry) {
+        if (!confirm(`Remove "${entry.startup_name}" from the leaderboard?`)) return;
+        setRemovingId(entry.id);
+        setMessage(null);
         try {
-            const res = await fetch('/api/leaderboard/join', { method: 'DELETE' });
+            const res = await fetch(`/api/leaderboard/join?entry_id=${entry.id}`, { method: 'DELETE' });
             const data = await res.json();
-            if (data.success) {
-                setStatus('idle');
-                setForm({
-                    startup_name: '',
-                    description: '',
-                    website_url: '',
-                    logo_url: '',
-                    category: 'SaaS',
-                    mrr_range: '$0-500',
-                    looking_for: [],
-                    twitter_handle: '',
-                    ga_property_id: '',
-                });
-                setMessage('✅ You\'ve been removed from the leaderboard');
+            if (!res.ok || !data.success) {
+                setMessage({ tone: 'err', text: data.error || data.detail || 'Failed to remove.' });
             } else {
-                setMessage(data.detail || data.error || 'Failed to leave leaderboard');
+                setMessage({ tone: 'ok', text: 'Listing removed.' });
+                await refreshEntries();
             }
         } catch {
-            setMessage('Network error — please try again');
+            setMessage({ tone: 'err', text: 'Network error — please try again.' });
         } finally {
-            setLeaving(false);
+            setRemovingId(null);
         }
     }
 
-    function toggleLookingFor(value: string) {
-        setForm(prev => ({
-            ...prev,
-            looking_for: prev.looking_for.includes(value)
-                ? prev.looking_for.filter(v => v !== value)
-                : [...prev.looking_for, value],
-        }));
-    }
+    const headerCopy = useMemo(() => {
+        if (mode.kind === 'create') return { title: 'Add a verified site', subtitle: 'Each site needs its own GA4 property — we match the property\'s web stream against the host.' };
+        if (mode.kind === 'edit') return { title: 'Edit listing', subtitle: 'Update the public profile or swap the connected GA4 property.' };
+        return { title: 'Traffic Leaderboard', subtitle: 'Share verified GA4 traffic publicly. List as many of your sites as you like — each needs its own GA4 property.' };
+    }, [mode.kind]);
 
-    if (status === 'loading') {
+    if (loading) {
         return (
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-                <div className="flex items-center gap-3">
-                    <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
-                    <span className="text-sm text-zinc-500">Loading leaderboard status...</span>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                <div className="flex items-center gap-3 text-sm text-zinc-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading your leaderboard listings…
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-gradient-to-br from-emerald-500/[0.04] to-cyan-500/[0.02] border border-emerald-500/[0.12] rounded-2xl p-4 sm:p-6">
+        <div className="rounded-2xl border border-emerald-500/[0.12] bg-gradient-to-br from-emerald-500/[0.04] to-cyan-500/[0.02] p-4 sm:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                        <Trophy className="w-4 h-4 text-emerald-400" />
-                    </div>
+                    {mode.kind !== 'list' ? (
+                        <button
+                            type="button"
+                            onClick={backToList}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-zinc-400 transition hover:text-white"
+                            aria-label="Back to listings"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                        </button>
+                    ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10">
+                            <Trophy className="h-4 w-4 text-emerald-400" />
+                        </div>
+                    )}
                     <div>
-                        <h2 className="text-sm font-semibold text-white">Traffic Leaderboard</h2>
-                        <p className="text-[10px] text-zinc-500">Share your verified GA4 analytics publicly</p>
+                        <h2 className="text-sm font-semibold text-white">{headerCopy.title}</h2>
+                        <p className="text-[10px] text-zinc-500">{headerCopy.subtitle}</p>
                     </div>
                 </div>
-                {status === 'joined' && (
-                    <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Listed
-                    </span>
+                {mode.kind === 'list' && entries.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={startCreate}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/15"
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add site
+                    </button>
                 )}
             </div>
 
-            {/* Message */}
             {message && (
-                <div className={`text-xs px-3 py-2 rounded-lg mb-4 ${
-                    message.includes('🎉') || message.includes('✅')
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15'
-                        : 'bg-red-500/10 text-red-400 border border-red-500/15'
-                }`}>
-                    {message}
+                <div
+                    className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
+                        message.tone === 'ok'
+                            ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-300'
+                            : 'border-red-500/15 bg-red-500/10 text-red-300'
+                    }`}
+                >
+                    {message.text}
                 </div>
             )}
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Startup Name */}
-                <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-1 block">Startup Name *</label>
-                    <input
-                        type="text"
-                        value={form.startup_name}
-                        onChange={(e) => setForm(prev => ({ ...prev, startup_name: e.target.value }))}
-                        placeholder="Acme Inc"
-                        maxLength={100}
-                        className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
-                    />
-                </div>
-
-                {/* Description */}
-                <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-1 block">Description</label>
-                    <textarea
-                        value={form.description}
-                        onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="What does your startup do?"
-                        rows={2}
-                        maxLength={200}
-                        className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition resize-none"
-                    />
-                </div>
-
-                {/* Category + MRR */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-xs font-medium text-zinc-400 mb-1 block">Category</label>
-                        <div className="relative">
-                            <select
-                                value={form.category}
-                                onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
-                                className="w-full appearance-none bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 pr-8 text-sm text-white cursor-pointer focus:outline-none focus:border-emerald-500/30 transition"
+            {/* List of entries */}
+            {mode.kind === 'list' && (
+                entries.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/[0.06] bg-black/20 p-6 text-center">
+                        <p className="mx-auto max-w-sm text-sm text-zinc-400">
+                            You haven&apos;t listed any sites yet. Connect a GA4 property and we&apos;ll verify it
+                            against the website host — your listing goes live as soon as the match passes.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={startCreate}
+                            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add your first site
+                        </button>
+                    </div>
+                ) : (
+                    <ul className="space-y-3">
+                        {entries.map((entry) => (
+                            <li
+                                key={entry.id}
+                                className="rounded-xl border border-white/[0.06] bg-black/20 p-4 transition hover:border-white/[0.1]"
                             >
-                                {CATEGORIES.map(c => (
-                                    <option key={c.value} value={c.value}>{c.label}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-zinc-400 mb-1 block">Monthly Revenue (MRR)</label>
-                        <div className="relative">
-                            <select
-                                value={form.mrr_range}
-                                onChange={(e) => setForm(prev => ({ ...prev, mrr_range: e.target.value }))}
-                                className="w-full appearance-none bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 pr-8 text-sm text-white cursor-pointer focus:outline-none focus:border-emerald-500/30 transition"
-                            >
-                                {MRR_RANGES.map(m => (
-                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                        </div>
-                    </div>
-                </div>
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex min-w-0 items-start gap-3">
+                                        <EntryThumb entry={entry} />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="truncate text-sm font-semibold text-white">
+                                                    {entry.startup_name}
+                                                </span>
+                                                <StatusPill status={entry.verification_status} />
+                                                {!entry.is_active && (
+                                                    <span className="rounded-full border border-white/[0.1] bg-white/[0.02] px-2 py-0.5 text-[10px] text-zinc-500">
+                                                        Inactive
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+                                                {entry.website_url && (
+                                                    <span className="inline-flex items-center gap-1 truncate">
+                                                        <Globe className="h-3 w-3" />
+                                                        {entry.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                                                    </span>
+                                                )}
+                                                {entry.ga_property_id && (
+                                                    <span className="rounded-full border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
+                                                        {entry.ga_property_id}
+                                                    </span>
+                                                )}
+                                                <span className="text-zinc-400">
+                                                    {formatNumber(entry.monthly_visitors)} visitors / 28d
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        {entry.is_verified && (
+                                            <a
+                                                href={`/leaderboard/${entry.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
+                                            >
+                                                <ExternalLink className="h-3 w-3" />
+                                                View
+                                            </a>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowBadgeEmbed(showBadgeEmbed === entry.id ? null : entry.id)}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
+                                        >
+                                            <Code2 className="h-3 w-3" />
+                                            Embed
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => startEdit(entry)}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
+                                        >
+                                            <Pencil className="h-3 w-3" />
+                                            Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemove(entry)}
+                                            disabled={removingId === entry.id}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-red-500/15 bg-red-500/[0.06] px-2.5 py-1.5 text-[11px] font-medium text-red-300 transition hover:bg-red-500/[0.12] disabled:opacity-50"
+                                        >
+                                            {removingId === entry.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
 
-                {/* GA Property */}
-                {properties.length > 0 && (
-                    <div>
-                        <label className="text-xs font-medium text-zinc-400 mb-1 block">
-                            <ShieldCheck className="w-3 h-3 inline mr-1 text-emerald-400" />
-                            Google Analytics Property
-                        </label>
-                        <div className="relative">
-                            <select
-                                value={form.ga_property_id}
-                                onChange={(e) => setForm(prev => ({ ...prev, ga_property_id: e.target.value }))}
-                                className="w-full appearance-none bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 pr-8 text-sm text-white cursor-pointer focus:outline-none focus:border-emerald-500/30 transition"
-                            >
-                                {properties.map(p => (
-                                    <option key={p.property} value={p.property}>
-                                        {p.displayName} ({p.property})
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                        </div>
-                    </div>
-                )}
+                                {showBadgeEmbed === entry.id && (
+                                    <BadgeEmbedBlock
+                                        entryId={entry.id}
+                                        copiedField={copiedField}
+                                        onCopy={(field, value) => {
+                                            navigator.clipboard.writeText(value);
+                                            setCopiedField(field);
+                                            setTimeout(() => setCopiedField(null), 2000);
+                                        }}
+                                    />
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )
+            )}
 
-                {/* Website + Twitter */}
-                <div className="grid grid-cols-2 gap-3">
+            {/* Create / edit form */}
+            {(mode.kind === 'create' || mode.kind === 'edit') && (
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="text-xs font-medium text-zinc-400 mb-1 block">
-                            <Globe className="w-3 h-3 inline mr-1" /> Website
-                        </label>
-                        <input
-                            type="url"
-                            value={form.website_url}
-                            onChange={(e) => setForm(prev => ({ ...prev, website_url: e.target.value }))}
-                            placeholder="https://example.com"
-                            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-zinc-400 mb-1 block">
-                            <Twitter className="w-3 h-3 inline mr-1" /> X / Twitter
-                        </label>
+                        <label className="mb-1 block text-xs font-medium text-zinc-400">Startup Name *</label>
                         <input
                             type="text"
-                            value={form.twitter_handle}
-                            onChange={(e) => setForm(prev => ({ ...prev, twitter_handle: e.target.value }))}
-                            placeholder="@handle"
-                            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
+                            value={form.startup_name}
+                            onChange={(e) => setForm((p) => ({ ...p, startup_name: e.target.value }))}
+                            placeholder="Acme Inc"
+                            maxLength={100}
+                            className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
                         />
                     </div>
-                </div>
 
-                {/* Logo URL */}
-                <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-1 block">Logo URL (optional)</label>
-                    <input
-                        type="url"
-                        value={form.logo_url}
-                        onChange={(e) => setForm(prev => ({ ...prev, logo_url: e.target.value }))}
-                        placeholder="https://example.com/logo.png"
-                        className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition"
-                    />
-                </div>
-
-                {/* Looking For */}
-                <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-2 block">Interested In</label>
-                    <div className="flex items-center gap-2">
-                        {LOOKING_FOR_OPTIONS.map(opt => (
-                            <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => toggleLookingFor(opt.value)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                                    form.looking_for.includes(opt.value)
-                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                        : 'bg-black/20 text-zinc-500 border-white/[0.06] hover:border-white/[0.1]'
-                                }`}
-                            >
-                                {opt.emoji} {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-3 pt-2">
-                    <button
-                        type="submit"
-                        disabled={saving || !form.startup_name.trim()}
-                        className="flex items-center gap-2 px-5 py-2.5 min-h-[44px] text-sm font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {saving ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Trophy className="w-4 h-4" />
-                        )}
-                        {status === 'joined' ? 'Update Listing' : 'Join Leaderboard'}
-                    </button>
-
-                    {status === 'joined' && (
-                        <>
-                            <a
-                                href="/leaderboard"
-                                target="_blank"
-                                className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-medium text-zinc-400 border border-white/[0.06] rounded-xl hover:text-white hover:border-white/[0.1] transition"
-                            >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                                View Leaderboard
-                            </a>
-                            <button
-                                type="button"
-                                onClick={handleLeave}
-                                disabled={leaving}
-                                className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-medium text-red-400 border border-red-500/[0.15] rounded-xl hover:bg-red-500/[0.08] transition disabled:opacity-50"
-                            >
-                                {leaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                                Leave
-                            </button>
-                        </>
-                    )}
-                </div>
-            </form>
-
-            {/* Share & Badge Section — shown when joined */}
-            {status === 'joined' && entryId && (
-                <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-4">
-                    {/* Share heading */}
-                    <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Share your listing</h3>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {/* Share on X */}
-                        <a
-                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                                `Just got verified on TrafficClaw! Check out ${form.startup_name || 'my startup'}'s real traffic stats https://trafficclaw.com/leaderboard/${entryId}`
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
-                        >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                            Share on X
-                        </a>
-
-                        {/* Copy Link */}
-                        <button
-                            onClick={() => {
-                                navigator.clipboard.writeText(`https://trafficclaw.com/leaderboard/${entryId}`);
-                                setCopiedField('link');
-                                setTimeout(() => setCopiedField(null), 2000);
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
-                        >
-                            {copiedField === 'link' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copiedField === 'link' ? 'Copied!' : 'Copy Link'}
-                        </button>
-
-                        {/* View Profile */}
-                        <a
-                            href={`/leaderboard/${entryId}`}
-                            target="_blank"
-                            className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition text-zinc-300"
-                        >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            View Profile
-                        </a>
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-zinc-400">Description</label>
+                        <textarea
+                            value={form.description}
+                            onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                            placeholder="What does your startup do? (200 chars)"
+                            rows={2}
+                            maxLength={200}
+                            className="w-full resize-none rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
+                        />
                     </div>
 
-                    {/* Embed Badge Toggle */}
-                    <button
-                        onClick={() => setShowBadgeEmbed(!showBadgeEmbed)}
-                        className="flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-300 transition"
-                    >
-                        <Code2 className="w-3.5 h-3.5" />
-                        Add a badge to your website
-                        <ChevronDown className={`w-3 h-3 transition-transform ${showBadgeEmbed ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {showBadgeEmbed && (
-                        <div className="space-y-3 animate-in fade-in duration-200">
-                            {/* Badge Preview */}
-                            <div className="bg-zinc-900/50 border border-white/[0.06] rounded-xl p-4 flex flex-col items-center gap-2">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src="/badges/verified_on_trafficclaw.svg" alt="Verified on TrafficClaw" height={32} />
-                                <span className="text-[10px] text-zinc-600">Default height is 32px. You can change the height value.</span>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-400">Category</label>
+                            <div className="relative">
+                                <select
+                                    value={form.category}
+                                    onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                                    className="w-full appearance-none rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 pr-8 text-sm text-white focus:border-emerald-500/30 focus:outline-none"
+                                >
+                                    {CATEGORIES.map((c) => (
+                                        <option key={c.value} value={c.value}>{c.label}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
                             </div>
-
-                            {/* HTML */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">HTML</span>
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(
-                                                `<a href="https://trafficclaw.com/leaderboard/${entryId}" target="_blank" rel="noopener noreferrer">\n  <img src="https://trafficclaw.com/badges/verified_on_trafficclaw.svg" alt="Verified on TrafficClaw" height="32" />\n</a>`
-                                            );
-                                            setCopiedField('html');
-                                            setTimeout(() => setCopiedField(null), 2000);
-                                        }}
-                                        className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-white transition"
-                                    >
-                                        {copiedField === 'html' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                        {copiedField === 'html' ? 'Copied!' : 'Copy HTML'}
-                                    </button>
-                                </div>
-                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-2.5 text-[10px] text-zinc-500 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-{`<a href="https://trafficclaw.com/leaderboard/${entryId}" target="_blank" rel="noopener noreferrer">
-  <img src="https://trafficclaw.com/badges/verified_on_trafficclaw.svg" alt="Verified on TrafficClaw" height="32" />
-</a>`}
-                                </pre>
-                            </div>
-
-                            {/* Markdown */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Markdown</span>
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(
-                                                `[![Verified on TrafficClaw](https://trafficclaw.com/badges/verified_on_trafficclaw.svg)](https://trafficclaw.com/leaderboard/${entryId})`
-                                            );
-                                            setCopiedField('md');
-                                            setTimeout(() => setCopiedField(null), 2000);
-                                        }}
-                                        className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-white transition"
-                                    >
-                                        {copiedField === 'md' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                        {copiedField === 'md' ? 'Copied!' : 'Copy Markdown'}
-                                    </button>
-                                </div>
-                                <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-2.5 text-[10px] text-zinc-500 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-{`[![Verified on TrafficClaw](https://trafficclaw.com/badges/verified_on_trafficclaw.svg)](https://trafficclaw.com/leaderboard/${entryId})`}
-                                </pre>
-                            </div>
-
-                            <p className="text-[10px] text-zinc-600 text-center">
-                                When someone clicks this badge, it links back to your verified listing — free backlink! 🔗
-                            </p>
                         </div>
-                    )}
-                </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-400">Monthly Revenue (MRR)</label>
+                            <div className="relative">
+                                <select
+                                    value={form.mrr_range}
+                                    onChange={(e) => setForm((p) => ({ ...p, mrr_range: e.target.value }))}
+                                    className="w-full appearance-none rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 pr-8 text-sm text-white focus:border-emerald-500/30 focus:outline-none"
+                                >
+                                    {MRR_RANGES.map((m) => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-400">
+                            <ShieldCheck className="h-3 w-3 text-emerald-400" />
+                            Google Analytics Property *
+                        </label>
+                        {properties.length > 0 ? (
+                            <div className="relative">
+                                <select
+                                    value={form.ga_property_id}
+                                    onChange={(e) => setForm((p) => ({ ...p, ga_property_id: e.target.value }))}
+                                    className="w-full appearance-none rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 pr-8 text-sm text-white focus:border-emerald-500/30 focus:outline-none"
+                                >
+                                    <option value="">Select a GA4 property…</option>
+                                    {properties.map((p) => (
+                                        <option key={p.property} value={p.property}>
+                                            {p.displayName} ({p.property})
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-300">
+                                No GA4 properties found. Connect Google Analytics from the Account tab first.
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-400">
+                                <Globe className="h-3 w-3" /> Website *
+                            </label>
+                            <input
+                                type="url"
+                                value={form.website_url}
+                                onChange={(e) => setForm((p) => ({ ...p, website_url: e.target.value }))}
+                                placeholder="https://example.com"
+                                className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-400">
+                                <Twitter className="h-3 w-3" /> X / Twitter
+                            </label>
+                            <input
+                                type="text"
+                                value={form.twitter_handle}
+                                onChange={(e) => setForm((p) => ({ ...p, twitter_handle: e.target.value }))}
+                                placeholder="@handle"
+                                className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-zinc-400">Logo URL (optional — auto-fetched from your domain if empty)</label>
+                        <input
+                            type="url"
+                            value={form.logo_url}
+                            onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))}
+                            placeholder="https://example.com/logo.png"
+                            className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-xs font-medium text-zinc-400">Interested In</label>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {LOOKING_FOR_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => toggleLookingFor(opt.value)}
+                                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                                        form.looking_for.includes(opt.value)
+                                            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+                                            : 'border-white/[0.06] bg-black/20 text-zinc-500 hover:border-white/[0.1]'
+                                    }`}
+                                >
+                                    {opt.emoji} {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                        <button
+                            type="submit"
+                            disabled={saving || !form.startup_name.trim() || !form.ga_property_id || !form.website_url.trim()}
+                            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
+                            {mode.kind === 'edit' ? 'Save changes' : 'Verify & list'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={backToList}
+                            className="inline-flex min-h-[44px] items-center rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-xs font-medium text-zinc-400 transition hover:text-white"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             )}
         </div>
     );
 }
+
+function BadgeEmbedBlock({
+    entryId,
+    copiedField,
+    onCopy,
+}: {
+    entryId: number;
+    copiedField: string | null;
+    onCopy: (field: string, value: string) => void;
+}) {
+    const html = `<a href="https://trafficclaw.com/leaderboard/${entryId}" target="_blank" rel="noopener noreferrer">\n  <img src="https://trafficclaw.com/api/badges/${entryId}" alt="Verified on TrafficClaw" height="48" />\n</a>`;
+    const md = `[![Verified on TrafficClaw](https://trafficclaw.com/api/badges/${entryId})](https://trafficclaw.com/leaderboard/${entryId})`;
+    const htmlField = `html-${entryId}`;
+    const mdField = `md-${entryId}`;
+    return (
+        <div className="mt-4 space-y-3 border-t border-white/[0.06] pt-3">
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">HTML</span>
+                <button
+                    type="button"
+                    onClick={() => onCopy(htmlField, html)}
+                    className="inline-flex items-center gap-1 text-[10px] text-zinc-500 transition hover:text-white"
+                >
+                    {copiedField === htmlField ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    {copiedField === htmlField ? 'Copied' : 'Copy HTML'}
+                </button>
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-white/[0.06] bg-black/40 p-2.5 font-mono text-[10px] leading-5 text-zinc-400">
+                {html}
+            </pre>
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Markdown</span>
+                <button
+                    type="button"
+                    onClick={() => onCopy(mdField, md)}
+                    className="inline-flex items-center gap-1 text-[10px] text-zinc-500 transition hover:text-white"
+                >
+                    {copiedField === mdField ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    {copiedField === mdField ? 'Copied' : 'Copy Markdown'}
+                </button>
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-white/[0.06] bg-black/40 p-2.5 font-mono text-[10px] leading-5 text-zinc-400">
+                {md}
+            </pre>
+            <div className="flex items-center gap-2">
+                <a
+                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just got verified on TrafficClaw! https://trafficclaw.com/leaderboard/${entryId}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:bg-white/[0.05]"
+                >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                    Share on X
+                </a>
+                <button
+                    type="button"
+                    onClick={() => onCopy(`link-${entryId}`, `https://trafficclaw.com/leaderboard/${entryId}`)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:bg-white/[0.05]"
+                >
+                    {copiedField === `link-${entryId}` ? <CheckCircle2 className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    {copiedField === `link-${entryId}` ? 'Copied' : 'Copy link'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
