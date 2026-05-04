@@ -9,6 +9,22 @@ export interface ChatMessage {
      *  block above the answer. Distinct from `content` because the user can
      *  hide it once the answer lands. */
     thinking?: string;
+    /** B5-full: planner's structured plan (if persona.plannerEnabled). */
+    plan?: {
+        intent: string;
+        summary: string;
+        steps: { tool: string; why: string; expected: string }[];
+        est_runtime_s: number;
+        est_cost_cents: number;
+    };
+    /** B5-full: critic's verdict (if persona.criticEnabled). */
+    critic?: {
+        score: number;
+        groundedness: number;
+        completeness: number;
+        format: number;
+        notes: string;
+    };
     hasError?: boolean;
 }
 

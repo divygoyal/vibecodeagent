@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -4686,6 +4686,134 @@ async def chat_stats(
             "down": down,
             "rate": (up / (up + down)) if (up + down) > 0 else None,
         },
+    }
+
+
+# ============= Chat Embeddings (B1-full: semantic recall) =============
+class ChatEmbeddingCreate(BaseModel):
+    user_identifier: str
+    source_kind: str  # turn | fact
+    source_id: str
+    thread_id: Optional[str] = None
+    text_excerpt: Optional[str] = None
+    vector: list[float]
+    model: str = 'text-embedding-004'
+
+
+class ChatEmbeddingQuery(BaseModel):
+    user_identifier: str
+    vector: list[float]
+    top_k: int = 5
+    source_kinds: Optional[list[str]] = None  # filter to ['turn','fact'] etc.
+
+
+@app.post("/api/chat/embeddings")
+async def insert_chat_embedding(
+    data: ChatEmbeddingCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Insert one embedding row. Caller is responsible for not duplicating
+    (we dedupe on (user_id, source_kind, source_id) — older rows win)."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if data.source_kind not in ('turn', 'fact'):
+        raise HTTPException(status_code=400, detail="source_kind must be 'turn' or 'fact'")
+    if not isinstance(data.vector, list) or len(data.vector) == 0:
+        raise HTTPException(status_code=400, detail="vector must be a non-empty list")
+
+    # Dedupe: skip if a row with the same (user, kind, source_id) exists.
+    existing = await db.execute(
+        select(ChatEmbedding).where(
+            ChatEmbedding.user_id == user.id,
+            ChatEmbedding.source_kind == data.source_kind,
+            ChatEmbedding.source_id == data.source_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        return {"id": None, "deduped": True}
+
+    emb = ChatEmbedding(
+        user_id=user.id,
+        source_kind=data.source_kind,
+        source_id=data.source_id,
+        thread_id=data.thread_id,
+        text_excerpt=(data.text_excerpt or '')[:2000],
+        vector_json=json.dumps(data.vector),
+        dim=len(data.vector),
+        model=data.model[:60],
+    )
+    db.add(emb)
+    await db.commit()
+    await db.refresh(emb)
+    return {"id": emb.id, "deduped": False}
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = 0.0
+    na = 0.0
+    nb = 0.0
+    for x, y in zip(a, b):
+        dot += x * y
+        na += x * x
+        nb += y * y
+    if na <= 0 or nb <= 0:
+        return 0.0
+    import math
+    return dot / (math.sqrt(na) * math.sqrt(nb))
+
+
+@app.post("/api/chat/embeddings/search")
+async def search_chat_embeddings(
+    data: ChatEmbeddingQuery,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Brute-force cosine top-k retrieval over a user's embeddings.
+    Loads all matching rows into memory (acceptable up to ~5k/user)."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        return {"hits": []}
+    if not isinstance(data.vector, list) or len(data.vector) == 0:
+        return {"hits": []}
+
+    q = select(ChatEmbedding).where(ChatEmbedding.user_id == user.id)
+    if data.source_kinds:
+        q = q.where(ChatEmbedding.source_kind.in_(data.source_kinds))
+    q = q.order_by(ChatEmbedding.created_at.desc()).limit(5000)
+    result = await db.execute(q)
+    rows = result.scalars().all()
+
+    scored = []
+    for r in rows:
+        if r.dim != len(data.vector):
+            continue  # different model — skip
+        try:
+            v = json.loads(r.vector_json)
+        except Exception:
+            continue
+        s = _cosine(data.vector, v)
+        if s > 0.4:  # noise floor
+            scored.append((s, r))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = scored[: max(1, min(20, data.top_k))]
+    return {
+        "hits": [
+            {
+                "id": r.id,
+                "score": round(score, 4),
+                "source_kind": r.source_kind,
+                "source_id": r.source_id,
+                "thread_id": r.thread_id,
+                "text_excerpt": r.text_excerpt,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for score, r in top
+        ]
     }
 
 

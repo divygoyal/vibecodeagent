@@ -329,6 +329,31 @@ export default function AIChatbot() {
                                 updated[updated.length - 1] = last;
                                 return updated;
                             });
+                        } else if (data.type === 'plan_proposed') {
+                            // B5-full: planner's structured plan, attached to the
+                            // in-flight message so the PlanCard renders it inline.
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.plan = data.plan;
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
+                        } else if (data.type === 'critic_verdict') {
+                            // B5-full: critic's score + diagnosis.
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.critic = {
+                                    score: data.score,
+                                    groundedness: data.groundedness,
+                                    completeness: data.completeness,
+                                    format: data.format,
+                                    notes: data.notes,
+                                };
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
                         } else if (data.type === 'tool_start') {
                             setMessages(prev => {
                                 const updated = [...prev];

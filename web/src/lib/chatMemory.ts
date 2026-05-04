@@ -6,10 +6,14 @@
  *   extractFactsFromTurn(...)           → Flash-Lite prompt → admin POST /api/chat/facts
  *   summarizeThread(...)                → Flash-Lite prompt → admin PATCH /api/chat/threads/{id}
  *
- * All four are best-effort: failures don't crash the chat. Extraction +
- * summarization are kicked off AFTER the assistant response has streamed
- * to the user, so they never add to user-visible latency. They just
- * enrich the next turn's context.
+ *   B1-full additions:
+ *   embedTurn(...)                      → Gemini embeddings → admin POST /api/chat/embeddings
+ *   recallSimilarTurns(...)             → embed query → admin POST /api/chat/embeddings/search
+ *
+ * All helpers are best-effort: failures don't crash the chat. Extraction,
+ * summarization and embedding are kicked off AFTER the assistant response
+ * has streamed to the user, so they never add to user-visible latency.
+ * They just enrich the next turn's context.
  */
 import type { GoogleGenAI } from '@google/genai';
 
@@ -72,9 +76,9 @@ export async function loadThreadSummary(userId: string, threadId: string | undef
     return (data?.summary as string | null) ?? null;
 }
 
-/** Format facts + summary for inclusion in the system prompt. Capped lengths
- *  so the memory block doesn't dominate the context. */
-export function formatMemoryBlock(facts: UserFact[], summary: string | null): string {
+/** Format facts + summary + recalled turns for inclusion in the system prompt.
+ *  Capped lengths so the memory block doesn't dominate the context. */
+export function formatMemoryBlock(facts: UserFact[], summary: string | null, recalled?: RecalledHit[] | null): string {
     const parts: string[] = [];
     if (summary && summary.trim()) {
         const trimmed = summary.length > 1500 ? summary.slice(0, 1500) + '…' : summary;
@@ -90,6 +94,17 @@ export function formatMemoryBlock(facts: UserFact[], summary: string | null): st
             });
         if (lines.length > 0) {
             parts.push(`[USER FACTS — durable preferences and context]\n${lines.join('\n')}`);
+        }
+    }
+    if (recalled && recalled.length > 0) {
+        const lines = recalled
+            .slice(0, 3)
+            .map((r, i) => {
+                const excerpt = (r.text_excerpt || '').slice(0, 400).replace(/\n+/g, ' ');
+                return `(${i + 1}) [score=${r.score}] ${excerpt}`;
+            });
+        if (lines.length > 0) {
+            parts.push(`[RECALL — semantically similar past exchanges; use as context, do not repeat]\n${lines.join('\n')}`);
         }
     }
     return parts.length > 0 ? '\n\n' + parts.join('\n\n') : '';
@@ -187,6 +202,107 @@ JSON:`;
     } catch {
         return 0;
     }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * B1-full: embeddings + semantic recall
+ * ────────────────────────────────────────────────────────────────── */
+
+const EMBED_MODEL = 'text-embedding-004';
+
+export interface RecalledHit {
+    id: number;
+    score: number;
+    source_kind: 'turn' | 'fact';
+    source_id: string;
+    thread_id?: string | null;
+    text_excerpt: string | null;
+}
+
+/** Generate an embedding vector for a piece of text. Returns null on
+ *  any failure — caller should treat embedding as best-effort.
+ *  Cap input at 8000 chars (the model accepts more but past that is noise). */
+async function embedText(genai: GoogleGenAI, text: string): Promise<number[] | null> {
+    if (!text || !text.trim()) return null;
+    try {
+        const trimmed = text.length > 8000 ? text.slice(0, 8000) : text;
+        const res: any = await (genai as any).models.embedContent({
+            model: EMBED_MODEL,
+            contents: trimmed,
+        });
+        // The SDK returns either { embeddings: [{ values: number[] }] }
+        // or { embedding: { values: number[] } } depending on call shape.
+        const vec: number[] | undefined =
+            res?.embeddings?.[0]?.values
+            ?? res?.embedding?.values
+            ?? res?.values;
+        if (!Array.isArray(vec) || vec.length === 0) return null;
+        return vec;
+    } catch {
+        return null;
+    }
+}
+
+interface EmbedTurnArgs {
+    genai: GoogleGenAI;
+    userId: string;
+    threadId: string;
+    sourceId: string;        // message id (string) for the assistant turn
+    userMessage: string;
+    assistantMessage: string;
+}
+
+/**
+ * Embed a (user → assistant) exchange and POST to admin so it can be
+ * recalled later. Concatenates the two messages with a clear separator
+ * — the embedding captures the QUESTION + ANSWER together, which is
+ * what we want to surface on similar future questions.
+ */
+export async function embedTurn({ genai, userId, threadId, sourceId, userMessage, assistantMessage }: EmbedTurnArgs): Promise<boolean> {
+    if (!userId || !sourceId || !userMessage) return false;
+    const text = `Q: ${userMessage}\n\nA: ${assistantMessage}`;
+    const vec = await embedText(genai, text);
+    if (!vec) return false;
+    const ok = await adminFetch('/api/chat/embeddings', {
+        method: 'POST',
+        body: {
+            user_identifier: userId,
+            source_kind: 'turn',
+            source_id: sourceId,
+            thread_id: threadId,
+            text_excerpt: text.slice(0, 1500),
+            vector: vec,
+            model: EMBED_MODEL,
+        },
+    });
+    return !!ok;
+}
+
+interface RecallArgs {
+    genai: GoogleGenAI;
+    userId: string;
+    query: string;           // the user's CURRENT message
+    topK?: number;
+}
+
+/**
+ * Embed the current user message and pull top-k similar past turns from
+ * admin. Used pre-flight to inject [RECALL] block into context.
+ */
+export async function recallSimilarTurns({ genai, userId, query, topK = 3 }: RecallArgs): Promise<RecalledHit[]> {
+    if (!userId || !query) return [];
+    const vec = await embedText(genai, query);
+    if (!vec) return [];
+    const data = await adminFetch('/api/chat/embeddings/search', {
+        method: 'POST',
+        body: {
+            user_identifier: userId,
+            vector: vec,
+            top_k: topK,
+            source_kinds: ['turn'],
+        },
+    });
+    return Array.isArray(data?.hits) ? (data.hits as RecalledHit[]) : [];
 }
 
 interface SummarizeArgs {

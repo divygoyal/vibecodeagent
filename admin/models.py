@@ -410,6 +410,39 @@ class ChatFact(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ChatEmbedding(Base):
+    """Embedded chat exchanges + facts for semantic recall (B1-full).
+
+    A row stores a vector representation of a piece of text (a Q&A turn
+    or a durable fact) so that future turns can retrieve the most
+    semantically relevant past content via cosine similarity.
+
+    source_kind:
+      'turn'  — one Q&A pair from a thread (concatenated user+assistant)
+      'fact'  — a durable user fact (from chat_facts)
+
+    vector_json: JSON-serialized array of floats. We don't have sqlite-vec
+    available so retrieval is brute-force cosine in Python. Acceptable up
+    to ~5k vectors per user; beyond that we'll need a real vector index.
+
+    dim: dimensionality of the embedding model output (768 for Gemini's
+    text-embedding-004). Stored explicitly so we can detect
+    model-mismatch on retrieval.
+    """
+    __tablename__ = "chat_embeddings"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    source_kind = Column(String(20), nullable=False)
+    source_id = Column(String(64), nullable=False)  # message_id or fact_id (string for flexibility)
+    thread_id = Column(String(36), index=True)
+    text_excerpt = Column(Text)                     # First 600 chars of the embedded text — for display in [RECALL] block
+    vector_json = Column(Text, nullable=False)      # JSON array of floats
+    dim = Column(Integer, nullable=False)
+    model = Column(String(60), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class ChatFeedback(Base):
     """User feedback (👍/👎 + optional reason) on individual assistant messages.
 

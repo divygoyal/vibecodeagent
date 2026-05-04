@@ -153,6 +153,27 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json(data, { status });
     }
+    if (action === 'embed_insert') {
+        const { status, data } = await proxy('POST', `/api/chat/embeddings`, {
+            user_identifier: userId,
+            source_kind: body.source_kind,
+            source_id: body.source_id,
+            thread_id: body.thread_id,
+            text_excerpt: body.text_excerpt,
+            vector: body.vector,
+            model: body.model,
+        });
+        return NextResponse.json(data, { status });
+    }
+    if (action === 'embed_search') {
+        const { status, data } = await proxy('POST', `/api/chat/embeddings/search`, {
+            user_identifier: userId,
+            vector: body.vector,
+            top_k: body.top_k,
+            source_kinds: body.source_kinds,
+        });
+        return NextResponse.json(data, { status });
+    }
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
 

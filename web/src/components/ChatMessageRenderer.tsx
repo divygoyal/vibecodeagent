@@ -12,6 +12,8 @@ import { SmartChartPanel } from './chat/ChatCharts';
 import { splitContentOnChartTags, renderSnapshotChart } from './chat/SnapshotChartRenderer';
 import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
 import { ThinkingBlock } from './chat/ThinkingBlock';
+import { PlanCard, type ChatPlan } from './chat/PlanCard';
+import { CriticBadge, type CriticVerdict } from './chat/CriticBadge';
 import { safeParseToolResult } from '@/lib/chatUtils';
 
 /* ─── Code Block ─── */
@@ -247,12 +249,16 @@ interface ChatMessageRendererProps {
     /** B5-full: model's pre-tool reasoning. Rendered as a collapsible block
      *  above tool icons so users can read it OR hide it. Streamed live. */
     thinking?: string;
+    /** B5-full: planner's structured plan. Rendered as a card above thinking. */
+    plan?: ChatPlan;
+    /** B5-full: critic's score + diagnosis. Rendered as a small badge below the answer. */
+    critic?: CriticVerdict;
     isStreaming?: boolean;
     snapshot?: DashboardSnapshot;
     onSuggestionClick?: (suggestion: string) => void;
 }
 
-export default memo(function ChatMessageRenderer({ content, tools, thinking, isStreaming, snapshot, onSuggestionClick }: ChatMessageRendererProps) {
+export default memo(function ChatMessageRenderer({ content, tools, thinking, plan, critic, isStreaming, snapshot, onSuggestionClick }: ChatMessageRendererProps) {
     const { cleanContent, suggestions } = useMemo(
         () => isStreaming ? { cleanContent: content, suggestions: [] } : parseSuggestions(content || ''),
         [content, isStreaming]
@@ -277,6 +283,10 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, isS
 
     return (
         <div className="chat-message-content">
+            {/* B5-full: planner's plan card — rendered first so the user sees
+                what's about to happen BEFORE thinking + tool icons. */}
+            {plan && <PlanCard plan={plan} />}
+
             {/* B5-full: model's pre-tool reasoning, collapsible. Auto-opens
                 while streaming so the user has something to watch; collapsible
                 once the answer lands. Renders ABOVE tool icons because in the
@@ -340,6 +350,11 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, isS
             {isStreaming && (
                 <span className="inline-block w-0.5 h-5 bg-white/60 animate-pulse ml-0.5 align-middle rounded-full" />
             )}
+
+            {/* B5-full: critic verdict — at the bottom because it judges what
+                the user just read. Only renders for personas where critic is
+                enabled (DIAGNOSTIC, EXECUTIVE_SUMMARY). */}
+            {!isStreaming && critic && <CriticBadge verdict={critic} />}
         </div>
     );
 });

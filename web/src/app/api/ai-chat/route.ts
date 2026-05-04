@@ -12,7 +12,13 @@ import {
     formatMemoryBlock,
     extractFactsFromTurn,
     summarizeThread,
+    embedTurn,
+    recallSimilarTurns,
+    type RecalledHit,
 } from '@/lib/chatMemory';
+import { resolvePersona } from '@/services/chat/personas';
+import { runPlanner } from '@/services/chat/planner';
+import { runCritic } from '@/services/chat/critic';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -113,9 +119,55 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UNIVERSAL ANALYST — SYSTEM INSTRUCTION
+// UNIVERSAL ANALYST — SYSTEM INSTRUCTION (shared preamble + persona)
+// B3-full: persona-specific blocks live in services/chat/personas/*.ts
+// and are composed in via composePromptForPersona() per turn.
 // ═══════════════════════════════════════════════════════════════
-const BASE_SYSTEM_INSTRUCTION = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.
+const SHARED_PREAMBLE = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.`;
+
+const SHARED_RULES = `RULES:
+1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools only when the snapshot is insufficient.
+2) Plan tool use: pick the SMALLEST set that answers the question. Prefer 1 tool call. Hard cap 8.
+3) Cite exact numbers. Never round to "about" — say "12,847 clicks (-23% WoW)".
+4) Use the EXACT siteUrl from [AVAILABLE SITES] / [Site:].
+5) GitHub tools: only when [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise; never mention GitHub when [GitHub:not_connected].
+6) [Repo: x · {confirmed|auto}] = the repo for the current site — pass repo=x to ALL GitHub tools. NEVER call list_user_repos. If status=auto, gently mention once: "I'm checking {repo} — confirm in the dropdown if that's right." If confirmed, use silently.
+
+GENERATOR TOOLS (generate_content_strategy / generate_meta_tags / suggest_internal_links / analyze_keyword_clusters / find_cannibalization):
+These return a STRUCTURED PAYLOAD with { task, expectedFormat, inputs }. Read the task, follow the expectedFormat, and use the inputs as your data. DO NOT echo "task" or "expectedFormat" back to the user — that's a planning artifact, not the answer.
+
+INVALID-ARGS HANDLING: if a tool returns { error: 'invalid_args', message: ... }, fix the arg per the message and retry ONCE.
+
+CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
+REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
+
+CHARTS (USE SPARINGLY — they were spammy before, now contextual):
+Emit AT MOST ONE chart per response, and ONLY when ONE of these is true:
+  (a) the user asks for "show", "visualize", "chart", "graph", "see"
+  (b) it's the FIRST diagnostic turn of the conversation (user has not seen any chart yet)
+  (c) you're presenting a comparison or distribution where text alone is materially worse
+DO NOT repeat a chart tag that already appeared in the LAST 2 assistant turns of conversation history.
+DO NOT add a chart for greetings ("hi", "thanks"), follow-ups ("explain more", "what about X"), or text-only opinions.
+Default = NO chart. When in doubt, omit. The user has dashboards for visualization; the chat is for analysis.
+
+When you DO use a chart:
+  - Pick the SINGLE most-informative tag for THIS question (not a stack of 4).
+  - Tags: overview|topKeywords|topPages|ctrOpportunities|strikingDistance|positionDistribution|trafficTrend|deviceSplit|countries
+  - Format: <!-- chart:TAG_NAME --> on its OWN line at the TOP.
+  - Inline (when answer is filtered to data NOT in dashboard snapshot):
+    <!-- chart:inline:{"type":"keywords","title":"T","rows":[{"query":"...","clicks":N,"impressions":N,"ctr":N,"position":N}]} -->
+  - Mapping: keywords→topKeywords, pages→topPages, CTR→ctrOpportunities, trends→trafficTrend, devices→deviceSplit, countries→countries, filtered subset→inline.
+
+FOLLOW-UPS: End MOST responses with exactly 3 follow-up questions in the format below — but SKIP this for CASUAL_GREETING, EXECUTIVE_SUMMARY, and META_QUESTION intents (their persona prompts override this rule).
+<!-- suggestions: ["Q1?", "Q2?", "Q3?"] -->`;
+
+/** B3-full: persona-aware system-prompt composer. Replaces BASE_SYSTEM_INSTRUCTION. */
+function composePromptForPersona(personaPrompt: string): string {
+    return `${SHARED_PREAMBLE}\n\n${personaPrompt}\n\n${SHARED_RULES}`;
+}
+
+// Kept as a fallback when ai isn't initialized — intentionally minimal.
+const BASE_SYSTEM_INSTRUCTION = `${SHARED_PREAMBLE}
 
 INTENT MODES (pick ONE for each turn — first message of the turn, infer from the user's question):
 • CASUAL_GREETING — "hi", "thanks", "ok", short pleasantries. RESPONSE: 1-3 conversational sentences. No tools. No charts. No 5-section template. Just acknowledge + offer one concrete next step ("Want a snapshot of where you stand?").
@@ -437,14 +489,16 @@ export async function POST(req: NextRequest) {
         // stream call below.
         const intentPromise = ai ? classifyIntent(ai, message).catch(() => null) : Promise.resolve(null);
 
-        // B1-full: load durable facts + thread summary in parallel with intent classification.
-        // Both are best-effort and fall through to empty if admin is unreachable.
-        const memoryPromise: Promise<[Awaited<ReturnType<typeof loadUserFacts>>, string | null]> = userId
+        // B1-full: load durable facts + thread summary + semantic recall in
+        // parallel with intent classification. All three are best-effort and
+        // fall through to empty if admin or embeddings are unreachable.
+        const memoryPromise: Promise<[Awaited<ReturnType<typeof loadUserFacts>>, string | null, RecalledHit[]]> = (userId && ai)
             ? Promise.all([
                   loadUserFacts(String(userId)).catch(() => [] as Awaited<ReturnType<typeof loadUserFacts>>),
                   loadThreadSummary(String(userId), threadId).catch(() => null),
+                  recallSimilarTurns({ genai: ai, userId: String(userId), query: message, topK: 3 }).catch(() => [] as RecalledHit[]),
               ])
-            : Promise.resolve([[] as Awaited<ReturnType<typeof loadUserFacts>>, null]);
+            : Promise.resolve([[] as Awaited<ReturnType<typeof loadUserFacts>>, null, [] as RecalledHit[]]);
 
         // User message with injected data context
         const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
@@ -454,11 +508,13 @@ export async function POST(req: NextRequest) {
             : '';
         const intentLabel = await intentPromise;
         const intentTag = intentLabel ? `[INTENT: ${intentLabel}]` : '';
-        const [userFacts, threadSummary] = await memoryPromise;
+        const [userFacts, threadSummary, recalledHits] = await memoryPromise;
         // B1-full: persistent memory injection. Goes BEFORE the dashboard data
         // so the model reads "what we know about you" first, then "what's
         // happening right now."
-        const memoryBlock = formatMemoryBlock(userFacts, threadSummary);
+        const memoryBlock = formatMemoryBlock(userFacts, threadSummary, recalledHits);
+        // B3-full: resolve persona for this intent (falls back to DIAGNOSTIC if unknown).
+        const persona = resolvePersona(intentLabel);
         const contextBlock = dataContext
             ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${dataContext}${availableSitesContext}\n---\n${message}`
             : `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${availableSitesContext}\n${message}`;
@@ -467,9 +523,10 @@ export async function POST(req: NextRequest) {
             parts: [{ text: contextBlock }],
         });
 
-        // ── Build system instruction once ──
+        // ── Build system instruction once (B3-full: persona-composed) ──
         const today = new Date().toISOString().split('T')[0];
-        const systemInstruction = `${BASE_SYSTEM_INSTRUCTION}
+        const composedPrompt = composePromptForPersona(persona.systemPrompt);
+        const systemInstruction = `${composedPrompt}
 
 CRITICAL SYSTEM CONTEXT:
 - TODAY'S DATE IS: ${today}.
@@ -506,6 +563,26 @@ CRITICAL SYSTEM CONTEXT:
                     // CASUAL_GREETING intents).
                     if (intentLabel) {
                         controller.enqueue(encodeSSE({ type: 'intent', value: intentLabel }));
+                    }
+
+                    // B2-full: planner pre-pass for personas that need it.
+                    // Streams the plan to the user so they see what's coming.
+                    if (ai && persona.plannerEnabled) {
+                        try {
+                            const allowed = persona.allowedTools
+                                ? Array.from(persona.allowedTools)
+                                : (AI_CHAT_TOOL_DECLARATIONS as any[]).map(t => t.name);
+                            const plan = await runPlanner({
+                                genai: ai,
+                                intent: persona.label,
+                                userMessage: message,
+                                availableTools: allowed,
+                                contextTags: `${siteTag}${githubTag}${repoTag}`,
+                            });
+                            if (plan) {
+                                controller.enqueue(encodeSSE({ type: 'plan_proposed', plan }));
+                            }
+                        } catch { /* planner failure is non-fatal */ }
                     }
 
                     let currentContents = [...contents];
@@ -745,6 +822,41 @@ CRITICAL SYSTEM CONTEXT:
                         }
                     }
 
+                    // Reconstruct assistant text once — used by critic (pre-DONE) +
+                    // memory writes (post-DONE) below.
+                    const lastModel = [...currentContents].reverse().find((c: any) => c?.role === 'model');
+                    const assistantText: string = lastModel?.parts
+                        ?.map((p: any) => p?.text || '')
+                        ?.filter(Boolean)
+                        ?.join('\n')
+                        ?.slice(0, 4000) || '';
+
+                    // B2-full: critic pass BEFORE [DONE] so the verdict event
+                    // arrives at the client. Adds ~600ms to first-tweak latency.
+                    // Critic is OFF by default — only runs for personas where
+                    // format compliance materially matters (DIAGNOSTIC, EXECUTIVE).
+                    if (ai && persona.criticEnabled && assistantText && assistantText.length >= 60) {
+                        try {
+                            const verdict = await runCritic({
+                                genai: ai,
+                                intent: persona.label,
+                                userMessage: message,
+                                assistantMessage: assistantText,
+                                formatExpectation: persona.systemPrompt.slice(0, 1500),
+                            });
+                            if (verdict) {
+                                controller.enqueue(encodeSSE({
+                                    type: 'critic_verdict',
+                                    score: verdict.score,
+                                    groundedness: verdict.groundedness,
+                                    completeness: verdict.completeness,
+                                    format: verdict.format,
+                                    notes: verdict.notes,
+                                }));
+                            }
+                        } catch { /* critic failure is non-fatal */ }
+                    }
+
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
 
@@ -752,16 +864,6 @@ CRITICAL SYSTEM CONTEXT:
                     // so they don't add to user-visible latency. Both calls are
                     // wrapped in try/catch internally — failure is silent.
                     if (ai && userId && intentLabel !== 'CASUAL_GREETING' && intentLabel !== 'META_QUESTION') {
-                        // Reconstruct the assistant message text for fact extraction.
-                        // currentContents accumulates {role,parts} for every loop iteration;
-                        // the last assistant turn's text lives in chunks we already streamed,
-                        // so we pull from the last 'model'-role entry.
-                        const lastModel = [...currentContents].reverse().find((c: any) => c?.role === 'model');
-                        const assistantText: string = lastModel?.parts
-                            ?.map((p: any) => p?.text || '')
-                            ?.filter(Boolean)
-                            ?.join('\n')
-                            ?.slice(0, 4000) || '';
 
                         if (assistantText && message) {
                             void extractFactsFromTurn({
@@ -771,6 +873,22 @@ CRITICAL SYSTEM CONTEXT:
                                 assistantMessage: assistantText,
                                 threadId,
                             }).catch(() => 0);
+                        }
+
+                        // B1-full: embed the (user → assistant) turn so future
+                        // questions can recall it via cosine similarity. Best-effort
+                        // and non-blocking. Only embed turns with substantive
+                        // content — skip CASUAL_GREETING (already excluded above)
+                        // and very short answers (<60 chars — usually error fallbacks).
+                        if (assistantText && assistantText.length >= 60 && threadId) {
+                            void embedTurn({
+                                genai: ai,
+                                userId: String(userId),
+                                threadId,
+                                sourceId: `${threadId}:${Date.now()}`,
+                                userMessage: message,
+                                assistantMessage: assistantText,
+                            }).catch(() => false);
                         }
 
                         // Run the summarizer every 6th assistant turn (history length is
@@ -791,6 +909,9 @@ CRITICAL SYSTEM CONTEXT:
                                 upToMessageIndex: allMsgs.length,
                             }).catch(() => false);
                         }
+
+                        // (Critic moved up — runs BEFORE [DONE] so the verdict
+                        // event reaches the client. This block was a duplicate.)
                     }
                 } catch (error: any) {
                     try {
