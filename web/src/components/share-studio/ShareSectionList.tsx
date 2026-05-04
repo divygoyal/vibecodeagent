@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Eye, EyeOff } from 'lucide-react';
 import {
@@ -12,24 +12,32 @@ import {
 } from '@/lib/shareTypes';
 
 const SECTION_LABELS: Record<ShareSectionId, string> = {
-  metrics: 'KPI cards + main chart',
-  sources: 'Sources / Refs',
+  metrics: 'KPIs + chart',
+  sources: 'Sources',
   geo: 'Geography',
-  devices: 'Devices / Browsers',
+  devices: 'Devices',
   pages: 'Top Pages',
-  events: 'Events / Conversions',
-  liveGeo: 'Live Geo globe',
+  events: 'Events',
+  liveGeo: 'Live globe',
 };
 
 const SECTION_DESCRIPTIONS: Record<ShareSectionId, string> = {
-  metrics: 'Active Users / Sessions / Pageviews / Pages per session + selected-metric chart',
-  sources: 'Refs / URLs / UTM source / medium / campaign breakdown',
-  geo: 'Country / region / city tables',
-  devices: 'Devices / browsers / OS / brand / model',
-  pages: 'Top pages, entries, exits',
-  events: 'Events / conversions / link-out',
-  liveGeo: 'Realtime globe + activity feed',
+  metrics: 'KPI cards + main metric chart',
+  sources: 'Refs / UTM / source tables',
+  geo: 'Country / region / city',
+  devices: 'Device / browser / OS',
+  pages: 'Pages / entries / exits',
+  events: 'Events / conversions',
+  liveGeo: 'Realtime globe + activity',
 };
+
+/**
+ * Sections that span the full content width on the public view (so they take
+ * the whole row in the panel preview too). Everything else tiles in a 2-up grid
+ * that mirrors the public dashboard's Sources↔Geo, Devices↔Pages, Events↔LiveGeo
+ * pairing.
+ */
+const FULL_WIDTH_SECTIONS = new Set<ShareSectionId>(['metrics']);
 
 interface Props {
   draft: NormalizedShareConfig;
@@ -72,13 +80,14 @@ export default function ShareSectionList({ draft, onChange }: Props) {
         <span className="text-[9px] uppercase tracking-wider text-white/30">drag to reorder</span>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <div className="space-y-1">
+        <SortableContext items={order} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-2 gap-2">
             {order.map((id) => (
-              <SortableRow
+              <SortableTile
                 key={id}
                 id={id}
                 visible={draft.sectionVisibility[id] !== false}
+                fullWidth={FULL_WIDTH_SECTIONS.has(id)}
                 onToggle={() => toggleVisibility(id)}
               />
             ))}
@@ -86,64 +95,73 @@ export default function ShareSectionList({ draft, onChange }: Props) {
         </SortableContext>
       </DndContext>
       <p className="px-1 text-[10px] leading-relaxed text-white/30">
-        Sections render top-to-bottom in the public view. Hidden sections are skipped entirely.
+        Tiles mirror the public layout — pairs sit side-by-side, KPIs span the full row.
+        Drag to reorder, click the eye to hide a section.
       </p>
     </div>
   );
 }
 
-function SortableRow({
+function SortableTile({
   id,
   visible,
+  fullWidth,
   onToggle,
 }: {
   id: ShareSectionId;
   visible: boolean;
+  fullWidth: boolean;
   onToggle: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.6 : 1,
+    opacity: isDragging ? 0.55 : 1,
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 transition ${
+      className={`relative flex flex-col gap-1.5 rounded-lg border px-2.5 py-2 transition ${
+        fullWidth ? 'col-span-2' : ''
+      } ${
         visible
           ? 'border-white/[0.08] bg-white/[0.03]'
-          : 'border-white/[0.04] bg-white/[0.015] opacity-60'
-      }`}
+          : 'border-dashed border-white/[0.05] bg-white/[0.015] opacity-60'
+      } ${isDragging ? 'ring-1 ring-[var(--db-primary,#14C4E1)]/40' : ''}`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        type="button"
-        className="cursor-grab touch-none rounded p-1 text-white/30 hover:bg-white/[0.06] hover:text-white/70 active:cursor-grabbing"
-        aria-label={`Drag ${SECTION_LABELS[id]}`}
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium text-white/85">{SECTION_LABELS[id]}</div>
-        <div className="truncate text-[10px] text-white/40">{SECTION_DESCRIPTIONS[id]}</div>
+      <div className="flex items-center gap-1.5">
+        <button
+          {...attributes}
+          {...listeners}
+          type="button"
+          className="cursor-grab touch-none rounded p-0.5 text-white/30 hover:bg-white/[0.06] hover:text-white/70 active:cursor-grabbing"
+          aria-label={`Drag ${SECTION_LABELS[id]}`}
+        >
+          <GripVertical className="h-3 w-3" />
+        </button>
+        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-white/85">
+          {SECTION_LABELS[id]}
+        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded transition ${
+            visible
+              ? 'bg-[var(--db-primary,#14C4E1)]/15 text-[var(--db-primary,#14C4E1)] hover:bg-[var(--db-primary,#14C4E1)]/25'
+              : 'bg-white/[0.04] text-white/30 hover:bg-white/[0.08]'
+          }`}
+          title={visible ? 'Hide on public view' : 'Show on public view'}
+          aria-label={visible ? 'Hide section' : 'Show section'}
+        >
+          {visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded transition ${
-          visible
-            ? 'bg-[var(--db-primary,#14C4E1)]/15 text-[var(--db-primary,#14C4E1)] hover:bg-[var(--db-primary,#14C4E1)]/25'
-            : 'bg-white/[0.04] text-white/30 hover:bg-white/[0.08]'
-        }`}
-        title={visible ? 'Hide this section in the public view' : 'Show this section'}
-        aria-label={visible ? 'Hide section' : 'Show section'}
-      >
-        {visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-      </button>
+      <p className="line-clamp-2 text-[9px] leading-snug text-white/40">
+        {SECTION_DESCRIPTIONS[id]}
+      </p>
     </div>
   );
 }
