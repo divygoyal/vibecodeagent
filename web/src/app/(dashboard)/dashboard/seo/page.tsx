@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import dynamic from 'next/dynamic';
 const AreaChart = dynamic(() => import('recharts').then(m => ({ default: m.AreaChart })), { ssr: false });
 const Area = dynamic(() => import('recharts').then(m => ({ default: m.Area })), { ssr: false });
@@ -9,18 +9,22 @@ const YAxis = dynamic(() => import('recharts').then(m => ({ default: m.YAxis }))
 const CartesianGrid = dynamic(() => import('recharts').then(m => ({ default: m.CartesianGrid })), { ssr: false });
 const Tooltip = dynamic(() => import('recharts').then(m => ({ default: m.Tooltip })), { ssr: false });
 const ResponsiveContainer = dynamic(() => import('recharts').then(m => ({ default: m.ResponsiveContainer })), { ssr: false });
+const SparkLine = dynamic(() => import('recharts').then(m => ({ default: m.LineChart })), { ssr: false });
+const SparkLineSeries = dynamic(() => import('recharts').then(m => ({ default: m.Line })), { ssr: false });
+import ReactMarkdown, { type Components as MarkdownComponents } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
     ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download,
-    Bot, PenTool, Link2, Sparkles, Brain, Radar, BarChart3, Globe,
-    FileText, Layers, Activity, Shield, Clock, Cpu, ScanSearch
+    Bot, PenTool, Link2, Sparkles, Brain, Globe,
+    FileText, ScanSearch, FileCheck, XCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { exportSeoData } from '@/lib/exportUtils';
-import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
+import { useSeoData, useSiteList, useContainerStatus, useOpportunitiesData } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
@@ -33,6 +37,17 @@ import { AnnotationBadge, getAnnotations } from '@/components/AnnotationBadge';
 import { IntentBadge } from '@/components/IntentBadge';
 import ZombiePageMonitor from '@/components/dashboard/ZombiePageMonitor';
 import MobileGapWidget from '@/components/dashboard/MobileGapWidget';
+import StrikingDistanceWidget from '@/components/dashboard/StrikingDistanceWidget';
+import CtrOptimizationLab from '@/components/dashboard/CtrOptimizationLab';
+import SilentDecayMonitor from '@/components/dashboard/SilentDecayMonitor';
+import IndexingStatus from '@/components/dashboard/IndexingStatus';
+import CannibalizationWidget from '@/components/dashboard/CannibalizationWidget';
+import WinnersLosersWidget from '@/components/dashboard/WinnersLosersWidget';
+import AeoScoreWidget from '@/components/dashboard/AeoScoreWidget';
+import AioSimulator from '@/components/dashboard/AioSimulator';
+import AiVisibilityWidget from '@/components/dashboard/AiVisibilityWidget';
+import CoreWebVitalsLive from '@/components/dashboard/CoreWebVitalsLive';
+import SchemaAuditWidget from '@/components/dashboard/SchemaAuditWidget';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -83,6 +98,21 @@ interface TrendPoint {
     position: number;
 }
 
+interface QueryPagePoint {
+    query: string;
+    page: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+}
+
+interface OpportunitiesResponse {
+    queries?: Query[];
+    comparisonQueries?: Query[];
+    queryPages?: QueryPagePoint[];
+}
+
 const severityConfig: Record<string, { bg: string; border: string; icon: any; badge: string }> = {
     high: { bg: 'bg-red-500/5', border: 'border-red-500/20', icon: AlertTriangle, badge: 'bg-red-500/10 text-red-400' },
     medium: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', icon: FileWarning, badge: 'bg-amber-500/10 text-amber-400' },
@@ -107,6 +137,93 @@ function ChangeIndicator({ value, suffix = '%', invert = false }: { value: numbe
     );
 }
 
+const ICON_BG: Record<string, string> = {
+    emerald: 'bg-emerald-400/10 text-emerald-400',
+    cyan: 'bg-cyan-400/10 text-cyan-400',
+    violet: 'bg-violet-400/10 text-violet-400',
+    amber: 'bg-amber-400/10 text-amber-400',
+    blue: 'bg-blue-400/10 text-blue-400',
+    red: 'bg-red-400/10 text-red-400',
+};
+
+function KpiTile({
+    icon: Icon,
+    iconColor,
+    label,
+    value,
+    change,
+    invertChange = false,
+    sparkline,
+    sparkKey,
+    sparkColor,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    iconColor: keyof typeof ICON_BG;
+    label: string;
+    value: string | number;
+    change?: number;
+    invertChange?: boolean;
+    sparkline?: TrendPoint[];
+    sparkKey?: keyof TrendPoint;
+    sparkColor?: string;
+}) {
+    const sparkData = sparkline && sparkKey ? sparkline.slice(-14) : null;
+    const iconClasses = ICON_BG[iconColor] || ICON_BG.emerald;
+    return (
+        <div className="premium-card p-3 sm:p-5 stat-card-hover">
+            <div className="flex items-center justify-between mb-3">
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center ${iconClasses}`}>
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </div>
+                {typeof change === 'number' && <ChangeIndicator value={change} invert={invertChange} />}
+            </div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{value}</div>
+            <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">{label}</div>
+            {sparkData && sparkData.length > 1 && sparkColor && (
+                <div className="mt-2 h-7 -mx-1 opacity-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <SparkLine data={sparkData}>
+                            <SparkLineSeries
+                                type="monotone"
+                                dataKey={sparkKey as string}
+                                stroke={sparkColor}
+                                strokeWidth={1.5}
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        </SparkLine>
+                    </ResponsiveContainer>
+                </div>
+            )}
+        </div>
+    );
+}
+
+const blogMarkdownComponents: MarkdownComponents = {
+    h1: ({ children }) => <h1 className="text-lg font-bold text-white mt-4 mb-2">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-base font-bold text-white mt-4 mb-2">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-sm font-semibold text-white mt-3 mb-1.5">{children}</h3>,
+    p: ({ children }) => <p className="text-xs text-zinc-300 leading-relaxed my-2">{children}</p>,
+    strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
+    em: ({ children }) => <em className="text-zinc-400">{children}</em>,
+    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline">{children}</a>,
+    ul: ({ children }) => <ul className="space-y-1 my-2 list-disc list-inside text-xs text-zinc-300">{children}</ul>,
+    ol: ({ children }) => <ol className="space-y-1 my-2 list-decimal list-inside text-xs text-zinc-300">{children}</ol>,
+    li: ({ children }) => <li className="text-xs text-zinc-300 leading-relaxed">{children}</li>,
+    code: ({ children, className }) => {
+        const isBlock = className?.startsWith('language-');
+        if (isBlock) {
+            return <pre className="my-2 p-3 bg-black/40 border border-white/[0.06] rounded text-[11px] text-emerald-300 font-mono overflow-x-auto">{children}</pre>;
+        }
+        return <code className="bg-white/[0.04] text-emerald-300 px-1 rounded text-[11px] font-mono">{children}</code>;
+    },
+    blockquote: ({ children }) => <blockquote className="pl-3 border-l-2 border-emerald-500/30 my-2 text-xs text-zinc-400 italic">{children}</blockquote>,
+    hr: () => <hr className="border-white/[0.06] my-3" />,
+    table: ({ children }) => <div className="my-2 overflow-x-auto"><table className="w-full text-[11px] border-collapse">{children}</table></div>,
+    th: ({ children }) => <th className="px-2 py-1.5 text-left text-[10px] text-zinc-500 font-medium border-b border-white/[0.06]">{children}</th>,
+    td: ({ children }) => <td className="px-2 py-1.5 text-zinc-300 border-b border-white/[0.04]">{children}</td>,
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
@@ -129,8 +246,11 @@ export default function SEOPage() {
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
     const { selectedSite, setSelectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
+    const [activeOppTab, setActiveOppTab] = useState<'striking' | 'ctr' | 'decay'>('striking');
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
+    const [serpPreviewIndex, setSerpPreviewIndex] = useState(0);
+    const [activePillar, setActivePillar] = useState<'seo' | 'aeo' | 'geo'>('seo');
 
     // SEO Tools state
     const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -179,6 +299,13 @@ export default function SEOPage() {
 
     // 2. Fetch SEO Data (only when Google connected)
     const { data: seoData, isLoading, isError } = useSeoData('all', activeSite, hasGoogleConnection && (isDemoWorkspace || !!activeSite), range, isDemoWorkspace);
+
+    // 3. Fetch Opportunities Data (queries + comparison + queryPages — powers the 3 widgets)
+    const { data: oppData, isLoading: oppLoading, error: oppError } = useOpportunitiesData(
+        hasGoogleConnection && activeSite ? activeSite : null,
+        '28d'
+    );
+    const oppDataTyped = (oppData as OpportunitiesResponse | undefined) || {};
 
     // Show connect prompt if Google not connected
     if (!containerLoading && !hasGoogleConnection) {
@@ -254,9 +381,6 @@ export default function SEOPage() {
     const recommendations: Recommendation[] = Array.isArray(seoData?.recommendations) ? seoData.recommendations : [];
     const trend: TrendPoint[] = Array.isArray(seoData?.trend) ? seoData.trend : [];
 
-    // Alias for UI replacement
-    const loading = isLoading;
-
     return (
         <div className="space-y-6 p-4 sm:p-6">
             {isDemoWorkspace ? (
@@ -314,47 +438,60 @@ export default function SEOPage() {
 
             {/* KPI Cards */}
             {kpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
-                                <MousePointer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeClicks} />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Total Clicks</div>
-                    </div>
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
-                                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeImpressions} />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Impressions</div>
-                    </div>
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
-                                <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeCTR} />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Avg. CTR</div>
-                    </div>
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
-                                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changePosition} invert />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.avgPosition}</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Avg. Position</div>
-                    </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+                    <KpiTile
+                        icon={MousePointer}
+                        iconColor="emerald"
+                        label="Total Clicks"
+                        value={kpis.totalClicks.toLocaleString()}
+                        change={kpis.changeClicks}
+                        sparkline={trend}
+                        sparkKey="clicks"
+                        sparkColor="#34d399"
+                    />
+                    <KpiTile
+                        icon={Eye}
+                        iconColor="cyan"
+                        label="Impressions"
+                        value={kpis.totalImpressions.toLocaleString()}
+                        change={kpis.changeImpressions}
+                        sparkline={trend}
+                        sparkKey="impressions"
+                        sparkColor="#22d3ee"
+                    />
+                    <KpiTile
+                        icon={Hash}
+                        iconColor="violet"
+                        label="Avg. CTR"
+                        value={`${kpis.avgCTR}%`}
+                        change={kpis.changeCTR}
+                        sparkline={trend}
+                        sparkKey="ctr"
+                        sparkColor="#a78bfa"
+                    />
+                    <KpiTile
+                        icon={Search}
+                        iconColor="amber"
+                        label="Avg. Position"
+                        value={kpis.avgPosition}
+                        change={kpis.changePosition}
+                        invertChange
+                        sparkline={trend}
+                        sparkKey="position"
+                        sparkColor="#fbbf24"
+                    />
+                    <KpiTile
+                        icon={FileCheck}
+                        iconColor="blue"
+                        label="Indexed Pages"
+                        value={(kpis.indexedPages || 0).toLocaleString()}
+                    />
+                    <KpiTile
+                        icon={XCircle}
+                        iconColor="red"
+                        label="Crawl Errors"
+                        value={(kpis.crawlErrors || 0).toLocaleString()}
+                    />
                 </div>
             )}
 
@@ -400,6 +537,79 @@ export default function SEOPage() {
                         );
                     })}
                 </div>
+            </div>
+
+            {/* ─── Three Pillars: SEO • AEO • GEO ─── */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 via-blue-400 to-violet-400 flex items-center justify-center">
+                            <Sparkles className="w-3.5 h-3.5 text-black" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-white">Three Pillars of Modern Search</h3>
+                    </div>
+                    <div className="flex bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.06] flex-wrap">
+                        {[
+                            { key: 'seo', label: 'Traditional SEO', sub: 'Google rankings', color: 'emerald' },
+                            { key: 'aeo', label: 'Answer Engine', sub: 'AI Overviews', color: 'blue' },
+                            { key: 'geo', label: 'Generative Engine', sub: 'LLM citations', color: 'violet' },
+                        ].map(p => (
+                            <button
+                                key={p.key}
+                                onClick={() => setActivePillar(p.key as 'seo' | 'aeo' | 'geo')}
+                                className={`flex flex-col items-start px-3 py-1.5 text-xs font-medium rounded-md transition ${
+                                    activePillar === p.key
+                                        ? `bg-white/[0.1] text-${p.color}-400`
+                                        : 'text-zinc-500 hover:text-zinc-300'
+                                }`}
+                            >
+                                <span>{p.label}</span>
+                                <span className="text-[9px] text-zinc-600 font-normal hidden sm:inline">{p.sub}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {activePillar === 'seo' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {activeSite && <CannibalizationWidget siteUrl={activeSite} />}
+                        {activeSite && <WinnersLosersWidget siteUrl={activeSite} />}
+                        <div className="lg:col-span-2">
+                            <CoreWebVitalsLive
+                                siteUrl={activeSite || ''}
+                                suggestedPages={pages.slice(0, 4).map(p => p.page)}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {activePillar === 'aeo' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <AeoScoreWidget
+                            siteUrl={activeSite || ''}
+                            suggestedPages={pages.slice(0, 4).map(p => p.page)}
+                        />
+                        <SchemaAuditWidget
+                            siteUrl={activeSite || ''}
+                            suggestedPages={pages.slice(0, 4).map(p => p.page)}
+                        />
+                        <div className="lg:col-span-2">
+                            <AioSimulator
+                                siteUrl={activeSite || ''}
+                                suggestedQueries={queries.slice(0, 4).map(q => q.query)}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {activePillar === 'geo' && activeSite && (
+                    <AiVisibilityWidget siteUrl={activeSite} />
+                )}
+                {activePillar === 'geo' && !activeSite && (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 text-center text-xs text-zinc-500">
+                        Select a site to track AI Visibility.
+                    </div>
+                )}
             </div>
 
             {/* ─── SEO Robot / AI SEO Bot ─── */}
@@ -485,8 +695,10 @@ export default function SEOPage() {
                                             <FixWithBotButton label="Publish via Bot" size="md" variant="solid" context="Your bot can publish this directly to your CMS" site={selectedSite} />
                                             <button onClick={() => navigator.clipboard.writeText(toolResult.content)} className="px-3 py-1.5 text-xs text-zinc-400 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">Copy</button>
                                         </div>
-                                        <div className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[400px] overflow-y-auto">
-                                            <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono">{toolResult.content}</pre>
+                                        <div className="bg-black/30 border border-white/[0.06] rounded-lg p-5 max-h-[480px] overflow-y-auto">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={blogMarkdownComponents}>
+                                                {toolResult.content}
+                                            </ReactMarkdown>
                                         </div>
                                     </>
                                 )}
@@ -601,131 +813,79 @@ export default function SEOPage() {
                 )}
             </div>
 
-            {/* ─── Deep SEO Intelligence Features ─── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Content Decay Detector */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                            <Activity className="w-4 h-4 text-red-400" />
+            {/* ─── Indexing Status ─── */}
+            {kpis && (kpis.indexedPages > 0 || kpis.crawlErrors > 0) && (
+                <IndexingStatus
+                    indexed={kpis.indexedPages || 0}
+                    errors={kpis.crawlErrors || 0}
+                    excluded={0}
+                />
+            )}
+
+            {/* ─── Growth Opportunities (real widgets, tabbed) ─── */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-violet-400 flex items-center justify-center">
+                            <Target className="w-3.5 h-3.5 text-black" />
                         </div>
-                        <h4 className="text-sm font-semibold text-white">Content Decay Detector</h4>
+                        <h3 className="text-sm font-semibold text-white">Growth Opportunities</h3>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 font-medium">Live</span>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Monitors your top-performing pages and alerts when traffic declines so you can refresh content before rankings drop.</p>
-                    {pages.length > 0 ? (
-                        <div className="space-y-1.5">
-                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).slice(0, 3).map((p, i) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-400 truncate max-w-[60%]">{p.page}</span>
-                                    <span className="text-red-400 font-medium">pos {p.position.toFixed(1)}</span>
-                                </div>
-                            ))}
-                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length > 0 && (
-                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get deep analysis on decaying content and optimization strategies" site={selectedSite} /></div>
-                            )}
-                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length === 0 && (
-                                <span className="text-[11px] text-emerald-400">No decaying content detected</span>
-                            )}
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Connect Google to detect decaying content</span>
-                    )}
+                    <div className="flex bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.06]">
+                        {[
+                            { key: 'striking', label: 'Striking Distance', icon: Target },
+                            { key: 'ctr', label: 'CTR Lab', icon: Zap },
+                            { key: 'decay', label: 'Winners & Losers', icon: TrendingUp },
+                        ].map(({ key, label, icon: Icon }) => (
+                            <button
+                                key={key}
+                                onClick={() => setActiveOppTab(key as 'striking' | 'ctr' | 'decay')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition ${
+                                    activeOppTab === key
+                                        ? 'bg-white/[0.1] text-white'
+                                        : 'text-zinc-500 hover:text-zinc-300'
+                                }`}
+                            >
+                                <Icon className="w-3 h-3" />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Keyword Cannibalization */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                            <Shuffle className="w-4 h-4 text-amber-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Cannibalization Scanner</h4>
+                {oppLoading && !oppData ? (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Detects when multiple pages compete for the same keywords, splitting ranking power.</p>
-                    {queries.length > 0 ? (
-                        <div className="space-y-1.5">
-                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).slice(0, 3).map((q: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-400 truncate max-w-[60%]">{q.query}</span>
-                                    <span className="text-amber-400 font-medium">pos {q.position}</span>
-                                </div>
-                            ))}
-                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length > 0 && (
-                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get detailed cannibalization analysis and fix recommendations" site={selectedSite} /></div>
-                            )}
-                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length === 0 && (
-                                <span className="text-[11px] text-emerald-400">No cannibalization issues found</span>
-                            )}
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Analyzed from your Search Console data</span>
-                    )}
-                </div>
-
-                {/* Competitor Gap Analysis */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                            <Radar className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Competitor Gap Analysis</h4>
+                ) : oppError && !oppData ? (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex items-center justify-center gap-3">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs text-zinc-400">Couldn&apos;t load opportunities data. Try refreshing.</span>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Keywords your competitors rank for that you don&apos;t. Use the Keyword Research tool above to discover gaps.</p>
-                    {queries.length > 0 ? (
-                        <div className="text-xs text-zinc-400">
-                            <span className="text-emerald-400 font-bold">{queries.length}</span> keywords tracked.
-                            <span className="text-amber-400 font-bold ml-2">{queries.filter((q: any) => q.position > 10).length}</span> outside top 10.
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Connect Google to analyze gaps</span>
-                    )}
-                </div>
-
-                {/* Core Web Vitals Monitor */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <Cpu className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Core Web Vitals</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Use the Audit tool to check LCP, FID, CLS for any page. Navigate to Audit from the sidebar.</p>
-                    <a href="/dashboard/audit" className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 hover:underline"><ArrowUpRight className="w-3 h-3" /> Open Audit Tool</a>
-                </div>
-
-                {/* Daily Rank Tracker */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                            <BarChart3 className="w-4 h-4 text-pink-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Rank Tracking</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Your keyword positions from Search Console data. Updated with each data refresh.</p>
-                    {queries.length > 0 ? (
-                        <div className="space-y-1.5">
-                            {queries.slice(0, 3).map((q: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-400 truncate max-w-[55%]">{q.query}</span>
-                                    <span className={`font-medium ${q.position <= 5 ? 'text-emerald-400' : q.position <= 10 ? 'text-amber-400' : 'text-red-400'}`}>#{q.position}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Connect Google to track rankings</span>
-                    )}
-                </div>
-
-                {/* Programmatic SEO */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                            <Layers className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Programmatic SEO</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Use the Blog Writer + Keyword Research tools above to generate content at scale for long-tail keywords.</p>
-                    <span className="text-[11px] text-violet-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Use tools above</span>
-                </div>
+                ) : (
+                    <>
+                        {activeOppTab === 'striking' && (
+                            <StrikingDistanceWidget
+                                queries={oppDataTyped.queries || queries}
+                                siteUrl={activeSite || ''}
+                            />
+                        )}
+                        {activeOppTab === 'ctr' && (
+                            <CtrOptimizationLab
+                                queryPages={oppDataTyped.queryPages || []}
+                                siteUrl={activeSite || ''}
+                            />
+                        )}
+                        {activeOppTab === 'decay' && (
+                            <SilentDecayMonitor
+                                queries={oppDataTyped.queries || queries}
+                                comparisonQueries={oppDataTyped.comparisonQueries || []}
+                                siteUrl={activeSite || ''}
+                            />
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Search Trend Chart */}
@@ -908,28 +1068,66 @@ export default function SEOPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* SERP Preview */}
                     <div className="premium-card p-4 sm:p-5">
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center">
                                 <Globe className="w-3.5 h-3.5 text-white" />
                             </div>
                             <h3 className="text-sm font-semibold text-white">SERP Preview</h3>
-                            <span className="text-[10px] text-zinc-600">How your top result appears in Google</span>
+                            <span className="text-[10px] text-zinc-600">How this page appears in Google</span>
                         </div>
-                        {pages[0] && (
-                            <div className="serp-preview">
-                                <div className="serp-url">{pages[0].page}</div>
-                                <div className="serp-title">{pages[0].page.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Page Title'}</div>
-                                <div className="serp-desc">This page has {pages[0].clicks} clicks and {pages[0].impressions?.toLocaleString()} impressions with a CTR of {pages[0].ctr}% at position {pages[0].position.toFixed(1)}.</div>
-                            </div>
-                        )}
-                        <div className="mt-3 flex items-center gap-2">
-                            <button
-                                onClick={() => pages[0] && router.push(`/dashboard/audit?url=${encodeURIComponent(pages[0].page)}`)}
-                                className="audit-pill"
-                            >
-                                <ScanSearch className="w-3 h-3" /> Audit This Page
-                            </button>
-                        </div>
+                        {pages.length > 0 && (() => {
+                            const safeIndex = Math.min(serpPreviewIndex, pages.length - 1);
+                            const previewPage = pages[safeIndex];
+                            const titleText = previewPage.page.split('/').filter(Boolean).pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Page Title';
+                            const descText = `This page has ${previewPage.clicks.toLocaleString()} clicks and ${previewPage.impressions?.toLocaleString()} impressions with a CTR of ${previewPage.ctr}% at position ${previewPage.position.toFixed(1)}.`;
+                            const titleOver = titleText.length > 60;
+                            const descOver = descText.length > 160;
+                            return (
+                                <>
+                                    <div className="relative mb-3">
+                                        <select
+                                            value={safeIndex}
+                                            onChange={(e) => setSerpPreviewIndex(Number(e.target.value))}
+                                            className="w-full appearance-none bg-white/[0.03] border border-white/[0.08] rounded-lg pl-3 pr-8 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/30"
+                                        >
+                                            {pages.slice(0, 25).map((p, i) => (
+                                                <option key={i} value={i}>{p.page}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                                    </div>
+                                    <div className="serp-preview">
+                                        <div className="serp-url">{previewPage.page}</div>
+                                        <div className="serp-title">{titleText}</div>
+                                        <div className="serp-desc">{descText}</div>
+                                    </div>
+                                    {(titleOver || descOver) && (
+                                        <div className="mt-2 flex flex-col gap-1">
+                                            {titleOver && (
+                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    Title is {titleText.length} chars — Google truncates around 60.
+                                                </div>
+                                            )}
+                                            {descOver && (
+                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    Description is {descText.length} chars — Google truncates around 160.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <button
+                                            onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(previewPage.page)}`)}
+                                            className="audit-pill"
+                                        >
+                                            <ScanSearch className="w-3 h-3" /> Audit This Page
+                                        </button>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
 
                     {/* Quick Domain Actions */}
