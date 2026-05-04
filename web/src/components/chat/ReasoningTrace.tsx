@@ -51,8 +51,14 @@ export const ReasoningTrace = memo(function ReasoningTrace({ lines, active }: Re
     }, [active, lines.length]);
 
     // Show a fallback cycling phrase only when there are no real lines yet.
+    // Cap to LAST 3 lines so the trace doesn't grow into a wall of text on
+    // tool-heavy turns. Older lines slide off the top, opacity fades from
+    // 0.35 (oldest) → 1.0 (newest) — rolling-status-update pattern.
     const hasLines = lines.length > 0;
-    const visibleLines = hasLines ? lines : [{ id: 'fb-' + phase, text: FALLBACK_PHRASES[phase] }];
+    const VISIBLE_MAX = 3;
+    const visibleLines = hasLines
+        ? lines.slice(-VISIBLE_MAX)
+        : [{ id: 'fb-' + phase, text: FALLBACK_PHRASES[phase] }];
 
     return (
         <div className="flex justify-start">
@@ -62,13 +68,18 @@ export const ReasoningTrace = memo(function ReasoningTrace({ lines, active }: Re
                 <div className="space-y-1">
                     {visibleLines.map((line, i) => {
                         const isLast = i === visibleLines.length - 1;
+                        const N = visibleLines.length;
+                        // Linear fade: position 0 (oldest) = 0.35, last = 1.0.
+                        const opacity = hasLines && N > 1
+                            ? 0.35 + (0.65 * i) / (N - 1)
+                            : 1;
                         return (
                             <div
                                 key={line.id}
                                 className="text-[13px] text-zinc-400 leading-relaxed flex items-start gap-1.5"
                                 style={{
                                     animation: 'tcReasoningFade 0.32s ease-out',
-                                    opacity: hasLines && !isLast ? 0.55 : 1,
+                                    opacity,
                                 }}
                             >
                                 <span className="mt-1 w-1 h-1 rounded-full bg-zinc-500 flex-shrink-0" />

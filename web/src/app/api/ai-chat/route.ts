@@ -600,6 +600,11 @@ CRITICAL SYSTEM CONTEXT:
                     let gscCallCount = 0;
                     let githubCallCount = 0;
                     let inspectCallCount = 0; // A9: cap inspect_url at 3/conversation (GSC quota friendliness)
+                    // Track whether ANY text was streamed across the entire turn.
+                    // If we exit the tool loop without a single text chunk (the "ran 8
+                    // tools but never wrote the answer" failure mode), we force a final
+                    // tool-less pass below to make the model summarize.
+                    let anyTextStreamedThisTurn = false;
                     const MAX_GSC_CALLS = 8;
                     const MAX_GITHUB_CALLS = 5;
                     const MAX_INSPECT_CALLS = 3;
@@ -690,6 +695,7 @@ CRITICAL SYSTEM CONTEXT:
                             // text stream itself — much cleaner separation.
                             if (chunk.text) {
                                 fullText += chunk.text;
+                                anyTextStreamedThisTurn = true;
                                 controller.enqueue(encodeSSE({ type: 'text', content: chunk.text }));
                             }
 
@@ -817,6 +823,64 @@ CRITICAL SYSTEM CONTEXT:
                                 keepGoing = false;
                             }
                         }
+                    }
+
+                    // RESCUE PASS — if the tool loop exited without ever streaming text,
+                    // the model burned its iterations on tool calls but never wrote the
+                    // answer. Force one final NO-tools pass so the user sees a verdict
+                    // instead of just a stack of tool icons.
+                    if (ai && !anyTextStreamedThisTurn && !abortSignal.aborted) {
+                        try {
+                            // Inject a system-style nudge as the last user turn telling
+                            // the model: tools are done, write the answer NOW.
+                            const rescueContents = [
+                                ...currentContents,
+                                {
+                                    role: 'user',
+                                    parts: [{
+                                        text: 'You have gathered enough data. Write the FINAL answer NOW based on the tool results above. NO more tool calls. Follow your persona\'s response shape. Cite specific numbers from the tool results.',
+                                    }],
+                                },
+                            ];
+                            const rescue = await ai.models.generateContentStream({
+                                model: 'gemini-3-flash-preview',
+                                contents: rescueContents,
+                                config: {
+                                    systemInstruction: finalSystemInstruction,
+                                    // CRITICAL: no tools — force the model to write text.
+                                    temperature: 0.4,
+                                    maxOutputTokens: 3072,
+                                    httpOptions: { timeout: 25000 },
+                                },
+                            });
+                            let rescueText = '';
+                            for await (const chunk of rescue) {
+                                if (abortSignal.aborted) break;
+                                if (chunk.text) {
+                                    anyTextStreamedThisTurn = true;
+                                    controller.enqueue(encodeSSE({ type: 'text', content: chunk.text }));
+                                    rescueText += chunk.text;
+                                }
+                            }
+                            if (rescueText) {
+                                // Stitch rescue text into history so the critic + memory
+                                // writes downstream see it as the assistant's turn.
+                                currentContents.push({
+                                    role: 'model',
+                                    parts: [{ text: rescueText }],
+                                });
+                            }
+                        } catch (rescueErr: any) {
+                            console.warn('[AI-CHAT] rescue pass failed:', rescueErr?.message?.slice(0, 100));
+                        }
+                    }
+                    // If even the rescue produced no text, surface a graceful note
+                    // so the user isn't staring at tool icons with no answer.
+                    if (!anyTextStreamedThisTurn) {
+                        controller.enqueue(encodeSSE({
+                            type: 'text',
+                            content: 'I gathered the data but ran out of room to write the final analysis. Try asking a more specific question or "summarize the findings".',
+                        }));
                     }
 
                     // Reconstruct assistant text once — used by critic (pre-DONE) +
