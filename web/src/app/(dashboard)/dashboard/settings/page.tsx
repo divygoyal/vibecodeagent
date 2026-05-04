@@ -1,36 +1,41 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-    User, Mail, LogOut, Github, Plug,
-    CheckCircle2, ChevronRight, Gift, Copy, Check, CreditCard
+    Mail, LogOut, Github, ChevronRight, Gift, Copy, Check,
+    CreditCard, BellRing, User, Trophy, Bell, Plug, Settings as SettingsIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { BellRing } from 'lucide-react';
 import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } from '@/lib/pushNotifications';
 import { useContainerStatus } from '@/lib/useDashboardData';
 import { toast } from 'sonner';
 import LeaderboardOptIn from './LeaderboardOptIn';
 
-function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: string }) {
-    return (
-        <button
-            onClick={onChange}
-            role="switch"
-            aria-checked={checked}
-            aria-label={label}
-            className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-emerald-400' : 'bg-zinc-700'}`}
-        >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
-        </button>
-    );
-}
+/* ───────────────────────────────────────────────────────────────────
+ * Settings
+ *
+ * Premium-pass redesign — neutral palette, vertical sidebar nav,
+ * cleaner cards, no rainbow gradients. Functionality is byte-for-byte
+ * identical: Google + GitHub OAuth flows, push notifications, referral
+ * link generation, leaderboard opt-in, sign-out. The
+ * ProviderConnectionCallback child still POSTs to /api/auth/register-provider
+ * after the OAuth round-trip with the same error messages.
+ * ──────────────────────────────────────────────────────────────────── */
 
+type TabKey = 'account' | 'connections' | 'notifications' | 'leaderboard';
 
-// Isolated child so the useSearchParams() Suspense bailout doesn't disable
-// static rendering for the entire settings page (Next.js 16 prerender requirement).
+const TABS: { key: TabKey; label: string; icon: typeof User }[] = [
+    { key: 'account',       label: 'Account',       icon: User },
+    { key: 'connections',   label: 'Connections',   icon: Plug },
+    { key: 'notifications', label: 'Notifications', icon: Bell },
+    { key: 'leaderboard',   label: 'Leaderboard',   icon: Trophy },
+];
+
+/* ──────────────────────────────────────
+ * Suspense-isolated child for OAuth callback registration.
+ * ────────────────────────────────────── */
 function ProviderConnectionCallback({ onConnected }: { onConnected: () => void }) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -81,7 +86,7 @@ export default function SettingsPage() {
             try {
                 const saved = localStorage.getItem('tc-notification-prefs');
                 if (saved) return JSON.parse(saved);
-            } catch { /* use defaults */ }
+            } catch { /* defaults */ }
         }
         return { seoAlerts: true, weeklyReport: true, contentDecay: true, botErrors: false };
     });
@@ -94,233 +99,368 @@ export default function SettingsPage() {
         });
     };
 
-    const [activeTab, setActiveTab] = useState<'account' | 'notifications' | 'leaderboard'>('account');
+    const [activeTab, setActiveTab] = useState<TabKey>('account');
 
     return (
-        <div className="space-y-6 max-w-2xl">
+        <div className="max-w-5xl">
             <Suspense fallback={null}>
                 <ProviderConnectionCallback onConnected={refreshContainer} />
             </Suspense>
-            <div>
-                <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
-                <p className="text-sm text-zinc-500">
-                    Manage your account, plan, and preferences.
-                </p>
-            </div>
 
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-1 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit">
-                {(['account', 'notifications', 'leaderboard'] as const).map(tab => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2.5 min-h-[44px] text-xs font-medium rounded-lg transition-all capitalize ${
-                            activeTab === tab
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-                        }`}
-                    >
-                        {tab}
-                    </button>
-                ))}
-            </div>
+            {/* Header */}
+            <header className="mb-6 flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02]">
+                    <SettingsIcon className="h-4 w-4 text-zinc-300" />
+                </div>
+                <div>
+                    <h1 className="text-xl font-semibold tracking-tight text-white">Settings</h1>
+                    <p className="text-[12px] text-zinc-500">Manage your account, integrations, and preferences.</p>
+                </div>
+            </header>
 
-            {activeTab === 'account' && (<>
-            {/* Profile */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Profile</h2>
-                <div className="flex items-center gap-4">
-                    {session?.user?.image ? (
-                        <img
-                            src={session.user.image}
-                            alt=""
-                            className="w-14 h-14 rounded-full ring-2 ring-white/[0.08]"
+            <div className="grid gap-5 md:grid-cols-[180px_1fr]">
+                {/* Vertical tab nav (mobile: horizontal scroll fallback) */}
+                <nav className="md:sticky md:top-4 self-start">
+                    <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0">
+                        {TABS.map((tab) => {
+                            const Icon = tab.icon;
+                            const active = activeTab === tab.key;
+                            return (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setActiveTab(tab.key)}
+                                    className={`group inline-flex md:flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors flex-shrink-0 ${
+                                        active
+                                            ? 'bg-white/[0.06] text-white'
+                                            : 'text-zinc-400 hover:bg-white/[0.025] hover:text-zinc-200'
+                                    }`}
+                                >
+                                    <Icon className={`h-3.5 w-3.5 ${active ? 'text-zinc-200' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                                    <span className="font-medium">{tab.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </nav>
+
+                {/* Tab content */}
+                <main className="space-y-4 min-w-0">
+                    {activeTab === 'account' && (
+                        <AccountTab
+                            session={session}
                         />
-                    ) : (
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                            <User className="w-6 h-6 text-black" />
-                        </div>
                     )}
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg font-semibold text-white">{session?.user?.name || 'TrafficClaw User'}</span>
-                        </div>
-                        <div className="text-sm text-zinc-500 flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5" />
-                            {session?.user?.email || 'Not available'}
-                        </div>
-                    </div>
-                    <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2.5 py-1 rounded-full font-medium hidden sm:inline-flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Verified
-                    </span>
-                </div>
+                    {activeTab === 'connections' && (
+                        <ConnectionsTab
+                            hasGoogleConnection={hasGoogleConnection}
+                            hasGithubConnection={hasGithubConnection}
+                            refreshContainer={refreshContainer}
+                        />
+                    )}
+                    {activeTab === 'notifications' && (
+                        <NotificationsTab
+                            notifications={notifications}
+                            toggleNotification={toggleNotification}
+                        />
+                    )}
+                    {activeTab === 'leaderboard' && (
+                        <LeaderboardOptIn />
+                    )}
+                </main>
             </div>
-
-            {/* Plan & Billing Link */}
-            <Link href="/dashboard/plan" className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/[0.06] rounded-2xl hover:bg-white/[0.04] transition-colors group">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                        <CreditCard className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                        <div className="text-sm font-medium text-white">Plan & Billing</div>
-                        <div className="text-xs text-zinc-500">Manage your subscription, view credits, and upgrade</div>
-                    </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
-            </Link>
-
-            {/* Connections */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Plug className="w-3.5 h-3.5" />
-                    Connections
-                </h2>
-                <p className="text-xs text-zinc-500 mb-4">
-                    Connect your data sources so the AI chatbot can diagnose issues across SEO, analytics, and your codebase in a single conversation.
-                </p>
-                <div className="space-y-1">
-                    <ServiceRow
-                        name="Google (Analytics + Search Console)"
-                        description="Lets the AI read GA4 traffic and GSC search performance"
-                        icon={<span className="text-base">📊</span>}
-                        connected={hasGoogleConnection}
-                        onConnect={() => signIn('google', { callbackUrl: '/dashboard/settings?connected=google' }, { prompt: 'select_account consent' })}
-                    />
-                    <ServiceRow
-                        name="GitHub"
-                        description="Selective per-repo access via the TrafficClaw GitHub App — pick exactly which repos the AI can read"
-                        icon={<Github className="w-4 h-4 text-white" />}
-                        connected={hasGithubConnection}
-                        onConnect={() => { window.location.href = '/api/auth/github-app/install'; }}
-                        onDisconnect={async () => {
-                            if (!confirm('Disconnect GitHub from TrafficClaw? You can also fully revoke access by uninstalling on github.com/settings/installations.')) return;
-                            try {
-                                const res = await fetch('/api/github-app/disconnect', { method: 'POST' });
-                                if (res.ok) {
-                                    toast.success('GitHub disconnected.');
-                                    refreshContainer();
-                                } else {
-                                    toast.error('Failed to disconnect GitHub.');
-                                }
-                            } catch {
-                                toast.error('Failed to disconnect GitHub.');
-                            }
-                        }}
-                    />
-                    <ServiceRow
-                        name="Vercel"
-                        description="Coming soon — correlate deploys, build failures, and edge logs with traffic events"
-                        icon={
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-white">
-                                <path d="M12 3 22 20H2L12 3Z" />
-                            </svg>
-                        }
-                        connected={false}
-                        comingSoon
-                    />
-                    <ServiceRow
-                        name="WordPress"
-                        description="Coming soon — read posts, drafts, and plugins; correlate publish dates with ranking changes"
-                        icon={
-                            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-[#5fbcd9]">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
-                                <path d="M3 12a9 9 0 0 0 5.2 8.15L4.6 9.65A8.96 8.96 0 0 0 3 12Z" fill="currentColor" />
-                                <path d="M19.6 7.7a8.96 8.96 0 0 1 .9 8.7l-3.6-9.85a4 4 0 0 1 2.7 1.15Z" fill="currentColor" opacity="0.85" />
-                                <path d="M11 4.4 14 13l-1.7 5.4a9 9 0 0 0 5.6-2.1L13.4 4.5l-2.4-.1Z" fill="currentColor" opacity="0.7" />
-                            </svg>
-                        }
-                        connected={false}
-                        comingSoon
-                    />
-                </div>
-            </div>
-
-            {/* Referral Program */}
-            <ReferralSection email={session?.user?.email || ''} />
-
-            {/* Danger Zone */}
-            <div className="bg-red-500/[0.03] border border-red-500/[0.1] rounded-2xl p-4 sm:p-6">
-                <h2 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-4">Danger Zone</h2>
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="text-white font-medium text-sm">Sign Out</div>
-                            <div className="text-xs text-zinc-500 mt-0.5">Sign out of your TrafficClaw account</div>
-                        </div>
-                        <button
-                            onClick={() => signOut({ callbackUrl: '/' })}
-                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] text-sm text-red-400 border border-red-500/[0.2] rounded-xl hover:bg-red-500/[0.08] transition-colors"
-                        >
-                            <LogOut className="w-3.5 h-3.5" />
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
-            </div>
-            </>)}
-
-
-            {activeTab === 'notifications' && (<>
-            {/* Notification Preferences */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Notifications</h2>
-                <div className="space-y-4">
-                    <NotificationRow label="SEO Alerts" description="Position drops, crawl errors, new keyword opportunities" checked={notifications.seoAlerts} onChange={() => toggleNotification('seoAlerts')} />
-                    <NotificationRow label="Weekly Performance Report" description="Summary of traffic, rankings, and AI recommendations" checked={notifications.weeklyReport} onChange={() => toggleNotification('weeklyReport')} />
-                    <NotificationRow label="Content Decay Warnings" description="Alert when a page loses significant organic traffic" checked={notifications.contentDecay} onChange={() => toggleNotification('contentDecay')} />
-                    <NotificationRow label="Bot Error Notifications" description="Alert when your bot encounters an error" checked={notifications.botErrors} onChange={() => toggleNotification('botErrors')} />
-                </div>
-            </div>
-
-            {/* Browser Push Notifications */}
-            {isPushSupported() && (
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-6">
-                    <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <BellRing className="w-3.5 h-3.5" />
-                        Browser Push Notifications
-                    </h2>
-                    <PushNotificationToggle />
-                </div>
-            )}
-            </>)}
-
-            {activeTab === 'leaderboard' && (
-                <LeaderboardOptIn />
-            )}
         </div>
     );
 }
 
-function ServiceRow({ name, description, connected, icon, onConnect, onDisconnect, comingSoon }: {
+/* ───────────────────────────────────────────────────────────────────
+ * Tabs
+ * ──────────────────────────────────────────────────────────────────── */
+
+function AccountTab({ session }: { session: ReturnType<typeof useSession>['data'] }) {
+    return (
+        <>
+            {/* Profile card */}
+            <Card>
+                <SectionHeader title="Profile" />
+                <div className="mt-4 flex items-center gap-4">
+                    {session?.user?.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={session.user.image}
+                            alt=""
+                            className="h-14 w-14 rounded-full ring-1 ring-white/[0.08]"
+                        />
+                    ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04]">
+                            <User className="h-6 w-6 text-zinc-300" />
+                        </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-semibold text-white truncate">
+                            {session?.user?.name || 'TrafficClaw user'}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-500">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate">{session?.user?.email || 'Not available'}</span>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            {/* Plan & Billing link */}
+            <Link
+                href="/dashboard/plan"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-4 transition-colors hover:border-white/[0.12]"
+            >
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                        <CreditCard className="h-4 w-4 text-zinc-300" />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[13.5px] font-semibold text-white">Plan & billing</div>
+                        <div className="text-[11.5px] text-zinc-500">Subscription, credits, renewal</div>
+                    </div>
+                </div>
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-zinc-600" />
+            </Link>
+
+            {/* Referral */}
+            <ReferralSection email={session?.user?.email || ''} />
+
+            {/* Danger zone */}
+            <Card>
+                <SectionHeader title="Danger zone" />
+                <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="text-[13px] font-medium text-white">Sign out</div>
+                        <div className="mt-0.5 text-[11.5px] text-zinc-500">Sign out of your TrafficClaw account.</div>
+                    </div>
+                    <button
+                        onClick={() => signOut({ callbackUrl: '/' })}
+                        className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/[0.05] px-3 py-2 text-[12px] font-medium text-red-300 transition-colors hover:bg-red-500/[0.12]"
+                    >
+                        <LogOut className="h-3.5 w-3.5" />
+                        Sign out
+                    </button>
+                </div>
+            </Card>
+        </>
+    );
+}
+
+function ConnectionsTab({
+    hasGoogleConnection, hasGithubConnection, refreshContainer,
+}: {
+    hasGoogleConnection: boolean;
+    hasGithubConnection: boolean;
+    refreshContainer: () => void;
+}) {
+    return (
+        <Card>
+            <SectionHeader title="Connections" />
+            <p className="mt-1 text-[12px] text-zinc-500">
+                Connect data sources so the AI can diagnose issues across SEO, analytics, and your codebase in one conversation.
+            </p>
+            <div className="mt-4 divide-y divide-white/[0.04]">
+                <ServiceRow
+                    name="Google · Analytics + Search Console"
+                    description="Reads GA4 traffic and GSC search performance."
+                    icon={
+                        <svg viewBox="0 0 48 48" className="h-4 w-4">
+                            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-11.3 8 12 12 0 1 1 7.9-21l5.6-5.6A20 20 0 1 0 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8A12 12 0 0 1 24 12a12 12 0 0 1 7.9 3l5.6-5.6A20 20 0 0 0 6.3 14.7z"/>
+                            <path fill="#4CAF50" d="M24 44a20 20 0 0 0 13.5-5.2l-6.2-5.2A12 12 0 0 1 24 36a12 12 0 0 1-11.3-8L6.1 33A20 20 0 0 0 24 44z"/>
+                            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4.1 5.6l6.2 5.2A19.6 19.6 0 0 0 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                        </svg>
+                    }
+                    connected={hasGoogleConnection}
+                    onConnect={() => signIn('google', { callbackUrl: '/dashboard/settings?connected=google' }, { prompt: 'select_account consent' })}
+                />
+                <ServiceRow
+                    name="GitHub"
+                    description="Selective per-repo access via the TrafficClaw GitHub App — pick exactly which repos the AI can read."
+                    icon={<Github className="h-4 w-4 text-white" />}
+                    connected={hasGithubConnection}
+                    onConnect={() => { window.location.href = '/api/auth/github-app/install'; }}
+                    onDisconnect={async () => {
+                        if (!confirm('Disconnect GitHub from TrafficClaw? You can also fully revoke access by uninstalling on github.com/settings/installations.')) return;
+                        try {
+                            const res = await fetch('/api/github-app/disconnect', { method: 'POST' });
+                            if (res.ok) {
+                                toast.success('GitHub disconnected.');
+                                refreshContainer();
+                            } else {
+                                toast.error('Failed to disconnect GitHub.');
+                            }
+                        } catch {
+                            toast.error('Failed to disconnect GitHub.');
+                        }
+                    }}
+                />
+                <ServiceRow
+                    name="Vercel"
+                    description="Coming soon — correlate deploys, build failures, and edge logs with traffic events."
+                    icon={
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-white">
+                            <path d="M12 3 22 20H2L12 3Z" />
+                        </svg>
+                    }
+                    connected={false}
+                    comingSoon
+                />
+                <ServiceRow
+                    name="WordPress"
+                    description="Coming soon — read posts, drafts, and plugins; correlate publish dates with ranking changes."
+                    icon={
+                        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-[#5fbcd9]">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+                            <path d="M3 12a9 9 0 0 0 5.2 8.15L4.6 9.65A8.96 8.96 0 0 0 3 12Z" fill="currentColor" />
+                            <path d="M19.6 7.7a8.96 8.96 0 0 1 .9 8.7l-3.6-9.85a4 4 0 0 1 2.7 1.15Z" fill="currentColor" opacity="0.85" />
+                            <path d="M11 4.4 14 13l-1.7 5.4a9 9 0 0 0 5.6-2.1L13.4 4.5l-2.4-.1Z" fill="currentColor" opacity="0.7" />
+                        </svg>
+                    }
+                    connected={false}
+                    comingSoon
+                />
+            </div>
+        </Card>
+    );
+}
+
+function NotificationsTab({
+    notifications, toggleNotification,
+}: {
+    notifications: { seoAlerts: boolean; weeklyReport: boolean; contentDecay: boolean; botErrors: boolean };
+    toggleNotification: (key: keyof typeof notifications) => void;
+}) {
+    return (
+        <>
+            <Card>
+                <SectionHeader title="Email & in-app" />
+                <div className="mt-3 divide-y divide-white/[0.04]">
+                    <NotificationRow
+                        label="SEO alerts"
+                        description="Position drops, crawl errors, new keyword opportunities."
+                        checked={notifications.seoAlerts}
+                        onChange={() => toggleNotification('seoAlerts')}
+                    />
+                    <NotificationRow
+                        label="Weekly performance report"
+                        description="Summary of traffic, rankings, and AI recommendations."
+                        checked={notifications.weeklyReport}
+                        onChange={() => toggleNotification('weeklyReport')}
+                    />
+                    <NotificationRow
+                        label="Content decay warnings"
+                        description="Alert when a page loses significant organic traffic."
+                        checked={notifications.contentDecay}
+                        onChange={() => toggleNotification('contentDecay')}
+                    />
+                    <NotificationRow
+                        label="Bot error notifications"
+                        description="Alert when your bot encounters an error."
+                        checked={notifications.botErrors}
+                        onChange={() => toggleNotification('botErrors')}
+                    />
+                </div>
+            </Card>
+
+            {isPushSupported() && (
+                <Card>
+                    <SectionHeader
+                        title="Browser push"
+                        icon={<BellRing className="h-3 w-3" />}
+                    />
+                    <div className="mt-3">
+                        <PushNotificationToggle />
+                    </div>
+                </Card>
+            )}
+        </>
+    );
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Reusable primitives
+ * ──────────────────────────────────────────────────────────────────── */
+
+function Card({ children }: { children: ReactNode }) {
+    return (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-5">
+            {children}
+        </div>
+    );
+}
+
+function SectionHeader({ title, icon }: { title: string; icon?: ReactNode }) {
+    return (
+        <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            {icon}
+            {title}
+        </h2>
+    );
+}
+
+function ToggleSwitch({ checked, onChange, label, disabled }: {
+    checked: boolean;
+    onChange: () => void;
+    label?: string;
+    disabled?: boolean;
+}) {
+    return (
+        <button
+            onClick={onChange}
+            disabled={disabled}
+            role="switch"
+            aria-checked={checked}
+            aria-label={label}
+            className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${
+                checked ? 'bg-emerald-500/80' : 'bg-zinc-700'
+            } ${disabled ? 'opacity-50' : ''}`}
+        >
+            <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                    checked ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+            />
+        </button>
+    );
+}
+
+function ServiceRow({
+    name, description, connected, icon, onConnect, onDisconnect, comingSoon,
+}: {
     name: string;
     description: string;
     connected: boolean;
-    icon: React.ReactNode;
+    icon: ReactNode;
     onConnect?: () => void;
     onDisconnect?: () => void | Promise<void>;
     comingSoon?: boolean;
 }) {
     return (
-        <div className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/[0.02] transition">
+        <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
             <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
                     {icon}
                 </div>
                 <div className="min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{name}</div>
-                    <div className="text-xs text-zinc-500">{description}</div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-semibold text-white truncate">{name}</span>
+                        {connected && (
+                            <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        )}
+                    </div>
+                    <p className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{description}</p>
                 </div>
             </div>
             {connected ? (
-                <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> Connected
-                    </span>
+                <div className="flex flex-shrink-0 items-center gap-2">
+                    <span className="text-[10.5px] font-medium text-emerald-300">Connected</span>
                     {onDisconnect && (
                         <button
                             onClick={onDisconnect}
-                            className="text-[11px] text-red-400 hover:text-red-300 transition px-2 py-1 rounded-md border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/[0.06]"
+                            className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10.5px] text-zinc-400 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.06] hover:text-red-300"
                             title="Disconnect"
                         >
                             Disconnect
@@ -328,16 +468,16 @@ function ServiceRow({ name, description, connected, icon, onConnect, onDisconnec
                     )}
                 </div>
             ) : comingSoon ? (
-                <span className="text-[10px] bg-white/[0.04] text-zinc-400 px-2 py-0.5 rounded-full font-medium shrink-0 border border-white/[0.06]">
+                <span className="flex-shrink-0 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[10.5px] text-zinc-500">
                     Coming soon
                 </span>
             ) : (
                 <button
                     onClick={onConnect}
                     disabled={!onConnect}
-                    className="text-xs text-zinc-300 hover:text-white transition flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/[0.08] hover:border-white/[0.16] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    className="inline-flex flex-shrink-0 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[11.5px] text-zinc-200 transition-colors hover:bg-white/[0.08] hover:border-white/[0.16] disabled:opacity-50"
                 >
-                    Connect <ChevronRight className="w-3 h-3" />
+                    Connect <ChevronRight className="h-3 w-3" />
                 </button>
             )}
         </div>
@@ -361,30 +501,29 @@ function ReferralSection({ email }: { email: string }) {
     };
 
     return (
-        <div className="bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] border border-emerald-500/[0.15] rounded-2xl p-4 sm:p-6">
-            <div className="flex items-center gap-2 mb-3">
-                <Gift className="w-4 h-4 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-white">Invite Friends, Earn Credits</h2>
+        <Card>
+            <div className="flex items-center justify-between gap-2">
+                <SectionHeader title="Refer a friend" icon={<Gift className="h-3 w-3" />} />
+                {referralCount > 0 && (
+                    <span className="text-[10.5px] text-zinc-500 tabular-nums">{referralCount} invited</span>
+                )}
             </div>
-            <p className="text-xs text-zinc-400 mb-4">
-                Share your referral link. When a friend signs up, you both get <span className="text-emerald-400 font-bold">5 free credits</span>.
+            <p className="mt-2 text-[12px] text-zinc-400">
+                Share your link — when a friend signs up, you both get <span className="font-semibold text-white">5 free credits</span>.
             </p>
-            <div className="flex items-center gap-2">
-                <div className="flex-1 bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-400 truncate">
+            <div className="mt-3 flex items-center gap-2">
+                <code className="flex-1 truncate rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 font-mono text-[11.5px] text-zinc-400">
                     {referralLink}
-                </div>
+                </code>
                 <button
                     onClick={copyLink}
-                    className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition"
+                    className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[11.5px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.08]"
                 >
-                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied ? 'Copied!' : 'Copy'}
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? 'Copied' : 'Copy'}
                 </button>
             </div>
-            {referralCount > 0 && (
-                <p className="text-[10px] text-zinc-500 mt-2">{referralCount} friend{referralCount !== 1 ? 's' : ''} invited</p>
-            )}
-        </div>
+        </Card>
     );
 }
 
@@ -405,27 +544,24 @@ function PushNotificationToggle() {
     };
 
     return (
-        <div className="flex items-center justify-between">
-            <div>
-                <div className="text-sm font-medium text-white">Critical Alert Notifications</div>
-                <div className="text-xs text-zinc-500 mt-0.5">
-                    {enabled ? 'You\'ll receive browser notifications for critical alerts' : 'Get instant browser alerts when critical issues are detected'}
+        <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+                <div className="text-[13px] font-medium text-white">Critical alert notifications</div>
+                <div className="mt-0.5 text-[11.5px] text-zinc-500">
+                    {enabled
+                        ? 'Browser will surface alerts when critical issues are detected.'
+                        : 'Get instant browser alerts for critical issues.'}
                 </div>
             </div>
-            <button
-                onClick={toggle}
+            <ToggleSwitch
+                checked={enabled}
+                onChange={toggle}
                 disabled={requesting}
-                className={`relative w-10 h-5 rounded-full transition-colors ${enabled ? 'bg-emerald-400' : 'bg-zinc-700'} ${requesting ? 'opacity-50' : ''}`}
-                role="switch"
-                aria-checked={enabled}
-                aria-label="Browser push notifications"
-            >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
+                label="Browser push notifications"
+            />
         </div>
     );
 }
-
 
 function NotificationRow({ label, description, checked, onChange }: {
     label: string;
@@ -434,12 +570,13 @@ function NotificationRow({ label, description, checked, onChange }: {
     onChange: () => void;
 }) {
     return (
-        <div className="flex items-center justify-between">
-            <div>
-                <div className="text-sm font-medium text-white">{label}</div>
-                <div className="text-xs text-zinc-500 mt-0.5">{description}</div>
+        <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+                <div className="text-[13px] font-medium text-white">{label}</div>
+                <div className="mt-0.5 text-[11.5px] text-zinc-500">{description}</div>
             </div>
             <ToggleSwitch checked={checked} onChange={onChange} label={label} />
         </div>
     );
 }
+
