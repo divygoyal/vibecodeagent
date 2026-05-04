@@ -19,7 +19,9 @@ function Navbar() {
     const isPublicMentionsRoute = pathname === '/x' || pathname === '/reddit';
     const dashboardHref = pathname === '/reddit' ? '/dashboard/reddit-api' : '/dashboard/x-api';
     const resolvedDashboardHref = isPublicMentionsRoute ? dashboardHref : '/dashboard';
-    const signInCallbackUrl = isPublicMentionsRoute ? dashboardHref : '/dashboard/analytics';
+    // Post-login lands on AI chat — that's the primary surface for new users.
+    // Public-mention routes (X / Reddit) keep their existing builder destination.
+    const signInCallbackUrl = isPublicMentionsRoute ? dashboardHref : '/dashboard/ai-chat';
     const resolvedPrimaryLabel = isPublicMentionsRoute ? 'Open builder' : isHomepage ? 'Start with Google' : 'Start Free';
     const resolvedSessionLabel = isPublicMentionsRoute ? 'Open builder' : 'Dashboard';
     const publicMentionsCtaClassName =
