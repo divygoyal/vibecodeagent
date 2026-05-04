@@ -73,7 +73,19 @@ import {
     DEFAULT_SECTION_ORDER,
     type NormalizedShareConfig,
     type ShareSectionId,
+    type ShareBranding,
 } from '@/lib/shareTypes';
+
+/* Live-preview overrides posted from the Share Studio (same-origin postMessage).
+ * Any subset of these fields shadows the persisted config without touching the DB. */
+type StudioPreviewOverrides = {
+    accentColor?: string | null;
+    branding?: Partial<ShareBranding>;
+    sectionOrder?: ShareSectionId[];
+    sectionVisibility?: Partial<Record<ShareSectionId, boolean>>;
+};
+
+const STUDIO_PREVIEW_MESSAGE_TYPE = 'tc-share-studio-preview';
 
 const WorldMap = dynamic(() => import('@/components/analytics/WorldMap'), { ssr: false });
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
@@ -3578,14 +3590,51 @@ function ShareOverviewPage() {
     const handleRangeChange = (value: string) => setRange(value as ShareOverviewRange);
     const activeFilterCount = filters.length + eventNames.length;
 
-    /* Resolve accent + branding + section settings from share config (share mode only). */
-    const accentColor = runtime.config?.theme.accentColor || DEFAULT_SHARE_ACCENT;
-    const branding = runtime.config?.branding ?? null;
-    const showWatermark = branding?.showWatermark ?? true;
-    const sectionOrder: ShareSectionId[] = runtime.config?.sectionOrder?.length
-        ? runtime.config.sectionOrder
-        : DEFAULT_SECTION_ORDER;
-    const sectionVisibility = runtime.config?.sectionVisibility ?? null;
+    /* ─── Live-preview overrides (Share Studio postMessage) ─── */
+    const [previewOverrides, setPreviewOverrides] = useState<StudioPreviewOverrides>({});
+
+    useEffect(() => {
+        if (runtime.mode !== 'share') return;
+        function onMessage(event: MessageEvent) {
+            // Only same-origin (Studio runs on the same domain as the iframe).
+            if (typeof window === 'undefined' || event.origin !== window.location.origin) return;
+            const data = event.data;
+            if (!data || typeof data !== 'object' || data.type !== STUDIO_PREVIEW_MESSAGE_TYPE) return;
+            const next: StudioPreviewOverrides = {};
+            if ('accentColor' in data) next.accentColor = data.accentColor;
+            if (data.branding && typeof data.branding === 'object') next.branding = data.branding;
+            if (Array.isArray(data.sectionOrder)) next.sectionOrder = data.sectionOrder;
+            if (data.sectionVisibility && typeof data.sectionVisibility === 'object') {
+                next.sectionVisibility = data.sectionVisibility;
+            }
+            setPreviewOverrides(next);
+        }
+        window.addEventListener('message', onMessage);
+        return () => window.removeEventListener('message', onMessage);
+    }, [runtime.mode]);
+
+    /* Resolve accent + branding + section settings from share config (share mode only),
+     * with Studio postMessage overrides taking precedence when present. */
+    const accentColor =
+        previewOverrides.accentColor ?? runtime.config?.theme.accentColor ?? DEFAULT_SHARE_ACCENT;
+    const branding = {
+        logoUrl: previewOverrides.branding?.logoUrl ?? runtime.config?.branding.logoUrl ?? null,
+        companyName:
+            previewOverrides.branding?.companyName ?? runtime.config?.branding.companyName ?? null,
+        showWatermark:
+            previewOverrides.branding?.showWatermark ??
+            runtime.config?.branding.showWatermark ??
+            true,
+    };
+    const showWatermark = branding.showWatermark;
+    const sectionOrder: ShareSectionId[] = previewOverrides.sectionOrder?.length
+        ? previewOverrides.sectionOrder
+        : runtime.config?.sectionOrder?.length
+            ? runtime.config.sectionOrder
+            : DEFAULT_SECTION_ORDER;
+    const sectionVisibility = previewOverrides.sectionVisibility
+        ?? runtime.config?.sectionVisibility
+        ?? null;
 
     useEffect(() => {
         if (runtime.mode !== 'dashboard' || didHydrateRangeRef.current) {

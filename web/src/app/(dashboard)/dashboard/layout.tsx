@@ -13,9 +13,9 @@ const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), 
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import Image from 'next/image';
 import {
-    LayoutDashboard, Bot, BarChart3, Search, Settings,
+    Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
-    Coins, MessageCircle, MessageSquare,
+    Coins, MessageSquare,
     ChevronDown, Bell, Globe, Sparkles, Target, Trophy, Share2, type LucideIcon
 } from 'lucide-react';
 import {
@@ -107,9 +107,6 @@ type SidebarItem = { icon: LucideIcon; label: string; href: string };
 type SidebarGroup = { label: string | null; items: SidebarItem[] };
 
 const sidebarGroups: SidebarGroup[] = [
-    { label: null, items: [
-        { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-    ]},
     { label: 'Intelligence', items: [
         { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/ai-chat' },
         { icon: Bot, label: 'Bot', href: '/dashboard/bot' },
@@ -117,14 +114,13 @@ const sidebarGroups: SidebarGroup[] = [
     { label: 'Analysis', items: [
         { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
         { icon: Search, label: 'SEO', href: '/dashboard/seo' },
+        { icon: Share2, label: 'Share Dashboard', href: '/dashboard/share' },
     ]},
     { label: 'Social APIs', items: [
         { icon: Sparkles, label: 'X mentions', href: '/dashboard/x-api' },
-        { icon: MessageCircle, label: 'Reddit mentions', href: '/dashboard/reddit-api' },
         { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
     { label: 'Growth', items: [
-        { icon: Share2, label: 'Share & Preview', href: '/dashboard/share' },
         { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
         { icon: Trophy, label: 'Leaderboard', href: '/leaderboard' },
     ]},

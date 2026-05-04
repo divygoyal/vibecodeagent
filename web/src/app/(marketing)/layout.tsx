@@ -80,13 +80,17 @@ function Navbar() {
 
                 <div className="hidden items-center gap-3 md:flex">
                     {session ? (
-                        <Link
-                            href={resolvedDashboardHref}
-                            className={isPublicMentionsRoute ? publicMentionsCtaClassName : defaultCtaClassName}
-                        >
-                            {resolvedSessionLabel}
-                            <ArrowRight className="h-4 w-4" />
-                        </Link>
+                        // On the homepage the hero CTA already points at the dashboard;
+                        // skip the duplicate top-right pill there.
+                        isHomepage ? null : (
+                            <Link
+                                href={resolvedDashboardHref}
+                                className={isPublicMentionsRoute ? publicMentionsCtaClassName : defaultCtaClassName}
+                            >
+                                {resolvedSessionLabel}
+                                <ArrowRight className="h-4 w-4" />
+                            </Link>
+                        )
                     ) : (
                         isPublicMentionsRoute ? (
                             <GoogleAuthButton
@@ -170,14 +174,16 @@ function Navbar() {
                             </a>
                         ))}
                         {session ? (
-                            <Link
-                                href={resolvedDashboardHref}
-                                onClick={() => setMobileOpen(false)}
-                                className={`${defaultCtaClassName} mt-2 min-h-[46px] justify-center`}
-                            >
-                                {resolvedSessionLabel}
-                                <ArrowRight className="h-4 w-4" />
-                            </Link>
+                            isHomepage ? null : (
+                                <Link
+                                    href={resolvedDashboardHref}
+                                    onClick={() => setMobileOpen(false)}
+                                    className={`${defaultCtaClassName} mt-2 min-h-[46px] justify-center`}
+                                >
+                                    {resolvedSessionLabel}
+                                    <ArrowRight className="h-4 w-4" />
+                                </Link>
+                            )
                         ) : (
                             <>
                                 <button

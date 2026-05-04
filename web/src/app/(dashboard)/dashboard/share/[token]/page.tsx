@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Layers, Palette, Sparkles, Link2, SlidersHorizontal, Save, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,6 +23,8 @@ const TABS: { id: StudioTab; label: string; icon: typeof Layers }[] = [
   { id: 'links', label: 'Links', icon: Link2 },
 ];
 
+const STUDIO_PREVIEW_MESSAGE_TYPE = 'tc-share-studio-preview';
+
 function configsEqual(a: NormalizedShareConfig | null, b: NormalizedShareConfig | null) {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -43,6 +45,39 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
   const [activeTab, setActiveTab] = useState<StudioTab>('layout');
   const [showPreview, setShowPreview] = useState(true);
   const [reloadKey, setReloadKey] = useState<string>('init');
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  /* Push live-preview overrides to the iframe whenever the draft changes.
+   * Theme accent, branding, section order/visibility update instantly without saving;
+   * Save still persists everything to the backend. */
+  useEffect(() => {
+    if (!draft) return;
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      {
+        type: STUDIO_PREVIEW_MESSAGE_TYPE,
+        accentColor: draft.theme.accentColor,
+        branding: {
+          logoUrl: draft.branding.logoUrl,
+          companyName: draft.branding.companyName,
+          showWatermark: draft.branding.showWatermark,
+        },
+        sectionOrder: draft.sectionOrder,
+        sectionVisibility: draft.sectionVisibility,
+      },
+      typeof window !== 'undefined' ? window.location.origin : '*',
+    );
+  }, [
+    draft?.theme.accentColor,
+    draft?.branding.logoUrl,
+    draft?.branding.companyName,
+    draft?.branding.showWatermark,
+    draft?.sectionOrder,
+    draft?.sectionVisibility,
+    reloadKey,
+    draft,
+  ]);
 
   /* Load share */
   useEffect(() => {
@@ -205,32 +240,45 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left tabs panel */}
-        <div className="flex w-72 flex-col flex-shrink-0 border-r border-white/[0.06] bg-zinc-950/60">
-          <div className="flex flex-shrink-0 border-b border-white/[0.06]">
-            {TABS.map((t) => {
-              const Icon = t.icon;
-              const active = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setActiveTab(t.id)}
-                  className={`flex flex-1 items-center justify-center gap-1 px-1 py-2.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                    active
-                      ? 'border-b-2 border-[var(--db-primary,#14C4E1)] text-[var(--db-primary,#14C4E1)]'
-                      : 'text-white/30 hover:text-white/50'
-                  }`}
-                  title={t.label}
-                >
-                  <Icon className="h-3 w-3" />
-                  <span className="hidden xl:inline">{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
+      <div className="flex flex-1 min-w-0 overflow-hidden">
+        {/* Vertical icon rail — keeps tab labels out of the preview's horizontal lane */}
+        <div className="flex w-14 flex-col flex-shrink-0 border-r border-white/[0.06] bg-zinc-950/80 py-2">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const active = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setActiveTab(t.id)}
+                title={t.label}
+                aria-label={t.label}
+                aria-current={active ? 'page' : undefined}
+                className={`group relative flex h-12 items-center justify-center transition-colors ${
+                  active
+                    ? 'text-[var(--db-primary,#14C4E1)]'
+                    : 'text-white/30 hover:text-white/70'
+                }`}
+              >
+                {active && (
+                  <span className="absolute left-0 top-1/2 h-7 w-0.5 -translate-y-1/2 rounded-r bg-[var(--db-primary,#14C4E1)]" />
+                )}
+                <Icon className="h-[18px] w-[18px]" />
+                <span className="pointer-events-none absolute left-full ml-2 hidden rounded-md border border-white/[0.08] bg-zinc-900 px-2 py-1 text-[10px] font-medium text-white/80 shadow-lg group-hover:block z-50 whitespace-nowrap">
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
+        {/* Tab content panel */}
+        <div className="flex w-[300px] flex-shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/60 min-w-0">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+              {TABS.find((t) => t.id === activeTab)?.label}
+            </span>
+          </div>
           <div className="flex-1 overflow-y-auto p-3">
             {activeTab === 'layout' && <ShareSectionList draft={draft} onChange={setDraft} />}
             {activeTab === 'theme' && <ShareThemePanel draft={draft} onChange={setDraft} />}
@@ -250,9 +298,9 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
 
         {/* Preview pane */}
         {showPreview ? (
-          <div className="hidden flex-1 lg:flex">
-            <div className="flex-1 min-w-0">
-              <SharePreviewIframe token={token} reloadKey={reloadKey} isDirty={isDirty} />
+          <div className="hidden min-w-0 flex-1 lg:flex">
+            <div className="min-w-0 flex-1">
+              <SharePreviewIframe ref={iframeRef} token={token} reloadKey={reloadKey} />
             </div>
           </div>
         ) : (
