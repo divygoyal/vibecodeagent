@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import {
     Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles, Lock, Github, X
 } from 'lucide-react';
-import DemoModeBanner from '@/components/DemoModeBanner';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData, useSiteRepoLinks, useGithubRepos, type SiteRepoLink, type GithubRepoLite } from '@/lib/useDashboardData';
 import { findBestRepoMatch } from '@/lib/githubApi';
 import { useRegistration } from '../layout';
@@ -1072,32 +1071,28 @@ export default function AIChat() {
     const lastMsg = messages[messages.length - 1];
     const showEmpty = messages.length === 0;
 
-    if (showGa4LockedState) {
-        return (
-            <div className="space-y-6">
-                <DemoModeBanner
-                    title="AI Chat Unavailable"
-                    badgeLabel="GA4 Required"
-                    description="AI Chat is unavailable because this account does not have any Google Analytics property connected yet."
-                    secondaryDescription="Connect a different Google account or create a GA4 property to use AI Chat with your own analytics data."
-                />
-                <div className="rounded-[28px] border border-white/[0.08] bg-[#05070a] p-8 shadow-[0_28px_80px_rgba(0,0,0,0.32)]">
-                    <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-white/[0.08] bg-white/[0.04]">
-                            <Lock className="h-7 w-7 text-amber-300" />
-                        </div>
-                        <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white">Connect GA4 to unlock AI Chat</h1>
-                        <p className="mt-3 max-w-xl text-sm leading-7 text-zinc-400">
-                            TrafficClaw AI needs a real Google Analytics property before it can answer questions, inspect conversion leaks, or generate action plans from your own numbers.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Previously the GA4-locked state took over the whole page with an
+    // empty-state card. The user prefers the chat UI stays visible — just
+    // gate input behind a top alert. We compute one boolean and use it
+    // (a) to render the banner below, (b) to OR into all input disabled
+    // states so the user can't actually send a message.
+    const isGa4Locked = showGa4LockedState;
 
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-black">
+
+            {/* ── GA4-required alert banner (replaces the old full-page lock) ── */}
+            {isGa4Locked && (
+                <div className="flex-shrink-0 px-4 sm:px-6 pt-3">
+                    <div className="max-w-[760px] mx-auto flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
+                        <Lock className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
+                            <span className="font-semibold text-amber-200">Connect a GA4 property to use chat.</span>{' '}
+                            This account has no Google Analytics property connected yet, so chat input is paused. Connect a different Google account or create a GA4 property to start asking questions about your own numbers.
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Messages / Empty State ── */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
@@ -1214,7 +1209,7 @@ export default function AIChat() {
                                         onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything about your traffic…"
-                                        disabled={isLoading || !dataReady}
+                                        disabled={isLoading || !dataReady || isGa4Locked}
                                         rows={1}
                                         className="w-full resize-none bg-transparent px-6 pt-5 pb-3 text-[15.5px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 caret-cyan-400 outline-none max-h-44 disabled:opacity-40"
                                     />
@@ -1265,7 +1260,7 @@ export default function AIChat() {
                                         </div>
                                         <button
                                             onClick={() => sendMessage()}
-                                            disabled={!input.trim() || isLoading || !dataReady}
+                                            disabled={!input.trim() || isLoading || !dataReady || isGa4Locked}
                                             aria-label="Send"
                                             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22d3ee] text-[#06141a]
                                                        shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_10px_rgba(34,211,238,0.30)]
@@ -1284,7 +1279,7 @@ export default function AIChat() {
                                     <button
                                         key={s.label}
                                         onClick={() => sendMessage(s.prompt)}
-                                        disabled={isLoading || !dataReady}
+                                        disabled={isLoading || !dataReady || isGa4Locked}
                                         className="rounded-full border border-white/[0.08] bg-[#0a0d12]/60 px-4 py-2 text-[13px] text-zinc-300
                                                    shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]
                                                    transition-all hover:border-white/[0.16] hover:bg-[#0e1218] hover:text-zinc-100
@@ -1354,8 +1349,8 @@ export default function AIChat() {
                                 value={input}
                                 onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Ask about traffic, pages, channels, or conversions"
-                                disabled={isLoading}
+                                placeholder={isGa4Locked ? 'Connect a GA4 property to start chatting…' : 'Ask about traffic, pages, channels, or conversions'}
+                                disabled={isLoading || isGa4Locked}
                                 rows={1}
                                 className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed"
                             />
@@ -1404,7 +1399,7 @@ export default function AIChat() {
                                 )}
                                 <button
                                     onClick={() => sendMessage()}
-                                    disabled={!input.trim() || isLoading}
+                                    disabled={!input.trim() || isLoading || isGa4Locked}
                                     className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
                                 >
                                     <ArrowUp className="w-4 h-4" />
