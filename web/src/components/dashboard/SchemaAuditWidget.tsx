@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Loader2, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Sparkles } from 'lucide-react';
+import { FileText, Loader2, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Sparkles, Globe, RefreshCw } from 'lucide-react';
 import FixWithBotButton from '@/components/FixWithBotButton';
+import { safeJson } from '@/lib/safeJson';
 
 interface SchemaIssue {
     severity: 'error' | 'warning' | 'info';
@@ -35,7 +36,6 @@ interface SchemaAuditResult {
         warningCount: number;
     };
     recommendations: string[];
-    error?: string;
 }
 
 interface SchemaAuditWidgetProps {
@@ -58,36 +58,33 @@ export default function SchemaAuditWidget({ siteUrl, suggestedPages = [] }: Sche
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<SchemaAuditResult | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const run = async (target: string) => {
         if (!target.trim()) return;
         setLoading(true);
         setResult(null);
+        setError(null);
         try {
             const res = await fetch('/api/seo/schema-audit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url: target }),
             });
-            const data = await res.json();
-            if (!res.ok) {
-                setResult({ ...data, error: data.error });
+            const parsed = await safeJson<SchemaAuditResult>(res);
+            if (parsed.ok) {
+                setResult(parsed.data);
             } else {
-                setResult(data);
+                setError(parsed.error);
             }
         } catch (err) {
-            setResult({
-                url: target,
-                schemas: [],
-                coverage: { hasOrganization: false, hasWebsite: false, hasArticleLike: false, hasFAQ: false, hasHowTo: false, hasProduct: false, hasBreadcrumb: false, hasPerson: false },
-                summary: { totalSchemas: 0, validSchemas: 0, errorCount: 0, warningCount: 0 },
-                recommendations: [],
-                error: err instanceof Error ? err.message : 'Failed',
-            });
+            setError(err instanceof Error ? err.message : 'Network error — please retry.');
         } finally {
             setLoading(false);
         }
     };
+
+    const isIdle = !loading && !result && !error;
 
     return (
         <div className="premium-card p-5 sm:p-6">
@@ -103,29 +100,34 @@ export default function SchemaAuditWidget({ siteUrl, suggestedPages = [] }: Sche
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                <input
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="https://example.com/page"
-                    className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/30"
-                />
+                <div className="relative flex-1">
+                    <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                    <input
+                        value={url}
+                        onChange={e => setUrl(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') run(url); }}
+                        placeholder="https://example.com/page"
+                        className="w-full bg-[#0a0d12] border border-white/[0.08] rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-zinc-600 hover:border-white/[0.16] focus:outline-none focus:border-violet-500/40 focus:bg-violet-500/[0.02] focus:shadow-[0_0_24px_rgba(167,139,250,0.08)] transition"
+                    />
+                </div>
                 <button
                     onClick={() => run(url)}
                     disabled={loading || !url.trim()}
-                    className="px-4 py-2 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2 justify-center"
+                    className="px-5 py-2.5 bg-gradient-to-br from-violet-400 to-pink-500 hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 justify-center shadow-[0_8px_28px_rgba(167,139,250,0.25)] disabled:shadow-none"
                 >
-                    {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Audit
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {loading ? 'Auditing…' : 'Audit'}
                 </button>
             </div>
 
-            {suggestedPages.length > 0 && !result && !loading && (
+            {suggestedPages.length > 0 && isIdle && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                    <span className="text-[10px] text-zinc-500 mr-1">Try:</span>
+                    <span className="text-[10px] text-zinc-500 mr-1 self-center">Top pages:</span>
                     {suggestedPages.slice(0, 4).map(p => (
                         <button
                             key={p}
                             onClick={() => { setUrl(p); run(p); }}
-                            className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white transition truncate max-w-[200px]"
+                            className="text-[10px] px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-zinc-300 hover:bg-violet-500/[0.08] hover:border-violet-500/25 hover:text-violet-300 transition truncate max-w-[220px]"
                         >
                             {p.replace(/^https?:\/\//, '')}
                         </button>
@@ -133,14 +135,51 @@ export default function SchemaAuditWidget({ siteUrl, suggestedPages = [] }: Sche
                 </div>
             )}
 
-            {result?.error && (
-                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    {result.error}
+            {error && (
+                <div className="relative overflow-hidden rounded-xl border border-red-500/20 bg-[linear-gradient(135deg,rgba(248,113,113,0.08),rgba(248,113,113,0.02))] p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="w-4 h-4 text-red-300" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-red-300/80">Audit Failed</div>
+                            <p className="text-sm text-zinc-200 mt-0.5">{error}</p>
+                            <button
+                                onClick={() => run(url)}
+                                disabled={loading}
+                                className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-red-200 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Retry
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {result && !result.error && (
+            {isIdle && (
+                <div className="rounded-xl border border-dashed border-white/[0.08] bg-[#06090d] px-4 py-5 text-center">
+                    <div className="inline-flex w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/15 to-pink-500/10 border border-violet-500/15 items-center justify-center mb-2">
+                        <FileText className="w-5 h-5 text-violet-300/80" />
+                    </div>
+                    <div className="text-xs text-zinc-300 font-medium">Audit your structured data</div>
+                    <p className="text-[11px] text-zinc-500 mt-1 max-w-md mx-auto">
+                        We&apos;ll detect every JSON-LD block on the page, validate required fields per type, and show coverage gaps for the most important schema types (Organization, Article, FAQPage, HowTo).
+                    </p>
+                </div>
+            )}
+
+            {loading && (
+                <div className="space-y-3">
+                    <div className="grid grid-cols-4 gap-2">
+                        {[1, 2, 3, 4].map(i => <div key={i} className="h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] animate-pulse" />)}
+                    </div>
+                    <div className="space-y-1.5">
+                        {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-lg bg-white/[0.02] border border-white/[0.06] animate-pulse" />)}
+                    </div>
+                </div>
+            )}
+
+            {result && (
                 <div className="space-y-3">
                     {/* Summary */}
                     <div className="grid grid-cols-4 gap-2">

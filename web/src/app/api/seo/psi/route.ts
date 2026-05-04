@@ -101,9 +101,24 @@ export async function POST(req: NextRequest) {
         }
         if (PSI_API_KEY) psiUrl.searchParams.set('key', PSI_API_KEY);
 
-        const psiRes = await fetch(psiUrl.toString(), {
-            signal: AbortSignal.timeout(60000),
-        });
+        // Cap at 25s — most reverse proxies (Cloudflare/nginx/Coolify) drop the connection
+        // around 30s, and the client retries on timeout cleanly.
+        let psiRes: Response;
+        try {
+            psiRes = await fetch(psiUrl.toString(), {
+                signal: AbortSignal.timeout(25000),
+            });
+        } catch (fetchErr) {
+            const isTimeout = fetchErr instanceof Error && (fetchErr.name === 'AbortError' || fetchErr.name === 'TimeoutError');
+            return NextResponse.json(
+                {
+                    error: isTimeout
+                        ? 'PageSpeed Insights took longer than 25 seconds to respond. Try again — Google\'s API is sometimes slow on the first run for a new URL.'
+                        : `Network error reaching PageSpeed Insights: ${fetchErr instanceof Error ? fetchErr.message : 'unknown'}`,
+                },
+                { status: 504 }
+            );
+        }
 
         if (!psiRes.ok) {
             const text = await psiRes.text().catch(() => '');

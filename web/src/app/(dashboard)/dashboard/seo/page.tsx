@@ -521,29 +521,45 @@ export default function SEOPage() {
                         {recommendations.length} items
                     </span>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                     {recommendations.map(rec => {
                         const config = severityConfig[rec.severity] || severityConfig.low;
                         const TypeIcon = typeIcons[rec.type] || Lightbulb;
+                        const severityIconBg: Record<string, string> = {
+                            high: 'bg-gradient-to-br from-red-500/25 to-red-500/5 border-red-500/25 text-red-300 shadow-[0_0_20px_rgba(248,113,113,0.1)]',
+                            medium: 'bg-gradient-to-br from-amber-500/25 to-amber-500/5 border-amber-500/25 text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.1)]',
+                            low: 'bg-gradient-to-br from-blue-500/25 to-blue-500/5 border-blue-500/25 text-blue-300 shadow-[0_0_20px_rgba(96,165,250,0.1)]',
+                        };
+                        const accentLeft: Record<string, string> = {
+                            high: 'before:bg-gradient-to-b before:from-red-400 before:to-red-600',
+                            medium: 'before:bg-gradient-to-b before:from-amber-400 before:to-amber-600',
+                            low: 'before:bg-gradient-to-b before:from-blue-400 before:to-blue-600',
+                        };
                         return (
-                            <div key={rec.id} className={`${config.bg} border ${config.border} rounded-xl p-3 sm:p-4 hover:bg-opacity-10 transition`}>
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-0.5">
-                                        <TypeIcon className="w-4 h-4 text-zinc-400" />
+                            <div
+                                key={rec.id}
+                                className={`group relative overflow-hidden rounded-xl border ${config.border} ${config.bg} p-4 transition-all hover:bg-white/[0.04] hover:border-white/[0.16] hover:shadow-[0_8px_28px_rgba(0,0,0,0.25)] before:content-[''] before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px] before:rounded-full ${accentLeft[rec.severity] || accentLeft.low}`}
+                            >
+                                <div className="flex items-start gap-3 pl-2">
+                                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0 ${severityIconBg[rec.severity] || severityIconBg.low}`}>
+                                        <TypeIcon className="w-4 h-4" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <h4 className="text-sm font-semibold text-white">{rec.title}</h4>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${config.badge}`}>
+                                            <h4 className="text-sm font-semibold tracking-tight text-white">{rec.title}</h4>
+                                            <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${config.badge}`}>
                                                 {rec.severity}
                                             </span>
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400 font-medium">
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.06] text-zinc-300 font-medium tabular-nums">
                                                 {rec.impact}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-zinc-400 mb-2">{rec.description}</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-emerald-400 font-medium">→ {rec.action}</span>
+                                        <p className="text-xs text-zinc-400 mb-2.5 leading-relaxed">{rec.description}</p>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="flex items-center gap-1.5 text-[11px] text-emerald-300 bg-emerald-500/[0.08] border border-emerald-500/20 rounded-md px-2 py-1 font-medium">
+                                                <ArrowUpRight className="w-3 h-3" />
+                                                {rec.action}
+                                            </div>
                                             <FixWithBotButton label="Analyze" size="sm" variant="ghost" context={`Get deep analysis: ${rec.action}`} site={selectedSite} />
                                         </div>
                                     </div>
@@ -1151,13 +1167,16 @@ export default function SEOPage() {
             {queries.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* SERP Preview */}
-                    <div className="premium-card p-4 sm:p-5">
-                        <div className="flex items-center gap-2 mb-4 flex-wrap">
-                            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center">
-                                <Globe className="w-3.5 h-3.5 text-white" />
+                    <div className="premium-card p-5 sm:p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/25 to-cyan-500/15 border border-blue-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(96,165,250,0.1)]">
+                                <Globe className="w-5 h-5 text-blue-300" />
                             </div>
-                            <h3 className="text-sm font-semibold text-white">SERP Preview</h3>
-                            <span className="text-[10px] text-zinc-600">How this page appears in Google</span>
+                            <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Preview</div>
+                                <h3 className="text-sm sm:text-base font-semibold tracking-tight text-white">SERP Preview</h3>
+                                <p className="text-[11px] text-zinc-500">How your page renders in Google search</p>
+                            </div>
                         </div>
                         {pages.length > 0 && (() => {
                             const safeIndex = Math.min(serpPreviewIndex, pages.length - 1);
@@ -1172,13 +1191,13 @@ export default function SEOPage() {
                                         <select
                                             value={safeIndex}
                                             onChange={(e) => setSerpPreviewIndex(Number(e.target.value))}
-                                            className="w-full appearance-none bg-white/[0.03] border border-white/[0.08] rounded-lg pl-3 pr-8 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/30"
+                                            className="w-full appearance-none bg-[#0a0d12] border border-white/[0.08] rounded-xl pl-3 pr-9 py-2 text-xs text-zinc-200 hover:border-white/[0.16] focus:outline-none focus:border-blue-500/40 transition"
                                         >
                                             {pages.slice(0, 25).map((p, i) => (
                                                 <option key={i} value={i}>{p.page}</option>
                                             ))}
                                         </select>
-                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
                                     </div>
                                     <div className="serp-preview">
                                         <div className="serp-url">{previewPage.page}</div>
@@ -1186,15 +1205,15 @@ export default function SEOPage() {
                                         <div className="serp-desc">{descText}</div>
                                     </div>
                                     {(titleOver || descOver) && (
-                                        <div className="mt-2 flex flex-col gap-1">
+                                        <div className="mt-3 flex flex-col gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2">
                                             {titleOver && (
-                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400">
+                                                <div className="flex items-center gap-1.5 text-[11px] text-amber-300">
                                                     <AlertTriangle className="w-3 h-3" />
                                                     Title is {titleText.length} chars — Google truncates around 60.
                                                 </div>
                                             )}
                                             {descOver && (
-                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400">
+                                                <div className="flex items-center gap-1.5 text-[11px] text-amber-300">
                                                     <AlertTriangle className="w-3 h-3" />
                                                     Description is {descText.length} chars — Google truncates around 160.
                                                 </div>
@@ -1204,7 +1223,7 @@ export default function SEOPage() {
                                     <div className="mt-3 flex items-center gap-2">
                                         <button
                                             onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(previewPage.page)}`)}
-                                            className="audit-pill"
+                                            className="inline-flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-blue-200 bg-blue-500/10 border border-blue-500/25 rounded-lg hover:bg-blue-500/15 hover:border-blue-500/40 transition"
                                         >
                                             <ScanSearch className="w-3 h-3" /> Audit This Page
                                         </button>
@@ -1215,53 +1234,68 @@ export default function SEOPage() {
                     </div>
 
                     {/* Quick Domain Actions */}
-                    <div className="premium-card p-4 sm:p-5">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-violet-400 flex items-center justify-center">
-                                <Zap className="w-3.5 h-3.5 text-white" />
+                    <div className="premium-card p-5 sm:p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-violet-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.1)]">
+                                <Zap className="w-5 h-5 text-emerald-300" />
                             </div>
-                            <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
+                            <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Shortcuts</div>
+                                <h3 className="text-sm sm:text-base font-semibold tracking-tight text-white">Quick Actions</h3>
+                                <p className="text-[11px] text-zinc-500">Jump straight into the right tool</p>
+                            </div>
                         </div>
                         <div className="space-y-2">
-                            <button
-                                onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(activeSite.replace('sc-domain:', 'https://'))}`)}
-                                className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-emerald-500/20 hover:bg-emerald-500/[0.04] transition-all text-left group"
-                            >
-                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition">
-                                    <ScanSearch className="w-4 h-4 text-emerald-400" />
-                                </div>
-                                <div>
-                                    <div className="text-xs font-semibold text-white">Full Site Audit</div>
-                                    <div className="text-[10px] text-zinc-500">50+ SEO & technical checks</div>
-                                </div>
-                                <ArrowUpRight className="w-4 h-4 text-zinc-600 ml-auto group-hover:text-emerald-400 transition" />
-                            </button>
-                            <button
-                                onClick={() => { setActiveTool('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                                className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-violet-500/20 hover:bg-violet-500/[0.04] transition-all text-left group"
-                            >
-                                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition">
-                                    <PenTool className="w-4 h-4 text-violet-400" />
-                                </div>
-                                <div>
-                                    <div className="text-xs font-semibold text-white">AI Content Writer</div>
-                                    <div className="text-[10px] text-zinc-500">Generate SEO blog posts</div>
-                                </div>
-                                <ArrowUpRight className="w-4 h-4 text-zinc-600 ml-auto group-hover:text-violet-400 transition" />
-                            </button>
-                            <button
-                                onClick={() => { setActiveTool('keywords'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                                className="w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-amber-500/20 hover:bg-amber-500/[0.04] transition-all text-left group"
-                            >
-                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition">
-                                    <Brain className="w-4 h-4 text-amber-400" />
-                                </div>
-                                <div>
-                                    <div className="text-xs font-semibold text-white">Find Keywords</div>
-                                    <div className="text-[10px] text-zinc-500">AI keyword research</div>
-                                </div>
-                                <ArrowUpRight className="w-4 h-4 text-zinc-600 ml-auto group-hover:text-amber-400 transition" />
-                            </button>
+                            {[
+                                {
+                                    onClick: () => router.push(`/dashboard/audit?url=${encodeURIComponent(activeSite.replace('sc-domain:', 'https://'))}`),
+                                    icon: ScanSearch,
+                                    title: 'Full Site Audit',
+                                    desc: '50+ SEO & technical checks',
+                                    iconBg: 'bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/20',
+                                    iconText: 'text-emerald-300',
+                                    hoverBorder: 'hover:border-emerald-500/30 hover:bg-emerald-500/[0.04] hover:shadow-[0_0_24px_rgba(52,211,153,0.1)]',
+                                    accent: 'group-hover:text-emerald-300',
+                                },
+                                {
+                                    onClick: () => { setActiveTool('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+                                    icon: PenTool,
+                                    title: 'AI Content Writer',
+                                    desc: 'Generate SEO blog posts',
+                                    iconBg: 'bg-gradient-to-br from-violet-500/25 to-violet-500/5 border border-violet-500/20',
+                                    iconText: 'text-violet-300',
+                                    hoverBorder: 'hover:border-violet-500/30 hover:bg-violet-500/[0.04] hover:shadow-[0_0_24px_rgba(167,139,250,0.1)]',
+                                    accent: 'group-hover:text-violet-300',
+                                },
+                                {
+                                    onClick: () => { setActiveTool('keywords'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+                                    icon: Brain,
+                                    title: 'Find Keywords',
+                                    desc: 'AI keyword research',
+                                    iconBg: 'bg-gradient-to-br from-amber-500/25 to-amber-500/5 border border-amber-500/20',
+                                    iconText: 'text-amber-300',
+                                    hoverBorder: 'hover:border-amber-500/30 hover:bg-amber-500/[0.04] hover:shadow-[0_0_24px_rgba(251,191,36,0.1)]',
+                                    accent: 'group-hover:text-amber-300',
+                                },
+                            ].map((action, i) => {
+                                const ActionIcon = action.icon;
+                                return (
+                                    <button
+                                        key={i}
+                                        onClick={action.onClick}
+                                        className={`w-full flex items-center gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl transition-all text-left group ${action.hoverBorder}`}
+                                    >
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition ${action.iconBg}`}>
+                                            <ActionIcon className={`w-5 h-5 ${action.iconText}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-semibold tracking-tight text-white">{action.title}</div>
+                                            <div className="text-[10px] text-zinc-500">{action.desc}</div>
+                                        </div>
+                                        <ArrowUpRight className={`w-4 h-4 text-zinc-600 transition ${action.accent}`} />
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
