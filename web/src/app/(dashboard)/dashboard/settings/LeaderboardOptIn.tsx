@@ -37,6 +37,7 @@ interface GAProperty {
 
 interface LeaderboardEntry {
     id: number;
+    slug: string | null;
     is_active: boolean;
     startup_name: string;
     description: string | null;
@@ -46,6 +47,8 @@ interface LeaderboardEntry {
     mrr_range: string | null;
     looking_for: string[];
     twitter_handle: string | null;
+    founder_name: string | null;
+    contact_email: string | null;
     ga_property_id: string | null;
     monthly_visitors: number;
     visitor_trend: number;
@@ -66,6 +69,8 @@ const EMPTY_FORM = {
     mrr_range: '$0-500',
     looking_for: [] as string[],
     twitter_handle: '',
+    founder_name: '',
+    contact_email: '',
     ga_property_id: '',
 };
 
@@ -198,6 +203,8 @@ export default function LeaderboardOptIn() {
             mrr_range: entry.mrr_range || '$0-500',
             looking_for: entry.looking_for || [],
             twitter_handle: entry.twitter_handle || '',
+            founder_name: entry.founder_name || '',
+            contact_email: entry.contact_email || '',
             ga_property_id: entry.ga_property_id || '',
         });
         setMessage(null);
@@ -417,7 +424,7 @@ export default function LeaderboardOptIn() {
                                     <div className="flex items-center gap-1.5">
                                         {entry.is_verified && (
                                             <a
-                                                href={`/leaderboard/${entry.id}`}
+                                                href={`/leaderboard/${entry.slug || entry.id}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
@@ -457,6 +464,7 @@ export default function LeaderboardOptIn() {
                                 {showBadgeEmbed === entry.id && (
                                     <BadgeEmbedBlock
                                         entryId={entry.id}
+                                        slug={entry.slug}
                                         copiedField={copiedField}
                                         onCopy={(field, value) => {
                                             navigator.clipboard.writeText(value);
@@ -605,6 +613,34 @@ export default function LeaderboardOptIn() {
                         />
                     </div>
 
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-400">Founder name (shown on the public profile)</label>
+                            <input
+                                type="text"
+                                value={form.founder_name}
+                                onChange={(e) => setForm((p) => ({ ...p, founder_name: e.target.value }))}
+                                placeholder="Jane Doe"
+                                maxLength={100}
+                                className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-400">Contact email (powers the public Contact button)</label>
+                            <input
+                                type="email"
+                                inputMode="email"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                value={form.contact_email}
+                                onChange={(e) => setForm((p) => ({ ...p, contact_email: e.target.value }))}
+                                placeholder="hello@example.com"
+                                className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
                     <div>
                         <label className="mb-2 block text-xs font-medium text-zinc-400">Interested In</label>
                         <div className="flex flex-wrap items-center gap-2">
@@ -650,15 +686,21 @@ export default function LeaderboardOptIn() {
 
 function BadgeEmbedBlock({
     entryId,
+    slug,
     copiedField,
     onCopy,
 }: {
     entryId: number;
+    slug: string | null;
     copiedField: string | null;
     onCopy: (field: string, value: string) => void;
 }) {
-    const html = `<a href="https://trafficclaw.com/leaderboard/${entryId}" target="_blank" rel="noopener noreferrer">\n  <img src="https://trafficclaw.com/api/badges/${entryId}" alt="Verified on TrafficClaw" height="48" />\n</a>`;
-    const md = `[![Verified on TrafficClaw](https://trafficclaw.com/api/badges/${entryId})](https://trafficclaw.com/leaderboard/${entryId})`;
+    // Wrap the badge image in a slug-based link (pretty + SEO), but keep the
+    // image source ID-based — it's an internal asset and an extra slug lookup
+    // would just add latency without a user-visible benefit.
+    const profilePath = slug || String(entryId);
+    const html = `<a href="https://trafficclaw.com/leaderboard/${profilePath}" target="_blank" rel="noopener noreferrer">\n  <img src="https://trafficclaw.com/api/badges/${entryId}" alt="Verified on TrafficClaw" height="48" />\n</a>`;
+    const md = `[![Verified on TrafficClaw](https://trafficclaw.com/api/badges/${entryId})](https://trafficclaw.com/leaderboard/${profilePath})`;
     const htmlField = `html-${entryId}`;
     const mdField = `md-${entryId}`;
     return (
@@ -693,7 +735,7 @@ function BadgeEmbedBlock({
             </pre>
             <div className="flex items-center gap-2">
                 <a
-                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just got verified on TrafficClaw! https://trafficclaw.com/leaderboard/${entryId}`)}`}
+                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just got verified on TrafficClaw! https://trafficclaw.com/leaderboard/${profilePath}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:bg-white/[0.05]"
@@ -703,7 +745,7 @@ function BadgeEmbedBlock({
                 </a>
                 <button
                     type="button"
-                    onClick={() => onCopy(`link-${entryId}`, `https://trafficclaw.com/leaderboard/${entryId}`)}
+                    onClick={() => onCopy(`link-${entryId}`, `https://trafficclaw.com/leaderboard/${profilePath}`)}
                     className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:bg-white/[0.05]"
                 >
                     {copiedField === `link-${entryId}` ? <CheckCircle2 className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}

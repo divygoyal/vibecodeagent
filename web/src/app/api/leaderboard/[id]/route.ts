@@ -7,7 +7,10 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Public endpoint — get a single leaderboard entry's full details.
- * Proxies to admin API's GET /api/leaderboard/{id}/detail.
+ *
+ * The path segment accepts either a numeric id (legacy `/leaderboard/4`) or
+ * the new slug (`/leaderboard/antigravity-codes-a3f9b2`); we forward whatever
+ * we got and admin's detail endpoint resolves both.
  */
 export async function GET(
     _req: Request,
@@ -16,7 +19,7 @@ export async function GET(
     const { id } = await params;
 
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${id}/detail`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${encodeURIComponent(id)}/detail`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
             signal: AbortSignal.timeout(5000),
         });

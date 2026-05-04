@@ -158,8 +158,12 @@ type RawEntryBody = {
     mrr_range?: string;
     looking_for?: string[];
     twitter_handle?: string;
+    founder_name?: string;
+    contact_email?: string;
     ga_property_id?: string;
 };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Verify + sanitize an inbound entry body. Returns either the cleaned payload
@@ -196,6 +200,15 @@ async function preparePayload(
     if (logoUrl && isBlockedUrl(logoUrl)) {
         return { ok: false, response: NextResponse.json({ error: 'Logo URL must be a public http(s) URL.' }, { status: 400 }) };
     }
+
+    const contactEmailRaw = typeof rawBody.contact_email === 'string' ? rawBody.contact_email.trim() : '';
+    if (contactEmailRaw && !EMAIL_RE.test(contactEmailRaw)) {
+        return { ok: false, response: NextResponse.json({ error: 'Contact email must be a valid email address.' }, { status: 400 }) };
+    }
+    const contactEmail: string | undefined = contactEmailRaw || undefined;
+
+    const founderNameRaw = typeof rawBody.founder_name === 'string' ? rawBody.founder_name.trim() : '';
+    const founderName: string | undefined = founderNameRaw ? founderNameRaw.slice(0, 100) : undefined;
 
     const description = sanitizeDescription(rawBody.description);
     if (description && SPAM_TERMS.test(description)) {
@@ -236,6 +249,8 @@ async function preparePayload(
         description,
         website_url: websiteUrl,
         logo_url: resolvedLogo ?? undefined,
+        contact_email: contactEmail,
+        founder_name: founderName,
         verification_status: verificationStatus,
         verified_host: verifiedHost,
     };

@@ -28,7 +28,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     const { id } = await params;
     let entry: EntryDetail | null = null;
     try {
-        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${id}/detail`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${encodeURIComponent(id)}/detail`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
             cache: 'no-store',
         });

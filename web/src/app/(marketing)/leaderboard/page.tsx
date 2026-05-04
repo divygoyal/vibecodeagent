@@ -7,13 +7,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import {
     Trophy, Sparkles, Clock, ShieldCheck,
-    ExternalLink, ArrowUpRight, ArrowDownRight, Search as SearchIcon,
+    ArrowUpRight, ArrowDownRight, Search as SearchIcon,
     ChevronDown, ChevronLeft, ChevronRight, Users, Zap,
     AlertTriangle, Flame, ArrowRight,
 } from 'lucide-react';
 
 interface LeaderboardEntry {
     id: number;
+    slug: string | null;
     startup_name: string;
     description: string | null;
     website_url: string | null;
@@ -193,7 +194,7 @@ function MoversRail({ entries }: { entries: LeaderboardEntry[] }) {
                 {entries.map((entry) => (
                     <Link
                         key={entry.id}
-                        href={`/leaderboard/${entry.id}`}
+                        href={`/leaderboard/${entry.slug || entry.id}`}
                         className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.08),transparent_44%),linear-gradient(180deg,rgba(10,14,20,0.96),rgba(4,7,11,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_24px_50px_rgba(0,0,0,0.42)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#14C4E1]/40 hover:shadow-[0_24px_60px_rgba(20,196,225,0.18)]"
                     >
                         <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(122,217,218,0.45),transparent)] opacity-0 transition-opacity group-hover:opacity-100" />
@@ -577,8 +578,8 @@ function LeaderboardPageInner() {
                                             exit={{ opacity: 0 }}
                                             transition={{ duration: 0.25, delay: index * 0.02 }}
                                             type="button"
-                                            onClick={() => router.push(`/leaderboard/${entry.id}`)}
-                                            className="group block w-full border-b border-white/[0.04] px-5 py-4 text-left transition-all duration-200 last:border-b-0 hover:bg-[linear-gradient(90deg,rgba(20,196,225,0.06),transparent)]"
+                                            onClick={() => router.push(`/leaderboard/${entry.slug || entry.id}`)}
+                                            className="group block w-full cursor-pointer border-b border-white/[0.04] px-5 py-4 text-left transition-all duration-200 last:border-b-0 hover:bg-[linear-gradient(90deg,rgba(20,196,225,0.06),transparent)]"
                                         >
                                             <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] sm:gap-4">
                                                 <div className="hidden sm:flex sm:items-center sm:justify-start">
@@ -596,17 +597,6 @@ function LeaderboardPageInner() {
                                                                 {entry.startup_name}
                                                             </h3>
                                                             <VerifiedPill status={entry.verification_status} />
-                                                            {entry.website_url && (
-                                                                <a
-                                                                    href={entry.website_url}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-zinc-600 transition hover:text-[#7AD9DA]"
-                                                                >
-                                                                    <ExternalLink className="h-3 w-3" />
-                                                                </a>
-                                                            )}
                                                         </div>
                                                         {entry.description && (
                                                             <p className="mt-1 line-clamp-1 max-w-xl text-[12px] leading-5 text-zinc-500">
