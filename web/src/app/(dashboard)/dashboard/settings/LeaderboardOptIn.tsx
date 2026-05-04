@@ -565,10 +565,14 @@ export default function LeaderboardOptIn() {
                                 <Globe className="h-3 w-3" /> Website *
                             </label>
                             <input
-                                type="url"
+                                type="text"
+                                inputMode="url"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
                                 value={form.website_url}
                                 onChange={(e) => setForm((p) => ({ ...p, website_url: e.target.value }))}
-                                placeholder="https://example.com"
+                                placeholder="example.com or https://example.com"
                                 className="w-full rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/30 focus:outline-none"
                             />
                         </div>
@@ -589,7 +593,11 @@ export default function LeaderboardOptIn() {
                     <div>
                         <label className="mb-1 block text-xs font-medium text-zinc-400">Logo URL (optional — auto-fetched from your domain if empty)</label>
                         <input
-                            type="url"
+                            type="text"
+                            inputMode="url"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
                             value={form.logo_url}
                             onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))}
                             placeholder="https://example.com/logo.png"

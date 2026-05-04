@@ -173,12 +173,22 @@ async function preparePayload(
     | { ok: true; payload: Record<string, unknown>; verifiedHost: string | null; verificationStatus: string }
     | { ok: false; response: NextResponse }
 > {
-    const websiteUrl: string | undefined = typeof rawBody.website_url === 'string' && rawBody.website_url.trim()
-        ? rawBody.website_url.trim()
-        : undefined;
-    const logoUrl: string | undefined = typeof rawBody.logo_url === 'string' && rawBody.logo_url.trim()
-        ? rawBody.logo_url.trim()
-        : undefined;
+    // Accept bare hostnames (`antigravity.codes`) AND fully-qualified URLs
+    // (`https://antigravity.codes/`). We prepend https:// when no scheme is
+    // present so verifyPropertyDomain + isBlockedUrl always see a parseable
+    // URL, and we store the canonical https form.
+    function canonicalizeUrl(raw: unknown): string | undefined {
+        if (typeof raw !== 'string') return undefined;
+        const trimmed = raw.trim();
+        if (!trimmed) return undefined;
+        if (/^https?:\/\//i.test(trimmed)) return trimmed;
+        // Reject obviously-broken inputs (whitespace, no dot) before adding scheme.
+        if (/\s/.test(trimmed) || !trimmed.includes('.')) return trimmed;
+        return `https://${trimmed}`;
+    }
+
+    const websiteUrl = canonicalizeUrl(rawBody.website_url);
+    const logoUrl = canonicalizeUrl(rawBody.logo_url);
 
     if (websiteUrl && isBlockedUrl(websiteUrl)) {
         return { ok: false, response: NextResponse.json({ error: 'Website URL must be a public http(s) URL.' }, { status: 400 }) };
