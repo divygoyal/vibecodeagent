@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update, delete, text, func
+from sqlalchemy import select, update, delete, text, func, or_
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
@@ -72,6 +72,80 @@ async def init_db():
                 await conn.execute(text(f"ALTER TABLE leaderboard_entries ADD COLUMN {col} {col_def}"))
             except Exception:
                 pass
+
+        # Multi-site leaderboard (011_multi_site_leaderboard.sql).
+        # Drops the legacy UNIQUE constraint on leaderboard_entries.user_id by
+        # rebuilding the table — SQLite has no DROP CONSTRAINT for column-level
+        # UNIQUE. Detection: a UNIQUE auto-index on the table after we removed
+        # the model-level `unique=True` from user_id.
+        try:
+            index_rows = (await conn.execute(
+                text("PRAGMA index_list(leaderboard_entries)")
+            )).fetchall()
+            has_legacy_unique = any(
+                bool(row[2]) and str(row[1]).startswith("sqlite_autoindex_leaderboard_entries_")
+                for row in index_rows
+            )
+            if has_legacy_unique:
+                await conn.execute(text("PRAGMA foreign_keys = OFF"))
+                await conn.execute(text(
+                    """
+                    CREATE TABLE leaderboard_entries_v2 (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        startup_name VARCHAR(100) NOT NULL,
+                        description TEXT,
+                        website_url VARCHAR(500),
+                        logo_url VARCHAR(500),
+                        category VARCHAR(50),
+                        mrr_range VARCHAR(30),
+                        looking_for TEXT,
+                        twitter_handle VARCHAR(100),
+                        ga_property_id VARCHAR(100),
+                        monthly_visitors INTEGER DEFAULT 0,
+                        monthly_pageviews INTEGER DEFAULT 0,
+                        engagement_rate FLOAT DEFAULT 0.0,
+                        bounce_rate FLOAT DEFAULT 0.0,
+                        avg_session_duration FLOAT DEFAULT 0.0,
+                        visitor_trend FLOAT DEFAULT 0.0,
+                        verified_host VARCHAR(255),
+                        verification_status VARCHAR(20) DEFAULT 'pending',
+                        primary_country VARCHAR(2),
+                        is_verified BOOLEAN DEFAULT 0,
+                        is_active BOOLEAN DEFAULT 1,
+                        last_refreshed DATETIME,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                ))
+                await conn.execute(text(
+                    """
+                    INSERT INTO leaderboard_entries_v2 (
+                        id, user_id, startup_name, description, website_url, logo_url,
+                        category, mrr_range, looking_for, twitter_handle, ga_property_id,
+                        monthly_visitors, monthly_pageviews, engagement_rate, bounce_rate,
+                        avg_session_duration, visitor_trend, verified_host, verification_status,
+                        primary_country, is_verified, is_active, last_refreshed, created_at, updated_at
+                    )
+                    SELECT id, user_id, startup_name, description, website_url, logo_url,
+                        category, mrr_range, looking_for, twitter_handle, ga_property_id,
+                        monthly_visitors, monthly_pageviews, engagement_rate, bounce_rate,
+                        avg_session_duration, visitor_trend, verified_host, verification_status,
+                        primary_country, is_verified, is_active, last_refreshed, created_at, updated_at
+                    FROM leaderboard_entries
+                    """
+                ))
+                await conn.execute(text("DROP TABLE leaderboard_entries"))
+                await conn.execute(text("ALTER TABLE leaderboard_entries_v2 RENAME TO leaderboard_entries"))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_leaderboard_entries_user_id "
+                    "ON leaderboard_entries(user_id)"
+                ))
+                await conn.execute(text("PRAGMA foreign_keys = ON"))
+                print("[startup] leaderboard_entries: dropped legacy UNIQUE on user_id (multi-site enabled).")
+        except Exception as exc:
+            print(f"[startup] multi-site leaderboard migration skipped: {exc}")
 
 
 async def get_db():
@@ -2995,11 +3069,20 @@ async def get_leaderboard_entry_detail(
     entry_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """Public endpoint — get a single leaderboard entry's full details."""
+    """Public endpoint — get a single leaderboard entry's full details.
+
+    Returns 404 for unverified entries so we don't expose pending /
+    host_mismatch listings via direct URL access. The owner can still preview
+    their entry from /dashboard/settings before it's verified.
+    """
     result = await db.execute(
         select(LeaderboardEntry).where(
             LeaderboardEntry.id == entry_id,
-            LeaderboardEntry.is_active == True
+            LeaderboardEntry.is_active == True,
+            or_(
+                LeaderboardEntry.verification_status == "verified",
+                LeaderboardEntry.is_verified == True,
+            ),
         )
     )
     entry = result.scalar_one_or_none()
@@ -3071,7 +3154,22 @@ async def list_leaderboard(
     page = max(page, 1)
     page_size = max(min(page_size, 100), 1)
 
-    base = select(LeaderboardEntry).where(LeaderboardEntry.is_active == True)
+    # Public board only shows VERIFIED entries (GA4 property defaultUri matched
+    # the claimed website host, or legacy is_verified=True). Pending /
+    # host_mismatch / failed entries stay invisible to the world; the owner can
+    # still see them in their settings panel and re-verify.
+    base = (
+        select(LeaderboardEntry)
+        .where(LeaderboardEntry.is_active == True)
+        .where(or_(
+            LeaderboardEntry.verification_status == "verified",
+            LeaderboardEntry.is_verified == True,
+        ))
+        # Drop entries that have never received GA4 stats (visitors == 0). Most
+        # of these are stale / abandoned signups; without this guard a verified
+        # entry whose cron never ran would still rank "first" with all zeros.
+        .where(LeaderboardEntry.monthly_visitors > 0)
+    )
 
     if category and category != "all":
         base = base.where(LeaderboardEntry.category == category)
@@ -3133,6 +3231,34 @@ async def list_leaderboard(
     }
 
 
+def _serialize_entry(entry: LeaderboardEntry) -> dict:
+    """Shape used by the user-facing status endpoints (settings page, join page)."""
+    return {
+        "id": entry.id,
+        "is_active": bool(entry.is_active),
+        "startup_name": entry.startup_name,
+        "description": entry.description,
+        "website_url": entry.website_url,
+        "logo_url": entry.logo_url,
+        "category": entry.category,
+        "mrr_range": entry.mrr_range,
+        "looking_for": json.loads(entry.looking_for) if entry.looking_for else [],
+        "twitter_handle": entry.twitter_handle,
+        "ga_property_id": entry.ga_property_id,
+        "monthly_visitors": entry.monthly_visitors or 0,
+        "monthly_pageviews": entry.monthly_pageviews or 0,
+        "engagement_rate": entry.engagement_rate or 0,
+        "bounce_rate": entry.bounce_rate or 0,
+        "visitor_trend": entry.visitor_trend or 0,
+        "is_verified": bool(entry.is_verified),
+        "verification_status": entry.verification_status or ("verified" if entry.is_verified else "pending"),
+        "verified_host": entry.verified_host,
+        "primary_country": entry.primary_country,
+        "last_refreshed": entry.last_refreshed.isoformat() if entry.last_refreshed else None,
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+    }
+
+
 @app.post("/api/leaderboard/{identifier}/join")
 async def join_leaderboard_for_user(
     identifier: str,
@@ -3140,15 +3266,29 @@ async def join_leaderboard_for_user(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
-    """Create or update a leaderboard entry for the given user."""
+    """Create or upsert a leaderboard entry for the given user.
+
+    Multi-site: a user can register multiple verified sites. We upsert on the
+    composite (user_id, ga_property_id) key — joining the same property twice
+    updates the existing row instead of duplicating it. A user with no entries
+    yet gets a brand-new row; a user already listing site A who joins again
+    with site B gets a second row.
+    """
     user = await get_user_by_identifier(db, identifier)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
-    )
-    entry = existing.scalar_one_or_none()
+    # Upsert key is (user_id, ga_property_id). When ga_property_id is None we
+    # fall back to a fresh row to avoid collapsing distinct unverified drafts.
+    entry = None
+    if data.ga_property_id:
+        existing = await db.execute(
+            select(LeaderboardEntry).where(
+                LeaderboardEntry.user_id == user.id,
+                LeaderboardEntry.ga_property_id == data.ga_property_id,
+            )
+        )
+        entry = existing.scalar_one_or_none()
     is_new = entry is None
 
     if entry:
@@ -3194,24 +3334,37 @@ async def join_leaderboard_for_user(
     }
 
 
-@app.put("/api/leaderboard/{identifier}")
-async def update_leaderboard_entry(
-    identifier: str,
-    data: LeaderboardUpdateRequest,
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_admin_key),
-):
-    """Update a leaderboard entry."""
+async def _resolve_user_entry(
+    db: AsyncSession, identifier: str, entry_id: int
+) -> LeaderboardEntry:
+    """Fetch a leaderboard entry and verify it belongs to the resolved user.
+
+    Used by the entry-scoped PUT/DELETE endpoints — the web layer passes the
+    session's GitHub-id-equivalent identifier so admin can prove ownership
+    before mutating.
+    """
     user = await get_user_by_identifier(db, identifier)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
     result = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
+        select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id)
     )
     entry = result.scalar_one_or_none()
-    if not entry:
+    if not entry or entry.user_id != user.id:
         raise HTTPException(status_code=404, detail="Leaderboard entry not found")
+    return entry
+
+
+@app.put("/api/leaderboard/entry/{entry_id}")
+async def update_leaderboard_entry(
+    entry_id: int,
+    data: LeaderboardUpdateRequest,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Update a single leaderboard entry. Caller must own the entry."""
+    entry = await _resolve_user_entry(db, user_identifier, entry_id)
 
     update_data = data.model_dump(exclude_unset=True)
     if "looking_for" in update_data and update_data["looking_for"] is not None:
@@ -3222,31 +3375,119 @@ async def update_leaderboard_entry(
     entry.updated_at = datetime.utcnow()
 
     await db.commit()
-    return {"success": True, "message": "Entry updated"}
+    await db.refresh(entry)
+    return {"success": True, "entry": _serialize_entry(entry)}
 
 
-@app.delete("/api/leaderboard/{identifier}")
-async def leave_leaderboard(
-    identifier: str,
+@app.delete("/api/leaderboard/entry/{entry_id}")
+async def leave_leaderboard_entry(
+    entry_id: int,
+    user_identifier: str,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
-    """Opt-out of the leaderboard (soft delete — sets is_active=False)."""
-    user = await get_user_by_identifier(db, identifier)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    result = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
-    )
-    entry = result.scalar_one_or_none()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Leaderboard entry not found")
-
+    """Opt-out a single leaderboard entry (soft delete — sets is_active=False)."""
+    entry = await _resolve_user_entry(db, user_identifier, entry_id)
     entry.is_active = False
     entry.updated_at = datetime.utcnow()
     await db.commit()
-    return {"success": True, "message": "Left leaderboard"}
+    return {"success": True, "message": "Entry removed", "id": entry_id}
+
+
+@app.get("/api/superadmin/leaderboard")
+async def superadmin_list_leaderboard(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Superadmin: every entry, including pending / inactive / mismatched.
+
+    The public list endpoint hides anything not verified, so superadmin needs
+    a parallel route that shows the full backlog with the user attached.
+    """
+    result = await db.execute(
+        select(LeaderboardEntry).order_by(LeaderboardEntry.created_at.desc())
+    )
+    entries = list(result.scalars().all())
+    user_ids = {e.user_id for e in entries}
+    user_rows = {}
+    if user_ids:
+        users_result = await db.execute(
+            select(User).where(User.id.in_(user_ids))
+        )
+        for u in users_result.scalars().all():
+            user_rows[u.id] = u
+    return {
+        "entries": [
+            {
+                **_serialize_entry(e),
+                "user": {
+                    "id": user_rows[e.user_id].id,
+                    "github_id": user_rows[e.user_id].github_id,
+                    "email": user_rows[e.user_id].email,
+                    "github_username": user_rows[e.user_id].github_username,
+                } if e.user_id in user_rows else None,
+            }
+            for e in entries
+        ],
+        "total": len(entries),
+    }
+
+
+class SuperadminLeaderboardAction(BaseModel):
+    action: str  # verify | unverify | activate | deactivate | delete
+
+
+@app.post("/api/superadmin/leaderboard/{entry_id}")
+async def superadmin_leaderboard_action(
+    entry_id: int,
+    body: SuperadminLeaderboardAction,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Superadmin moderation: force a verification state, hide, or hard-delete.
+
+    Actions:
+        verify      → verification_status='verified', is_verified=True, is_active=True
+        unverify    → verification_status='pending', is_verified=False
+        activate    → is_active=True (visible if also verified)
+        deactivate  → is_active=False (hidden from public board)
+        delete      → hard delete the row + its history snapshots
+    """
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    action = body.action
+    if action == "verify":
+        entry.verification_status = "verified"
+        entry.is_verified = True
+        entry.is_active = True
+    elif action == "unverify":
+        entry.verification_status = "pending"
+        entry.is_verified = False
+    elif action == "activate":
+        entry.is_active = True
+    elif action == "deactivate":
+        entry.is_active = False
+    elif action == "delete":
+        await db.execute(
+            delete(LeaderboardStatsHistory).where(
+                LeaderboardStatsHistory.entry_id == entry.id
+            )
+        )
+        await db.delete(entry)
+        await db.commit()
+        return {"success": True, "deleted": entry_id}
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+
+    entry.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(entry)
+    return {"success": True, "entry": _serialize_entry(entry)}
 
 
 @app.get("/api/leaderboard/{identifier}/status")
@@ -3255,32 +3496,26 @@ async def get_leaderboard_status(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key),
 ):
-    """Check if a user has a leaderboard entry."""
+    """Return all of a user's leaderboard entries (active + inactive).
+
+    Settings UI uses this to render one card per registered site and to drive
+    the "Add another site" affordance. Empty list ⇒ user has never joined.
+    """
     user = await get_user_by_identifier(db, identifier)
     if not user:
-        return {"joined": False}
+        return {"joined": False, "entries": []}
 
     result = await db.execute(
-        select(LeaderboardEntry).where(LeaderboardEntry.user_id == user.id)
+        select(LeaderboardEntry)
+        .where(LeaderboardEntry.user_id == user.id)
+        .order_by(LeaderboardEntry.created_at.asc())
     )
-    entry = result.scalar_one_or_none()
-    if not entry:
-        return {"joined": False}
+    entries = list(result.scalars().all())
+    if not entries:
+        return {"joined": False, "entries": []}
     return {
         "joined": True,
-        "id": entry.id,
-        "is_active": entry.is_active,
-        "startup_name": entry.startup_name,
-        "description": entry.description,
-        "website_url": entry.website_url,
-        "logo_url": entry.logo_url,
-        "category": entry.category,
-        "mrr_range": entry.mrr_range,
-        "looking_for": json.loads(entry.looking_for) if entry.looking_for else [],
-        "twitter_handle": entry.twitter_handle,
-        "ga_property_id": entry.ga_property_id,
-        "monthly_visitors": entry.monthly_visitors,
-        "is_verified": entry.is_verified,
+        "entries": [_serialize_entry(e) for e in entries],
     }
 
 

@@ -79,14 +79,39 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     );
 }
 
-function LogoIcon({ name, url, size = 'lg' }: { name: string; url: string | null; size?: 'sm' | 'lg' }) {
+function autoLogoFromHost(websiteUrl: string | null | undefined): string | null {
+    if (!websiteUrl) return null;
+    try {
+        const withScheme = /^https?:\/\//i.test(websiteUrl) ? websiteUrl : `https://${websiteUrl}`;
+        const host = new URL(withScheme).hostname.replace(/^www\./, '');
+        return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128` : null;
+    } catch {
+        return null;
+    }
+}
+
+function LogoIcon({
+    name,
+    url,
+    websiteUrl,
+    size = 'lg',
+}: {
+    name: string;
+    url: string | null;
+    websiteUrl?: string | null;
+    size?: 'sm' | 'lg';
+}) {
     const sizeClass = size === 'lg' ? 'h-20 w-20 rounded-2xl text-3xl' : 'h-10 w-10 rounded-xl text-base';
-    if (url) {
+    const fallback = autoLogoFromHost(websiteUrl);
+    const [errored, setErrored] = useState(false);
+    const resolved = !errored ? (url || fallback) : null;
+    if (resolved) {
         return (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-                src={url}
+                src={resolved}
                 alt={name}
+                onError={() => setErrored(true)}
                 className={`${sizeClass} object-cover ring-1 ring-white/10 shadow-[0_24px_60px_rgba(0,0,0,0.45)]`}
             />
         );
@@ -151,49 +176,104 @@ function VerificationBadge({ status }: { status?: string }) {
     );
 }
 
-function VisitorSparkline({ history }: { history: StartupProfileData['history'] }) {
-    if (!history || history.length < 2) {
+function VisitorSparkline({
+    history,
+    currentVisitors,
+    visitorTrend,
+}: {
+    history: StartupProfileData['history'];
+    currentVisitors: number;
+    visitorTrend: number;
+}) {
+    // Derive the chart series. Order of preference:
+    //   1. Real history with ≥2 days — plot as-is.
+    //   2. Single history row — synthesize a 28-days-ago point using the current
+    //      trend so the chart still draws a line (no awkward empty box).
+    //   3. No history at all — synthesize a two-point line from the trend.
+    const data: Array<{ date: string; visitors: number; synthetic: boolean }> = [];
+    if (history && history.length >= 2) {
+        for (const h of history) {
+            data.push({
+                date: h.recorded_on || '',
+                visitors: h.monthly_visitors || 0,
+                synthetic: false,
+            });
+        }
+    } else if (currentVisitors > 0) {
+        const today = new Date();
+        const baselineDate = new Date(today);
+        baselineDate.setDate(baselineDate.getDate() - 28);
+        // If trend is positive the "before" point is lower; if negative it's higher.
+        const baseline = visitorTrend !== 0
+            ? Math.max(0, Math.round(currentVisitors / (1 + visitorTrend / 100)))
+            : Math.max(0, Math.round(currentVisitors * 0.92));
+        data.push({
+            date: baselineDate.toISOString().slice(0, 10),
+            visitors: baseline,
+            synthetic: true,
+        });
+        const todayPoint = history && history.length === 1
+            ? history[0]
+            : { recorded_on: today.toISOString().slice(0, 10), monthly_visitors: currentVisitors };
+        data.push({
+            date: todayPoint.recorded_on || today.toISOString().slice(0, 10),
+            visitors: todayPoint.monthly_visitors || currentVisitors,
+            synthetic: history?.length !== 1,
+        });
+    }
+
+    if (data.length < 2) {
         return (
-            <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] text-center text-[12px] italic text-zinc-500">
+            <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] text-center text-[12px] italic text-zinc-500">
                 Visitor history fills in after the daily refresh.
             </div>
         );
     }
-    const data = history.map((h) => ({ date: h.recorded_on, visitors: h.monthly_visitors }));
+
+    const isSynthetic = data.some((d) => d.synthetic);
+
     return (
-        <div className="h-32 -mx-2">
-            <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
-                    <defs>
-                        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#14C4E1" stopOpacity={0.45} />
-                            <stop offset="100%" stopColor="#14C4E1" stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" hide />
-                    <YAxis hide domain={['auto', 'auto']} />
-                    <Tooltip
-                        contentStyle={{
-                            background: '#04070d',
-                            border: '1px solid rgba(20,196,225,0.3)',
-                            borderRadius: 12,
-                            fontSize: 11,
-                            boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-                        }}
-                        labelStyle={{ color: '#94a3b8' }}
-                        itemStyle={{ color: '#7AD9DA' }}
-                        formatter={(value: number | undefined) => [formatNumber(value ?? 0), 'Visitors']}
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="visitors"
-                        stroke="#7AD9DA"
-                        strokeWidth={2}
-                        fill="url(#sparkFill)"
-                        isAnimationActive={false}
-                    />
-                </AreaChart>
-            </ResponsiveContainer>
+        <div className="space-y-2">
+            <div className="h-40 -mx-2">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
+                        <defs>
+                            <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#14C4E1" stopOpacity={0.45} />
+                                <stop offset="100%" stopColor="#14C4E1" stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+                        <XAxis dataKey="date" hide />
+                        <YAxis hide domain={['auto', 'auto']} />
+                        <Tooltip
+                            contentStyle={{
+                                background: '#04070d',
+                                border: '1px solid rgba(20,196,225,0.3)',
+                                borderRadius: 12,
+                                fontSize: 11,
+                                boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+                            }}
+                            labelStyle={{ color: '#94a3b8' }}
+                            itemStyle={{ color: '#7AD9DA' }}
+                            formatter={(value: number | undefined) => [formatNumber(value ?? 0), 'Visitors']}
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="visitors"
+                            stroke="#7AD9DA"
+                            strokeWidth={2}
+                            fill="url(#sparkFill)"
+                            isAnimationActive={false}
+                            strokeDasharray={isSynthetic ? '4 3' : undefined}
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+            {isSynthetic && (
+                <p className="text-[10px] italic text-zinc-600">
+                    Day-1 reading — the daily refresh fills in real history points over time.
+                </p>
+            )}
         </div>
     );
 }
@@ -225,7 +305,7 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                 {/* Hero card */}
                 <div className="mt-6 overflow-hidden rounded-[32px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.1),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-10">
                     <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                        <LogoIcon name={entry.startup_name} url={entry.logo_url} size="lg" />
+                        <LogoIcon name={entry.startup_name} url={entry.logo_url} websiteUrl={entry.website_url} size="lg" />
                         <div className="min-w-0 flex-1">
                             <div className="mb-3 flex flex-wrap items-center gap-2">
                                 <SectionLabel>{entry.category || 'Startup'}</SectionLabel>
@@ -339,7 +419,11 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                                 </span>
                             )}
                         </div>
-                        <VisitorSparkline history={entry.history} />
+                        <VisitorSparkline
+                            history={entry.history}
+                            currentVisitors={entry.monthly_visitors}
+                            visitorTrend={entry.visitor_trend}
+                        />
                     </div>
 
                     <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">

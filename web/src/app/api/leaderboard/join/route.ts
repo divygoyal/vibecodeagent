@@ -11,7 +11,7 @@ const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 
 type JoinRateEntry = { timestamps: number[] };
 const JOIN_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const JOIN_RATE_MAX = 3;
+const JOIN_RATE_MAX = 5;
 const joinRateStore = new Map<string, JoinRateEntry>();
 
 function consumeJoinRate(userId: string): { allowed: boolean; retryAfterSeconds: number } {
@@ -28,7 +28,6 @@ function consumeJoinRate(userId: string): { allowed: boolean; retryAfterSeconds:
     return { allowed: true, retryAfterSeconds: 0 };
 }
 
-// Match ASCII control chars (NUL through US, plus DEL) and replace with spaces.
 const CONTROL_CHARS_RE = new RegExp('[\\u0000-\\u001F\\u007F]', 'g');
 
 function sanitizeDescription(input: unknown): string | null {
@@ -37,6 +36,24 @@ function sanitizeDescription(input: unknown): string | null {
     return stripped.slice(0, 200);
 }
 
+function normalizeHost(input: string | undefined | null): string | null {
+    if (!input) return null;
+    const raw = input.trim().toLowerCase();
+    if (!raw) return null;
+    const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+        return new URL(withScheme).hostname.replace(/^www\./, '') || null;
+    } catch {
+        return null;
+    }
+}
+
+// Google's S2 favicons endpoint always returns *something* — for anything
+// vaguely real it serves the site's own icon at the requested size, which is
+// dramatically better than the gradient-letter placeholder we were rendering.
+function autoLogoForHost(host: string): string {
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
+}
 
 const SPAM_TERMS = /(viagra|crypto-?(moon|pump)|free-?bitcoin|adult-?cam|porn-?hub)/i;
 
@@ -50,8 +67,8 @@ function cleanPropertyId(id: string): string {
 }
 
 /**
- * Fetch GA4 stats and update the leaderboard entry.
- * Uses the user's Google tokens directly from the session.
+ * Fetch GA4 stats and update a leaderboard entry. Used right after join so
+ * the new listing has real numbers without waiting for the daily cron.
  */
 async function refreshEntryStats(
     entryId: number,
@@ -60,13 +77,9 @@ async function refreshEntryStats(
     googleRefreshToken?: string,
 ) {
     try {
-        // 1. Get a valid access token (refreshes if needed)
         const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
         const pid = cleanPropertyId(gaPropertyId);
 
-        console.log(`[Leaderboard Instant] Fetching GA4 stats for property ${pid}, entry ${entryId}`);
-
-        // 3. Fetch current + previous month stats from GA4
         const [currentRes, prevRes] = await Promise.all([
             fetch(`${GA_DATA_BASE}/${pid}:runReport`, {
                 method: 'POST',
@@ -102,11 +115,7 @@ async function refreshEntryStats(
         const currentData = await currentRes.json();
         const prevData = prevRes.ok ? await prevRes.json() : null;
         const row = currentData.rows?.[0];
-
-        if (!row) {
-            console.log('[Leaderboard Instant] No GA4 data found for property');
-            return null;
-        }
+        if (!row) return null;
 
         const mv = row.metricValues;
         const currentUsers = parseInt(mv[0].value) || 0;
@@ -126,28 +135,122 @@ async function refreshEntryStats(
             visitor_trend: trend,
         };
 
-        // 4. Update the entry with real stats
         const updateRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/${entryId}/stats`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
             body: JSON.stringify(stats),
         });
 
-        if (updateRes.ok) {
-            console.log(`[Leaderboard Instant] ✓ Entry ${entryId} updated: ${stats.monthly_visitors} visitors, ${stats.engagement_rate}% engagement`);
-            return stats;
-        } else {
-            console.error(`[Leaderboard Instant] ✗ Failed to update entry ${entryId}`);
-            return stats; // Still return stats even if DB update failed
-        }
+        return updateRes.ok ? stats : stats;
     } catch (err) {
         console.error('[Leaderboard Instant] Stats refresh failed:', err);
         return null;
     }
 }
 
+type RawEntryBody = {
+    entry_id?: number;
+    startup_name?: string;
+    description?: string;
+    website_url?: string;
+    logo_url?: string;
+    category?: string;
+    mrr_range?: string;
+    looking_for?: string[];
+    twitter_handle?: string;
+    ga_property_id?: string;
+};
+
 /**
- * Join the leaderboard (opt-in). Requires authentication.
+ * Verify + sanitize an inbound entry body. Returns either the cleaned payload
+ * (ready to forward to admin) or an error response. Shared by POST and PUT.
+ */
+async function preparePayload(
+    rawBody: RawEntryBody,
+    googleAccessToken: string | undefined,
+    googleRefreshToken: string | undefined,
+): Promise<
+    | { ok: true; payload: Record<string, unknown>; verifiedHost: string | null; verificationStatus: string }
+    | { ok: false; response: NextResponse }
+> {
+    // Accept bare hostnames (`antigravity.codes`) AND fully-qualified URLs
+    // (`https://antigravity.codes/`). We prepend https:// when no scheme is
+    // present so verifyPropertyDomain + isBlockedUrl always see a parseable
+    // URL, and we store the canonical https form.
+    function canonicalizeUrl(raw: unknown): string | undefined {
+        if (typeof raw !== 'string') return undefined;
+        const trimmed = raw.trim();
+        if (!trimmed) return undefined;
+        if (/^https?:\/\//i.test(trimmed)) return trimmed;
+        // Reject obviously-broken inputs (whitespace, no dot) before adding scheme.
+        if (/\s/.test(trimmed) || !trimmed.includes('.')) return trimmed;
+        return `https://${trimmed}`;
+    }
+
+    const websiteUrl = canonicalizeUrl(rawBody.website_url);
+    const logoUrl = canonicalizeUrl(rawBody.logo_url);
+
+    if (websiteUrl && isBlockedUrl(websiteUrl)) {
+        return { ok: false, response: NextResponse.json({ error: 'Website URL must be a public http(s) URL.' }, { status: 400 }) };
+    }
+    if (logoUrl && isBlockedUrl(logoUrl)) {
+        return { ok: false, response: NextResponse.json({ error: 'Logo URL must be a public http(s) URL.' }, { status: 400 }) };
+    }
+
+    const description = sanitizeDescription(rawBody.description);
+    if (description && SPAM_TERMS.test(description)) {
+        return { ok: false, response: NextResponse.json({ error: 'Description rejected by content filter.' }, { status: 400 }) };
+    }
+
+    let verificationStatus: 'verified' | 'host_mismatch' | 'no_web_stream' | 'no_website_url' | 'failed' | 'pending' = 'pending';
+    let verifiedHost: string | null = null;
+    if (rawBody.ga_property_id && websiteUrl && googleAccessToken) {
+        const verify = await verifyPropertyDomain(
+            rawBody.ga_property_id,
+            websiteUrl,
+            googleAccessToken,
+            googleRefreshToken,
+        );
+        verificationStatus = verify.status;
+        if (verify.ok) {
+            verifiedHost = verify.matchedHost;
+        } else if (verify.status === 'host_mismatch' || verify.status === 'no_web_stream') {
+            return {
+                ok: false,
+                response: NextResponse.json(
+                    { error: verify.reason, status: verify.status, expectedHost: verify.expectedHost, actualHosts: verify.actualHosts },
+                    { status: 400 },
+                ),
+            };
+        }
+    }
+
+    // Auto-resolve a logo from the verified host so listings always render
+    // a real brand mark instead of the gradient initial. The user can still
+    // override by passing logo_url explicitly.
+    const resolvedHost = verifiedHost || normalizeHost(websiteUrl);
+    const resolvedLogo = logoUrl || (resolvedHost ? autoLogoForHost(resolvedHost) : null);
+
+    const payload: Record<string, unknown> = {
+        ...rawBody,
+        description,
+        website_url: websiteUrl,
+        logo_url: resolvedLogo ?? undefined,
+        verification_status: verificationStatus,
+        verified_host: verifiedHost,
+    };
+    delete payload.entry_id;
+
+    return { ok: true, payload, verifiedHost, verificationStatus };
+}
+
+/**
+ * Create a new leaderboard entry (multi-site).
+ *
+ * Each call creates a fresh row when the user posts a new ga_property_id; if
+ * they re-submit an existing property the admin upserts the same row. The web
+ * layer enforces that ga_property_id + website_url + ownership of the GA4
+ * property are present — without those we can't stand behind the listing.
  */
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -174,105 +277,76 @@ export async function POST(req: Request) {
         );
     }
 
+    let rawBody: RawEntryBody;
     try {
-        const rawBody = await req.json();
+        rawBody = (await req.json()) as RawEntryBody;
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-        // Validate URL fields and sanitize description before sending to admin.
-        const websiteUrl: string | undefined = typeof rawBody.website_url === 'string' && rawBody.website_url.trim()
-            ? rawBody.website_url.trim()
-            : undefined;
-        const logoUrl: string | undefined = typeof rawBody.logo_url === 'string' && rawBody.logo_url.trim()
-            ? rawBody.logo_url.trim()
-            : undefined;
+    if (!rawBody.startup_name || !String(rawBody.startup_name).trim()) {
+        return NextResponse.json({ error: 'Startup name is required.' }, { status: 400 });
+    }
+    if (!rawBody.ga_property_id) {
+        return NextResponse.json(
+            { error: 'Pick a Google Analytics property — we need it to verify your traffic.' },
+            { status: 400 },
+        );
+    }
+    if (!rawBody.website_url || !String(rawBody.website_url).trim()) {
+        return NextResponse.json(
+            { error: 'Add the website URL you want to list — we match it against your GA4 property.' },
+            { status: 400 },
+        );
+    }
+    if (!googleAccessToken) {
+        return NextResponse.json(
+            { error: 'Reconnect Google so we can verify your GA4 property.' },
+            { status: 400 },
+        );
+    }
 
-        if (websiteUrl && isBlockedUrl(websiteUrl)) {
-            return NextResponse.json({ error: 'Website URL must be a public http(s) URL.' }, { status: 400 });
-        }
-        if (logoUrl && isBlockedUrl(logoUrl)) {
-            return NextResponse.json({ error: 'Logo URL must be a public http(s) URL.' }, { status: 400 });
-        }
+    const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
+    if (!prepared.ok) return prepared.response;
 
-        const description = sanitizeDescription(rawBody.description);
-        if (description && SPAM_TERMS.test(description)) {
-            return NextResponse.json({ error: 'Description rejected by content filter.' }, { status: 400 });
-        }
-
-        // Domain-match verification: GA4 property's web stream defaultUri must match website host.
-        let verificationStatus: 'verified' | 'host_mismatch' | 'no_web_stream' | 'no_website_url' | 'failed' | 'pending' = 'pending';
-        let verifiedHost: string | null = null;
-        if (rawBody.ga_property_id && websiteUrl && googleAccessToken) {
-            const verify = await verifyPropertyDomain(
-                rawBody.ga_property_id,
-                websiteUrl,
-                googleAccessToken,
-                googleRefreshToken,
-            );
-            verificationStatus = verify.status;
-            if (verify.ok) {
-                verifiedHost = verify.matchedHost;
-            } else if (verify.status === 'host_mismatch' || verify.status === 'no_web_stream') {
-                // Hard-block obvious mismatches so users can't claim a domain they don't track.
-                return NextResponse.json(
-                    { error: verify.reason, status: verify.status, expectedHost: verify.expectedHost, actualHosts: verify.actualHosts },
-                    { status: 400 },
-                );
-            }
-            // 'failed' (transient API error) or 'no_website_url' fall through with status persisted.
-        }
-
-        const body = {
-            ...rawBody,
-            description,
-            website_url: websiteUrl,
-            logo_url: logoUrl,
-            verification_status: verificationStatus,
-            verified_host: verifiedHost,
-        };
-
+    try {
         const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}/join`;
-        console.log(`[Leaderboard Join] POST ${adminUrl} for user ${userId} (verification=${verificationStatus})`);
-
         const res = await fetch(adminUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': ADMIN_API_KEY,
-            },
-            body: JSON.stringify(body),
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+            body: JSON.stringify(prepared.payload),
             signal: AbortSignal.timeout(10000),
         });
 
         const responseText = await res.text();
-        console.log(`[Leaderboard Join] Admin API response: ${res.status} ${responseText.substring(0, 500)}`);
-
         let data;
         try {
             data = JSON.parse(responseText);
         } catch {
-            console.error('[Leaderboard Join] Non-JSON response from admin API:', responseText.substring(0, 200));
-            return NextResponse.json({ error: 'Admin API returned non-JSON response', detail: responseText.substring(0, 200) }, { status: 502 });
+            return NextResponse.json(
+                { error: 'Admin API returned non-JSON response', detail: responseText.slice(0, 200) },
+                { status: 502 },
+            );
         }
 
         if (!res.ok) {
             return NextResponse.json(data, { status: res.status });
         }
 
-        // Fetch GA4 stats synchronously so data is ready instantly
+        // Eager stats refresh so the new listing isn't all zeros.
         let stats = null;
-        if (data.success && data.id && body.ga_property_id && googleAccessToken) {
+        if (data.success && data.id && rawBody.ga_property_id) {
             try {
-                stats = await refreshEntryStats(data.id, body.ga_property_id, googleAccessToken, googleRefreshToken);
+                stats = await refreshEntryStats(data.id, rawBody.ga_property_id, googleAccessToken, googleRefreshToken);
             } catch (statsErr) {
-                console.error('[Leaderboard Join] Stats fetch failed, will retry via cron:', statsErr);
+                console.error('[Leaderboard Join] Stats fetch failed:', statsErr);
             }
-        } else {
-            console.log(`[Leaderboard Join] Skipping stats fetch: success=${data.success}, id=${data.id}, ga_property=${body.ga_property_id}, hasGoogleToken=${!!googleAccessToken}`);
         }
 
         return NextResponse.json({
             ...data,
             stats,
-            verification: { status: verificationStatus, verifiedHost },
+            verification: { status: prepared.verificationStatus, verifiedHost: prepared.verifiedHost },
         });
     } catch (err) {
         console.error('Leaderboard join error:', err);
@@ -281,7 +355,7 @@ export async function POST(req: Request) {
 }
 
 /**
- * Get current user's leaderboard status.
+ * List all of the current user's leaderboard entries (active + inactive).
  */
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -292,7 +366,7 @@ export async function GET() {
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
     if (!userId) {
-        return NextResponse.json({ joined: false });
+        return NextResponse.json({ joined: false, entries: [] });
     }
 
     try {
@@ -300,23 +374,21 @@ export async function GET() {
             headers: { 'X-API-Key': ADMIN_API_KEY },
             signal: AbortSignal.timeout(10000),
         });
-
         const text = await res.text();
         let data;
         try { data = JSON.parse(text); } catch {
-            console.error('Leaderboard status: non-JSON response:', text.slice(0, 200));
-            return NextResponse.json({ joined: false });
+            return NextResponse.json({ joined: false, entries: [] });
         }
-
         return NextResponse.json(data);
     } catch (err) {
         console.error('Leaderboard status error:', err);
-        return NextResponse.json({ joined: false });
+        return NextResponse.json({ joined: false, entries: [] });
     }
 }
 
 /**
- * Update leaderboard profile.
+ * Update an existing leaderboard entry. Body must include `entry_id`. The
+ * admin API verifies the entry belongs to the resolved user before mutating.
  */
 export async function PUT(req: Request) {
     const session = await getServerSession(authOptions);
@@ -326,27 +398,42 @@ export async function PUT(req: Request) {
 
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
+    // @ts-expect-error - googleAccessToken added in callbacks
+    const googleAccessToken: string | undefined = session.user.googleAccessToken;
+    // @ts-expect-error - refreshToken added in callbacks
+    const googleRefreshToken: string | undefined = session.user.refreshToken;
+    if (!userId) {
+        return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    }
+
+    let rawBody: RawEntryBody;
+    try {
+        rawBody = (await req.json()) as RawEntryBody;
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    const entryId = Number(rawBody.entry_id);
+    if (!Number.isFinite(entryId) || entryId <= 0) {
+        return NextResponse.json({ error: 'entry_id is required' }, { status: 400 });
+    }
+
+    const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
+    if (!prepared.ok) return prepared.response;
 
     try {
-        const body = await req.json();
-
-        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/${userId}`, {
+        const params = new URLSearchParams({ user_identifier: String(userId) });
+        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/entry/${entryId}?${params}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': ADMIN_API_KEY,
-            },
-            body: JSON.stringify(body),
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+            body: JSON.stringify(prepared.payload),
             signal: AbortSignal.timeout(10000),
         });
-
         const text = await res.text();
         let data;
         try { data = JSON.parse(text); } catch {
-            console.error('Leaderboard update: non-JSON response:', text.slice(0, 200));
             return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
         }
-
         return NextResponse.json(data, { status: res.status });
     } catch (err) {
         console.error('Leaderboard update error:', err);
@@ -355,9 +442,10 @@ export async function PUT(req: Request) {
 }
 
 /**
- * Leave the leaderboard (opt-out).
+ * Soft-delete a single leaderboard entry. Pass `?entry_id=N` (query) so we
+ * never accidentally remove a different site than the one the user clicked.
  */
-export async function DELETE() {
+export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -365,29 +453,32 @@ export async function DELETE() {
 
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
+    if (!userId) {
+        return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    }
+
+    const url = new URL(req.url);
+    const entryIdParam = url.searchParams.get('entry_id');
+    const entryId = Number(entryIdParam);
+    if (!Number.isFinite(entryId) || entryId <= 0) {
+        return NextResponse.json({ error: 'entry_id query param is required' }, { status: 400 });
+    }
 
     try {
-        const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}`;
-        console.log(`[Leaderboard Leave] DELETE ${adminUrl} for user ${userId}`);
-
-        const res = await fetch(adminUrl, {
+        const params = new URLSearchParams({ user_identifier: String(userId) });
+        const res = await fetch(`${ADMIN_API_URL}/api/leaderboard/entry/${entryId}?${params}`, {
             method: 'DELETE',
             headers: { 'X-API-Key': ADMIN_API_KEY },
             signal: AbortSignal.timeout(10000),
         });
-
         const text = await res.text();
-        console.log(`[Leaderboard Leave] Response: ${res.status} ${text.substring(0, 300)}`);
-
         let data;
         try { data = JSON.parse(text); } catch {
-            console.error('Leaderboard leave: non-JSON response:', text.slice(0, 200));
             return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
         }
-
         return NextResponse.json(data, { status: res.status });
     } catch (err) {
         console.error('Leaderboard leave error:', err);
-        return NextResponse.json({ error: 'Failed to leave leaderboard' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to remove entry' }, { status: 500 });
     }
 }

@@ -117,6 +117,14 @@ export async function GET(req: Request) {
             return NextResponse.json({ user: userData, logs: logsData })
         }
 
+        if (endpoint === 'leaderboard') {
+            const res = await fetch(`${ADMIN_API_URL}/api/superadmin/leaderboard`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) throw new Error('Failed to get leaderboard entries')
+            return NextResponse.json(await res.json())
+        }
+
         if (endpoint === 'user-profile') {
             const githubId = searchParams.get('id')
             if (!githubId) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
@@ -265,6 +273,26 @@ export async function POST(req: Request) {
                 headers: { 'X-API-Key': ADMIN_API_KEY }
             })
             return NextResponse.json(await res.json())
+        }
+
+        if (action === 'leaderboard-moderate') {
+            const { entryId, leaderboardAction } = body
+            if (!entryId || !leaderboardAction) {
+                return NextResponse.json({ error: 'Missing entryId or leaderboardAction' }, { status: 400 })
+            }
+            const allowed = new Set(['verify', 'unverify', 'activate', 'deactivate', 'delete'])
+            if (!allowed.has(leaderboardAction)) {
+                return NextResponse.json({ error: `Unknown action: ${leaderboardAction}` }, { status: 400 })
+            }
+            const res = await fetch(`${ADMIN_API_URL}/api/superadmin/leaderboard/${encodeURIComponent(entryId)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': ADMIN_API_KEY,
+                },
+                body: JSON.stringify({ action: leaderboardAction }),
+            })
+            return NextResponse.json(await res.json(), { status: res.status })
         }
 
         if (action === 'delete-query') {
