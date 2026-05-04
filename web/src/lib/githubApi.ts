@@ -551,6 +551,40 @@ export function findBestRepoMatch<T extends RepoLite>(
     return best;
 }
 
+/**
+ * List files changed in a Pull Request, including the patch text.
+ * Caps each patch at 4000 chars to keep token budget bounded.
+ *
+ * Used by the AI chat's analyze_pr_seo_diff tool to detect SEO-meaningful
+ * changes (meta tags, robots.txt, JSON-LD, redirects) without scraping
+ * the entire PR.
+ */
+export async function getPullRequestFiles(
+    token: string,
+    args: { repo: string; prNumber: number; per_page?: number }
+) {
+    const parsed = parseRepo(args.repo);
+    if (!parsed) return { error: 'bad_args', message: `Invalid repo "${args.repo}". Use "owner/repo".` };
+    const per_page = Math.min(args.per_page || 30, 100);
+    const r = await ghFetch<any[]>(
+        `/repos/${parsed.owner}/${parsed.repo}/pulls/${args.prNumber}/files?per_page=${per_page}`,
+        token
+    );
+    if (isError(r)) return r;
+    return {
+        data: (r.data || []).map((f: any) => ({
+            filename: f.filename,
+            status: f.status,                   // added | modified | removed | renamed
+            additions: f.additions,
+            deletions: f.deletions,
+            changes: f.changes,
+            previous_filename: f.previous_filename,
+            patch: clip(f.patch, 4000),         // unified diff (may be empty for binary files)
+            raw_url: f.raw_url,
+        })),
+    };
+}
+
 export async function getRepoLanguages(token: string, args: { repo: string }) {
     const parsed = parseRepo(args.repo);
     if (!parsed) return { error: 'bad_args', message: `Invalid repo "${args.repo}". Use "owner/repo".` };

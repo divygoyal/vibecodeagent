@@ -1,6 +1,15 @@
 // AI Chat Tools Definition & Executor
 // These tools are injected into the Gemini API so the AI can "call" them to perform deep diagnosis.
-import { getValidAccessToken, runFlexibleGAReport, runFlexibleRealtimeReport, getPropertyMetadata, inspectGscUrl } from '@/lib/googleApi';
+import {
+    getValidAccessToken,
+    runFlexibleGAReport,
+    runFlexibleRealtimeReport,
+    getPropertyMetadata,
+    inspectGscUrl,
+    fetchFunnelData,
+    fetchJourneyData,
+    fetchRetentionCohorts,
+} from '@/lib/googleApi';
 import {
     getValidGithubToken,
     listUserRepos,
@@ -11,9 +20,11 @@ import {
     getWorkflowRuns,
     getFileContents,
     getRepoHealth,
+    getPullRequestFiles,
 } from '@/lib/githubApi';
 import { computeAlerts } from '@/lib/alertEngine';
 import { runSiteAudit } from '@/lib/siteAudit';
+import { wrapUntrusted } from '@/lib/chatSafety';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -812,6 +823,115 @@ DO NOT use it for general questions ("what should I focus on") — use get_alert
             required: ['siteUrl', 'symptom'],
         },
     },
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE B-4 — funnel, journey, cohort, PR-SEO-diff, site-health, annotation
+    // ═══════════════════════════════════════════════════════════════
+    {
+        name: 'run_funnel_analysis',
+        description: `Run a multi-step conversion funnel against GA4. Pass an ordered list of page paths (e.g. ["/pricing", "/checkout", "/thank-you"]) and the tool returns visitors, % of step 1, and drop-off % per step.
+
+WHEN TO USE: "Where do users drop in my checkout?" / "How many visitors reach /thank-you?" / "Drop-off between /signup and /onboarding?" — questions that ask about progression through a sequence of pages.
+
+DO NOT use for single-page metrics — use run_ga4_report instead.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                propertyId: { type: 'STRING' as const, description: 'GA4 property ID from [AVAILABLE PROPERTIES].' },
+                stepPages: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const },
+                    description: 'Ordered list of page paths (2–8 steps). Step 1 = top of funnel.',
+                },
+                range: { type: 'STRING' as const, description: 'Date range like "30d", "7d", "90d". Default "30d".' },
+            },
+            required: ['propertyId', 'stepPages'],
+        },
+    },
+    {
+        name: 'run_journey_analysis',
+        description: `Surface user journey patterns: top landing pages, top exit pages, and the most-traveled paths through the site. Combines several GA4 reports.
+
+WHEN TO USE: "Where do users start?" / "Where do they leave?" / "What are the common paths through my site?" / "Why are users not getting to my CTA?"`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                propertyId: { type: 'STRING' as const, description: 'GA4 property ID from [AVAILABLE PROPERTIES].' },
+                range: { type: 'STRING' as const, description: 'Date range like "30d". Default "30d".' },
+            },
+            required: ['propertyId'],
+        },
+    },
+    {
+        name: 'run_cohort_retention',
+        description: `Compute cohort retention curves (% of users from each cohort still active on day N / week N / month N). Distinguishes "traffic dropped" from "we broke retention" — competitor blind spot.
+
+WHEN TO USE: "Are returning users sticking?" / "What's my D7 retention?" / "Did the redesign hurt repeat visits?"`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                propertyId: { type: 'STRING' as const, description: 'GA4 property ID from [AVAILABLE PROPERTIES].' },
+                mode: {
+                    type: 'STRING' as const,
+                    enum: ['daily', 'weekly', 'monthly'],
+                    description: 'Cohort granularity. Default "daily" (last 14 cohorts).',
+                },
+            },
+            required: ['propertyId'],
+        },
+    },
+    {
+        name: 'analyze_pr_seo_diff',
+        description: `Pull a Pull Request's file diff and flag SEO-meaningful changes: <head> meta/title/canonical edits, robots.txt changes, _redirects/next.config edits, JSON-LD schema changes, sitemap edits, noindex toggles. Returns ranked findings with the relevant patch snippets.
+
+WHEN TO USE: "Did PR #123 break SEO?" / "What changed in PR #456 that could affect ranking?" / Used internally by cross_source_diagnose when a suspect PR is identified.
+
+REQUIRES: GitHub connected + repo specified. Do NOT call without [Repo:] tag set.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                repo: { type: 'STRING' as const, description: 'Repo as "owner/repo".' },
+                prNumber: { type: 'INTEGER' as const, description: 'Pull Request number.' },
+            },
+            required: ['repo', 'prNumber'],
+        },
+    },
+    {
+        name: 'compute_site_health_score',
+        description: `Aggregate health-roll-up: combines run_site_audit (HTML/SEO checks) + get_alerts (anomalies) + recent commit count → single 0-100 score with sub-scores per dimension. Gives executives one number; gives the chat a cheap "is anything on fire?" entry point.
+
+WHEN TO USE: "Give me my SEO health score" / "Is everything OK?" / "Quick health check" / first-look question on a site.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: { type: 'STRING' as const, description: 'Full URL to audit (e.g., https://example.com).' },
+                repo: { type: 'STRING' as const, description: 'Optional "owner/repo" — when present, contributes a "deploy velocity" sub-score from recent commits.' },
+            },
+            required: ['siteUrl'],
+        },
+    },
+    {
+        name: 'write_dashboard_annotation',
+        description: `Persist the chat's verdict back to the user's dashboard as an annotation pinned at a specific date. Builds a shared, time-anchored knowledge base — chat answers stop being ephemeral.
+
+WHEN TO USE: after delivering a diagnostic verdict ("Drop began Apr 12; PR #42 was the cause") OR when the user explicitly asks "save this", "log this", "remember this", "annotate this".
+
+DO NOT spam — at most ONE annotation per chat response.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                date: { type: 'STRING' as const, description: 'YYYY-MM-DD — the date the annotation should anchor to (the event date, not today).' },
+                title: { type: 'STRING' as const, description: 'Short title (≤80 chars).' },
+                description: { type: 'STRING' as const, description: 'Longer body (≤500 chars).' },
+                category: {
+                    type: 'STRING' as const,
+                    enum: ['deploy', 'algorithm_update', 'campaign', 'incident', 'verdict', 'custom'],
+                    description: 'Category. Default "verdict" (chat-generated).',
+                },
+                propertyId: { type: 'STRING' as const, description: 'Optional GA4 property to scope the annotation to.' },
+            },
+            required: ['date', 'title'],
+        },
+    },
 ];
 
 export interface GscContext {
@@ -893,6 +1013,38 @@ const ARG_VALIDATORS: Record<string, ArgValidator> = {
     get_file_contents: (a) => {
         if (typeof a.repo !== 'string' || !a.repo) return 'repo is required';
         if (typeof a.path !== 'string' || !a.path) return 'path is required';
+        return null;
+    },
+    run_funnel_analysis: (a) => {
+        if (typeof a.propertyId !== 'string' || !a.propertyId) return 'propertyId is required';
+        if (!Array.isArray(a.stepPages) || a.stepPages.length < 2) return 'stepPages must be an array of at least 2 page paths';
+        if (a.stepPages.length > 8) return 'stepPages capped at 8 steps — collapse intermediate steps';
+        for (const p of a.stepPages) if (typeof p !== 'string' || !p.startsWith('/')) return `stepPages entries must be absolute paths (e.g. "/checkout"); got "${p}"`;
+        return null;
+    },
+    run_journey_analysis: (a) => {
+        if (typeof a.propertyId !== 'string' || !a.propertyId) return 'propertyId is required';
+        return null;
+    },
+    run_cohort_retention: (a) => {
+        if (typeof a.propertyId !== 'string' || !a.propertyId) return 'propertyId is required';
+        if (a.mode && !['daily', 'weekly', 'monthly'].includes(a.mode)) return 'mode must be daily | weekly | monthly';
+        return null;
+    },
+    analyze_pr_seo_diff: (a) => {
+        if (typeof a.repo !== 'string' || !a.repo) return 'repo is required';
+        if (!Number.isInteger(a.prNumber) || a.prNumber <= 0) return 'prNumber must be a positive integer';
+        return null;
+    },
+    compute_site_health_score: (a) => {
+        if (typeof a.siteUrl !== 'string' || !/^https?:\/\//.test(a.siteUrl)) return 'siteUrl must be a full URL (https://…)';
+        return null;
+    },
+    write_dashboard_annotation: (a) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '')) return 'date must be YYYY-MM-DD';
+        if (typeof a.title !== 'string' || !a.title.trim()) return 'title is required';
+        if (a.title.length > 80) return 'title must be ≤80 chars';
+        if (a.description && a.description.length > 500) return 'description must be ≤500 chars';
         return null;
     },
 };
@@ -2014,6 +2166,276 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // PHASE B-4 — funnel / journey / cohort
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'run_funnel_analysis') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected.' };
+        }
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const steps = await fetchFunnelData(token, args.propertyId, args.stepPages, args.range || '30d');
+            return {
+                result: {
+                    task: 'Identify the BIGGEST drop step. Quantify lost users. Recommend ONE specific fix for that step.',
+                    expectedFormat: '🎯 VERDICT — The drop is at step N (X→Y, -Z%). Then a markdown table: | # | Step | Visitors | % of step 1 | Drop-off |. Then ⚡ ACTION line.',
+                    propertyId: args.propertyId,
+                    range: args.range || '30d',
+                    steps,
+                    biggestDrop: steps.reduce((worst: any, s: any, i: number) =>
+                        i > 0 && s.dropOff > (worst?.dropOff || 0) ? { stepIndex: i, name: s.name, dropOff: s.dropOff, lostUsers: (steps[i - 1].visitors - s.visitors) } : worst
+                        , null),
+                },
+            };
+        } catch (e: any) {
+            return { error: 'funnel_failed', message: e?.message || 'Failed to fetch funnel data.' };
+        }
+    }
+
+    if (name === 'run_journey_analysis') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected.' };
+        }
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const journey = await fetchJourneyData(token, args.propertyId, args.range || '30d');
+            return {
+                result: {
+                    task: 'State (1) where users land most, (2) where they leak out, (3) the highest-impact path with a fix. Cite exact percentages.',
+                    expectedFormat: '🎯 VERDICT line. Then 3 short sections: **Top Landings** (table), **Top Exits** (table), **Top Paths** (numbered list). End with ⚡ ACTION.',
+                    propertyId: args.propertyId,
+                    range: args.range || '30d',
+                    journey,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'journey_failed', message: e?.message || 'Failed to fetch journey data.' };
+        }
+    }
+
+    if (name === 'run_cohort_retention') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected.' };
+        }
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const data = await fetchRetentionCohorts(token, args.propertyId, args.mode || 'daily');
+            if (!data) return { error: 'no_cohort_data', message: 'GA4 returned no cohort data — property may have insufficient history.' };
+            return {
+                result: {
+                    task: 'Read the retention curve. Is it healthy (>20% D7) or leaking (<10% D7)? Compare against typical SaaS/content benchmarks. Prescribe ONE retention move.',
+                    expectedFormat: '🎯 VERDICT — D1 X% / D7 Y% / D30 Z% — [healthy|leaking|catastrophic]. Then 1-line interpretation. End with ⚡ ACTION.',
+                    propertyId: args.propertyId,
+                    mode: args.mode || 'daily',
+                    averages: data.averages,
+                    curve: data.curve,
+                    cohortCount: data.cohorts.length,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'cohort_failed', message: e?.message || 'Failed to fetch cohort retention.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE B-4 — analyze_pr_seo_diff
+    //   Fetches a PR's file diff and flags SEO-meaningful changes.
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'analyze_pr_seo_diff') {
+        const ghToken = await getValidGithubToken(gscContext?.githubAccessToken, gscContext?.userId);
+        if (!ghToken) {
+            return { error: 'github_not_connected', response: 'GitHub is not connected. Click Connect GitHub in Settings, then retry.' };
+        }
+        try {
+            const filesR = await getPullRequestFiles(ghToken, { repo: args.repo, prNumber: args.prNumber });
+            if ('error' in filesR) return { error: filesR.error, message: (filesR as any).message };
+            const files = filesR.data || [];
+
+            // Heuristics for SEO-meaningful files. Each rule contributes a category + severity.
+            const SEO_RULES: { match: RegExp; category: string; severity: 'critical' | 'high' | 'med'; why: string }[] = [
+                { match: /(^|\/)robots\.txt$/i, category: 'crawl_control', severity: 'critical', why: 'robots.txt change directly affects crawler access' },
+                { match: /(^|\/)sitemap.*\.(xml|ts|js|tsx|jsx)$/i, category: 'sitemap', severity: 'high', why: 'sitemap change affects discovery + indexation signal' },
+                { match: /(^|\/)_redirects$|(^|\/)(next|nuxt|astro|vercel)\.config\.(js|ts|mjs)$/i, category: 'redirects_config', severity: 'high', why: 'redirect/header config can introduce 301 chains or noindex headers' },
+                { match: /(^|\/)next-sitemap\.config\.(js|ts)$/i, category: 'sitemap', severity: 'high', why: 'sitemap generator config' },
+                { match: /(layout|head|metadata)\.(t|j)sx?$/i, category: 'meta_head', severity: 'high', why: 'page <head> / metadata definition' },
+                { match: /\.(html?|hbs|liquid|ejs|pug)$/i, category: 'html_template', severity: 'med', why: 'static HTML template — may contain meta/title/canonical/JSON-LD' },
+                { match: /schema|jsonld|json-ld|structured-?data/i, category: 'schema_jsonld', severity: 'high', why: 'structured data file — affects rich-results eligibility' },
+                { match: /(^|\/)public\/(robots|sitemap)/i, category: 'crawl_control', severity: 'critical', why: 'public crawler-control asset' },
+            ];
+
+            const PATCH_RULES: { match: RegExp; severity: 'critical' | 'high' | 'med'; why: string }[] = [
+                { match: /noindex|nofollow/i, severity: 'critical', why: 'noindex/nofollow directive added or modified' },
+                { match: /<title[^>]*>|next\/head|metadata\s*[:=]\s*\{|export\s+const\s+metadata/i, severity: 'high', why: 'page title or metadata edit' },
+                { match: /canonical/i, severity: 'high', why: 'canonical URL change' },
+                { match: /og:title|og:description|twitter:card/i, severity: 'med', why: 'social meta change — affects share previews + crawl signals' },
+                { match: /Disallow:|Allow:|User-agent:/i, severity: 'critical', why: 'robots.txt directive change' },
+                { match: /application\/ld\+json|@context|@type/i, severity: 'high', why: 'JSON-LD structured data edit' },
+                { match: /redirect[s]?\s*[:=(]|status:\s*30[1278]/i, severity: 'high', why: 'redirect rule edit' },
+            ];
+
+            const findings: any[] = [];
+            for (const f of files) {
+                const fileHits: { kind: string; severity: string; why: string }[] = [];
+                for (const r of SEO_RULES) if (r.match.test(f.filename)) fileHits.push({ kind: 'file_path', severity: r.severity, why: r.why });
+                if (f.patch) {
+                    for (const r of PATCH_RULES) if (r.match.test(f.patch)) fileHits.push({ kind: 'patch_content', severity: r.severity, why: r.why });
+                }
+                if (fileHits.length > 0) {
+                    const topSev = fileHits.some(h => h.severity === 'critical') ? 'critical' : fileHits.some(h => h.severity === 'high') ? 'high' : 'med';
+                    findings.push({
+                        filename: f.filename,
+                        status: f.status,
+                        additions: f.additions,
+                        deletions: f.deletions,
+                        severity: topSev,
+                        signals: fileHits,
+                        // Wrap the patch — it's untrusted external content (PR author wrote it).
+                        patch_excerpt: f.patch ? wrapUntrusted(f.patch.slice(0, 1500), `pr-${args.prNumber}-${f.filename}`) : null,
+                    });
+                }
+            }
+
+            findings.sort((a, b) => {
+                const order = { critical: 0, high: 1, med: 2 } as const;
+                return (order[a.severity as keyof typeof order] ?? 99) - (order[b.severity as keyof typeof order] ?? 99);
+            });
+
+            return {
+                result: {
+                    task: 'For each finding, state PLAINLY: did this PR likely break SEO? Cite the file + signal. End with ✅ SAFE / 🟡 REVIEW NEEDED / 🔴 LIKELY REGRESSION.',
+                    expectedFormat: 'Markdown table: | Severity | File | Signal | Why |. Then VERDICT line. Quote at most 1 patch excerpt to support the verdict.',
+                    repo: args.repo,
+                    prNumber: args.prNumber,
+                    filesChanged: files.length,
+                    seoMeaningfulFiles: findings.length,
+                    findings: findings.slice(0, 12),
+                    note: findings.length === 0
+                        ? 'No SEO-meaningful files touched in this PR. The change is content/UI/internal-only as far as SEO heuristics can tell.'
+                        : null,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'pr_diff_failed', message: e?.message || 'PR diff analysis failed.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE B-4 — compute_site_health_score
+    //   Aggregates: site audit (HTML/SEO) + alerts (anomalies) + deploy velocity
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'compute_site_health_score') {
+        try {
+            const auditP = runSiteAudit(args.siteUrl).catch((e: any) => ({ _failed: true, message: e?.message || 'audit failed' } as any));
+            const alerts = computeAlerts(gscContext?.seoContext, gscContext?.analyticsContext);
+            let deployScore = 50;
+            let deployNote = 'No repo linked — skipping deploy velocity sub-score.';
+            let recentCommitCount = 0;
+            if (args.repo) {
+                try {
+                    const ghToken = await getValidGithubToken(gscContext?.githubAccessToken, gscContext?.userId);
+                    if (ghToken) {
+                        const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+                        const commitsR = await getRecentCommits(ghToken, { repo: args.repo, since, per_page: 100 });
+                        if (!('error' in commitsR)) {
+                            recentCommitCount = (commitsR.data || []).length;
+                            // 0 = stagnant (50), 1-5 = slow (60), 6-20 = healthy (85), 21+ = active (95)
+                            deployScore = recentCommitCount === 0 ? 50
+                                : recentCommitCount <= 5 ? 60
+                                    : recentCommitCount <= 20 ? 85
+                                        : 95;
+                            deployNote = `${recentCommitCount} commits in last 30 days.`;
+                        }
+                    }
+                } catch { /* swallow */ }
+            }
+            const audit = await auditP;
+            const auditScore = audit && !(audit as any)._failed ? (audit as any).score : 0;
+            const auditFailed = !!(audit as any)._failed;
+
+            // Anomaly sub-score: start at 100, dock per critical/warning alert.
+            const critCount = alerts.filter((a) => a.severity === 'critical').length;
+            const warnCount = alerts.filter((a) => a.severity === 'warning').length;
+            const anomalyScore = Math.max(0, 100 - critCount * 25 - warnCount * 10);
+
+            // Final composite: 50% on-page audit, 35% anomalies, 15% deploy velocity.
+            const overall = Math.round(auditScore * 0.5 + anomalyScore * 0.35 + deployScore * 0.15);
+            const verdict = overall >= 85 ? 'EXCELLENT' : overall >= 70 ? 'HEALTHY' : overall >= 55 ? 'AT RISK' : overall >= 40 ? 'STRUGGLING' : 'CRITICAL';
+
+            return {
+                result: {
+                    task: 'Lead with one sentence: "Health Score: N/100 — VERDICT." Then list the 2-3 sub-scores driving it. End with ⚡ TOP 3 FIXES (ranked by impact).',
+                    expectedFormat: '🎯 VERDICT — score + label. Then a markdown table: | Sub-score | Value | Why |. Then ⚡ TOP 3 FIXES (numbered).',
+                    siteUrl: args.siteUrl,
+                    repo: args.repo || null,
+                    overall,
+                    verdict,
+                    subScores: {
+                        onPageAudit: auditScore,
+                        anomalies: anomalyScore,
+                        deployVelocity: deployScore,
+                    },
+                    weights: { onPageAudit: 0.5, anomalies: 0.35, deployVelocity: 0.15 },
+                    drivers: {
+                        criticalAlerts: critCount,
+                        warningAlerts: warnCount,
+                        recentCommits: recentCommitCount,
+                        deployNote,
+                        auditFailed,
+                        topAuditIssues: !auditFailed ? (audit as any).issues?.filter((i: any) => i.severity === 'critical' || i.severity === 'warning').slice(0, 5) : [],
+                        topAlerts: alerts.slice(0, 5),
+                    },
+                },
+            };
+        } catch (e: any) {
+            return { error: 'health_score_failed', message: e?.message || 'Site health score computation failed.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE B-4 — write_dashboard_annotation
+    //   Persists chat verdicts back to the user's dashboard timeline.
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'write_dashboard_annotation') {
+        if (!ADMIN_API_KEY || !gscContext?.userId) {
+            return { error: 'admin_not_configured', message: 'Admin API not configured — annotation cannot be persisted.' };
+        }
+        try {
+            const res = await fetch(`${ADMIN_API_URL}/api/annotations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+                body: JSON.stringify({
+                    user_identifier: gscContext.userId,
+                    date: args.date,
+                    title: args.title.slice(0, 80),
+                    description: (args.description || '').slice(0, 500),
+                    category: args.category || 'verdict',
+                    property_id: args.propertyId,
+                    color: args.category === 'incident' ? '#ef4444' : args.category === 'deploy' ? '#22d3ee' : args.category === 'algorithm_update' ? '#f59e0b' : '#a855f7',
+                }),
+                signal: AbortSignal.timeout(8000),
+            });
+            if (!res.ok) {
+                const errText = await res.text().catch(() => '');
+                return { error: 'annotation_write_failed', message: `Admin returned ${res.status}: ${errText.slice(0, 200)}` };
+            }
+            const data = await res.json().catch(() => ({}));
+            return {
+                result: {
+                    task: 'Confirm to the user that the annotation is saved. Mention the date + title. Suggest one related follow-up.',
+                    expectedFormat: 'One short paragraph: "✅ Saved an annotation for {date}: \\"{title}\\". You\'ll see it on charts going forward."',
+                    saved: true,
+                    annotationId: data.id || data.annotation_id || null,
+                    date: args.date,
+                    title: args.title,
+                    category: args.category || 'verdict',
+                },
+            };
+        } catch (e: any) {
+            return { error: 'annotation_write_failed', message: e?.message || 'Annotation write failed.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // GITHUB TOOL EXECUTORS
     // ═══════════════════════════════════════════════════════════════
     const GITHUB_TOOLS = new Set([
@@ -2052,15 +2474,29 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
                     return forwardGithubResult(await getRepoIssues(token, args as any));
                 case 'get_workflow_runs':
                     return forwardGithubResult(await getWorkflowRuns(token, args as any));
-                case 'get_file_contents':
-                    return forwardGithubResult(await getFileContents(token, args as { repo: string; path: string; ref?: string }));
+                case 'get_file_contents': {
+                    // B7-lite: file content from a public repo can be attacker-controlled
+                    // (e.g. a malicious commit on a fork containing prompt-injection text).
+                    // Wrap in <untrusted_content> so the system prompt's anti-injection rule
+                    // applies. The model still gets the content — it just won't follow
+                    // instructions inside it.
+                    const r = await getFileContents(token, args as { repo: string; path: string; ref?: string });
+                    if (r && typeof r === 'object' && 'error' in r) {
+                        return { error: r.error, response: (r as any).message || r.error };
+                    }
+                    const data = (r as any).data;
+                    if (data?.content) {
+                        data.content = wrapUntrusted(data.content, `${args.repo}:${args.path}`);
+                    }
+                    return { result: data };
+                }
             }
         } catch (e: any) {
             return { error: 'github_tool_failed', response: e?.message || 'GitHub tool execution failed.' };
         }
     }
 
-    return { error: `Tool "${name}" not found. Available tools: get_search_performance, calculate_revenue_impact, run_ga4_report, run_page_audit, generate_content_strategy, analyze_keyword_clusters, compare_time_periods, find_cannibalization, suggest_internal_links, generate_meta_tags, run_realtime_report, get_custom_dimensions, list_user_repos, get_repo_health, search_repo_code, get_recent_commits, get_pull_requests, get_repo_issues, get_workflow_runs, get_file_contents` };
+    return { error: `Tool "${name}" not found.` };
 }
 
 // Normalize the GithubResult discriminated union into the {result, error} shape
