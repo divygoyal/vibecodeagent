@@ -5,51 +5,53 @@ import { getSafeRedirectUrl } from '@/lib/checkout';
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-    CheckCircle2, Coins, Sparkles, Bot, Crown,
-    Zap, TrendingUp, Shield, History, AlertTriangle, X, Loader2
+    CheckCircle2, Coins, Bot, Zap, TrendingUp, Shield,
+    History, AlertTriangle, X, Loader2, ArrowRight, Check,
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
 
-const PLAN_CONFIG: Record<string, { label: string; color: string; gradient: string; icon: typeof Zap; credits: number; price: string }> = {
-    free: { label: 'Free', color: 'text-zinc-400', gradient: 'from-zinc-500 to-zinc-600', icon: Zap, credits: 0, price: '$0' },
-    starter: { label: 'Starter', color: 'text-cyan-400', gradient: 'from-cyan-400 to-blue-500', icon: Zap, credits: 50, price: '$9' },
-    growth: { label: 'Growth', color: 'text-emerald-400', gradient: 'from-emerald-400 to-cyan-400', icon: TrendingUp, credits: 150, price: '$19' },
-    pro: { label: 'Pro', color: 'text-violet-400', gradient: 'from-violet-400 to-purple-500', icon: Shield, credits: 300, price: '$29' },
+/* ───────────────────────────────────────────────────────────────────
+ * Plan & Billing
+ *
+ * Premium-pass redesign — neutral palette, tabular numbers, no rainbow
+ * gradients. Functionality is byte-for-byte identical to the previous
+ * version: same Dodo Payments product IDs + checkout URLs, same
+ * /api/subscription/cancel call, same useCredits hook, same upgraded=true
+ * URL-param handshake.
+ * ──────────────────────────────────────────────────────────────────── */
+
+interface PlanInfo {
+    label: string;
+    icon: typeof Zap;
+    credits: number;
+    price: string;
+    blurb: string;
+}
+
+const PLAN_CONFIG: Record<string, PlanInfo> = {
+    free:    { label: 'Free',    icon: Zap,         credits: 0,   price: '$0',  blurb: 'Free tier — no AI credits' },
+    starter: { label: 'Starter', icon: Zap,         credits: 50,  price: '$9',  blurb: 'For side projects' },
+    growth:  { label: 'Growth',  icon: TrendingUp,  credits: 150, price: '$19', blurb: 'For growing businesses' },
+    pro:     { label: 'Pro',     icon: Shield,      credits: 300, price: '$29', blurb: 'Telegram bot + everything' },
 };
 
 const SUBSCRIPTION_PLANS = [
     {
         key: 'starter',
-        name: 'Starter',
-        price: '$9',
-        credits: 50,
-        telegramBot: false,
         productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
-        color: 'cyan',
-        icon: Zap,
-        features: ['50 AI credits/month', 'Full dashboard access', 'SEO & analytics tools', 'Site audit reports'],
+        features: ['50 AI credits / month', 'Full dashboard access', 'SEO & analytics tools', 'Site audit reports'],
     },
     {
         key: 'growth',
-        name: 'Growth',
-        price: '$19',
-        credits: 150,
-        telegramBot: false,
         productId: 'pdt_0NaLMM1bLW9wAbmxcsebm',
-        color: 'emerald',
-        icon: TrendingUp,
-        features: ['150 AI credits/month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence'],
+        features: ['150 AI credits / month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence'],
+        recommended: true,
     },
     {
         key: 'pro',
-        name: 'Pro',
-        price: '$29',
-        credits: 300,
-        telegramBot: true,
         productId: 'pdt_0NaLMM4r23kncRahthuyj',
-        color: 'violet',
-        icon: Shield,
-        features: ['300 AI credits/month', 'Everything in Growth', 'Telegram bot included', 'Priority support'],
+        features: ['300 AI credits / month', 'Everything in Growth', 'Telegram bot included', 'Priority support'],
+        telegramBot: true,
     },
 ];
 
@@ -63,9 +65,10 @@ export default function PlanPage() {
 
 function PlanPageContent() {
     const { data: session } = useSession();
-    const { credits, plan, telegramBotEnabled, subscriptionEnd, subscriptionId, subscriptionCancelled, refresh: refreshCredits } = useCredits();
+    const { credits, plan, telegramBotEnabled, subscriptionEnd, subscriptionCancelled, refresh: refreshCredits } = useCredits();
     const searchParams = useSearchParams();
     const justUpgraded = useMemo(() => searchParams.get('upgraded') === 'true', [searchParams]);
+
     const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(justUpgraded);
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [cancelling, setCancelling] = useState(false);
@@ -76,8 +79,8 @@ function PlanPageContent() {
         if (!justUpgraded) return;
         refreshCredits();
         window.history.replaceState({}, '', '/dashboard/plan');
-        const timer = setTimeout(() => setShowUpgradeSuccess(false), 8000);
-        return () => clearTimeout(timer);
+        const t = setTimeout(() => setShowUpgradeSuccess(false), 8000);
+        return () => clearTimeout(t);
     }, [justUpgraded, refreshCredits]);
 
     const handleCancelSubscription = async () => {
@@ -100,352 +103,285 @@ function PlanPageContent() {
         }
     };
 
-    const displayCredits = credits ?? 0;
-    const isLow = displayCredits < 20;
-    const isMed = displayCredits < 50;
     const currentPlan = PLAN_CONFIG[plan] || PLAN_CONFIG.free;
     const PlanIcon = currentPlan.icon;
+    const displayCredits = credits ?? 0;
     const planMaxCredits = currentPlan.credits || 100;
-
-    const renewalDate = subscriptionEnd ? new Date(subscriptionEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+    const creditsPct = Math.min(100, (displayCredits / planMaxCredits) * 100);
+    const lowSeverity = displayCredits < 20 ? 'low' : displayCredits < 50 ? 'medium' : 'ok';
+    const renewalDate = subscriptionEnd
+        ? new Date(subscriptionEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : null;
 
     return (
-        <div className="space-y-6 max-w-3xl">
-            <div>
-                <h1 className="text-2xl font-bold text-white mb-1">Plan & Billing</h1>
-                <p className="text-sm text-zinc-500">
-                    Manage your subscription, credits, and billing.
-                </p>
-            </div>
+        <div className="max-w-3xl space-y-5">
+            {/* Header */}
+            <header>
+                <h1 className="text-xl font-semibold text-white tracking-tight">Plan & billing</h1>
+                <p className="mt-1 text-[13px] text-zinc-500">Manage your subscription, credits, and renewal.</p>
+            </header>
 
-            {/* Upgrade Success Banner */}
+            {/* Upgrade success banner */}
             {showUpgradeSuccess && (
-                <div className="bg-emerald-500/[0.08] border border-emerald-500/[0.2] rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                    <div>
-                        <p className="text-sm font-semibold text-emerald-300">Payment successful!</p>
-                        <p className="text-xs text-zinc-400">Your plan is being activated. It may take a moment to reflect.</p>
-                    </div>
-                </div>
+                <Banner
+                    tone="success"
+                    title="Payment successful"
+                    body="Your plan is being activated. It may take a moment to reflect."
+                />
+            )}
+            {cancelSuccess && (
+                <Banner
+                    tone="warning"
+                    title="Subscription cancelled"
+                    body={`Your plan stays active until ${renewalDate || 'the end of the billing period'}. You won't be charged again.`}
+                    onClose={() => setCancelSuccess(false)}
+                />
             )}
 
-            {/* Current Plan Card */}
-            <div className={`relative overflow-hidden border rounded-2xl p-6 ${
-                plan === 'pro' ? 'bg-gradient-to-br from-violet-500/[0.08] to-purple-500/[0.04] border-violet-500/[0.2]' :
-                plan === 'growth' ? 'bg-gradient-to-br from-emerald-500/[0.08] to-cyan-500/[0.04] border-emerald-500/[0.2]' :
-                plan === 'starter' ? 'bg-gradient-to-br from-cyan-500/[0.08] to-blue-500/[0.04] border-cyan-500/[0.2]' :
-                'bg-white/[0.02] border-white/[0.06]'
-            }`}>
-                {/* Glow */}
-                <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-20 bg-gradient-to-br ${currentPlan.gradient}`} />
-                <div className="relative">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${currentPlan.gradient} flex items-center justify-center`}>
-                                <PlanIcon className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                                    {currentPlan.label} Plan
-                                    {plan !== 'free' && <Crown className="w-3.5 h-3.5 text-amber-400" />}
-                                </h2>
-                                <p className="text-[11px] text-zinc-500">
-                                    {plan === 'free' ? 'Free tier — upgrade for AI credits' : `${currentPlan.price}/month • ${currentPlan.credits} credits/month`}
-                                </p>
-                            </div>
+            {/* Current plan summary */}
+            <section className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
+                            <PlanIcon className="h-4.5 w-4.5 text-zinc-200" />
                         </div>
-                        {renewalDate && plan !== 'free' && (
-                            <div className={`text-[10px] px-2.5 py-1 rounded-lg ${
-                                subscriptionCancelled
-                                    ? 'text-amber-400 bg-amber-500/[0.08] border border-amber-500/[0.15]'
-                                    : 'text-zinc-500 bg-white/[0.04]'
-                            }`}>
-                                {subscriptionCancelled ? `Active until ${renewalDate}` : `Renews ${renewalDate}`}
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-[15px] font-semibold text-white">{currentPlan.label}</h2>
+                                {plan !== 'free' && (
+                                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-zinc-300">
+                                        Active
+                                    </span>
+                                )}
                             </div>
-                        )}
+                            <p className="mt-0.5 text-[12px] text-zinc-500">
+                                {plan === 'free' ? currentPlan.blurb : `${currentPlan.price} / month · ${currentPlan.credits} credits / month`}
+                            </p>
+                        </div>
                     </div>
+                    {renewalDate && plan !== 'free' && (
+                        <div className={`flex-shrink-0 rounded-lg border px-2.5 py-1 text-[10px] tabular-nums ${
+                            subscriptionCancelled
+                                ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-300'
+                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-400'
+                        }`}>
+                            {subscriptionCancelled ? `Active until ${renewalDate}` : `Renews ${renewalDate}`}
+                        </div>
+                    )}
+                </div>
 
-                    {/* Credits bar */}
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <Coins className={`w-4 h-4 ${isLow ? 'text-red-400' : isMed ? 'text-amber-400' : currentPlan.color}`} />
-                            <span className={`text-2xl font-bold ${isLow ? 'text-red-400' : isMed ? 'text-amber-400' : currentPlan.color}`}>
-                                {credits !== null ? displayCredits : '—'}
+                {/* Credits */}
+                <div className="mt-5">
+                    <div className="flex items-baseline justify-between">
+                        <div className="flex items-baseline gap-2">
+                            <Coins className="h-4 w-4 self-center text-zinc-400" />
+                            <span className="text-[28px] font-semibold tabular-nums text-white leading-none">
+                                {credits !== null ? displayCredits.toLocaleString() : '—'}
                             </span>
-                            <span className="text-xs text-zinc-500">credits remaining</span>
+                            <span className="text-[12px] text-zinc-500">credits</span>
                         </div>
-                        {isLow && credits !== null && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/[0.08] border border-red-500/[0.15]">
-                                <Sparkles className="w-3 h-3 text-red-400" />
-                                <span className="text-[10px] font-medium text-red-400">Running low!</span>
-                            </div>
+                        {lowSeverity === 'low' && credits !== null && (
+                            <span className="rounded-full border border-amber-500/25 bg-amber-500/[0.06] px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                                Running low
+                            </span>
                         )}
                     </div>
-                    <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden mb-3">
+                    <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/[0.05]">
                         <div
-                            className={`h-full rounded-full transition-all duration-500 ${isLow ? 'bg-red-400' : isMed ? 'bg-amber-400' : `bg-gradient-to-r ${currentPlan.gradient}`}`}
-                            style={{ width: `${Math.min(100, (displayCredits / planMaxCredits) * 100)}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${
+                                lowSeverity === 'low' ? 'bg-amber-400' : lowSeverity === 'medium' ? 'bg-zinc-300' : 'bg-white'
+                            }`}
+                            style={{ width: `${creditsPct}%` }}
                         />
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-zinc-600">
-                        <span>1 credit = 1 AI message</span>
-                        {plan !== 'free' && <span>Credits reset monthly</span>}
-                    </div>
-
-                    {/* Telegram bot access */}
-                    {telegramBotEnabled && (
-                        <div className="flex items-center gap-2 mt-4 p-2.5 rounded-lg bg-violet-500/[0.06] border border-violet-500/[0.1]">
-                            <Bot className="w-4 h-4 text-violet-400" />
-                            <span className="text-[11px] text-violet-300 font-medium">Telegram bot access included</span>
-                            <CheckCircle2 className="w-3 h-3 text-violet-400 ml-auto" />
-                        </div>
-                    )}
-
-                    {/* Cancel subscription button or cancelled status */}
-                    {plan !== 'free' && (
-                        <div className="mt-4 pt-4 border-t border-white/[0.06]">
-                            {subscriptionCancelled ? (
-                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/[0.06] border border-amber-500/[0.1]">
-                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                                    <span className="text-[11px] text-amber-300">
-                                        Subscription cancelled — active until {renewalDate || 'end of billing period'}
-                                    </span>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setShowCancelModal(true)}
-                                    className="text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/[0.1] hover:bg-red-500/[0.12] hover:border-red-500/[0.2]"
-                                >
-                                    Cancel subscription
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <p className="mt-2 text-[11px] text-zinc-500">
+                        1 credit = 1 AI message · {plan === 'free' ? 'upgrade to refill monthly' : 'resets each billing cycle'}
+                    </p>
                 </div>
-            </div>
 
-            {/* Cancel Success Banner */}
-            {cancelSuccess && (
-                <div className="bg-amber-500/[0.08] border border-amber-500/[0.2] rounded-2xl p-4 flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                    <div className="flex-1">
-                        <p className="text-sm font-semibold text-amber-300">Subscription cancelled</p>
-                        <p className="text-xs text-zinc-400">
-                            Your plan remains active until {renewalDate || 'the end of your billing period'}. You won&apos;t be charged again.
-                        </p>
+                {/* Telegram bot ribbon */}
+                {telegramBotEnabled && (
+                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                        <Bot className="h-3.5 w-3.5 text-zinc-300" />
+                        <span className="text-[12px] text-zinc-300">Telegram bot access included</span>
+                        <CheckCircle2 className="ml-auto h-3 w-3 text-zinc-500" />
                     </div>
-                    <button onClick={() => setCancelSuccess(false)} className="text-zinc-500 hover:text-zinc-300">
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
+                )}
 
-            {/* Subscription Plans */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                {/* Cancel control */}
+                {plan !== 'free' && (
+                    <div className="mt-4 border-t border-white/[0.05] pt-4">
+                        {subscriptionCancelled ? (
+                            <div className="flex items-center gap-2 text-[11.5px] text-amber-300">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                Subscription cancelled — active until {renewalDate || 'end of billing period'}
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowCancelModal(true)}
+                                className="text-[11.5px] font-medium text-zinc-400 transition-colors hover:text-red-300"
+                            >
+                                Cancel subscription
+                            </button>
+                        )}
+                    </div>
+                )}
+            </section>
+
+            {/* Plan grid */}
+            <section className="space-y-3">
+                <div className="flex items-end justify-between">
                     <div>
-                        <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-emerald-400" />
-                            {plan === 'free' ? 'Choose a Plan' : 'Change Plan'}
+                        <h2 className="text-[13px] font-semibold text-white">
+                            {plan === 'free' ? 'Choose a plan' : 'Change plan'}
                         </h2>
-                        <p className="text-[11px] text-zinc-500 mt-0.5">
-                            {plan === 'free' ? 'Upgrade to unlock AI credits and premium features.' : 'Upgrade or switch your subscription.'}
+                        <p className="mt-0.5 text-[11.5px] text-zinc-500">
+                            {plan === 'free' ? 'Upgrade to unlock AI credits.' : 'Switch to a different tier — credits prorate next cycle.'}
                         </p>
                     </div>
-                    <span className="text-[10px] text-zinc-600">Credits reset monthly</span>
+                    <span className="text-[10.5px] text-zinc-600">Cancel anytime</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                     {SUBSCRIPTION_PLANS.map((p) => {
-                        const isCurrentPlan = p.key === plan;
-                        const isUpgrade = SUBSCRIPTION_PLANS.findIndex(x => x.key === plan) < SUBSCRIPTION_PLANS.findIndex(x => x.key === p.key);
+                        const info = PLAN_CONFIG[p.key];
+                        const isCurrent = p.key === plan;
                         const userEmail = session?.user?.email || '';
                         const returnUrl = getSafeRedirectUrl('/dashboard/plan?upgraded=true');
                         const checkoutUrl = userEmail
                             ? `https://checkout.dodopayments.com/buy/${p.productId}?email=${encodeURIComponent(userEmail)}&redirect_url=${encodeURIComponent(returnUrl)}`
                             : '';
-                        const IconComp = p.icon;
-                        const isGrowth = p.key === 'growth';
-                        const isPro = p.key === 'pro';
+                        const isUpgrade =
+                            SUBSCRIPTION_PLANS.findIndex((x) => x.key === plan) <
+                            SUBSCRIPTION_PLANS.findIndex((x) => x.key === p.key);
+                        const Icon = info.icon;
 
                         return (
-                            <div
+                            <article
                                 key={p.key}
-                                className={`relative flex flex-col p-5 rounded-2xl border transition-all duration-300 group overflow-hidden ${
-                                    isCurrentPlan
-                                        ? isPro ? 'bg-gradient-to-b from-violet-500/[0.1] via-purple-500/[0.04] to-transparent border-violet-500/[0.3]'
-                                        : isGrowth ? 'bg-gradient-to-b from-emerald-500/[0.1] via-emerald-500/[0.04] to-transparent border-emerald-500/[0.3]'
-                                        : 'bg-gradient-to-b from-cyan-500/[0.1] via-cyan-500/[0.04] to-transparent border-cyan-500/[0.3]'
-                                    : isPro ? 'bg-gradient-to-b from-violet-500/[0.06] via-purple-500/[0.02] to-transparent border-violet-500/[0.15] hover:border-violet-500/[0.3]'
-                                    : isGrowth ? 'bg-gradient-to-b from-emerald-500/[0.06] via-emerald-500/[0.02] to-transparent border-2 border-emerald-500/[0.25] hover:border-emerald-500/[0.4]'
-                                    : 'bg-white/[0.02] border-white/[0.06] hover:border-cyan-500/[0.2]'
+                                className={`relative flex flex-col rounded-2xl border p-5 transition-colors ${
+                                    isCurrent
+                                        ? 'border-cyan-400/30 bg-cyan-500/[0.04]'
+                                        : 'border-white/[0.06] bg-[#0a0d12] hover:border-white/[0.12]'
                                 }`}
                             >
-                                {/* Glow effect for Pro */}
-                                {isPro && <div className="absolute top-0 right-0 w-28 h-28 bg-violet-500/[0.06] rounded-full blur-3xl pointer-events-none" />}
-
-                                {/* Badges */}
-                                {isCurrentPlan && (
-                                    <span className={`absolute -top-0 left-0 right-0 text-center text-[9px] py-1 font-bold uppercase tracking-wider ${
-                                        isPro ? 'bg-gradient-to-r from-violet-400 to-purple-500' : isGrowth ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black' : 'bg-gradient-to-r from-cyan-400 to-blue-500'
-                                    } text-white`}>
-                                        Current Plan
+                                {p.recommended && !isCurrent && (
+                                    <span className="absolute -top-2.5 left-4 rounded-full border border-cyan-400/30 bg-cyan-500/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-cyan-200">
+                                        Recommended
                                     </span>
                                 )}
-                                {isGrowth && !isCurrentPlan && (
-                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[9px] font-bold text-black uppercase tracking-wider shadow-lg shadow-emerald-500/20">
-                                        Most Popular
-                                    </span>
-                                )}
-                                {isPro && !isCurrentPlan && (
-                                    <span className="absolute -top-3 right-3 px-3 py-0.5 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[9px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20">
-                                        Best Value
+                                {isCurrent && (
+                                    <span className="absolute -top-2.5 left-4 rounded-full border border-cyan-400/30 bg-cyan-500/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-cyan-200">
+                                        Current
                                     </span>
                                 )}
 
-                                <div className="relative pt-2">
-                                    {/* Icon */}
-                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${
-                                        isPro ? 'bg-gradient-to-br from-violet-400/20 to-purple-500/20' : isGrowth ? 'bg-gradient-to-br from-emerald-400/20 to-cyan-400/20' : 'bg-gradient-to-br from-cyan-400/20 to-blue-500/20'
-                                    }`}>
-                                        <IconComp className={`w-4.5 h-4.5 ${isPro ? 'text-violet-400' : isGrowth ? 'text-emerald-400' : 'text-cyan-400'}`} />
-                                    </div>
+                                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02]">
+                                    <Icon className="h-4 w-4 text-zinc-300" />
+                                </div>
+                                <h3 className="text-[15px] font-semibold text-white">{info.label}</h3>
+                                <p className="mt-0.5 text-[11px] text-zinc-500">{info.blurb}</p>
 
-                                    {/* Name & description */}
-                                    <h3 className="text-base font-bold text-white mb-0.5">{p.name}</h3>
-                                    <p className="text-[10px] text-zinc-500 mb-4">
-                                        {isPro ? 'Everything unlocked + Telegram bot' : isGrowth ? 'For growing businesses' : 'Perfect for side projects'}
-                                    </p>
+                                <div className="mt-4 flex items-baseline gap-1">
+                                    <span className="text-[28px] font-semibold tabular-nums text-white leading-none">
+                                        {info.price}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-500">/ mo</span>
+                                </div>
+                                <div className="mt-1 text-[11px] text-zinc-400 tabular-nums">
+                                    {info.credits} AI credits / month
+                                </div>
 
-                                    {/* Price */}
-                                    <div className="flex items-baseline gap-1 mb-1">
-                                        <span className={`text-3xl font-bold ${
-                                            isPro ? 'bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent'
-                                            : isGrowth ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent'
-                                            : 'text-white'
-                                        }`}>{p.price}</span>
-                                        <span className="text-xs text-zinc-500">/mo</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mb-5">
-                                        <span className={`text-xs font-medium ${isPro ? 'text-violet-400' : isGrowth ? 'text-emerald-400' : 'text-cyan-400'}`}>
-                                            {p.credits} AI credits/month
-                                        </span>
-                                        {isGrowth && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15] font-semibold">3x Starter</span>}
-                                        {isPro && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-violet-500/[0.1] text-violet-400 border border-violet-500/[0.15] font-semibold">6x Starter</span>}
-                                    </div>
-
-                                    {/* CTA Button */}
-                                    {isCurrentPlan ? (
-                                        <div className={`text-center text-xs font-semibold px-4 py-2.5 rounded-xl mb-5 ${
-                                            isPro ? 'bg-violet-500/[0.08] text-violet-400 border border-violet-500/[0.2]' : isGrowth ? 'bg-emerald-500/[0.08] text-emerald-400 border border-emerald-500/[0.2]' : 'bg-cyan-500/[0.08] text-cyan-400 border border-cyan-500/[0.2]'
-                                        }`}>
+                                <div className="mt-4">
+                                    {isCurrent ? (
+                                        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-2 text-center text-[11px] text-zinc-400">
                                             Active
                                         </div>
                                     ) : !checkoutUrl ? (
-                                        <div className="text-center text-[10px] text-zinc-500 px-4 py-2.5 rounded-xl mb-5 bg-white/[0.03] border border-white/[0.06]">
-                                            Email required to subscribe
+                                        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-2 text-center text-[11px] text-zinc-500">
+                                            Email required
                                         </div>
-                                    ) : isGrowth ? (
-                                        <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
-                                            className="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all duration-200 mb-5 block text-center">
-                                            {isUpgrade || plan === 'free' ? 'Get Growth' : 'Switch to Growth'}
-                                        </a>
-                                    ) : isPro ? (
-                                        <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
-                                            className="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all duration-200 mb-5 block text-center">
-                                            {isUpgrade || plan === 'free' ? 'Get Pro' : 'Switch to Pro'}
-                                        </a>
                                     ) : (
-                                        <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
-                                            className="w-full py-2.5 rounded-xl text-xs font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-5 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2]">
-                                            {isUpgrade || plan === 'free' ? 'Get Starter' : 'Switch to Starter'}
+                                        <a
+                                            href={checkoutUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition-colors ${
+                                                p.recommended
+                                                    ? 'bg-white text-black hover:bg-zinc-200'
+                                                    : 'border border-white/[0.08] bg-white/[0.04] text-zinc-100 hover:bg-white/[0.08] hover:border-white/[0.16]'
+                                            }`}
+                                        >
+                                            {isUpgrade || plan === 'free' ? `Get ${info.label}` : `Switch to ${info.label}`}
+                                            <ArrowRight className="h-3 w-3" />
                                         </a>
                                     )}
-
-                                    {/* Features */}
-                                    <ul className="space-y-2.5 flex-1">
-                                        {p.features.map((f, i) => (
-                                            <li key={i} className={`flex items-center gap-2 text-[11px] ${
-                                                f.includes('Telegram') ? (isPro ? 'text-violet-300 font-medium' : 'text-zinc-400') : isCurrentPlan ? 'text-zinc-300' : 'text-zinc-400'
-                                            }`}>
-                                                {f.includes('Telegram') ? (
-                                                    <Bot className={`w-3.5 h-3.5 flex-shrink-0 ${isPro ? 'text-violet-400' : 'text-zinc-600'}`} />
-                                                ) : (
-                                                    <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${
-                                                        isPro ? 'text-violet-400' : isGrowth ? 'text-emerald-400' : isCurrentPlan ? 'text-cyan-400' : 'text-zinc-600'
-                                                    }`} />
-                                                )}
-                                                {f}
-                                            </li>
-                                        ))}
-                                    </ul>
                                 </div>
-                            </div>
+
+                                <ul className="mt-4 space-y-2">
+                                    {p.features.map((f, i) => {
+                                        const isTelegram = f.toLowerCase().includes('telegram');
+                                        return (
+                                            <li key={i} className="flex items-start gap-2 text-[11.5px] text-zinc-300">
+                                                {isTelegram ? (
+                                                    <Bot className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-zinc-300" />
+                                                ) : (
+                                                    <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-zinc-500" />
+                                                )}
+                                                <span>{f}</span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </article>
                         );
                     })}
                 </div>
-                <p className="text-[10px] text-zinc-600 text-center">
-                    Secure payments by Dodo Payments • Cancel anytime
+                <p className="text-center text-[10.5px] text-zinc-600">
+                    Secure payments by Dodo Payments
                 </p>
-            </div>
+            </section>
 
-            {/* Credit Usage History */}
+            {/* Credit usage history */}
             <CreditUsageHistory />
 
-            {/* Cancel Subscription Modal */}
+            {/* Cancel modal */}
             {showCancelModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-[#0a0a0f] border border-white/[0.08] rounded-2xl p-6 max-w-md w-full space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-red-500/[0.1] flex items-center justify-center">
-                                <AlertTriangle className="w-5 h-5 text-red-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-white">Cancel subscription?</h3>
-                                <p className="text-[11px] text-zinc-500">This action will stop future renewals</p>
-                            </div>
-                        </div>
+                <CancelSubscriptionModal
+                    planLabel={currentPlan.label}
+                    renewalDate={renewalDate}
+                    cancelling={cancelling}
+                    cancelError={cancelError}
+                    onClose={() => { setShowCancelModal(false); setCancelError(null); }}
+                    onConfirm={handleCancelSubscription}
+                />
+            )}
+        </div>
+    );
+}
 
-                        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 space-y-2">
-                            <p className="text-xs text-zinc-300">
-                                Your <span className={`font-semibold ${currentPlan.color}`}>{currentPlan.label}</span> plan will remain active until <span className="text-white font-medium">{renewalDate || 'the end of your billing period'}</span>.
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                                After that, you&apos;ll be downgraded to the Free plan. Your remaining credits will still be usable until then.
-                            </p>
-                        </div>
+/* ───────────────────────────────────────────────────────────────────
+ * Subcomponents
+ * ──────────────────────────────────────────────────────────────────── */
 
-                        {cancelError && (
-                            <div className="bg-red-500/[0.08] border border-red-500/[0.15] rounded-lg p-3">
-                                <p className="text-xs text-red-400">{cancelError}</p>
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-3 pt-1">
-                            <button
-                                onClick={() => { setShowCancelModal(false); setCancelError(null); }}
-                                disabled={cancelling}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-all border border-white/[0.06]"
-                            >
-                                Keep my plan
-                            </button>
-                            <button
-                                onClick={handleCancelSubscription}
-                                disabled={cancelling}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-red-500/[0.1] text-red-400 hover:bg-red-500/[0.2] transition-all border border-red-500/[0.2] flex items-center justify-center gap-2"
-                            >
-                                {cancelling ? (
-                                    <>
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        Cancelling...
-                                    </>
-                                ) : (
-                                    'Cancel subscription'
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+function Banner({ tone, title, body, onClose }: { tone: 'success' | 'warning'; title: string; body: string; onClose?: () => void }) {
+    const cls = tone === 'success'
+        ? 'border-emerald-500/20 bg-emerald-500/[0.05]'
+        : 'border-amber-500/20 bg-amber-500/[0.05]';
+    const icon = tone === 'success'
+        ? <CheckCircle2 className="h-4 w-4 text-emerald-300 flex-shrink-0" />
+        : <AlertTriangle className="h-4 w-4 text-amber-300 flex-shrink-0" />;
+    return (
+        <div className={`flex items-start gap-3 rounded-xl border ${cls} px-4 py-3`}>
+            {icon}
+            <div className="flex-1 min-w-0">
+                <p className="text-[12.5px] font-semibold text-zinc-100">{title}</p>
+                <p className="mt-0.5 text-[11.5px] text-zinc-400">{body}</p>
+            </div>
+            {onClose && (
+                <button onClick={onClose} className="flex-shrink-0 text-zinc-500 hover:text-zinc-300" aria-label="Dismiss">
+                    <X className="h-3.5 w-3.5" />
+                </button>
             )}
         </div>
     );
@@ -457,33 +393,97 @@ function CreditUsageHistory() {
         try {
             const saved = localStorage.getItem('tc-credit-usage');
             if (saved) return JSON.parse(saved);
-        } catch { /* empty */ }
+        } catch { /* ignore */ }
         return [];
     });
 
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <History className="w-3.5 h-3.5" />
-                Credit Usage History
+        <section className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                <History className="h-3 w-3" />
+                Recent activity
             </h2>
             {history.length === 0 ? (
-                <p className="text-xs text-zinc-600 text-center py-4">No credit usage recorded yet. Credits are tracked as you use AI features.</p>
+                <p className="py-4 text-center text-[12px] text-zinc-600">
+                    No activity yet — credits are tracked as you use AI features.
+                </p>
             ) : (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                <ul className="max-h-[220px] space-y-0 overflow-y-auto divide-y divide-white/[0.04]">
                     {history.slice(-20).reverse().map((entry, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
-                            <div className="flex items-center gap-2">
-                                <span className="text-zinc-500">{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                                <span className="text-zinc-300">{entry.action}</span>
+                        <li key={i} className="flex items-center justify-between gap-3 py-2 text-[12px]">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span className="text-zinc-500 tabular-nums w-12 flex-shrink-0">
+                                    {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                                <span className="text-zinc-300 truncate">{entry.action}</span>
                             </div>
-                            <span className={`font-medium ${entry.amount < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                            <span className={`font-medium tabular-nums flex-shrink-0 ${entry.amount < 0 ? 'text-zinc-300' : 'text-emerald-300'}`}>
                                 {entry.amount > 0 ? '+' : ''}{entry.amount}
                             </span>
-                        </div>
+                        </li>
                     ))}
-                </div>
+                </ul>
             )}
+        </section>
+    );
+}
+
+function CancelSubscriptionModal({
+    planLabel, renewalDate, cancelling, cancelError, onClose, onConfirm,
+}: {
+    planLabel: string;
+    renewalDate: string | null;
+    cancelling: boolean;
+    cancelError: string | null;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-[#0a0d12] p-5 shadow-2xl shadow-black/60">
+                <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/[0.08]">
+                        <AlertTriangle className="h-4 w-4 text-amber-300" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-[14px] font-semibold text-white">Cancel subscription?</h3>
+                        <p className="mt-0.5 text-[11.5px] text-zinc-500">Stops future renewals — your plan stays active until the end of the cycle.</p>
+                    </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.015] p-3 text-[12px] text-zinc-300">
+                    Your <span className="font-semibold text-white">{planLabel}</span> plan stays active until{' '}
+                    <span className="font-medium text-white">{renewalDate || 'the end of your billing period'}</span>.
+                    After that you'll be downgraded to Free. Remaining credits stay usable until then.
+                </div>
+
+                {cancelError && (
+                    <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/[0.06] px-3 py-2 text-[11.5px] text-red-300">
+                        {cancelError}
+                    </div>
+                )}
+
+                <div className="mt-4 flex items-center gap-2">
+                    <button
+                        onClick={onClose}
+                        disabled={cancelling}
+                        className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.03] py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.06]"
+                    >
+                        Keep my plan
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={cancelling}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/25 bg-red-500/[0.08] py-2 text-[12px] font-medium text-red-300 transition-colors hover:bg-red-500/[0.15]"
+                    >
+                        {cancelling ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" />Cancelling…</>
+                        ) : (
+                            'Cancel subscription'
+                        )}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
