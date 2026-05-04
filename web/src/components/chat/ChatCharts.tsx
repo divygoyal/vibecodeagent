@@ -4,43 +4,94 @@ import { memo, useMemo } from 'react';
 import {
     AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
     ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip,
+    LabelList,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Eye, MousePointerClick, MapPin, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Eye, MousePointerClick, MapPin, AlertTriangle, BarChart3 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   SHARED CONFIG
+   SHARED PALETTE — brand-cyan primary, semantic ramp by rank.
+   The previous all-orange approach made every chart look identical;
+   this maps top→cyan, mid→amber, tail→zinc so a glance reads rank.
    ═══════════════════════════════════════════════════════════════ */
 
-const COLORS = {
-    clicks: '#f97316',      // orange-500
-    impressions: '#64748b', // slate-500
-    ctr: '#10b981',         // emerald-500
-    position: '#f59e0b',    // amber-500
-    device: { mobile: '#f97316', desktop: '#334155', tablet: '#10b981' },
-    pie: ['#f97316', '#334155', '#64748b', '#cbd5e1', '#f59e0b', '#10b981', '#ef4444'],
-    posBuckets: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'], // top3, 4-10, 11-20, 20+
+const PALETTE = {
+    primary: '#22d3ee',      // brand cyan
+    primaryDeep: '#0e7490',
+    success: '#10b981',      // emerald (good CTR / top positions)
+    warning: '#f59e0b',      // amber (mid)
+    danger: '#ef4444',       // red (bad CTR / page 3+)
+    neutral: '#52525b',      // zinc-600 (impressions / passives)
+    impressions: '#6366f1',  // indigo (distinct from clicks)
+    deviceMobile: '#22d3ee',
+    deviceDesktop: '#a855f7', // purple
+    deviceTablet: '#f59e0b',
+    posBuckets: ['#10b981', '#22d3ee', '#f59e0b', '#ef4444'], // top3 / 4-10 / 11-20 / 20+
 };
 
-const CARD = 'rounded-xl border border-white/[0.04] bg-white/[0.02] overflow-hidden';
+/** Rank-based color: top performer cyan → amber middle → zinc tail. */
+function rankColor(idx: number, total: number): string {
+    if (total <= 1) return PALETTE.primary;
+    const pct = idx / Math.max(1, total - 1);
+    if (pct <= 0.34) return PALETTE.primary;
+    if (pct <= 0.67) return PALETTE.warning;
+    return PALETTE.neutral;
+}
+
+/** Card with brand-cyan accent stripe on the left edge. */
+const CARD = 'relative rounded-xl border border-white/[0.06] bg-gradient-to-b from-white/[0.025] to-white/[0.01] overflow-hidden';
+const ACCENT_BAR = 'absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-gradient-to-b from-[#22d3ee] via-[#0e7490] to-transparent';
 
 function ChartTooltip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#050508] border border-white/[0.1] rounded-xl px-3 py-2 shadow-2xl text-[11px]">
-            {label && <p className="text-zinc-500 mb-1 font-medium">{label}</p>}
+        <div className="bg-[#050508]/95 backdrop-blur border border-white/[0.12] rounded-xl px-3 py-2 shadow-2xl shadow-black/50 text-[11px]">
+            {label && <p className="text-zinc-400 mb-1.5 font-semibold">{label}</p>}
             {payload.map((e: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: e.color }} />
-                    <span className="text-zinc-400">{e.name}:</span>
-                    <span className="text-white font-semibold tabular-nums">{typeof e.value === 'number' ? e.value.toLocaleString() : e.value}</span>
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: e.color || e.fill }} />
+                    <span className="text-zinc-500">{e.name}:</span>
+                    <span className="text-white font-semibold tabular-nums">
+                        {typeof e.value === 'number' ? e.value.toLocaleString() : e.value}
+                    </span>
                 </div>
             ))}
         </div>
     );
 }
 
+/** Data-label rendered AT THE END of horizontal bars so values are visible without hover. */
+function BarValueLabel({ x, y, width, height, value }: any) {
+    if (typeof value !== 'number' || value === 0) return null;
+    const display = value >= 10000 ? `${(value / 1000).toFixed(1)}k` : value.toLocaleString();
+    return (
+        <text
+            x={x + width + 6}
+            y={y + height / 2}
+            fill="#e4e4e7"
+            fontSize={10}
+            fontWeight={600}
+            dominantBaseline="middle"
+            className="tabular-nums"
+        >
+            {display}
+        </text>
+    );
+}
+
+function ChartHeader({ icon: Icon, iconColor = 'text-cyan-400', title, sub }: { icon?: any; iconColor?: string; title: string; sub?: string }) {
+    return (
+        <div className="flex items-center justify-between mb-2.5 ml-2">
+            <div className="flex items-center gap-1.5">
+                {Icon && <Icon className={`w-3.5 h-3.5 ${iconColor}`} />}
+                <span className="text-[11px] text-zinc-300 font-semibold uppercase tracking-wider">{title}</span>
+            </div>
+            {sub && <span className="text-[10px] text-zinc-500 tabular-nums">{sub}</span>}
+        </div>
+    );
+}
+
 /* ═══════════════════════════════════════════════════════════════
-   1. TREND LINE CHART (AreaChart — date dimension)
+   1. TREND LINE CHART (date dimension)
    ═══════════════════════════════════════════════════════════════ */
 
 interface TrendRow { date: string; clicks: number; impressions: number; ctr?: number; position?: number }
@@ -49,38 +100,47 @@ export const TrendLineChart = memo(function TrendLineChart({ rows }: { rows: Tre
     const data = useMemo(() => {
         if (!rows?.length) return [];
         return rows.map(r => ({
-            date: r.date?.replace(/^\d{4}-/, '') || '', // strip year for compact labels
+            date: r.date?.replace(/^\d{4}-/, '') || '',
             Clicks: r.clicks,
             Impressions: r.impressions,
         }));
     }, [rows]);
 
+    const totals = useMemo(() => ({
+        clicks: data.reduce((s, d) => s + d.Clicks, 0),
+        impressions: data.reduce((s, d) => s + d.Impressions, 0),
+    }), [data]);
+
     if (data.length < 2) return null;
 
     return (
-        <div className={`${CARD} my-3 p-4`}>
-            <p className="text-[11px] text-zinc-400 font-semibold mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Traffic Trend
-            </p>
+        <div className={`${CARD} my-3 p-4 pl-5`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader
+                icon={TrendingUp}
+                iconColor="text-emerald-400"
+                title="Traffic Trend"
+                sub={`${totals.clicks.toLocaleString()} clicks · ${totals.impressions.toLocaleString()} impr`}
+            />
             <div className="h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                    <AreaChart data={data} margin={{ top: 5, right: 8, left: -18, bottom: 5 }}>
                         <defs>
                             <linearGradient id="chatGradClicks" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLORS.clicks} stopOpacity={0.25} />
-                                <stop offset="95%" stopColor={COLORS.clicks} stopOpacity={0} />
+                                <stop offset="5%" stopColor={PALETTE.primary} stopOpacity={0.45} />
+                                <stop offset="95%" stopColor={PALETTE.primary} stopOpacity={0} />
                             </linearGradient>
                             <linearGradient id="chatGradImpr" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLORS.impressions} stopOpacity={0.15} />
-                                <stop offset="95%" stopColor={COLORS.impressions} stopOpacity={0} />
+                                <stop offset="5%" stopColor={PALETTE.impressions} stopOpacity={0.18} />
+                                <stop offset="95%" stopColor={PALETTE.impressions} stopOpacity={0} />
                             </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                         <XAxis dataKey="date" tick={{ fill: '#71717a', fontSize: 10 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fill: '#71717a', fontSize: 10 }} axisLine={false} tickLine={false} />
                         <Tooltip content={<ChartTooltip />} />
-                        <Area type="monotone" dataKey="Clicks" stroke={COLORS.clicks} strokeWidth={2} fill="url(#chatGradClicks)" dot={false} />
-                        <Area type="monotone" dataKey="Impressions" stroke={COLORS.impressions} strokeWidth={1.5} fill="url(#chatGradImpr)" dot={false} />
+                        <Area type="monotone" dataKey="Impressions" stroke={PALETTE.impressions} strokeWidth={1.5} fill="url(#chatGradImpr)" dot={false} />
+                        <Area type="monotone" dataKey="Clicks" stroke={PALETTE.primary} strokeWidth={2.25} fill="url(#chatGradClicks)" dot={false} activeDot={{ r: 4, fill: PALETTE.primary, stroke: '#050508', strokeWidth: 2 }} />
                     </AreaChart>
                 </ResponsiveContainer>
             </div>
@@ -89,7 +149,7 @@ export const TrendLineChart = memo(function TrendLineChart({ rows }: { rows: Tre
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   2. HORIZONTAL BAR CHART (query / page dimension)
+   2. HORIZONTAL BAR CHART (query / page) — rank-colored + value labels
    ═══════════════════════════════════════════════════════════════ */
 
 export const HorizontalBarChart = memo(function HorizontalBarChart({ rows, dimKey, title }: {
@@ -102,28 +162,61 @@ export const HorizontalBarChart = memo(function HorizontalBarChart({ rows, dimKe
         return rows.slice(0, 8).map(r => {
             const label = String(r[dimKey] || r.query || r.page || '');
             return {
-                name: label.length > 28 ? label.slice(0, 28) + '\u2026' : label,
+                name: label.length > 32 ? label.slice(0, 32) + '…' : label,
+                fullName: label,
                 Clicks: r.clicks || 0,
                 Impressions: r.impressions || 0,
             };
-        }).reverse(); // highest at top
+        }).sort((a, b) => b.Clicks - a.Clicks); // ensure descending; reverse() at render time
     }, [rows, dimKey]);
 
     if (data.length === 0) return null;
 
+    const total = data.reduce((s, d) => s + d.Clicks, 0);
+    const renderData = [...data].reverse(); // top performer at top of chart
+
     return (
-        <div className={`${CARD} my-3 p-4`}>
-            <p className="text-[11px] text-zinc-400 font-semibold mb-2 uppercase tracking-wider">
-                {title || `Top by ${dimKey}`}
-            </p>
-            <div style={{ height: Math.max(120, data.length * 32 + 20) }}>
+        <div className={`${CARD} my-3 p-4 pl-5`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader
+                icon={BarChart3}
+                title={title || `Top by ${dimKey}`}
+                sub={`${data.length} ${dimKey === 'query' ? 'keywords' : 'pages'} · ${total.toLocaleString()} clicks`}
+            />
+            <div style={{ height: Math.max(140, renderData.length * 34 + 24) }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+                    <BarChart data={renderData} layout="vertical" margin={{ top: 0, right: 56, left: 0, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id="barGradPrimary" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor={PALETTE.primary} stopOpacity={0.85} />
+                                <stop offset="100%" stopColor={PALETTE.primaryDeep} stopOpacity={0.65} />
+                            </linearGradient>
+                            <linearGradient id="barGradMid" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor={PALETTE.warning} stopOpacity={0.85} />
+                                <stop offset="100%" stopColor="#b45309" stopOpacity={0.6} />
+                            </linearGradient>
+                            <linearGradient id="barGradLow" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor={PALETTE.neutral} stopOpacity={0.65} />
+                                <stop offset="100%" stopColor="#3f3f46" stopOpacity={0.4} />
+                            </linearGradient>
+                        </defs>
                         <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.04)" />
                         <XAxis type="number" tick={{ fill: '#71717a', fontSize: 10 }} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 10 }} axisLine={false} tickLine={false} width={140} />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Bar dataKey="Clicks" fill={COLORS.clicks} radius={[0, 4, 4, 0]} barSize={14} />
+                        <YAxis type="category" dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 10 }} axisLine={false} tickLine={false} width={150} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(34,211,238,0.06)' }} />
+                        <Bar dataKey="Clicks" radius={[0, 6, 6, 0]} barSize={16}>
+                            <LabelList dataKey="Clicks" content={BarValueLabel} />
+                            {renderData.map((_, i) => {
+                                // renderData is reversed, so visual-top index = renderData.length-1-i in original rank
+                                const rank = renderData.length - 1 - i;
+                                const fill = rank / Math.max(1, data.length - 1) <= 0.34
+                                    ? 'url(#barGradPrimary)'
+                                    : rank / Math.max(1, data.length - 1) <= 0.67
+                                        ? 'url(#barGradMid)'
+                                        : 'url(#barGradLow)';
+                                return <Cell key={i} fill={fill} />;
+                            })}
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -132,16 +225,16 @@ export const HorizontalBarChart = memo(function HorizontalBarChart({ rows, dimKe
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   3. DEVICE DONUT CHART (device dimension)
+   3. DEVICE DONUT
    ═══════════════════════════════════════════════════════════════ */
 
 export const DeviceDonutChart = memo(function DeviceDonutChart({ rows }: { rows: any[] }) {
     const data = useMemo(() => {
         if (!rows?.length) return [];
-        // Handle both {device, clicks} and {device, percentage} shapes
         const total = rows.reduce((s, r) => s + (r.clicks || r.value || 0), 0);
         return rows.map(r => {
-            const name = (r.device || r.name || 'Unknown').charAt(0).toUpperCase() + (r.device || r.name || 'Unknown').slice(1);
+            const raw = (r.device || r.name || 'Unknown') as string;
+            const name = raw.charAt(0).toUpperCase() + raw.slice(1);
             const value = r.clicks || r.value || 0;
             return { name, value, pct: total > 0 ? ((value / total) * 100).toFixed(1) : (r.percentage || 0) };
         });
@@ -149,26 +242,39 @@ export const DeviceDonutChart = memo(function DeviceDonutChart({ rows }: { rows:
 
     if (data.length === 0) return null;
 
-    const deviceColors: Record<string, string> = { Mobile: COLORS.device.mobile, Desktop: COLORS.device.desktop, Tablet: COLORS.device.tablet };
+    const deviceColors: Record<string, string> = {
+        Mobile: PALETTE.deviceMobile,
+        Desktop: PALETTE.deviceDesktop,
+        Tablet: PALETTE.deviceTablet,
+    };
 
     return (
-        <div className={`${CARD} my-3 p-4`}>
-            <p className="text-[11px] text-zinc-400 font-semibold mb-2 uppercase tracking-wider">Device Split</p>
-            <div className="flex items-center gap-4">
+        <div className={`${CARD} my-3 p-4 pl-5`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader title="Device Split" sub={`${data.length} categories`} />
+            <div className="flex items-center gap-5">
                 <div className="h-[140px] w-[140px] flex-shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                            <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value" stroke="none">
-                                {data.map((d, i) => <Cell key={i} fill={deviceColors[d.name] || COLORS.pie[i]} />)}
+                            <defs>
+                                {data.map((d, i) => (
+                                    <radialGradient key={i} id={`devGrad${i}`} cx="50%" cy="50%" r="50%">
+                                        <stop offset="60%" stopColor={deviceColors[d.name] || PALETTE.primary} stopOpacity={0.95} />
+                                        <stop offset="100%" stopColor={deviceColors[d.name] || PALETTE.primary} stopOpacity={0.55} />
+                                    </radialGradient>
+                                ))}
+                            </defs>
+                            <Pie data={data} cx="50%" cy="50%" innerRadius={42} outerRadius={66} paddingAngle={3} dataKey="value" stroke="#050508" strokeWidth={1.5}>
+                                {data.map((_, i) => <Cell key={i} fill={`url(#devGrad${i})`} />)}
                             </Pie>
                             <Tooltip content={<ChartTooltip />} />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1">
                     {data.map((d, i) => (
                         <div key={i} className="flex items-center gap-2 text-[11px]">
-                            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: deviceColors[d.name] || COLORS.pie[i] }} />
+                            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: deviceColors[d.name] || PALETTE.primary }} />
                             <span className="text-zinc-400">{d.name}</span>
                             <span className="text-white font-semibold ml-auto tabular-nums">{d.pct}%</span>
                         </div>
@@ -180,7 +286,7 @@ export const DeviceDonutChart = memo(function DeviceDonutChart({ rows }: { rows:
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   4. COUNTRY BAR CHART (country dimension)
+   4. COUNTRY BAR CHART
    ═══════════════════════════════════════════════════════════════ */
 
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -199,23 +305,38 @@ export const CountryBarChart = memo(function CountryBarChart({ rows }: { rows: a
                 name: `${COUNTRY_FLAGS[code] || '\u{1F30D}'} ${r.country || r.name || 'Unknown'}`,
                 Clicks: r.clicks || r.value || 0,
             };
-        }).reverse();
+        }).sort((a, b) => b.Clicks - a.Clicks);
     }, [rows]);
 
     if (data.length === 0) return null;
 
+    const total = data.reduce((s, d) => s + d.Clicks, 0);
+    const renderData = [...data].reverse();
+
     return (
-        <div className={`${CARD} my-3 p-4`}>
-            <p className="text-[11px] text-zinc-400 font-semibold mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-cyan-400" /> Top Countries
-            </p>
-            <div style={{ height: Math.max(100, data.length * 30 + 20) }}>
+        <div className={`${CARD} my-3 p-4 pl-5`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader
+                icon={MapPin}
+                iconColor="text-cyan-400"
+                title="Top Countries"
+                sub={`${data.length} regions · ${total.toLocaleString()} clicks`}
+            />
+            <div style={{ height: Math.max(110, renderData.length * 32 + 24) }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+                    <BarChart data={renderData} layout="vertical" margin={{ top: 0, right: 56, left: 0, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id="countryGrad" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor={PALETTE.primary} stopOpacity={0.85} />
+                                <stop offset="100%" stopColor={PALETTE.primaryDeep} stopOpacity={0.55} />
+                            </linearGradient>
+                        </defs>
                         <XAxis type="number" tick={{ fill: '#71717a', fontSize: 10 }} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 10 }} axisLine={false} tickLine={false} width={120} />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Bar dataKey="Clicks" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={14} />
+                        <YAxis type="category" dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 10 }} axisLine={false} tickLine={false} width={130} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(34,211,238,0.06)' }} />
+                        <Bar dataKey="Clicks" fill="url(#countryGrad)" radius={[0, 6, 6, 0]} barSize={14}>
+                            <LabelList dataKey="Clicks" content={BarValueLabel} />
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -224,18 +345,19 @@ export const CountryBarChart = memo(function CountryBarChart({ rows }: { rows: a
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   5. POSITION DISTRIBUTION CHART (donut — 4 buckets)
+   5. POSITION DISTRIBUTION — show all 4 buckets so the donut
+   has visual context even when one bucket dominates.
    ═══════════════════════════════════════════════════════════════ */
 
 export const PositionDistributionChart = memo(function PositionDistributionChart({ rows }: { rows: any[] }) {
     const data = useMemo(() => {
-        if (!rows?.length) return [];
         const buckets = [
-            { name: 'Top 3', count: 0, range: [0, 3] },
-            { name: 'Pos 4-10', count: 0, range: [4, 10] },
-            { name: 'Pos 11-20', count: 0, range: [11, 20] },
-            { name: 'Pos 20+', count: 0, range: [20, Infinity] },
+            { name: 'Top 3', count: 0 },
+            { name: 'Pos 4-10', count: 0 },
+            { name: 'Pos 11-20', count: 0 },
+            { name: 'Pos 20+', count: 0 },
         ];
+        if (!rows?.length) return buckets;
         for (const r of rows) {
             const pos = r.position || 50;
             if (pos <= 3) buckets[0].count++;
@@ -243,33 +365,46 @@ export const PositionDistributionChart = memo(function PositionDistributionChart
             else if (pos <= 20) buckets[2].count++;
             else buckets[3].count++;
         }
-        return buckets.filter(b => b.count > 0).map(b => ({ name: b.name, value: b.count }));
+        return buckets;
     }, [rows]);
 
-    if (data.length === 0) return null;
-    const total = data.reduce((s, d) => s + d.value, 0);
+    const total = data.reduce((s, d) => s + d.count, 0);
+    if (total === 0) return null;
+
+    // Recharts pie wants non-zero values; substitute a tiny epsilon for empty buckets
+    // but keep their displayed value as 0. This makes the donut show all 4 segments
+    // proportionally even when one bucket holds 100% of keywords (the big-blob bug).
+    const pieData = data.map(d => ({ ...d, value: d.count > 0 ? d.count : 0.0001, displayCount: d.count }));
 
     return (
-        <div className={`${CARD} my-3 p-4`}>
-            <p className="text-[11px] text-zinc-400 font-semibold mb-2 uppercase tracking-wider">Position Distribution</p>
-            <div className="flex items-center gap-4">
+        <div className={`${CARD} my-3 p-4 pl-5`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader title="Position Distribution" sub={`${total} keywords`} />
+            <div className="flex items-center gap-5">
                 <div className="h-[140px] w-[140px] flex-shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                            <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value" stroke="none">
-                                {data.map((_, i) => <Cell key={i} fill={COLORS.posBuckets[i]} />)}
+                            <defs>
+                                {data.map((_, i) => (
+                                    <radialGradient key={i} id={`posGrad${i}`} cx="50%" cy="50%" r="50%">
+                                        <stop offset="60%" stopColor={PALETTE.posBuckets[i]} stopOpacity={0.95} />
+                                        <stop offset="100%" stopColor={PALETTE.posBuckets[i]} stopOpacity={0.55} />
+                                    </radialGradient>
+                                ))}
+                            </defs>
+                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={42} outerRadius={66} paddingAngle={2} dataKey="value" stroke="#050508" strokeWidth={1.5}>
+                                {data.map((_, i) => <Cell key={i} fill={`url(#posGrad${i})`} opacity={data[i].count > 0 ? 1 : 0.25} />)}
                             </Pie>
-                            <Tooltip content={<ChartTooltip />} />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 flex-1">
                     {data.map((d, i) => (
-                        <div key={i} className="flex items-center gap-2 text-[11px]">
-                            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: COLORS.posBuckets[i] }} />
+                        <div key={i} className={`flex items-center gap-2 text-[11px] ${d.count === 0 ? 'opacity-40' : ''}`}>
+                            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: PALETTE.posBuckets[i] }} />
                             <span className="text-zinc-400">{d.name}</span>
                             <span className="text-white font-semibold ml-auto tabular-nums">
-                                {d.value} ({total > 0 ? ((d.value / total) * 100).toFixed(0) : 0}%)
+                                {d.count} <span className="text-zinc-500">({total > 0 ? ((d.count / total) * 100).toFixed(0) : 0}%)</span>
                             </span>
                         </div>
                     ))}
@@ -280,7 +415,7 @@ export const PositionDistributionChart = memo(function PositionDistributionChart
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   6. CTR OPPORTUNITY LIST (styled list — no chart)
+   6. CTR OPPORTUNITY LIST
    ═══════════════════════════════════════════════════════════════ */
 
 const CTR_BENCHMARKS: Record<number, number> = {
@@ -314,44 +449,57 @@ export const CtrOpportunityList = memo(function CtrOpportunityList({ rows }: { r
     if (opportunities.length === 0) return null;
 
     return (
-        <div className={`${CARD} my-3 p-4`}>
-            <p className="text-[11px] text-zinc-400 font-semibold mb-3 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> CTR Opportunities
-            </p>
-            <div className="space-y-2">
-                {opportunities.map((o, i) => (
-                    <div key={i} className="flex items-center gap-3 text-[11px] py-1.5 px-2 rounded-lg hover:bg-white/[0.02]">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-zinc-300 truncate font-medium">{o.query}</p>
-                            <p className="text-zinc-500 text-[10px]">
-                                Pos {o.position?.toFixed(0)} &middot; {o.impressions?.toLocaleString()} impr
-                            </p>
+        <div className={`${CARD} my-3 p-4 pl-5`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader
+                icon={AlertTriangle}
+                iconColor="text-amber-400"
+                title="CTR Opportunities"
+                sub={`${opportunities.length} keywords leaking clicks`}
+            />
+            <div className="space-y-1.5">
+                {opportunities.map((o, i) => {
+                    const gapPct = (o.gap / o.expected) * 100;
+                    return (
+                        <div key={i} className="flex items-center gap-3 text-[11px] py-2 px-2.5 rounded-lg bg-white/[0.015] hover:bg-white/[0.04] transition-colors">
+                            <div className="flex-1 min-w-0">
+                                <p className="text-zinc-200 truncate font-medium">{o.query}</p>
+                                <p className="text-zinc-500 text-[10px]">
+                                    Pos {o.position?.toFixed(0)} &middot; {o.impressions?.toLocaleString()} impr
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-red-400 font-mono font-semibold tabular-nums">{o.ctr?.toFixed(1)}%</span>
+                                <TrendingDown className="w-3 h-3 text-zinc-600" />
+                                <span className="text-emerald-400 font-mono font-semibold tabular-nums">{o.expected?.toFixed(1)}%</span>
+                                <span
+                                    className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
+                                    style={{
+                                        background: gapPct > 70 ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                                        color: gapPct > 70 ? '#fca5a5' : '#fbbf24',
+                                    }}
+                                >
+                                    +{o.gap.toFixed(1)}% gap
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-red-400 font-mono font-semibold">{o.ctr?.toFixed(1)}%</span>
-                            <TrendingDown className="w-3 h-3 text-zinc-600" />
-                            <span className="text-emerald-400 font-mono font-semibold">{o.expected?.toFixed(1)}%</span>
-                            <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded-full font-semibold">
-                                +{o.gap.toFixed(1)}% gap
-                            </span>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   7. OVERVIEW METRIC CARDS (summary KPI grid)
+   7. OVERVIEW METRIC CARDS
    ═══════════════════════════════════════════════════════════════ */
 
 export const OverviewMetricCards = memo(function OverviewMetricCards({ data }: { data: any }) {
     if (!data) return null;
 
     const metrics = [
-        { label: 'Clicks', value: data.totalClicks ?? data.clicks, icon: MousePointerClick, color: 'text-orange-400' },
-        { label: 'Impressions', value: data.totalImpressions ?? data.impressions, icon: Eye, color: 'text-slate-400' },
+        { label: 'Clicks', value: data.totalClicks ?? data.clicks, change: data.changeClicks, icon: MousePointerClick, color: 'text-cyan-400' },
+        { label: 'Impressions', value: data.totalImpressions ?? data.impressions, icon: Eye, color: 'text-indigo-400' },
         { label: 'Avg CTR', value: data.avgCTR ?? data.ctr, suffix: '%', icon: TrendingUp, color: 'text-emerald-400' },
         { label: 'Avg Pos', value: data.avgPosition ?? data.position, icon: MapPin, color: 'text-amber-400' },
     ].filter(m => m.value !== undefined && m.value !== null);
@@ -365,11 +513,20 @@ export const OverviewMetricCards = memo(function OverviewMetricCards({ data }: {
                 const display = typeof m.value === 'number'
                     ? (m.suffix ? m.value.toFixed(1) + m.suffix : m.value.toLocaleString())
                     : String(m.value);
+                const change: number | undefined = (m as any).change;
+                const showChange = typeof change === 'number' && Number.isFinite(change);
+                const positive = (change || 0) >= 0;
                 return (
-                    <div key={i} className={`${CARD} p-3 text-center`}>
+                    <div key={i} className={`${CARD} p-3 text-center pl-3.5`}>
+                        <div className={ACCENT_BAR} />
                         <Icon className={`w-4 h-4 mx-auto mb-1 ${m.color}`} />
                         <p className="text-white font-bold text-sm tabular-nums">{display}</p>
                         <p className="text-zinc-500 text-[10px] uppercase tracking-wider">{m.label}</p>
+                        {showChange && (
+                            <p className={`text-[10px] font-semibold mt-0.5 tabular-nums ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {positive ? '▲' : '▼'} {Math.abs(change as number).toFixed(1)}%
+                            </p>
+                        )}
                     </div>
                 );
             })}
@@ -378,7 +535,9 @@ export const OverviewMetricCards = memo(function OverviewMetricCards({ data }: {
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   SMART CHART PANEL — auto-selects charts based on dimensions
+   SMART CHART PANEL — picks ONE most-informative chart per result.
+   Previously rendered up to 5 stacked charts on a single tool result;
+   that combined badly with the model's MANDATORY-charts behavior.
    ═══════════════════════════════════════════════════════════════ */
 
 export interface StructuredToolResult {
@@ -401,15 +560,22 @@ export const SmartChartPanel = memo(function SmartChartPanel({ result }: { resul
     const hasDevice = dimensions.includes('device');
     const hasCountry = dimensions.includes('country');
 
-    return (
-        <div className="chat-charts-panel">
-            {hasDate && <TrendLineChart rows={rows} />}
-            {hasQuery && <HorizontalBarChart rows={rows} dimKey="query" title="Top Keywords by Clicks" />}
-            {hasQuery && <CtrOpportunityList rows={rows} />}
-            {hasPage && <HorizontalBarChart rows={rows} dimKey="page" title="Top Pages by Clicks" />}
-            {hasDevice && <DeviceDonutChart rows={rows} />}
-            {hasCountry && <CountryBarChart rows={rows} />}
-            {!hasDate && hasPositionData(rows) && <PositionDistributionChart rows={rows} />}
-        </div>
-    );
+    // Pick THE single most-informative chart for this dimension shape.
+    // Time-series wins over rank breakdown; device/country are dimension-exclusive.
+    if (hasDate) return <div className="chat-charts-panel"><TrendLineChart rows={rows} /></div>;
+    if (hasDevice) return <div className="chat-charts-panel"><DeviceDonutChart rows={rows} /></div>;
+    if (hasCountry) return <div className="chat-charts-panel"><CountryBarChart rows={rows} /></div>;
+    if (hasQuery) {
+        // For queries, prefer the CTR-opportunity list when there's clear underperformance;
+        // otherwise show the rank-colored bar chart. Both is overkill.
+        const hasCtrLeak = rows.some((r: any) => (r.impressions || 0) > 100 && (r.ctr || 0) < 3);
+        return (
+            <div className="chat-charts-panel">
+                {hasCtrLeak ? <CtrOpportunityList rows={rows} /> : <HorizontalBarChart rows={rows} dimKey="query" title="Top Keywords by Clicks" />}
+            </div>
+        );
+    }
+    if (hasPage) return <div className="chat-charts-panel"><HorizontalBarChart rows={rows} dimKey="page" title="Top Pages by Clicks" /></div>;
+    if (hasPositionData(rows)) return <div className="chat-charts-panel"><PositionDistributionChart rows={rows} /></div>;
+    return null;
 });
