@@ -14,6 +14,7 @@ import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
 import { ThinkingBlock } from './chat/ThinkingBlock';
 import { PlanCard, type ChatPlan } from './chat/PlanCard';
 import { CriticBadge, type CriticVerdict } from './chat/CriticBadge';
+import { highlightNumbersInChildren } from './chat/HighlightedNumbers';
 import { safeParseToolResult } from '@/lib/chatUtils';
 
 /* ─── Code Block ─── */
@@ -157,10 +158,14 @@ const markdownComponents: Components = {
         <h4 className="text-sm font-semibold text-zinc-200 mt-4 mb-1.5">{children}</h4>
     ),
     p: ({ children }) => (
-        <p className="text-[15px] text-zinc-300 leading-[1.8] my-3">{children}</p>
+        <p className="text-[15px] text-zinc-300 leading-[1.8] my-3">
+            {highlightNumbersInChildren(children, 'p')}
+        </p>
     ),
     strong: ({ children }) => (
-        <strong className="text-white font-semibold">{children}</strong>
+        <strong className="text-white font-semibold">
+            {highlightNumbersInChildren(children, 'strong')}
+        </strong>
     ),
     em: ({ children }) => (
         <em className="text-zinc-400">{children}</em>
@@ -188,7 +193,7 @@ const markdownComponents: Components = {
                 ) : (
                     <span className="flex-shrink-0 mt-[10px] w-1.5 h-1.5 rounded-full bg-zinc-600" />
                 )}
-                <div className="flex-1 min-w-0">{children}</div>
+                <div className="flex-1 min-w-0">{highlightNumbersInChildren(children, 'li')}</div>
             </li>
         );
     },
@@ -224,7 +229,9 @@ const markdownComponents: Components = {
         <th className="px-4 py-3 text-left text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">{children}</th>
     ),
     td: ({ children }) => (
-        <td className="px-4 py-3 text-zinc-300">{children}</td>
+        <td className="px-4 py-3 text-zinc-300">
+            {highlightNumbersInChildren(children, 'td')}
+        </td>
     ),
 };
 

@@ -45,10 +45,15 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 /**
- * Pulsing-orb thinking indicator with cycling phases. When activeTool is
- * set, swaps to a tool-specific label. Extracted from AIChatbot.tsx.
+ * Pulsing-orb thinking indicator with cycling phases. Priorities:
+ *   isPlanning  → "Planning…" (cyan ring, distinct from analysis)
+ *   activeTool  → tool-specific label
+ *   else        → cycling generic phases
+ *
+ * Extracted from AIChatbot.tsx. Now accepts isPlanning so the user knows
+ * why the first ~2s of latency on diagnostic intents looks like dead air.
  */
-export const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { activeTool?: string }) {
+export const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool, isPlanning }: { activeTool?: string; isPlanning?: boolean }) {
     const [phase, setPhase] = useState(0);
 
     useEffect(() => {
@@ -56,14 +61,27 @@ export const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }:
         return () => clearInterval(timer);
     }, []);
 
-    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : THINKING_PHASES[phase];
+    const message = isPlanning
+        ? 'Planning the steps...'
+        : activeTool
+            ? (TOOL_LABELS[activeTool] || 'Running analysis...')
+            : THINKING_PHASES[phase];
 
     return (
         <div className="flex justify-start">
             <div className="flex items-center gap-3 px-1 py-2">
                 <div className="relative flex-shrink-0 w-6 h-6">
-                    <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" style={{ animationDuration: '2s' }} />
-                    <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 opacity-80" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+                    {isPlanning ? (
+                        <>
+                            <div className="absolute inset-0 rounded-full bg-cyan-500/25 animate-ping" style={{ animationDuration: '1.6s' }} />
+                            <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 opacity-90" style={{ animation: 'pulse 1.2s ease-in-out infinite' }} />
+                        </>
+                    ) : (
+                        <>
+                            <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" style={{ animationDuration: '2s' }} />
+                            <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 opacity-80" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+                        </>
+                    )}
                 </div>
                 <span className="text-[13px] text-zinc-400">{message}</span>
             </div>

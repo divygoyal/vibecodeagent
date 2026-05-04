@@ -134,6 +134,11 @@ export default function AIChatbot() {
     // streamed from the server as type:'intent' once classification lands.
     const lastIntentRef = useRef<string | null>(null);
 
+    // B5-full: planning state — true while the planner is running pre-stream.
+    // Drives the "Planning…" indicator so the user knows why first-token is
+    // delayed by ~2s on diagnostic intents.
+    const [isPlanning, setIsPlanning] = useState(false);
+
     const handleStop = useCallback(() => {
         if (abortRef.current) {
             try { abortRef.current.abort(); } catch { /* already aborted */ }
@@ -213,6 +218,7 @@ export default function AIChatbot() {
         setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date().toISOString(), tools: [] }]);
         setInput('');
         setIsLoading(true);
+        setIsPlanning(false);
 
         // B-1: persist the user turn to the server (best-effort, fire-and-forget)
         const turnStartedAt = Date.now();
@@ -329,9 +335,14 @@ export default function AIChatbot() {
                                 updated[updated.length - 1] = last;
                                 return updated;
                             });
+                        } else if (data.type === 'planning') {
+                            setIsPlanning(true);
+                        } else if (data.type === 'planning_done') {
+                            setIsPlanning(false);
                         } else if (data.type === 'plan_proposed') {
                             // B5-full: planner's structured plan, attached to the
                             // in-flight message so the PlanCard renders it inline.
+                            setIsPlanning(false);
                             setMessages(prev => {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
@@ -474,6 +485,7 @@ export default function AIChatbot() {
             });
         } finally {
             setIsLoading(false);
+            setIsPlanning(false);
         }
     }, [appendStreamText, flushStreamBuffer]); // stable deps only
 
@@ -669,8 +681,8 @@ export default function AIChatbot() {
                         );
                     })}
 
-                    {isLoading && (!lastMsg?.content || activeTool) && (
-                        <ThinkingIndicator activeTool={activeTool} />
+                    {isLoading && (!lastMsg?.content || activeTool || isPlanning) && (
+                        <ThinkingIndicator activeTool={activeTool} isPlanning={isPlanning} />
                     )}
                     <div ref={messagesEndRef} />
                 </div>

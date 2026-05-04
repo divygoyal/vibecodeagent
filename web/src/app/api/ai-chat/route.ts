@@ -568,6 +568,10 @@ CRITICAL SYSTEM CONTEXT:
                     // B2-full: planner pre-pass for personas that need it.
                     // Streams the plan to the user so they see what's coming.
                     if (ai && persona.plannerEnabled) {
+                        // Emit a 'planning' marker so the UI can show "Planning…"
+                        // for the ~2s the Pro model takes — otherwise the user sees
+                        // dead air between send-click and first token.
+                        controller.enqueue(encodeSSE({ type: 'planning' }));
                         try {
                             const allowed = persona.allowedTools
                                 ? Array.from(persona.allowedTools)
@@ -581,8 +585,13 @@ CRITICAL SYSTEM CONTEXT:
                             });
                             if (plan) {
                                 controller.enqueue(encodeSSE({ type: 'plan_proposed', plan }));
+                            } else {
+                                // Planner failed silently — clear the indicator.
+                                controller.enqueue(encodeSSE({ type: 'planning_done' }));
                             }
-                        } catch { /* planner failure is non-fatal */ }
+                        } catch {
+                            controller.enqueue(encodeSSE({ type: 'planning_done' }));
+                        }
                     }
 
                     let currentContents = [...contents];
