@@ -90,14 +90,15 @@ export default function SchemaAuditWidget({ siteUrl, suggestedPages = [] }: Sche
     };
 
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-violet-400" />
+        <div className="premium-card p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/25 to-violet-500/5 border border-violet-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(167,139,250,0.1)]">
+                    <FileText className="w-5 h-5 text-violet-300" />
                 </div>
                 <div>
-                    <h4 className="text-sm font-semibold text-white">Schema Audit &amp; Validator</h4>
-                    <p className="text-[11px] text-zinc-500">Detect JSON-LD, validate required fields, find coverage gaps</p>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Structured Data</div>
+                    <h4 className="text-sm sm:text-base font-semibold tracking-tight text-white">Schema Audit &amp; Validator</h4>
+                    <p className="text-[11px] text-zinc-500">JSON-LD detection + required-field validation</p>
                 </div>
             </div>
 

@@ -17,7 +17,7 @@ import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
     ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download,
-    Bot, PenTool, Link2, Sparkles, Brain, Globe,
+    Bot, PenTool, Link2, Sparkles, Brain, Globe, BarChart3,
     FileText, ScanSearch, FileCheck, XCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -138,12 +138,12 @@ function ChangeIndicator({ value, suffix = '%', invert = false }: { value: numbe
 }
 
 const ICON_BG: Record<string, string> = {
-    emerald: 'bg-emerald-400/10 text-emerald-400',
-    cyan: 'bg-cyan-400/10 text-cyan-400',
-    violet: 'bg-violet-400/10 text-violet-400',
-    amber: 'bg-amber-400/10 text-amber-400',
-    blue: 'bg-blue-400/10 text-blue-400',
-    red: 'bg-red-400/10 text-red-400',
+    emerald: 'bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.08)]',
+    cyan: 'bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/20 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.08)]',
+    violet: 'bg-gradient-to-br from-violet-500/25 to-violet-500/5 border border-violet-500/20 text-violet-300 shadow-[0_0_20px_rgba(167,139,250,0.08)]',
+    amber: 'bg-gradient-to-br from-amber-500/25 to-amber-500/5 border border-amber-500/20 text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.08)]',
+    blue: 'bg-gradient-to-br from-blue-500/25 to-blue-500/5 border border-blue-500/20 text-blue-300 shadow-[0_0_20px_rgba(96,165,250,0.08)]',
+    red: 'bg-gradient-to-br from-red-500/25 to-red-500/5 border border-red-500/20 text-red-300 shadow-[0_0_20px_rgba(248,113,113,0.08)]',
 };
 
 function KpiTile({
@@ -390,48 +390,60 @@ export default function SEOPage() {
                 />
             ) : null}
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-white">SEO Intelligence</h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <p className="text-sm text-zinc-500">Search Console data with AI-powered insights</p>
-                        {seoData && <LastUpdated timestamp={new Date()} />}
+            {/* ─── Premium Hero Header ─── */}
+            <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[linear-gradient(135deg,rgba(52,211,153,0.06),rgba(34,211,238,0.04)_40%,rgba(167,139,250,0.04)_70%,transparent_95%)] p-5 sm:p-7">
+                <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-emerald-500/[0.06] blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-24 -left-12 h-72 w-72 rounded-full bg-violet-500/[0.05] blur-3xl" />
+                <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/[0.08] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-emerald-300">
+                                <span className="relative flex h-1.5 w-1.5">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                </span>
+                                Live · Search Console
+                            </span>
+                            {seoData && <LastUpdated timestamp={new Date()} />}
+                        </div>
+                        <h1 className="gradient-text text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-[1.05]">
+                            SEO Intelligence
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-sm text-zinc-400 leading-relaxed">
+                            Three-pillar coverage across Google rankings, AI Overviews, and LLM citations — engineered for the 2026 search landscape.
+                        </p>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    {/* Export Button */}
-                    <button
-                        onClick={() => exportSeoData(seoData)}
-                        disabled={!seoData}
-                        className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors disabled:opacity-30"
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                        Export
-                    </button>
-
-                    {/* Site Selector */}
-                    <div className="relative w-full sm:w-auto">
-                        <select
-                            value={selectedSite}
-                            onChange={(e) => setSelectedSite(e.target.value)}
-                            disabled={sitesLoading || sites.length === 0}
-                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition w-full sm:min-w-[200px] sm:w-auto max-w-full"
+                    <div className="flex items-stretch gap-2 sm:gap-3 flex-wrap lg:justify-end">
+                        <div className="relative w-full sm:w-auto">
+                            <select
+                                value={selectedSite}
+                                onChange={(e) => setSelectedSite(e.target.value)}
+                                disabled={sitesLoading || sites.length === 0}
+                                className="appearance-none bg-[#0a0d12] border border-white/[0.1] rounded-xl pl-3 pr-9 py-2.5 text-sm text-zinc-200 hover:border-white/[0.16] focus:outline-none focus:border-emerald-500/50 transition w-full sm:min-w-[220px] sm:w-auto max-w-full font-medium"
+                            >
+                                {sitesLoading ? (
+                                    <option>Loading sites…</option>
+                                ) : sites.length === 0 ? (
+                                    <option value="">No sites found</option>
+                                ) : (
+                                    sites.map(s => (
+                                        <option key={s.siteUrl} value={s.siteUrl}>
+                                            {s.siteUrl.replace('sc-domain:', '')}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                        </div>
+                        <button
+                            onClick={() => exportSeoData(seoData)}
+                            disabled={!seoData}
+                            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] hover:border-white/[0.16] transition disabled:opacity-30"
                         >
-                            {sitesLoading ? (
-                                <option>Loading sites...</option>
-                            ) : sites.length === 0 ? (
-                                <option value="">No sites found</option>
-                            ) : (
-                                sites.map(s => (
-                                    <option key={s.siteUrl} value={s.siteUrl}>
-                                        {s.siteUrl.replace('sc-domain:', '')}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                            <Download className="w-3.5 h-3.5" />
+                            Export
+                        </button>
                     </div>
                 </div>
             </div>
@@ -497,12 +509,15 @@ export default function SEOPage() {
 
             {/* AI Recommendations */}
             <div>
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                        <Zap className="w-3.5 h-3.5 text-black" />
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-cyan-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_24px_rgba(52,211,153,0.1)]">
+                        <Zap className="w-5 h-5 text-emerald-300" />
                     </div>
-                    <h3 className="text-sm font-semibold text-white">AI Recommendations</h3>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 font-medium">
+                    <div className="flex-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Insights</div>
+                        <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">AI Recommendations</h3>
+                    </div>
+                    <span className="gradient-badge text-[10px] px-2.5 py-1 rounded-full font-semibold">
                         {recommendations.length} items
                     </span>
                 </div>
@@ -540,33 +555,42 @@ export default function SEOPage() {
             </div>
 
             {/* ─── Three Pillars: SEO • AEO • GEO ─── */}
-            <div className="space-y-3">
+            <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 via-blue-400 to-violet-400 flex items-center justify-center">
-                            <Sparkles className="w-3.5 h-3.5 text-black" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 via-blue-500/20 to-violet-500/20 border border-white/[0.1] flex items-center justify-center shadow-[0_0_24px_rgba(34,211,238,0.12)]">
+                            <Sparkles className="w-5 h-5 text-cyan-300" />
                         </div>
-                        <h3 className="text-sm font-semibold text-white">Three Pillars of Modern Search</h3>
+                        <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Coverage</div>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Three Pillars of Modern Search</h3>
+                        </div>
                     </div>
-                    <div className="flex bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.06] flex-wrap">
+                    <div className="flex bg-[#0a0d12] rounded-xl p-1 border border-white/[0.08] gap-1 flex-wrap">
                         {[
-                            { key: 'seo', label: 'Traditional SEO', sub: 'Google rankings', color: 'emerald' },
-                            { key: 'aeo', label: 'Answer Engine', sub: 'AI Overviews', color: 'blue' },
-                            { key: 'geo', label: 'Generative Engine', sub: 'LLM citations', color: 'violet' },
-                        ].map(p => (
-                            <button
-                                key={p.key}
-                                onClick={() => setActivePillar(p.key as 'seo' | 'aeo' | 'geo')}
-                                className={`flex flex-col items-start px-3 py-1.5 text-xs font-medium rounded-md transition ${
-                                    activePillar === p.key
-                                        ? `bg-white/[0.1] text-${p.color}-400`
-                                        : 'text-zinc-500 hover:text-zinc-300'
-                                }`}
-                            >
-                                <span>{p.label}</span>
-                                <span className="text-[9px] text-zinc-600 font-normal hidden sm:inline">{p.sub}</span>
-                            </button>
-                        ))}
+                            { key: 'seo', label: 'Traditional SEO', sub: 'Google rankings', activeClasses: 'bg-emerald-500/[0.08] border border-emerald-500/30 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.18)]', dotColor: 'bg-emerald-400' },
+                            { key: 'aeo', label: 'Answer Engine', sub: 'AI Overviews', activeClasses: 'bg-blue-500/[0.08] border border-blue-500/30 text-blue-300 shadow-[0_0_20px_rgba(96,165,250,0.18)]', dotColor: 'bg-blue-400' },
+                            { key: 'geo', label: 'Generative Engine', sub: 'LLM citations', activeClasses: 'bg-violet-500/[0.08] border border-violet-500/30 text-violet-300 shadow-[0_0_20px_rgba(167,139,250,0.18)]', dotColor: 'bg-violet-400' },
+                        ].map(p => {
+                            const isActive = activePillar === p.key;
+                            return (
+                                <button
+                                    key={p.key}
+                                    onClick={() => setActivePillar(p.key as 'seo' | 'aeo' | 'geo')}
+                                    className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-all ${
+                                        isActive ? p.activeClasses : 'border border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                                    }`}
+                                >
+                                    <span className={`relative flex h-1.5 w-1.5 rounded-full ${isActive ? p.dotColor : 'bg-zinc-600'}`}>
+                                        {isActive && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${p.dotColor} opacity-75`} />}
+                                    </span>
+                                    <span className="flex flex-col items-start">
+                                        <span>{p.label}</span>
+                                        <span className={`text-[9px] font-normal hidden sm:inline ${isActive ? 'opacity-70' : 'text-zinc-600'}`}>{p.sub}</span>
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -613,66 +637,101 @@ export default function SEOPage() {
             </div>
 
             {/* ─── SEO Robot / AI SEO Bot ─── */}
-            <div className="bg-gradient-to-br from-violet-500/[0.04] to-emerald-500/[0.04] border border-violet-500/[0.12] rounded-2xl p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-violet-500/20">
-                        <Bot className="w-5 h-5 text-white" />
+            <div className="relative overflow-hidden rounded-2xl border border-violet-500/[0.14] bg-[linear-gradient(135deg,rgba(167,139,250,0.06),rgba(52,211,153,0.04)_60%,transparent_95%)] p-5 sm:p-7">
+                <div className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-violet-500/[0.08] blur-3xl" />
+                <div className="relative">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-400 flex items-center justify-center shadow-[0_8px_32px_rgba(167,139,250,0.3)]">
+                            <Bot className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-300/80">Automation</div>
+                            <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">SEO Robot</h3>
+                            <p className="text-[11px] text-zinc-500 mt-0.5">AI-powered SEO automation engine</p>
+                        </div>
+                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 font-semibold border border-violet-500/30 tracking-wider">BETA</span>
                     </div>
-                    <div>
-                        <h3 className="text-base font-bold text-white">SEO Robot</h3>
-                        <p className="text-[11px] text-zinc-500">AI-powered SEO automation engine</p>
-                    </div>
-                    <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 font-semibold border border-violet-500/20">BETA</span>
-                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* AI Blog Generation */}
-                    <button onClick={() => { setActiveTool(activeTool === 'blog' ? null : 'blog'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'blog' ? 'border-emerald-500/30 bg-emerald-500/[0.05]' : 'border-white/[0.06] hover:border-emerald-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3 group-hover:bg-emerald-500/20 transition">
-                            <PenTool className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">AI Blog Writer</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Generate SEO-optimized blog posts with headings, meta tags, internal links, and schema markup.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'blog' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
-
-                    {/* Auto Keyword Research */}
-                    <button onClick={() => { setActiveTool(activeTool === 'keywords' ? null : 'keywords'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'keywords' ? 'border-amber-500/30 bg-amber-500/[0.05]' : 'border-white/[0.06] hover:border-amber-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500/20 transition">
-                            <Brain className="w-4 h-4 text-amber-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">Auto Keyword Research</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">AI finds untapped keyword opportunities by analyzing competitors, search trends, and content gaps.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-amber-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'keywords' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
-
-                    {/* AI Internal Linking */}
-                    <button onClick={() => { setActiveTool(activeTool === 'linking' ? null : 'linking'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'linking' ? 'border-cyan-500/30 bg-cyan-500/[0.05]' : 'border-white/[0.06] hover:border-cyan-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500/20 transition">
-                            <Link2 className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">AI Smart Linking</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Discover and suggest internal links between your pages to build topical authority.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-cyan-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'linking' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
-
-                    {/* Schema Markup Generator */}
-                    <button onClick={() => { setActiveTool(activeTool === 'schema' ? null : 'schema'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'schema' ? 'border-violet-500/30 bg-violet-500/[0.05]' : 'border-white/[0.06] hover:border-violet-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center mb-3 group-hover:bg-violet-500/20 transition">
-                            <FileText className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">Schema Generator</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Auto-generate JSON-LD structured data for FAQ, Article, Product, HowTo pages.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-violet-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'schema' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
+                    {[
+                        {
+                            key: 'blog',
+                            icon: PenTool,
+                            title: 'AI Blog Writer',
+                            desc: 'Generate SEO-optimized blog posts with headings, meta tags, internal links, and schema markup.',
+                            activeBorder: 'border-emerald-500/40 bg-emerald-500/[0.06]',
+                            inactiveHover: 'hover:border-emerald-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/20 group-hover:border-emerald-500/30',
+                            iconText: 'text-emerald-300',
+                            labelText: 'text-emerald-300',
+                            glow: 'rgba(52,211,153,0.18)',
+                        },
+                        {
+                            key: 'keywords',
+                            icon: Brain,
+                            title: 'Auto Keyword Research',
+                            desc: 'AI finds untapped keyword opportunities by analyzing competitors, search trends, and content gaps.',
+                            activeBorder: 'border-amber-500/40 bg-amber-500/[0.06]',
+                            inactiveHover: 'hover:border-amber-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-amber-500/25 to-amber-500/5 border border-amber-500/20 group-hover:border-amber-500/30',
+                            iconText: 'text-amber-300',
+                            labelText: 'text-amber-300',
+                            glow: 'rgba(251,191,36,0.18)',
+                        },
+                        {
+                            key: 'linking',
+                            icon: Link2,
+                            title: 'AI Smart Linking',
+                            desc: 'Discover and suggest internal links between your pages to build topical authority.',
+                            activeBorder: 'border-cyan-500/40 bg-cyan-500/[0.06]',
+                            inactiveHover: 'hover:border-cyan-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/20 group-hover:border-cyan-500/30',
+                            iconText: 'text-cyan-300',
+                            labelText: 'text-cyan-300',
+                            glow: 'rgba(34,211,238,0.18)',
+                        },
+                        {
+                            key: 'schema',
+                            icon: FileText,
+                            title: 'Schema Generator',
+                            desc: 'Auto-generate JSON-LD structured data for FAQ, Article, Product, HowTo pages.',
+                            activeBorder: 'border-violet-500/40 bg-violet-500/[0.06]',
+                            inactiveHover: 'hover:border-violet-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-violet-500/25 to-violet-500/5 border border-violet-500/20 group-hover:border-violet-500/30',
+                            iconText: 'text-violet-300',
+                            labelText: 'text-violet-300',
+                            glow: 'rgba(167,139,250,0.18)',
+                        },
+                    ].map(({ key, icon: ToolIcon, title, desc, activeBorder, inactiveHover, iconBg, iconText, labelText, glow }) => {
+                        const isActive = activeTool === key;
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => { setActiveTool(isActive ? null : key); setToolResult(null); }}
+                                className={`relative overflow-hidden bg-white/[0.02] border rounded-xl p-4 text-left transition-all group cursor-pointer ${
+                                    isActive ? activeBorder : `border-white/[0.06] ${inactiveHover}`
+                                }`}
+                                style={isActive ? { boxShadow: `0 0 32px ${glow}` } : undefined}
+                            >
+                                {isActive && (
+                                    <div
+                                        className="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full blur-3xl"
+                                        style={{ background: glow }}
+                                    />
+                                )}
+                                <div className="relative">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition ${iconBg}`}>
+                                        <ToolIcon className={`w-5 h-5 ${iconText}`} />
+                                    </div>
+                                    <h4 className="text-sm font-semibold text-white mb-1 tracking-tight">{title}</h4>
+                                    <p className="text-[11px] text-zinc-500 leading-relaxed">{desc}</p>
+                                    <div className={`mt-3 flex items-center gap-1.5 text-[10px] font-medium ${labelText}`}>
+                                        <Sparkles className="w-3 h-3" /> {isActive ? 'Active' : 'Click to use'}
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* ─── Active Tool Panel ─── */}
@@ -811,6 +870,7 @@ export default function SEOPage() {
                         )}
                     </div>
                 )}
+                </div>
             </div>
 
             {/* ─── Indexing Status ─── */}
@@ -823,16 +883,21 @@ export default function SEOPage() {
             )}
 
             {/* ─── Growth Opportunities (real widgets, tabbed) ─── */}
-            <div className="space-y-3">
+            <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-violet-400 flex items-center justify-center">
-                            <Target className="w-3.5 h-3.5 text-black" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-violet-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_24px_rgba(52,211,153,0.1)]">
+                            <Target className="w-5 h-5 text-emerald-300" />
                         </div>
-                        <h3 className="text-sm font-semibold text-white">Growth Opportunities</h3>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 font-medium">Live</span>
+                        <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 flex items-center gap-1.5">
+                                <span>Quick Wins</span>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-500/[0.08] px-1.5 py-0 text-[9px] font-medium text-emerald-300 normal-case tracking-normal">Live</span>
+                            </div>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Growth Opportunities</h3>
+                        </div>
                     </div>
-                    <div className="flex bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.06]">
+                    <div className="flex bg-[#0a0d12] rounded-xl p-1 border border-white/[0.08] gap-1">
                         {[
                             { key: 'striking', label: 'Striking Distance', icon: Target },
                             { key: 'ctr', label: 'CTR Lab', icon: Zap },
@@ -841,10 +906,10 @@ export default function SEOPage() {
                             <button
                                 key={key}
                                 onClick={() => setActiveOppTab(key as 'striking' | 'ctr' | 'decay')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition ${
+                                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-all ${
                                     activeOppTab === key
-                                        ? 'bg-white/[0.1] text-white'
-                                        : 'text-zinc-500 hover:text-zinc-300'
+                                        ? 'bg-emerald-500/[0.08] border border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]'
+                                        : 'border border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
                                 }`}
                             >
                                 <Icon className="w-3 h-3" />
@@ -889,8 +954,16 @@ export default function SEOPage() {
             </div>
 
             {/* Search Trend Chart */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-                <h3 className="text-sm font-semibold text-white mb-4">Search Performance Trend</h3>
+            <div className="premium-card p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-violet-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.1)]">
+                        <BarChart3 className="w-5 h-5 text-emerald-300" />
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Trend</div>
+                        <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Search Performance</h3>
+                    </div>
+                </div>
                 <div className="h-[280px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={trend} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -917,20 +990,31 @@ export default function SEOPage() {
             </div>
 
             {/* Queries / Pages Tab */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-                <div className="flex items-center gap-1 mb-4 bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5 w-fit">
+            <div className="premium-card p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/25 to-emerald-500/15 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.1)]">
+                            <Search className="w-5 h-5 text-cyan-300" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Drill-down</div>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Top Search Performance</h3>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-[#0a0d12] border border-white/[0.08] rounded-xl p-1 w-fit">
                     <button
                         onClick={() => setActiveTab('queries')}
-                        className={`px-4 py-2 min-h-[44px] text-xs font-medium rounded-md transition ${activeTab === 'queries' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`px-4 py-2 min-h-[40px] text-xs font-medium rounded-lg transition-all border ${activeTab === 'queries' ? 'bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]' : 'border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'}`}
                     >
                         Top Queries
                     </button>
                     <button
                         onClick={() => setActiveTab('pages')}
-                        className={`px-4 py-2 min-h-[44px] text-xs font-medium rounded-md transition ${activeTab === 'pages' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`px-4 py-2 min-h-[40px] text-xs font-medium rounded-lg transition-all border ${activeTab === 'pages' ? 'bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]' : 'border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'}`}
                     >
                         Top Pages
                     </button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">

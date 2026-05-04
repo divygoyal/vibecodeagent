@@ -89,16 +89,19 @@ export default function AioSimulator({ siteUrl, suggestedQueries = [] }: AioSimu
     };
 
     return (
-        <div className="bg-gradient-to-br from-blue-500/[0.03] to-violet-500/[0.03] border border-blue-500/[0.12] rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-2.5 mb-4 flex-wrap">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
+        <div className="relative overflow-hidden rounded-2xl border border-blue-500/[0.14] bg-[linear-gradient(135deg,rgba(96,165,250,0.06),rgba(167,139,250,0.04)_60%,transparent_95%)] p-5 sm:p-6">
+            <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-blue-500/[0.08] blur-3xl" />
+            <div className="relative flex items-center gap-3 mb-4 flex-wrap">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/30 to-violet-500/15 border border-blue-500/25 flex items-center justify-center shadow-[0_0_24px_rgba(96,165,250,0.18)]">
+                    <Sparkles className="w-5 h-5 text-blue-300" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-white">AI Overview Simulator</h4>
-                    <p className="text-[11px] text-zinc-500">Run a query through Gemini with web grounding — see who Google AI cites</p>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-300/80">Answer Engine</div>
+                    <h4 className="text-sm sm:text-base font-semibold tracking-tight text-white">AI Overview Simulator</h4>
+                    <p className="text-[11px] text-zinc-500">Gemini-grounded — see who Google AI cites</p>
                 </div>
             </div>
+            <div className="relative">
 
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
                 <input
@@ -204,6 +207,7 @@ export default function AioSimulator({ siteUrl, suggestedQueries = [] }: AioSimu
                     )}
                 </div>
             )}
+            </div>
         </div>
     );
 }

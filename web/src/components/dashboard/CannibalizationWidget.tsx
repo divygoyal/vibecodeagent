@@ -24,14 +24,15 @@ export default function CannibalizationWidget({ siteUrl }: CannibalizationWidget
     const totalImpressionsAtRisk = cannibalized.reduce((s, c) => s + c.totalImpressions, 0);
 
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
+        <div className="premium-card p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                        <Shuffle className="w-4 h-4 text-amber-400" />
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/25 to-amber-500/5 border border-amber-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(251,191,36,0.1)]">
+                        <Shuffle className="w-5 h-5 text-amber-300" />
                     </div>
                     <div>
-                        <h4 className="text-sm font-semibold text-white">Real Cannibalization Scanner</h4>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Quality</div>
+                        <h4 className="text-sm sm:text-base font-semibold tracking-tight text-white">Cannibalization Scanner</h4>
                         <p className="text-[11px] text-zinc-500">Multiple pages competing for the same query</p>
                     </div>
                 </div>

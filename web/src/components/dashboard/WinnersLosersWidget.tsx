@@ -31,28 +31,35 @@ export default function WinnersLosersWidget({ siteUrl }: WinnersLosersWidgetProp
     } : { winners: 0, losers: 0, new: 0, lost: 0 };
 
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-2.5 mb-4 flex-wrap">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+        <div className="premium-card p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.1)]">
+                    <TrendingUp className="w-5 h-5 text-emerald-300" />
                 </div>
-                <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-white">Winners &amp; Losers</h4>
-                    <p className="text-[11px] text-zinc-500">Period-over-period query movement (28d vs prior 28d)</p>
+                <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Movement</div>
+                    <h4 className="text-sm sm:text-base font-semibold tracking-tight text-white">Winners &amp; Losers</h4>
+                    <p className="text-[11px] text-zinc-500">Period-over-period (28d vs prior 28d)</p>
                 </div>
             </div>
 
-            <div className="flex bg-white/[0.03] rounded-lg p-0.5 border border-white/[0.06] mb-3 w-full sm:w-fit">
+            <div className="flex bg-[#0a0d12] rounded-xl p-1 gap-1 border border-white/[0.08] mb-3 w-full sm:w-fit">
                 {(Object.keys(tabConfig) as Tab[]).map(k => {
                     const cfg = tabConfig[k];
                     const Icon = cfg.icon;
-                    const colorClass = `text-${cfg.color}-400`;
+                    const activeMap: Record<string, string> = {
+                        emerald: 'bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]',
+                        red: 'bg-red-500/[0.08] border-red-500/30 text-red-300 shadow-[0_0_16px_rgba(248,113,113,0.15)]',
+                        blue: 'bg-blue-500/[0.08] border-blue-500/30 text-blue-300 shadow-[0_0_16px_rgba(96,165,250,0.15)]',
+                        purple: 'bg-purple-500/[0.08] border-purple-500/30 text-purple-300 shadow-[0_0_16px_rgba(192,132,252,0.15)]',
+                    };
+                    const activeClasses = activeMap[cfg.color] || activeMap.emerald;
                     return (
                         <button
                             key={k}
                             onClick={() => setTab(k)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition flex-1 sm:flex-initial justify-center ${
-                                tab === k ? `bg-white/[0.08] ${colorClass}` : 'text-zinc-500 hover:text-zinc-300'
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex-1 sm:flex-initial justify-center border ${
+                                tab === k ? activeClasses : 'border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
                             }`}
                         >
                             <Icon className="w-3 h-3" />

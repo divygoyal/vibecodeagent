@@ -135,24 +135,27 @@ export default function AiVisibilityWidget({ siteUrl }: AiVisibilityWidgetProps)
     const lastRun = response?.results[0]?.fetchedAt;
 
     return (
-        <div className="bg-gradient-to-br from-violet-500/[0.03] to-pink-500/[0.03] border border-violet-500/[0.12] rounded-2xl p-4 sm:p-5">
-            <div className="flex items-start gap-3 mb-4 flex-wrap">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-400 flex items-center justify-center shadow-lg shadow-violet-500/20">
-                    <Eye className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-white">AI Visibility Tracker</h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 font-semibold border border-violet-500/20">
-                            GEMINI / AI OVERVIEWS
-                        </span>
+        <div className="relative overflow-hidden rounded-2xl border border-violet-500/[0.14] bg-[linear-gradient(135deg,rgba(167,139,250,0.07),rgba(244,114,182,0.04)_55%,transparent_95%)] p-5 sm:p-7">
+            <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-violet-500/[0.1] blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-pink-500/[0.06] blur-3xl" />
+            <div className="relative">
+                <div className="flex items-start gap-3 mb-5 flex-wrap">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-pink-400 flex items-center justify-center shadow-[0_8px_32px_rgba(167,139,250,0.35)]">
+                        <Eye className="w-6 h-6 text-white" />
                     </div>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
-                        Track which prompts cite your domain in AI search.
-                        ChatGPT &amp; Perplexity coverage on paid plan.
-                    </p>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-300/80">Generative Engine</div>
+                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-semibold border border-violet-500/30 tracking-wider">
+                                GEMINI / AIO
+                            </span>
+                        </div>
+                        <h4 className="text-base sm:text-lg font-bold tracking-tight text-white mt-0.5">AI Visibility Tracker</h4>
+                        <p className="text-[11px] text-zinc-500 mt-0.5 max-w-md">
+                            Track which prompts cite your domain in AI search. ChatGPT &amp; Perplexity coverage on paid plan.
+                        </p>
+                    </div>
                 </div>
-            </div>
 
             {/* Summary card */}
             {response && (
@@ -289,6 +292,7 @@ export default function AiVisibilityWidget({ siteUrl }: AiVisibilityWidgetProps)
                         site={siteUrl}
                     />
                 )}
+            </div>
             </div>
         </div>
     );

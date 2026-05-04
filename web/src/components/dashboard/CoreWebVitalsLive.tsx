@@ -102,14 +102,15 @@ export default function CoreWebVitalsLive({ siteUrl, suggestedPages = [] }: Core
     };
 
     return (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-2.5 mb-4 flex-wrap">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <Cpu className="w-4 h-4 text-emerald-400" />
+        <div className="premium-card p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-cyan-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.12)]">
+                    <Cpu className="w-5 h-5 text-emerald-300" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-white">Core Web Vitals (Live)</h4>
-                    <p className="text-[11px] text-zinc-500">Real lab + field data via PageSpeed Insights API</p>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Performance</div>
+                    <h4 className="text-sm sm:text-base font-semibold tracking-tight text-white">Core Web Vitals · Live</h4>
+                    <p className="text-[11px] text-zinc-500">Lab + field data via PageSpeed Insights</p>
                 </div>
                 <div className="flex bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.06]">
                     <button
