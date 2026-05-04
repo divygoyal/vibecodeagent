@@ -16,6 +16,7 @@ import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
+import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from '@/components/chat/ReasoningTrace';
 
 type DashboardSiteOption = {
     siteUrl: string;
@@ -739,6 +740,14 @@ export default function AIChat() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activeTool, setActiveTool] = useState<string | undefined>();
+    // B5-polish: Claude-style live reasoning trace — replaces the static
+    // "Thinking" label with a growing list of italic narration lines.
+    const [traceLines, setTraceLines] = useState<TraceLine[]>([]);
+    const traceCounterRef = useRef(0);
+    const pushTraceLine = useCallback((text: string) => {
+        const id = `tl-${++traceCounterRef.current}-${Date.now()}`;
+        setTraceLines(prev => [...prev, { id, text }]);
+    }, []);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [siteOpen, setSiteOpen] = useState(false);
@@ -885,6 +894,7 @@ export default function AIChat() {
 
         const userMessage: ChatMessage = { role: 'user', content: messageText, timestamp: new Date().toISOString() };
         setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '', timestamp: new Date().toISOString(), tools: [] }]);
+        setTraceLines([]); // reset trace per-turn
         setInput('');
         setIsLoading(true);
         setActiveTool(undefined);
@@ -962,8 +972,34 @@ export default function AIChat() {
                         const data = JSON.parse(dataStr);
                         if (data.type === 'text') {
                             appendStreamText(data.content);
+                        } else if (data.type === 'planning') {
+                            pushTraceLine('Planning the approach…');
+                        } else if (data.type === 'plan_proposed') {
+                            if (data.plan?.summary) pushTraceLine(data.plan.summary);
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.plan = data.plan;
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
+                        } else if (data.type === 'critic_verdict') {
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.critic = {
+                                    score: data.score,
+                                    groundedness: data.groundedness,
+                                    completeness: data.completeness,
+                                    format: data.format,
+                                    notes: data.notes,
+                                };
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
                         } else if (data.type === 'tool_start') {
                             setActiveTool(data.name);
+                            pushTraceLine(narrateToolStart(data.name));
                             setMessages(prev => {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
@@ -973,6 +1009,7 @@ export default function AIChat() {
                             });
                         } else if (data.type === 'tool_result') {
                             setActiveTool(undefined);
+                            pushTraceLine(narrateToolResult(data.name, data.result));
                             setMessages(prev => {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
@@ -1295,7 +1332,11 @@ export default function AIChat() {
                             );
                         })}
 
-                        {isLoading && (!lastMsg?.content || activeTool) && (
+                        {isLoading && !lastMsg?.content && (
+                            <ReasoningTrace lines={traceLines} active={isLoading} />
+                        )}
+                        {/* Legacy fallback if you ever want the old static label back: */}
+                        {false && isLoading && (!lastMsg?.content || activeTool) && (
                             <ThinkingIndicator activeTool={activeTool} />
                         )}
 
