@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -4236,6 +4236,234 @@ async def get_public_custom_dashboard(
         **_dashboard_to_dict(dashboard, user_identifier),
         "ownerIdentifier": user_identifier,
     }
+
+
+# ============= Chat Threads & Messages (Phase B-1: server-side memory) =============
+class ChatThreadCreate(BaseModel):
+    user_identifier: str
+    id: str  # client-generated UUID
+    title: Optional[str] = None
+    persona: Optional[str] = None
+    site_url: Optional[str] = None
+    repo: Optional[str] = None
+
+
+class ChatThreadUpdate(BaseModel):
+    title: Optional[str] = None
+    persona: Optional[str] = None
+    summary: Optional[str] = None
+    summary_updated_at_msg: Optional[int] = None
+    archived: Optional[bool] = None
+
+
+class ChatMessageCreate(BaseModel):
+    user_identifier: str
+    role: str  # user | assistant
+    content: Optional[str] = None
+    tools_json: Optional[str] = None
+    model: Optional[str] = None
+    intent: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    latency_ms: Optional[int] = None
+
+
+def _serialize_thread(t: ChatThread) -> dict:
+    return {
+        "id": t.id,
+        "title": t.title,
+        "persona": t.persona,
+        "site_url": t.site_url,
+        "repo": t.repo,
+        "summary": t.summary,
+        "summary_updated_at_msg": t.summary_updated_at_msg,
+        "archived": t.archived,
+        "last_message_at": t.last_message_at.isoformat() if t.last_message_at else None,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
+def _serialize_message(m: ChatMessage) -> dict:
+    return {
+        "id": m.id,
+        "thread_id": m.thread_id,
+        "role": m.role,
+        "content": m.content,
+        "tools_json": m.tools_json,
+        "model": m.model,
+        "intent": m.intent,
+        "input_tokens": m.input_tokens,
+        "output_tokens": m.output_tokens,
+        "latency_ms": m.latency_ms,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+@app.get("/api/chat/threads")
+async def list_chat_threads(
+    user_identifier: str,
+    include_archived: bool = False,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List threads for a user, newest first."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"threads": []}
+    q = select(ChatThread).where(ChatThread.user_id == user.id)
+    if not include_archived:
+        q = q.where(ChatThread.archived == False)  # noqa: E712
+    q = q.order_by(ChatThread.last_message_at.desc()).limit(min(max(1, limit), 200))
+    result = await db.execute(q)
+    threads = result.scalars().all()
+    return {"threads": [_serialize_thread(t) for t in threads]}
+
+
+@app.post("/api/chat/threads")
+async def create_chat_thread(
+    data: ChatThreadCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Create (or upsert) a thread."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Upsert — if a thread with this id already exists, update its mutable fields.
+    existing = await db.execute(select(ChatThread).where(ChatThread.id == data.id))
+    t = existing.scalar_one_or_none()
+    if t:
+        if t.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Thread belongs to a different user")
+        if data.title is not None: t.title = data.title[:255]
+        if data.persona is not None: t.persona = data.persona[:40]
+        if data.site_url is not None: t.site_url = data.site_url[:500]
+        if data.repo is not None: t.repo = data.repo[:255]
+    else:
+        t = ChatThread(
+            id=data.id,
+            user_id=user.id,
+            title=(data.title or "New conversation")[:255],
+            persona=data.persona,
+            site_url=data.site_url,
+            repo=data.repo,
+        )
+        db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return _serialize_thread(t)
+
+
+@app.patch("/api/chat/threads/{thread_id}")
+async def update_chat_thread(
+    thread_id: str,
+    data: ChatThreadUpdate,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Patch thread fields (title, summary, archived…)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(select(ChatThread).where(ChatThread.id == thread_id))
+    t = result.scalar_one_or_none()
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    if data.title is not None: t.title = data.title[:255]
+    if data.persona is not None: t.persona = data.persona[:40]
+    if data.summary is not None: t.summary = data.summary[:8000]
+    if data.summary_updated_at_msg is not None: t.summary_updated_at_msg = data.summary_updated_at_msg
+    if data.archived is not None: t.archived = data.archived
+    await db.commit()
+    await db.refresh(t)
+    return _serialize_thread(t)
+
+
+@app.delete("/api/chat/threads/{thread_id}")
+async def delete_chat_thread(
+    thread_id: str,
+    user_identifier: str,
+    hard: bool = False,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Archive (default) or hard-delete a thread + its messages."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(select(ChatThread).where(ChatThread.id == thread_id))
+    t = result.scalar_one_or_none()
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    if hard:
+        await db.execute(delete(ChatMessage).where(ChatMessage.thread_id == thread_id))
+        await db.delete(t)
+    else:
+        t.archived = True
+    await db.commit()
+    return {"ok": True, "hard": hard}
+
+
+@app.get("/api/chat/threads/{thread_id}/messages")
+async def list_chat_messages(
+    thread_id: str,
+    user_identifier: str,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List messages for a thread (oldest first)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"messages": []}
+    # Verify thread belongs to user
+    tres = await db.execute(select(ChatThread).where(ChatThread.id == thread_id))
+    t = tres.scalar_one_or_none()
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    q = select(ChatMessage).where(ChatMessage.thread_id == thread_id) \
+        .order_by(ChatMessage.created_at.asc()) \
+        .limit(min(max(1, limit), 500))
+    result = await db.execute(q)
+    msgs = result.scalars().all()
+    return {"messages": [_serialize_message(m) for m in msgs], "summary": t.summary}
+
+
+@app.post("/api/chat/threads/{thread_id}/messages")
+async def append_chat_message(
+    thread_id: str,
+    data: ChatMessageCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Append a message to a thread + bump last_message_at on the thread."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    tres = await db.execute(select(ChatThread).where(ChatThread.id == thread_id))
+    t = tres.scalar_one_or_none()
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    if data.role not in ("user", "assistant"):
+        raise HTTPException(status_code=400, detail="role must be user or assistant")
+    m = ChatMessage(
+        thread_id=thread_id,
+        role=data.role,
+        content=data.content,
+        tools_json=data.tools_json,
+        model=data.model,
+        intent=data.intent,
+        input_tokens=data.input_tokens,
+        output_tokens=data.output_tokens,
+        latency_ms=data.latency_ms,
+    )
+    db.add(m)
+    t.last_message_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(m)
+    return _serialize_message(m)
 
 
 # ============= Health Check =============

@@ -18,6 +18,96 @@ function getStorageKey(): string {
     return currentUserId ? `${BASE_STORAGE_KEY}:${currentUserId}` : BASE_STORAGE_KEY;
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+ * Phase B-1: Server-side sync (additive — localStorage stays primary)
+ *
+ *   localStorage  =  fast read path on chat open (instant)
+ *   server        =  source of truth, survives cache clear, cross-device
+ *
+ * We sync threads + messages best-effort. Failures don't break the chat —
+ * they just mean this turn isn't durable until the next one succeeds.
+ * The chat thread id is generated client-side and reused across turns of
+ * a single conversation; clearing the chat starts a new thread.
+ * ────────────────────────────────────────────────────────────────────── */
+
+const THREAD_ID_KEY = 'tc-chat-thread-id';
+
+function generateThreadId(): string {
+    // Crypto-grade UUID (browsers >= Chrome 92 / Firefox 95 / Safari 15.4).
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        try { return (crypto as any).randomUUID(); } catch { /* fallthrough */ }
+    }
+    // Fallback: timestamp + 16 hex bytes.
+    const rand = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('');
+    return `${Date.now().toString(36)}-${rand}`;
+}
+
+export function getOrCreateThreadId(): string {
+    if (typeof window === 'undefined') return '';
+    try {
+        const existing = localStorage.getItem(`${THREAD_ID_KEY}:${currentUserId}`);
+        if (existing) return existing;
+        const fresh = generateThreadId();
+        localStorage.setItem(`${THREAD_ID_KEY}:${currentUserId}`, fresh);
+        return fresh;
+    } catch {
+        return generateThreadId();
+    }
+}
+
+export function resetThreadId(): string {
+    if (typeof window !== 'undefined') {
+        try { localStorage.removeItem(`${THREAD_ID_KEY}:${currentUserId}`); } catch { /* skip */ }
+    }
+    return getOrCreateThreadId();
+}
+
+let threadEnsuredFor: string | null = null;
+async function ensureThreadOnServer(threadId: string, opts: { title?: string; persona?: string; site_url?: string; repo?: string } = {}): Promise<void> {
+    if (threadEnsuredFor === threadId) return;
+    threadEnsuredFor = threadId;
+    try {
+        await fetch(`/api/chat-store?action=create_thread`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: threadId, ...opts }),
+        });
+    } catch { /* server-sync is best-effort */ }
+}
+
+export interface PersistMessageOpts {
+    role: 'user' | 'assistant';
+    content: string;
+    tools?: ChatMessage['tools'];
+    intent?: string;
+    model?: string;
+    latency_ms?: number;
+}
+
+/**
+ * Fire-and-forget: persist a single turn to the server. Called by AIChatbot
+ * after a user sends and after an assistant message finishes streaming.
+ */
+export async function persistMessage(opts: PersistMessageOpts, threadOpts?: { title?: string; site_url?: string; repo?: string }): Promise<void> {
+    if (typeof window === 'undefined') return;
+    const threadId = getOrCreateThreadId();
+    await ensureThreadOnServer(threadId, threadOpts);
+    try {
+        await fetch(`/api/chat-store?action=append_message&thread=${encodeURIComponent(threadId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                role: opts.role,
+                content: opts.content,
+                tools_json: opts.tools && opts.tools.length ? JSON.stringify(opts.tools) : null,
+                model: opts.model,
+                intent: opts.intent,
+                latency_ms: opts.latency_ms,
+            }),
+        });
+    } catch { /* server-sync is best-effort */ }
+}
+
 function loadFromStorage(): ChatMessage[] {
     if (typeof window === 'undefined') return [];
     try {
@@ -94,6 +184,9 @@ export const useChatStore = create<ChatStore>((set) => ({
             localStorage.removeItem(getStorageKey());
             localStorage.removeItem(BASE_STORAGE_KEY);
         }
+        // B-1: rotate thread id so next message starts a fresh server-side thread
+        threadEnsuredFor = null;
+        resetThreadId();
         set({ messages: [] });
     },
 

@@ -336,6 +336,51 @@ class LeaderboardEntry(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ChatThread(Base):
+    """A persisted AI-chat conversation thread.
+
+    Phase B-1 (memory) — moves chat from client-only localStorage to server-side
+    storage so conversations survive cache clears, sync across devices, and
+    can be summarized into a rolling-context block. The localStorage cache stays
+    as a fast read path; the server is the source of truth.
+
+    summary: Flash-Lite-generated rolling summary of older turns (refreshed
+    every 6 turns by the chat route). Allows long conversations to fit in
+    context without pruning.
+    """
+    __tablename__ = "chat_threads"
+
+    id = Column(String(36), primary_key=True)  # client-generated UUID
+    user_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(255))                 # auto-generated from first user message
+    persona = Column(String(40))                # diagnostic | opportunity | content_brief | etc. (B3)
+    site_url = Column(String(500))              # site context active at thread creation
+    repo = Column(String(255))                  # owner/repo if linked
+    summary = Column(Text)                      # Flash-Lite rolling summary of older turns
+    summary_updated_at_msg = Column(Integer, default=0)  # last message index summarized
+    archived = Column(Boolean, default=False)
+    last_message_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ChatMessage(Base):
+    """A single turn within a ChatThread."""
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True)
+    thread_id = Column(String(36), nullable=False, index=True)
+    role = Column(String(20), nullable=False)   # user | assistant
+    content = Column(Text)
+    tools_json = Column(Text)                   # JSON array of {name,args,result,structuredData}
+    model = Column(String(60))
+    intent = Column(String(40))                 # intent classified by IntentRouter (B2)
+    input_tokens = Column(Integer)
+    output_tokens = Column(Integer)
+    latency_ms = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class LeaderboardStatsHistory(Base):
     """Per-day snapshot of a leaderboard entry's stats — powers sparkline + weekly digest."""
     __tablename__ = "leaderboard_stats_history"

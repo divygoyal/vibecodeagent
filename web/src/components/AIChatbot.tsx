@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe, Sun } from 'lucide-react';
+import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe, Sun, Square } from 'lucide-react';
 import Link from 'next/link';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import ChatMessageRenderer from './ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
-import { useChatStore, type ChatMessage } from '@/stores/chatStore';
+import { useChatStore, persistMessage, getOrCreateThreadId, type ChatMessage } from '@/stores/chatStore';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -207,6 +207,28 @@ export default function AIChatbot() {
     const streamBufferRef = useRef('');
     const rafIdRef = useRef<number | null>(null);
 
+    // B5-thin: lifted AbortController so the Stop button can abort the
+    // in-flight fetch from outside sendMessage's closure. Reset per-turn.
+    const abortRef = useRef<AbortController | null>(null);
+
+    // B2-thin: classified intent for the current/last assistant turn —
+    // streamed from the server as type:'intent' once classification lands.
+    const lastIntentRef = useRef<string | null>(null);
+
+    const handleStop = useCallback(() => {
+        if (abortRef.current) {
+            try { abortRef.current.abort(); } catch { /* already aborted */ }
+            // Best-effort telemetry — server logs the interrupt for tool-latency analysis
+            try {
+                fetch('/api/ai-chat/interrupt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ threadId: getOrCreateThreadId(), directive: 'user_stopped' }),
+                });
+            } catch { /* swallow */ }
+        }
+    }, []);
+
     const flushStreamBuffer = useCallback(() => {
         rafIdRef.current = null;
         const buffered = streamBufferRef.current;
@@ -273,12 +295,22 @@ export default function AIChatbot() {
         setInput('');
         setIsLoading(true);
 
+        // B-1: persist the user turn to the server (best-effort, fire-and-forget)
+        const turnStartedAt = Date.now();
+        void persistMessage(
+            { role: 'user', content: messageText },
+            { title: messageText.slice(0, 80), site_url: currentSite },
+        );
+
         try {
             // A1: Send compressed-but-COMPLETE context every turn — not just first.
             // Otherwise Gemini hallucinates by turn 5 ("what was my #3 keyword?" → wrong).
             // Compressed (top 8 queries + top 5 pages + KPIs) ≈ +500 tokens/turn,
             // still well under context budget.
+            // B5-thin: AbortController lives in abortRef so the Stop button
+            // can call .abort() from outside this closure.
             const abortController = new AbortController();
+            abortRef.current = abortController;
             const ttfbTimeout = setTimeout(() => abortController.abort(), 60000);
 
             const res = await fetch('/api/ai-chat', {
@@ -383,6 +415,10 @@ export default function AIChatbot() {
                                 updated[updated.length - 1] = last;
                                 return updated;
                             });
+                        } else if (data.type === 'intent') {
+                            // B2-thin: server-side IntentRouter result (one of 7 labels).
+                            // We just stash it for telemetry / future per-intent UI tweaks.
+                            lastIntentRef.current = data.value || null;
                         } else if (data.type === 'tool_progress') {
                             // A6: heartbeat for slow tools — annotate the in-flight tool
                             // with its elapsed seconds so the UI can show "Running X… (12s)".
@@ -440,6 +476,21 @@ export default function AIChatbot() {
                 }
                 flushStreamBuffer();
             }
+
+            // B-1: persist the completed assistant turn (read latest content + tools
+            // from the messages ref since setMessages has finished by now).
+            try {
+                const latest = messagesRef.current[messagesRef.current.length - 1];
+                if (latest?.role === 'assistant' && latest.content) {
+                    void persistMessage({
+                        role: 'assistant',
+                        content: latest.content,
+                        tools: latest.tools,
+                        intent: lastIntentRef.current || undefined,
+                        latency_ms: Date.now() - turnStartedAt,
+                    });
+                }
+            } catch { /* persistence is best-effort */ }
         } catch (err: any) {
             const isTimeout = err?.name === 'AbortError';
             setMessages(prev => {
@@ -735,14 +786,29 @@ export default function AIChatbot() {
                             rows={1}
                             style={{ minHeight: '24px', maxHeight: isExpanded ? '120px' : '80px' }}
                         />
-                        <button
-                            onClick={() => sendMessage()}
-                            disabled={isLoading || !input.trim()}
-                            className="w-10 h-10 sm:w-8 sm:h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200 flex-shrink-0"
-                            aria-label="Send message"
-                        >
-                            <Send className="w-3.5 h-3.5" />
-                        </button>
+                        {/* B5-thin: Stop replaces Send while a response is streaming.
+                            Aborts the in-flight fetch so the user isn't held hostage by
+                            a runaway tool. The server route already listens to req.signal
+                            at every chunk boundary and bails gracefully + refunds the credit. */}
+                        {isLoading ? (
+                            <button
+                                onClick={handleStop}
+                                className="w-10 h-10 sm:w-8 sm:h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-full bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 hover:text-red-200 transition-all flex items-center justify-center flex-shrink-0"
+                                aria-label="Stop response"
+                                title="Stop"
+                            >
+                                <Square className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => sendMessage()}
+                                disabled={!input.trim()}
+                                className="w-10 h-10 sm:w-8 sm:h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200 flex-shrink-0"
+                                aria-label="Send message"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                     </div>
                     {credits !== null && credits < 30 && (
                         <div className="mt-1.5 px-1">

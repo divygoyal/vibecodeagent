@@ -24,6 +24,47 @@ const CHAT_MODELS = [
     { model: 'gemini-3.1-flash-lite-preview', timeout: 15000 },
 ] as const;
 
+// B2-thin: lightweight intent classifier — runs ONCE per turn before the main
+// stream so we can pin the system prompt to the right INTENT MODE. Uses the
+// cheapest model. Output is plaintext "INTENT_LABEL"; we whitelist on parse.
+const INTENT_LABELS = [
+    'CASUAL_GREETING', 'DIAGNOSTIC', 'OPPORTUNITY', 'CONTENT_BRIEF',
+    'EXECUTIVE_SUMMARY', 'TECHNICAL_AUDIT', 'META_QUESTION',
+] as const;
+type IntentLabel = typeof INTENT_LABELS[number];
+
+async function classifyIntent(genai: GoogleGenAI, userMessage: string): Promise<IntentLabel | null> {
+    try {
+        const res: any = await genai.models.generateContent({
+            model: 'gemini-3.1-flash-lite-preview',
+            contents: [{ role: 'user', parts: [{ text:
+                `Classify this user message into ONE of these intent labels and respond with JUST the label, nothing else:\n` +
+                `CASUAL_GREETING — pleasantries, "hi", "thanks", small talk, no analytical question.\n` +
+                `DIAGNOSTIC — a "why did X happen / what broke" investigation request.\n` +
+                `OPPORTUNITY — "what should I do / find me wins / growth opportunities".\n` +
+                `CONTENT_BRIEF — write a brief, generate meta tags, blog ideas, content outline.\n` +
+                `EXECUTIVE_SUMMARY — "summarize", "top-line", "executive snapshot", "TLDR".\n` +
+                `TECHNICAL_AUDIT — "audit my site", "is my SEO good", "find issues".\n` +
+                `META_QUESTION — asks about the chat itself ("what can you do", "which tools").\n\n` +
+                `MESSAGE: ${userMessage.slice(0, 800)}\n\n` +
+                `Respond with exactly one label from the list above. No quotes, no commentary.`
+            }] }],
+            config: {
+                temperature: 0,
+                maxOutputTokens: 12,
+                httpOptions: { timeout: 6000 },
+            },
+        });
+        const raw = (res?.text || '').trim().toUpperCase();
+        for (const label of INTENT_LABELS) {
+            if (raw.includes(label)) return label;
+        }
+        return null;
+    } catch {
+        return null; // best-effort; caller falls back to inferring from prompt
+    }
+}
+
 function isRetryableError(error: any): boolean {
     const msg = error?.message || '';
     const name = error?.name || '';
@@ -382,15 +423,24 @@ export async function POST(req: NextRequest) {
             availableSitesContext += `\n[GA4: ${cachedGa4Properties.map((p: any) => `${p.property}(${p.displayName || ''})`).join(', ')}]`;
         }
 
+        // B2-thin: classify intent ONCE per turn (cheap pre-flight call).
+        // Result is injected as [INTENT: <label>] so the model can pin its
+        // response shape to the matching INTENT MODE in the system prompt.
+        // We don't await this — kick it off and resolve it before the main
+        // stream call below.
+        const intentPromise = ai ? classifyIntent(ai, message).catch(() => null) : Promise.resolve(null);
+
         // User message with injected data context
         const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
         const githubTag = `[GitHub:${githubConnected ? 'connected' : 'not_connected'}]`;
         const repoTag = (githubConnected && selectedRepo)
             ? `[Repo: ${selectedRepo} · ${repoIsAuto ? 'auto' : 'confirmed'}]`
             : '';
+        const intentLabel = await intentPromise;
+        const intentTag = intentLabel ? `[INTENT: ${intentLabel}]` : '';
         const contextBlock = dataContext
-            ? `${siteTag}${githubTag}${repoTag}${dataContext}${availableSitesContext}\n---\n${message}`
-            : `${siteTag}${githubTag}${repoTag}${availableSitesContext}\n${message}`;
+            ? `${siteTag}${githubTag}${repoTag}${intentTag}${dataContext}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${repoTag}${intentTag}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],
@@ -429,6 +479,12 @@ CRITICAL SYSTEM CONTEXT:
                     // Send credit update immediately
                     if (creditBalance !== null) {
                         controller.enqueue(encodeSSE({ type: 'credits', value: creditBalance }));
+                    }
+                    // B2-thin: surface classified intent so the client can show
+                    // a per-intent badge / tune its UI (e.g. hide chart panel for
+                    // CASUAL_GREETING intents).
+                    if (intentLabel) {
+                        controller.enqueue(encodeSSE({ type: 'intent', value: intentLabel }));
                     }
 
                     let currentContents = [...contents];
