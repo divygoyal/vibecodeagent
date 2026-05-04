@@ -3712,6 +3712,64 @@ async def update_leaderboard_stats(
     return {"success": True}
 
 
+class HistoryBackfillRequest(BaseModel):
+    days: List[Dict[str, Any]]  # [{date, monthly_visitors, monthly_pageviews?, engagement_rate?, bounce_rate?, avg_session_duration?}]
+
+
+@app.post("/api/leaderboard/{entry_id}/history/backfill")
+async def backfill_leaderboard_history(
+    entry_id: int,
+    body: HistoryBackfillRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Bulk-upsert per-day history rows for the visitor sparkline.
+
+    Called by the web join route right after a new entry's first GA4 fetch so
+    the chart shows real 30-day history immediately instead of being a flat
+    line until the daily cron has run for a month. Idempotent on
+    (entry_id, recorded_on) — re-running with the same dates overwrites.
+    """
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    upserted = 0
+    for row in body.days:
+        raw_date = row.get("date")
+        if not raw_date:
+            continue
+        try:
+            # Accept either "YYYYMMDD" (GA4 native) or "YYYY-MM-DD".
+            cleaned = str(raw_date).replace("-", "")
+            recorded_on = date(int(cleaned[:4]), int(cleaned[4:6]), int(cleaned[6:8]))
+        except (ValueError, IndexError):
+            continue
+
+        existing = await db.execute(
+            select(LeaderboardStatsHistory).where(
+                LeaderboardStatsHistory.entry_id == entry.id,
+                LeaderboardStatsHistory.recorded_on == recorded_on,
+            )
+        )
+        history = existing.scalar_one_or_none()
+        if history is None:
+            history = LeaderboardStatsHistory(entry_id=entry.id, recorded_on=recorded_on)
+            db.add(history)
+        history.monthly_visitors = int(row.get("monthly_visitors", 0) or 0)
+        history.monthly_pageviews = int(row.get("monthly_pageviews", 0) or 0)
+        history.engagement_rate = float(row.get("engagement_rate", 0) or 0)
+        history.bounce_rate = float(row.get("bounce_rate", 0) or 0)
+        history.avg_session_duration = float(row.get("avg_session_duration", 0) or 0)
+        upserted += 1
+
+    await db.commit()
+    return {"success": True, "upserted": upserted}
+
+
 # ============= Annotations =============
 
 VALID_ANNOTATION_CATEGORIES = {"marketing", "technical", "product", "algorithm_update", "custom"}

@@ -141,10 +141,84 @@ async function refreshEntryStats(
             body: JSON.stringify(stats),
         });
 
+        // Backfill the per-day history sparkline so the chart renders 30 real
+        // days the moment a user joins, instead of being a flat one-point line
+        // until the daily cron has run for a month. Best-effort — failures
+        // here don't block the join because the cron will eventually catch up.
+        backfillHistory(entryId, pid, token).catch((err) =>
+            console.error('[Leaderboard Instant] History backfill failed:', err),
+        );
+
         return updateRes.ok ? stats : stats;
     } catch (err) {
         console.error('[Leaderboard Instant] Stats refresh failed:', err);
         return null;
+    }
+}
+
+/**
+ * Pull the last 30 days of per-day GA4 metrics and bulk-upsert them into
+ * leaderboard_stats_history so the visitor sparkline has real points right
+ * away. Idempotent: re-runs overwrite same-date rows on the admin side.
+ */
+async function backfillHistory(
+    entryId: number,
+    cleanedPropertyId: string,
+    token: string,
+) {
+    const reportRes = await fetch(`${GA_DATA_BASE}/${cleanedPropertyId}:runReport`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            dateRanges: [{ startDate: '29daysAgo', endDate: 'today' }],
+            dimensions: [{ name: 'date' }],
+            metrics: [
+                { name: 'activeUsers' },
+                { name: 'screenPageViews' },
+                { name: 'engagementRate' },
+                { name: 'bounceRate' },
+                { name: 'averageSessionDuration' },
+            ],
+            orderBys: [{ dimension: { dimensionName: 'date' } }],
+            limit: 60,
+        }),
+        signal: AbortSignal.timeout(15000),
+    });
+
+    if (!reportRes.ok) {
+        console.error('[Leaderboard Backfill] GA4 daily-series error:', await reportRes.text());
+        return;
+    }
+
+    type GA4Row = { dimensionValues?: Array<{ value: string }>; metricValues?: Array<{ value: string }> };
+    const data = (await reportRes.json()) as { rows?: GA4Row[] };
+    const rows = data.rows || [];
+
+    const days = rows.map((r) => {
+        const date = r.dimensionValues?.[0]?.value || '';
+        const m = r.metricValues || [];
+        return {
+            date,
+            monthly_visitors: parseInt(m[0]?.value || '0', 10) || 0,
+            monthly_pageviews: parseInt(m[1]?.value || '0', 10) || 0,
+            engagement_rate: +(((parseFloat(m[2]?.value || '0') || 0) * 100).toFixed(1)),
+            bounce_rate: +(((parseFloat(m[3]?.value || '0') || 0) * 100).toFixed(1)),
+            avg_session_duration: Math.round(parseFloat(m[4]?.value || '0') || 0),
+        };
+    });
+
+    if (days.length === 0) return;
+
+    const backfillRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/${entryId}/history/backfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+        body: JSON.stringify({ days }),
+    });
+
+    if (backfillRes.ok) {
+        console.log(`[Leaderboard Backfill] ✓ Entry ${entryId}: ${days.length} days seeded`);
+    } else {
+        console.error(`[Leaderboard Backfill] ✗ Entry ${entryId}: admin returned ${backfillRes.status}`);
     }
 }
 
