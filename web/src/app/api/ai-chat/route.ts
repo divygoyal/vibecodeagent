@@ -586,6 +586,11 @@ CRITICAL SYSTEM CONTEXT:
 
                         let fullText = '';
                         let pendingFunctionCalls: any[] = [];
+                        // B5-full: track when this stream pass first emits a tool call —
+                        // text BEFORE that boundary is "thinking" (pre-tool reasoning),
+                        // text AFTER is the user-facing answer. Stream them as different
+                        // SSE event types so the client can render them differently.
+                        let sawToolCallInThisPass = false;
 
                         // Stream chunks from the SDK
                         for await (const chunk of response) {
@@ -594,16 +599,24 @@ CRITICAL SYSTEM CONTEXT:
                                 controller.close();
                                 return;
                             }
-                            // A6: stream text chunks ALWAYS — including the model's pre-tool
-                            // reasoning (e.g. "I'll start by checking your GSC data for…").
-                            // Previously gated on "no function calls in chunk", which silently
-                            // dropped the most user-visible part: the thinking out loud.
+                            // A6 + B5-full: stream text chunks ALWAYS, but split on the
+                            // tool-call boundary. Pre-tool text is reasoning ("Thinking…"
+                            // collapsible); post-tool text is the answer. The first
+                            // assistant pass may emit only thinking; later passes after
+                            // tools execute emit only answer.
                             if (chunk.text) {
                                 fullText += chunk.text;
+                                const eventType = (loopCount === 1 && !sawToolCallInThisPass)
+                                    ? 'thinking_block'
+                                    : 'text';
                                 controller.enqueue(encodeSSE({
-                                    type: 'text',
+                                    type: eventType,
                                     content: chunk.text,
                                 }));
+                            }
+                            // Detect tool-call boundary so subsequent text is treated as answer.
+                            if (chunk.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall)) {
+                                sawToolCallInThisPass = true;
                             }
 
                             // Collect function call parts from raw candidates

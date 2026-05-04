@@ -5,6 +5,10 @@ export interface ChatMessage {
     content: string;
     timestamp: string; // ISO string for serialization
     tools?: { name: string; args: any; result?: string; structuredData?: any }[];
+    /** B5-full: model's pre-tool reasoning. Renders as a collapsible "Thinking…"
+     *  block above the answer. Distinct from `content` because the user can
+     *  hide it once the answer lands. */
+    thinking?: string;
     hasError?: boolean;
 }
 

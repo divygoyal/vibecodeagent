@@ -1,15 +1,35 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Sparkles, Minimize2, Maximize2, Coins, RotateCcw, ChevronDown, Globe, Sun, Square, History, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
-import Link from 'next/link';
+/**
+ * AIChatbot — chat widget orchestrator.
+ *
+ * After the B5-full split, this file is a thin state container. It owns:
+ *   • all useState / useRef / useCallback hooks
+ *   • the SSE streaming loop in sendMessage()
+ *   • event listeners (open-ai-chat, trafficclaw:ask-ai, Esc-to-close)
+ *   • the floating-button (closed) + chat-window (open) composition
+ *
+ * Presentation lives in components/chat/*:
+ *   ChatHeader      — header bar, site picker, action buttons
+ *   HistoryPanel    — overlay listing past threads
+ *   QuickPrompts    — empty-state prompt chips + Daily Briefing button
+ *   ChatInput       — textarea + Send/Stop button
+ *   MessageBubble   — single message row (memoized)
+ *   ThinkingIndicator — pulsing-orb activity indicator
+ */
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Sparkles } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
-import ChatMessageRenderer from './ChatMessageRenderer';
 import { buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, persistMessage, getOrCreateThreadId, setActiveThreadId, type ChatMessage } from '@/stores/chatStore';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
+import { ChatHeader } from './chat/ChatHeader';
+import { HistoryPanel, type HistoryThread } from './chat/HistoryPanel';
+import { QuickPrompts } from './chat/QuickPrompts';
+import { ChatInput } from './chat/ChatInput';
+import { MessageBubble } from './chat/MessageBubble';
+import { ThinkingIndicator } from './chat/ThinkingIndicator';
 
 type Message = ChatMessage;
 
@@ -18,107 +38,6 @@ interface SiteOption {
     label: string;
     type: string;
 }
-
-const QUICK_PROMPTS = [
-    '🎯 What is the ONE thing I should do today to grow?',
-    '🚨 Why did my traffic drop?',
-    '💰 Which pages are money pits? (high impressions, low clicks)',
-    '📈 Keywords on page 2 I can push to page 1',
-    '📝 Give me 5 blog post ideas based on my data',
-    '📊 Grade my SEO (A-F)',
-    '⚡ Are my Core Web Vitals hurting my rankings?',
-    '🔮 Growth opportunities I am missing',
-];
-
-const THINKING_PHASES = [
-    { text: 'Warming up brain cells...', anim: 'typing' },
-    { text: 'Scanning your data...', anim: 'searching' },
-    { text: 'Crunching the numbers...', anim: 'lifting' },
-    { text: 'Connecting the dots...', anim: 'thinking' },
-    { text: 'Hunting for insights...', anim: 'searching' },
-    { text: 'Downloading intelligence...', anim: 'rocket' },
-    { text: 'Processing at light speed...', anim: 'rocket' },
-    { text: 'Reading the data tea leaves...', anim: 'thinking' },
-    { text: 'Asking the data gods...', anim: 'typing' },
-    { text: 'Decoding the matrix...', anim: 'lifting' },
-    { text: 'Robot brain go brrrr...', anim: 'thinking' },
-    { text: 'Consulting the algorithm overlords...', anim: 'searching' },
-    { text: 'Performing digital gymnastics...', anim: 'lifting' },
-    { text: 'Brewing data espresso...', anim: 'typing' },
-] as const;
-
-const TOOL_LABELS: Record<string, string> = {
-    get_search_performance: 'Digging through search data...',
-    run_ga4_report: 'Querying your analytics...',
-    run_page_audit: 'Running PageSpeed Insights...',
-    run_site_audit: 'Auditing 50+ HTML/SEO checks...',
-    inspect_url: 'Asking Google about indexing...',
-    cross_source_diagnose: 'Cross-referencing GA4 + GSC + commits...',
-    get_alerts: 'Triaging anomalies...',
-    run_funnel_analysis: 'Mapping funnel drop-offs...',
-    run_journey_analysis: 'Tracing user journeys...',
-    run_cohort_retention: 'Computing retention curves...',
-    analyze_pr_seo_diff: 'Reading PR diff for SEO regressions...',
-    compute_site_health_score: 'Rolling up health score...',
-    write_dashboard_annotation: 'Saving annotation to dashboard...',
-    calculate_revenue_impact: 'Counting potential dollars...',
-    generate_content_strategy: 'Cooking up content ideas...',
-    analyze_keyword_clusters: 'Clustering your keywords...',
-    compare_time_periods: 'Comparing time periods...',
-    find_cannibalization: 'Checking for cannibalization...',
-    suggest_internal_links: 'Finding linking opportunities...',
-    generate_meta_tags: 'Crafting meta tags...',
-    run_realtime_report: 'Checking who\'s online now...',
-    get_custom_dimensions: 'Discovering custom tracking...',
-};
-
-// Memoized message bubble — prevents re-rendering old messages when new chunks arrive
-const MessageBubble = memo(function MessageBubble({ msg, isExpanded, isStreaming, snapshot, onSuggestionClick }: { msg: Message; isExpanded: boolean; isStreaming?: boolean; snapshot?: any; onSuggestionClick?: (s: string) => void }) {
-    const isUser = msg.role === 'user';
-    return (
-        <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-            <div className={`${isExpanded ? 'max-w-[90%] sm:max-w-[75%]' : 'max-w-[88%]'} text-sm leading-relaxed ${isUser
-                ? 'bg-white/[0.07] text-zinc-100 rounded-[20px] rounded-br-md px-3 py-2.5 sm:px-4 sm:py-3'
-                : 'text-zinc-300 px-1 py-1'
-                }`}>
-                {msg.role === 'assistant' ? (
-                    <ChatMessageRenderer content={msg.content} tools={msg.tools} isStreaming={isStreaming} snapshot={snapshot} onSuggestionClick={onSuggestionClick} />
-                ) : (
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
-                )}
-                <div className={`text-[10px] text-zinc-600 mt-1.5 select-none ${isUser ? '' : 'px-0'}`}>
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-            </div>
-        </div>
-    );
-});
-
-// Fun animated robot thinking indicator with full body + phase-specific animations
-
-const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { activeTool?: string }) {
-    const [phase, setPhase] = useState(0);
-
-    useEffect(() => {
-        const timer = setInterval(() => setPhase(p => (p + 1) % THINKING_PHASES.length), 2500);
-        return () => clearInterval(timer);
-    }, []);
-
-    const message = activeTool ? (TOOL_LABELS[activeTool] || 'Running analysis...') : THINKING_PHASES[phase].text;
-
-    return (
-        <div className="flex justify-start">
-            <div className="flex items-center gap-3 px-1 py-2">
-                {/* Minimal pulsing orb */}
-                <div className="relative flex-shrink-0 w-6 h-6">
-                    <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" style={{ animationDuration: '2s' }} />
-                    <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 opacity-80" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
-                </div>
-                <span className="text-[13px] text-zinc-400">{message}</span>
-            </div>
-        </div>
-    );
-});
 
 const WELCOME_MESSAGE: Message = {
     role: 'assistant',
@@ -400,6 +319,16 @@ export default function AIChatbot() {
                         if (data.type === 'text') {
                             // Batched via rAF — no setState per chunk
                             appendStreamText(data.content);
+                        } else if (data.type === 'thinking_block') {
+                            // B5-full: append to the message's `thinking` field.
+                            // Streamed in real time so the user can watch it grow.
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.thinking = (last.thinking || '') + data.content;
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
                         } else if (data.type === 'tool_start') {
                             setMessages(prev => {
                                 const updated = [...prev];
@@ -577,7 +506,7 @@ export default function AIChatbot() {
     // B1-full: thread sidebar state — list of past threads + load handler.
     const [showHistory, setShowHistory] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [historyThreads, setHistoryThreads] = useState<{ id: string; title: string; last_message_at: string; site_url?: string; persona?: string; archived?: boolean }[]>([]);
+    const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
 
     const fetchHistory = useCallback(async () => {
         setHistoryLoading(true);
@@ -660,142 +589,31 @@ export default function AIChatbot() {
     // ─── Chat window ───
     return (
         <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-0 right-0 w-full h-full sm:bottom-6 sm:right-6 sm:w-[440px] sm:h-[640px]'} transition-all duration-300`}>
-            <div className="w-full h-full bg-[var(--sidebar-bg)] border border-[var(--card-border)] rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
-                {/* ── Header ── */}
-                <div className="px-4 py-3 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--header-bg)]">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center relative">
-                            <Sparkles className="w-4 h-4 text-black" />
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[var(--header-bg)]" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm sm:text-base font-semibold text-white leading-none">AI Analyst</h3>
-                            {/* Site selector inline */}
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowSiteDropdown(!showSiteDropdown)}
-                                    className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors mt-0.5"
-                                >
-                                    <Globe className="w-2.5 h-2.5" />
-                                    <span className="max-w-[120px] truncate">{currentSiteLabel}</span>
-                                    <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showSiteDropdown ? 'rotate-180' : ''}`} />
-                                </button>
-                                {showSiteDropdown && (
-                                    <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setShowSiteDropdown(false)} />
-                                        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[200px] overflow-y-auto">
-                                            {allSites.length === 0 ? (
-                                                <div className="px-3 py-2 text-[11px] text-zinc-600">No sites connected</div>
-                                            ) : (
-                                                allSites.map(site => (
-                                                    <button
-                                                        key={site.id}
-                                                        onClick={() => { setSelectedChatSite(site.id); setShowSiteDropdown(false); }}
-                                                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 transition ${selectedChatSite === site.id
-                                                            ? 'text-emerald-400 bg-emerald-500/[0.06]'
-                                                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
-                                                            }`}
-                                                    >
-                                                        <Globe className="w-3 h-3 flex-shrink-0" />
-                                                        <span className="truncate">{site.label}</span>
-                                                        <span className="ml-auto text-[9px] text-zinc-600">{site.type}</span>
-                                                        {selectedChatSite === site.id && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-1" />}
-                                                    </button>
-                                                ))
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        {credits !== null && (
-                            <div className="relative flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/8 border border-amber-500/15 mr-1">
-                                <Coins className="w-3 h-3 text-amber-400" />
-                                <span className="text-[10px] font-bold text-amber-400">{credits}</span>
-                                <AnimatePresence>
-                                    {showCreditAnim && (
-                                        <motion.span
-                                            initial={{ opacity: 1, y: 0 }}
-                                            animate={{ opacity: 0, y: -20 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 1.5, ease: 'easeOut' }}
-                                            className="absolute -top-1 right-0 text-[10px] font-bold text-red-400 pointer-events-none"
-                                        >
-                                            -1
-                                        </motion.span>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        )}
-                        <button
-                            onClick={() => { setShowHistory(prev => { if (!prev) void fetchHistory(); return !prev; }); }}
-                            className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'text-white bg-white/[0.06]' : 'text-zinc-600 hover:text-white hover:bg-white/[0.04]'}`}
-                            aria-label="Past conversations"
-                            title="History"
-                        >
-                            <History className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setShowClearConfirm(true)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" aria-label="Clear chat history" title="Clear chat">
-                            <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" aria-label={isExpanded ? 'Minimize chat' : 'Expand chat'} title={isExpanded ? 'Minimize' : 'Expand'}>
-                            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                        </button>
-                        <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-colors" aria-label="Close chat" title="Close (Esc)">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
+            <div className="w-full h-full bg-[var(--sidebar-bg)] border border-[var(--card-border)] rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden relative">
+                <ChatHeader
+                    currentSiteLabel={currentSiteLabel}
+                    allSites={allSites}
+                    selectedChatSite={selectedChatSite}
+                    onSiteChange={setSelectedChatSite}
+                    showSiteDropdown={showSiteDropdown}
+                    setShowSiteDropdown={setShowSiteDropdown}
+                    credits={credits}
+                    showCreditAnim={showCreditAnim}
+                    showHistory={showHistory}
+                    onHistoryClick={() => { setShowHistory(prev => { if (!prev) void fetchHistory(); return !prev; }); }}
+                    onClearClick={() => setShowClearConfirm(true)}
+                    isExpanded={isExpanded}
+                    onExpandToggle={() => setIsExpanded(!isExpanded)}
+                    onClose={() => setIsOpen(false)}
+                />
 
-                {/* B1-full: thread history panel — overlays the chat region.
-                    Click outside or X to close; click a thread to load its messages. */}
                 {showHistory && (
-                    <div className="absolute inset-x-0 top-[57px] bottom-0 z-40 bg-[var(--sidebar-bg)] border-t border-[var(--card-border)] flex flex-col">
-                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--card-border)]">
-                            <div className="flex items-center gap-2">
-                                <History className="w-3.5 h-3.5 text-cyan-400" />
-                                <span className="text-[12px] font-semibold text-white">Past conversations</span>
-                                <span className="text-[10px] text-zinc-500 tabular-nums">{historyThreads.length}</span>
-                            </div>
-                            <button onClick={() => setShowHistory(false)} className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/[0.04]" aria-label="Close history">
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                            {historyLoading && (
-                                <div className="flex items-center justify-center py-8 text-zinc-500">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                </div>
-                            )}
-                            {!historyLoading && historyThreads.length === 0 && (
-                                <div className="px-4 py-8 text-center text-[12px] text-zinc-500">
-                                    No saved conversations yet. Send a message to start one.
-                                </div>
-                            )}
-                            {!historyLoading && historyThreads.map(t => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => loadThread(t.id)}
-                                    className="w-full text-left px-4 py-2.5 border-b border-white/[0.03] hover:bg-white/[0.025] transition-colors"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-[12px] text-zinc-200 truncate font-medium">{t.title || 'Untitled'}</p>
-                                            <p className="text-[10px] text-zinc-500 mt-0.5 truncate">
-                                                {t.site_url ? t.site_url.replace(/^sc-domain:|^https?:\/\//, '').replace(/\/$/, '') : '—'}
-                                                {t.persona ? ` · ${t.persona}` : ''}
-                                            </p>
-                                        </div>
-                                        <span className="text-[9px] text-zinc-600 flex-shrink-0 tabular-nums">
-                                            {t.last_message_at ? new Date(t.last_message_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
-                                        </span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <HistoryPanel
+                        threads={historyThreads}
+                        loading={historyLoading}
+                        onSelect={loadThread}
+                        onClose={() => setShowHistory(false)}
+                    />
                 )}
 
                 {/* ── Messages ── */}
@@ -818,7 +636,7 @@ export default function AIChatbot() {
                                             }}
                                             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.08] hover:text-white transition"
                                         >
-                                            <RotateCcw className="w-3 h-3" /> Retry
+                                            ↻ Retry
                                         </button>
                                     </div>
                                 )}
@@ -826,102 +644,33 @@ export default function AIChatbot() {
                         );
                     })}
 
-                    {/* Thinking indicator — cute robot with cycling messages */}
                     {isLoading && (!lastMsg?.content || activeTool) && (
                         <ThinkingIndicator activeTool={activeTool} />
                     )}
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* ── Quick Prompts — shown until the user sends their first message ── */}
                 {!messages.some(m => m.role === 'user') && !isLoading && (
-                    <div className="px-4 pb-2">
-                        {!dataReady && (
-                            <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full border border-emerald-500/30 border-t-emerald-400 animate-spin" />
-                                Loading your data...
-                            </div>
-                        )}
-                        <div className="flex flex-wrap gap-1.5">
-                            {/* A5: Briefing is now an explicit button — was previously auto-firing
-                                on widget open, which spent a credit before the user typed anything. */}
-                            <button
-                                onClick={requestBriefing}
-                                disabled={!dataReady || briefingDoneToday}
-                                title={briefingDoneToday ? 'Already viewed today' : 'Daily briefing of overnight changes + #1 priority'}
-                                className="text-xs px-3 py-2 sm:text-[11px] sm:px-2.5 sm:py-1.5 rounded-lg bg-amber-500/[0.05] border border-amber-500/[0.20] text-amber-300 hover:bg-amber-500/[0.10] hover:border-amber-500/[0.35] hover:text-amber-200 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-amber-500/[0.05] disabled:hover:border-amber-500/[0.20]"
-                            >
-                                <Sun className="w-3 h-3" />
-                                {briefingDoneToday ? 'Briefing — already viewed' : 'Daily Briefing'}
-                            </button>
-                            {QUICK_PROMPTS.map((prompt, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => sendMessage(prompt)}
-                                    disabled={!dataReady}
-                                    className="text-xs px-3 py-2 sm:text-[11px] sm:px-2.5 sm:py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/[0.15] hover:bg-emerald-500/[0.03] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-500 disabled:hover:border-white/[0.04] disabled:hover:bg-white/[0.02]"
-                                >
-                                    {prompt}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <QuickPrompts
+                        dataReady={dataReady}
+                        briefingDoneToday={briefingDoneToday}
+                        onBriefingClick={requestBriefing}
+                        onPromptClick={(prompt) => sendMessage(prompt)}
+                    />
                 )}
 
-                {/* ── Input ── */}
-                <div className="px-3 py-3 border-t border-[var(--card-border)] bg-[var(--sidebar-bg)]">
-                    <div className="flex items-end gap-2 bg-[var(--input-bg)] rounded-2xl px-4 py-3 border border-transparent focus-within:border-[var(--input-border)] transition-colors">
-                        <textarea
-                            ref={isExpanded ? textareaRef : inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    sendMessage();
-                                }
-                            }}
-                            placeholder="Ask anything..."
-                            className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
-                            disabled={isLoading}
-                            rows={1}
-                            style={{ minHeight: '24px', maxHeight: isExpanded ? '120px' : '80px' }}
-                        />
-                        {/* B5-thin: Stop replaces Send while a response is streaming.
-                            Aborts the in-flight fetch so the user isn't held hostage by
-                            a runaway tool. The server route already listens to req.signal
-                            at every chunk boundary and bails gracefully + refunds the credit. */}
-                        {isLoading ? (
-                            <button
-                                onClick={handleStop}
-                                className="w-10 h-10 sm:w-8 sm:h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-full bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 hover:text-red-200 transition-all flex items-center justify-center flex-shrink-0"
-                                aria-label="Stop response"
-                                title="Stop"
-                            >
-                                <Square className="w-3.5 h-3.5 fill-current" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => sendMessage()}
-                                disabled={!input.trim()}
-                                className="w-10 h-10 sm:w-8 sm:h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200 flex-shrink-0"
-                                aria-label="Send message"
-                            >
-                                <Send className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                    </div>
-                    {credits !== null && credits < 30 && (
-                        <div className="mt-1.5 px-1">
-                            <Link href="/dashboard/plan" className="text-[9px] text-amber-500/70 font-medium hover:text-amber-400 transition-colors">
-                                Low messages: {credits} — Upgrade for more
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                <ChatInput
+                    ref={isExpanded ? textareaRef : (inputRef as unknown as React.RefObject<HTMLTextAreaElement>)}
+                    input={input}
+                    onChange={setInput}
+                    onSubmit={() => sendMessage()}
+                    isLoading={isLoading}
+                    onStop={handleStop}
+                    isExpanded={isExpanded}
+                    credits={credits}
+                />
             </div>
 
-            {/* Confirm clear chat dialog */}
             <ConfirmDialog
                 open={showClearConfirm}
                 onClose={() => setShowClearConfirm(false)}

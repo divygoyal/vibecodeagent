@@ -11,6 +11,7 @@ import type { Components } from 'react-markdown';
 import { SmartChartPanel } from './chat/ChatCharts';
 import { splitContentOnChartTags, renderSnapshotChart } from './chat/SnapshotChartRenderer';
 import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
+import { ThinkingBlock } from './chat/ThinkingBlock';
 import { safeParseToolResult } from '@/lib/chatUtils';
 
 /* ─── Code Block ─── */
@@ -243,12 +244,15 @@ function parseSuggestions(text: string): { cleanContent: string; suggestions: st
 interface ChatMessageRendererProps {
     content: string;
     tools?: ToolCall[];
+    /** B5-full: model's pre-tool reasoning. Rendered as a collapsible block
+     *  above tool icons so users can read it OR hide it. Streamed live. */
+    thinking?: string;
     isStreaming?: boolean;
     snapshot?: DashboardSnapshot;
     onSuggestionClick?: (suggestion: string) => void;
 }
 
-export default memo(function ChatMessageRenderer({ content, tools, isStreaming, snapshot, onSuggestionClick }: ChatMessageRendererProps) {
+export default memo(function ChatMessageRenderer({ content, tools, thinking, isStreaming, snapshot, onSuggestionClick }: ChatMessageRendererProps) {
     const { cleanContent, suggestions } = useMemo(
         () => isStreaming ? { cleanContent: content, suggestions: [] } : parseSuggestions(content || ''),
         [content, isStreaming]
@@ -273,6 +277,14 @@ export default memo(function ChatMessageRenderer({ content, tools, isStreaming, 
 
     return (
         <div className="chat-message-content">
+            {/* B5-full: model's pre-tool reasoning, collapsible. Auto-opens
+                while streaming so the user has something to watch; collapsible
+                once the answer lands. Renders ABOVE tool icons because in the
+                stream timeline reasoning happens first. */}
+            {thinking && thinking.trim() && (
+                <ThinkingBlock content={thinking} isStreaming={isStreaming && !content} />
+            )}
+
             {/* Tool calls */}
             {tools && tools.length > 0 && (
                 <div className="mb-4 space-y-1">
