@@ -213,23 +213,24 @@ const markdownComponents: Components = {
         );
     },
     pre: ({ children }) => <>{children}</>,
+    // Premium table treatment: no card background, no rounded corners, just
+    // a thin top + bottom rule with subtle row dividers. Headers are zinc-500
+    // small-caps, NOT loud uppercase. Matches the Claude/ChatGPT visual style.
     table: ({ children }) => (
-        <div className="my-5 rounded-xl overflow-hidden border border-zinc-800/60 bg-[var(--input-bg)]">
-            <div className="overflow-x-auto">
-                <table className="w-full text-[13px]">{children}</table>
-            </div>
+        <div className="my-5 -mx-1 overflow-x-auto">
+            <table className="w-full text-[13px] border-collapse">{children}</table>
         </div>
     ),
     thead: ({ children }) => (
-        <thead className="border-b border-zinc-800/80">{children}</thead>
+        <thead className="border-b border-white/[0.08]">{children}</thead>
     ),
-    tbody: ({ children }) => <tbody className="divide-y divide-zinc-800/40">{children}</tbody>,
-    tr: ({ children }) => <tr className="hover:bg-white/[0.02]">{children}</tr>,
+    tbody: ({ children }) => <tbody className="divide-y divide-white/[0.04]">{children}</tbody>,
+    tr: ({ children }) => <tr className="transition-colors hover:bg-white/[0.015]">{children}</tr>,
     th: ({ children }) => (
-        <th className="px-4 py-3 text-left text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">{children}</th>
+        <th className="px-3 py-2 text-left text-[11px] text-zinc-500 font-medium">{children}</th>
     ),
     td: ({ children }) => (
-        <td className="px-4 py-3 text-zinc-300">
+        <td className="px-3 py-2.5 text-zinc-300 align-top">
             {highlightNumbersInChildren(children, 'td')}
         </td>
     ),

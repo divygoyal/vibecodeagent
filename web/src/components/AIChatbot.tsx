@@ -15,7 +15,8 @@
  *   QuickPrompts    — empty-state prompt chips + Daily Briefing button
  *   ChatInput       — textarea + Send/Stop button
  *   MessageBubble   — single message row (memoized)
- *   ThinkingIndicator — pulsing-orb activity indicator
+ *   ReasoningTrace  — Claude-style live narration timeline (replaces the
+ *                     old ThinkingIndicator pulsing-orb)
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
@@ -29,7 +30,7 @@ import { HistoryPanel, type HistoryThread } from './chat/HistoryPanel';
 import { QuickPrompts } from './chat/QuickPrompts';
 import { ChatInput } from './chat/ChatInput';
 import { MessageBubble } from './chat/MessageBubble';
-import { ThinkingIndicator } from './chat/ThinkingIndicator';
+import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from './chat/ReasoningTrace';
 
 type Message = ChatMessage;
 
@@ -139,6 +140,16 @@ export default function AIChatbot() {
     // delayed by ~2s on diagnostic intents.
     const [isPlanning, setIsPlanning] = useState(false);
 
+    // B5-polish: live reasoning trace — array of lines that fades in as SSE
+    // events arrive (planning → tool starts → tool results → reasoning).
+    // Replaces the static cycling-phrase orb with Claude-style live narration.
+    const [traceLines, setTraceLines] = useState<TraceLine[]>([]);
+    const traceCounterRef = useRef(0);
+    const pushTraceLine = useCallback((text: string) => {
+        const id = `tl-${++traceCounterRef.current}-${Date.now()}`;
+        setTraceLines(prev => [...prev, { id, text }]);
+    }, []);
+
     const handleStop = useCallback(() => {
         if (abortRef.current) {
             try { abortRef.current.abort(); } catch { /* already aborted */ }
@@ -219,6 +230,7 @@ export default function AIChatbot() {
         setInput('');
         setIsLoading(true);
         setIsPlanning(false);
+        setTraceLines([]); // reset trace per-turn
 
         // B-1: persist the user turn to the server (best-effort, fire-and-forget)
         const turnStartedAt = Date.now();
@@ -337,12 +349,14 @@ export default function AIChatbot() {
                             });
                         } else if (data.type === 'planning') {
                             setIsPlanning(true);
+                            pushTraceLine('Planning the approach…');
                         } else if (data.type === 'planning_done') {
                             setIsPlanning(false);
                         } else if (data.type === 'plan_proposed') {
                             // B5-full: planner's structured plan, attached to the
                             // in-flight message so the PlanCard renders it inline.
                             setIsPlanning(false);
+                            if (data.plan?.summary) pushTraceLine(data.plan.summary);
                             setMessages(prev => {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
@@ -366,6 +380,7 @@ export default function AIChatbot() {
                                 return updated;
                             });
                         } else if (data.type === 'tool_start') {
+                            pushTraceLine(narrateToolStart(data.name));
                             setMessages(prev => {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
@@ -374,6 +389,7 @@ export default function AIChatbot() {
                                 return updated;
                             });
                         } else if (data.type === 'tool_result') {
+                            pushTraceLine(narrateToolResult(data.name, data.result));
                             setMessages(prev => {
                                 const updated = [...prev];
                                 const last = { ...updated[updated.length - 1] };
@@ -681,8 +697,13 @@ export default function AIChatbot() {
                         );
                     })}
 
-                    {isLoading && (!lastMsg?.content || activeTool || isPlanning) && (
-                        <ThinkingIndicator activeTool={activeTool} isPlanning={isPlanning} />
+                    {/* B5-polish: live reasoning trace replaces the static thinking
+                        orb. Shows plan summary + each tool start/result narration as
+                        events arrive — same pattern Claude uses to keep users from
+                        bouncing during multi-second tool runs. Hides once the
+                        assistant message has actual content. */}
+                    {isLoading && !lastMsg?.content && (
+                        <ReasoningTrace lines={traceLines} active={isLoading} />
                     )}
                     <div ref={messagesEndRef} />
                 </div>

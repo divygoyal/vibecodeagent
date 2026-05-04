@@ -39,12 +39,17 @@ const PATTERNS = [
     { type: 'big' as const, re: /\b\d{3,}\b/g },
 ];
 
+// Premium look: data tokens get visual WEIGHT (semibold + tabular nums), not
+// rainbow colors. The previous emerald/cyan/amber palette read as "cheap" —
+// Claude/ChatGPT/Grok all use a monochrome treatment for numbers in answers
+// and let the bold weight do the work.
+const NUMBER_TOKEN_CLASS = 'text-white font-semibold tabular-nums';
 const TONE: Record<string, string> = {
-    currency: 'text-emerald-300 font-semibold',
-    percent: 'text-cyan-300 font-semibold',
-    position: 'text-amber-300 font-semibold',
-    thousand: 'text-zinc-100 font-semibold tabular-nums',
-    big: 'text-zinc-100 font-semibold tabular-nums',
+    currency: NUMBER_TOKEN_CLASS,
+    percent: NUMBER_TOKEN_CLASS,
+    position: NUMBER_TOKEN_CLASS,
+    thousand: NUMBER_TOKEN_CLASS,
+    big: NUMBER_TOKEN_CLASS,
 };
 
 interface Match {

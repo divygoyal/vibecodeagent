@@ -453,38 +453,31 @@ export const CtrOpportunityList = memo(function CtrOpportunityList({ rows }: { r
             <div className={ACCENT_BAR} />
             <ChartHeader
                 icon={AlertTriangle}
-                iconColor="text-amber-400"
+                iconColor="text-zinc-400"
                 title="CTR Opportunities"
-                sub={`${opportunities.length} keywords leaking clicks`}
+                sub={`${opportunities.length} keywords below benchmark`}
             />
-            <div className="space-y-1.5">
-                {opportunities.map((o, i) => {
-                    const gapPct = (o.gap / o.expected) * 100;
-                    return (
-                        <div key={i} className="flex items-center gap-3 text-[11px] py-2 px-2.5 rounded-lg bg-white/[0.015] hover:bg-white/[0.04] transition-colors">
-                            <div className="flex-1 min-w-0">
-                                <p className="text-zinc-200 truncate font-medium">{o.query}</p>
-                                <p className="text-zinc-500 text-[10px]">
-                                    Pos {o.position?.toFixed(0)} &middot; {o.impressions?.toLocaleString()} impr
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-red-400 font-mono font-semibold tabular-nums">{o.ctr?.toFixed(1)}%</span>
-                                <TrendingDown className="w-3 h-3 text-zinc-600" />
-                                <span className="text-emerald-400 font-mono font-semibold tabular-nums">{o.expected?.toFixed(1)}%</span>
-                                <span
-                                    className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
-                                    style={{
-                                        background: gapPct > 70 ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
-                                        color: gapPct > 70 ? '#fca5a5' : '#fbbf24',
-                                    }}
-                                >
-                                    +{o.gap.toFixed(1)}% gap
-                                </span>
-                            </div>
+            <div className="space-y-0.5">
+                {opportunities.map((o, i) => (
+                    <div key={i} className="flex items-center gap-3 text-[12px] py-2 px-2.5 rounded-md hover:bg-white/[0.02] transition-colors">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-zinc-200 truncate font-medium">{o.query}</p>
+                            <p className="text-zinc-500 text-[10px]">
+                                Pos {o.position?.toFixed(0)} &middot; {o.impressions?.toLocaleString()} impr
+                            </p>
                         </div>
-                    );
-                })}
+                        <div className="flex items-center gap-3 flex-shrink-0 text-[11px]">
+                            <div className="flex items-center gap-1.5 text-zinc-500">
+                                <span className="text-zinc-100 font-semibold tabular-nums">{o.ctr?.toFixed(1)}%</span>
+                                <TrendingDown className="w-3 h-3 text-zinc-600" />
+                                <span className="text-zinc-400 tabular-nums">{o.expected?.toFixed(1)}%</span>
+                            </div>
+                            <span className="text-zinc-500 tabular-nums text-[10px]">
+                                gap {o.gap.toFixed(1)}%
+                            </span>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
