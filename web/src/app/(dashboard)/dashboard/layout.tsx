@@ -15,7 +15,7 @@ import Image from 'next/image';
 import {
     LayoutDashboard, Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
-    Coins, MessageCircle, MessageSquare,
+    Coins, MessageSquare,
     ChevronDown, Bell, Globe, Sparkles, Target, Trophy, Share2, type LucideIcon
 } from 'lucide-react';
 import {
@@ -120,7 +120,6 @@ const sidebarGroups: SidebarGroup[] = [
     ]},
     { label: 'Social APIs', items: [
         { icon: Sparkles, label: 'X mentions', href: '/dashboard/x-api' },
-        { icon: MessageCircle, label: 'Reddit mentions', href: '/dashboard/reddit-api' },
         { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
     { label: 'Growth', items: [
