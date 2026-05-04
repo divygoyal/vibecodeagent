@@ -381,6 +381,58 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class ChatFact(Base):
+    """Durable user-level facts extracted from conversations.
+
+    Phase B-1 — fact-extraction layer. After each assistant turn the chat
+    route fires a Flash-Lite call that pulls out durable facts (KPI prefs,
+    business model, brand voice, past commitments) as JSON. Facts persist
+    across threads and get injected into every system prompt as
+    [USER FACTS] context.
+
+    scope: 'global' | 'site' | 'repo' | 'correction' (last one for things
+    the user explicitly corrected the model on).
+    confidence: 0.0–1.0; we only inject facts above 0.6 by default.
+    """
+    __tablename__ = "chat_facts"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    scope = Column(String(20), nullable=False, default='global')
+    scope_value = Column(String(255))           # e.g. site_url for scope='site', repo for scope='repo'
+    key = Column(String(80), nullable=False, index=True)
+    value = Column(Text, nullable=False)
+    confidence = Column(Float, default=0.7)
+    source_message_id = Column(Integer)
+    source_thread_id = Column(String(36))
+    superseded_at = Column(DateTime, nullable=True)  # set when a newer fact overrides
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ChatFeedback(Base):
+    """User feedback (👍/👎 + optional reason) on individual assistant messages.
+
+    Phase B-6 minimal — drives a simple thumbs-up rate metric and feeds the
+    `correction` scope of ChatFact when users mark "hallucinated" or edit
+    a message factually.
+
+    rating: 'up' | 'down'.
+    reason: structured tag like 'wrong_number' | 'hallucinated' | 'too_long' |
+            'wrong_format' | 'missed_point' | 'other'.
+    """
+    __tablename__ = "chat_feedback"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    message_id = Column(Integer, nullable=False, index=True)
+    thread_id = Column(String(36), index=True)
+    rating = Column(String(10), nullable=False)
+    reason = Column(String(40))
+    comment = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class LeaderboardStatsHistory(Base):
     """Per-day snapshot of a leaderboard entry's stats — powers sparkline + weekly digest."""
     __tablename__ = "leaderboard_stats_history"

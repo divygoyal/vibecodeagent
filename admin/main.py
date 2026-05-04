@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -4464,6 +4464,229 @@ async def append_chat_message(
     await db.commit()
     await db.refresh(m)
     return _serialize_message(m)
+
+
+# ============= Chat Facts (Phase B-1: durable user facts) =============
+class ChatFactUpsert(BaseModel):
+    user_identifier: str
+    scope: str = 'global'                # global | site | repo | correction
+    scope_value: Optional[str] = None
+    key: str
+    value: str
+    confidence: float = 0.7
+    source_message_id: Optional[int] = None
+    source_thread_id: Optional[str] = None
+
+
+def _serialize_fact(f: ChatFact) -> dict:
+    return {
+        "id": f.id,
+        "scope": f.scope,
+        "scope_value": f.scope_value,
+        "key": f.key,
+        "value": f.value,
+        "confidence": f.confidence,
+        "source_message_id": f.source_message_id,
+        "source_thread_id": f.source_thread_id,
+        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+    }
+
+
+@app.get("/api/chat/facts")
+async def list_chat_facts(
+    user_identifier: str,
+    scope: Optional[str] = None,
+    min_confidence: float = 0.0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List a user's facts, newest-first."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"facts": []}
+    q = select(ChatFact).where(ChatFact.user_id == user.id, ChatFact.superseded_at.is_(None))
+    if scope:
+        q = q.where(ChatFact.scope == scope)
+    if min_confidence > 0:
+        q = q.where(ChatFact.confidence >= min_confidence)
+    q = q.order_by(ChatFact.updated_at.desc()).limit(min(max(1, limit), 200))
+    result = await db.execute(q)
+    return {"facts": [_serialize_fact(f) for f in result.scalars().all()]}
+
+
+@app.post("/api/chat/facts")
+async def upsert_chat_fact(
+    data: ChatFactUpsert,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Upsert a fact. Conflicting facts (same scope+scope_value+key) are
+    superseded — newest wins unless its confidence is materially lower."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if data.scope not in ('global', 'site', 'repo', 'correction'):
+        raise HTTPException(status_code=400, detail="invalid scope")
+    if not data.key or not data.value:
+        raise HTTPException(status_code=400, detail="key and value are required")
+
+    # Find an existing matching fact and supersede if confidence improves OR scope=correction
+    existing_q = select(ChatFact).where(
+        ChatFact.user_id == user.id,
+        ChatFact.scope == data.scope,
+        ChatFact.key == data.key[:80],
+        ChatFact.superseded_at.is_(None),
+    )
+    if data.scope_value:
+        existing_q = existing_q.where(ChatFact.scope_value == data.scope_value[:255])
+    existing = (await db.execute(existing_q)).scalars().all()
+    for prev in existing:
+        # Don't replace a higher-confidence fact with a lower one (unless this is a correction)
+        if data.scope != 'correction' and prev.confidence > data.confidence + 0.15:
+            continue
+        prev.superseded_at = datetime.utcnow()
+
+    fact = ChatFact(
+        user_id=user.id,
+        scope=data.scope,
+        scope_value=data.scope_value[:255] if data.scope_value else None,
+        key=data.key[:80],
+        value=data.value[:2000],
+        confidence=max(0.0, min(1.0, data.confidence)),
+        source_message_id=data.source_message_id,
+        source_thread_id=data.source_thread_id,
+    )
+    db.add(fact)
+    await db.commit()
+    await db.refresh(fact)
+    return _serialize_fact(fact)
+
+
+@app.delete("/api/chat/facts/{fact_id}")
+async def delete_chat_fact(
+    fact_id: int,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Soft-delete a fact (mark superseded). Lets users curate their memory."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    res = await db.execute(select(ChatFact).where(ChatFact.id == fact_id, ChatFact.user_id == user.id))
+    f = res.scalar_one_or_none()
+    if not f:
+        raise HTTPException(status_code=404, detail="Fact not found")
+    f.superseded_at = datetime.utcnow()
+    await db.commit()
+    return {"ok": True}
+
+
+# ============= Chat Feedback (Phase B-7-min: thumbs + reasons) =============
+class ChatFeedbackCreate(BaseModel):
+    user_identifier: str
+    message_id: int
+    thread_id: Optional[str] = None
+    rating: str  # up | down
+    reason: Optional[str] = None
+    comment: Optional[str] = None
+
+
+@app.post("/api/chat/feedback")
+async def submit_chat_feedback(
+    data: ChatFeedbackCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Record a thumbs-up/down on an assistant message."""
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if data.rating not in ('up', 'down'):
+        raise HTTPException(status_code=400, detail="rating must be up or down")
+    fb = ChatFeedback(
+        user_id=user.id,
+        message_id=data.message_id,
+        thread_id=data.thread_id,
+        rating=data.rating,
+        reason=(data.reason or None) and data.reason[:40],
+        comment=(data.comment or None) and data.comment[:1000],
+    )
+    db.add(fb)
+    await db.commit()
+    await db.refresh(fb)
+    return {"id": fb.id, "ok": True}
+
+
+# ============= Chat Stats (Phase B-7-min: observability) =============
+@app.get("/api/chat/stats")
+async def chat_stats(
+    user_identifier: str,
+    days: int = 7,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Per-user chat rollup: latency p50/p95, intent distribution, error rate,
+    thumbs-up rate. Lightweight — used by the per-user observability strip,
+    not a full admin dashboard (that's the next session's B7-full)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"messages": 0, "threads": 0, "intents": {}, "thumbs": {"up": 0, "down": 0}}
+    cutoff = datetime.utcnow() - timedelta(days=max(1, min(90, days)))
+
+    # Threads
+    threads_count = (await db.execute(
+        select(func.count(ChatThread.id)).where(ChatThread.user_id == user.id, ChatThread.created_at >= cutoff)
+    )).scalar() or 0
+
+    # Messages — count + intent distribution + latency samples
+    msgs_q = select(ChatMessage).join(ChatThread, ChatThread.id == ChatMessage.thread_id) \
+        .where(ChatThread.user_id == user.id, ChatMessage.created_at >= cutoff)
+    msgs = (await db.execute(msgs_q)).scalars().all()
+
+    intents: dict = {}
+    latencies: list = []
+    assistant_count = 0
+    for m in msgs:
+        if m.role == 'assistant':
+            assistant_count += 1
+            if m.intent:
+                intents[m.intent] = intents.get(m.intent, 0) + 1
+            if isinstance(m.latency_ms, int) and m.latency_ms > 0:
+                latencies.append(m.latency_ms)
+
+    latencies.sort()
+    def pctl(p: float) -> int:
+        if not latencies: return 0
+        idx = max(0, min(len(latencies) - 1, int(round(p * (len(latencies) - 1)))))
+        return int(latencies[idx])
+
+    # Feedback
+    fb_q = select(ChatFeedback).where(ChatFeedback.user_id == user.id, ChatFeedback.created_at >= cutoff)
+    fbs = (await db.execute(fb_q)).scalars().all()
+    up = sum(1 for f in fbs if f.rating == 'up')
+    down = sum(1 for f in fbs if f.rating == 'down')
+
+    return {
+        "windowDays": days,
+        "threads": threads_count,
+        "messages": len(msgs),
+        "assistantMessages": assistant_count,
+        "intents": intents,
+        "latencyMs": {
+            "p50": pctl(0.50),
+            "p95": pctl(0.95),
+            "p99": pctl(0.99),
+            "samples": len(latencies),
+        },
+        "thumbs": {
+            "up": up,
+            "down": down,
+            "rate": (up / (up + down)) if (up + down) > 0 else None,
+        },
+    }
 
 
 # ============= Health Check =============

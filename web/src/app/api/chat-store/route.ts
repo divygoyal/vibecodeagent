@@ -75,6 +75,21 @@ export async function GET(req: NextRequest) {
             `/api/chat/threads/${encodeURIComponent(thread)}/messages?user_identifier=${encodeURIComponent(userId)}&limit=${limit}`);
         return NextResponse.json(data, { status });
     }
+    if (action === 'list_facts') {
+        const scope = searchParams.get('scope');
+        const minConf = searchParams.get('min_confidence') || '0';
+        const limit = searchParams.get('limit') || '50';
+        let path = `/api/chat/facts?user_identifier=${encodeURIComponent(userId)}&min_confidence=${minConf}&limit=${limit}`;
+        if (scope) path += `&scope=${encodeURIComponent(scope)}`;
+        const { status, data } = await proxy('GET', path);
+        return NextResponse.json(data, { status });
+    }
+    if (action === 'stats') {
+        const days = searchParams.get('days') || '7';
+        const { status, data } = await proxy('GET',
+            `/api/chat/stats?user_identifier=${encodeURIComponent(userId)}&days=${days}`);
+        return NextResponse.json(data, { status });
+    }
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
 
@@ -114,6 +129,30 @@ export async function POST(req: NextRequest) {
             });
         return NextResponse.json(data, { status });
     }
+    if (action === 'upsert_fact') {
+        const { status, data } = await proxy('POST', `/api/chat/facts`, {
+            user_identifier: userId,
+            scope: body.scope || 'global',
+            scope_value: body.scope_value,
+            key: body.key,
+            value: body.value,
+            confidence: body.confidence ?? 0.7,
+            source_message_id: body.source_message_id,
+            source_thread_id: body.source_thread_id,
+        });
+        return NextResponse.json(data, { status });
+    }
+    if (action === 'submit_feedback') {
+        const { status, data } = await proxy('POST', `/api/chat/feedback`, {
+            user_identifier: userId,
+            message_id: body.message_id,
+            thread_id: body.thread_id,
+            rating: body.rating,
+            reason: body.reason,
+            comment: body.comment,
+        });
+        return NextResponse.json(data, { status });
+    }
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
 
@@ -146,6 +185,13 @@ export async function DELETE(req: NextRequest) {
         if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
         const { status, data } = await proxy('DELETE',
             `/api/chat/threads/${encodeURIComponent(id)}?user_identifier=${encodeURIComponent(userId)}&hard=${hard}`);
+        return NextResponse.json(data, { status });
+    }
+    if (action === 'delete_fact') {
+        const id = searchParams.get('id');
+        if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+        const { status, data } = await proxy('DELETE',
+            `/api/chat/facts/${encodeURIComponent(id)}?user_identifier=${encodeURIComponent(userId)}`);
         return NextResponse.json(data, { status });
     }
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

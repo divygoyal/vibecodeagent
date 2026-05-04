@@ -59,7 +59,17 @@ export function resetThreadId(): string {
     if (typeof window !== 'undefined') {
         try { localStorage.removeItem(`${THREAD_ID_KEY}:${currentUserId}`); } catch { /* skip */ }
     }
+    threadEnsuredFor = null;
     return getOrCreateThreadId();
+}
+
+/** Switch the active thread (used by the sidebar when the user picks a past
+ *  conversation). Resets the ensure-on-server cache so a stale create call
+ *  isn't skipped if we land on a thread we haven't synced yet this session. */
+export function setActiveThreadId(id: string): void {
+    if (typeof window === 'undefined' || !id) return;
+    try { localStorage.setItem(`${THREAD_ID_KEY}:${currentUserId}`, id); } catch { /* skip */ }
+    threadEnsuredFor = id; // already exists on server (we're loading from it), no need to re-create
 }
 
 let threadEnsuredFor: string | null = null;

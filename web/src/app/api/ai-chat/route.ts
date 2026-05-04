@@ -6,6 +6,13 @@ import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatT
 import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken, listAnalyticsProperties } from '@/lib/googleApi';
 import { fetchGithubTokenFromDb, fetchGithubAppToken } from '@/lib/githubApi';
 import { GoogleGenAI } from '@google/genai';
+import {
+    loadUserFacts,
+    loadThreadSummary,
+    formatMemoryBlock,
+    extractFactsFromTurn,
+    summarizeThread,
+} from '@/lib/chatMemory';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -297,7 +304,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { message, selectedSite, selectedRepo, repoIsAuto, analyticsContext, seoContext, history, mode } = body;
+        const { message, selectedSite, selectedRepo, repoIsAuto, analyticsContext, seoContext, history, mode, threadId } = body;
 
         if (!message || typeof message !== 'string') {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -430,6 +437,15 @@ export async function POST(req: NextRequest) {
         // stream call below.
         const intentPromise = ai ? classifyIntent(ai, message).catch(() => null) : Promise.resolve(null);
 
+        // B1-full: load durable facts + thread summary in parallel with intent classification.
+        // Both are best-effort and fall through to empty if admin is unreachable.
+        const memoryPromise: Promise<[Awaited<ReturnType<typeof loadUserFacts>>, string | null]> = userId
+            ? Promise.all([
+                  loadUserFacts(String(userId)).catch(() => [] as Awaited<ReturnType<typeof loadUserFacts>>),
+                  loadThreadSummary(String(userId), threadId).catch(() => null),
+              ])
+            : Promise.resolve([[] as Awaited<ReturnType<typeof loadUserFacts>>, null]);
+
         // User message with injected data context
         const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
         const githubTag = `[GitHub:${githubConnected ? 'connected' : 'not_connected'}]`;
@@ -438,9 +454,14 @@ export async function POST(req: NextRequest) {
             : '';
         const intentLabel = await intentPromise;
         const intentTag = intentLabel ? `[INTENT: ${intentLabel}]` : '';
+        const [userFacts, threadSummary] = await memoryPromise;
+        // B1-full: persistent memory injection. Goes BEFORE the dashboard data
+        // so the model reads "what we know about you" first, then "what's
+        // happening right now."
+        const memoryBlock = formatMemoryBlock(userFacts, threadSummary);
         const contextBlock = dataContext
-            ? `${siteTag}${githubTag}${repoTag}${intentTag}${dataContext}${availableSitesContext}\n---\n${message}`
-            : `${siteTag}${githubTag}${repoTag}${intentTag}${availableSitesContext}\n${message}`;
+            ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${dataContext}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],
@@ -497,6 +518,12 @@ CRITICAL SYSTEM CONTEXT:
                     const MAX_GITHUB_CALLS = 5;
                     const MAX_INSPECT_CALLS = 3;
                     const MAX_LOOPS = 8;
+                    // B7-min: per-turn wall-clock cost cap. The maxDuration export is 300s
+                    // but a runaway tool loop shouldn't burn that. 90s is enough for the
+                    // longest legitimate flow (PageSpeed audit + cross-source diagnose +
+                    // a final summarization pass) while still aborting genuine runaways.
+                    const TURN_DEADLINE_MS = 90_000;
+                    const turnStartedAt = Date.now();
                     const GITHUB_TOOL_NAMES = new Set([
                         'list_user_repos', 'get_repo_health', 'search_repo_code',
                         'get_recent_commits', 'get_pull_requests', 'get_repo_issues',
@@ -508,6 +535,17 @@ CRITICAL SYSTEM CONTEXT:
                         if (abortSignal.aborted) {
                             controller.close();
                             return;
+                        }
+                        // B7-min: per-turn wall-clock cap — bail with a clean message
+                        // if the loop has been running too long, before starting yet
+                        // another model call. Refunds the credit on the way out via
+                        // the existing error-path handler.
+                        if (Date.now() - turnStartedAt > TURN_DEADLINE_MS) {
+                            controller.enqueue(encodeSSE({
+                                type: 'text',
+                                content: '\n\n⚠️ Hit the per-turn time budget — stopping here. Try a more specific question.',
+                            }));
+                            break;
                         }
                         loopCount++;
                         keepGoing = false;
@@ -696,6 +734,51 @@ CRITICAL SYSTEM CONTEXT:
 
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
+
+                    // B1-full: background memory writes. Run AFTER closing the stream
+                    // so they don't add to user-visible latency. Both calls are
+                    // wrapped in try/catch internally — failure is silent.
+                    if (ai && userId && intentLabel !== 'CASUAL_GREETING' && intentLabel !== 'META_QUESTION') {
+                        // Reconstruct the assistant message text for fact extraction.
+                        // currentContents accumulates {role,parts} for every loop iteration;
+                        // the last assistant turn's text lives in chunks we already streamed,
+                        // so we pull from the last 'model'-role entry.
+                        const lastModel = [...currentContents].reverse().find((c: any) => c?.role === 'model');
+                        const assistantText: string = lastModel?.parts
+                            ?.map((p: any) => p?.text || '')
+                            ?.filter(Boolean)
+                            ?.join('\n')
+                            ?.slice(0, 4000) || '';
+
+                        if (assistantText && message) {
+                            void extractFactsFromTurn({
+                                genai: ai,
+                                userId: String(userId),
+                                userMessage: message,
+                                assistantMessage: assistantText,
+                                threadId,
+                            }).catch(() => 0);
+                        }
+
+                        // Run the summarizer every 6th assistant turn (history length is
+                        // user+assistant pairs, so trigger when (history.length+1) is a
+                        // multiple of 12 — i.e. 6 full Q&A rounds).
+                        if (threadId && history && Array.isArray(history) && (history.length + 2) >= 12 && (history.length + 2) % 12 === 0) {
+                            const allMsgs = [
+                                ...history.map((h: any) => ({ role: h.role, content: h.content || '' })),
+                                { role: 'user' as const, content: message },
+                                { role: 'assistant' as const, content: assistantText },
+                            ];
+                            void summarizeThread({
+                                genai: ai,
+                                userId: String(userId),
+                                threadId,
+                                messages: allMsgs.filter(m => m.content),
+                                previousSummary: threadSummary,
+                                upToMessageIndex: allMsgs.length,
+                            }).catch(() => false);
+                        }
+                    }
                 } catch (error: any) {
                     try {
                         console.error('[AI-CHAT] Stream error:', error?.message || error, error?.name);
