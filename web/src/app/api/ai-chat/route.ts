@@ -672,11 +672,6 @@ CRITICAL SYSTEM CONTEXT:
 
                         let fullText = '';
                         let pendingFunctionCalls: any[] = [];
-                        // B5-full: track when this stream pass first emits a tool call —
-                        // text BEFORE that boundary is "thinking" (pre-tool reasoning),
-                        // text AFTER is the user-facing answer. Stream them as different
-                        // SSE event types so the client can render them differently.
-                        let sawToolCallInThisPass = false;
 
                         // Stream chunks from the SDK
                         for await (const chunk of response) {
@@ -685,24 +680,17 @@ CRITICAL SYSTEM CONTEXT:
                                 controller.close();
                                 return;
                             }
-                            // A6 + B5-full: stream text chunks ALWAYS, but split on the
-                            // tool-call boundary. Pre-tool text is reasoning ("Thinking…"
-                            // collapsible); post-tool text is the answer. The first
-                            // assistant pass may emit only thinking; later passes after
-                            // tools execute emit only answer.
+                            // A6: always stream text as 'text'. Previous attempt to split
+                            // on the tool-call boundary (thinking_block before tools, text
+                            // after) had a fatal flaw: for personas with no tools (e.g.
+                            // CASUAL_GREETING for "hi"), the entire response was routed to
+                            // thinking_block and ended up hidden in a collapsed panel.
+                            // The "live thinking" UX now comes from ReasoningTrace's
+                            // narration of planner + tool events, not from gating the
+                            // text stream itself — much cleaner separation.
                             if (chunk.text) {
                                 fullText += chunk.text;
-                                const eventType = (loopCount === 1 && !sawToolCallInThisPass)
-                                    ? 'thinking_block'
-                                    : 'text';
-                                controller.enqueue(encodeSSE({
-                                    type: eventType,
-                                    content: chunk.text,
-                                }));
-                            }
-                            // Detect tool-call boundary so subsequent text is treated as answer.
-                            if (chunk.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall)) {
-                                sawToolCallInThisPass = true;
+                                controller.enqueue(encodeSSE({ type: 'text', content: chunk.text }));
                             }
 
                             // Collect function call parts from raw candidates
