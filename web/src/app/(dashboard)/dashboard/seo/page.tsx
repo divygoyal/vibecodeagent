@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import dynamic from 'next/dynamic';
 const AreaChart = dynamic(() => import('recharts').then(m => ({ default: m.AreaChart })), { ssr: false });
 const Area = dynamic(() => import('recharts').then(m => ({ default: m.Area })), { ssr: false });
@@ -9,18 +9,22 @@ const YAxis = dynamic(() => import('recharts').then(m => ({ default: m.YAxis }))
 const CartesianGrid = dynamic(() => import('recharts').then(m => ({ default: m.CartesianGrid })), { ssr: false });
 const Tooltip = dynamic(() => import('recharts').then(m => ({ default: m.Tooltip })), { ssr: false });
 const ResponsiveContainer = dynamic(() => import('recharts').then(m => ({ default: m.ResponsiveContainer })), { ssr: false });
+const SparkLine = dynamic(() => import('recharts').then(m => ({ default: m.LineChart })), { ssr: false });
+const SparkLineSeries = dynamic(() => import('recharts').then(m => ({ default: m.Line })), { ssr: false });
+import ReactMarkdown, { type Components as MarkdownComponents } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
     TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
     AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
     ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2, Download,
-    Bot, PenTool, Link2, Sparkles, Brain, Radar, BarChart3, Globe,
-    FileText, Layers, Activity, Shield, Clock, Cpu, ScanSearch
+    Bot, PenTool, Link2, Sparkles, Brain, Globe, BarChart3,
+    FileText, ScanSearch, FileCheck, XCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { exportSeoData } from '@/lib/exportUtils';
-import { useSeoData, useSiteList, useContainerStatus } from '@/lib/useDashboardData';
+import { useSeoData, useSiteList, useContainerStatus, useOpportunitiesData } from '@/lib/useDashboardData';
 import LastUpdated from '@/components/dashboard/LastUpdated';
 import { signIn } from 'next-auth/react';
 import FixWithBotButton from '@/components/FixWithBotButton';
@@ -33,6 +37,17 @@ import { AnnotationBadge, getAnnotations } from '@/components/AnnotationBadge';
 import { IntentBadge } from '@/components/IntentBadge';
 import ZombiePageMonitor from '@/components/dashboard/ZombiePageMonitor';
 import MobileGapWidget from '@/components/dashboard/MobileGapWidget';
+import StrikingDistanceWidget from '@/components/dashboard/StrikingDistanceWidget';
+import CtrOptimizationLab from '@/components/dashboard/CtrOptimizationLab';
+import SilentDecayMonitor from '@/components/dashboard/SilentDecayMonitor';
+import IndexingStatus from '@/components/dashboard/IndexingStatus';
+import CannibalizationWidget from '@/components/dashboard/CannibalizationWidget';
+import WinnersLosersWidget from '@/components/dashboard/WinnersLosersWidget';
+import AeoScoreWidget from '@/components/dashboard/AeoScoreWidget';
+import AioSimulator from '@/components/dashboard/AioSimulator';
+import AiVisibilityWidget from '@/components/dashboard/AiVisibilityWidget';
+import CoreWebVitalsLive from '@/components/dashboard/CoreWebVitalsLive';
+import SchemaAuditWidget from '@/components/dashboard/SchemaAuditWidget';
 
 interface SEOKPIs {
     totalClicks: number;
@@ -83,6 +98,21 @@ interface TrendPoint {
     position: number;
 }
 
+interface QueryPagePoint {
+    query: string;
+    page: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+}
+
+interface OpportunitiesResponse {
+    queries?: Query[];
+    comparisonQueries?: Query[];
+    queryPages?: QueryPagePoint[];
+}
+
 const severityConfig: Record<string, { bg: string; border: string; icon: any; badge: string }> = {
     high: { bg: 'bg-red-500/5', border: 'border-red-500/20', icon: AlertTriangle, badge: 'bg-red-500/10 text-red-400' },
     medium: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', icon: FileWarning, badge: 'bg-amber-500/10 text-amber-400' },
@@ -107,6 +137,93 @@ function ChangeIndicator({ value, suffix = '%', invert = false }: { value: numbe
     );
 }
 
+const ICON_BG: Record<string, string> = {
+    emerald: 'bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.08)]',
+    cyan: 'bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/20 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.08)]',
+    violet: 'bg-gradient-to-br from-violet-500/25 to-violet-500/5 border border-violet-500/20 text-violet-300 shadow-[0_0_20px_rgba(167,139,250,0.08)]',
+    amber: 'bg-gradient-to-br from-amber-500/25 to-amber-500/5 border border-amber-500/20 text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.08)]',
+    blue: 'bg-gradient-to-br from-blue-500/25 to-blue-500/5 border border-blue-500/20 text-blue-300 shadow-[0_0_20px_rgba(96,165,250,0.08)]',
+    red: 'bg-gradient-to-br from-red-500/25 to-red-500/5 border border-red-500/20 text-red-300 shadow-[0_0_20px_rgba(248,113,113,0.08)]',
+};
+
+function KpiTile({
+    icon: Icon,
+    iconColor,
+    label,
+    value,
+    change,
+    invertChange = false,
+    sparkline,
+    sparkKey,
+    sparkColor,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    iconColor: keyof typeof ICON_BG;
+    label: string;
+    value: string | number;
+    change?: number;
+    invertChange?: boolean;
+    sparkline?: TrendPoint[];
+    sparkKey?: keyof TrendPoint;
+    sparkColor?: string;
+}) {
+    const sparkData = sparkline && sparkKey ? sparkline.slice(-14) : null;
+    const iconClasses = ICON_BG[iconColor] || ICON_BG.emerald;
+    return (
+        <div className="premium-card p-3 sm:p-5 stat-card-hover">
+            <div className="flex items-center justify-between mb-3">
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center ${iconClasses}`}>
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </div>
+                {typeof change === 'number' && <ChangeIndicator value={change} invert={invertChange} />}
+            </div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{value}</div>
+            <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">{label}</div>
+            {sparkData && sparkData.length > 1 && sparkColor && (
+                <div className="mt-2 h-7 -mx-1 opacity-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <SparkLine data={sparkData}>
+                            <SparkLineSeries
+                                type="monotone"
+                                dataKey={sparkKey as string}
+                                stroke={sparkColor}
+                                strokeWidth={1.5}
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        </SparkLine>
+                    </ResponsiveContainer>
+                </div>
+            )}
+        </div>
+    );
+}
+
+const blogMarkdownComponents: MarkdownComponents = {
+    h1: ({ children }) => <h1 className="text-lg font-bold text-white mt-4 mb-2">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-base font-bold text-white mt-4 mb-2">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-sm font-semibold text-white mt-3 mb-1.5">{children}</h3>,
+    p: ({ children }) => <p className="text-xs text-zinc-300 leading-relaxed my-2">{children}</p>,
+    strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
+    em: ({ children }) => <em className="text-zinc-400">{children}</em>,
+    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline">{children}</a>,
+    ul: ({ children }) => <ul className="space-y-1 my-2 list-disc list-inside text-xs text-zinc-300">{children}</ul>,
+    ol: ({ children }) => <ol className="space-y-1 my-2 list-decimal list-inside text-xs text-zinc-300">{children}</ol>,
+    li: ({ children }) => <li className="text-xs text-zinc-300 leading-relaxed">{children}</li>,
+    code: ({ children, className }) => {
+        const isBlock = className?.startsWith('language-');
+        if (isBlock) {
+            return <pre className="my-2 p-3 bg-black/40 border border-white/[0.06] rounded text-[11px] text-emerald-300 font-mono overflow-x-auto">{children}</pre>;
+        }
+        return <code className="bg-white/[0.04] text-emerald-300 px-1 rounded text-[11px] font-mono">{children}</code>;
+    },
+    blockquote: ({ children }) => <blockquote className="pl-3 border-l-2 border-emerald-500/30 my-2 text-xs text-zinc-400 italic">{children}</blockquote>,
+    hr: () => <hr className="border-white/[0.06] my-3" />,
+    table: ({ children }) => <div className="my-2 overflow-x-auto"><table className="w-full text-[11px] border-collapse">{children}</table></div>,
+    th: ({ children }) => <th className="px-2 py-1.5 text-left text-[10px] text-zinc-500 font-medium border-b border-white/[0.06]">{children}</th>,
+    td: ({ children }) => <td className="px-2 py-1.5 text-zinc-300 border-b border-white/[0.04]">{children}</td>,
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
@@ -129,8 +246,11 @@ export default function SEOPage() {
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
     const { selectedSite, setSelectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
+    const [activeOppTab, setActiveOppTab] = useState<'striking' | 'ctr' | 'decay'>('striking');
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
+    const [serpPreviewIndex, setSerpPreviewIndex] = useState(0);
+    const [activePillar, setActivePillar] = useState<'seo' | 'aeo' | 'geo'>('seo');
 
     // SEO Tools state
     const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -179,6 +299,13 @@ export default function SEOPage() {
 
     // 2. Fetch SEO Data (only when Google connected)
     const { data: seoData, isLoading, isError } = useSeoData('all', activeSite, hasGoogleConnection && (isDemoWorkspace || !!activeSite), range, isDemoWorkspace);
+
+    // 3. Fetch Opportunities Data (queries + comparison + queryPages — powers the 3 widgets)
+    const { data: oppData, isLoading: oppLoading, error: oppError } = useOpportunitiesData(
+        hasGoogleConnection && activeSite ? activeSite : null,
+        '28d'
+    );
+    const oppDataTyped = (oppData as OpportunitiesResponse | undefined) || {};
 
     // Show connect prompt if Google not connected
     if (!containerLoading && !hasGoogleConnection) {
@@ -254,9 +381,6 @@ export default function SEOPage() {
     const recommendations: Recommendation[] = Array.isArray(seoData?.recommendations) ? seoData.recommendations : [];
     const trend: TrendPoint[] = Array.isArray(seoData?.trend) ? seoData.trend : [];
 
-    // Alias for UI replacement
-    const loading = isLoading;
-
     return (
         <div className="space-y-6 p-4 sm:p-6">
             {isDemoWorkspace ? (
@@ -266,106 +390,134 @@ export default function SEOPage() {
                 />
             ) : null}
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-white">SEO Intelligence</h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <p className="text-sm text-zinc-500">Search Console data with AI-powered insights</p>
-                        {seoData && <LastUpdated timestamp={new Date()} />}
+            {/* ─── Premium Hero Header ─── */}
+            <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[linear-gradient(135deg,rgba(52,211,153,0.06),rgba(34,211,238,0.04)_40%,rgba(167,139,250,0.04)_70%,transparent_95%)] p-5 sm:p-7">
+                <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-emerald-500/[0.06] blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-24 -left-12 h-72 w-72 rounded-full bg-violet-500/[0.05] blur-3xl" />
+                <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/[0.08] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-emerald-300">
+                                <span className="relative flex h-1.5 w-1.5">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                </span>
+                                Live · Search Console
+                            </span>
+                            {seoData && <LastUpdated timestamp={new Date()} />}
+                        </div>
+                        <h1 className="gradient-text text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-[1.05]">
+                            SEO Intelligence
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-sm text-zinc-400 leading-relaxed">
+                            Three-pillar coverage across Google rankings, AI Overviews, and LLM citations — engineered for the 2026 search landscape.
+                        </p>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    {/* Export Button */}
-                    <button
-                        onClick={() => exportSeoData(seoData)}
-                        disabled={!seoData}
-                        className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/[0.03] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition-colors disabled:opacity-30"
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                        Export
-                    </button>
-
-                    {/* Site Selector */}
-                    <div className="relative w-full sm:w-auto">
-                        <select
-                            value={selectedSite}
-                            onChange={(e) => setSelectedSite(e.target.value)}
-                            disabled={sitesLoading || sites.length === 0}
-                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition w-full sm:min-w-[200px] sm:w-auto max-w-full"
+                    <div className="flex items-stretch gap-2 sm:gap-3 flex-wrap lg:justify-end">
+                        <div className="relative w-full sm:w-auto">
+                            <select
+                                value={selectedSite}
+                                onChange={(e) => setSelectedSite(e.target.value)}
+                                disabled={sitesLoading || sites.length === 0}
+                                className="appearance-none bg-[#0a0d12] border border-white/[0.1] rounded-xl pl-3 pr-9 py-2.5 text-sm text-zinc-200 hover:border-white/[0.16] focus:outline-none focus:border-emerald-500/50 transition w-full sm:min-w-[220px] sm:w-auto max-w-full font-medium"
+                            >
+                                {sitesLoading ? (
+                                    <option>Loading sites…</option>
+                                ) : sites.length === 0 ? (
+                                    <option value="">No sites found</option>
+                                ) : (
+                                    sites.map(s => (
+                                        <option key={s.siteUrl} value={s.siteUrl}>
+                                            {s.siteUrl.replace('sc-domain:', '')}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                        </div>
+                        <button
+                            onClick={() => exportSeoData(seoData)}
+                            disabled={!seoData}
+                            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] hover:border-white/[0.16] transition disabled:opacity-30"
                         >
-                            {sitesLoading ? (
-                                <option>Loading sites...</option>
-                            ) : sites.length === 0 ? (
-                                <option value="">No sites found</option>
-                            ) : (
-                                sites.map(s => (
-                                    <option key={s.siteUrl} value={s.siteUrl}>
-                                        {s.siteUrl.replace('sc-domain:', '')}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                            <Download className="w-3.5 h-3.5" />
+                            Export
+                        </button>
                     </div>
                 </div>
             </div>
 
             {/* KPI Cards */}
             {kpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
-                                <MousePointer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeClicks} />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Total Clicks</div>
-                    </div>
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
-                                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeImpressions} />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Impressions</div>
-                    </div>
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
-                                <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeCTR} />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.avgCTR}%</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Avg. CTR</div>
-                    </div>
-                    <div className="premium-card p-3 sm:p-5 stat-card-hover">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
-                                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changePosition} invert />
-                        </div>
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{kpis.avgPosition}</div>
-                        <div className="text-[10px] sm:text-xs text-zinc-500 mt-1">Avg. Position</div>
-                    </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+                    <KpiTile
+                        icon={MousePointer}
+                        iconColor="emerald"
+                        label="Total Clicks"
+                        value={kpis.totalClicks.toLocaleString()}
+                        change={kpis.changeClicks}
+                        sparkline={trend}
+                        sparkKey="clicks"
+                        sparkColor="#34d399"
+                    />
+                    <KpiTile
+                        icon={Eye}
+                        iconColor="cyan"
+                        label="Impressions"
+                        value={kpis.totalImpressions.toLocaleString()}
+                        change={kpis.changeImpressions}
+                        sparkline={trend}
+                        sparkKey="impressions"
+                        sparkColor="#22d3ee"
+                    />
+                    <KpiTile
+                        icon={Hash}
+                        iconColor="violet"
+                        label="Avg. CTR"
+                        value={`${kpis.avgCTR}%`}
+                        change={kpis.changeCTR}
+                        sparkline={trend}
+                        sparkKey="ctr"
+                        sparkColor="#a78bfa"
+                    />
+                    <KpiTile
+                        icon={Search}
+                        iconColor="amber"
+                        label="Avg. Position"
+                        value={kpis.avgPosition}
+                        change={kpis.changePosition}
+                        invertChange
+                        sparkline={trend}
+                        sparkKey="position"
+                        sparkColor="#fbbf24"
+                    />
+                    <KpiTile
+                        icon={FileCheck}
+                        iconColor="blue"
+                        label="Indexed Pages"
+                        value={(kpis.indexedPages || 0).toLocaleString()}
+                    />
+                    <KpiTile
+                        icon={XCircle}
+                        iconColor="red"
+                        label="Crawl Errors"
+                        value={(kpis.crawlErrors || 0).toLocaleString()}
+                    />
                 </div>
             )}
 
             {/* AI Recommendations */}
             <div>
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                        <Zap className="w-3.5 h-3.5 text-black" />
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-cyan-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_24px_rgba(52,211,153,0.1)]">
+                        <Zap className="w-5 h-5 text-emerald-300" />
                     </div>
-                    <h3 className="text-sm font-semibold text-white">AI Recommendations</h3>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 font-medium">
+                    <div className="flex-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Insights</div>
+                        <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">AI Recommendations</h3>
+                    </div>
+                    <span className="gradient-badge text-[10px] px-2.5 py-1 rounded-full font-semibold">
                         {recommendations.length} items
                     </span>
                 </div>
@@ -402,67 +554,184 @@ export default function SEOPage() {
                 </div>
             </div>
 
-            {/* ─── SEO Robot / AI SEO Bot ─── */}
-            <div className="bg-gradient-to-br from-violet-500/[0.04] to-emerald-500/[0.04] border border-violet-500/[0.12] rounded-2xl p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-violet-500/20">
-                        <Bot className="w-5 h-5 text-white" />
+            {/* ─── Three Pillars: SEO • AEO • GEO ─── */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 via-blue-500/20 to-violet-500/20 border border-white/[0.1] flex items-center justify-center shadow-[0_0_24px_rgba(34,211,238,0.12)]">
+                            <Sparkles className="w-5 h-5 text-cyan-300" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Coverage</div>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Three Pillars of Modern Search</h3>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-base font-bold text-white">SEO Robot</h3>
-                        <p className="text-[11px] text-zinc-500">AI-powered SEO automation engine</p>
+                    <div className="flex bg-[#0a0d12] rounded-xl p-1 border border-white/[0.08] gap-1 flex-wrap">
+                        {[
+                            { key: 'seo', label: 'Traditional SEO', sub: 'Google rankings', activeClasses: 'bg-emerald-500/[0.08] border border-emerald-500/30 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.18)]', dotColor: 'bg-emerald-400' },
+                            { key: 'aeo', label: 'Answer Engine', sub: 'AI Overviews', activeClasses: 'bg-blue-500/[0.08] border border-blue-500/30 text-blue-300 shadow-[0_0_20px_rgba(96,165,250,0.18)]', dotColor: 'bg-blue-400' },
+                            { key: 'geo', label: 'Generative Engine', sub: 'LLM citations', activeClasses: 'bg-violet-500/[0.08] border border-violet-500/30 text-violet-300 shadow-[0_0_20px_rgba(167,139,250,0.18)]', dotColor: 'bg-violet-400' },
+                        ].map(p => {
+                            const isActive = activePillar === p.key;
+                            return (
+                                <button
+                                    key={p.key}
+                                    onClick={() => setActivePillar(p.key as 'seo' | 'aeo' | 'geo')}
+                                    className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-all ${
+                                        isActive ? p.activeClasses : 'border border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                                    }`}
+                                >
+                                    <span className={`relative flex h-1.5 w-1.5 rounded-full ${isActive ? p.dotColor : 'bg-zinc-600'}`}>
+                                        {isActive && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${p.dotColor} opacity-75`} />}
+                                    </span>
+                                    <span className="flex flex-col items-start">
+                                        <span>{p.label}</span>
+                                        <span className={`text-[9px] font-normal hidden sm:inline ${isActive ? 'opacity-70' : 'text-zinc-600'}`}>{p.sub}</span>
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
-                    <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 font-semibold border border-violet-500/20">BETA</span>
                 </div>
 
+                {activePillar === 'seo' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {activeSite && <CannibalizationWidget siteUrl={activeSite} />}
+                        {activeSite && <WinnersLosersWidget siteUrl={activeSite} />}
+                        <div className="lg:col-span-2">
+                            <CoreWebVitalsLive
+                                siteUrl={activeSite || ''}
+                                suggestedPages={pages.slice(0, 4).map(p => p.page)}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {activePillar === 'aeo' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <AeoScoreWidget
+                            siteUrl={activeSite || ''}
+                            suggestedPages={pages.slice(0, 4).map(p => p.page)}
+                        />
+                        <SchemaAuditWidget
+                            siteUrl={activeSite || ''}
+                            suggestedPages={pages.slice(0, 4).map(p => p.page)}
+                        />
+                        <div className="lg:col-span-2">
+                            <AioSimulator
+                                siteUrl={activeSite || ''}
+                                suggestedQueries={queries.slice(0, 4).map(q => q.query)}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {activePillar === 'geo' && activeSite && (
+                    <AiVisibilityWidget siteUrl={activeSite} />
+                )}
+                {activePillar === 'geo' && !activeSite && (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 text-center text-xs text-zinc-500">
+                        Select a site to track AI Visibility.
+                    </div>
+                )}
+            </div>
+
+            {/* ─── SEO Robot / AI SEO Bot ─── */}
+            <div className="relative overflow-hidden rounded-2xl border border-violet-500/[0.14] bg-[linear-gradient(135deg,rgba(167,139,250,0.06),rgba(52,211,153,0.04)_60%,transparent_95%)] p-5 sm:p-7">
+                <div className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-violet-500/[0.08] blur-3xl" />
+                <div className="relative">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-400 flex items-center justify-center shadow-[0_8px_32px_rgba(167,139,250,0.3)]">
+                            <Bot className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-300/80">Automation</div>
+                            <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">SEO Robot</h3>
+                            <p className="text-[11px] text-zinc-500 mt-0.5">AI-powered SEO automation engine</p>
+                        </div>
+                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 font-semibold border border-violet-500/30 tracking-wider">BETA</span>
+                    </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* AI Blog Generation */}
-                    <button onClick={() => { setActiveTool(activeTool === 'blog' ? null : 'blog'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'blog' ? 'border-emerald-500/30 bg-emerald-500/[0.05]' : 'border-white/[0.06] hover:border-emerald-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3 group-hover:bg-emerald-500/20 transition">
-                            <PenTool className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">AI Blog Writer</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Generate SEO-optimized blog posts with headings, meta tags, internal links, and schema markup.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'blog' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
-
-                    {/* Auto Keyword Research */}
-                    <button onClick={() => { setActiveTool(activeTool === 'keywords' ? null : 'keywords'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'keywords' ? 'border-amber-500/30 bg-amber-500/[0.05]' : 'border-white/[0.06] hover:border-amber-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500/20 transition">
-                            <Brain className="w-4 h-4 text-amber-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">Auto Keyword Research</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">AI finds untapped keyword opportunities by analyzing competitors, search trends, and content gaps.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-amber-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'keywords' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
-
-                    {/* AI Internal Linking */}
-                    <button onClick={() => { setActiveTool(activeTool === 'linking' ? null : 'linking'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'linking' ? 'border-cyan-500/30 bg-cyan-500/[0.05]' : 'border-white/[0.06] hover:border-cyan-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500/20 transition">
-                            <Link2 className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">AI Smart Linking</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Discover and suggest internal links between your pages to build topical authority.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-cyan-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'linking' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
-
-                    {/* Schema Markup Generator */}
-                    <button onClick={() => { setActiveTool(activeTool === 'schema' ? null : 'schema'); setToolResult(null); }} className={`bg-white/[0.03] border rounded-xl p-4 text-left transition-all group cursor-pointer ${activeTool === 'schema' ? 'border-violet-500/30 bg-violet-500/[0.05]' : 'border-white/[0.06] hover:border-violet-500/20'}`}>
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center mb-3 group-hover:bg-violet-500/20 transition">
-                            <FileText className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-1">Schema Generator</h4>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Auto-generate JSON-LD structured data for FAQ, Article, Product, HowTo pages.</p>
-                        <div className="mt-3 flex items-center gap-1 text-[10px] text-violet-400 font-medium">
-                            <Sparkles className="w-3 h-3" /> {activeTool === 'schema' ? 'Active' : 'Click to use'}
-                        </div>
-                    </button>
+                    {[
+                        {
+                            key: 'blog',
+                            icon: PenTool,
+                            title: 'AI Blog Writer',
+                            desc: 'Generate SEO-optimized blog posts with headings, meta tags, internal links, and schema markup.',
+                            activeBorder: 'border-emerald-500/40 bg-emerald-500/[0.06]',
+                            inactiveHover: 'hover:border-emerald-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/20 group-hover:border-emerald-500/30',
+                            iconText: 'text-emerald-300',
+                            labelText: 'text-emerald-300',
+                            glow: 'rgba(52,211,153,0.18)',
+                        },
+                        {
+                            key: 'keywords',
+                            icon: Brain,
+                            title: 'Auto Keyword Research',
+                            desc: 'AI finds untapped keyword opportunities by analyzing competitors, search trends, and content gaps.',
+                            activeBorder: 'border-amber-500/40 bg-amber-500/[0.06]',
+                            inactiveHover: 'hover:border-amber-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-amber-500/25 to-amber-500/5 border border-amber-500/20 group-hover:border-amber-500/30',
+                            iconText: 'text-amber-300',
+                            labelText: 'text-amber-300',
+                            glow: 'rgba(251,191,36,0.18)',
+                        },
+                        {
+                            key: 'linking',
+                            icon: Link2,
+                            title: 'AI Smart Linking',
+                            desc: 'Discover and suggest internal links between your pages to build topical authority.',
+                            activeBorder: 'border-cyan-500/40 bg-cyan-500/[0.06]',
+                            inactiveHover: 'hover:border-cyan-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/20 group-hover:border-cyan-500/30',
+                            iconText: 'text-cyan-300',
+                            labelText: 'text-cyan-300',
+                            glow: 'rgba(34,211,238,0.18)',
+                        },
+                        {
+                            key: 'schema',
+                            icon: FileText,
+                            title: 'Schema Generator',
+                            desc: 'Auto-generate JSON-LD structured data for FAQ, Article, Product, HowTo pages.',
+                            activeBorder: 'border-violet-500/40 bg-violet-500/[0.06]',
+                            inactiveHover: 'hover:border-violet-500/25 hover:bg-white/[0.04]',
+                            iconBg: 'bg-gradient-to-br from-violet-500/25 to-violet-500/5 border border-violet-500/20 group-hover:border-violet-500/30',
+                            iconText: 'text-violet-300',
+                            labelText: 'text-violet-300',
+                            glow: 'rgba(167,139,250,0.18)',
+                        },
+                    ].map(({ key, icon: ToolIcon, title, desc, activeBorder, inactiveHover, iconBg, iconText, labelText, glow }) => {
+                        const isActive = activeTool === key;
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => { setActiveTool(isActive ? null : key); setToolResult(null); }}
+                                className={`relative overflow-hidden bg-white/[0.02] border rounded-xl p-4 text-left transition-all group cursor-pointer ${
+                                    isActive ? activeBorder : `border-white/[0.06] ${inactiveHover}`
+                                }`}
+                                style={isActive ? { boxShadow: `0 0 32px ${glow}` } : undefined}
+                            >
+                                {isActive && (
+                                    <div
+                                        className="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full blur-3xl"
+                                        style={{ background: glow }}
+                                    />
+                                )}
+                                <div className="relative">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition ${iconBg}`}>
+                                        <ToolIcon className={`w-5 h-5 ${iconText}`} />
+                                    </div>
+                                    <h4 className="text-sm font-semibold text-white mb-1 tracking-tight">{title}</h4>
+                                    <p className="text-[11px] text-zinc-500 leading-relaxed">{desc}</p>
+                                    <div className={`mt-3 flex items-center gap-1.5 text-[10px] font-medium ${labelText}`}>
+                                        <Sparkles className="w-3 h-3" /> {isActive ? 'Active' : 'Click to use'}
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* ─── Active Tool Panel ─── */}
@@ -485,8 +754,10 @@ export default function SEOPage() {
                                             <FixWithBotButton label="Publish via Bot" size="md" variant="solid" context="Your bot can publish this directly to your CMS" site={selectedSite} />
                                             <button onClick={() => navigator.clipboard.writeText(toolResult.content)} className="px-3 py-1.5 text-xs text-zinc-400 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] transition">Copy</button>
                                         </div>
-                                        <div className="bg-black/30 border border-white/[0.06] rounded-lg p-4 max-h-[400px] overflow-y-auto">
-                                            <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono">{toolResult.content}</pre>
+                                        <div className="bg-black/30 border border-white/[0.06] rounded-lg p-5 max-h-[480px] overflow-y-auto">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={blogMarkdownComponents}>
+                                                {toolResult.content}
+                                            </ReactMarkdown>
                                         </div>
                                     </>
                                 )}
@@ -599,138 +870,100 @@ export default function SEOPage() {
                         )}
                     </div>
                 )}
+                </div>
             </div>
 
-            {/* ─── Deep SEO Intelligence Features ─── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Content Decay Detector */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                            <Activity className="w-4 h-4 text-red-400" />
+            {/* ─── Indexing Status ─── */}
+            {kpis && (kpis.indexedPages > 0 || kpis.crawlErrors > 0) && (
+                <IndexingStatus
+                    indexed={kpis.indexedPages || 0}
+                    errors={kpis.crawlErrors || 0}
+                    excluded={0}
+                />
+            )}
+
+            {/* ─── Growth Opportunities (real widgets, tabbed) ─── */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-violet-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_24px_rgba(52,211,153,0.1)]">
+                            <Target className="w-5 h-5 text-emerald-300" />
                         </div>
-                        <h4 className="text-sm font-semibold text-white">Content Decay Detector</h4>
+                        <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 flex items-center gap-1.5">
+                                <span>Quick Wins</span>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-500/[0.08] px-1.5 py-0 text-[9px] font-medium text-emerald-300 normal-case tracking-normal">Live</span>
+                            </div>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Growth Opportunities</h3>
+                        </div>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Monitors your top-performing pages and alerts when traffic declines so you can refresh content before rankings drop.</p>
-                    {pages.length > 0 ? (
-                        <div className="space-y-1.5">
-                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).slice(0, 3).map((p, i) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-400 truncate max-w-[60%]">{p.page}</span>
-                                    <span className="text-red-400 font-medium">pos {p.position.toFixed(1)}</span>
-                                </div>
-                            ))}
-                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length > 0 && (
-                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get deep analysis on decaying content and optimization strategies" site={selectedSite} /></div>
-                            )}
-                            {pages.filter((p: any) => p.status === 'decay' || p.position > 15).length === 0 && (
-                                <span className="text-[11px] text-emerald-400">No decaying content detected</span>
-                            )}
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Connect Google to detect decaying content</span>
-                    )}
+                    <div className="flex bg-[#0a0d12] rounded-xl p-1 border border-white/[0.08] gap-1">
+                        {[
+                            { key: 'striking', label: 'Striking Distance', icon: Target },
+                            { key: 'ctr', label: 'CTR Lab', icon: Zap },
+                            { key: 'decay', label: 'Winners & Losers', icon: TrendingUp },
+                        ].map(({ key, label, icon: Icon }) => (
+                            <button
+                                key={key}
+                                onClick={() => setActiveOppTab(key as 'striking' | 'ctr' | 'decay')}
+                                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-all ${
+                                    activeOppTab === key
+                                        ? 'bg-emerald-500/[0.08] border border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]'
+                                        : 'border border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                                }`}
+                            >
+                                <Icon className="w-3 h-3" />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Keyword Cannibalization */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                            <Shuffle className="w-4 h-4 text-amber-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Cannibalization Scanner</h4>
+                {oppLoading && !oppData ? (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Detects when multiple pages compete for the same keywords, splitting ranking power.</p>
-                    {queries.length > 0 ? (
-                        <div className="space-y-1.5">
-                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).slice(0, 3).map((q: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-400 truncate max-w-[60%]">{q.query}</span>
-                                    <span className="text-amber-400 font-medium">pos {q.position}</span>
-                                </div>
-                            ))}
-                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length > 0 && (
-                                <div className="mt-2"><FixWithBotButton label="Get Analysis" size="sm" variant="ghost" context="Get detailed cannibalization analysis and fix recommendations" site={selectedSite} /></div>
-                            )}
-                            {queries.filter((q: any) => q.position > 8 && q.impressions > 100).length === 0 && (
-                                <span className="text-[11px] text-emerald-400">No cannibalization issues found</span>
-                            )}
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Analyzed from your Search Console data</span>
-                    )}
-                </div>
-
-                {/* Competitor Gap Analysis */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                            <Radar className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Competitor Gap Analysis</h4>
+                ) : oppError && !oppData ? (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex items-center justify-center gap-3">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs text-zinc-400">Couldn&apos;t load opportunities data. Try refreshing.</span>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-3">Keywords your competitors rank for that you don&apos;t. Use the Keyword Research tool above to discover gaps.</p>
-                    {queries.length > 0 ? (
-                        <div className="text-xs text-zinc-400">
-                            <span className="text-emerald-400 font-bold">{queries.length}</span> keywords tracked.
-                            <span className="text-amber-400 font-bold ml-2">{queries.filter((q: any) => q.position > 10).length}</span> outside top 10.
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Connect Google to analyze gaps</span>
-                    )}
-                </div>
-
-                {/* Core Web Vitals Monitor */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <Cpu className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Core Web Vitals</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Use the Audit tool to check LCP, FID, CLS for any page. Navigate to Audit from the sidebar.</p>
-                    <a href="/dashboard/audit" className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 hover:underline"><ArrowUpRight className="w-3 h-3" /> Open Audit Tool</a>
-                </div>
-
-                {/* Daily Rank Tracker */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                            <BarChart3 className="w-4 h-4 text-pink-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Rank Tracking</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Your keyword positions from Search Console data. Updated with each data refresh.</p>
-                    {queries.length > 0 ? (
-                        <div className="space-y-1.5">
-                            {queries.slice(0, 3).map((q: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-400 truncate max-w-[55%]">{q.query}</span>
-                                    <span className={`font-medium ${q.position <= 5 ? 'text-emerald-400' : q.position <= 10 ? 'text-amber-400' : 'text-red-400'}`}>#{q.position}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-zinc-600">Connect Google to track rankings</span>
-                    )}
-                </div>
-
-                {/* Programmatic SEO */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/[0.1] transition">
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                            <Layers className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-white">Programmatic SEO</h4>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-3">Use the Blog Writer + Keyword Research tools above to generate content at scale for long-tail keywords.</p>
-                    <span className="text-[11px] text-violet-400 font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> Use tools above</span>
-                </div>
+                ) : (
+                    <>
+                        {activeOppTab === 'striking' && (
+                            <StrikingDistanceWidget
+                                queries={oppDataTyped.queries || queries}
+                                siteUrl={activeSite || ''}
+                            />
+                        )}
+                        {activeOppTab === 'ctr' && (
+                            <CtrOptimizationLab
+                                queryPages={oppDataTyped.queryPages || []}
+                                siteUrl={activeSite || ''}
+                            />
+                        )}
+                        {activeOppTab === 'decay' && (
+                            <SilentDecayMonitor
+                                queries={oppDataTyped.queries || queries}
+                                comparisonQueries={oppDataTyped.comparisonQueries || []}
+                                siteUrl={activeSite || ''}
+                            />
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Search Trend Chart */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-                <h3 className="text-sm font-semibold text-white mb-4">Search Performance Trend</h3>
+            <div className="premium-card p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-violet-500/15 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.1)]">
+                        <BarChart3 className="w-5 h-5 text-emerald-300" />
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Trend</div>
+                        <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Search Performance</h3>
+                    </div>
+                </div>
                 <div className="h-[280px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={trend} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -757,20 +990,31 @@ export default function SEOPage() {
             </div>
 
             {/* Queries / Pages Tab */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 sm:p-5">
-                <div className="flex items-center gap-1 mb-4 bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5 w-fit">
+            <div className="premium-card p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/25 to-emerald-500/15 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.1)]">
+                            <Search className="w-5 h-5 text-cyan-300" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Drill-down</div>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-white">Top Search Performance</h3>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-[#0a0d12] border border-white/[0.08] rounded-xl p-1 w-fit">
                     <button
                         onClick={() => setActiveTab('queries')}
-                        className={`px-4 py-2 min-h-[44px] text-xs font-medium rounded-md transition ${activeTab === 'queries' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`px-4 py-2 min-h-[40px] text-xs font-medium rounded-lg transition-all border ${activeTab === 'queries' ? 'bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]' : 'border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'}`}
                     >
                         Top Queries
                     </button>
                     <button
                         onClick={() => setActiveTab('pages')}
-                        className={`px-4 py-2 min-h-[44px] text-xs font-medium rounded-md transition ${activeTab === 'pages' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`px-4 py-2 min-h-[40px] text-xs font-medium rounded-lg transition-all border ${activeTab === 'pages' ? 'bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.15)]' : 'border-transparent text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'}`}
                     >
                         Top Pages
                     </button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -908,28 +1152,66 @@ export default function SEOPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* SERP Preview */}
                     <div className="premium-card p-4 sm:p-5">
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center">
                                 <Globe className="w-3.5 h-3.5 text-white" />
                             </div>
                             <h3 className="text-sm font-semibold text-white">SERP Preview</h3>
-                            <span className="text-[10px] text-zinc-600">How your top result appears in Google</span>
+                            <span className="text-[10px] text-zinc-600">How this page appears in Google</span>
                         </div>
-                        {pages[0] && (
-                            <div className="serp-preview">
-                                <div className="serp-url">{pages[0].page}</div>
-                                <div className="serp-title">{pages[0].page.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Page Title'}</div>
-                                <div className="serp-desc">This page has {pages[0].clicks} clicks and {pages[0].impressions?.toLocaleString()} impressions with a CTR of {pages[0].ctr}% at position {pages[0].position.toFixed(1)}.</div>
-                            </div>
-                        )}
-                        <div className="mt-3 flex items-center gap-2">
-                            <button
-                                onClick={() => pages[0] && router.push(`/dashboard/audit?url=${encodeURIComponent(pages[0].page)}`)}
-                                className="audit-pill"
-                            >
-                                <ScanSearch className="w-3 h-3" /> Audit This Page
-                            </button>
-                        </div>
+                        {pages.length > 0 && (() => {
+                            const safeIndex = Math.min(serpPreviewIndex, pages.length - 1);
+                            const previewPage = pages[safeIndex];
+                            const titleText = previewPage.page.split('/').filter(Boolean).pop()?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Page Title';
+                            const descText = `This page has ${previewPage.clicks.toLocaleString()} clicks and ${previewPage.impressions?.toLocaleString()} impressions with a CTR of ${previewPage.ctr}% at position ${previewPage.position.toFixed(1)}.`;
+                            const titleOver = titleText.length > 60;
+                            const descOver = descText.length > 160;
+                            return (
+                                <>
+                                    <div className="relative mb-3">
+                                        <select
+                                            value={safeIndex}
+                                            onChange={(e) => setSerpPreviewIndex(Number(e.target.value))}
+                                            className="w-full appearance-none bg-white/[0.03] border border-white/[0.08] rounded-lg pl-3 pr-8 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/30"
+                                        >
+                                            {pages.slice(0, 25).map((p, i) => (
+                                                <option key={i} value={i}>{p.page}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                                    </div>
+                                    <div className="serp-preview">
+                                        <div className="serp-url">{previewPage.page}</div>
+                                        <div className="serp-title">{titleText}</div>
+                                        <div className="serp-desc">{descText}</div>
+                                    </div>
+                                    {(titleOver || descOver) && (
+                                        <div className="mt-2 flex flex-col gap-1">
+                                            {titleOver && (
+                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    Title is {titleText.length} chars — Google truncates around 60.
+                                                </div>
+                                            )}
+                                            {descOver && (
+                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    Description is {descText.length} chars — Google truncates around 160.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <button
+                                            onClick={() => router.push(`/dashboard/audit?url=${encodeURIComponent(previewPage.page)}`)}
+                                            className="audit-pill"
+                                        >
+                                            <ScanSearch className="w-3 h-3" /> Audit This Page
+                                        </button>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
 
                     {/* Quick Domain Actions */}
