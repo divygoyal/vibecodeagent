@@ -185,15 +185,6 @@ export default function DashboardLayout({
     const [selectedSite, setSelectedSite] = useState('');
     const [showWelcome, setShowWelcome] = useState(false);
     const [range, setRange] = useState('30d');
-    useEffect(() => {
-        if (!mobileOpen) {
-            setSiteDropdownOpen(false);
-        }
-    }, [mobileOpen]);
-
-    useEffect(() => {
-        setSiteDropdownOpen(false);
-    }, [pathname]);
 
     // Load user-scoped selections and chat history once session is available
     useEffect(() => {
@@ -293,7 +284,6 @@ export default function DashboardLayout({
         }
     }, [user, getUserKey]);
     const [bellOpen, setBellOpen] = useState(false);
-    const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
 
     // Logout handler — clears user-scoped data to prevent cross-user leaks
     const handleSignOut = useCallback(() => {
@@ -340,7 +330,7 @@ export default function DashboardLayout({
     }, [bellOpen]);
 
     // Alerts for notification bell
-    const { hasGoogleConnection } = useContainerStatus();
+    const { hasGoogleConnection, isLoading: containerStatusLoading } = useContainerStatus();
     const {
         sites: gscSites,
         isLoading: siteInventoryLoading,
@@ -378,16 +368,17 @@ export default function DashboardLayout({
         && typedProperties.length === 0;
     const displaySiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
 
-    // Redirect-to-setup guard — first-time users get walked through workspace
-    // selection before landing on a content-light dashboard. Skip the redirect
-    // when the user is in demo mode, hasn't yet connected any provider, or is
-    // already on /dashboard/setup. Skip while inventories are still loading.
+    // Redirect-to-setup guard — every freshly-signed-in user gets routed to the
+    // /dashboard/setup screen before landing in the dashboard, including users
+    // with no Google connection yet (the setup page itself shows the
+    // Connect-Google CTA). Skip the redirect on the setup route, in demo mode,
+    // and during the brief loading windows for container status / inventories.
     useEffect(() => {
         if (!user || !isWorkspaceLoaded) return;
         if (isSetupRoute) return;
-        if (!hasGoogleConnection) return;
+        if (containerStatusLoading) return;
         if (isDemoWorkspace) return;
-        if (siteInventoryLoading || propertyInventoryLoading) return;
+        if (hasGoogleConnection && (siteInventoryLoading || propertyInventoryLoading)) return;
         const hasSelection = Boolean(selectedProperty) || Boolean(selectedSite);
         if (!hasSelection) {
             router.replace('/dashboard/setup');
@@ -396,6 +387,7 @@ export default function DashboardLayout({
         user,
         isWorkspaceLoaded,
         isSetupRoute,
+        containerStatusLoading,
         hasGoogleConnection,
         isDemoWorkspace,
         siteInventoryLoading,
@@ -640,14 +632,6 @@ export default function DashboardLayout({
                     }`}
             >
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(20,196,225,0.16),transparent_64%),radial-gradient(circle_at_top_right,rgba(122,217,218,0.1),transparent_48%)]" />
-                {siteDropdownOpen && (
-                    <button
-                        type="button"
-                        className="fixed inset-0 z-[60] hidden cursor-default bg-transparent lg:block"
-                        onClick={() => setSiteDropdownOpen(false)}
-                        aria-label="Close site selector"
-                    />
-                )}
                 {/* Logo */}
                 <div className="relative z-10 h-16 flex items-center px-4 border-b border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]">
                     <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
@@ -660,56 +644,36 @@ export default function DashboardLayout({
                     </Link>
                 </div>
 
-                {/* Site selector */}
-                {gscSites.length > 0 && (
-                    <div className={`relative px-2.5 pt-3 pb-1.5 ${siteDropdownOpen ? 'z-[80]' : 'z-10'}`}>
-                        <div className="relative">
-                            <button
-                                onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                className={`relative z-[90] w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-zinc-300 bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] border border-white/[0.08] shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${shellCompactRadiusClass} hover:border-[#14C4E1]/24 hover:bg-[linear-gradient(180deg,rgba(16,24,34,0.94),rgba(8,13,20,0.96))] transition ${collapsed ? 'justify-center' : ''}`}
-                                aria-label="Switch site"
-                            >
-                                <div className={`w-4 h-4 ${isOverviewRoute ? 'rounded-none' : 'rounded'} bg-[#14C4E1]/14 flex items-center justify-center flex-shrink-0`}>
-                                    <Globe className="w-2.5 h-2.5 text-[#7AD9DA]" />
-                                </div>
-                                {!collapsed && (
-                                    <>
-                                        <span className="flex-1 text-left truncate font-medium">{displaySiteUrl ? formatSiteLabel(displaySiteUrl) : 'Select site'}</span>
-                                        <ChevronDown className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
-                                    </>
-                                )}
-                            </button>
-                            {siteDropdownOpen && (
-                                <div className={`absolute ${collapsed ? 'left-full ml-2 top-0' : 'left-0 right-0 mt-2'} z-[95] bg-[linear-gradient(180deg,#09131c_0%,#040912_100%)] border border-[#14C4E1]/20 ${shellRadiusClass} shadow-[0_26px_60px_rgba(0,0,0,0.48)] py-1.5 min-w-[220px] max-h-[260px] overflow-y-auto backdrop-blur-xl`}>
-                                        <div className="px-3 pb-1.5 pt-0.5">
-                                            <span className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">Sites</span>
-                                        </div>
-                                        {typedSites.map((site) => {
-                                            const url = site.siteUrl;
-                                            const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                            const isSelected = url === displaySiteUrl;
-                                            return (
-                                                <button
-                                                    key={url}
-                                                    onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
-                                                    className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2.5 transition ${
-                                                        isSelected ? 'text-[#7AD9DA] bg-[#14C4E1]/[0.10]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                                    }`}
-                                                >
-                                                    <Globe className="w-3 h-3 flex-shrink-0" />
-                                                    <span className="truncate">{label}</span>
-                                                    {isSelected && <span className={`w-1.5 h-1.5 ${shellBadgeRadiusClass} bg-[#7AD9DA] ml-auto flex-shrink-0`} />}
-                                                </button>
-                                            );
-                                        })}
-                                </div>
+                {/* Workspace selector — links to /dashboard/setup (single source of truth) */}
+                {hasGoogleConnection && (
+                    <div className="relative px-2.5 pt-3 pb-1.5 z-10">
+                        <Link
+                            href="/dashboard/setup"
+                            aria-label="Switch workspace"
+                            title="Switch workspace"
+                            className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-zinc-300 bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] border border-white/[0.08] shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${shellCompactRadiusClass} hover:border-[#14C4E1]/24 hover:bg-[linear-gradient(180deg,rgba(16,24,34,0.94),rgba(8,13,20,0.96))] transition ${collapsed ? 'justify-center' : ''}`}
+                        >
+                            <div className={`w-4 h-4 ${isOverviewRoute ? 'rounded-none' : 'rounded'} bg-[#14C4E1]/14 flex items-center justify-center flex-shrink-0`}>
+                                <Globe className="w-2.5 h-2.5 text-[#7AD9DA]" />
+                            </div>
+                            {!collapsed && (
+                                <>
+                                    <span className="flex-1 text-left truncate font-medium">
+                                        {displaySiteUrl
+                                            ? formatSiteLabel(displaySiteUrl)
+                                            : isDemoWorkspace
+                                                ? DEMO_DOMAIN_LABEL
+                                                : 'Select workspace'}
+                                    </span>
+                                    <ChevronRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+                                </>
                             )}
-                        </div>
+                        </Link>
                     </div>
                 )}
 
                 {/* Grouped nav items */}
-                <nav className={`relative z-10 flex-1 py-2 px-2.5 overflow-y-auto transition-opacity duration-200 ${siteDropdownOpen ? 'pointer-events-none opacity-35' : ''}`} aria-label="Main navigation">
+                <nav className="relative z-10 flex-1 py-2 px-2.5 overflow-y-auto" aria-label="Main navigation">
                     {sidebarGroups.map((group, gi) => (
                         <div key={gi} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--divider)]' : ''}>
                             {group.label && !collapsed && (
@@ -741,7 +705,7 @@ export default function DashboardLayout({
                 </nav>
 
                 {/* Bottom section: Settings + Credits + User + Collapse */}
-                <div className={`relative z-10 border-t border-[var(--divider)] p-2.5 space-y-1.5 transition-opacity duration-200 ${siteDropdownOpen ? 'pointer-events-none opacity-35' : ''}`}>
+                <div className="relative z-10 border-t border-[var(--divider)] p-2.5 space-y-1.5">
                     {/* Settings link */}
                     {(() => {
                         const isSettingsActive = pathname.startsWith('/dashboard/settings');
@@ -853,27 +817,6 @@ export default function DashboardLayout({
                             <div className={`hidden md:block ${isAnalyticsMainRoute ? 'invisible pointer-events-none w-0 overflow-hidden' : ''}`}>
                                 <DatePicker range={range} setRange={setRange} />
                             </div>
-                            {/* Workspace pill — current selection + link to /dashboard/setup
-                                to switch property/site. Replaces every per-page picker. */}
-                            {hasGoogleConnection && !isSetupRoute && (
-                                <Link
-                                    href="/dashboard/setup"
-                                    className={`hidden sm:flex items-center gap-1.5 px-2.5 h-8 ${shellCompactRadiusClass} text-[11px] font-medium text-zinc-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-[#14C4E1]/24 transition-colors`}
-                                    title="Switch workspace"
-                                    aria-label="Switch workspace"
-                                >
-                                    <Globe className="w-3 h-3 text-[#7AD9DA]" />
-                                    <span className="max-w-[160px] truncate">
-                                        {displaySiteUrl
-                                            ? formatSiteLabel(displaySiteUrl)
-                                            : resolvedPropertyId
-                                                ? 'GA4 only'
-                                                : isDemoWorkspace
-                                                    ? DEMO_DOMAIN_LABEL
-                                                    : 'Pick workspace'}
-                                    </span>
-                                </Link>
-                            )}
                             {/* Notification Bell — clickable rows that route to the
                                 AI chat with a pre-filled question about the alert.
                                 Falls back to the relevant dashboard route per category. */}
@@ -1023,14 +966,6 @@ export default function DashboardLayout({
                     />
                     <div className="fixed left-0 top-0 bottom-0 z-50 flex w-[296px] max-w-[88vw] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[linear-gradient(180deg,#050914_0%,#060b12_18%,#020306_100%)] shadow-[0_30px_70px_rgba(0,0,0,0.45)] lg:hidden">
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(20,196,225,0.18),transparent_64%),radial-gradient(circle_at_top_right,rgba(122,217,218,0.1),transparent_48%)]" />
-                        {siteDropdownOpen && (
-                            <button
-                                type="button"
-                                className="absolute inset-0 z-40 cursor-default bg-[#040914]/78 backdrop-blur-[2px]"
-                                onClick={() => setSiteDropdownOpen(false)}
-                                aria-label="Close site selector"
-                            />
-                        )}
                         {/* Header with logo and close */}
                         <div className="relative z-10 flex h-16 items-center justify-between border-b border-white/[0.06] px-4 pt-[env(safe-area-inset-top,0px)]">
                             <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
@@ -1048,46 +983,32 @@ export default function DashboardLayout({
                             </button>
                         </div>
 
-                        {/* Mobile site selector — shown when multiple sites */}
-                        {gscSites.length > 1 && (
-                            <div className={`relative px-3 pt-3 pb-1.5 ${siteDropdownOpen ? 'z-[80]' : 'z-10'}`}>
-                                <label className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-1 mb-1.5 block">Site</label>
-                                <button
-                                    onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                                    className="relative z-[90] w-full flex items-center gap-2.5 px-3 py-3 text-xs text-zinc-300 bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] border border-white/[0.08] rounded-2xl shadow-[0_10px_24px_rgba(0,0,0,0.18)] hover:border-[#14C4E1]/24 hover:bg-[linear-gradient(180deg,rgba(16,24,34,0.94),rgba(8,13,20,0.96))] transition"
+                        {/* Mobile workspace selector — links to /dashboard/setup */}
+                        {hasGoogleConnection && (
+                            <div className="relative px-3 pt-3 pb-1.5 z-10">
+                                <label className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-1 mb-1.5 block">Workspace</label>
+                                <Link
+                                    href="/dashboard/setup"
+                                    onClick={() => setMobileOpen(false)}
+                                    className="relative w-full flex items-center gap-2.5 px-3 py-3 text-xs text-zinc-300 bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] border border-white/[0.08] rounded-2xl shadow-[0_10px_24px_rgba(0,0,0,0.18)] hover:border-[#14C4E1]/24 hover:bg-[linear-gradient(180deg,rgba(16,24,34,0.94),rgba(8,13,20,0.96))] transition"
+                                    aria-label="Switch workspace"
                                 >
                                     <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#14C4E1]/12">
                                         <Globe className="w-3.5 h-3.5 text-[#7AD9DA] flex-shrink-0" />
                                     </div>
-                                    <span className="flex-1 text-left truncate">{displaySiteUrl ? formatSiteLabel(displaySiteUrl) : 'Select site'}</span>
-                                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 flex-shrink-0 transition-transform ${siteDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {siteDropdownOpen && (
-                                    <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[95] rounded-2xl bg-[linear-gradient(180deg,#09131d_0%,#040913_100%)] border border-[#14C4E1]/18 shadow-[0_24px_50px_rgba(0,0,0,0.45)] py-1.5 max-h-[220px] overflow-y-auto backdrop-blur-xl">
-                                        {typedSites.map((site) => {
-                                            const url = site.siteUrl;
-                                            const label = url.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                            const isSelected = url === displaySiteUrl;
-                                            return (
-                                                <button
-                                                    key={url}
-                                                    onClick={() => { setSelectedSite(url); setSiteDropdownOpen(false); }}
-                                                    className={`w-full text-left px-3 py-2.5 text-xs flex items-center gap-2 min-h-[44px] transition ${
-                                                        isSelected ? 'text-[#7AD9DA] bg-[#14C4E1]/[0.10]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                                                    }`}
-                                                >
-                                                    <Globe className="w-3 h-3 flex-shrink-0" />
-                                                    <span className="truncate">{label}</span>
-                                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#7AD9DA] ml-auto flex-shrink-0" />}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                    <span className="flex-1 text-left truncate">
+                                        {displaySiteUrl
+                                            ? formatSiteLabel(displaySiteUrl)
+                                            : isDemoWorkspace
+                                                ? DEMO_DOMAIN_LABEL
+                                                : 'Select workspace'}
+                                    </span>
+                                    <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                                </Link>
                             </div>
                         )}
 
-                        <div className={`relative z-10 flex min-h-0 flex-1 flex-col transition-opacity duration-200 ${siteDropdownOpen ? 'pointer-events-none opacity-35' : ''}`}>
+                        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
                             {/* Mobile date range picker */}
                             <MobileDatePicker range={range} setRange={setRange} />
 
