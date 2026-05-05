@@ -144,14 +144,20 @@ export async function POST(req: NextRequest) {
 
         if (!psiRes.ok) {
             const text = await psiRes.text().catch(() => '');
+            // 429 with no API key → unauthenticated quota exhausted. Surface as a clean empty state
+            // so SeoPageHealthPanel can render an info banner instead of a generic error.
+            if ((psiRes.status === 429 || psiRes.status === 403) && !PSI_API_KEY) {
+                return NextResponse.json(
+                    { supported: false, reason: 'pagespeed_quota_exhausted', error: 'PageSpeed Insights anonymous quota exhausted. Add a free GOOGLE_PAGESPEED_API_KEY (console.cloud.google.com) to lift the limit.' },
+                    { status: 200 }
+                );
+            }
             // Classify upstream errors so the user gets actionable copy instead of "502 Bad Gateway".
             let userMessage = `PageSpeed Insights returned ${psiRes.status}.`;
             if (psiRes.status === 400) {
                 userMessage = 'PageSpeed Insights couldn\'t analyze this URL. Make sure it returns a 2xx status and isn\'t blocked by robots.txt or a paywall.';
             } else if (psiRes.status === 403) {
-                userMessage = PSI_API_KEY
-                    ? 'PageSpeed Insights API key is invalid or doesn\'t have the PageSpeed Insights API enabled. Check the GOOGLE_PAGESPEED_API_KEY env var.'
-                    : 'PageSpeed Insights rate-limited this request. Add a GOOGLE_PAGESPEED_API_KEY env var (free at console.cloud.google.com) for higher quota.';
+                userMessage = 'PageSpeed Insights API key is invalid or doesn\'t have the PageSpeed Insights API enabled. Check the GOOGLE_PAGESPEED_API_KEY env var.';
             } else if (psiRes.status === 429) {
                 userMessage = 'PageSpeed Insights rate limit hit. Wait a minute, then try again.';
             } else if (psiRes.status >= 500) {
