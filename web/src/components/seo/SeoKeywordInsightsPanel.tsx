@@ -4,8 +4,6 @@ import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 import {
     AlertCircle,
-    ArrowDown,
-    ArrowUp,
     Eye,
     ExternalLink,
     Hash,
@@ -13,6 +11,7 @@ import {
     MousePointer,
     Search,
     Sparkles,
+    TrendingUp,
     type LucideIcon,
 } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
@@ -100,20 +99,43 @@ function shortenPath(url: string): string {
     }
 }
 
-function KpiTile({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string; sub?: { label: string; positive: boolean } }) {
+type Tone = 'emerald' | 'cyan' | 'amber' | 'violet';
+
+const TONE_VALUE: Record<Tone, string> = {
+    emerald: 'text-emerald-300',
+    cyan: 'text-cyan-300',
+    amber: 'text-amber-300',
+    violet: 'text-violet-300',
+};
+const TONE_ICON: Record<Tone, string> = {
+    emerald: 'text-emerald-400 bg-emerald-500/[0.08] border-emerald-500/20',
+    cyan: 'text-cyan-400 bg-cyan-500/[0.08] border-cyan-500/20',
+    amber: 'text-amber-400 bg-amber-500/[0.08] border-amber-500/20',
+    violet: 'text-violet-400 bg-violet-500/[0.08] border-violet-500/20',
+};
+
+function KpiTile({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: string; tone: Tone }) {
     return (
         <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12] px-3.5 py-3">
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <div className="mb-2 flex items-center gap-1.5">
+                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-md border ${TONE_ICON[tone]}`}>
+                    <Icon className="h-2.5 w-2.5" />
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{label}</span>
+            </div>
+            <p className={`text-[1.6rem] font-bold tabular-nums leading-none tracking-[-0.02em] ${TONE_VALUE[tone]}`}>{value}</p>
+        </div>
+    );
+}
+
+function SectionHeader({ icon: Icon, label, hint }: { icon: LucideIcon; label: string; hint?: string }) {
+    return (
+        <div className="mb-2 flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
                 <Icon className="h-3 w-3" />
                 {label}
-            </div>
-            <p className="text-[1.25rem] font-semibold tabular-nums leading-none tracking-[-0.02em] text-white">{value}</p>
-            {sub ? (
-                <span className={`mt-2 inline-flex items-center gap-1 text-[11px] font-semibold ${sub.positive ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {sub.positive ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}
-                    {sub.label}
-                </span>
-            ) : null}
+            </span>
+            {hint ? <span className="text-[10px] uppercase tracking-wider text-zinc-500">{hint}</span> : null}
         </div>
     );
 }
@@ -146,12 +168,12 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
 
     return (
         <AnalyticsSubpagePanel
-            title={keyword ? 'Keyword detail' : 'Review insights'}
+            title="Keyword detail"
             description={keyword ? 'Performance, trend, and pages for the selected query.' : 'Pick a query on the left to populate this panel.'}
             tone="cyan"
             action={
                 keyword ? (
-                    <span className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
+                    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
                         <Sparkles className="h-3 w-3" />
                         <span className="max-w-[180px] truncate">{keyword}</span>
                         <IntentBadge keyword={keyword} className="hidden sm:inline-flex flex-shrink-0" />
@@ -175,37 +197,18 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
                     Couldn&apos;t load keyword detail. {error.info?.error || error.message}
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
                     {/* KPI strip */}
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                        <KpiTile
-                            icon={MousePointer}
-                            label="Total Clicks"
-                            value={computed ? formatCompactNumber(computed.clicks) : '—'}
-                        />
-                        <KpiTile
-                            icon={Eye}
-                            label="Impressions"
-                            value={computed ? formatCompactNumber(computed.impressions) : '—'}
-                        />
-                        <KpiTile
-                            icon={Hash}
-                            label="Avg. Position"
-                            value={computed ? computed.position.toFixed(1) : '—'}
-                        />
-                        <KpiTile
-                            icon={Sparkles}
-                            label="Avg. CTR"
-                            value={computed ? computed.ctrLabel : '—'}
-                        />
+                        <KpiTile icon={MousePointer} label="Total Clicks" tone="emerald" value={computed ? formatCompactNumber(computed.clicks) : '—'} />
+                        <KpiTile icon={Eye} label="Impressions" tone="cyan" value={computed ? formatCompactNumber(computed.impressions) : '—'} />
+                        <KpiTile icon={Hash} label="Avg. Position" tone="amber" value={computed ? computed.position.toFixed(1) : '—'} />
+                        <KpiTile icon={TrendingUp} label="Avg. CTR" tone="violet" value={computed ? computed.ctrLabel : '—'} />
                     </div>
 
                     {/* 7-day trend */}
                     <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12] px-4 py-3">
-                        <div className="mb-2 flex items-center justify-between">
-                            <p className="text-[12px] font-semibold tracking-tight text-zinc-300">7-day trend</p>
-                            <span className="text-[10px] uppercase tracking-wider text-zinc-500">Last 7 days</span>
-                        </div>
+                        <SectionHeader icon={TrendingUp} label="7-day trend" hint="Last 7 days" />
                         {trendData.length > 1 ? (
                             <div className="h-[160px]">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -215,8 +218,8 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
                                         <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} width={32} />
                                         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} width={42} />
                                         <Tooltip content={<ChartTooltip />} />
-                                        <Line yAxisId="left" type="monotone" dataKey="clicks" name="Clicks" stroke="#22d3ee" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                        <Line yAxisId="right" type="monotone" dataKey="impressions" name="Impressions" stroke="#67e8f9" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />
+                                        <Line yAxisId="left" type="monotone" dataKey="clicks" name="Clicks" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
+                                        <Line yAxisId="right" type="monotone" dataKey="impressions" name="Impressions" stroke="#22d3ee" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
@@ -224,21 +227,24 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
                             <div className="flex h-[160px] items-center justify-center text-[12px] text-zinc-600">Not enough data for a trend.</div>
                         )}
                         <div className="mt-2 flex gap-4 text-[11px] text-zinc-400">
-                            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cyan-400" /> Clicks</span>
-                            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cyan-200" /> Impressions</span>
+                            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Clicks</span>
+                            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cyan-400" /> Impressions</span>
                         </div>
                     </div>
 
-                    {/* Related pages */}
+                    {/* Related pages — scrollable */}
                     <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12]">
                         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
-                            <p className="text-[12px] font-semibold tracking-tight text-zinc-300">Related pages</p>
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+                                <ExternalLink className="h-3 w-3" />
+                                Related pages
+                            </span>
                             {detail?.pages?.length ? (
                                 <span className="text-[10px] uppercase tracking-wider text-zinc-500">{detail.pages.length} pages</span>
                             ) : null}
                         </div>
                         {detail?.pages?.length ? (
-                            <div>
+                            <>
                                 <div
                                     className="hidden md:grid gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[11px] font-medium text-zinc-500"
                                     style={{ gridTemplateColumns: 'minmax(0,1fr) 80px 88px 64px 80px' }}
@@ -249,27 +255,29 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
                                     <span className="text-right">CTR</span>
                                     <span className="text-right">Position</span>
                                 </div>
-                                {detail.pages.slice(0, 6).map((p, i) => (
-                                    <div
-                                        key={i}
-                                        className="grid h-9 grid-cols-[minmax(0,1fr)_80px_88px_64px_80px] items-center gap-3 border-b border-white/[0.04] px-4 last:border-b-0 hover:bg-white/[0.02]"
-                                    >
-                                        <a
-                                            href={p.page}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex min-w-0 items-center gap-1.5 text-[12px] text-zinc-200 hover:text-cyan-300"
+                                <div className="max-h-[280px] overflow-y-auto">
+                                    {detail.pages.map((p, i) => (
+                                        <div
+                                            key={i}
+                                            className="grid h-9 grid-cols-[minmax(0,1fr)_80px_88px_64px_80px] items-center gap-3 border-b border-white/[0.04] px-4 last:border-b-0 hover:bg-white/[0.02]"
                                         >
-                                            <span className="block truncate">{shortenPath(p.page)}</span>
-                                            <ExternalLink className="h-3 w-3 flex-shrink-0 text-zinc-600" />
-                                        </a>
-                                        <span className="text-right font-mono text-[12px] tabular-nums text-zinc-100">{formatCompactNumber(p.clicks)}</span>
-                                        <span className="text-right font-mono text-[12px] tabular-nums text-zinc-300">{formatCompactNumber(p.impressions)}</span>
-                                        <span className="text-right font-mono text-[12px] tabular-nums text-zinc-400">{p.ctr.toFixed(1)}%</span>
-                                        <span className="text-right"><PositionPill pos={p.position} /></span>
-                                    </div>
-                                ))}
-                            </div>
+                                            <a
+                                                href={p.page}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex min-w-0 items-center gap-1.5 text-[12px] text-zinc-200 hover:text-cyan-300"
+                                            >
+                                                <span className="block truncate">{shortenPath(p.page)}</span>
+                                                <ExternalLink className="h-3 w-3 flex-shrink-0 text-zinc-600" />
+                                            </a>
+                                            <span className="text-right font-mono text-[12px] tabular-nums text-emerald-300">{formatCompactNumber(p.clicks)}</span>
+                                            <span className="text-right font-mono text-[12px] tabular-nums text-cyan-300">{formatCompactNumber(p.impressions)}</span>
+                                            <span className="text-right font-mono text-[12px] tabular-nums text-zinc-300">{p.ctr.toFixed(1)}%</span>
+                                            <span className="text-right"><PositionPill pos={p.position} /></span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
                         ) : (
                             <div className="px-4 py-6 text-center text-[12px] text-zinc-500">No pages found for this query.</div>
                         )}

@@ -91,7 +91,11 @@ export default function MagnitudeTable<T>({
 
     const maxMagnitude = magFn ? Math.max(...display.map(magFn), 1) : 1;
 
-    const gridTemplate = ['minmax(0,1fr)', ...columns.slice(1).map(c => c.width || '88px')].join(' ');
+    const isSingleColumn = columns.length <= 1;
+    const gridTemplate = isSingleColumn
+        ? 'minmax(0,1fr)'
+        : ['minmax(0,1fr)', ...columns.slice(1).map(c => c.width || '88px')].join(' ');
+    const mobileGridTemplate = isSingleColumn ? 'minmax(0,1fr)' : 'minmax(0,1fr) 104px';
 
     function toggleSort(key: string) {
         const col = columns.find(c => c.key === key);
@@ -148,9 +152,9 @@ export default function MagnitudeTable<T>({
                 </div>
 
                 {/* Mobile header */}
-                <div className="grid grid-cols-[minmax(0,1fr)_104px] gap-2 border-b border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[11px] font-medium text-zinc-400 md:hidden">
+                <div className={`grid gap-2 border-b border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[11px] font-medium text-zinc-400 md:hidden ${isSingleColumn ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_104px]'}`}>
                     <span>{columns[0]?.label}</span>
-                    <span className="text-right">{columns[1]?.label}</span>
+                    {!isSingleColumn ? <span className="text-right">{columns[1]?.label}</span> : null}
                 </div>
 
                 <div>
@@ -170,7 +174,7 @@ export default function MagnitudeTable<T>({
                                         isActive ? 'bg-cyan-500/[0.10] before:pointer-events-none before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-cyan-400' : ''
                                     } ${onRowClick ? 'cursor-pointer' : 'cursor-default'}`}
                                     style={{
-                                        ['--cols-mobile' as string]: 'minmax(0,1fr) 104px',
+                                        ['--cols-mobile' as string]: mobileGridTemplate,
                                         ['--cols-desktop' as string]: gridTemplate,
                                     }}
                                 >
@@ -192,17 +196,19 @@ export default function MagnitudeTable<T>({
                                         {columns[0].render(row, i)}
                                     </div>
 
-                                    {/* Mobile: stacked primary + secondary */}
-                                    <div className="relative z-10 flex flex-col items-end text-right md:hidden">
-                                        <span className="font-mono text-[12px] leading-none text-zinc-100">
-                                            {columns[1]?.render(row, i)}
-                                        </span>
-                                        {columns[2] ? (
-                                            <span className="mt-0.5 font-mono text-[10px] leading-none text-zinc-500">
-                                                {columns[2].label}: {columns[2].render(row, i)}
+                                    {/* Mobile: stacked primary + secondary (skipped when single-column) */}
+                                    {!isSingleColumn ? (
+                                        <div className="relative z-10 flex flex-col items-end text-right md:hidden">
+                                            <span className="font-mono text-[12px] leading-none text-zinc-100">
+                                                {columns[1]?.render(row, i)}
                                             </span>
-                                        ) : null}
-                                    </div>
+                                            {columns[2] ? (
+                                                <span className="mt-0.5 font-mono text-[10px] leading-none text-zinc-500">
+                                                    {columns[2].label}: {columns[2].render(row, i)}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
 
                                     {/* Desktop: per-column cells */}
                                     {columns.slice(1).map(col => (

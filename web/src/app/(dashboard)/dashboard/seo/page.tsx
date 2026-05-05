@@ -167,7 +167,9 @@ export default function SEOPage() {
             {/* Trend (left, ~2/3) + Recommendations (right, ~1/3) */}
             <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <SeoTrendPanel trend={trend} />
-                <SeoRecommendationsPanel items={recommendations} />
+                <div id="seo-recommendations">
+                    <SeoRecommendationsPanel items={recommendations} />
+                </div>
             </div>
 
             {/* Search performance — 3-col split: table | keyword insights | opportunities & risks */}
@@ -179,6 +181,7 @@ export default function SEOPage() {
                     onSelectPage={setSelectedPageUrl}
                     selectedKeyword={selectedKeyword}
                     selectedPage={selectedPageUrl}
+                    compact
                 />
                 <SeoKeywordInsightsPanel
                     keyword={selectedKeyword}

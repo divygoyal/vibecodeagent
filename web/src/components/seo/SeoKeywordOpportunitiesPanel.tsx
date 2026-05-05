@@ -11,6 +11,8 @@ interface SeoKeywordOpportunitiesPanelProps {
     siteUrl: string | null;
     /** Selected query's row from the parent table — used for the CTR-vs-expected and recommendation logic. */
     queryRow?: SeoQuery;
+    /** DOM id of the page-level recommendations panel for "View all" scroll-to. */
+    recommendationsAnchorId?: string;
 }
 
 const EXPECTED_CTR: Record<number, number> = {
@@ -49,7 +51,7 @@ function shortenPath(url: string): string {
     }
 }
 
-export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRow }: SeoKeywordOpportunitiesPanelProps) {
+export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRow, recommendationsAnchorId = 'seo-recommendations' }: SeoKeywordOpportunitiesPanelProps) {
     const { data: cannData } = useCannibalizationData(siteUrl);
     const cannMatch = useMemo<CannibalizedRow | null>(() => {
         if (!keyword) return null;
@@ -61,8 +63,7 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
         if (!queryRow) return null;
         const expected = getExpectedCtr(queryRow.position);
         const gap = +(expected - queryRow.ctr).toFixed(2);
-        const benchmark = expected > 0 ? (queryRow.ctr / expected) * 100 : 100;
-        return { actual: queryRow.ctr, expected, gap, benchmark, position: queryRow.position };
+        return { actual: queryRow.ctr, expected, gap, position: queryRow.position };
     }, [queryRow]);
 
     const recommendation = useMemo(() => {
@@ -71,7 +72,7 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
             return {
                 title: 'Consolidate cannibalized pages',
                 detail: `${cannMatch.pages.length} pages compete for this query. Pick the strongest performer, redirect or canonicalise the rest.`,
-                impact: `+${Math.round(cannMatch.totalImpressions * 0.04)} clicks/mo`,
+                impact: `+${Math.round(cannMatch.totalImpressions * 0.04).toLocaleString()} clicks/mo`,
                 tone: 'high' as const,
             };
         }
@@ -88,7 +89,7 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
             return {
                 title: 'Push into striking distance',
                 detail: 'Currently ranking on page 2. Add internal links, expand content depth, and refresh on-page signals.',
-                impact: `+${Math.round(queryRow.impressions * 0.05)} clicks/mo`,
+                impact: `+${Math.round(queryRow.impressions * 0.05).toLocaleString()} clicks/mo`,
                 tone: 'medium' as const,
             };
         }
@@ -99,6 +100,12 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
             tone: 'low' as const,
         };
     }, [cannMatch, ctrAnalysis, queryRow]);
+
+    const handleViewAll = () => {
+        if (typeof document === 'undefined') return;
+        const el = document.getElementById(recommendationsAnchorId);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     return (
         <AnalyticsSubpagePanel
@@ -116,62 +123,53 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
                 <div className="space-y-3">
                     {/* Cannibalization risk */}
                     <div className={`rounded-[14px] border px-3.5 py-3 ${cannMatch ? 'border-amber-500/20 bg-amber-500/[0.04]' : 'border-white/[0.06] bg-[#0d0e12]'}`}>
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <AlertTriangle className={`h-3.5 w-3.5 ${cannMatch ? 'text-amber-300' : 'text-zinc-500'}`} />
-                                <p className="text-[12.5px] font-semibold text-white">Cannibalization risk</p>
-                            </div>
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400">
+                                <AlertTriangle className="h-3 w-3" />
+                                Cannibalization risk
+                            </span>
                             <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${cannMatch ? SEVERITY_BADGE[cannMatch.severity] : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'}`}>
                                 {cannMatch ? SEVERITY_LABEL[cannMatch.severity] : 'None'}
                             </span>
                         </div>
                         {cannMatch ? (
                             <>
-                                <p className="mt-1.5 text-[11.5px] leading-snug text-zinc-400">
-                                    This query is served by {cannMatch.pages.length} pages. Multiple URLs compete in positions {cannMatch.bestPosition.toFixed(1)}–{Math.max(...cannMatch.pages.map(p => p.position)).toFixed(1)}.
+                                <p className="text-[11.5px] leading-snug text-zinc-400">
+                                    This query is served by <span className="font-semibold text-zinc-200">{cannMatch.pages.length} pages</span>. URLs compete in positions {cannMatch.bestPosition.toFixed(1)}–{Math.max(...cannMatch.pages.map(p => p.position)).toFixed(1)}.
                                 </p>
                                 <div className="mt-2.5 grid grid-cols-3 gap-2 text-[11px]">
-                                    <div>
-                                        <p className="text-zinc-600">Affected pages</p>
-                                        <p className="mt-0.5 font-semibold tabular-nums text-zinc-200">{cannMatch.pages.length}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-zinc-600">Total impressions</p>
-                                        <p className="mt-0.5 font-semibold tabular-nums text-zinc-200">{formatCompactNumber(cannMatch.totalImpressions)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-zinc-600">Best position</p>
-                                        <p className="mt-0.5 font-semibold tabular-nums text-zinc-200">{cannMatch.bestPosition.toFixed(1)}</p>
-                                    </div>
+                                    <Stat label="Affected" value={cannMatch.pages.length.toString()} tone="amber" />
+                                    <Stat label="Impressions" value={formatCompactNumber(cannMatch.totalImpressions)} tone="cyan" />
+                                    <Stat label="Best pos." value={cannMatch.bestPosition.toFixed(1)} tone="emerald" />
                                 </div>
                                 <p className="mt-2 truncate text-[11px] text-zinc-500">
                                     Top URL: <span className="text-zinc-300">{shortenPath(cannMatch.pages[0]?.page || '')}</span>
                                 </p>
                             </>
                         ) : (
-                            <p className="mt-1.5 text-[11.5px] leading-snug text-zinc-500">Single page ranks for this query — no cannibalization detected.</p>
+                            <p className="text-[11.5px] leading-snug text-zinc-500">Single page ranks for this query — no cannibalization detected.</p>
                         )}
                     </div>
 
                     {/* CTR vs expected */}
                     {ctrAnalysis ? (
                         <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12] px-3.5 py-3">
-                            <div className="mb-2 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
-                                    <p className="text-[12.5px] font-semibold text-white">CTR vs expected</p>
-                                </div>
+                            <div className="mb-3 flex items-center justify-between">
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-400">
+                                    <TrendingUp className="h-3 w-3" />
+                                    CTR vs expected
+                                </span>
                                 <span className="text-[10px] uppercase tracking-wider text-zinc-500">Pos. {ctrAnalysis.position.toFixed(1)}</span>
                             </div>
 
-                            <div className="space-y-2">
-                                <BenchmarkRow label="You" value={ctrAnalysis.actual} max={Math.max(ctrAnalysis.actual, ctrAnalysis.expected, 1)} color="bg-cyan-400" />
-                                <BenchmarkRow label="Expected" value={ctrAnalysis.expected} max={Math.max(ctrAnalysis.actual, ctrAnalysis.expected, 1)} color="bg-zinc-500" />
+                            <div className="space-y-2.5">
+                                <BenchmarkRow label="You" value={ctrAnalysis.actual} max={Math.max(ctrAnalysis.actual, ctrAnalysis.expected, 1)} color="bg-cyan-400" valueColor="text-cyan-300" />
+                                <BenchmarkRow label="Expected" value={ctrAnalysis.expected} max={Math.max(ctrAnalysis.actual, ctrAnalysis.expected, 1)} color="bg-red-400" valueColor="text-red-300" />
                             </div>
 
-                            <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+                            <p className="mt-3 text-[11px] leading-snug text-zinc-500">
                                 {ctrAnalysis.gap > 0
-                                    ? `CTR is ${ctrAnalysis.gap.toFixed(1)} pp below benchmark — improving the title and meta description usually closes most of the gap.`
+                                    ? <>CTR is <span className="font-semibold text-amber-300">{ctrAnalysis.gap.toFixed(1)} pp</span> below benchmark — improving title and meta description usually closes most of the gap.</>
                                     : 'CTR meets or exceeds the expected benchmark for this position.'}
                             </p>
                         </div>
@@ -179,25 +177,26 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
 
                     {/* Recommendation */}
                     {recommendation ? (
-                        <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12] px-3.5 py-3">
-                            <div className="flex items-center gap-2">
-                                <Lightbulb className="h-3.5 w-3.5 text-emerald-300" />
-                                <p className="text-[12.5px] font-semibold text-white">Recommendation</p>
-                            </div>
-                            <p className="mt-1.5 text-[12.5px] font-semibold text-zinc-100">{recommendation.title}</p>
-                            <p className="mt-1 text-[11.5px] leading-snug text-zinc-500">{recommendation.detail}</p>
-                            <div className="mt-2 flex items-center gap-2">
+                        <div className="rounded-[14px] border border-emerald-500/15 bg-emerald-500/[0.03] px-3.5 py-3">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+                                <Lightbulb className="h-3 w-3" />
+                                Recommendation
+                            </span>
+                            <p className="mt-1.5 text-[13px] font-semibold text-white">{recommendation.title}</p>
+                            <p className="mt-1 text-[11.5px] leading-snug text-zinc-400">{recommendation.detail}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                 <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${SEVERITY_BADGE[recommendation.tone]}`}>
                                     {SEVERITY_LABEL[recommendation.tone]} impact
                                 </span>
-                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
                                     <Sparkles className="h-2.5 w-2.5" />
                                     {recommendation.impact}
                                 </span>
                             </div>
                             <button
                                 type="button"
-                                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.06] py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.12]"
+                                onClick={handleViewAll}
+                                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-emerald-500/25 bg-emerald-500/[0.08] py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.16]"
                             >
                                 View all recommendations
                                 <ArrowRight className="h-3 w-3" />
@@ -210,15 +209,25 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
     );
 }
 
-function BenchmarkRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone: 'emerald' | 'cyan' | 'amber' }) {
+    const cls = tone === 'emerald' ? 'text-emerald-300' : tone === 'cyan' ? 'text-cyan-300' : 'text-amber-300';
+    return (
+        <div>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600">{label}</p>
+            <p className={`mt-0.5 font-semibold tabular-nums ${cls}`}>{value}</p>
+        </div>
+    );
+}
+
+function BenchmarkRow({ label, value, max, color, valueColor }: { label: string; value: number; max: number; color: string; valueColor: string }) {
     const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
     return (
         <div className="flex items-center gap-2">
             <span className="w-16 shrink-0 text-[11px] text-zinc-500">{label}</span>
-            <div className="relative flex-1 overflow-hidden rounded-full bg-white/[0.04] h-1.5">
+            <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
                 <div className={`absolute left-0 top-0 h-full ${color} rounded-full transition-[width]`} style={{ width: `${pct}%` }} />
             </div>
-            <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-zinc-300">{value.toFixed(1)}%</span>
+            <span className={`w-12 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums ${valueColor}`}>{value.toFixed(1)}%</span>
         </div>
     );
 }
