@@ -732,7 +732,9 @@ export default function DashboardLayout({
                             <div className={`hidden md:block ${isAnalyticsMainRoute ? 'invisible pointer-events-none w-0 overflow-hidden' : ''}`}>
                                 <DatePicker range={range} setRange={setRange} />
                             </div>
-                            {/* Notification Bell */}
+                            {/* Notification Bell — clickable rows that route to the
+                                AI chat with a pre-filled question about the alert.
+                                Falls back to the relevant dashboard route per category. */}
                             <div className="relative" ref={bellRef}>
                                 <button
                                     onClick={() => setBellOpen(!bellOpen)}
@@ -744,53 +746,64 @@ export default function DashboardLayout({
                                 >
                                     <Bell className="w-4 h-4" />
                                     {criticalAlertCount > 0 && (
-                                        <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 ${shellBadgeRadiusClass} bg-red-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-[var(--background)]`}>
+                                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-2 ring-[var(--background)]">
                                             {criticalAlertCount > 9 ? '9+' : criticalAlertCount}
                                         </span>
                                     )}
                                 </button>
                                 {bellOpen && (
-                                    <div className={`absolute right-0 mt-1 z-50 bg-[var(--dropdown-bg)] border border-[var(--card-border)] ${shellRadiusClass} shadow-2xl py-1 w-[280px] sm:w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden`}>
-                                        <div className="px-4 py-2.5 border-b border-[var(--divider)] flex items-center justify-between">
-                                            <span className="text-xs font-semibold text-white">Alerts</span>
+                                    <div className="absolute right-0 mt-2 z-50 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0d12] shadow-2xl shadow-black/60">
+                                        <div className="flex items-center justify-between border-b border-white/[0.05] px-4 py-2.5">
+                                            <span className="text-[12px] font-semibold text-white">Alerts</span>
                                             {alertCount > 0 && (
-                                                <span className="text-[10px] text-zinc-500">{alertCount} active</span>
+                                                <span className="text-[10px] text-zinc-500 tabular-nums">{alertCount} active</span>
                                             )}
                                         </div>
-                                        <div className="overflow-y-auto max-h-[300px]">
+                                        <div className="max-h-[340px] overflow-y-auto">
                                             {alerts.length === 0 ? (
-                                                <div className="px-4 py-6 text-center">
-                                                    <Bell className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
-                                                    <p className="text-[11px] text-zinc-600">No alerts right now</p>
+                                                <div className="px-4 py-8 text-center">
+                                                    <Bell className="mx-auto mb-2 h-4 w-4 text-zinc-700" />
+                                                    <p className="text-[11px] text-zinc-500">No alerts right now</p>
+                                                    <p className="mt-0.5 text-[10px] text-zinc-600">Anomalies will surface here as they're detected.</p>
                                                 </div>
                                             ) : (
-                                                typedAlerts.slice(0, 10).map((alert) => (
-                                                    <div key={alert.id} className="px-4 py-2.5 hover:bg-white/[0.03] transition border-b border-[var(--divider)] last:border-0">
-                                                        <div className="flex items-start gap-2.5">
-                                                            <div className={`w-2 h-2 ${shellBadgeRadiusClass} mt-1.5 flex-shrink-0 ${
-                                                                alert.severity === 'critical' ? 'bg-red-400' :
-                                                                alert.severity === 'warning' ? 'bg-amber-400' :
-                                                                alert.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400'
-                                                            }`} />
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-[11px] font-medium text-zinc-200 leading-snug">{alert.title}</p>
-                                                                {alert.metric && (
-                                                                    <p className="text-[10px] text-zinc-500 mt-0.5">{alert.metric}</p>
-                                                                )}
+                                                typedAlerts.slice(0, 10).map((alert) => {
+                                                    // Compose a chat prompt that asks the AI to investigate THIS alert.
+                                                    const prompt = `${alert.title}${alert.metric ? ` — ${alert.metric}` : ''}. Investigate why and recommend the next move.`;
+                                                    const dotClass =
+                                                        alert.severity === 'critical' ? 'bg-red-400' :
+                                                        alert.severity === 'warning'  ? 'bg-amber-400' :
+                                                        alert.severity === 'success'  ? 'bg-emerald-400' : 'bg-zinc-400';
+                                                    return (
+                                                        <Link
+                                                            key={alert.id}
+                                                            href={`/dashboard/ai-chat?q=${encodeURIComponent(prompt)}`}
+                                                            onClick={() => setBellOpen(false)}
+                                                            className="block border-b border-white/[0.04] px-4 py-2.5 transition-colors hover:bg-white/[0.03] last:border-0"
+                                                        >
+                                                            <div className="flex items-start gap-2.5">
+                                                                <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotClass}`} />
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="text-[12px] font-medium leading-snug text-zinc-100">{alert.title}</p>
+                                                                    {alert.metric && (
+                                                                        <p className="mt-0.5 text-[10.5px] text-zinc-500 tabular-nums">{alert.metric}</p>
+                                                                    )}
+                                                                    <p className="mt-1 text-[10px] text-zinc-600">Tap to ask the AI →</p>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                ))
+                                                        </Link>
+                                                    );
+                                                })
                                             )}
                                         </div>
                                         {alerts.length > 0 && (
-                                            <div className="px-4 py-2 border-t border-[var(--divider)]">
+                                            <div className="border-t border-white/[0.05] px-4 py-2">
                                                 <Link
-                                                    href="/dashboard"
+                                                    href="/dashboard/ai-chat"
                                                     onClick={() => setBellOpen(false)}
-                                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition"
+                                                    className="text-[11px] font-medium text-zinc-300 transition-colors hover:text-white"
                                                 >
-                                                    View all alerts →
+                                                    Open AI chat →
                                                 </Link>
                                             </div>
                                         )}

@@ -36,6 +36,20 @@ const SUGGESTIONS: readonly Suggestion[] = [
     { label: 'Content ideas', prompt: 'Suggest 5 content ideas based on my existing keywords and gaps in my site.' },
 ] as const;
 
+/** Quick-prompt chips rendered BELOW the chat-active input — same set the
+ *  floating widget shows. Lets the user fire a canned investigation in one
+ *  tap instead of typing it out. */
+const QUICK_PROMPTS: readonly string[] = [
+    '🎯 What is the ONE thing I should do today to grow?',
+    '🚨 Why did my traffic drop?',
+    '💰 Which pages are money pits? (high impressions, low clicks)',
+    '📈 Keywords on page 2 I can push to page 1',
+    '📝 Give me 5 blog post ideas based on my data',
+    '📊 Grade my SEO (A-F)',
+    '⚡ Are my Core Web Vitals hurting my rankings?',
+    '🔮 Growth opportunities I am missing',
+] as const;
+
 type ConnectorName = 'github' | 'wordpress' | 'vercel' | 'ga4' | 'gsc';
 
 const CONNECTOR_LABELS: Record<ConnectorName, string> = {
@@ -607,6 +621,32 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 
     return null;
 }
 
+/**
+ * AutoPromptFromQuery — when the page is opened with ?q=<text>
+ * (e.g. from an alert in the bell), auto-send the question once and
+ * scrub the URL. Suspense-isolated like ProviderConnectionCallback.
+ */
+function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const firedRef = useRef(false);
+    useEffect(() => {
+        if (firedRef.current) return;
+        const q = searchParams.get('q');
+        if (!q || !q.trim()) return;
+        firedRef.current = true;
+        // Scrub ?q first so a refresh doesn't re-fire.
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('q');
+        const qs = params.toString();
+        router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
+        // Tiny delay so the scroll/layout settles + dataReady has a chance.
+        const t = setTimeout(() => onPrompt(q), 250);
+        return () => clearTimeout(t);
+    }, [searchParams, router, onPrompt]);
+    return null;
+}
+
 const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Searching your data',
     run_ga4_report: 'Querying analytics',
@@ -1100,6 +1140,9 @@ export default function AIChat() {
                     <div className="relative min-h-full overflow-hidden bg-black">
                         {/* OAuth callback handler — runs after signIn() redirects back to ?connected=... */}
                         <Suspense fallback={null}>
+                            <AutoPromptFromQuery onPrompt={(q) => sendMessage(q)} />
+                        </Suspense>
+                        <Suspense fallback={null}>
                             <ProviderConnectionCallback onConnected={handleProviderConnected} />
                         </Suspense>
 
@@ -1406,6 +1449,24 @@ export default function AIChat() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Quick-prompt chips below the input — same set as the
+                            floating widget. Hidden while the model is responding so
+                            we don't tempt the user to fire a second turn mid-stream. */}
+                        {!isLoading && (
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+                                {QUICK_PROMPTS.map((prompt) => (
+                                    <button
+                                        key={prompt}
+                                        onClick={() => sendMessage(prompt)}
+                                        disabled={isGa4Locked}
+                                        className="rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/[0.02] disabled:hover:border-white/[0.06]"
+                                    >
+                                        {prompt}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
