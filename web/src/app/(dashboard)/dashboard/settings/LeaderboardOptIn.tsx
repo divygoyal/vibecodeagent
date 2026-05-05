@@ -243,37 +243,44 @@ export default function LeaderboardOptIn() {
         setSaving(true);
         setMessage(null);
         try {
-            if (mode.kind === 'edit') {
-                const res = await fetch('/api/leaderboard/join', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...form, entry_id: mode.entry.id }),
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                    setMessage({ tone: 'err', text: data.error || data.detail || 'Failed to save.' });
-                } else {
-                    setMessage({ tone: 'ok', text: 'Listing updated.' });
-                    await refreshEntries();
-                    setMode({ kind: 'list' });
-                }
-            } else {
-                const res = await fetch('/api/leaderboard/join', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(form),
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                    setMessage({ tone: 'err', text: data.error || data.detail || 'Failed to join leaderboard.' });
-                } else {
-                    setMessage({ tone: 'ok', text: data.verification?.status === 'verified' ? '🎉 You\'re live on the leaderboard!' : 'Listing saved — verification will retry on the daily refresh.' });
-                    await refreshEntries();
-                    setMode({ kind: 'list' });
-                }
+            const isEdit = mode.kind === 'edit';
+            const res = await fetch('/api/leaderboard/join', {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(isEdit && mode.kind === 'edit' ? { ...form, entry_id: mode.entry.id } : form),
+            });
+
+            // Parse defensively — proxies can return HTML on 502/504 even when our
+            // route would have returned JSON, which used to throw and surface as
+            // an uninformative "Network error" toast.
+            const raw = await res.text();
+            let data: { success?: boolean; error?: string; detail?: string; verification?: { status?: string } } = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch {
+                data = { error: `Server returned ${res.status} (${raw.slice(0, 120) || 'empty body'})` };
             }
-        } catch {
-            setMessage({ tone: 'err', text: 'Network error — please try again.' });
+
+            if (!res.ok || !data.success) {
+                const fallback = res.status === 502 || res.status === 504
+                    ? 'Server is briefly unavailable — please try again in a moment.'
+                    : `Could not save (status ${res.status}).`;
+                setMessage({ tone: 'err', text: data.error || data.detail || fallback });
+            } else {
+                setMessage({
+                    tone: 'ok',
+                    text: isEdit
+                        ? 'Listing updated.'
+                        : data.verification?.status === 'verified'
+                            ? '🎉 You\'re live on the leaderboard!'
+                            : 'Listing saved — verification will retry on the daily refresh.',
+                });
+                await refreshEntries();
+                setMode({ kind: 'list' });
+            }
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : '';
+            setMessage({ tone: 'err', text: detail ? `Network error — ${detail}` : 'Network error — please try again.' });
         } finally {
             setSaving(false);
         }
