@@ -1,20 +1,20 @@
 'use client';
 
 /**
- * /dashboard/setup — Named workspace selection.
+ * /dashboard/setup — Workspace data-source selection.
  *
- * The user assembles a workspace by:
- *   1. Naming it (label, e.g. "antigravity.codes" or "Client: Acme")
- *   2. Optionally connecting GA4
- *   3. Optionally connecting GSC
+ * The user picks at least ONE of:
+ *   - a GA4 property
+ *   - a Search Console site
  *
- * Continue enables when at least ONE of GA4 / GSC is chosen. The label is
- * recommended but not required (auto-derived from selection if blank).
+ * The workspace name (label) is fully auto-derived from the selection:
+ * GA4 property displayName wins (more authoritative), else GSC root domain.
+ * No user-typed name input — the label updates live as the selection changes
+ * and is saved on Continue. Renaming is deferred to a future settings surface.
  *
- * No more auto-match auto-fill — instead, when one side is picked, we surface
- * a SOFT SUGGESTION below the other card ("We found X — pair?"). The user
- * always explicitly accepts or ignores. Mismatch warning is gone; if the user
- * paired things on purpose, they get to do that.
+ * When one side is picked and the other is empty, we surface a SOFT
+ * SUGGESTION ("We found X — pair?") that the user explicitly accepts or
+ * dismisses. No silent auto-fill, no mismatch warning.
  */
 import { useEffect, useMemo, useState, useCallback, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
@@ -127,8 +127,6 @@ export default function SetupPage() {
 
     const [chosenProperty, setChosenProperty] = useState(selectedProperty);
     const [chosenSite, setChosenSite] = useState(selectedSite);
-    const [label, setLabel] = useState(serverLabel || '');
-    const [labelManuallyEdited, setLabelManuallyEdited] = useState(Boolean(serverLabel));
     const [propSearch, setPropSearch] = useState('');
     const [siteSearch, setSiteSearch] = useState('');
     const [saving, setSaving] = useState(false);
@@ -148,27 +146,20 @@ export default function SetupPage() {
         if (!isWorkspaceLoaded) return;
         if (selectedProperty && !chosenProperty) setChosenProperty(selectedProperty);
         if (selectedSite && !chosenSite) setChosenSite(selectedSite);
-        if (serverLabel && !label) {
-            setLabel(serverLabel);
-            setLabelManuallyEdited(true);
-        }
-    }, [isWorkspaceLoaded, selectedProperty, selectedSite, serverLabel, chosenProperty, chosenSite, label]);
+    }, [isWorkspaceLoaded, selectedProperty, selectedSite, chosenProperty, chosenSite]);
 
-    // Auto-suggest the workspace label from what's been picked, but only if
-    // the user hasn't typed something themselves. Picking GSC site
-    // sc-domain:antigrav.io seeds the label with "antigrav.io". GA4 picks
-    // seed it with the property's displayName.
-    useEffect(() => {
-        if (labelManuallyEdited) return;
-        if (chosenSite) {
-            setLabel(rootDomainFromSite(chosenSite));
-            return;
-        }
+    // Workspace label is fully auto-derived from the selection — no user input.
+    // Precedence: GA4 displayName wins (more authoritative), else GSC root
+    // domain. Falls back to the GA4 propertyId when displayName is missing.
+    // serverLabel from a previous save is shown if no fresh selection exists.
+    const derivedLabel = useMemo(() => {
         if (chosenProperty) {
             const prop = properties.find((p) => p.property === chosenProperty);
-            if (prop?.displayName) setLabel(prop.displayName);
+            return prop?.displayName || prop?.property || chosenProperty;
         }
-    }, [chosenProperty, chosenSite, properties, labelManuallyEdited]);
+        if (chosenSite) return rootDomainFromSite(chosenSite);
+        return serverLabel || '';
+    }, [chosenProperty, chosenSite, properties, serverLabel]);
 
     // Suggestion: when one side is picked and the other is not, find a
     // token-overlap match in the inventory and surface it as a hint card.
@@ -251,16 +242,13 @@ export default function SetupPage() {
         if (!canContinue || saving) return;
         setSaving(true);
         setSaveError(null);
-        // Auto-derive label if user didn't type one — pick best-effort guess.
-        const finalLabel = label.trim() || (() => {
-            if (chosenSite) return rootDomainFromSite(chosenSite);
-            const prop = properties.find((p) => p.property === chosenProperty);
-            return prop?.displayName || 'My workspace';
-        })();
+        // Label is fully auto-derived from the current selection. canContinue
+        // guarantees at least one of property/site is set, so derivedLabel
+        // will always be a non-empty string here.
         const ok = await saveWorkspace({
             property: chosenProperty || null,
             site: chosenSite || null,
-            label: finalLabel,
+            label: derivedLabel,
         });
         if (ok) await markSetupCompleted();
         setSaving(false);
@@ -268,12 +256,6 @@ export default function SetupPage() {
             setSaveError('Could not save your workspace. Try again.');
             return;
         }
-        router.push('/dashboard/ai-chat');
-    };
-
-    const onSkip = async () => {
-        await saveWorkspace({ property: null, site: null });
-        await markSetupCompleted();
         router.push('/dashboard/ai-chat');
     };
 
@@ -373,7 +355,7 @@ export default function SetupPage() {
         );
     }
 
-    // ─── Main flow: name → connect sources ───────────────────────────
+    // ─── Main flow: pick at least one data source ────────────────────
 
     return cosmicShell(
         <div className="max-w-5xl mx-auto py-10 sm:py-14 px-4 pb-32 sm:pb-14">
@@ -385,45 +367,20 @@ export default function SetupPage() {
                     Set up your workspace
                 </h1>
                 <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                    Name your workspace and connect data sources. Either Google Analytics or
-                    Search Console works on its own — both is even better.
+                    Pick a Google Analytics property or a Search Console site — at least one.
+                    Your workspace name is set automatically from your selection.
                 </p>
-                <button
-                    type="button"
-                    onClick={onSkip}
-                    className="mt-4 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
-                >
-                    Skip for now →
-                </button>
             </div>
 
-            {/* Step 1 — name */}
-            <div className="mx-auto max-w-2xl mb-8">
-                <div className="rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-5 shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
-                    <div className="flex items-baseline gap-2 mb-3">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7AD9DA]">Step 1</span>
-                        <h2 className="text-sm font-semibold text-white">Name your workspace</h2>
-                    </div>
-                    <input
-                        type="text"
-                        value={label}
-                        onChange={(e) => { setLabel(e.target.value); setLabelManuallyEdited(true); }}
-                        placeholder="e.g. antigravity.codes, Client: Acme, My blog"
-                        maxLength={120}
-                        className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-base text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#14C4E1]/50 focus:bg-white/[0.05] transition-colors"
-                    />
-                    <p className="text-[11px] text-zinc-500 mt-2">
-                        Used everywhere you see this workspace — sidebar, chat, exports.
-                        We&apos;ll auto-fill from your selection if you leave it blank.
-                    </p>
-                </div>
-            </div>
-
-            {/* Step 2 — sources */}
+            {/* Connect data sources */}
             <div className="mx-auto max-w-5xl">
                 <div className="text-center mb-5">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7AD9DA]">Step 2</span>
-                    <h2 className="text-sm font-semibold text-white inline-block ml-2">Connect data sources</h2>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7AD9DA]">Connect data sources</span>
+                    {derivedLabel && (
+                        <p className="text-[11px] text-zinc-500 mt-1.5">
+                            Workspace name: <span className="text-zinc-300 font-medium">{derivedLabel}</span>
+                        </p>
+                    )}
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-5">
@@ -537,7 +494,12 @@ export default function SetupPage() {
 
             {/* Continue — sticky on mobile, centered on desktop */}
             <div className="fixed sm:static bottom-0 inset-x-0 sm:bottom-auto sm:inset-x-auto sm:mt-10 px-4 sm:px-0 py-3 sm:py-0 bg-black/95 sm:bg-transparent backdrop-blur sm:backdrop-blur-0 border-t border-white/[0.06] sm:border-0 z-10">
-                <div className="max-w-5xl mx-auto sm:mx-0 flex items-center justify-center gap-3">
+                <div className="max-w-5xl mx-auto sm:mx-0 flex flex-col items-center justify-center gap-2">
+                    {!canContinue && !saving && (
+                        <p className="text-[11px] text-zinc-500">
+                            Pick at least one — a GA4 property or a Search Console site.
+                        </p>
+                    )}
                     <button
                         type="button"
                         onClick={onContinue}
