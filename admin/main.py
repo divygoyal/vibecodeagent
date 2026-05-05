@@ -3458,6 +3458,29 @@ async def join_leaderboard_for_user(
             or "leaderboard_entries.user_id" in msg and "UNIQUE" in msg
         )
         if is_legacy_unique:
+            # Capture every value we'll need *before* touching any ORM state
+            # post-rollback. After a SQLAlchemy 2.0 async rollback, attribute
+            # access on the previous-session ORM object can trigger lazy I/O
+            # that raises MissingGreenlet because the greenlet context is gone.
+            user_id_int = int(user.id)
+            payload = {
+                "user_id": user_id_int,
+                "startup_name": data.startup_name,
+                "description": data.description,
+                "website_url": data.website_url,
+                "logo_url": data.logo_url,
+                "category": data.category or "Other",
+                "mrr_range": data.mrr_range or "$0-500",
+                "looking_for": json.dumps(data.looking_for or []),
+                "twitter_handle": data.twitter_handle,
+                "founder_name": data.founder_name,
+                "contact_email": data.contact_email,
+                "ga_property_id": data.ga_property_id,
+                "verification_status": data.verification_status or "pending",
+                "verified_host": data.verified_host,
+                "is_verified": 1 if data.verification_status == "verified" else 0,
+            }
+
             print(f"[join] legacy UNIQUE(user_id) detected — running self-heal migration")
             try:
                 async with engine.begin() as mig_conn:
@@ -3469,50 +3492,87 @@ async def join_leaderboard_for_user(
                     detail=f"Self-heal migration failed: {type(mig_exc).__name__}: {str(mig_exc)[:200]}",
                 )
 
-            # Retry the insert in a brand-new session — the previous one's
-            # state is poisoned by the rollback + the table no longer exists
-            # under the same identity after the rebuild.
+            # Retry using raw SQL through engine.begin() — sidesteps every ORM
+            # session/identity-map gotcha that can happen post-migration. The
+            # legacy UNIQUE constraint is gone now, so this insert succeeds.
             try:
-                async with async_session() as retry_db:
-                    if data.ga_property_id:
-                        existing = await retry_db.execute(
-                            select(LeaderboardEntry).where(
-                                LeaderboardEntry.user_id == user.id,
-                                LeaderboardEntry.ga_property_id == data.ga_property_id,
-                            )
-                        )
-                        retry_entry = existing.scalar_one_or_none()
-                    else:
-                        retry_entry = None
+                async with engine.begin() as retry_conn:
+                    existing_id = None
+                    if payload["ga_property_id"]:
+                        row = (await retry_conn.execute(
+                            text(
+                                "SELECT id FROM leaderboard_entries "
+                                "WHERE user_id = :user_id AND ga_property_id = :ga_property_id "
+                                "LIMIT 1"
+                            ),
+                            {"user_id": payload["user_id"], "ga_property_id": payload["ga_property_id"]},
+                        )).fetchone()
+                        if row:
+                            existing_id = int(row[0])
 
-                    if retry_entry is None:
-                        slug = await _generate_unique_slug(retry_db, data.startup_name)
-                        retry_entry = LeaderboardEntry(
-                            user_id=user.id,
-                            slug=slug,
-                            startup_name=data.startup_name,
-                            description=data.description,
-                            website_url=data.website_url,
-                            logo_url=data.logo_url,
-                            category=data.category or "Other",
-                            mrr_range=data.mrr_range or "$0-500",
-                            looking_for=json.dumps(data.looking_for or []),
-                            twitter_handle=data.twitter_handle,
-                            founder_name=data.founder_name,
-                            contact_email=data.contact_email,
-                            ga_property_id=data.ga_property_id,
-                            verification_status=data.verification_status or "pending",
-                            verified_host=data.verified_host,
-                            is_verified=(data.verification_status == "verified"),
+                    if existing_id is not None:
+                        await retry_conn.execute(
+                            text(
+                                "UPDATE leaderboard_entries SET "
+                                "startup_name = :startup_name, description = :description, "
+                                "website_url = :website_url, logo_url = :logo_url, "
+                                "category = :category, mrr_range = :mrr_range, "
+                                "looking_for = :looking_for, twitter_handle = :twitter_handle, "
+                                "founder_name = :founder_name, contact_email = :contact_email, "
+                                "ga_property_id = :ga_property_id, "
+                                "verification_status = :verification_status, "
+                                "verified_host = :verified_host, is_verified = :is_verified, "
+                                "is_active = 1, updated_at = CURRENT_TIMESTAMP "
+                                "WHERE id = :id"
+                            ),
+                            {**payload, "id": existing_id},
                         )
-                        retry_db.add(retry_entry)
-                    await retry_db.commit()
-                    await retry_db.refresh(retry_entry)
-                    return {
-                        "success": True,
-                        "id": retry_entry.id,
-                        "message": "Joined leaderboard (auto-migrated)",
-                    }
+                        final_id = existing_id
+                        msg = "Updated leaderboard entry (auto-migrated)"
+                    else:
+                        # Generate a unique slug via raw SQL too — avoid
+                        # _generate_unique_slug which uses an ORM session.
+                        base = _slugify(payload["startup_name"])
+                        slug = base
+                        for _ in range(5):
+                            suffix = "".join(
+                                secrets.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(6)
+                            )
+                            candidate = f"{base}-{suffix}"
+                            check = (await retry_conn.execute(
+                                text("SELECT 1 FROM leaderboard_entries WHERE slug = :s LIMIT 1"),
+                                {"s": candidate},
+                            )).fetchone()
+                            if not check:
+                                slug = candidate
+                                break
+
+                        result = await retry_conn.execute(
+                            text(
+                                "INSERT INTO leaderboard_entries ("
+                                "user_id, slug, startup_name, description, website_url, logo_url, "
+                                "category, mrr_range, looking_for, twitter_handle, founder_name, "
+                                "contact_email, ga_property_id, verification_status, verified_host, "
+                                "is_verified, is_active, created_at, updated_at"
+                                ") VALUES ("
+                                ":user_id, :slug, :startup_name, :description, :website_url, :logo_url, "
+                                ":category, :mrr_range, :looking_for, :twitter_handle, :founder_name, "
+                                ":contact_email, :ga_property_id, :verification_status, :verified_host, "
+                                ":is_verified, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP"
+                                ")"
+                            ),
+                            {**payload, "slug": slug},
+                        )
+                        final_id = int(result.lastrowid) if result.lastrowid else 0
+                        if final_id == 0:
+                            row = (await retry_conn.execute(
+                                text("SELECT id FROM leaderboard_entries WHERE slug = :s"),
+                                {"s": slug},
+                            )).fetchone()
+                            final_id = int(row[0]) if row else 0
+                        msg = "Joined leaderboard (auto-migrated)"
+
+                return {"success": True, "id": final_id, "message": msg}
             except Exception as retry_exc:
                 raise HTTPException(
                     status_code=500,
