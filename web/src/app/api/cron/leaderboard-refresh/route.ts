@@ -50,6 +50,57 @@ async function fetchWithRetry(input: string, init: RequestInit): Promise<Respons
     return fetch(input, init);
 }
 
+/**
+ * Pull the last 30 days of GA4 daily metrics and bulk-upsert them into
+ * leaderboard_stats_history via the admin backfill endpoint. Idempotent so
+ * the cron can re-run it freely without duplicating rows.
+ */
+async function backfillHistory(entryId: number, gaPropertyId: string, token: string) {
+    const pid = cleanPropertyId(gaPropertyId);
+    const reportRes = await fetchWithRetry(`${GA_DATA_BASE}/${pid}:runReport`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            dateRanges: [{ startDate: '29daysAgo', endDate: 'today' }],
+            dimensions: [{ name: 'date' }],
+            metrics: [
+                { name: 'activeUsers' },
+                { name: 'screenPageViews' },
+                { name: 'engagementRate' },
+                { name: 'bounceRate' },
+                { name: 'averageSessionDuration' },
+            ],
+            orderBys: [{ dimension: { dimensionName: 'date' } }],
+            limit: 60,
+        }),
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!reportRes.ok) return;
+
+    type GA4Row = { dimensionValues?: Array<{ value: string }>; metricValues?: Array<{ value: string }> };
+    const data = (await reportRes.json()) as { rows?: GA4Row[] };
+    const rows = data.rows || [];
+    if (rows.length === 0) return;
+
+    const days = rows.map((r) => {
+        const m = r.metricValues || [];
+        return {
+            date: r.dimensionValues?.[0]?.value || '',
+            monthly_visitors: parseInt(m[0]?.value || '0', 10) || 0,
+            monthly_pageviews: parseInt(m[1]?.value || '0', 10) || 0,
+            engagement_rate: +(((parseFloat(m[2]?.value || '0') || 0) * 100).toFixed(1)),
+            bounce_rate: +(((parseFloat(m[3]?.value || '0') || 0) * 100).toFixed(1)),
+            avg_session_duration: Math.round(parseFloat(m[4]?.value || '0') || 0),
+        };
+    });
+
+    await fetchWithRetry(`${ADMIN_API_URL}/api/leaderboard/${entryId}/history/backfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+        body: JSON.stringify({ days }),
+    });
+}
+
 type LeaderboardStats = {
     monthly_visitors: number;
     monthly_pageviews: number;
@@ -225,6 +276,12 @@ export async function GET(req: NextRequest) {
                 if (updateRes.ok) {
                     successCount++;
                     console.log(`[CRON] ✓ Updated entry ${entry.entry_id}: ${stats.monthly_visitors} visitors${stats.primary_country ? ` (${stats.primary_country})` : ''}${verificationStatus ? `, ${verificationStatus}` : ''}`);
+                    // Re-seed the per-day history so any entry that missed
+                    // the join-time backfill (or had a stale window) gets
+                    // caught up. Backfill is idempotent on (entry_id, date).
+                    backfillHistory(entry.entry_id, entry.ga_property_id, token).catch((err) =>
+                        console.warn(`[CRON] History backfill failed for entry ${entry.entry_id}:`, err),
+                    );
                 } else {
                     failCount++;
                     console.error(`[CRON] ✗ Failed to update entry ${entry.entry_id}: ${updateRes.status}`);

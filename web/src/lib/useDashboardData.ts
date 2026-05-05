@@ -331,6 +331,45 @@ export function useMobileGapData(siteUrl: string | null) {
   return useRegisteredSWR<{ data: unknown[] }>(url);
 }
 
+export function useCannibalizationData(siteUrl: string | null) {
+  const url = siteUrl
+    ? `/api/seo/cannibalization?siteUrl=${encodeURIComponent(siteUrl)}`
+    : null;
+  return useRegisteredSWR<{
+    cannibalized: Array<{
+      query: string;
+      pages: Array<{ page: string; clicks: number; impressions: number; ctr: number; position: number }>;
+      totalClicks: number;
+      totalImpressions: number;
+      bestPosition: number;
+      severity: 'high' | 'medium' | 'low';
+    }>;
+  }>(url);
+}
+
+export function useWinnersLosersData(siteUrl: string | null, timeframe: string = '28d') {
+  const url = siteUrl
+    ? `/api/seo/winners-losers?siteUrl=${encodeURIComponent(siteUrl)}&timeframe=${timeframe}`
+    : null;
+  type Movement = {
+    query: string;
+    clicksCurrent: number;
+    clicksPrevious: number;
+    clicksDelta: number;
+    clicksDeltaPct: number;
+    positionCurrent: number;
+    positionPrevious: number;
+    positionDelta: number;
+    impressionsCurrent: number;
+  };
+  return useRegisteredSWR<{
+    winners: Movement[];
+    losers: Movement[];
+    new: Movement[];
+    lost: Movement[];
+  }>(url);
+}
+
 export type SiteRepoLink = {
   site_url: string;
   repo_full_name: string;

@@ -308,6 +308,10 @@ class LeaderboardEntry(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False, index=True)
+    # Public-facing URL slug — `slugify(startup_name)-<6char>`. Generated once
+    # at create time and never regenerated (renames keep the same slug so
+    # external embed badges and shared links never 404).
+    slug = Column(String(150), unique=True, index=True, nullable=True)
 
     # Profile info (user-provided)
     startup_name = Column(String(100), nullable=False)
@@ -318,6 +322,8 @@ class LeaderboardEntry(Base):
     mrr_range = Column(String(30))  # $0-500, $500-1K, $1K-5K, $5K-10K, $10K+
     looking_for = Column(Text)  # JSON array: ["partner","visibility","buyer"]
     twitter_handle = Column(String(100))
+    founder_name = Column(String(100))  # Display name for founder card on detail page
+    contact_email = Column(String(255))  # Drives "Contact" mailto: button
 
     # GA4-verified stats (cron-refreshed daily)
     ga_property_id = Column(String(100))

@@ -5,14 +5,15 @@ import Link from 'next/link';
 import {
     ShieldCheck, ShieldAlert, ExternalLink, ArrowUpRight, ArrowDownRight,
     Users, Eye, Zap, Timer, ArrowLeft, Copy, Check,
-    Twitter, Globe, ChevronDown, Sparkles,
+    Twitter, Mail, BarChart3, Code2,
 } from 'lucide-react';
 import {
-    XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart,
+    XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid,
 } from 'recharts';
 
 export interface StartupProfileData {
     id: number;
+    slug: string | null;
     startup_name: string;
     description: string | null;
     website_url: string | null;
@@ -21,6 +22,9 @@ export interface StartupProfileData {
     mrr_range: string | null;
     looking_for: string[];
     twitter_handle: string | null;
+    founder_name: string | null;
+    contact_email: string | null;
+    ga_property_id: string | null;
     monthly_visitors: number;
     monthly_pageviews: number;
     engagement_rate: number;
@@ -79,6 +83,30 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     );
 }
 
+function XAvatar({ handle, size = 16 }: { handle: string | null | undefined; size?: number }) {
+    const [errored, setErrored] = useState(false);
+    const cleaned = (handle || '').replace(/^@/, '').trim();
+    if (!cleaned || errored) {
+        return <Twitter className="h-3.5 w-3.5" aria-hidden="true" />;
+    }
+    // unavatar.io is a public no-auth avatar proxy. `?fallback=false` makes
+    // the endpoint 404 when there's no real avatar so onError can fall back
+    // to the Twitter glyph instead of showing a generic placeholder.
+    const src = `https://unavatar.io/x/${encodeURIComponent(cleaned)}?fallback=false`;
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            src={src}
+            alt={`@${cleaned}`}
+            width={size}
+            height={size}
+            onError={() => setErrored(true)}
+            className="rounded-full ring-1 ring-white/10 object-cover"
+            style={{ width: size, height: size }}
+        />
+    );
+}
+
 function autoLogoFromHost(websiteUrl: string | null | undefined): string | null {
     if (!websiteUrl) return null;
     try {
@@ -131,6 +159,37 @@ function LogoIcon({
     );
 }
 
+function FounderCard({ founder, handle }: { founder: string | null; handle: string | null }) {
+    const cleanedHandle = (handle || '').replace(/^@/, '').trim();
+    if (!founder && !cleanedHandle) return null;
+    const inner = (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-right transition hover:border-white/[0.12]">
+            <XAvatar handle={cleanedHandle || null} size={36} />
+            <div className="min-w-0 leading-tight">
+                {founder && (
+                    <div className="truncate text-sm font-semibold text-white">{founder}</div>
+                )}
+                {cleanedHandle && (
+                    <div className="truncate text-[11px] text-zinc-500">@{cleanedHandle}</div>
+                )}
+            </div>
+        </div>
+    );
+    if (cleanedHandle) {
+        return (
+            <a
+                href={`https://x.com/${cleanedHandle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden shrink-0 sm:block"
+            >
+                {inner}
+            </a>
+        );
+    }
+    return <div className="hidden shrink-0 sm:block">{inner}</div>;
+}
+
 function CopyButton({ text, label }: { text: string; label: string }) {
     const [copied, setCopied] = useState(false);
     return (
@@ -176,118 +235,103 @@ function VerificationBadge({ status }: { status?: string }) {
     );
 }
 
-function VisitorSparkline({
-    history,
-    currentVisitors,
-    visitorTrend,
-}: {
-    history: StartupProfileData['history'];
-    currentVisitors: number;
-    visitorTrend: number;
-}) {
-    // Derive the chart series. Order of preference:
-    //   1. Real history with ≥2 days — plot as-is.
-    //   2. Single history row — synthesize a 28-days-ago point using the current
-    //      trend so the chart still draws a line (no awkward empty box).
-    //   3. No history at all — synthesize a two-point line from the trend.
-    const data: Array<{ date: string; visitors: number; synthetic: boolean }> = [];
-    if (history && history.length >= 2) {
-        for (const h of history) {
-            data.push({
-                date: h.recorded_on || '',
-                visitors: h.monthly_visitors || 0,
-                synthetic: false,
-            });
-        }
-    } else if (currentVisitors > 0) {
-        const today = new Date();
-        const baselineDate = new Date(today);
-        baselineDate.setDate(baselineDate.getDate() - 28);
-        // If trend is positive the "before" point is lower; if negative it's higher.
-        const baseline = visitorTrend !== 0
-            ? Math.max(0, Math.round(currentVisitors / (1 + visitorTrend / 100)))
-            : Math.max(0, Math.round(currentVisitors * 0.92));
-        data.push({
-            date: baselineDate.toISOString().slice(0, 10),
-            visitors: baseline,
-            synthetic: true,
-        });
-        const todayPoint = history && history.length === 1
-            ? history[0]
-            : { recorded_on: today.toISOString().slice(0, 10), monthly_visitors: currentVisitors };
-        data.push({
-            date: todayPoint.recorded_on || today.toISOString().slice(0, 10),
-            visitors: todayPoint.monthly_visitors || currentVisitors,
-            synthetic: history?.length !== 1,
-        });
-    }
+function formatHistoryDate(iso: string | null | undefined): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
-    if (data.length < 2) {
+function VisitorSparkline({ history }: { history: StartupProfileData['history'] }) {
+    // Plot only real, recorded history points. No synthesis — a misleading
+    // straight line from a fake baseline to "today" was confusing users into
+    // thinking the entry had real 30-day movement.
+    const data = (history || []).map((h) => ({
+        date: h.recorded_on || '',
+        visitors: h.monthly_visitors || 0,
+    }));
+
+    if (data.length === 0) {
         return (
-            <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] text-center text-[12px] italic text-zinc-500">
+            <div className="flex h-56 items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] text-center text-[12px] italic text-zinc-500">
                 Visitor history fills in after the daily refresh.
             </div>
         );
     }
 
-    const isSynthetic = data.some((d) => d.synthetic);
+    // Single point — render dot + flat reference line so the panel still looks
+    // intentional. Recharts won't draw an Area with one point, so use a tiny
+    // ghosted twin so the dot/marker is the focal element.
+    const renderData = data.length === 1
+        ? [{ ...data[0] }, { ...data[0] }]
+        : data;
 
     return (
-        <div className="space-y-2">
-            <div className="h-40 -mx-2">
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
-                        <defs>
-                            <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#14C4E1" stopOpacity={0.45} />
-                                <stop offset="100%" stopColor="#14C4E1" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <XAxis dataKey="date" hide />
-                        <YAxis hide domain={['auto', 'auto']} />
-                        <Tooltip
-                            contentStyle={{
-                                background: '#04070d',
-                                border: '1px solid rgba(20,196,225,0.3)',
-                                borderRadius: 12,
-                                fontSize: 11,
-                                boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-                            }}
-                            labelStyle={{ color: '#94a3b8' }}
-                            itemStyle={{ color: '#7AD9DA' }}
-                            formatter={(value: number | undefined) => [formatNumber(value ?? 0), 'Visitors']}
-                        />
-                        <Area
-                            type="monotone"
-                            dataKey="visitors"
-                            stroke="#7AD9DA"
-                            strokeWidth={2}
-                            fill="url(#sparkFill)"
-                            isAnimationActive={false}
-                            strokeDasharray={isSynthetic ? '4 3' : undefined}
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </div>
-            {isSynthetic && (
-                <p className="text-[10px] italic text-zinc-600">
-                    Day-1 reading — the daily refresh fills in real history points over time.
-                </p>
-            )}
+        <div className="h-56 -mx-1">
+            <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={renderData} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+                    <defs>
+                        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#14C4E1" stopOpacity={0.42} />
+                            <stop offset="100%" stopColor="#14C4E1" stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
+                    <XAxis
+                        dataKey="date"
+                        tickFormatter={formatHistoryDate}
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        minTickGap={32}
+                    />
+                    <YAxis
+                        tickFormatter={(value: number) => formatNumber(value)}
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={42}
+                    />
+                    <Tooltip
+                        cursor={{ stroke: 'rgba(255,255,255,0.12)' }}
+                        content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null;
+                            const value = Number(payload[0]?.value || 0);
+                            return (
+                                <div className="rounded-lg border border-white/[0.08] bg-[#04070d] px-3 py-2 text-xs shadow-xl">
+                                    <div className="mb-1 text-zinc-500">{formatHistoryDate(String(label || ''))}</div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-[#7AD9DA]" />
+                                        <span className="text-zinc-400">Visitors</span>
+                                        <span className="ml-3 font-mono text-white">{formatNumber(value)}</span>
+                                    </div>
+                                </div>
+                            );
+                        }}
+                    />
+                    <Area
+                        type="monotone"
+                        dataKey="visitors"
+                        stroke="#7AD9DA"
+                        strokeWidth={2}
+                        fill="url(#sparkFill)"
+                        isAnimationActive={false}
+                        dot={data.length === 1 ? { r: 4, fill: '#7AD9DA', stroke: '#04070d', strokeWidth: 2 } : false}
+                        activeDot={{ r: 4, fill: '#7AD9DA', stroke: '#04070d', strokeWidth: 2 }}
+                    />
+                </AreaChart>
+            </ResponsiveContainer>
         </div>
     );
 }
 
 export default function StartupProfileClient({ entry, profileUrl }: { entry: StartupProfileData; profileUrl: string }) {
-    const [showBadge, setShowBadge] = useState(false);
-
     const baseOrigin = profileUrl.replace(/\/leaderboard\/\d+$/, '');
     const minimalBadgeUrl = `${baseOrigin}/api/badges/${entry.id}`;
     const rankBadgeUrl = `${minimalBadgeUrl}?variant=rank`;
-    const htmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${minimalBadgeUrl}" alt="Verified on TrafficClaw" height="48" />\n</a>`;
-    const rankHtmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${rankBadgeUrl}" alt="${entry.startup_name} — TrafficClaw rank" height="48" />\n</a>`;
+    const htmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${minimalBadgeUrl}" alt="Verified on TrafficClaw" height="54" />\n</a>`;
+    const rankHtmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${rankBadgeUrl}" alt="${entry.startup_name} — TrafficClaw rank" height="54" />\n</a>`;
     const markdownEmbed = `[![Verified on TrafficClaw](${minimalBadgeUrl})](${profileUrl})`;
-    const tweetText = `Just got verified on TrafficClaw! Check out ${entry.startup_name}'s real traffic stats ${profileUrl}`;
 
     return (
         <div className="relative min-h-screen overflow-x-clip bg-[#010101] text-white">
@@ -304,68 +348,87 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
 
                 {/* Hero card */}
                 <div className="mt-6 overflow-hidden rounded-[32px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.1),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-10">
-                    <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                        <LogoIcon name={entry.startup_name} url={entry.logo_url} websiteUrl={entry.website_url} size="lg" />
-                        <div className="min-w-0 flex-1">
-                            <div className="mb-3 flex flex-wrap items-center gap-2">
-                                <SectionLabel>{entry.category || 'Startup'}</SectionLabel>
-                                <VerificationBadge status={entry.verification_status} />
-                            </div>
-                            <h1 className="text-balance text-3xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
-                                {entry.startup_name}
-                            </h1>
-                            {entry.description && (
-                                <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">
-                                    {entry.description}
-                                </p>
-                            )}
-
-                            <div className="mt-5 flex flex-wrap items-center gap-2">
-                                {entry.website_url && (
-                                    <a
-                                        href={entry.website_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-300 transition hover:border-[#14C4E1]/35 hover:text-[#dff9ff]"
-                                    >
-                                        <Globe className="h-3.5 w-3.5" />
-                                        {entry.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                                        <ExternalLink className="h-3 w-3" />
-                                    </a>
-                                )}
-                                {entry.twitter_handle && (
-                                    <a
-                                        href={`https://x.com/${entry.twitter_handle.replace('@', '')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-300 transition hover:border-[#14C4E1]/35 hover:text-[#dff9ff]"
-                                    >
-                                        <Twitter className="h-3.5 w-3.5" />
-                                        @{entry.twitter_handle.replace('@', '')}
-                                    </a>
-                                )}
-                                {entry.mrr_range && (
-                                    <span className="rounded-full border border-[#14C4E1]/22 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#dff9ff]">
-                                        MRR · {entry.mrr_range}
-                                    </span>
-                                )}
-                                {entry.primary_country && (
-                                    <span className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-400">
-                                        {entry.primary_country}
-                                    </span>
-                                )}
-                                {entry.looking_for?.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                                            LOOKING_FOR_COLORS[tag] || 'border-white/[0.08] bg-white/[0.02] text-zinc-400'
-                                        }`}
-                                    >
-                                        🎯 {tag}
-                                    </span>
-                                ))}
+                    {/* Top row: logo + name on the left, founder card on the right */}
+                    <div className="flex items-start justify-between gap-6">
+                        <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-6">
+                            <LogoIcon name={entry.startup_name} url={entry.logo_url} websiteUrl={entry.website_url} size="lg" />
+                            <div className="min-w-0 flex-1">
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                    <SectionLabel>{entry.category || 'Startup'}</SectionLabel>
+                                    <VerificationBadge status={entry.verification_status} />
+                                </div>
+                                <h1 className="text-balance text-3xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
+                                    {entry.startup_name}
+                                </h1>
                             </div>
                         </div>
+                        {(entry.founder_name || entry.twitter_handle) && (
+                            <FounderCard founder={entry.founder_name} handle={entry.twitter_handle} />
+                        )}
+                    </div>
+
+                    {entry.description && (
+                        <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">
+                            {entry.description}
+                        </p>
+                    )}
+
+                    {/* Tag row — MRR / country / interests */}
+                    <div className="mt-5 flex flex-wrap items-center gap-2">
+                        {entry.mrr_range && (
+                            <span className="rounded-full border border-[#14C4E1]/22 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#dff9ff]">
+                                MRR · {entry.mrr_range}
+                            </span>
+                        )}
+                        {entry.primary_country && (
+                            <span className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-400">
+                                {entry.primary_country}
+                            </span>
+                        )}
+                        {entry.looking_for?.map((tag) => (
+                            <span
+                                key={tag}
+                                className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                                    LOOKING_FOR_COLORS[tag] || 'border-white/[0.08] bg-white/[0.02] text-zinc-400'
+                                }`}
+                            >
+                                🎯 {tag}
+                            </span>
+                        ))}
+                    </div>
+
+                    {/* Primary action row — Visit / Share on X / Copy link / Contact */}
+                    <div className="mt-6 flex flex-wrap items-center gap-2">
+                        {entry.website_url && (
+                            <a
+                                href={entry.website_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#14C4E1]/30 bg-[linear-gradient(135deg,rgba(20,196,225,0.18),rgba(122,217,218,0.06))] px-3.5 py-2 text-xs font-semibold text-[#dff9ff] transition hover:brightness-110"
+                            >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                Visit
+                            </a>
+                        )}
+                        <a
+                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just got verified on TrafficClaw! Check out ${entry.startup_name}'s real traffic stats ${profileUrl}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/[0.15] hover:text-white"
+                        >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                            Share
+                        </a>
+                        <CopyButton text={profileUrl} label="Copy link" />
+                        {entry.contact_email && (
+                            <a
+                                href={`mailto:${entry.contact_email}`}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/[0.15] hover:text-white"
+                            >
+                                <Mail className="h-3.5 w-3.5" />
+                                Contact
+                            </a>
+                        )}
                     </div>
                 </div>
 
@@ -419,11 +482,7 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                                 </span>
                             )}
                         </div>
-                        <VisitorSparkline
-                            history={entry.history}
-                            currentVisitors={entry.monthly_visitors}
-                            visitorTrend={entry.visitor_trend}
-                        />
+                        <VisitorSparkline history={entry.history} />
                     </div>
 
                     <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
@@ -440,7 +499,25 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                                 tone={entry.visitor_trend > 0 ? 'green' : entry.visitor_trend < 0 ? 'red' : undefined}
                             />
                         </div>
-                        <div className="mt-5 space-y-1 border-t border-white/[0.04] pt-4">
+                        <div className="mt-5 space-y-2 border-t border-white/[0.04] pt-4 text-[12px] text-zinc-400">
+                            {entry.created_at && (
+                                <p>
+                                    First joined TrafficClaw on{' '}
+                                    <span className="font-semibold text-zinc-200">
+                                        {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                    .
+                                </p>
+                            )}
+                            {entry.ga_property_id && (
+                                <p className="flex items-center gap-1.5 text-zinc-500">
+                                    <BarChart3 className="h-3.5 w-3.5 text-[#7AD9DA]" />
+                                    Verified via GA4 property:{' '}
+                                    <span className="font-mono text-xs font-semibold text-zinc-200">
+                                        {entry.ga_property_id.replace(/^properties\//, '')}
+                                    </span>
+                                </p>
+                            )}
                             {entry.last_refreshed && (
                                 <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-600">
                                     Last refresh ·{' '}
@@ -449,73 +526,37 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                                     </span>
                                 </p>
                             )}
-                            {entry.created_at && (
-                                <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-600">
-                                    First listed ·{' '}
-                                    <span className="text-zinc-400">
-                                        {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
-                                </p>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Share + embed */}
+                {/* Embed badge — always visible, matches Trust Traffic pattern */}
                 <div className="mt-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                            <SectionLabel>Share</SectionLabel>
-                            <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">Show off your verified traffic</h2>
-                            <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-400">
-                                Drop a badge on your site or share the listing — every click sends a backlink to your verified profile.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <a
-                                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-4 py-2 text-xs font-semibold text-[#031017] shadow-[0_14px_32px_rgba(20,196,225,0.22)] transition hover:brightness-105"
-                            >
-                                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                                Share on X
-                            </a>
-                            <CopyButton text={profileUrl} label="Copy link" />
-                        </div>
+                    <div className="mb-2 flex items-center gap-2">
+                        <Code2 className="h-4 w-4 text-[#7AD9DA]" />
+                        <h2 className="text-lg font-semibold tracking-[-0.02em] text-white">Embed badge</h2>
+                    </div>
+                    <p className="text-sm leading-6 text-zinc-400">
+                        Add this badge to your site to show you&apos;re verified on TrafficClaw — every click is a free backlink to your listing.
+                    </p>
+
+                    {/* Live preview tile */}
+                    <div className="mt-5 flex flex-col items-center gap-3 rounded-2xl border border-white/[0.06] bg-[#04070d]/60 px-6 py-8">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={minimalBadgeUrl} alt="Verified on TrafficClaw" height={54} />
+                        <p className="text-[11px] text-zinc-500">Default height is 54px. Change the height attribute to resize.</p>
                     </div>
 
-                    <button
-                        onClick={() => setShowBadge(!showBadge)}
-                        className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:text-white"
-                    >
-                        <Sparkles className="h-3.5 w-3.5 text-[#7AD9DA]" />
-                        Embed badge
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showBadge ? 'rotate-180' : ''}`} />
-                    </button>
+                    {/* Snippets */}
+                    <div className="mt-5 space-y-4">
+                        <SnippetBlock label="HTML" code={htmlEmbed} />
+                        <SnippetBlock label="HTML — with rank" code={rankHtmlEmbed} />
+                        <SnippetBlock label="Markdown" code={markdownEmbed} />
+                    </div>
 
-                    {showBadge && (
-                        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                            <div className="rounded-2xl border border-white/[0.06] bg-[#04070d]/80 p-5">
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7AD9DA]">Live preview</div>
-                                <div className="mt-4 flex flex-col items-center gap-3">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={minimalBadgeUrl} alt="Verified on TrafficClaw" height={48} />
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={rankBadgeUrl} alt={`${entry.startup_name} — TrafficClaw category rank`} height={48} />
-                                </div>
-                                <p className="mt-4 text-center text-[10px] text-zinc-500">
-                                    Both badges refresh hourly. The rank-aware variant updates automatically as your placement changes.
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <SnippetBlock label="HTML — minimal" code={htmlEmbed} />
-                                <SnippetBlock label="HTML — rank-aware" code={rankHtmlEmbed} />
-                                <SnippetBlock label="Markdown" code={markdownEmbed} />
-                            </div>
-                        </div>
-                    )}
+                    <p className="mt-5 text-center text-[11px] text-zinc-500">
+                        When someone clicks this badge, it links back to your TrafficClaw listing.
+                    </p>
                 </div>
             </div>
         </div>
