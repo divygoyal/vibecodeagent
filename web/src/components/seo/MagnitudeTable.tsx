@@ -167,7 +167,7 @@ export default function MagnitudeTable<T>({
                                     onClick={() => onRowClick?.(row)}
                                     disabled={!onRowClick}
                                     className={`group relative grid h-auto min-h-[44px] w-full items-center gap-3 overflow-hidden border-b border-white/[0.07] px-3 py-1.5 text-left transition last:border-b-0 grid-cols-[var(--cols-mobile)] md:grid-cols-[var(--cols-desktop)] md:h-9 md:min-h-9 md:px-4 md:py-0 ${
-                                        isActive ? 'bg-blue-500/[0.12]' : ''
+                                        isActive ? 'bg-cyan-500/[0.10] before:pointer-events-none before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-cyan-400' : ''
                                     } ${onRowClick ? 'cursor-pointer' : 'cursor-default'}`}
                                     style={{
                                         ['--cols-mobile' as string]: 'minmax(0,1fr) 104px',
@@ -179,8 +179,8 @@ export default function MagnitudeTable<T>({
                                         <div
                                             className={`pointer-events-none absolute left-0 top-[1px] bottom-[1px] rounded-r-[2px] transition ${
                                                 isActive
-                                                    ? 'bg-blue-500/[0.18]'
-                                                    : 'bg-white/[0.035] group-hover:bg-blue-500/[0.10]'
+                                                    ? 'bg-cyan-500/[0.16]'
+                                                    : 'bg-white/[0.035] group-hover:bg-cyan-500/[0.10]'
                                             }`}
                                             style={{ width: `${widthPct}%` }}
                                             aria-hidden

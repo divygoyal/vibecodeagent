@@ -1,0 +1,237 @@
+'use client';
+
+import { useMemo } from 'react';
+import { AlertTriangle, ExternalLink, Lightbulb, Search, Smartphone, Sparkles } from 'lucide-react';
+import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { useCannibalizationData, useMobileGapData } from '@/lib/useDashboardData';
+import PositionPill from './PositionPill';
+
+type Severity = 'high' | 'medium' | 'low';
+
+export interface IssueSelection {
+    sourceType: 'cannibalization' | 'mobile-gap';
+    query: string;
+}
+
+interface SeoIssueDetailPanelProps {
+    selection: IssueSelection | null;
+    siteUrl: string | null;
+}
+
+interface CannibalizedRow {
+    query: string;
+    pages: Array<{ page: string; clicks: number; impressions: number; ctr: number; position: number }>;
+    totalClicks: number;
+    totalImpressions: number;
+    bestPosition: number;
+    severity: Severity;
+}
+
+interface MobileGapRow {
+    query: string;
+    mobilePosition: number;
+    desktopPosition: number;
+    mobileImpressions: number;
+    desktopImpressions: number;
+    mobileClicks: number;
+    desktopClicks: number;
+    mobileCtr: number;
+    desktopCtr: number;
+    gap: number;
+}
+
+const SEVERITY_BADGE: Record<Severity, string> = {
+    high: 'border-red-500/30 bg-red-500/10 text-red-300',
+    medium: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    low: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300',
+};
+const SEVERITY_LABEL: Record<Severity, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+
+function shortenPath(url: string): string {
+    try {
+        const u = new URL(url);
+        return (u.pathname + u.search) || '/';
+    } catch {
+        return url;
+    }
+}
+
+export default function SeoIssueDetailPanel({ selection, siteUrl }: SeoIssueDetailPanelProps) {
+    const { data: cannData } = useCannibalizationData(siteUrl);
+    const { data: mobileData } = useMobileGapData(siteUrl);
+
+    const cannMatch = useMemo<CannibalizedRow | null>(() => {
+        if (!selection || selection.sourceType !== 'cannibalization') return null;
+        const list = (cannData?.cannibalized as CannibalizedRow[] | undefined) || [];
+        return list.find(c => c.query === selection.query) || null;
+    }, [cannData, selection]);
+
+    const mobileMatch = useMemo<MobileGapRow | null>(() => {
+        if (!selection || selection.sourceType !== 'mobile-gap') return null;
+        const list = (mobileData as { data?: MobileGapRow[] } | undefined)?.data || [];
+        return list.find(m => m.query === selection.query) || null;
+    }, [mobileData, selection]);
+
+    return (
+        <AnalyticsSubpagePanel
+            title="Issue detail"
+            description="Affected pages and a recommended fix for the selected issue."
+            tone="amber"
+        >
+            {!selection ? (
+                <div className="flex h-[280px] flex-col items-center justify-center rounded-[14px] border border-dashed border-white/[0.06] bg-[#0a0b0e] text-center">
+                    <Search className="mb-3 h-5 w-5 text-zinc-600" />
+                    <p className="text-[13px] font-semibold text-white">Pick an issue</p>
+                    <p className="mt-1 max-w-xs text-[12px] text-zinc-500">Click any row in the Issues table to see affected pages and a recommended fix.</p>
+                </div>
+            ) : selection.sourceType === 'cannibalization' ? (
+                <CannibalizationDetail row={cannMatch} query={selection.query} />
+            ) : (
+                <MobileGapDetail row={mobileMatch} query={selection.query} />
+            )}
+        </AnalyticsSubpagePanel>
+    );
+}
+
+function CannibalizationDetail({ row, query }: { row: CannibalizedRow | null; query: string }) {
+    if (!row) {
+        return <div className="rounded-[14px] border border-white/[0.04] bg-[#0a0b0e] px-4 py-6 text-center text-[12px] text-zinc-500">No detail available for this query.</div>;
+    }
+    const sortedPages = [...row.pages].sort((a, b) => b.impressions - a.impressions);
+    return (
+        <div className="space-y-3">
+            <div className="rounded-[14px] border border-amber-500/20 bg-amber-500/[0.04] px-3.5 py-3">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />
+                        <p className="text-[12.5px] font-semibold text-white">Cannibalized query</p>
+                    </div>
+                    <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${SEVERITY_BADGE[row.severity]}`}>
+                        {SEVERITY_LABEL[row.severity]}
+                    </span>
+                </div>
+                <p className="mt-1.5 break-words text-[12px] text-zinc-300">&ldquo;{query}&rdquo;</p>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                    <Stat label="Pages" value={row.pages.length.toString()} />
+                    <Stat label="Total clicks" value={formatCompactNumber(row.totalClicks)} />
+                    <Stat label="Best pos." value={row.bestPosition.toFixed(1)} />
+                </div>
+            </div>
+
+            <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12]">
+                <div className="border-b border-white/[0.06] px-4 py-2.5">
+                    <p className="text-[12px] font-semibold text-zinc-300">Competing pages</p>
+                </div>
+                <div
+                    className="hidden md:grid gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[11px] font-medium text-zinc-500"
+                    style={{ gridTemplateColumns: 'minmax(0,1fr) 70px 80px 56px 76px' }}
+                >
+                    <span>Page</span>
+                    <span className="text-right">Clicks</span>
+                    <span className="text-right">Impr.</span>
+                    <span className="text-right">CTR</span>
+                    <span className="text-right">Pos.</span>
+                </div>
+                {sortedPages.map((p, i) => (
+                    <div
+                        key={i}
+                        className="grid h-9 grid-cols-[minmax(0,1fr)_70px_80px_56px_76px] items-center gap-3 border-b border-white/[0.04] px-4 last:border-b-0 hover:bg-white/[0.02]"
+                    >
+                        <a
+                            href={p.page}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex min-w-0 items-center gap-1.5 text-[12px] text-zinc-200 hover:text-cyan-300"
+                        >
+                            <span className="block truncate">{shortenPath(p.page)}</span>
+                            <ExternalLink className="h-3 w-3 flex-shrink-0 text-zinc-600" />
+                        </a>
+                        <span className="text-right font-mono text-[12px] tabular-nums text-zinc-100">{formatCompactNumber(p.clicks)}</span>
+                        <span className="text-right font-mono text-[12px] tabular-nums text-zinc-300">{formatCompactNumber(p.impressions)}</span>
+                        <span className="text-right font-mono text-[12px] tabular-nums text-zinc-400">{p.ctr.toFixed(1)}%</span>
+                        <span className="text-right"><PositionPill pos={p.position} /></span>
+                    </div>
+                ))}
+            </div>
+
+            <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12] px-3.5 py-3">
+                <div className="flex items-center gap-2">
+                    <Lightbulb className="h-3.5 w-3.5 text-emerald-300" />
+                    <p className="text-[12.5px] font-semibold text-white">Recommended fix</p>
+                </div>
+                <p className="mt-1.5 text-[12px] leading-snug text-zinc-300">
+                    Pick the strongest performer (top page above), then 301-redirect or canonicalise the rest to consolidate ranking signals.
+                </p>
+                <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    +{Math.round(row.totalImpressions * 0.04).toLocaleString()} clicks/mo
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function MobileGapDetail({ row, query }: { row: MobileGapRow | null; query: string }) {
+    if (!row) {
+        return <div className="rounded-[14px] border border-white/[0.04] bg-[#0a0b0e] px-4 py-6 text-center text-[12px] text-zinc-500">No detail available for this query.</div>;
+    }
+    const mobileBetter = row.mobilePosition < row.desktopPosition;
+    return (
+        <div className="space-y-3">
+            <div className="rounded-[14px] border border-cyan-500/20 bg-cyan-500/[0.04] px-3.5 py-3">
+                <div className="flex items-center gap-2">
+                    <Smartphone className="h-3.5 w-3.5 text-cyan-300" />
+                    <p className="text-[12.5px] font-semibold text-white">Mobile vs desktop gap</p>
+                </div>
+                <p className="mt-1.5 break-words text-[12px] text-zinc-300">&ldquo;{query}&rdquo;</p>
+                <p className="mt-1.5 text-[11.5px] leading-snug text-zinc-400">
+                    Mobile ranks {mobileBetter ? 'better' : 'worse'} than desktop by {Math.abs(row.gap).toFixed(1)} positions.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+                <DeviceCard label="Mobile" position={row.mobilePosition} clicks={row.mobileClicks} impressions={row.mobileImpressions} ctr={row.mobileCtr * 100} highlight={!mobileBetter} />
+                <DeviceCard label="Desktop" position={row.desktopPosition} clicks={row.desktopClicks} impressions={row.desktopImpressions} ctr={row.desktopCtr * 100} highlight={mobileBetter} />
+            </div>
+
+            <div className="rounded-[14px] border border-white/[0.06] bg-[#0d0e12] px-3.5 py-3">
+                <div className="flex items-center gap-2">
+                    <Lightbulb className="h-3.5 w-3.5 text-emerald-300" />
+                    <p className="text-[12.5px] font-semibold text-white">Recommended fix</p>
+                </div>
+                <p className="mt-1.5 text-[12px] leading-snug text-zinc-300">
+                    {mobileBetter
+                        ? 'Desktop is the laggard — verify the desktop layout still surfaces above-the-fold content and CTAs.'
+                        : 'Mobile is the laggard — check Core Web Vitals on the page, ensure tap targets are 44 px+, and that the main content renders without horizontal scroll.'}
+                </p>
+                <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    +{Math.round(Math.max(row.mobileImpressions, row.desktopImpressions) * 0.03).toLocaleString()} clicks/mo
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DeviceCard({ label, position, clicks, impressions, ctr, highlight }: { label: string; position: number; clicks: number; impressions: number; ctr: number; highlight: boolean }) {
+    return (
+        <div className={`rounded-[14px] border px-3.5 py-3 ${highlight ? 'border-amber-500/25 bg-amber-500/[0.04]' : 'border-white/[0.06] bg-[#0d0e12]'}`}>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">{label}</p>
+            <div className="mt-1.5"><PositionPill pos={position} /></div>
+            <div className="mt-2.5 space-y-1 text-[11px]">
+                <div className="flex justify-between"><span className="text-zinc-500">Clicks</span><span className="font-mono tabular-nums text-zinc-200">{formatCompactNumber(clicks)}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Impr.</span><span className="font-mono tabular-nums text-zinc-200">{formatCompactNumber(impressions)}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">CTR</span><span className="font-mono tabular-nums text-zinc-200">{ctr.toFixed(1)}%</span></div>
+            </div>
+        </div>
+    );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <p className="text-zinc-600">{label}</p>
+            <p className="mt-0.5 font-semibold tabular-nums text-zinc-200">{value}</p>
+        </div>
+    );
+}

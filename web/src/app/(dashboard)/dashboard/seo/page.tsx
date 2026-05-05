@@ -1,14 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 
 import DemoModeBanner from '@/components/DemoModeBanner';
 import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
-import KeywordDetailDrawer from '@/components/KeywordDetailDrawer';
-import PageDetailDrawer from '@/components/PageDetailDrawer';
 import { useRegistration } from '../layout';
 import { useContainerStatus, useSeoData, useSiteList } from '@/lib/useDashboardData';
 import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
@@ -21,6 +19,9 @@ import SeoRecommendationsPanel from '@/components/seo/SeoRecommendationsPanel';
 import SeoQueriesPagesPanel, { type SeoQuery, type SeoPageRow } from '@/components/seo/SeoQueriesPagesPanel';
 import SeoMovementPanel from '@/components/seo/SeoMovementPanel';
 import SeoIssuesPanel from '@/components/seo/SeoIssuesPanel';
+import SeoIssueDetailPanel, { type IssueSelection } from '@/components/seo/SeoIssueDetailPanel';
+import SeoKeywordInsightsPanel from '@/components/seo/SeoKeywordInsightsPanel';
+import SeoKeywordOpportunitiesPanel from '@/components/seo/SeoKeywordOpportunitiesPanel';
 import SeoPageHealthPanel from '@/components/seo/SeoPageHealthPanel';
 import { type SeoRecommendation } from '@/components/seo/SeoInsightsList';
 
@@ -41,11 +42,11 @@ export default function SEOPage() {
     const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const { sites } = useSiteList(hasGoogleConnection);
     const typedSites = sites as Site[];
-    // Workspace selection is owned by /dashboard/setup; SEO page just reads it.
     const { selectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
 
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
+    const [selectedIssue, setSelectedIssue] = useState<IssueSelection | null>(null);
 
     const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
     const rangeDays = rangeToDays(range);
@@ -56,6 +57,28 @@ export default function SEOPage() {
         hasGoogleConnection && (isDemoWorkspace || !!activeSite),
         range,
         isDemoWorkspace,
+    );
+
+    const queries = useMemo(
+        () => (Array.isArray(seoData?.queries) ? seoData.queries : []) as SeoQuery[],
+        [seoData],
+    );
+    const pages = useMemo(
+        () => (Array.isArray(seoData?.pages) ? seoData.pages : []) as SeoPageRow[],
+        [seoData],
+    );
+
+    // Auto-select the first row when data arrives so the right panes are never empty.
+    useEffect(() => {
+        if (!selectedKeyword && queries.length > 0) setSelectedKeyword(queries[0].query);
+    }, [queries, selectedKeyword]);
+    useEffect(() => {
+        if (!selectedPageUrl && pages.length > 0) setSelectedPageUrl(pages[0].page);
+    }, [pages, selectedPageUrl]);
+
+    const selectedQueryRow = useMemo(
+        () => queries.find(q => q.query === selectedKeyword) ?? undefined,
+        [queries, selectedKeyword],
     );
 
     if (!containerLoading && !hasGoogleConnection) {
@@ -108,8 +131,6 @@ export default function SEOPage() {
     }
 
     const kpis = (seoData?.kpis as SeoKpis | undefined) ?? null;
-    const queries = (Array.isArray(seoData?.queries) ? seoData.queries : []) as SeoQuery[];
-    const pages = (Array.isArray(seoData?.pages) ? seoData.pages : []) as SeoPageRow[];
     const recommendations = (Array.isArray(seoData?.recommendations) ? seoData.recommendations : []) as SeoRecommendation[];
     const trend = (Array.isArray(seoData?.trend) ? seoData.trend : []) as SeoTrendPoint[];
 
@@ -149,37 +170,52 @@ export default function SEOPage() {
                 <SeoRecommendationsPanel items={recommendations} />
             </div>
 
-            <SeoQueriesPagesPanel
-                queries={queries}
-                pages={pages}
-                onSelectKeyword={setSelectedKeyword}
-                onSelectPage={setSelectedPageUrl}
-            />
+            {/* Search performance — 3-col split: table | keyword insights | opportunities & risks */}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.45fr)_minmax(0,1fr)]">
+                <SeoQueriesPagesPanel
+                    queries={queries}
+                    pages={pages}
+                    onSelectKeyword={setSelectedKeyword}
+                    onSelectPage={setSelectedPageUrl}
+                    selectedKeyword={selectedKeyword}
+                    selectedPage={selectedPageUrl}
+                />
+                <SeoKeywordInsightsPanel
+                    keyword={selectedKeyword}
+                    siteUrl={activeSite || null}
+                    summary={selectedQueryRow ? {
+                        clicks: selectedQueryRow.clicks,
+                        impressions: selectedQueryRow.impressions,
+                        ctr: selectedQueryRow.ctr,
+                        position: selectedQueryRow.position,
+                    } : undefined}
+                />
+                <SeoKeywordOpportunitiesPanel
+                    keyword={selectedKeyword}
+                    siteUrl={activeSite || null}
+                    queryRow={selectedQueryRow}
+                />
+            </div>
 
             <SeoMovementPanel
                 activeSite={activeSite || null}
                 onSelectKeyword={setSelectedKeyword}
             />
 
-            <SeoIssuesPanel
-                activeSite={activeSite || null}
-                onSelectKeyword={setSelectedKeyword}
-            />
+            {/* Issues — 2-col split: table | inline detail */}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                <SeoIssuesPanel
+                    activeSite={activeSite || null}
+                    onSelectIssue={setSelectedIssue}
+                    selected={selectedIssue}
+                />
+                <SeoIssueDetailPanel
+                    selection={selectedIssue}
+                    siteUrl={activeSite || null}
+                />
+            </div>
 
             <SeoPageHealthPanel suggestedPages={pages.slice(0, 4).map(p => p.page)} />
-
-            <KeywordDetailDrawer
-                isOpen={!!selectedKeyword}
-                onClose={() => setSelectedKeyword(null)}
-                keyword={selectedKeyword}
-                siteUrl={activeSite || null}
-            />
-            <PageDetailDrawer
-                isOpen={!!selectedPageUrl}
-                onClose={() => setSelectedPageUrl(null)}
-                pageUrl={selectedPageUrl}
-                siteUrl={activeSite || null}
-            />
         </div>
     );
 }

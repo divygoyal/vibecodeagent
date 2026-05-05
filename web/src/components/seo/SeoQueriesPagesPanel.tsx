@@ -30,6 +30,10 @@ interface SeoQueriesPagesPanelProps {
     pages: SeoPageRow[];
     onSelectKeyword: (keyword: string) => void;
     onSelectPage: (page: string) => void;
+    /** Currently selected query (renders the active-row accent). */
+    selectedKeyword?: string | null;
+    /** Currently selected page (renders the active-row accent). */
+    selectedPage?: string | null;
 }
 
 function shortenPath(url: string): string {
@@ -41,7 +45,7 @@ function shortenPath(url: string): string {
     }
 }
 
-export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, onSelectPage }: SeoQueriesPagesPanelProps) {
+export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, onSelectPage, selectedKeyword, selectedPage }: SeoQueriesPagesPanelProps) {
     const [tab, setTab] = useState<Tab>('queries');
 
     const queryColumns: MagnitudeColumn<SeoQuery>[] = [
@@ -173,6 +177,7 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
                     searchKey={r => r.query}
                     searchPlaceholder="Search queries"
                     onRowClick={r => onSelectKeyword(r.query)}
+                    activeRow={r => r.query === selectedKeyword}
                     emptyMessage="No queries with measurable traffic in this range yet."
                     maxRows={10}
                     defaultSort={{ key: 'clicks', dir: 'desc' }}
@@ -185,6 +190,7 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
                     searchKey={r => r.page}
                     searchPlaceholder="Search pages"
                     onRowClick={r => onSelectPage(r.page)}
+                    activeRow={r => r.page === selectedPage}
                     emptyMessage="No pages with measurable traffic in this range yet."
                     maxRows={10}
                     defaultSort={{ key: 'clicks', dir: 'desc' }}

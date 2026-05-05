@@ -11,7 +11,10 @@ import PositionPill from './PositionPill';
 
 interface SeoIssuesPanelProps {
     activeSite: string | null;
-    onSelectKeyword: (keyword: string) => void;
+    /** Notify parent which issue was selected (for the inline detail pane). */
+    onSelectIssue: (issue: { sourceType: 'cannibalization' | 'mobile-gap'; query: string }) => void;
+    /** Currently selected issue, for active-row highlighting. */
+    selected?: { sourceType: 'cannibalization' | 'mobile-gap'; query: string } | null;
 }
 
 type Tab = 'all' | 'cannibalization' | 'mobile';
@@ -75,7 +78,7 @@ function classifyGapSeverity(gap: number, mobileImpr: number): Severity {
     return 'low';
 }
 
-export default function SeoIssuesPanel({ activeSite, onSelectKeyword }: SeoIssuesPanelProps) {
+export default function SeoIssuesPanel({ activeSite, onSelectIssue, selected }: SeoIssuesPanelProps) {
     const [tab, setTab] = useState<Tab>('all');
     const cannQuery = useCannibalizationData(activeSite);
     const mobileQuery = useMobileGapData(activeSite);
@@ -221,7 +224,8 @@ export default function SeoIssuesPanel({ activeSite, onSelectKeyword }: SeoIssue
                     columns={cols}
                     searchKey={r => r.query}
                     searchPlaceholder="Search issues"
-                    onRowClick={r => onSelectKeyword(r.query)}
+                    onRowClick={r => onSelectIssue({ sourceType: r.sourceType, query: r.query })}
+                    activeRow={r => !!selected && selected.query === r.query && selected.sourceType === r.sourceType}
                     emptyMessage="No issues detected over the last 28 days."
                     maxRows={10}
                     defaultSort={{ key: 'impressions', dir: 'desc' }}
