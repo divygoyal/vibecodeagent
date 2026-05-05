@@ -1447,23 +1447,6 @@ export default function AIChat() {
                             </div>
                         </div>
 
-                        {/* Quick-prompt chips below the input — same set as the
-                            floating widget. Hidden while the model is responding so
-                            we don't tempt the user to fire a second turn mid-stream. */}
-                        {!isLoading && (
-                            <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-                                {QUICK_PROMPTS.map((prompt) => (
-                                    <button
-                                        key={prompt}
-                                        onClick={() => sendMessage(prompt)}
-                                        disabled={isGa4Locked}
-                                        className="rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/[0.02] disabled:hover:border-white/[0.06]"
-                                    >
-                                        {prompt}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 </div>
             )}

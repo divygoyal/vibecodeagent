@@ -7,13 +7,16 @@
  * selection becomes the dashboard's single source of truth (see
  * useWorkspace() in dashboard/layout.tsx). At least one of the two is
  * required before Continue is enabled. Reachable both as a guarded
- * post-login step (no saved workspace yet) and as a "Workspace" link in
- * the dashboard header.
+ * post-login step (no saved workspace yet) and as the workspace switcher
+ * pill in the dashboard sidebar.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
-import { CheckCircle2, Search, Sparkles, ArrowRight, AlertTriangle } from 'lucide-react';
+import { useSession, signIn } from 'next-auth/react';
+import {
+    CheckCircle2, Search, Sparkles, ArrowRight, AlertTriangle,
+    BarChart3, Globe as GlobeIcon, ScanSearch,
+} from 'lucide-react';
 import { useWorkspace } from '../layout';
 import {
     formatSiteLabel,
@@ -36,8 +39,49 @@ function tokensOverlap(a: Set<string>, b: Set<string>): boolean {
     return false;
 }
 
+type Star = { id: number; x: number; y: number; size: number; opMin: number; opMax: number; dur: number; delay: number };
+
+function MiniStarField() {
+    const [stars, setStars] = useState<Star[]>([]);
+    useEffect(() => {
+        setStars(
+            Array.from({ length: 80 }, (_, i) => ({
+                id: i,
+                x: Math.random() * 100,
+                y: Math.random() * 100,
+                size: Math.random() * 1.4 + 0.3,
+                opMin: Math.random() * 0.15 + 0.05,
+                opMax: Math.random() * 0.5 + 0.35,
+                dur: Math.random() * 4 + 3,
+                delay: Math.random() * 6,
+            })),
+        );
+    }, []);
+    return (
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+            {stars.map((s) => (
+                <span
+                    key={s.id}
+                    className="tc-star"
+                    style={{
+                        left: `${s.x}%`,
+                        top: `${s.y}%`,
+                        width: `${s.size}px`,
+                        height: `${s.size}px`,
+                        ['--tw-opacity-min' as never]: s.opMin,
+                        ['--tw-opacity-max' as never]: s.opMax,
+                        ['--twinkle-dur' as never]: `${s.dur}s`,
+                        ['--twinkle-delay' as never]: `${s.delay}s`,
+                    } as CSSProperties}
+                />
+            ))}
+        </div>
+    );
+}
+
 export default function SetupPage() {
     const router = useRouter();
+    const { data: session } = useSession();
     const {
         selectedProperty,
         selectedSite,
@@ -66,6 +110,14 @@ export default function SetupPage() {
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [autoMatched, setAutoMatched] = useState<{ property: string; site: string } | null>(null);
+
+    const userName = session?.user?.name?.split(' ')[0] || 'there';
+    const greeting = (() => {
+        const hr = new Date().getHours();
+        if (hr < 12) return 'Good morning';
+        if (hr < 17) return 'Good afternoon';
+        return 'Good evening';
+    })();
 
     // Hydrate the form from current workspace once it loads.
     useEffect(() => {
@@ -168,8 +220,6 @@ export default function SetupPage() {
     };
 
     const onSkip = async () => {
-        // Save an empty workspace so the redirect-guard stops looping back here.
-        // The dashboard will surface "Pick a property" banners until they return.
         await saveWorkspace({ property: null, site: null });
         router.push('/dashboard/ai-chat');
     };
@@ -181,36 +231,49 @@ export default function SetupPage() {
         if (ok) router.push('/dashboard/ai-chat');
     };
 
+    const cosmicShell = (children: React.ReactNode) => (
+        <div className="relative min-h-screen overflow-hidden bg-black -m-3 sm:-m-4 md:-m-6">
+            <MiniStarField />
+            <div aria-hidden className="pointer-events-none absolute inset-0">
+                <div className="absolute left-1/2 top-[-220px] h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(20,196,225,0.18),transparent_70%)] blur-3xl" />
+                <div className="absolute left-1/2 top-[280px] h-[420px] w-[680px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(122,217,218,0.10),transparent_70%)] blur-3xl" />
+            </div>
+            <div className="relative z-10">{children}</div>
+        </div>
+    );
+
     // ─── Render branches ──────────────────────────────────────────────
 
     if (!hasGoogleConnection) {
-        return (
-            <div className="max-w-2xl mx-auto py-12 px-4">
-                <div className="rounded-2xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] p-8 text-center shadow-[0_22px_50px_rgba(0,0,0,0.4)]">
-                    <div className="w-12 h-12 rounded-xl bg-[#14C4E1]/14 mx-auto mb-5 flex items-center justify-center">
-                        <Sparkles className="w-6 h-6 text-[#7AD9DA]" />
-                    </div>
-                    <h1 className="text-xl sm:text-2xl font-semibold text-white mb-2">Connect Google to set up your workspace</h1>
-                    <p className="text-sm text-zinc-400 mb-6 max-w-md mx-auto">
-                        TrafficClaw uses your Google Analytics and Search Console data. Connect once and we&apos;ll bring everything in.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                        <button
-                            type="button"
-                            onClick={() => signIn('google', { callbackUrl: '/dashboard/setup' }, { prompt: 'select_account consent' })}
-                            className="px-5 py-2.5 rounded-xl bg-[#14C4E1]/14 text-[#7AD9DA] hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 transition-colors text-sm font-medium"
-                        >
-                            Connect Google
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onContinueWithDemo}
-                            disabled={saving}
-                            className="px-5 py-2.5 rounded-xl bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                            Continue with demo data
-                        </button>
-                    </div>
+        return cosmicShell(
+            <div className="max-w-2xl mx-auto py-16 sm:py-24 px-4 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-4">
+                    {greeting}, {userName}
+                </p>
+                <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4">
+                    Let&apos;s set up your workspace
+                </h1>
+                <p className="text-sm sm:text-base text-zinc-400 mb-10 max-w-md mx-auto leading-relaxed">
+                    TrafficClaw needs your Google Analytics and Search Console data to surface
+                    insights, anomalies, and growth opportunities. Connect once and we&apos;ll
+                    bring everything in.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                        type="button"
+                        onClick={() => signIn('google', { callbackUrl: '/dashboard/setup' }, { prompt: 'select_account consent' })}
+                        className="group relative px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)]"
+                    >
+                        Connect Google
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onContinueWithDemo}
+                        disabled={saving}
+                        className="px-6 py-3 rounded-2xl bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.08] transition-colors text-sm font-medium disabled:opacity-50"
+                    >
+                        Continue with demo data →
+                    </button>
                 </div>
             </div>
         );
@@ -219,33 +282,34 @@ export default function SetupPage() {
     const inventoryEmpty = !propsLoading && !sitesLoading && properties.length === 0 && sites.length === 0 && !propsError && !sitesError;
 
     if (inventoryEmpty) {
-        return (
-            <div className="max-w-2xl mx-auto py-12 px-4">
-                <div className="rounded-2xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] p-8 text-center shadow-[0_22px_50px_rgba(0,0,0,0.4)]">
-                    <div className="w-12 h-12 rounded-xl bg-yellow-500/12 mx-auto mb-5 flex items-center justify-center">
-                        <AlertTriangle className="w-6 h-6 text-yellow-400" />
-                    </div>
-                    <h1 className="text-xl sm:text-2xl font-semibold text-white mb-2">No GA4 or Search Console data found</h1>
-                    <p className="text-sm text-zinc-400 mb-6 max-w-md mx-auto">
-                        We couldn&apos;t find any GA4 properties or Search Console sites for this Google account. You can re-connect with a different account, or explore the dashboard with demo data.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                        <button
-                            type="button"
-                            onClick={() => signIn('google', { callbackUrl: '/dashboard/setup' }, { prompt: 'select_account consent' })}
-                            className="px-5 py-2.5 rounded-xl bg-[#14C4E1]/14 text-[#7AD9DA] hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 transition-colors text-sm font-medium"
-                        >
-                            Switch Google account
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onContinueWithDemo}
-                            disabled={saving}
-                            className="px-5 py-2.5 rounded-xl bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                            Continue with demo data
-                        </button>
-                    </div>
+        return cosmicShell(
+            <div className="max-w-2xl mx-auto py-16 sm:py-24 px-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-yellow-500/12 mx-auto mb-6 flex items-center justify-center border border-yellow-500/20">
+                    <AlertTriangle className="w-6 h-6 text-yellow-400" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-3">
+                    No GA4 or Search Console data found
+                </h1>
+                <p className="text-sm text-zinc-400 mb-10 max-w-md mx-auto leading-relaxed">
+                    We couldn&apos;t find any GA4 properties or Search Console sites for this Google account.
+                    Re-connect with a different account, or explore with demo data.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                        type="button"
+                        onClick={() => signIn('google', { callbackUrl: '/dashboard/setup' }, { prompt: 'select_account consent' })}
+                        className="px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)]"
+                    >
+                        Switch Google account
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onContinueWithDemo}
+                        disabled={saving}
+                        className="px-6 py-3 rounded-2xl bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.08] transition-colors text-sm font-medium disabled:opacity-50"
+                    >
+                        Continue with demo data →
+                    </button>
                 </div>
             </div>
         );
@@ -253,35 +317,41 @@ export default function SetupPage() {
 
     // ─── Main two-column picker ───────────────────────────────────────
 
-    return (
-        <div className="max-w-5xl mx-auto py-6 sm:py-10 px-4 pb-32 sm:pb-10">
-            <div className="mb-6 sm:mb-8 flex items-start justify-between gap-3">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-semibold text-white">Pick your workspace</h1>
-                    <p className="text-sm text-zinc-400 mt-1">
-                        Choose a GA4 property and a Search Console site. Both are recommended, but either one will work.
-                    </p>
-                </div>
+    return cosmicShell(
+        <div className="max-w-5xl mx-auto py-10 sm:py-16 px-4 pb-32 sm:pb-16">
+            <div className="text-center mb-10 sm:mb-14">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-3">
+                    {greeting}, {userName}
+                </p>
+                <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
+                    Pick your workspace
+                </h1>
+                <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                    Choose a Google Analytics property and a Search Console site. Both are
+                    recommended, but either alone will work.
+                </p>
                 <button
                     type="button"
                     onClick={onSkip}
-                    className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors whitespace-nowrap"
+                    className="mt-4 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
                 >
-                    Skip for now
+                    Skip for now →
                 </button>
             </div>
 
             {autoMatched && chosenProperty === autoMatched.property && chosenSite === autoMatched.site && (
-                <div className="mb-4 rounded-xl border border-[#14C4E1]/22 bg-[#14C4E1]/06 px-4 py-2.5 flex items-center gap-2 text-xs text-[#7AD9DA]">
-                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                <div className="mb-6 mx-auto max-w-3xl rounded-2xl border border-[#14C4E1]/24 bg-[#14C4E1]/[0.06] px-4 py-3 flex items-center gap-2.5 text-xs text-[#7AD9DA] backdrop-blur">
+                    <Sparkles className="w-4 h-4 flex-shrink-0" />
                     <span>We auto-matched a GA4 property to your Search Console site. Change either side below if it&apos;s wrong.</span>
                 </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-4">
-                {/* GA4 column */}
+            <div className="grid md:grid-cols-2 gap-5">
                 <PickerColumn
+                    icon={BarChart3}
+                    iconColor="#7AD9DA"
                     title="GA4 property"
+                    subtitle="Realtime, retention, conversions"
                     badge={chosenProperty ? properties.find((p) => p.property === chosenProperty)?.displayName || 'Selected' : 'None selected'}
                     error={propsError ? 'Could not load GA4 properties.' : null}
                     loading={propsLoading}
@@ -298,15 +368,15 @@ export default function SetupPage() {
                                 type="button"
                                 disabled={!id}
                                 onClick={() => setChosenProperty(isSelected ? '' : id)}
-                                className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors flex items-center gap-2 ${
+                                className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 ${
                                     isSelected
-                                        ? 'border-[#14C4E1]/40 bg-[#14C4E1]/10 text-white'
-                                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.1]'
+                                        ? 'border-[#14C4E1]/50 bg-[#14C4E1]/[0.10] text-white shadow-[0_0_24px_rgba(20,196,225,0.18)]'
+                                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
                                 }`}
                             >
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-medium truncate">{p.displayName || '(unnamed)'}</div>
-                                    <div className="text-[10px] text-zinc-500 truncate">{id}</div>
+                                    <div className="text-[10.5px] text-zinc-500 truncate font-mono">{id}</div>
                                 </div>
                                 {isSelected && <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />}
                             </button>
@@ -314,9 +384,11 @@ export default function SetupPage() {
                     })}
                 </PickerColumn>
 
-                {/* GSC column */}
                 <PickerColumn
+                    icon={ScanSearch}
+                    iconColor="#7AD9DA"
                     title="Search Console site"
+                    subtitle="Queries, pages, rankings"
                     badge={chosenSite ? formatSiteLabel(chosenSite) : 'None selected'}
                     error={sitesError ? 'Could not load Search Console sites.' : null}
                     loading={sitesLoading}
@@ -331,15 +403,16 @@ export default function SetupPage() {
                                 key={s.siteUrl}
                                 type="button"
                                 onClick={() => setChosenSite(isSelected ? '' : s.siteUrl)}
-                                className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors flex items-center gap-2 ${
+                                className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 ${
                                     isSelected
-                                        ? 'border-[#14C4E1]/40 bg-[#14C4E1]/10 text-white'
-                                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.1]'
+                                        ? 'border-[#14C4E1]/50 bg-[#14C4E1]/[0.10] text-white shadow-[0_0_24px_rgba(20,196,225,0.18)]'
+                                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
                                 }`}
                             >
+                                <GlobeIcon className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-medium truncate">{formatSiteLabel(s.siteUrl)}</div>
-                                    <div className="text-[10px] text-zinc-500 truncate">{s.siteUrl}</div>
+                                    <div className="text-[10.5px] text-zinc-500 truncate font-mono">{s.siteUrl}</div>
                                 </div>
                                 {isSelected && <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />}
                             </button>
@@ -349,8 +422,8 @@ export default function SetupPage() {
             </div>
 
             {showMismatch && (
-                <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/[0.06] px-4 py-3 flex items-start gap-2 text-xs text-yellow-300">
-                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <div className="mt-5 mx-auto max-w-3xl rounded-xl border border-yellow-500/30 bg-yellow-500/[0.06] px-4 py-3 flex items-start gap-2.5 text-xs text-yellow-300 backdrop-blur">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <span>
                         These don&apos;t look like the same site — your GA4 property and Search Console site appear to be different domains. Continue anyway if that&apos;s intentional.
                     </span>
@@ -358,22 +431,22 @@ export default function SetupPage() {
             )}
 
             {saveError && (
-                <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/[0.06] px-4 py-3 text-xs text-red-300">
+                <div className="mt-5 mx-auto max-w-3xl rounded-xl border border-red-500/30 bg-red-500/[0.06] px-4 py-3 text-xs text-red-300">
                     {saveError}
                 </div>
             )}
 
-            {/* Continue — sticky on mobile, inline on desktop */}
-            <div className="fixed sm:static bottom-0 inset-x-0 sm:bottom-auto sm:inset-x-auto sm:mt-6 px-4 sm:px-0 py-3 sm:py-0 bg-[#010203]/95 sm:bg-transparent backdrop-blur sm:backdrop-blur-0 border-t border-white/[0.06] sm:border-0 z-10">
-                <div className="max-w-5xl mx-auto sm:mx-0 flex items-center justify-end gap-3">
+            {/* Continue — sticky on mobile, centered on desktop */}
+            <div className="fixed sm:static bottom-0 inset-x-0 sm:bottom-auto sm:inset-x-auto sm:mt-10 px-4 sm:px-0 py-3 sm:py-0 bg-black/95 sm:bg-transparent backdrop-blur sm:backdrop-blur-0 border-t border-white/[0.06] sm:border-0 z-10">
+                <div className="max-w-5xl mx-auto sm:mx-0 flex items-center justify-center gap-3">
                     <button
                         type="button"
                         onClick={onContinue}
                         disabled={!canContinue || saving}
-                        className="px-5 py-2.5 rounded-xl bg-[#14C4E1]/14 text-[#7AD9DA] hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="group relative px-7 py-3.5 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)] disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-2"
                     >
-                        {saving ? 'Saving…' : 'Continue'}
-                        {!saving && <ArrowRight className="w-4 h-4" />}
+                        {saving ? 'Saving…' : 'Continue to dashboard'}
+                        {!saving && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />}
                     </button>
                 </div>
             </div>
@@ -382,7 +455,10 @@ export default function SetupPage() {
 }
 
 function PickerColumn({
+    icon: Icon,
+    iconColor,
     title,
+    subtitle,
     badge,
     error,
     loading,
@@ -391,7 +467,10 @@ function PickerColumn({
     emptyText,
     children,
 }: {
+    icon: React.ElementType;
+    iconColor: string;
     title: string;
+    subtitle: string;
     badge: string;
     error: string | null;
     loading: boolean;
@@ -404,10 +483,16 @@ function PickerColumn({
     const isEmpty = !loading && !error && childArray.flat().filter(Boolean).length === 0;
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(12,18,26,0.92),rgba(6,10,16,0.94))] p-4 shadow-[0_22px_50px_rgba(0,0,0,0.3)]">
-            <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-white">{title}</h2>
-                <span className="text-[10px] text-zinc-500 truncate max-w-[55%]">{badge}</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-5 shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
+            <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-4 h-4" style={{ color: iconColor }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h2 className="text-sm font-semibold text-white">{title}</h2>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">{subtitle}</p>
+                </div>
+                <span className="text-[10px] text-zinc-500 truncate max-w-[40%] mt-1.5">{badge}</span>
             </div>
             <div className="relative mb-3">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -419,11 +504,11 @@ function PickerColumn({
                     className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#14C4E1]/30"
                 />
             </div>
-            <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {loading && (
                     <>
                         {[0, 1, 2, 3].map((i) => (
-                            <div key={i} className="h-12 rounded-lg bg-white/[0.02] animate-pulse" />
+                            <div key={i} className="h-14 rounded-xl bg-white/[0.02] animate-pulse" />
                         ))}
                     </>
                 )}
@@ -435,7 +520,7 @@ function PickerColumn({
                 )}
                 {!loading && !error && children}
                 {isEmpty && (
-                    <div className="text-xs text-zinc-500 italic px-3 py-4 text-center">
+                    <div className="text-xs text-zinc-500 italic px-3 py-6 text-center">
                         {emptyText}
                     </div>
                 )}
