@@ -405,10 +405,14 @@ export async function POST(req: Request) {
         );
     }
 
-    const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
-    if (!prepared.ok) return prepared.response;
-
+    // Wrap everything from here including preparePayload — any uncaught throw
+    // (GA4 verify hiccup, JSON.parse on a weird upstream body, etc.) would
+    // otherwise bubble to Next.js's default HTML 500 page, which the proxy
+    // can't always pass through and surfaces as a Cloudflare 502 with HTML.
     try {
+        const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
+        if (!prepared.ok) return prepared.response;
+
         const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}/join`;
         const res = await fetch(adminUrl, {
             method: 'POST',

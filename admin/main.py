@@ -3422,8 +3422,21 @@ async def join_leaderboard_for_user(
         )
         db.add(entry)
 
-    await db.commit()
-    await db.refresh(entry)
+    # Guard the commit — a schema-drifted prod (missing verified_host /
+    # verification_status / slug, etc.) would otherwise raise an OperationalError
+    # that uvicorn surfaces as a non-JSON response, which the upstream proxy
+    # then turns into a 502 with HTML. Catch and return clean JSON so the web
+    # layer can show an actionable message.
+    try:
+        await db.commit()
+        await db.refresh(entry)
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database write failed (likely missing migration): {type(exc).__name__}: {str(exc)[:200]}",
+        )
+
     return {
         "success": True,
         "id": entry.id,
