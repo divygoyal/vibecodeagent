@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { IntentBadge } from '@/components/IntentBadge';
 import MagnitudeTable, { type MagnitudeColumn } from './MagnitudeTable';
+import PositionPill from './PositionPill';
 
 export interface SeoQuery {
     query: string;
@@ -40,19 +41,6 @@ function shortenPath(url: string): string {
     }
 }
 
-function positionTone(pos: number): string {
-    if (pos <= 3) return 'text-emerald-400';
-    if (pos <= 10) return 'text-cyan-400';
-    if (pos <= 20) return 'text-amber-400';
-    return 'text-red-400';
-}
-
-const STATUS_TONE: Record<string, string> = {
-    healthy: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400',
-    warning: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
-    decay: 'border-red-500/20 bg-red-500/10 text-red-400',
-};
-
 export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, onSelectPage }: SeoQueriesPagesPanelProps) {
     const [tab, setTab] = useState<Tab>('queries');
 
@@ -65,7 +53,7 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
             getValue: r => r.query,
             render: r => (
                 <div className="flex items-center gap-2 min-w-0">
-                    <span className="truncate text-[13px] font-medium text-zinc-100">{r.query}</span>
+                    <span className="block truncate text-[13px] font-medium text-zinc-100">{r.query}</span>
                     <IntentBadge keyword={r.query} className="hidden sm:inline-flex flex-shrink-0" />
                 </div>
             ),
@@ -77,12 +65,12 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
             align: 'right',
             sortable: true,
             getValue: r => r.clicks,
-            render: r => <span className="tabular-nums">{formatCompactNumber(r.clicks)}</span>,
+            render: r => <span className="tabular-nums text-zinc-100">{formatCompactNumber(r.clicks)}</span>,
         },
         {
             key: 'impressions',
             label: 'Impressions',
-            width: '100px',
+            width: '104px',
             align: 'right',
             sortable: true,
             getValue: r => r.impressions,
@@ -91,7 +79,7 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
         {
             key: 'ctr',
             label: 'CTR',
-            width: '64px',
+            width: '72px',
             align: 'right',
             sortable: true,
             getValue: r => r.ctr,
@@ -99,12 +87,12 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
         },
         {
             key: 'position',
-            label: 'Pos.',
-            width: '64px',
+            label: 'Position',
+            width: '88px',
             align: 'right',
             sortable: true,
             getValue: r => r.position,
-            render: r => <span className={`tabular-nums font-medium ${positionTone(r.position)}`}>{r.position.toFixed(1)}</span>,
+            render: r => <PositionPill pos={r.position} />,
         },
     ];
 
@@ -117,12 +105,7 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
             getValue: r => r.page,
             render: r => (
                 <div className="flex items-center gap-2 min-w-0">
-                    <span className="truncate text-[13px] font-medium text-zinc-100">{shortenPath(r.page)}</span>
-                    {r.status && STATUS_TONE[r.status] ? (
-                        <span className={`hidden sm:inline-flex flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${STATUS_TONE[r.status]}`}>
-                            {r.status}
-                        </span>
-                    ) : null}
+                    <span className="block truncate text-[13px] font-medium text-zinc-100">{shortenPath(r.page)}</span>
                 </div>
             ),
         },
@@ -133,12 +116,12 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
             align: 'right',
             sortable: true,
             getValue: r => r.clicks,
-            render: r => <span className="tabular-nums">{formatCompactNumber(r.clicks)}</span>,
+            render: r => <span className="tabular-nums text-zinc-100">{formatCompactNumber(r.clicks)}</span>,
         },
         {
             key: 'impressions',
             label: 'Impressions',
-            width: '100px',
+            width: '104px',
             align: 'right',
             sortable: true,
             getValue: r => r.impressions,
@@ -147,7 +130,7 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
         {
             key: 'ctr',
             label: 'CTR',
-            width: '64px',
+            width: '72px',
             align: 'right',
             sortable: true,
             getValue: r => r.ctr,
@@ -155,27 +138,27 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
         },
         {
             key: 'position',
-            label: 'Pos.',
-            width: '64px',
+            label: 'Position',
+            width: '88px',
             align: 'right',
             sortable: true,
             getValue: r => r.position,
-            render: r => <span className={`tabular-nums font-medium ${positionTone(r.position)}`}>{r.position.toFixed(1)}</span>,
+            render: r => <PositionPill pos={r.position} />,
         },
     ];
 
     return (
         <AnalyticsSubpagePanel
             title="Top performance"
-            description="Queries and landing pages driving search traffic. Click a row to drill into its detail."
+            description="Queries and landing pages driving the most traffic."
             action={
-                <div className="inline-flex rounded-[14px] border border-white/[0.07] bg-[#090909] p-1 text-[12px] font-medium">
+                <div className="inline-flex rounded-[12px] border border-white/[0.07] bg-[#0a0b0e] p-1 text-[12px] font-medium">
                     {(['queries', 'pages'] as const).map(t => (
                         <button
                             key={t}
                             type="button"
                             onClick={() => setTab(t)}
-                            className={`rounded-[10px] px-3 py-1.5 transition ${tab === t ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
+                            className={`rounded-[9px] px-3 py-1.5 transition ${tab === t ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
                         >
                             {t === 'queries' ? 'Queries' : 'Pages'}
                         </button>
@@ -187,25 +170,25 @@ export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, 
                 <MagnitudeTable
                     rows={queries}
                     columns={queryColumns}
-                    getMagnitude={r => r.clicks}
                     searchKey={r => r.query}
                     searchPlaceholder="Search queries"
                     onRowClick={r => onSelectKeyword(r.query)}
                     emptyMessage="No queries with measurable traffic in this range yet."
                     maxRows={10}
                     defaultSort={{ key: 'clicks', dir: 'desc' }}
+                    viewAllLabel="View all queries"
                 />
             ) : (
                 <MagnitudeTable
                     rows={pages}
                     columns={pageColumns}
-                    getMagnitude={r => r.clicks}
                     searchKey={r => r.page}
                     searchPlaceholder="Search pages"
                     onRowClick={r => onSelectPage(r.page)}
                     emptyMessage="No pages with measurable traffic in this range yet."
                     maxRows={10}
                     defaultSort={{ key: 'clicks', dir: 'desc' }}
+                    viewAllLabel="View all pages"
                 />
             )}
         </AnalyticsSubpagePanel>

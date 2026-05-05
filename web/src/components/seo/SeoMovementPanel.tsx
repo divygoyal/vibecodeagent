@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { TrendingDown, TrendingUp, ArrowRight, Sparkles } from 'lucide-react';
+import { TrendingDown, TrendingUp } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { useOpportunitiesData, useWinnersLosersData } from '@/lib/useDashboardData';
 import MagnitudeTable, { type MagnitudeColumn } from './MagnitudeTable';
+import PositionPill from './PositionPill';
 
 interface SeoMovementPanelProps {
     activeSite: string | null;
@@ -56,7 +57,7 @@ function MovementCard({ activeSite, onSelectKeyword }: { activeSite: string | nu
             label: 'Query',
             sortable: true,
             getValue: r => r.query,
-            render: r => <span className="truncate text-[13px] font-medium text-zinc-100">{r.query}</span>,
+            render: r => <span className="block truncate text-[13px] font-medium text-zinc-100">{r.query}</span>,
         },
         {
             key: 'clicksCurrent',
@@ -65,12 +66,12 @@ function MovementCard({ activeSite, onSelectKeyword }: { activeSite: string | nu
             align: 'right',
             sortable: true,
             getValue: r => r.clicksCurrent,
-            render: r => <span className="tabular-nums">{formatCompactNumber(r.clicksCurrent)}</span>,
+            render: r => <span className="tabular-nums text-zinc-100">{formatCompactNumber(r.clicksCurrent)}</span>,
         },
         {
             key: 'clicksDelta',
             label: 'Δ Clicks',
-            width: '92px',
+            width: '88px',
             align: 'right',
             sortable: true,
             getValue: r => r.clicksDelta,
@@ -95,7 +96,7 @@ function MovementCard({ activeSite, onSelectKeyword }: { activeSite: string | nu
                 if (!r.positionPrevious) return <span className="text-zinc-600">–</span>;
                 const improved = r.positionDelta < 0;
                 return (
-                    <span className={`tabular-nums ${improved ? 'text-emerald-400' : r.positionDelta > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>
+                    <span className={`tabular-nums font-medium ${improved ? 'text-emerald-400' : r.positionDelta > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>
                         {r.positionDelta > 0 ? '+' : ''}{r.positionDelta.toFixed(1)}
                     </span>
                 );
@@ -103,26 +104,25 @@ function MovementCard({ activeSite, onSelectKeyword }: { activeSite: string | nu
         },
     ];
 
-    const tabs: Array<{ key: MovementTab; label: string; tone: string }> = [
-        { key: 'winners', label: 'Winners', tone: 'emerald' },
-        { key: 'losers', label: 'Losers', tone: 'red' },
-        { key: 'new', label: 'New', tone: 'cyan' },
-        { key: 'lost', label: 'Lost', tone: 'amber' },
+    const tabs: Array<{ key: MovementTab; label: string }> = [
+        { key: 'winners', label: 'Winners' },
+        { key: 'losers', label: 'Losers' },
+        { key: 'new', label: 'New' },
+        { key: 'lost', label: 'Lost' },
     ];
 
     return (
         <AnalyticsSubpagePanel
             title="Query movement"
-            description="28-day vs prior 28-day comparison. Track which queries are climbing, slipping, or showing up for the first time."
-            tone="emerald"
+            description="28-day vs prior 28-day comparison."
             action={
-                <div className="inline-flex flex-wrap rounded-[14px] border border-white/[0.07] bg-[#090909] p-1 text-[12px] font-medium">
+                <div className="inline-flex flex-wrap rounded-[12px] border border-white/[0.07] bg-[#0a0b0e] p-1 text-[12px] font-medium">
                     {tabs.map(t => (
                         <button
                             key={t.key}
                             type="button"
                             onClick={() => setTab(t.key)}
-                            className={`rounded-[10px] px-2.5 py-1.5 transition ${tab === t.key ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
+                            className={`rounded-[9px] px-2.5 py-1.5 transition ${tab === t.key ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
                         >
                             {t.label}
                         </button>
@@ -131,29 +131,22 @@ function MovementCard({ activeSite, onSelectKeyword }: { activeSite: string | nu
             }
         >
             {!activeSite ? (
-                <div className="rounded-[16px] border border-white/[0.06] bg-[#0a0b0e] px-4 py-10 text-center text-[12px] text-zinc-500">
-                    Select a site to load query movement.
-                </div>
+                <Empty msg="Select a site to load query movement." />
             ) : isLoading ? (
-                <div className="rounded-[16px] border border-white/[0.06] bg-[#0a0b0e] px-4 py-10 text-center text-[12px] text-zinc-500">
-                    Loading movement data…
-                </div>
+                <Empty msg="Loading movement data…" />
             ) : error ? (
-                <div className="rounded-[16px] border border-red-500/15 bg-red-500/[0.04] px-4 py-6 text-center text-[12px] text-red-300">
-                    Couldn&apos;t load movement data. {error.info?.error || error.message}
-                </div>
+                <ErrorBox msg={error.info?.error || error.message} />
             ) : (
                 <MagnitudeTable
                     rows={rows}
                     columns={cols}
-                    getMagnitude={r => Math.abs(r.clicksDelta) || r.clicksCurrent || 1}
                     searchKey={r => r.query}
-                    searchPlaceholder="Search query"
+                    searchPlaceholder="Search queries"
                     onRowClick={r => onSelectKeyword(r.query)}
                     emptyMessage={`No ${tab === 'new' ? 'new queries' : tab === 'lost' ? 'lost queries' : `${tab} this period`} yet.`}
                     maxRows={10}
                     defaultSort={{ key: 'clicksDelta', dir: tab === 'losers' ? 'asc' : 'desc' }}
-                    barColor={tab === 'winners' || tab === 'new' ? 'rgba(52, 211, 153, 0.07)' : 'rgba(248, 113, 113, 0.06)'}
+                    viewAllLabel="View all movement"
                 />
             )}
         </AnalyticsSubpagePanel>
@@ -203,23 +196,22 @@ function OpportunityCard({ activeSite, onSelectKeyword }: { activeSite: string |
 
     const tabs: Array<{ key: OppTab; label: string }> = [
         { key: 'striking', label: 'Striking distance' },
-        { key: 'ctr', label: 'CTR lab' },
+        { key: 'ctr', label: 'Low CTR' },
         { key: 'decay', label: 'Decay' },
     ];
 
     return (
         <AnalyticsSubpagePanel
             title="Opportunities"
-            description="Queries close to the win line, underperforming CTR, and eroding traffic."
-            tone="cyan"
+            description="Keywords with ranking potential."
             action={
-                <div className="inline-flex flex-wrap rounded-[14px] border border-white/[0.07] bg-[#090909] p-1 text-[12px] font-medium">
+                <div className="inline-flex flex-wrap rounded-[12px] border border-white/[0.07] bg-[#0a0b0e] p-1 text-[12px] font-medium">
                     {tabs.map(t => (
                         <button
                             key={t.key}
                             type="button"
                             onClick={() => setTab(t.key)}
-                            className={`rounded-[10px] px-2.5 py-1.5 transition ${tab === t.key ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
+                            className={`rounded-[9px] px-2.5 py-1.5 transition ${tab === t.key ? 'bg-white/[0.06] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
                         >
                             {t.label}
                         </button>
@@ -228,79 +220,80 @@ function OpportunityCard({ activeSite, onSelectKeyword }: { activeSite: string |
             }
         >
             {!activeSite ? (
-                <div className="rounded-[16px] border border-white/[0.06] bg-[#0a0b0e] px-4 py-10 text-center text-[12px] text-zinc-500">
-                    Select a site to load opportunities.
-                </div>
+                <Empty msg="Select a site to load opportunities." />
             ) : isLoading ? (
-                <div className="rounded-[16px] border border-white/[0.06] bg-[#0a0b0e] px-4 py-10 text-center text-[12px] text-zinc-500">
-                    Loading opportunities…
-                </div>
+                <Empty msg="Loading opportunities…" />
             ) : error ? (
-                <div className="rounded-[16px] border border-red-500/15 bg-red-500/[0.04] px-4 py-6 text-center text-[12px] text-red-300">
-                    Couldn&apos;t load opportunities. {error.info?.error || error.message}
-                </div>
+                <ErrorBox msg={error.info?.error || error.message} />
             ) : tab === 'striking' ? (
                 <MagnitudeTable<QueryRow>
                     rows={strikingRows}
                     columns={[
-                        { key: 'query', label: 'Query', sortable: true, getValue: r => r.query, render: r => <span className="truncate text-[13px] font-medium text-zinc-100">{r.query}</span> },
-                        { key: 'position', label: 'Pos.', width: '64px', align: 'right', sortable: true, getValue: r => r.position, render: r => <span className="tabular-nums text-amber-400">{r.position.toFixed(1)}</span> },
-                        { key: 'impressions', label: 'Impressions', width: '100px', align: 'right', sortable: true, getValue: r => r.impressions, render: r => <span className="tabular-nums">{formatCompactNumber(r.impressions)}</span> },
-                        { key: 'ctr', label: 'CTR', width: '64px', align: 'right', sortable: true, getValue: r => r.ctr, render: r => <span className="tabular-nums text-zinc-400">{r.ctr.toFixed(1)}%</span> },
+                        { key: 'query', label: 'Keyword', sortable: true, getValue: r => r.query, render: r => <span className="block truncate text-[13px] font-medium text-zinc-100">{r.query}</span> },
+                        { key: 'position', label: 'Position', width: '88px', align: 'right', sortable: true, getValue: r => r.position, render: r => <PositionPill pos={r.position} /> },
+                        { key: 'impressions', label: 'Impressions', width: '104px', align: 'right', sortable: true, getValue: r => r.impressions, render: r => <span className="tabular-nums text-zinc-300">{formatCompactNumber(r.impressions)}</span> },
+                        { key: 'ctr', label: 'CTR', width: '72px', align: 'right', sortable: true, getValue: r => r.ctr, render: r => <span className="tabular-nums text-zinc-400">{r.ctr.toFixed(1)}%</span> },
                     ]}
-                    getMagnitude={r => r.impressions}
                     searchKey={r => r.query}
-                    searchPlaceholder="Search striking-distance queries"
+                    searchPlaceholder="Search keywords"
                     onRowClick={r => onSelectKeyword(r.query)}
                     emptyMessage="No queries currently in positions 11–20. Try a wider date range."
                     maxRows={10}
                     defaultSort={{ key: 'impressions', dir: 'desc' }}
-                    barColor="rgba(251, 191, 36, 0.07)"
+                    viewAllLabel="View all opportunities"
                 />
             ) : tab === 'ctr' ? (
                 <MagnitudeTable
                     rows={ctrLabRows}
                     columns={[
-                        { key: 'query', label: 'Query', sortable: true, getValue: r => r.query, render: r => <span className="truncate text-[13px] font-medium text-zinc-100">{r.query}</span> },
-                        { key: 'position', label: 'Pos.', width: '64px', align: 'right', sortable: true, getValue: r => r.position, render: r => <span className="tabular-nums text-zinc-400">{r.position.toFixed(1)}</span> },
-                        { key: 'ctr', label: 'CTR', width: '64px', align: 'right', sortable: true, getValue: r => r.ctr, render: r => <span className="tabular-nums text-red-400">{r.ctr.toFixed(1)}%</span> },
-                        { key: 'expectedCtr', label: 'Expected', width: '78px', align: 'right', sortable: true, getValue: r => r.expectedCtr, render: r => <span className="tabular-nums text-emerald-400">{r.expectedCtr.toFixed(1)}%</span> },
-                        { key: 'ctrGap', label: 'Gap', width: '64px', align: 'right', sortable: true, getValue: r => r.ctrGap, render: r => <span className="tabular-nums text-amber-300">{r.ctrGap.toFixed(1)}%</span> },
+                        { key: 'query', label: 'Keyword', sortable: true, getValue: r => r.query, render: r => <span className="block truncate text-[13px] font-medium text-zinc-100">{r.query}</span> },
+                        { key: 'position', label: 'Position', width: '88px', align: 'right', sortable: true, getValue: r => r.position, render: r => <PositionPill pos={r.position} /> },
+                        { key: 'ctr', label: 'CTR', width: '72px', align: 'right', sortable: true, getValue: r => r.ctr, render: r => <span className="tabular-nums text-red-400">{r.ctr.toFixed(1)}%</span> },
+                        { key: 'expectedCtr', label: 'Expected', width: '84px', align: 'right', sortable: true, getValue: r => r.expectedCtr, render: r => <span className="tabular-nums text-emerald-400">{r.expectedCtr.toFixed(1)}%</span> },
                     ]}
-                    getMagnitude={r => r.ctrGap * r.impressions}
                     searchKey={r => r.query}
-                    searchPlaceholder="Search CTR-lab queries"
+                    searchPlaceholder="Search keywords"
                     onRowClick={r => onSelectKeyword(r.query)}
                     emptyMessage="No CTR underperformers found."
                     maxRows={10}
                     defaultSort={{ key: 'ctrGap', dir: 'desc' }}
-                    barColor="rgba(34, 211, 238, 0.07)"
+                    viewAllLabel="View all opportunities"
                 />
             ) : (
                 <MagnitudeTable
                     rows={decayRows}
                     columns={[
-                        { key: 'query', label: 'Query', sortable: true, getValue: r => r.query, render: r => <span className="truncate text-[13px] font-medium text-zinc-100">{r.query}</span> },
-                        { key: 'clicks', label: 'Clicks', width: '80px', align: 'right', sortable: true, getValue: r => r.clicks, render: r => <span className="tabular-nums">{formatCompactNumber(r.clicks)}</span> },
+                        { key: 'query', label: 'Keyword', sortable: true, getValue: r => r.query, render: r => <span className="block truncate text-[13px] font-medium text-zinc-100">{r.query}</span> },
+                        { key: 'clicks', label: 'Clicks', width: '80px', align: 'right', sortable: true, getValue: r => r.clicks, render: r => <span className="tabular-nums text-zinc-100">{formatCompactNumber(r.clicks)}</span> },
                         { key: 'prevClicks', label: 'Prev.', width: '76px', align: 'right', sortable: true, getValue: r => r.prevClicks, render: r => <span className="tabular-nums text-zinc-500">{formatCompactNumber(r.prevClicks)}</span> },
                         { key: 'deltaPct', label: 'Δ %', width: '76px', align: 'right', sortable: true, getValue: r => r.deltaPct, render: r => <span className="tabular-nums font-medium text-red-400">{r.deltaPct}%</span> },
                     ]}
-                    getMagnitude={r => Math.abs(r.delta)}
                     searchKey={r => r.query}
-                    searchPlaceholder="Search decaying queries"
+                    searchPlaceholder="Search keywords"
                     onRowClick={r => onSelectKeyword(r.query)}
                     emptyMessage="No decay detected — your traffic is stable."
                     maxRows={10}
                     defaultSort={{ key: 'deltaPct', dir: 'asc' }}
-                    barColor="rgba(248, 113, 113, 0.08)"
+                    viewAllLabel="View all opportunities"
                 />
             )}
-            <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-zinc-500">
-                <Sparkles className="h-3 w-3" />
-                <span>Tip: click any row to drill into per-keyword detail.</span>
-                <ArrowRight className="h-3 w-3 text-zinc-600" />
-            </div>
         </AnalyticsSubpagePanel>
+    );
+}
+
+function Empty({ msg }: { msg: string }) {
+    return (
+        <div className="rounded-[12px] border border-white/[0.06] bg-[#0a0b0e] px-4 py-10 text-center text-[12px] text-zinc-500">
+            {msg}
+        </div>
+    );
+}
+
+function ErrorBox({ msg }: { msg?: string }) {
+    return (
+        <div className="rounded-[12px] border border-red-500/15 bg-red-500/[0.04] px-4 py-6 text-center text-[12px] text-red-300">
+            {msg || 'Couldn’t load data.'}
+        </div>
     );
 }
 

@@ -167,7 +167,7 @@ export default function SeoPageHealthPanel({ suggestedPages = [] }: SeoPageHealt
     return (
         <AnalyticsSubpagePanel
             title="Page health"
-            description="Lighthouse performance scores and structured-data coverage for any page on your site."
+            description="Core Web Vitals and performance insights for your key pages."
             tone="cyan"
             action={
                 <div className="inline-flex flex-wrap rounded-[14px] border border-white/[0.07] bg-[#090909] p-1 text-[12px] font-medium">
@@ -225,7 +225,7 @@ export default function SeoPageHealthPanel({ suggestedPages = [] }: SeoPageHealt
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] bg-emerald-500/15 px-4 text-[13px] font-semibold text-emerald-300 ring-1 ring-emerald-500/30 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                        Run
+                        Run test
                     </button>
                 </div>
 

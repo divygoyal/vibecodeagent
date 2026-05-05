@@ -17,6 +17,7 @@ import { exportSeoData } from '@/lib/exportUtils';
 import SeoHeader from '@/components/seo/SeoHeader';
 import SeoKpiGrid, { type SeoKpis } from '@/components/seo/SeoKpiGrid';
 import SeoTrendPanel, { type SeoTrendPoint } from '@/components/seo/SeoTrendPanel';
+import SeoRecommendationsPanel from '@/components/seo/SeoRecommendationsPanel';
 import SeoQueriesPagesPanel, { type SeoQuery, type SeoPageRow } from '@/components/seo/SeoQueriesPagesPanel';
 import SeoMovementPanel from '@/components/seo/SeoMovementPanel';
 import SeoIssuesPanel from '@/components/seo/SeoIssuesPanel';
@@ -25,6 +26,15 @@ import { type SeoRecommendation } from '@/components/seo/SeoInsightsList';
 
 interface Site {
     siteUrl: string;
+}
+
+function rangeToDays(range: string): number {
+    if (range === '7d') return 7;
+    if (range === '28d') return 28;
+    if (range === '90d') return 90;
+    if (range === '6m' || range === '180d') return 180;
+    if (range === '12m' || range === '365d') return 365;
+    return 30;
 }
 
 export default function SEOPage() {
@@ -38,6 +48,7 @@ export default function SEOPage() {
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
 
     const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
+    const rangeDays = rangeToDays(range);
 
     const { data: seoData, isLoading, isError } = useSeoData(
         'all',
@@ -79,7 +90,6 @@ export default function SEOPage() {
                     </p>
                 </div>
 
-                {/* Switch workspace to pick a different property */}
                 <Link
                     href="/dashboard/setup"
                     className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#7AD9DA] bg-[#14C4E1]/14 hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 rounded-xl transition-colors"
@@ -127,15 +137,17 @@ export default function SEOPage() {
             ) : null}
 
             <SeoHeader
-                siteUrl={activeSite || ''}
-                isDemo={isDemoWorkspace}
                 canExport={!!seoData}
                 onExport={() => exportSeoData(seoData)}
             />
 
-            {kpis ? <SeoKpiGrid kpis={kpis} /> : null}
+            {kpis ? <SeoKpiGrid kpis={kpis} trend={trend} rangeDays={rangeDays} /> : null}
 
-            <SeoTrendPanel trend={trend} recommendations={recommendations} />
+            {/* Trend (left, ~2/3) + Recommendations (right, ~1/3) */}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <SeoTrendPanel trend={trend} />
+                <SeoRecommendationsPanel items={recommendations} />
+            </div>
 
             <SeoQueriesPagesPanel
                 queries={queries}
