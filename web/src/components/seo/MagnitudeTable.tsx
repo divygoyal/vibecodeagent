@@ -41,7 +41,7 @@ export default function MagnitudeTable<T>({
     activeRow,
     emptyMessage = 'No data yet',
     maxRows,
-    barColor = 'rgba(52, 211, 153, 0.10)',
+    barColor = 'rgba(52, 211, 153, 0.07)',
     defaultSort,
 }: MagnitudeTableProps<T>) {
     const [search, setSearch] = useState('');
@@ -144,17 +144,17 @@ export default function MagnitudeTable<T>({
                                     type="button"
                                     onClick={() => onRowClick?.(row)}
                                     disabled={!onRowClick}
-                                    className={`group relative grid w-full items-center gap-3 overflow-hidden border-b border-white/[0.04] px-3 py-2 text-left text-[13px] transition last:border-b-0 md:grid-cols-[var(--grid-template)] md:px-4 md:py-0 md:h-9 ${
-                                        isActive ? 'bg-emerald-500/[0.08]' : 'hover:bg-white/[0.025]'
+                                    className={`group relative grid w-full items-center gap-3 overflow-hidden border-b border-white/[0.04] px-3 py-2 text-left text-[13px] transition last:border-b-0 grid-cols-[var(--cols-mobile)] md:grid-cols-[var(--cols-desktop)] md:px-4 md:py-0 md:h-9 ${
+                                        isActive ? 'bg-emerald-500/[0.06]' : 'hover:bg-white/[0.025]'
                                     } ${onRowClick ? 'cursor-pointer' : 'cursor-default'}`}
                                     style={{
-                                        gridTemplateColumns: 'minmax(0,1fr) 104px',
-                                        ['--grid-template' as string]: gridTemplate,
+                                        ['--cols-mobile' as string]: 'minmax(0,1fr) 104px',
+                                        ['--cols-desktop' as string]: gridTemplate,
                                     }}
                                 >
                                     {/* Magnitude bar */}
                                     <div
-                                        className="pointer-events-none absolute left-0 top-[1px] bottom-[1px] rounded-r-[3px] transition-[width]"
+                                        className="pointer-events-none absolute left-0 top-[1px] bottom-[1px] rounded-r-[2px] transition-[width]"
                                         style={{
                                             width: `${widthPct}%`,
                                             background: barColor,

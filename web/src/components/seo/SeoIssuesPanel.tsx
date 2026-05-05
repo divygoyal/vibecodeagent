@@ -109,7 +109,7 @@ function CannibalizationView({ activeSite, onSelectKeyword }: { activeSite: stri
             emptyMessage="No cannibalization detected over the last 28 days. Nice."
             maxRows={10}
             defaultSort={{ key: 'totalImpressions', dir: 'desc' }}
-            barColor="rgba(167, 139, 250, 0.10)"
+            barColor="rgba(167, 139, 250, 0.07)"
         />
     );
 }
@@ -189,7 +189,7 @@ function MobileGapView({ activeSite, onSelectKeyword }: { activeSite: string | n
             emptyMessage="No meaningful mobile/desktop gaps. Your rankings are consistent across devices."
             maxRows={10}
             defaultSort={{ key: 'gap', dir: 'asc' }}
-            barColor="rgba(34, 211, 238, 0.10)"
+            barColor="rgba(34, 211, 238, 0.07)"
         />
     );
 }

@@ -153,7 +153,7 @@ function MovementCard({ activeSite, onSelectKeyword }: { activeSite: string | nu
                     emptyMessage={`No ${tab === 'new' ? 'new queries' : tab === 'lost' ? 'lost queries' : `${tab} this period`} yet.`}
                     maxRows={10}
                     defaultSort={{ key: 'clicksDelta', dir: tab === 'losers' ? 'asc' : 'desc' }}
-                    barColor={tab === 'winners' || tab === 'new' ? 'rgba(52, 211, 153, 0.10)' : 'rgba(248, 113, 113, 0.08)'}
+                    barColor={tab === 'winners' || tab === 'new' ? 'rgba(52, 211, 153, 0.07)' : 'rgba(248, 113, 113, 0.06)'}
                 />
             )}
         </AnalyticsSubpagePanel>
@@ -255,7 +255,7 @@ function OpportunityCard({ activeSite, onSelectKeyword }: { activeSite: string |
                     emptyMessage="No queries currently in positions 11–20. Try a wider date range."
                     maxRows={10}
                     defaultSort={{ key: 'impressions', dir: 'desc' }}
-                    barColor="rgba(251, 191, 36, 0.10)"
+                    barColor="rgba(251, 191, 36, 0.07)"
                 />
             ) : tab === 'ctr' ? (
                 <MagnitudeTable
@@ -274,7 +274,7 @@ function OpportunityCard({ activeSite, onSelectKeyword }: { activeSite: string |
                     emptyMessage="No CTR underperformers found."
                     maxRows={10}
                     defaultSort={{ key: 'ctrGap', dir: 'desc' }}
-                    barColor="rgba(34, 211, 238, 0.10)"
+                    barColor="rgba(34, 211, 238, 0.07)"
                 />
             ) : (
                 <MagnitudeTable
