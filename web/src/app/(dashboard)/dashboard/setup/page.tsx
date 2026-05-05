@@ -436,22 +436,6 @@ export default function SetupPage() {
         </div>
     );
 
-    // Bottom captions — three muted columns under the wizard card. Active
-    // step gets a brighter title; the rest stay zinc.
-    const stepCaptions = (
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto text-center">
-            {[
-                { active: step === 'pick-website', title: 'Step 1 — Select website', sub: 'Pick the website you want to analyze.' },
-                { active: step === 'pair-gsc', title: gscOnlyMode ? 'Step 2 — Connect GA4' : 'Step 2 — Connect GSC', sub: 'Choose the matching property if you have one.' },
-                { active: step === 'done', title: 'Step 3 — Ready', sub: 'We sync your data and build your dashboard.' },
-            ].map((c) => (
-                <div key={c.title}>
-                    <div className={`text-[12px] font-semibold mb-1 ${c.active ? 'text-[#7AD9DA]' : 'text-zinc-500'}`}>{c.title}</div>
-                    <div className="text-[11px] text-zinc-600 leading-relaxed">{c.sub}</div>
-                </div>
-            ))}
-        </div>
-    );
 
     // ─── STEP 1 ──────────────────────────────────────────────────────
 
@@ -483,23 +467,14 @@ export default function SetupPage() {
                         TrafficClaw
                     </p>
                     <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
-                        A better onboarding experience
+                        Set up your workspace
                     </h1>
                     <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                        Connect your data in three simple steps and unlock powerful SEO insights.
+                        Pick the website you want to analyze. We&apos;ll connect Search Console next.
                     </p>
                 </div>
 
                 {stepBadge}
-
-                <div className="text-center mb-6">
-                    <h2 className="text-xl sm:text-2xl font-semibold text-white mb-1.5">Choose your website workspace</h2>
-                    <p className="text-[12.5px] text-zinc-500 max-w-md mx-auto">
-                        {gscOnlyMode
-                            ? 'Select the Search Console site TrafficClaw should analyze. We’ll connect GA4 next.'
-                            : 'Select the GA4 property TrafficClaw should analyze. We’ll connect search data next.'}
-                    </p>
-                </div>
 
                 {/* Search */}
                 <div className="max-w-xl mx-auto mb-6 relative">
@@ -585,7 +560,7 @@ export default function SetupPage() {
                     </button>
                 </div>
 
-                {stepCaptions}
+
             </div>
         );
     }
@@ -604,8 +579,8 @@ export default function SetupPage() {
         ? 'Got Search Console for this site?'
         : 'Got Google Analytics for this site?';
     const stepSub = askingAboutGsc
-        ? 'Connect your Search Console site to unlock query, ranking, and CTR data.'
-        : 'Connect a GA4 property to unlock realtime, retention, and conversion data.';
+        ? "If you have a Search Console property for this site, pick it. Otherwise skip — you can always add it later."
+        : "If you have a GA4 property for this site, pick it. Otherwise skip — you can always add it later.";
     const skipSub = askingAboutGsc
         ? 'You can add it later from your workspace settings.'
         : 'You can add it later from your workspace settings.';
@@ -679,7 +654,7 @@ export default function SetupPage() {
                     </p>
                 </div>
 
-                {stepCaptions}
+
             </div>
         );
     }
@@ -700,13 +675,26 @@ export default function SetupPage() {
 
             {stepBadge}
 
-            <div className="mb-4 flex justify-center">
+            {/* Top action bar — Back + Skip both visible. Skip is the
+                primary escape hatch when the user doesn't have GSC, so
+                it gets equal weight with Back. */}
+            <div className="mb-5 flex items-center justify-center gap-2.5">
                 <button
                     type="button"
                     onClick={goBack}
-                    className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors inline-flex items-center gap-1"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.10] text-zinc-200 hover:text-white text-[12px] font-medium transition-colors"
                 >
-                    ← Back to website list
+                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                    Back to website list
+                </button>
+                <button
+                    type="button"
+                    onClick={onSkipStep2}
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/[0.10] hover:bg-amber-500/[0.18] border border-amber-500/30 hover:border-amber-500/50 text-amber-200 hover:text-amber-100 text-[12px] font-semibold transition-colors disabled:opacity-50"
+                >
+                    Skip for now
+                    <ArrowRight className="w-3.5 h-3.5" />
                 </button>
             </div>
 
@@ -865,18 +853,10 @@ export default function SetupPage() {
                 >
                     {saving ? 'Saving…' : <>Connect selected property <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>}
                 </button>
-                <button
-                    type="button"
-                    onClick={onSkipStep2}
-                    disabled={saving}
-                    className="text-[12px] text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50"
-                >
-                    Skip for now
-                </button>
                 <p className="text-[11px] text-zinc-600">{skipSub}</p>
             </div>
 
-            {stepCaptions}
+
         </div>
     );
 }
