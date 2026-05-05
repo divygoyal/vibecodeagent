@@ -32,7 +32,8 @@ import {
     type SiteOption,
 } from '@/lib/dashboardSelection';
 import { DEMO_PROPERTY_ID, DEMO_SITE_URL } from '@/lib/demoWorkspace';
-import { useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
+import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 function siteHostTokens(siteUrl: string): { host: string; tokens: Set<string> } {
     const cleaned = siteUrl.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -59,6 +60,22 @@ function propertyTokens(p: PropertyOption | undefined): Set<string> {
 function rootDomainFromSite(siteUrl: string): string {
     const cleaned = siteUrl.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
     return cleaned.split('/')[0].toLowerCase();
+}
+
+// Compact KPI formatter — 37424 → "37.4k", 1_240_000 → "1.2M". Avoids pulling
+// in another util; matches the post-bridge.com card style the user referenced.
+function formatCompact(n: number): string {
+    if (!Number.isFinite(n) || n <= 0) return '0';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}k`;
+    return Math.round(n).toLocaleString();
+}
+
+// Sanitize an id (propertyId, siteUrl) for use as a recharts <linearGradient>
+// id. Recharts requires unique gradient ids per chart on the page; we derive
+// from the source identifier so each card's gradient is stable across renders.
+function sparkGradId(raw: string): string {
+    return `sg-${raw.replace(/[^a-zA-Z0-9]+/g, '-')}`;
 }
 
 type Star = { id: number; x: number; y: number; size: number; opMin: number; opMax: number; dur: number; delay: number };
@@ -396,7 +413,7 @@ export default function SetupPage() {
         };
 
         return cosmicShell(
-            <div className="max-w-2xl mx-auto py-10 sm:py-14 px-4 pb-24 sm:pb-14">
+            <div className="max-w-5xl mx-auto py-10 sm:py-14 px-4 pb-24 sm:pb-14">
                 <div className="text-center mb-8">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-3">
                         {greeting}, {userName}
@@ -411,90 +428,72 @@ export default function SetupPage() {
 
                 {stepBadge}
 
-                <div className="rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-5 shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
-                    <div className="relative mb-3">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                        <input
-                            type="text"
-                            value={gscOnlyMode ? siteSearch : propSearch}
-                            onChange={(e) => (gscOnlyMode ? setSiteSearch : setPropSearch)(e.target.value)}
-                            placeholder="Search your websites…"
-                            className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#14C4E1]/30"
-                        />
-                    </div>
-
-                    <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
-                        {step1Loading && (
-                            <>
-                                {[0, 1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="h-16 rounded-xl bg-white/[0.02] animate-pulse" />
-                                ))}
-                            </>
-                        )}
-                        {step1Error && (
-                            <div className="rounded-lg border border-red-500/20 bg-red-500/[0.04] px-3 py-3 text-xs text-red-300 flex items-center gap-2">
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                Could not load your websites. Try refreshing.
-                            </div>
-                        )}
-                        {!step1Loading && !step1Error && gscOnlyMode && (
-                            <>
-                                {filteredSites.length === 0 && (
-                                    <div className="text-xs text-zinc-500 italic px-3 py-6 text-center">
-                                        No websites match your search.
-                                    </div>
-                                )}
-                                {filteredSites.map((s) => (
-                                    <button
-                                        key={s.siteUrl}
-                                        type="button"
-                                        onClick={() => onPickSite(s.siteUrl)}
-                                        className="w-full text-left px-4 py-3.5 rounded-xl border border-white/[0.06] bg-white/[0.02] text-zinc-200 hover:bg-white/[0.05] hover:border-[#14C4E1]/30 hover:text-white transition-all flex items-center gap-3 group"
-                                    >
-                                        <div className="w-9 h-9 rounded-xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
-                                            <GlobeIcon className="w-4 h-4 text-[#7AD9DA]" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-semibold truncate">{formatSiteLabel(s.siteUrl)}</div>
-                                            <div className="text-[10.5px] text-zinc-500 truncate font-mono">{s.siteUrl}</div>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                                    </button>
-                                ))}
-                            </>
-                        )}
-                        {!step1Loading && !step1Error && !gscOnlyMode && (
-                            <>
-                                {filteredProperties.length === 0 && (
-                                    <div className="text-xs text-zinc-500 italic px-3 py-6 text-center">
-                                        No websites match your search.
-                                    </div>
-                                )}
-                                {filteredProperties.map((p) => {
-                                    const id = p.property || p.propertyId || '';
-                                    return (
-                                        <button
-                                            key={id || p.displayName}
-                                            type="button"
-                                            disabled={!id}
-                                            onClick={() => onPickProperty(id)}
-                                            className="w-full text-left px-4 py-3.5 rounded-xl border border-white/[0.06] bg-white/[0.02] text-zinc-200 hover:bg-white/[0.05] hover:border-[#14C4E1]/30 hover:text-white transition-all flex items-center gap-3 group disabled:opacity-40 disabled:cursor-not-allowed"
-                                        >
-                                            <div className="w-9 h-9 rounded-xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
-                                                <GlobeIcon className="w-4 h-4 text-[#7AD9DA]" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-semibold truncate">{p.displayName || '(unnamed)'}</div>
-                                                <div className="text-[10.5px] text-zinc-500 truncate font-mono">{id}</div>
-                                            </div>
-                                            <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                                        </button>
-                                    );
-                                })}
-                            </>
-                        )}
-                    </div>
+                {/* Search */}
+                <div className="max-w-xl mx-auto mb-6 relative">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <input
+                        type="text"
+                        value={gscOnlyMode ? siteSearch : propSearch}
+                        onChange={(e) => (gscOnlyMode ? setSiteSearch : setPropSearch)(e.target.value)}
+                        placeholder="Search your websites…"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-[#0a0d12]/80 backdrop-blur-sm border border-white/[0.08] text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#14C4E1]/40 shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                    />
                 </div>
+
+                {/* Card grid — 3 across on desktop */}
+                {step1Error ? (
+                    <div className="max-w-xl mx-auto rounded-xl border border-red-500/20 bg-red-500/[0.04] px-4 py-3 text-xs text-red-300 flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Could not load your websites. Try refreshing.
+                    </div>
+                ) : step1Loading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                            <div key={i} className="rounded-2xl border border-white/[0.06] bg-[#0a0d12]/80 p-4 h-[164px] animate-pulse">
+                                <div className="h-3.5 w-32 rounded bg-white/[0.05]" />
+                                <div className="mt-4 h-12 w-full rounded bg-white/[0.03]" />
+                                <div className="mt-4 h-3 w-24 rounded bg-white/[0.04]" />
+                            </div>
+                        ))}
+                    </div>
+                ) : gscOnlyMode ? (
+                    filteredSites.length === 0 ? (
+                        <div className="text-xs text-zinc-500 italic px-3 py-12 text-center">
+                            No websites match your search.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {filteredSites.map((s) => (
+                                <WebsiteCardGsc
+                                    key={s.siteUrl}
+                                    siteUrl={s.siteUrl}
+                                    onClick={() => onPickSite(s.siteUrl)}
+                                />
+                            ))}
+                        </div>
+                    )
+                ) : (
+                    filteredProperties.length === 0 ? (
+                        <div className="text-xs text-zinc-500 italic px-3 py-12 text-center">
+                            No websites match your search.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {filteredProperties.map((p) => {
+                                const id = p.property || p.propertyId || '';
+                                return (
+                                    <WebsiteCardGa4
+                                        key={id || p.displayName}
+                                        propertyId={id}
+                                        displayName={p.displayName || '(unnamed)'}
+                                        disabled={!id}
+                                        onClick={() => onPickProperty(id)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )
+                )}
             </div>
         );
     }
@@ -694,6 +693,186 @@ export default function SetupPage() {
                 <p className="text-[11px] text-zinc-600 mt-2">{skipSub}</p>
             </div>
         </div>
+    );
+}
+
+// ─── WebsiteCardGa4 ─────────────────────────────────────────────────
+// Rich card shown on Step 1 for each GA4 property. 30-day visitor
+// sparkline + total visitor count, fetched per-card via useAnalyticsData.
+// SWR dedupes by URL (60s) and the server has a 3-min cache, so firing
+// N parallel fetches for typical inventories (3-5 properties) is cheap.
+// The card stays clickable even when the data hasn't loaded or errored
+// — selection should never be blocked on KPI fetches.
+
+type Ga4TrafficPoint = { date?: string; activeUsers?: number };
+
+function WebsiteCardGa4({
+    propertyId,
+    displayName,
+    onClick,
+    disabled,
+}: {
+    propertyId: string;
+    displayName: string;
+    onClick: () => void;
+    disabled?: boolean;
+}) {
+    const { data, isLoading, isError } = useAnalyticsData('all', propertyId, true, '30d', false);
+    const traffic: Ga4TrafficPoint[] = Array.isArray(data?.traffic) ? data.traffic : [];
+    const sparkData = useMemo(
+        () => traffic.map((t) => ({ v: typeof t.activeUsers === 'number' ? t.activeUsers : 0 })),
+        [traffic]
+    );
+    const total = useMemo(() => {
+        if (typeof data?.kpis?.totalUsers === 'number') return data.kpis.totalUsers;
+        return sparkData.reduce((sum, p) => sum + (p.v || 0), 0);
+    }, [data, sparkData]);
+    const hasSpark = sparkData.length > 1 && sparkData.some((p) => p.v > 0);
+    const gradId = sparkGradId(propertyId);
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className="group text-left rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_22px_60px_rgba(0,0,0,0.30)] hover:border-[#14C4E1]/30 hover:bg-[#0c1219] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label={`Pick ${displayName}`}
+        >
+            <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
+                    <GlobeIcon className="w-3 h-3 text-[#7AD9DA]" />
+                </div>
+                <div className="text-sm font-semibold text-white truncate flex-1">{displayName}</div>
+            </div>
+
+            <div className="h-12 w-full">
+                {isLoading ? (
+                    <div className="h-full w-full rounded bg-white/[0.02] animate-pulse" />
+                ) : hasSpark ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#7AD9DA" stopOpacity={0.45} />
+                                    <stop offset="100%" stopColor="#7AD9DA" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <Area
+                                type="monotone"
+                                dataKey="v"
+                                stroke="#7AD9DA"
+                                strokeWidth={1.5}
+                                fill={`url(#${gradId})`}
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="h-full w-full flex items-center justify-center text-[10px] text-zinc-600">
+                        {isError ? 'No data' : '—'}
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between">
+                <span className="text-[12.5px] text-zinc-300">
+                    {isLoading ? <span className="inline-block w-12 h-3 rounded bg-white/[0.05] animate-pulse" /> : (
+                        <>
+                            <span className="font-semibold text-white">{formatCompact(total)}</span>{' '}
+                            <span className="text-zinc-500">visitors</span>
+                        </>
+                    )}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all" />
+            </div>
+        </button>
+    );
+}
+
+// ─── WebsiteCardGsc ─────────────────────────────────────────────────
+// Symmetrical card for the GSC-only inverted branch. Shows total clicks
+// + 30-day click sparkline pulled from /api/seo's `trend` array.
+
+type GscTrendPoint = { date?: string; clicks?: number };
+
+function WebsiteCardGsc({
+    siteUrl,
+    onClick,
+}: {
+    siteUrl: string;
+    onClick: () => void;
+}) {
+    const { data, isLoading, isError } = useSeoData('all', siteUrl, true, '30d', false);
+    const trend: GscTrendPoint[] = Array.isArray(data?.trend) ? data.trend : [];
+    const sparkData = useMemo(
+        () => trend.map((t) => ({ v: typeof t.clicks === 'number' ? t.clicks : 0 })),
+        [trend]
+    );
+    const total = useMemo(() => {
+        if (typeof data?.kpis?.totalClicks === 'number') return data.kpis.totalClicks;
+        return sparkData.reduce((sum, p) => sum + (p.v || 0), 0);
+    }, [data, sparkData]);
+    const hasSpark = sparkData.length > 1 && sparkData.some((p) => p.v > 0);
+    const gradId = sparkGradId(siteUrl);
+    const label = formatSiteLabel(siteUrl);
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="group text-left rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_22px_60px_rgba(0,0,0,0.30)] hover:border-[#14C4E1]/30 hover:bg-[#0c1219] hover:-translate-y-0.5 transition-all"
+            aria-label={`Pick ${label}`}
+        >
+            <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
+                    <GlobeIcon className="w-3 h-3 text-[#7AD9DA]" />
+                </div>
+                <div className="text-sm font-semibold text-white truncate flex-1">{label}</div>
+            </div>
+
+            <div className="h-12 w-full">
+                {isLoading ? (
+                    <div className="h-full w-full rounded bg-white/[0.02] animate-pulse" />
+                ) : hasSpark ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#7AD9DA" stopOpacity={0.45} />
+                                    <stop offset="100%" stopColor="#7AD9DA" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <Area
+                                type="monotone"
+                                dataKey="v"
+                                stroke="#7AD9DA"
+                                strokeWidth={1.5}
+                                fill={`url(#${gradId})`}
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="h-full w-full flex items-center justify-center text-[10px] text-zinc-600">
+                        {isError ? 'No data' : '—'}
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between">
+                <span className="text-[12.5px] text-zinc-300">
+                    {isLoading ? <span className="inline-block w-12 h-3 rounded bg-white/[0.05] animate-pulse" /> : (
+                        <>
+                            <span className="font-semibold text-white">{formatCompact(total)}</span>{' '}
+                            <span className="text-zinc-500">clicks</span>
+                        </>
+                    )}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all" />
+            </div>
+        </button>
     );
 }
 
