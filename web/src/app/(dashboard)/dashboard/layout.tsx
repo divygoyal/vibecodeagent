@@ -168,18 +168,10 @@ export default function DashboardLayout({
         return uid ? `${key}:${uid}` : key;
     }, [user?.id, user?.email]);
 
-    // First-paint celebration — show the credit-welcome the first time a
-    // user lands in the dashboard. Workspace onboarding now happens at the
-    // dedicated /dashboard/setup route (see redirect-guard below), so the
-    // OnboardingWizard popup is no longer triggered.
-    useEffect(() => {
-        if (!user) return;
-        const welcomeKey = getUserKey('tc-welcomed');
-        if (!localStorage.getItem(welcomeKey)) {
-            localStorage.setItem(welcomeKey, 'true');
-            setShowWelcome(true);
-        }
-    }, [user, getUserKey]);
+    // First-paint celebration — show the credit-welcome ONLY the very first
+    // time a user signs up, ever. Server-side flag (welcome_seen) so the
+    // popup doesn't re-fire after sign-out/sign-in or on a new device.
+    // Wired up after loadWorkspace resolves — see effect below.
 
     const [selectedProperty, setSelectedProperty] = useState('');
     const [selectedSite, setSelectedSite] = useState('');
@@ -206,6 +198,11 @@ export default function DashboardLayout({
 
     // Workspace persistence — server is source of truth, localStorage is fast first-paint cache.
     const [isWorkspaceLoaded, setIsWorkspaceLoaded] = useState(false);
+    // True only when the user has explicitly finished /dashboard/setup at least
+    // once (server flag). Used by the redirect-guard so that an auto-picked
+    // first-inventory site does NOT count as "user chose a workspace."
+    const [serverSetupCompleted, setServerSetupCompleted] = useState(false);
+    const [serverWelcomeSeen, setServerWelcomeSeen] = useState(true);
     const workspaceLoadAttempted = useRef(false);
 
     const loadWorkspace = useCallback(async () => {
@@ -232,6 +229,8 @@ export default function DashboardLayout({
                     localStorage.setItem(getUserKey('tc-last-range'), data.selected_range);
                 }
             }
+            setServerSetupCompleted(Boolean(data?.workspace_setup_completed));
+            setServerWelcomeSeen(Boolean(data?.welcome_seen));
         } catch {
             // Network errors are non-fatal — we keep whatever localStorage gave us.
         } finally {
@@ -244,6 +243,13 @@ export default function DashboardLayout({
         workspaceLoadAttempted.current = true;
         loadWorkspace();
     }, [user, loadWorkspace]);
+
+    // Show the credit-welcome popup ONCE in the user's lifetime. Server-side
+    // flag means it won't re-fire after sign-out/sign-in or on a new device.
+    useEffect(() => {
+        if (!isWorkspaceLoaded) return;
+        if (!serverWelcomeSeen) setShowWelcome(true);
+    }, [isWorkspaceLoaded, serverWelcomeSeen]);
 
     const saveWorkspace = useCallback(async (data: WorkspaceSaveInput): Promise<boolean> => {
         if (!user) return false;
@@ -369,18 +375,17 @@ export default function DashboardLayout({
     const displaySiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
 
     // Redirect-to-setup guard — every freshly-signed-in user gets routed to the
-    // /dashboard/setup screen before landing in the dashboard, including users
-    // with no Google connection yet (the setup page itself shows the
-    // Connect-Google CTA). Skip the redirect on the setup route, in demo mode,
-    // and during the brief loading windows for container status / inventories.
+    // /dashboard/setup screen before landing in the dashboard until they
+    // explicitly finish setup (server flag `workspace_setup_completed`). The
+    // local `selectedSite`/`selectedProperty` state can be auto-filled by the
+    // inventory effect below (resolveDashboardSelection picks validSites[0]),
+    // so we MUST gate on the server flag, not on local state — otherwise a
+    // fresh user would skip /dashboard/setup as soon as their inventory loads.
     useEffect(() => {
         if (!user || !isWorkspaceLoaded) return;
         if (isSetupRoute) return;
         if (containerStatusLoading) return;
-        if (isDemoWorkspace) return;
-        if (hasGoogleConnection && (siteInventoryLoading || propertyInventoryLoading)) return;
-        const hasSelection = Boolean(selectedProperty) || Boolean(selectedSite);
-        if (!hasSelection) {
+        if (!serverSetupCompleted) {
             router.replace('/dashboard/setup');
         }
     }, [
@@ -388,12 +393,7 @@ export default function DashboardLayout({
         isWorkspaceLoaded,
         isSetupRoute,
         containerStatusLoading,
-        hasGoogleConnection,
-        isDemoWorkspace,
-        siteInventoryLoading,
-        propertyInventoryLoading,
-        selectedProperty,
-        selectedSite,
+        serverSetupCompleted,
         router,
     ]);
 
@@ -948,7 +948,17 @@ export default function DashboardLayout({
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
-                <CreditWelcome credits={10} onDismiss={() => setShowWelcome(false)} />
+                <CreditWelcome credits={10} onDismiss={() => {
+                    setShowWelcome(false);
+                    setServerWelcomeSeen(true);
+                    // Persist the dismissal server-side so the popup never
+                    // shows again — even after sign-out / sign-in.
+                    fetch('/api/user/workspace', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mark_welcome_seen: true }),
+                    }).catch(() => { /* non-fatal */ });
+                }} />
             )}
 
 

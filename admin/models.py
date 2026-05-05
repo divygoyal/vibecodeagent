@@ -50,6 +50,11 @@ class User(Base):
     selected_property_id = Column(String(100), nullable=True)
     selected_site_url = Column(String(500), nullable=True)
     selected_range = Column(String(20), default='30d')
+    # True once the user has gone through the welcome popup OR finished
+    # /dashboard/setup at least once. Server-side so it survives localStorage
+    # clears, sign-outs, and new devices.
+    workspace_setup_completed = Column(Boolean, default=False)
+    welcome_seen = Column(Boolean, default=False)
 
     # Subscription (Dodo Payments)
     subscription_id = Column(String(100), nullable=True)  # Dodo subscription ID
