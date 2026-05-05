@@ -43,6 +43,14 @@ class User(Base):
     # Credits (for AI chat usage)
     credits = Column(Integer, default=10)  # Start with 10 free credits
 
+    # Workspace selection — the user's active GA4 property + GSC site.
+    # Set during /dashboard/setup, persisted server-side so cache clears
+    # and new devices restore the same workspace. Single source of truth
+    # consumed by every dashboard page via useWorkspace().
+    selected_property_id = Column(String(100), nullable=True)
+    selected_site_url = Column(String(500), nullable=True)
+    selected_range = Column(String(20), default='30d')
+
     # Subscription (Dodo Payments)
     subscription_id = Column(String(100), nullable=True)  # Dodo subscription ID
     telegram_bot_enabled = Column(Boolean, default=False)  # Pro plan perk

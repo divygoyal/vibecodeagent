@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Target, Zap, AlertTriangle, Loader2, Search } from 'lucide-react';
 import DemoModeBanner from '@/components/DemoModeBanner';
@@ -82,15 +82,9 @@ function OpportunitiesPageInner() {
 
   const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
   const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-  const { selectedSite, setSelectedSite, isDemoWorkspace, demoDomainLabel } = useRegistration();
+  const { selectedSite, isDemoWorkspace, demoDomainLabel } = useRegistration();
 
-  // Auto-select first site
-  useEffect(() => {
-    if (!isDemoWorkspace && sites.length > 0 && !selectedSite) {
-      setSelectedSite(sites[0].siteUrl);
-    }
-  }, [isDemoWorkspace, sites, selectedSite, setSelectedSite]);
-
+  // Workspace selection is owned by /dashboard/setup; this page just reads it.
   const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
 
   // Update URL params when tab changes

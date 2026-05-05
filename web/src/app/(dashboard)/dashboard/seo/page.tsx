@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ComponentType } from 'react';
+import { useState, type ComponentType } from 'react';
 import dynamic from 'next/dynamic';
 const AreaChart = dynamic(() => import('recharts').then(m => ({ default: m.AreaChart })), { ssr: false });
 const Area = dynamic(() => import('recharts').then(m => ({ default: m.Area })), { ssr: false });
@@ -21,6 +21,7 @@ import {
     FileText, ScanSearch, FileCheck, XCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { exportSeoData } from '@/lib/exportUtils';
@@ -244,7 +245,7 @@ export default function SEOPage() {
 
     // 1. Fetch Sites (only when Google connected)
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-    const { selectedSite, setSelectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
+    const { selectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
     const [activeOppTab, setActiveOppTab] = useState<'striking' | 'ctr' | 'decay'>('striking');
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
@@ -288,13 +289,7 @@ export default function SEOPage() {
         }
     };
 
-    // Auto-select first site
-    useEffect(() => {
-        if (!isDemoWorkspace && sites.length > 0 && !selectedSite) {
-            setSelectedSite(sites[0].siteUrl);
-        }
-    }, [isDemoWorkspace, sites, selectedSite, setSelectedSite]);
-
+    // Workspace selection is owned by /dashboard/setup; SEO page just reads it.
     const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
 
     // 2. Fetch SEO Data (only when Google connected)
@@ -332,37 +327,13 @@ export default function SEOPage() {
                     </p>
                 </div>
 
-                {/* Site selector to pick another property */}
-                <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm">
-                    <h3 className="text-sm font-semibold text-white mb-3">Try a different site</h3>
-                    <div className="relative mb-3">
-                        <select
-                            value={selectedSite}
-                            onChange={(e) => setSelectedSite(e.target.value)}
-                            disabled={sitesLoading || sites.length === 0}
-                            className="w-full appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-2.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition"
-                        >
-                            {sitesLoading ? (
-                                <option>Loading sites...</option>
-                            ) : sites.length === 0 ? (
-                                <option value="">No sites found</option>
-                            ) : (
-                                sites.map(s => (
-                                    <option key={s.siteUrl} value={s.siteUrl}>
-                                        {s.siteUrl.replace('sc-domain:', '')}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                    </div>
-                    <p className="text-[10px] text-zinc-600">
-                        {sites.length > 0
-                            ? `${sites.length} site${sites.length > 1 ? 's' : ''} available in your Search Console`
-                            : 'No sites found. Make sure your Google account has Search Console access.'
-                        }
-                    </p>
-                </div>
+                {/* Switch workspace to pick a different property */}
+                <Link
+                    href="/dashboard/setup"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#7AD9DA] bg-[#14C4E1]/14 hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 rounded-xl transition-colors"
+                >
+                    Switch workspace →
+                </Link>
 
                 <button
                     onClick={() => signIn('google')}
@@ -388,6 +359,20 @@ export default function SEOPage() {
                     description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
                     secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
                 />
+            ) : null}
+
+            {/* Missing-source banner — SEO needs a Search Console site. */}
+            {!isDemoWorkspace && hasGoogleConnection && !selectedSite && sites.length > 0 ? (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
+                    <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
+                        <span className="font-semibold text-amber-200">SEO features need a Search Console site.</span>{' '}
+                        Pick one to see queries, pages, and rankings.{' '}
+                        <Link href="/dashboard/setup" className="underline font-semibold hover:text-amber-50">
+                            Pick one now →
+                        </Link>
+                    </div>
+                </div>
             ) : null}
 
             {/* Header — neutral palette, single subtle cyan accent stripe.
@@ -417,27 +402,17 @@ export default function SEOPage() {
                     </div>
 
                     <div className="flex items-stretch gap-2 flex-wrap lg:justify-end">
-                        <div className="relative w-full sm:w-auto">
-                            <select
-                                value={selectedSite}
-                                onChange={(e) => setSelectedSite(e.target.value)}
-                                disabled={sitesLoading || sites.length === 0}
-                                className="appearance-none rounded-lg border border-white/[0.08] bg-[#05080b] pl-3 pr-9 py-2 text-[12.5px] font-medium text-zinc-200 hover:border-white/[0.16] focus:outline-none focus:border-white/[0.24] transition w-full sm:min-w-[220px] sm:w-auto max-w-full"
-                            >
-                                {sitesLoading ? (
-                                    <option>Loading sites…</option>
-                                ) : sites.length === 0 ? (
-                                    <option value="">No sites found</option>
-                                ) : (
-                                    sites.map(s => (
-                                        <option key={s.siteUrl} value={s.siteUrl}>
-                                            {s.siteUrl.replace('sc-domain:', '')}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
-                        </div>
+                        <Link
+                            href="/dashboard/setup"
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#05080b] px-3 py-2 text-[12.5px] font-medium text-zinc-200 hover:border-[#14C4E1]/30 hover:text-white transition w-full sm:w-auto justify-center sm:justify-start"
+                            title="Switch workspace"
+                        >
+                            <span className="text-zinc-500">Workspace:</span>
+                            <span className="truncate max-w-[180px]">
+                                {selectedSite ? selectedSite.replace('sc-domain:', '') : isDemoWorkspace ? demoDomainLabel : 'Pick one'}
+                            </span>
+                            <span className="text-[#7AD9DA]">→</span>
+                        </Link>
                         <button
                             onClick={() => exportSeoData(seoData)}
                             disabled={!seoData}
