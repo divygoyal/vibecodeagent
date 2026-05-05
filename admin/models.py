@@ -50,6 +50,11 @@ class User(Base):
     selected_property_id = Column(String(100), nullable=True)
     selected_site_url = Column(String(500), nullable=True)
     selected_range = Column(String(20), default='30d')
+    # User-chosen friendly name for the workspace (e.g. "antigravity.codes",
+    # "Client: Acme"). Used everywhere the UI shows the active workspace —
+    # sidebar pill, AI chat references, exports. Falls back to the GA4
+    # property name or GSC site host when not set.
+    workspace_label = Column(String(120), nullable=True)
     # True once the user has gone through the welcome popup OR finished
     # /dashboard/setup at least once. Server-side so it survives localStorage
     # clears, sign-outs, and new devices.

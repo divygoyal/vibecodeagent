@@ -46,6 +46,7 @@ export interface WorkspaceSaveInput {
     property?: string | null;
     site?: string | null;
     range?: string;
+    label?: string | null;
 }
 interface WorkspaceContextType {
     isRegistered: boolean;
@@ -68,6 +69,7 @@ interface WorkspaceContextType {
     demoDomainLabel: string;
     range: string;
     setRange: (v: string) => void;
+    workspaceLabel: string;
     saveWorkspace: (data: WorkspaceSaveInput) => Promise<boolean>;
     loadWorkspace: () => Promise<void>;
     isWorkspaceLoaded: boolean;
@@ -94,6 +96,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
     demoDomainLabel: DEMO_DOMAIN_LABEL,
     range: '30d',
     setRange: () => { },
+    workspaceLabel: '',
     saveWorkspace: async () => false,
     loadWorkspace: async () => { },
     isWorkspaceLoaded: false,
@@ -203,6 +206,10 @@ export default function DashboardLayout({
     // first-inventory site does NOT count as "user chose a workspace."
     const [serverSetupCompleted, setServerSetupCompleted] = useState(false);
     const [serverWelcomeSeen, setServerWelcomeSeen] = useState(true);
+    // User-chosen friendly name shown in the sidebar pill, AI chat, exports.
+    // Falls back to formatSiteLabel(displaySiteUrl) or the GA4 displayName
+    // when not set; the fallback is computed in the consumer, not here.
+    const [workspaceLabel, setWorkspaceLabel] = useState('');
     const workspaceLoadAttempted = useRef(false);
 
     const loadWorkspace = useCallback(async () => {
@@ -231,6 +238,11 @@ export default function DashboardLayout({
             }
             setServerSetupCompleted(Boolean(data?.workspace_setup_completed));
             setServerWelcomeSeen(Boolean(data?.welcome_seen));
+            if (typeof data?.workspace_label === 'string') {
+                setWorkspaceLabel(data.workspace_label);
+            } else {
+                setWorkspaceLabel('');
+            }
         } catch {
             // Network errors are non-fatal — we keep whatever localStorage gave us.
         } finally {
@@ -277,6 +289,13 @@ export default function DashboardLayout({
             payload.selected_range = data.range;
             setRange(data.range);
             localStorage.setItem(getUserKey('tc-last-range'), data.range);
+        }
+        if (data.label === null) {
+            payload.clear_label = true;
+            setWorkspaceLabel('');
+        } else if (typeof data.label === 'string') {
+            payload.workspace_label = data.label;
+            setWorkspaceLabel(data.label);
         }
         try {
             const res = await fetch('/api/user/workspace', {
@@ -659,11 +678,9 @@ export default function DashboardLayout({
                             {!collapsed && (
                                 <>
                                     <span className="flex-1 text-left truncate font-medium">
-                                        {displaySiteUrl
-                                            ? formatSiteLabel(displaySiteUrl)
-                                            : isDemoWorkspace
-                                                ? DEMO_DOMAIN_LABEL
-                                                : 'Select workspace'}
+                                        {workspaceLabel
+                                            || (displaySiteUrl ? formatSiteLabel(displaySiteUrl) : '')
+                                            || (isDemoWorkspace ? DEMO_DOMAIN_LABEL : 'Select workspace')}
                                     </span>
                                     <ChevronRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
                                 </>
@@ -933,6 +950,7 @@ export default function DashboardLayout({
                             demoDomainLabel: DEMO_DOMAIN_LABEL,
                             range,
                             setRange,
+                            workspaceLabel,
                             saveWorkspace,
                             loadWorkspace,
                             isWorkspaceLoaded,
@@ -1007,11 +1025,9 @@ export default function DashboardLayout({
                                         <Globe className="w-3.5 h-3.5 text-[#7AD9DA] flex-shrink-0" />
                                     </div>
                                     <span className="flex-1 text-left truncate">
-                                        {displaySiteUrl
-                                            ? formatSiteLabel(displaySiteUrl)
-                                            : isDemoWorkspace
-                                                ? DEMO_DOMAIN_LABEL
-                                                : 'Select workspace'}
+                                        {workspaceLabel
+                                            || (displaySiteUrl ? formatSiteLabel(displaySiteUrl) : '')
+                                            || (isDemoWorkspace ? DEMO_DOMAIN_LABEL : 'Select workspace')}
                                     </span>
                                     <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                                 </Link>
