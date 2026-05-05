@@ -45,7 +45,17 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         
         # Auto-migrate new columns for existing SQLite databases
-        for col, col_def in [("credits", "INTEGER DEFAULT 10"), ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"), ("subscription_id", "VARCHAR(100)"), ("telegram_bot_enabled", "BOOLEAN DEFAULT 0"), ("subscription_cancelled", "BOOLEAN DEFAULT 0")]:
+        for col, col_def in [
+            ("credits", "INTEGER DEFAULT 10"),
+            ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"),
+            ("subscription_id", "VARCHAR(100)"),
+            ("telegram_bot_enabled", "BOOLEAN DEFAULT 0"),
+            ("subscription_cancelled", "BOOLEAN DEFAULT 0"),
+            # Workspace selection (server-side single source of truth)
+            ("selected_property_id", "VARCHAR(100)"),
+            ("selected_site_url", "VARCHAR(500)"),
+            ("selected_range", "VARCHAR(20) DEFAULT '30d'"),
+        ]:
             try:
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
             except Exception:
@@ -5192,6 +5202,75 @@ async def search_chat_embeddings(
             }
             for score, r in top
         ]
+    }
+
+
+# ============= Workspace Selection (server-side single source of truth) =============
+class WorkspaceUpdate(BaseModel):
+    selected_property_id: Optional[str] = None
+    selected_site_url: Optional[str] = None
+    selected_range: Optional[str] = None
+    # When True, explicitly clears the field even if value is None.
+    # Lets the UI distinguish "leave alone" from "set to null".
+    clear_property: bool = False
+    clear_site: bool = False
+
+
+@app.get("/api/users/{user_identifier}/workspace")
+async def get_user_workspace(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Fetch the user's active GA4 property + GSC site + range."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {
+            "selected_property_id": None,
+            "selected_site_url": None,
+            "selected_range": "30d",
+            "exists": False,
+        }
+    return {
+        "selected_property_id": user.selected_property_id,
+        "selected_site_url": user.selected_site_url,
+        "selected_range": user.selected_range or "30d",
+        "exists": True,
+    }
+
+
+@app.patch("/api/users/{user_identifier}/workspace")
+async def update_user_workspace(
+    user_identifier: str,
+    data: WorkspaceUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Update the user's active workspace. Fields that are None are left alone
+    UNLESS the matching `clear_*` flag is True (then explicitly set to NULL)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if data.clear_property:
+        user.selected_property_id = None
+    elif data.selected_property_id is not None:
+        user.selected_property_id = data.selected_property_id[:100]
+
+    if data.clear_site:
+        user.selected_site_url = None
+    elif data.selected_site_url is not None:
+        user.selected_site_url = data.selected_site_url[:500]
+
+    if data.selected_range is not None:
+        user.selected_range = data.selected_range[:20]
+
+    await db.commit()
+    await db.refresh(user)
+    return {
+        "selected_property_id": user.selected_property_id,
+        "selected_site_url": user.selected_site_url,
+        "selected_range": user.selected_range or "30d",
     }
 
 

@@ -3,13 +3,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 import ErrorBoundary from '@/components/ErrorBoundary';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
-const OnboardingWizard = dynamic(() => import('@/components/OnboardingWizard'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import Image from 'next/image';
 import {
@@ -39,8 +38,16 @@ type AlertItem = {
     severity?: 'critical' | 'warning' | 'success' | string;
 };
 
-// Registration context to coordinate registration with data fetching
-interface RegistrationContextType {
+// Workspace context — single source of truth for the user's active GA4 + GSC selection.
+// Persisted server-side via /api/user/workspace; localStorage acts as a fast first-paint cache.
+// Renamed from RegistrationContext; `useRegistration` is kept as an alias to avoid breaking
+// 30+ existing call sites in one phase.
+export interface WorkspaceSaveInput {
+    property?: string | null;
+    site?: string | null;
+    range?: string;
+}
+interface WorkspaceContextType {
     isRegistered: boolean;
     isRegistering: boolean;
     registrationError: string | null;
@@ -61,9 +68,12 @@ interface RegistrationContextType {
     demoDomainLabel: string;
     range: string;
     setRange: (v: string) => void;
+    saveWorkspace: (data: WorkspaceSaveInput) => Promise<boolean>;
+    loadWorkspace: () => Promise<void>;
+    isWorkspaceLoaded: boolean;
 }
 
-const RegistrationContext = createContext<RegistrationContextType>({
+const WorkspaceContext = createContext<WorkspaceContextType>({
     isRegistered: false,
     isRegistering: true,
     registrationError: null,
@@ -84,9 +94,14 @@ const RegistrationContext = createContext<RegistrationContextType>({
     demoDomainLabel: DEMO_DOMAIN_LABEL,
     range: '30d',
     setRange: () => { },
+    saveWorkspace: async () => false,
+    loadWorkspace: async () => { },
+    isWorkspaceLoaded: false,
 });
 
-export const useRegistration = () => useContext(RegistrationContext);
+export const useWorkspace = () => useContext(WorkspaceContext);
+// Back-compat alias — existing call sites import { useRegistration }. Phase 3 sweeps these.
+export const useRegistration = useWorkspace;
 
 function getInventoryErrorMessage(error: unknown) {
     if (error && typeof error === 'object' && 'info' in error) {
@@ -133,7 +148,9 @@ export default function DashboardLayout({
 }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
+    const router = useRouter();
     const isOverviewRoute = pathname === '/dashboard';
+    const isSetupRoute = pathname === '/dashboard/setup';
     const isAnalyticsMainRoute = pathname === '/dashboard/analytics';
     const shellRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-xl';
     const shellCompactRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-lg';
@@ -151,25 +168,22 @@ export default function DashboardLayout({
         return uid ? `${key}:${uid}` : key;
     }, [user?.id, user?.email]);
 
-    // Immediate onboarding check — runs on session, NOT registration
+    // First-paint celebration — show the credit-welcome the first time a
+    // user lands in the dashboard. Workspace onboarding now happens at the
+    // dedicated /dashboard/setup route (see redirect-guard below), so the
+    // OnboardingWizard popup is no longer triggered.
     useEffect(() => {
         if (!user) return;
         const welcomeKey = getUserKey('tc-welcomed');
-        const onboardKey = getUserKey('tc-onboarded');
         if (!localStorage.getItem(welcomeKey)) {
             localStorage.setItem(welcomeKey, 'true');
-            if (!localStorage.getItem(onboardKey)) {
-                setShowOnboarding(true);
-            } else {
-                setShowWelcome(true);
-            }
+            setShowWelcome(true);
         }
     }, [user, getUserKey]);
 
     const [selectedProperty, setSelectedProperty] = useState('');
     const [selectedSite, setSelectedSite] = useState('');
     const [showWelcome, setShowWelcome] = useState(false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
     const [range, setRange] = useState('30d');
     useEffect(() => {
         if (!mobileOpen) {
@@ -197,6 +211,86 @@ export default function DashboardLayout({
         if (savedProp) setSelectedProperty(savedProp);
         if (savedSite) setSelectedSite(savedSite);
         if (savedRange) setRange(savedRange);
+    }, [user, getUserKey]);
+
+    // Workspace persistence — server is source of truth, localStorage is fast first-paint cache.
+    const [isWorkspaceLoaded, setIsWorkspaceLoaded] = useState(false);
+    const workspaceLoadAttempted = useRef(false);
+
+    const loadWorkspace = useCallback(async () => {
+        if (!user) return;
+        try {
+            const res = await fetch('/api/user/workspace', { cache: 'no-store' });
+            if (!res.ok) {
+                setIsWorkspaceLoaded(true);
+                return;
+            }
+            const data = await res.json();
+            // Only override localStorage values if the server has something for us.
+            if (data?.exists && (data.selected_property_id || data.selected_site_url)) {
+                if (typeof data.selected_property_id === 'string') {
+                    setSelectedProperty(data.selected_property_id);
+                    localStorage.setItem(getUserKey('tc-last-property'), data.selected_property_id);
+                }
+                if (typeof data.selected_site_url === 'string') {
+                    setSelectedSite(data.selected_site_url);
+                    localStorage.setItem(getUserKey('tc-last-site'), data.selected_site_url);
+                }
+                if (typeof data.selected_range === 'string') {
+                    setRange(data.selected_range);
+                    localStorage.setItem(getUserKey('tc-last-range'), data.selected_range);
+                }
+            }
+        } catch {
+            // Network errors are non-fatal — we keep whatever localStorage gave us.
+        } finally {
+            setIsWorkspaceLoaded(true);
+        }
+    }, [user, getUserKey]);
+
+    useEffect(() => {
+        if (!user || workspaceLoadAttempted.current) return;
+        workspaceLoadAttempted.current = true;
+        loadWorkspace();
+    }, [user, loadWorkspace]);
+
+    const saveWorkspace = useCallback(async (data: WorkspaceSaveInput): Promise<boolean> => {
+        if (!user) return false;
+        // Optimistic local update so the UI reflects the change immediately.
+        const payload: Record<string, unknown> = {};
+        if (data.property === null) {
+            payload.clear_property = true;
+            setSelectedProperty('');
+            localStorage.removeItem(getUserKey('tc-last-property'));
+        } else if (typeof data.property === 'string') {
+            payload.selected_property_id = data.property;
+            setSelectedProperty(data.property);
+            localStorage.setItem(getUserKey('tc-last-property'), data.property);
+        }
+        if (data.site === null) {
+            payload.clear_site = true;
+            setSelectedSite('');
+            localStorage.removeItem(getUserKey('tc-last-site'));
+        } else if (typeof data.site === 'string') {
+            payload.selected_site_url = data.site;
+            setSelectedSite(data.site);
+            localStorage.setItem(getUserKey('tc-last-site'), data.site);
+        }
+        if (typeof data.range === 'string') {
+            payload.selected_range = data.range;
+            setRange(data.range);
+            localStorage.setItem(getUserKey('tc-last-range'), data.range);
+        }
+        try {
+            const res = await fetch('/api/user/workspace', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            return res.ok;
+        } catch {
+            return false;
+        }
     }, [user, getUserKey]);
     const [bellOpen, setBellOpen] = useState(false);
     const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
@@ -283,6 +377,33 @@ export default function DashboardLayout({
         && typedSites.length === 0
         && typedProperties.length === 0;
     const displaySiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
+
+    // Redirect-to-setup guard — first-time users get walked through workspace
+    // selection before landing on a content-light dashboard. Skip the redirect
+    // when the user is in demo mode, hasn't yet connected any provider, or is
+    // already on /dashboard/setup. Skip while inventories are still loading.
+    useEffect(() => {
+        if (!user || !isWorkspaceLoaded) return;
+        if (isSetupRoute) return;
+        if (!hasGoogleConnection) return;
+        if (isDemoWorkspace) return;
+        if (siteInventoryLoading || propertyInventoryLoading) return;
+        const hasSelection = Boolean(selectedProperty) || Boolean(selectedSite);
+        if (!hasSelection) {
+            router.replace('/dashboard/setup');
+        }
+    }, [
+        user,
+        isWorkspaceLoaded,
+        isSetupRoute,
+        hasGoogleConnection,
+        isDemoWorkspace,
+        siteInventoryLoading,
+        propertyInventoryLoading,
+        selectedProperty,
+        selectedSite,
+        router,
+    ]);
 
     useEffect(() => {
         if (!user) return;
@@ -732,6 +853,27 @@ export default function DashboardLayout({
                             <div className={`hidden md:block ${isAnalyticsMainRoute ? 'invisible pointer-events-none w-0 overflow-hidden' : ''}`}>
                                 <DatePicker range={range} setRange={setRange} />
                             </div>
+                            {/* Workspace pill — current selection + link to /dashboard/setup
+                                to switch property/site. Replaces every per-page picker. */}
+                            {hasGoogleConnection && !isSetupRoute && (
+                                <Link
+                                    href="/dashboard/setup"
+                                    className={`hidden sm:flex items-center gap-1.5 px-2.5 h-8 ${shellCompactRadiusClass} text-[11px] font-medium text-zinc-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-[#14C4E1]/24 transition-colors`}
+                                    title="Switch workspace"
+                                    aria-label="Switch workspace"
+                                >
+                                    <Globe className="w-3 h-3 text-[#7AD9DA]" />
+                                    <span className="max-w-[160px] truncate">
+                                        {displaySiteUrl
+                                            ? formatSiteLabel(displaySiteUrl)
+                                            : resolvedPropertyId
+                                                ? 'GA4 only'
+                                                : isDemoWorkspace
+                                                    ? DEMO_DOMAIN_LABEL
+                                                    : 'Pick workspace'}
+                                    </span>
+                                </Link>
+                            )}
                             {/* Notification Bell — clickable rows that route to the
                                 AI chat with a pre-filled question about the alert.
                                 Falls back to the relevant dashboard route per category. */}
@@ -829,7 +971,7 @@ export default function DashboardLayout({
                 {/* Page content */}
                 <main id="main-content" className={`flex-1 overflow-y-auto overflow-x-hidden p-3 max-w-full sm:p-4 md:p-6 ${isOverviewRoute ? 'bg-[#010203]' : ''}`} role="main">
                     <div className="max-w-7xl mx-auto">
-                        <RegistrationContext.Provider value={{
+                        <WorkspaceContext.Provider value={{
                             ...registrationState,
                             retryRegistration,
                             selectedProperty,
@@ -848,9 +990,12 @@ export default function DashboardLayout({
                             demoDomainLabel: DEMO_DOMAIN_LABEL,
                             range,
                             setRange,
+                            saveWorkspace,
+                            loadWorkspace,
+                            isWorkspaceLoaded,
                         }}>
                             <ErrorBoundary>{children}</ErrorBoundary>
-                        </RegistrationContext.Provider>
+                        </WorkspaceContext.Provider>
                     </div>
                 </main>
             </div>
@@ -863,15 +1008,6 @@ export default function DashboardLayout({
                 <CreditWelcome credits={10} onDismiss={() => setShowWelcome(false)} />
             )}
 
-            {/* Onboarding wizard for first-time users */}
-            {showOnboarding && (
-                <OnboardingWizard
-                    onComplete={() => { setShowOnboarding(false); setShowWelcome(true); }}
-                    onSelectSite={setSelectedSite}
-                    onSelectProperty={setSelectedProperty}
-                    storageKey={getUserKey('tc-onboarded')}
-                />
-            )}
 
             {/* ─── Mobile sidebar overlay ─── */}
             {mobileOpen && (

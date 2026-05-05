@@ -1119,7 +1119,10 @@ export default function AIChat() {
                         <Lock className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
                         <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
                             <span className="font-semibold text-amber-200">Connect a GA4 property to use chat.</span>{' '}
-                            This account has no Google Analytics property connected yet, so chat input is paused. Connect a different Google account or create a GA4 property to start asking questions about your own numbers.
+                            This account has no Google Analytics property connected yet, so chat input is paused.{' '}
+                            <Link href="/dashboard/setup" className="underline font-semibold hover:text-amber-50">
+                                Pick a workspace →
+                            </Link>
                         </div>
                     </div>
                 </div>

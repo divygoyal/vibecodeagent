@@ -311,10 +311,20 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
                             <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
                         </div>
                     ) : showGa4UnavailableState ? (
-                        <AnalyticsSubpageEmptyState
-                            title={ga4AvailabilityCopy.title}
-                            description={ga4AvailabilityCopy.description}
-                        />
+                        <div className="space-y-4">
+                            <AnalyticsSubpageEmptyState
+                                title={ga4AvailabilityCopy.title}
+                                description={ga4AvailabilityCopy.description}
+                            />
+                            <div className="flex justify-center">
+                                <Link
+                                    href="/dashboard/setup"
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#7AD9DA] bg-[#14C4E1]/14 hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 rounded-xl transition-colors"
+                                >
+                                    Pick a GA4 property →
+                                </Link>
+                            </div>
+                        </div>
                     ) : <ErrorBoundary>{children}</ErrorBoundary>}
                 </div>
 
