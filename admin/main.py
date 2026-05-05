@@ -40,7 +40,7 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 
 
 async def _ensure_multisite_leaderboard_schema(conn) -> str:
-    """Drop any legacy UNIQUE constraint on leaderboard_entries.user_id.
+    """Drop any legacy UNIQUE constraint/index on leaderboard_entries.user_id.
 
     Idempotent and safe to run on every boot — and as a fallback inside the
     join endpoint when an IntegrityError reveals the startup migration hasn't
@@ -60,6 +60,28 @@ async def _ensure_multisite_leaderboard_schema(conn) -> str:
         _re.search(r"\buser_id\b[^,\)]*\bUNIQUE\b", normalized, _re.IGNORECASE)
         or _re.search(r"\bUNIQUE\s*\(\s*user_id\s*\)", normalized, _re.IGNORECASE)
     )
+    if not has_unique_user_id:
+        # Older SQLAlchemy builds can materialize `unique=True, index=True` as
+        # a standalone unique index instead of an inline table constraint. The
+        # second-site join bug only shows up on that schema shape, so inspect
+        # SQLite's index metadata too.
+        index_rows = (await conn.execute(
+            text("PRAGMA index_list(leaderboard_entries)")
+        )).fetchall()
+        for idx in index_rows:
+            idx_name = str(idx[1] or "")
+            is_unique = bool(idx[2])
+            if not idx_name or not is_unique:
+                continue
+            safe_idx_name = idx_name.replace("'", "''")
+            idx_cols = (await conn.execute(
+                text(f"PRAGMA index_info('{safe_idx_name}')")
+            )).fetchall()
+            col_names = [str(r[2]) for r in idx_cols if r[2] is not None]
+            if col_names == ["user_id"]:
+                has_unique_user_id = True
+                break
+
     if not has_unique_user_id:
         return "already-ok"
 
@@ -103,21 +125,26 @@ async def _ensure_multisite_leaderboard_schema(conn) -> str:
     copy_cols_csv = ", ".join(copy_cols)
 
     await conn.execute(text("PRAGMA foreign_keys = OFF"))
-    await conn.execute(text(f"CREATE TABLE leaderboard_entries_v2 (\n            {target_def}\n        )"))
-    await conn.execute(text(
-        f"INSERT INTO leaderboard_entries_v2 ({copy_cols_csv}) "
-        f"SELECT {copy_cols_csv} FROM leaderboard_entries"
-    ))
-    await conn.execute(text("DROP TABLE leaderboard_entries"))
-    await conn.execute(text("ALTER TABLE leaderboard_entries_v2 RENAME TO leaderboard_entries"))
-    await conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS ix_leaderboard_entries_user_id ON leaderboard_entries(user_id)"
-    ))
-    await conn.execute(text(
-        "CREATE UNIQUE INDEX IF NOT EXISTS ix_leaderboard_entries_slug "
-        "ON leaderboard_entries(slug) WHERE slug IS NOT NULL"
-    ))
-    await conn.execute(text("PRAGMA foreign_keys = ON"))
+    try:
+        # A previous failed self-heal can leave this temp table behind; clear
+        # it so the migration remains retry-safe.
+        await conn.execute(text("DROP TABLE IF EXISTS leaderboard_entries_v2"))
+        await conn.execute(text(f"CREATE TABLE leaderboard_entries_v2 (\n            {target_def}\n        )"))
+        await conn.execute(text(
+            f"INSERT INTO leaderboard_entries_v2 ({copy_cols_csv}) "
+            f"SELECT {copy_cols_csv} FROM leaderboard_entries"
+        ))
+        await conn.execute(text("DROP TABLE leaderboard_entries"))
+        await conn.execute(text("ALTER TABLE leaderboard_entries_v2 RENAME TO leaderboard_entries"))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_leaderboard_entries_user_id ON leaderboard_entries(user_id)"
+        ))
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_leaderboard_entries_slug "
+            "ON leaderboard_entries(slug) WHERE slug IS NOT NULL"
+        ))
+    finally:
+        await conn.execute(text("PRAGMA foreign_keys = ON"))
     return "migrated"
 
 
