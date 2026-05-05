@@ -11,10 +11,10 @@ const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 
 type JoinRateEntry = { timestamps: number[] };
 const JOIN_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const JOIN_RATE_MAX = 5;
+const JOIN_RATE_MAX = 20;
 const joinRateStore = new Map<string, JoinRateEntry>();
 
-function consumeJoinRate(userId: string): { allowed: boolean; retryAfterSeconds: number } {
+function checkJoinRate(userId: string): { allowed: boolean; retryAfterSeconds: number } {
     const now = Date.now();
     const windowStart = now - JOIN_RATE_WINDOW_MS;
     const recent = (joinRateStore.get(userId)?.timestamps || []).filter((t) => t > windowStart);
@@ -23,9 +23,19 @@ function consumeJoinRate(userId: string): { allowed: boolean; retryAfterSeconds:
         joinRateStore.set(userId, { timestamps: recent });
         return { allowed: false, retryAfterSeconds: Math.ceil(retry / 1000) };
     }
-    recent.push(now);
     joinRateStore.set(userId, { timestamps: recent });
     return { allowed: true, retryAfterSeconds: 0 };
+}
+
+// Only count successful joins toward the rate limit. Failed attempts (502, 500,
+// 4xx from validation) used to consume the budget too, which locked users out
+// after a handful of legitimate retries.
+function recordJoinSuccess(userId: string) {
+    const now = Date.now();
+    const windowStart = now - JOIN_RATE_WINDOW_MS;
+    const recent = (joinRateStore.get(userId)?.timestamps || []).filter((t) => t > windowStart);
+    recent.push(now);
+    joinRateStore.set(userId, { timestamps: recent });
 }
 
 const CONTROL_CHARS_RE = new RegExp('[\\u0000-\\u001F\\u007F]', 'g');
@@ -358,7 +368,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
     }
 
-    const rate = consumeJoinRate(String(userId));
+    const rate = checkJoinRate(String(userId));
     if (!rate.allowed) {
         return NextResponse.json(
             { error: 'Too many join requests. Try again in a bit.', retryAfterSeconds: rate.retryAfterSeconds },
@@ -404,42 +414,68 @@ export async function POST(req: Request) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
             body: JSON.stringify(prepared.payload),
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(15000),
         });
 
         const responseText = await res.text();
-        let data;
+        let data: { success?: boolean; id?: number; error?: string; detail?: string } | null = null;
         try {
-            data = JSON.parse(responseText);
+            data = responseText ? JSON.parse(responseText) : null;
         } catch {
+            // Admin returned non-JSON (likely a crash or proxy error). Surface
+            // the actual snippet + upstream status so the failure is debuggable
+            // from devtools — far better than the opaque 502 it used to throw.
+            console.error('[Leaderboard Join] Admin returned non-JSON:', res.status, responseText.slice(0, 500));
             return NextResponse.json(
-                { error: 'Admin API returned non-JSON response', detail: responseText.slice(0, 200) },
+                {
+                    error: 'Could not save listing right now — please try again in a moment.',
+                    upstreamStatus: res.status,
+                    detail: responseText.slice(0, 200),
+                },
                 { status: 502 },
             );
         }
 
-        if (!res.ok) {
-            return NextResponse.json(data, { status: res.status });
+        if (!res.ok || !data?.success) {
+            return NextResponse.json(
+                data ?? { error: 'Admin API returned an empty response', upstreamStatus: res.status },
+                { status: res.ok ? 502 : res.status },
+            );
         }
 
-        // Eager stats refresh so the new listing isn't all zeros.
-        let stats = null;
-        if (data.success && data.id && rawBody.ga_property_id) {
-            try {
-                stats = await refreshEntryStats(data.id, rawBody.ga_property_id, googleAccessToken, googleRefreshToken);
-            } catch (statsErr) {
-                console.error('[Leaderboard Join] Stats fetch failed:', statsErr);
-            }
+        // Only consume the rate-limit budget on a successful create/upsert so
+        // failed attempts don't lock the user out (the prior bug behind the
+        // 429s observed in production).
+        recordJoinSuccess(String(userId));
+
+        // Stats refresh + history backfill are nice-to-haves — they should not
+        // block the response or risk a proxy timeout. Fire-and-forget; the
+        // daily cron will catch up if anything fails here.
+        if (data.id && rawBody.ga_property_id && googleAccessToken) {
+            const entryId = data.id;
+            const propertyId = rawBody.ga_property_id;
+            void refreshEntryStats(entryId, propertyId, googleAccessToken, googleRefreshToken).catch(
+                (err) => console.error('[Leaderboard Join] Background stats refresh failed:', err),
+            );
         }
 
         return NextResponse.json({
             ...data,
-            stats,
+            stats: null,
             verification: { status: prepared.verificationStatus, verifiedHost: prepared.verifiedHost },
         });
     } catch (err) {
         console.error('Leaderboard join error:', err);
-        return NextResponse.json({ error: 'Failed to join leaderboard', detail: String(err) }, { status: 500 });
+        const isAbort = err instanceof Error && err.name === 'TimeoutError';
+        return NextResponse.json(
+            {
+                error: isAbort
+                    ? 'Saving your listing took too long — please try again.'
+                    : 'Failed to join leaderboard',
+                detail: String(err),
+            },
+            { status: isAbort ? 504 : 500 },
+        );
     }
 }
 
