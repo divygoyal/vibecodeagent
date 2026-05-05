@@ -100,68 +100,80 @@ async def init_db():
         except Exception:
             pass
 
-        # Multi-site leaderboard (011_multi_site_leaderboard.sql).
-        # Drops the legacy UNIQUE constraint on leaderboard_entries.user_id by
-        # rebuilding the table — SQLite has no DROP CONSTRAINT for column-level
-        # UNIQUE. Detection: a UNIQUE auto-index on the table after we removed
-        # the model-level `unique=True` from user_id.
+        # Multi-site leaderboard: drop any legacy UNIQUE constraint on
+        # leaderboard_entries.user_id. SQLite has no DROP CONSTRAINT, so we
+        # rebuild the table when needed.
+        #
+        # Detection uses sqlite_master (the actual stored CREATE TABLE SQL)
+        # rather than PRAGMA index_list — autoindex naming was unreliable on
+        # prod, leaving column-level UNIQUE undetected and the IntegrityError
+        # surfacing on every second-site join. Also pulls the live column list
+        # so the rebuild only copies columns that actually exist in the source
+        # table, even on partially-migrated DBs.
+        import re as _re
         try:
-            index_rows = (await conn.execute(
-                text("PRAGMA index_list(leaderboard_entries)")
-            )).fetchall()
-            has_legacy_unique = any(
-                bool(row[2]) and str(row[1]).startswith("sqlite_autoindex_leaderboard_entries_")
-                for row in index_rows
+            sql_row = (await conn.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='leaderboard_entries'")
+            )).fetchone()
+            create_sql: str = (sql_row[0] or "") if sql_row else ""
+            normalized = " ".join(create_sql.split())  # collapse whitespace for regex
+            has_unique_user_id = bool(
+                _re.search(r"\buser_id\b[^,\)]*\bUNIQUE\b", normalized, _re.IGNORECASE)
+                or _re.search(r"\bUNIQUE\s*\(\s*user_id\s*\)", normalized, _re.IGNORECASE)
             )
-            if has_legacy_unique:
+
+            if has_unique_user_id:
+                # Snapshot existing columns so we can build a column list that
+                # matches the source even if it's missing some new columns
+                # (defensive — covers the case where ALTERs above ran partially).
+                col_rows = (await conn.execute(
+                    text("PRAGMA table_info(leaderboard_entries)")
+                )).fetchall()
+                existing_cols = [str(r[1]) for r in col_rows]
+
+                target_cols = [
+                    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+                    ("user_id", "INTEGER NOT NULL"),
+                    ("slug", "VARCHAR(150)"),
+                    ("startup_name", "VARCHAR(100) NOT NULL"),
+                    ("description", "TEXT"),
+                    ("website_url", "VARCHAR(500)"),
+                    ("logo_url", "VARCHAR(500)"),
+                    ("category", "VARCHAR(50)"),
+                    ("mrr_range", "VARCHAR(30)"),
+                    ("looking_for", "TEXT"),
+                    ("twitter_handle", "VARCHAR(100)"),
+                    ("founder_name", "VARCHAR(100)"),
+                    ("contact_email", "VARCHAR(255)"),
+                    ("ga_property_id", "VARCHAR(100)"),
+                    ("monthly_visitors", "INTEGER DEFAULT 0"),
+                    ("monthly_pageviews", "INTEGER DEFAULT 0"),
+                    ("engagement_rate", "FLOAT DEFAULT 0.0"),
+                    ("bounce_rate", "FLOAT DEFAULT 0.0"),
+                    ("avg_session_duration", "FLOAT DEFAULT 0.0"),
+                    ("visitor_trend", "FLOAT DEFAULT 0.0"),
+                    ("verified_host", "VARCHAR(255)"),
+                    ("verification_status", "VARCHAR(20) DEFAULT 'pending'"),
+                    ("primary_country", "VARCHAR(2)"),
+                    ("is_verified", "BOOLEAN DEFAULT 0"),
+                    ("is_active", "BOOLEAN DEFAULT 1"),
+                    ("last_refreshed", "DATETIME"),
+                    ("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+                    ("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+                ]
+                target_def = ",\n                        ".join(
+                    f"{name} {col_def}" for name, col_def in target_cols
+                )
+                # Only copy columns that exist in BOTH the new schema and the
+                # source — anything new gets its DEFAULT (or NULL).
+                copy_cols = [name for name, _ in target_cols if name in existing_cols]
+                copy_cols_csv = ", ".join(copy_cols)
+
                 await conn.execute(text("PRAGMA foreign_keys = OFF"))
+                await conn.execute(text(f"CREATE TABLE leaderboard_entries_v2 (\n                        {target_def}\n                    )"))
                 await conn.execute(text(
-                    """
-                    CREATE TABLE leaderboard_entries_v2 (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        startup_name VARCHAR(100) NOT NULL,
-                        description TEXT,
-                        website_url VARCHAR(500),
-                        logo_url VARCHAR(500),
-                        category VARCHAR(50),
-                        mrr_range VARCHAR(30),
-                        looking_for TEXT,
-                        twitter_handle VARCHAR(100),
-                        ga_property_id VARCHAR(100),
-                        monthly_visitors INTEGER DEFAULT 0,
-                        monthly_pageviews INTEGER DEFAULT 0,
-                        engagement_rate FLOAT DEFAULT 0.0,
-                        bounce_rate FLOAT DEFAULT 0.0,
-                        avg_session_duration FLOAT DEFAULT 0.0,
-                        visitor_trend FLOAT DEFAULT 0.0,
-                        verified_host VARCHAR(255),
-                        verification_status VARCHAR(20) DEFAULT 'pending',
-                        primary_country VARCHAR(2),
-                        is_verified BOOLEAN DEFAULT 0,
-                        is_active BOOLEAN DEFAULT 1,
-                        last_refreshed DATETIME,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """
-                ))
-                await conn.execute(text(
-                    """
-                    INSERT INTO leaderboard_entries_v2 (
-                        id, user_id, startup_name, description, website_url, logo_url,
-                        category, mrr_range, looking_for, twitter_handle, ga_property_id,
-                        monthly_visitors, monthly_pageviews, engagement_rate, bounce_rate,
-                        avg_session_duration, visitor_trend, verified_host, verification_status,
-                        primary_country, is_verified, is_active, last_refreshed, created_at, updated_at
-                    )
-                    SELECT id, user_id, startup_name, description, website_url, logo_url,
-                        category, mrr_range, looking_for, twitter_handle, ga_property_id,
-                        monthly_visitors, monthly_pageviews, engagement_rate, bounce_rate,
-                        avg_session_duration, visitor_trend, verified_host, verification_status,
-                        primary_country, is_verified, is_active, last_refreshed, created_at, updated_at
-                    FROM leaderboard_entries
-                    """
+                    f"INSERT INTO leaderboard_entries_v2 ({copy_cols_csv}) "
+                    f"SELECT {copy_cols_csv} FROM leaderboard_entries"
                 ))
                 await conn.execute(text("DROP TABLE leaderboard_entries"))
                 await conn.execute(text("ALTER TABLE leaderboard_entries_v2 RENAME TO leaderboard_entries"))
@@ -169,10 +181,16 @@ async def init_db():
                     "CREATE INDEX IF NOT EXISTS ix_leaderboard_entries_user_id "
                     "ON leaderboard_entries(user_id)"
                 ))
+                await conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_leaderboard_entries_slug "
+                    "ON leaderboard_entries(slug) WHERE slug IS NOT NULL"
+                ))
                 await conn.execute(text("PRAGMA foreign_keys = ON"))
                 print("[startup] leaderboard_entries: dropped legacy UNIQUE on user_id (multi-site enabled).")
+            else:
+                print("[startup] leaderboard_entries: multi-site schema already in place.")
         except Exception as exc:
-            print(f"[startup] multi-site leaderboard migration skipped: {exc}")
+            print(f"[startup] multi-site leaderboard migration FAILED: {type(exc).__name__}: {exc}")
 
 
 async def get_db():
