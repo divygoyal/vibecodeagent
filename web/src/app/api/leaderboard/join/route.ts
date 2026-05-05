@@ -414,11 +414,15 @@ export async function POST(req: Request) {
         if (!prepared.ok) return prepared.response;
 
         const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}/join`;
+        // 30s — the first second-site join may trigger admin's self-heal
+        // migration (rebuild the leaderboard_entries table), which is worst-case
+        // a few seconds of SQLite work. 30s gives plenty of headroom while
+        // staying under both Cloudflare's 100s edge limit and Coolify defaults.
         const res = await fetch(adminUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
             body: JSON.stringify(prepared.payload),
-            signal: AbortSignal.timeout(15000),
+            signal: AbortSignal.timeout(30000),
         });
 
         const responseText = await res.text();

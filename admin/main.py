@@ -3458,10 +3458,11 @@ async def join_leaderboard_for_user(
             or "leaderboard_entries.user_id" in msg and "UNIQUE" in msg
         )
         if is_legacy_unique:
-            # Capture every value we'll need *before* touching any ORM state
-            # post-rollback. After a SQLAlchemy 2.0 async rollback, attribute
-            # access on the previous-session ORM object can trigger lazy I/O
-            # that raises MissingGreenlet because the greenlet context is gone.
+            # Snapshot every value we need into plain primitives BEFORE we
+            # touch the original session further — once db.close() has run,
+            # any ORM attribute access on `user` or its row could trigger
+            # lazy I/O outside an active greenlet (the cause of the previous
+            # MissingGreenlet error).
             user_id_int = int(user.id)
             payload = {
                 "user_id": user_id_int,
@@ -3481,25 +3482,27 @@ async def join_leaderboard_for_user(
                 "is_verified": 1 if data.verification_status == "verified" else 0,
             }
 
-            print(f"[join] legacy UNIQUE(user_id) detected — running self-heal migration")
+            # Release the original session's connection so SQLite isn't
+            # holding a write lock when the migration tries to rebuild the
+            # table. Without this, the migration can hang past the proxy
+            # timeout and surface as a Cloudflare 502 HTML page.
             try:
-                async with engine.begin() as mig_conn:
-                    result = await _ensure_multisite_leaderboard_schema(mig_conn)
-                print(f"[join] self-heal migration: {result}")
-            except Exception as mig_exc:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Self-heal migration failed: {type(mig_exc).__name__}: {str(mig_exc)[:200]}",
-                )
+                await db.close()
+            except Exception:
+                pass
 
-            # Retry using raw SQL through engine.begin() — sidesteps every ORM
-            # session/identity-map gotcha that can happen post-migration. The
-            # legacy UNIQUE constraint is gone now, so this insert succeeds.
+            print(f"[join] legacy UNIQUE(user_id) detected — running self-heal migration + insert")
             try:
-                async with engine.begin() as retry_conn:
+                # Single transaction: migrate, then insert. Atomic, no
+                # cross-connection lock contention, no chance for the table
+                # to disappear between operations.
+                async with engine.begin() as conn:
+                    mig_result = await _ensure_multisite_leaderboard_schema(conn)
+                    print(f"[join] self-heal migration: {mig_result}")
+
                     existing_id = None
                     if payload["ga_property_id"]:
-                        row = (await retry_conn.execute(
+                        row = (await conn.execute(
                             text(
                                 "SELECT id FROM leaderboard_entries "
                                 "WHERE user_id = :user_id AND ga_property_id = :ga_property_id "
@@ -3511,7 +3514,7 @@ async def join_leaderboard_for_user(
                             existing_id = int(row[0])
 
                     if existing_id is not None:
-                        await retry_conn.execute(
+                        await conn.execute(
                             text(
                                 "UPDATE leaderboard_entries SET "
                                 "startup_name = :startup_name, description = :description, "
@@ -3530,24 +3533,20 @@ async def join_leaderboard_for_user(
                         final_id = existing_id
                         msg = "Updated leaderboard entry (auto-migrated)"
                     else:
-                        # Generate a unique slug via raw SQL too — avoid
-                        # _generate_unique_slug which uses an ORM session.
-                        base = _slugify(payload["startup_name"])
-                        slug = base
-                        for _ in range(5):
-                            suffix = "".join(
-                                secrets.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(6)
-                            )
-                            candidate = f"{base}-{suffix}"
-                            check = (await retry_conn.execute(
+                        # Generate a unique slug via raw SQL — _generate_unique_slug
+                        # uses an ORM session which we don't have here.
+                        base = _slugify(payload["startup_name"]) or f"site-{user_id_int}"
+                        slug = f"{base}-{secrets.token_urlsafe(6).lower().replace('_', '').replace('-', '')[:6]}"
+                        for _ in range(4):
+                            check = (await conn.execute(
                                 text("SELECT 1 FROM leaderboard_entries WHERE slug = :s LIMIT 1"),
-                                {"s": candidate},
+                                {"s": slug},
                             )).fetchone()
                             if not check:
-                                slug = candidate
                                 break
+                            slug = f"{base}-{secrets.token_urlsafe(6).lower().replace('_', '').replace('-', '')[:6]}"
 
-                        result = await retry_conn.execute(
+                        await conn.execute(
                             text(
                                 "INSERT INTO leaderboard_entries ("
                                 "user_id, slug, startup_name, description, website_url, logo_url, "
@@ -3563,20 +3562,23 @@ async def join_leaderboard_for_user(
                             ),
                             {**payload, "slug": slug},
                         )
-                        final_id = int(result.lastrowid) if result.lastrowid else 0
-                        if final_id == 0:
-                            row = (await retry_conn.execute(
-                                text("SELECT id FROM leaderboard_entries WHERE slug = :s"),
-                                {"s": slug},
-                            )).fetchone()
-                            final_id = int(row[0]) if row else 0
+                        # Look up by slug — slug is unique so this is reliable
+                        # across drivers (lastrowid behaves differently per backend).
+                        row = (await conn.execute(
+                            text("SELECT id FROM leaderboard_entries WHERE slug = :s"),
+                            {"s": slug},
+                        )).fetchone()
+                        final_id = int(row[0]) if row else 0
                         msg = "Joined leaderboard (auto-migrated)"
 
                 return {"success": True, "id": final_id, "message": msg}
             except Exception as retry_exc:
+                import traceback
+                print(f"[join] self-heal FAILED: {type(retry_exc).__name__}: {retry_exc}")
+                traceback.print_exc()
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Insert after self-heal failed: {type(retry_exc).__name__}: {str(retry_exc)[:200]}",
+                    detail=f"Self-heal failed: {type(retry_exc).__name__}: {str(retry_exc)[:300]}",
                 )
 
         raise HTTPException(
