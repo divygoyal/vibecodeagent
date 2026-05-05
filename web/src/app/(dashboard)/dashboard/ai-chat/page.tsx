@@ -7,9 +7,9 @@ import { useSession, signIn } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-    Globe, ChevronDown, Loader2, ArrowUp, RotateCcw, Sparkles, Lock, Github, X
+    Globe, ChevronDown, Loader2, ArrowUp, ArrowRight, RotateCcw, Sparkles, Lock, Github, X
 } from 'lucide-react';
-import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData, useSiteRepoLinks, useGithubRepos, type SiteRepoLink, type GithubRepoLite } from '@/lib/useDashboardData';
+import { useContainerStatus, usePropertyList, useAnalyticsData, useSeoData, useSiteRepoLinks, useGithubRepos, type SiteRepoLink, type GithubRepoLite } from '@/lib/useDashboardData';
 import { findBestRepoMatch } from '@/lib/githubApi';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
@@ -678,7 +678,7 @@ const ThinkingIndicator = memo(function ThinkingIndicator({ activeTool }: { acti
 export default function AIChat() {
     const {
         selectedSite,
-        setSelectedSite,
+        workspaceLabel,
         hasGa4Properties,
         propertyInventoryLoading,
     } = useRegistration();
@@ -754,13 +754,8 @@ export default function AIChat() {
         refreshContainer();
         setOpenConnector(null);
     }, [refreshContainer]);
-    const { sites: gscSites } = useSiteList(hasGoogleConnection);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
-    const normalizedSites = useMemo(
-        () => (Array.isArray(gscSites) ? (gscSites as DashboardSiteOption[]) : []),
-        [gscSites],
-    );
     const normalizedProperties = useMemo(
         () => (Array.isArray(ga4Properties) ? (ga4Properties as DashboardPropertyOption[]) : []),
         [ga4Properties],
@@ -780,8 +775,6 @@ export default function AIChat() {
     }, []);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const [siteOpen, setSiteOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Repo picker (paired with site picker — answers "which repo backs this site")
     const { links: siteRepoLinks, refresh: refreshSiteRepoLinks } = useSiteRepoLinks();
@@ -851,15 +844,6 @@ export default function AIChat() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
-
-    useEffect(() => {
-        if (!siteOpen) return;
-        const handler = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setSiteOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, [siteOpen]);
 
     useEffect(() => {
         if (!repoOpen) return;
@@ -1098,7 +1082,9 @@ export default function AIChat() {
         el.style.height = Math.min(el.scrollHeight, 160) + 'px';
     };
 
-    const siteLabel = selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : 'Select site';
+    const siteLabel = workspaceLabel
+        || (selectedSite ? selectedSite.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '') : '')
+        || 'Select workspace';
     const lastMsg = messages[messages.length - 1];
     const showEmpty = messages.length === 0;
 
@@ -1252,37 +1238,18 @@ export default function AIChat() {
                                     />
                                     <div className="flex items-center justify-between gap-2 px-3 pb-3">
                                         <div className="flex items-center gap-2 min-w-0">
-                                        <div className="relative" ref={dropdownRef}>
-                                            <button
-                                                onClick={() => setSiteOpen(!siteOpen)}
-                                                className="inline-flex h-9 items-center gap-2 rounded-full border border-white/[0.08] bg-transparent px-3 text-[12px] text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.04] hover:text-zinc-100"
-                                            >
-                                                <Globe className="h-3.5 w-3.5 text-zinc-400" />
-                                                <span className="max-w-[140px] truncate">{siteLabel}</span>
-                                                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                                            </button>
-                                            {siteOpen && normalizedSites.length > 0 && (
-                                                <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[260px] min-w-[260px] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c0f14] py-1 shadow-2xl shadow-black/70">
-                                                    {normalizedSites.map((site) => {
-                                                        const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                                        const active = site.siteUrl === selectedSite;
-                                                        return (
-                                                            <button
-                                                                key={site.siteUrl}
-                                                                onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
-                                                                className={`w-full px-4 py-2.5 text-left text-xs transition-colors ${
-                                                                    active
-                                                                        ? 'bg-emerald-500/[0.08] text-emerald-300'
-                                                                        : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
-                                                                }`}
-                                                            >
-                                                                {label}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
+                                        {/* Workspace pill — read-only display + click-through to /dashboard/setup.
+                                            The workspace is the single source of truth; this surface no longer
+                                            mutates it. To switch site/property, the user goes to setup. */}
+                                        <Link
+                                            href="/dashboard/setup"
+                                            title="Switch workspace"
+                                            className="inline-flex h-9 items-center gap-2 rounded-full border border-white/[0.08] bg-transparent px-3 text-[12px] text-zinc-300 transition-colors hover:border-[#14C4E1]/30 hover:bg-white/[0.04] hover:text-zinc-100"
+                                        >
+                                            <Globe className="h-3.5 w-3.5 text-zinc-400" />
+                                            <span className="max-w-[140px] truncate">{siteLabel}</span>
+                                            <ArrowRight className="h-3.5 w-3.5 opacity-60" />
+                                        </Link>
                                         <RepoPicker
                                             innerRef={repoDropdownRef}
                                             open={repoOpen}
@@ -1395,32 +1362,15 @@ export default function AIChat() {
                                 className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed"
                             />
                             <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                                {/* Site pill */}
-                                <div className="relative" ref={!showEmpty ? dropdownRef : undefined}>
-                                    <button
-                                        onClick={() => setSiteOpen(!siteOpen)}
-                                        className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 rounded-full px-3 py-1.5 transition-colors"
-                                    >
-                                        <Globe className="w-3 h-3" />
-                                        <span className="max-w-[80px] truncate">{siteLabel}</span>
-                                    </button>
-                                    {siteOpen && normalizedSites.length > 0 && (
-                                        <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl shadow-black/80 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
-                                            {normalizedSites.map((site) => {
-                                                const label = site.siteUrl.replace('sc-domain:', '').replace('https://', '').replace(/\/$/, '');
-                                                const active = site.siteUrl === selectedSite;
-                                                return (
-                                                    <button key={site.siteUrl}
-                                                        onClick={() => { setSelectedSite(site.siteUrl); setSiteOpen(false); }}
-                                                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${active ? 'text-emerald-400 bg-emerald-500/[0.06]' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-                                                    >
-                                                        {label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
+                                {/* Workspace pill — read-only display + click-through to /dashboard/setup. */}
+                                <Link
+                                    href="/dashboard/setup"
+                                    title="Switch workspace"
+                                    className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700/80 rounded-full px-3 py-1.5 transition-colors"
+                                >
+                                    <Globe className="w-3 h-3" />
+                                    <span className="max-w-[80px] truncate">{siteLabel}</span>
+                                </Link>
                                 <RepoPicker
                                     innerRef={repoDropdownRef}
                                     open={repoOpen}
