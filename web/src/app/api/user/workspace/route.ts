@@ -57,6 +57,8 @@ export async function GET() {
                     selected_property_id: null,
                     selected_site_url: null,
                     selected_range: '30d',
+                    workspace_setup_completed: false,
+                    welcome_seen: false,
                     exists: false,
                 },
                 { status: 200 }
@@ -70,6 +72,8 @@ export async function GET() {
                 selected_property_id: null,
                 selected_site_url: null,
                 selected_range: '30d',
+                workspace_setup_completed: false,
+                welcome_seen: false,
                 exists: false,
                 degraded: true,
             },
@@ -95,6 +99,8 @@ export async function PATCH(req: NextRequest) {
         selected_range: typeof body.selected_range === 'string' ? body.selected_range : undefined,
         clear_property: body.clear_property === true,
         clear_site: body.clear_site === true,
+        mark_setup_completed: body.mark_setup_completed === true,
+        mark_welcome_seen: body.mark_welcome_seen === true,
     };
 
     try {

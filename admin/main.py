@@ -55,6 +55,8 @@ async def init_db():
             ("selected_property_id", "VARCHAR(100)"),
             ("selected_site_url", "VARCHAR(500)"),
             ("selected_range", "VARCHAR(20) DEFAULT '30d'"),
+            ("workspace_setup_completed", "BOOLEAN DEFAULT 0"),
+            ("welcome_seen", "BOOLEAN DEFAULT 0"),
         ]:
             try:
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
@@ -5214,6 +5216,11 @@ class WorkspaceUpdate(BaseModel):
     # Lets the UI distinguish "leave alone" from "set to null".
     clear_property: bool = False
     clear_site: bool = False
+    # Setup-flow milestones — set by /dashboard/setup Continue and the
+    # CreditWelcome dismiss handler. Server-side so they survive localStorage
+    # clears across sign-out / new device.
+    mark_setup_completed: bool = False
+    mark_welcome_seen: bool = False
 
 
 @app.get("/api/users/{user_identifier}/workspace")
@@ -5229,12 +5236,16 @@ async def get_user_workspace(
             "selected_property_id": None,
             "selected_site_url": None,
             "selected_range": "30d",
+            "workspace_setup_completed": False,
+            "welcome_seen": False,
             "exists": False,
         }
     return {
         "selected_property_id": user.selected_property_id,
         "selected_site_url": user.selected_site_url,
         "selected_range": user.selected_range or "30d",
+        "workspace_setup_completed": bool(user.workspace_setup_completed),
+        "welcome_seen": bool(user.welcome_seen),
         "exists": True,
     }
 
@@ -5265,12 +5276,19 @@ async def update_user_workspace(
     if data.selected_range is not None:
         user.selected_range = data.selected_range[:20]
 
+    if data.mark_setup_completed:
+        user.workspace_setup_completed = True
+    if data.mark_welcome_seen:
+        user.welcome_seen = True
+
     await db.commit()
     await db.refresh(user)
     return {
         "selected_property_id": user.selected_property_id,
         "selected_site_url": user.selected_site_url,
         "selected_range": user.selected_range or "30d",
+        "workspace_setup_completed": bool(user.workspace_setup_completed),
+        "welcome_seen": bool(user.welcome_seen),
     }
 
 

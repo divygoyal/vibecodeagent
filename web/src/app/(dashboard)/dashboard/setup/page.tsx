@@ -203,6 +203,15 @@ export default function SetupPage() {
         return propTokens.size > 0 && siteTokens.size > 0 && !tokensOverlap(propTokens, siteTokens);
     }, [chosenProperty, chosenSite, properties]);
 
+    // Mark workspace_setup_completed=true server-side so the redirect-guard
+    // in dashboard/layout never sends this user back to /dashboard/setup
+    // unless they click the sidebar pill again.
+    const markSetupCompleted = () => fetch('/api/user/workspace', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mark_setup_completed: true }),
+    }).catch(() => { /* non-fatal */ });
+
     const onContinue = async () => {
         if (!canContinue || saving) return;
         setSaving(true);
@@ -211,6 +220,7 @@ export default function SetupPage() {
             property: chosenProperty || null,
             site: chosenSite || null,
         });
+        if (ok) await markSetupCompleted();
         setSaving(false);
         if (!ok) {
             setSaveError('Could not save your workspace. Try again.');
@@ -221,12 +231,14 @@ export default function SetupPage() {
 
     const onSkip = async () => {
         await saveWorkspace({ property: null, site: null });
+        await markSetupCompleted();
         router.push('/dashboard/ai-chat');
     };
 
     const onContinueWithDemo = async () => {
         setSaving(true);
         const ok = await saveWorkspace({ property: DEMO_PROPERTY_ID, site: DEMO_SITE_URL });
+        if (ok) await markSetupCompleted();
         setSaving(false);
         if (ok) router.push('/dashboard/ai-chat');
     };
