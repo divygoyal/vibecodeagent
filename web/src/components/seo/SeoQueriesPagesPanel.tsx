@@ -23,7 +23,7 @@ export interface SeoPageRow {
     status?: string;
 }
 
-type Tab = 'queries' | 'pages';
+export type PerformanceTab = 'queries' | 'pages';
 
 interface SeoQueriesPagesPanelProps {
     queries: SeoQuery[];
@@ -36,6 +36,9 @@ interface SeoQueriesPagesPanelProps {
     selectedPage?: string | null;
     /** Compact 3-col layout: Query | Clicks | Position (drops Impressions and CTR). */
     compact?: boolean;
+    /** Lift tab state up so the parent can render the matching detail panel. */
+    tab?: PerformanceTab;
+    onTabChange?: (tab: PerformanceTab) => void;
 }
 
 function shortenPath(url: string): string {
@@ -47,8 +50,13 @@ function shortenPath(url: string): string {
     }
 }
 
-export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, onSelectPage, selectedKeyword, selectedPage, compact = false }: SeoQueriesPagesPanelProps) {
-    const [tab, setTab] = useState<Tab>('queries');
+export default function SeoQueriesPagesPanel({ queries, pages, onSelectKeyword, onSelectPage, selectedKeyword, selectedPage, compact = false, tab: tabProp, onTabChange }: SeoQueriesPagesPanelProps) {
+    const [internalTab, setInternalTab] = useState<PerformanceTab>('queries');
+    const tab = tabProp ?? internalTab;
+    const setTab = (next: PerformanceTab) => {
+        if (onTabChange) onTabChange(next);
+        else setInternalTab(next);
+    };
 
     const queryLabel: MagnitudeColumn<SeoQuery> = {
         key: 'query',

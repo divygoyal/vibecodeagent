@@ -16,12 +16,14 @@ import SeoHeader from '@/components/seo/SeoHeader';
 import SeoKpiGrid, { type SeoKpis } from '@/components/seo/SeoKpiGrid';
 import SeoTrendPanel, { type SeoTrendPoint } from '@/components/seo/SeoTrendPanel';
 import SeoRecommendationsPanel from '@/components/seo/SeoRecommendationsPanel';
-import SeoQueriesPagesPanel, { type SeoQuery, type SeoPageRow } from '@/components/seo/SeoQueriesPagesPanel';
+import SeoQueriesPagesPanel, { type SeoQuery, type SeoPageRow, type PerformanceTab } from '@/components/seo/SeoQueriesPagesPanel';
 import SeoMovementPanel from '@/components/seo/SeoMovementPanel';
 import SeoIssuesPanel from '@/components/seo/SeoIssuesPanel';
 import SeoIssueDetailPanel, { type IssueSelection } from '@/components/seo/SeoIssueDetailPanel';
 import SeoKeywordInsightsPanel from '@/components/seo/SeoKeywordInsightsPanel';
 import SeoKeywordOpportunitiesPanel from '@/components/seo/SeoKeywordOpportunitiesPanel';
+import SeoPageInsightsPanel from '@/components/seo/SeoPageInsightsPanel';
+import SeoPageOpportunitiesPanel from '@/components/seo/SeoPageOpportunitiesPanel';
 import SeoPageHealthPanel from '@/components/seo/SeoPageHealthPanel';
 import { type SeoRecommendation } from '@/components/seo/SeoInsightsList';
 
@@ -47,6 +49,7 @@ export default function SEOPage() {
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
     const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
     const [selectedIssue, setSelectedIssue] = useState<IssueSelection | null>(null);
+    const [perfTab, setPerfTab] = useState<PerformanceTab>('queries');
 
     const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
     const rangeDays = rangeToDays(range);
@@ -79,6 +82,10 @@ export default function SEOPage() {
     const selectedQueryRow = useMemo(
         () => queries.find(q => q.query === selectedKeyword) ?? undefined,
         [queries, selectedKeyword],
+    );
+    const selectedPageRow = useMemo(
+        () => pages.find(p => p.page === selectedPageUrl) ?? undefined,
+        [pages, selectedPageUrl],
     );
 
     if (!containerLoading && !hasGoogleConnection) {
@@ -172,7 +179,7 @@ export default function SEOPage() {
                 </div>
             </div>
 
-            {/* Search performance — 3-col split: table | keyword insights | opportunities & risks */}
+            {/* Search performance — 3-col split: table | insights | opportunities & risks */}
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.45fr)_minmax(0,1fr)]">
                 <SeoQueriesPagesPanel
                     queries={queries}
@@ -182,22 +189,45 @@ export default function SEOPage() {
                     selectedKeyword={selectedKeyword}
                     selectedPage={selectedPageUrl}
                     compact
+                    tab={perfTab}
+                    onTabChange={setPerfTab}
                 />
-                <SeoKeywordInsightsPanel
-                    keyword={selectedKeyword}
-                    siteUrl={activeSite || null}
-                    summary={selectedQueryRow ? {
-                        clicks: selectedQueryRow.clicks,
-                        impressions: selectedQueryRow.impressions,
-                        ctr: selectedQueryRow.ctr,
-                        position: selectedQueryRow.position,
-                    } : undefined}
-                />
-                <SeoKeywordOpportunitiesPanel
-                    keyword={selectedKeyword}
-                    siteUrl={activeSite || null}
-                    queryRow={selectedQueryRow}
-                />
+                {perfTab === 'queries' ? (
+                    <SeoKeywordInsightsPanel
+                        keyword={selectedKeyword}
+                        siteUrl={activeSite || null}
+                        summary={selectedQueryRow ? {
+                            clicks: selectedQueryRow.clicks,
+                            impressions: selectedQueryRow.impressions,
+                            ctr: selectedQueryRow.ctr,
+                            position: selectedQueryRow.position,
+                        } : undefined}
+                    />
+                ) : (
+                    <SeoPageInsightsPanel
+                        pageUrl={selectedPageUrl}
+                        siteUrl={activeSite || null}
+                        summary={selectedPageRow ? {
+                            clicks: selectedPageRow.clicks,
+                            impressions: selectedPageRow.impressions,
+                            ctr: selectedPageRow.ctr,
+                            position: selectedPageRow.position,
+                        } : undefined}
+                    />
+                )}
+                {perfTab === 'queries' ? (
+                    <SeoKeywordOpportunitiesPanel
+                        keyword={selectedKeyword}
+                        siteUrl={activeSite || null}
+                        queryRow={selectedQueryRow}
+                    />
+                ) : (
+                    <SeoPageOpportunitiesPanel
+                        pageUrl={selectedPageUrl}
+                        siteUrl={activeSite || null}
+                        pageRow={selectedPageRow}
+                    />
+                )}
             </div>
 
             <SeoMovementPanel
