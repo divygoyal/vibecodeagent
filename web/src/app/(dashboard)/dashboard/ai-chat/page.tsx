@@ -27,18 +27,9 @@ type DashboardPropertyOption = {
     property?: string;
 };
 
-type Suggestion = { label: string; prompt: string };
-
-const SUGGESTIONS: readonly Suggestion[] = [
-    { label: 'Why did my traffic drop?', prompt: 'Why did my traffic drop recently? Pinpoint the date, the affected pages, and the most likely cause.' },
-    { label: 'Top SEO issues', prompt: 'Find the biggest SEO issues hurting my traffic right now and rank them by revenue impact.' },
-    { label: 'Best opportunities', prompt: 'What should I fix first this month to grow traffic faster?' },
-    { label: 'Content ideas', prompt: 'Suggest 5 content ideas based on my existing keywords and gaps in my site.' },
-] as const;
-
-/** Quick-prompt chips rendered BELOW the chat-active input — same set the
- *  floating widget shows. Lets the user fire a canned investigation in one
- *  tap instead of typing it out. */
+/** Quick-prompt chips — single source of truth for the empty-state hero
+ *  chips AND the chat-active footer chips. Same 8 emoji-prefixed prompts
+ *  the floating chat widget shows so the visual language stays consistent. */
 const QUICK_PROMPTS: readonly string[] = [
     '🎯 What is the ONE thing I should do today to grow?',
     '🚨 Why did my traffic drop?',
@@ -1316,19 +1307,22 @@ export default function AIChat() {
                                 </div>
                             </div>
 
-                            {/* Suggestion buttons — pill-shaped, weighted, no icons */}
+                            {/* Suggestion buttons — same 8-prompt set as the chat
+                                shortcut / floating widget (single source of truth =
+                                QUICK_PROMPTS). Was 4 plain pills, now 8 emoji-prefixed
+                                pills matching the rest of the product. */}
                             <div className="mt-7 flex max-w-3xl flex-wrap items-center justify-center gap-2 px-4">
-                                {SUGGESTIONS.map((s) => (
+                                {QUICK_PROMPTS.map((prompt) => (
                                     <button
-                                        key={s.label}
-                                        onClick={() => sendMessage(s.prompt)}
+                                        key={prompt}
+                                        onClick={() => sendMessage(prompt)}
                                         disabled={isLoading || !dataReady || isGa4Locked}
                                         className="rounded-full border border-white/[0.08] bg-[#0a0d12]/60 px-4 py-2 text-[13px] text-zinc-300
                                                    shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]
                                                    transition-all hover:border-white/[0.16] hover:bg-[#0e1218] hover:text-zinc-100
                                                    disabled:opacity-40"
                                     >
-                                        {s.label}
+                                        {prompt}
                                     </button>
                                 ))}
                             </div>
