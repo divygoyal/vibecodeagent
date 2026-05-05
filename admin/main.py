@@ -39,6 +39,88 @@ engine = create_async_engine(settings.DATABASE_URL, echo=False)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+async def _ensure_multisite_leaderboard_schema(conn) -> str:
+    """Drop any legacy UNIQUE constraint on leaderboard_entries.user_id.
+
+    Idempotent and safe to run on every boot — and as a fallback inside the
+    join endpoint when an IntegrityError reveals the startup migration hasn't
+    been picked up yet.
+
+    Returns one of: "migrated", "already-ok", "no-table".
+    """
+    import re as _re
+    sql_row = (await conn.execute(
+        text("SELECT sql FROM sqlite_master WHERE type='table' AND name='leaderboard_entries'")
+    )).fetchone()
+    if not sql_row:
+        return "no-table"
+    create_sql = sql_row[0] or ""
+    normalized = " ".join(create_sql.split())
+    has_unique_user_id = bool(
+        _re.search(r"\buser_id\b[^,\)]*\bUNIQUE\b", normalized, _re.IGNORECASE)
+        or _re.search(r"\bUNIQUE\s*\(\s*user_id\s*\)", normalized, _re.IGNORECASE)
+    )
+    if not has_unique_user_id:
+        return "already-ok"
+
+    col_rows = (await conn.execute(
+        text("PRAGMA table_info(leaderboard_entries)")
+    )).fetchall()
+    existing_cols = [str(r[1]) for r in col_rows]
+
+    target_cols = [
+        ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+        ("user_id", "INTEGER NOT NULL"),
+        ("slug", "VARCHAR(150)"),
+        ("startup_name", "VARCHAR(100) NOT NULL"),
+        ("description", "TEXT"),
+        ("website_url", "VARCHAR(500)"),
+        ("logo_url", "VARCHAR(500)"),
+        ("category", "VARCHAR(50)"),
+        ("mrr_range", "VARCHAR(30)"),
+        ("looking_for", "TEXT"),
+        ("twitter_handle", "VARCHAR(100)"),
+        ("founder_name", "VARCHAR(100)"),
+        ("contact_email", "VARCHAR(255)"),
+        ("ga_property_id", "VARCHAR(100)"),
+        ("monthly_visitors", "INTEGER DEFAULT 0"),
+        ("monthly_pageviews", "INTEGER DEFAULT 0"),
+        ("engagement_rate", "FLOAT DEFAULT 0.0"),
+        ("bounce_rate", "FLOAT DEFAULT 0.0"),
+        ("avg_session_duration", "FLOAT DEFAULT 0.0"),
+        ("visitor_trend", "FLOAT DEFAULT 0.0"),
+        ("verified_host", "VARCHAR(255)"),
+        ("verification_status", "VARCHAR(20) DEFAULT 'pending'"),
+        ("primary_country", "VARCHAR(2)"),
+        ("is_verified", "BOOLEAN DEFAULT 0"),
+        ("is_active", "BOOLEAN DEFAULT 1"),
+        ("last_refreshed", "DATETIME"),
+        ("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+        ("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+    ]
+    target_def = ",\n            ".join(f"{n} {d}" for n, d in target_cols)
+    copy_cols = [n for n, _ in target_cols if n in existing_cols]
+    copy_cols_csv = ", ".join(copy_cols)
+
+    await conn.execute(text("PRAGMA foreign_keys = OFF"))
+    await conn.execute(text(f"CREATE TABLE leaderboard_entries_v2 (\n            {target_def}\n        )"))
+    await conn.execute(text(
+        f"INSERT INTO leaderboard_entries_v2 ({copy_cols_csv}) "
+        f"SELECT {copy_cols_csv} FROM leaderboard_entries"
+    ))
+    await conn.execute(text("DROP TABLE leaderboard_entries"))
+    await conn.execute(text("ALTER TABLE leaderboard_entries_v2 RENAME TO leaderboard_entries"))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_leaderboard_entries_user_id ON leaderboard_entries(user_id)"
+    ))
+    await conn.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_leaderboard_entries_slug "
+        "ON leaderboard_entries(slug) WHERE slug IS NOT NULL"
+    ))
+    await conn.execute(text("PRAGMA foreign_keys = ON"))
+    return "migrated"
+
+
 async def init_db():
     """Initialize database tables"""
     async with engine.begin() as conn:
@@ -102,94 +184,12 @@ async def init_db():
             pass
 
         # Multi-site leaderboard: drop any legacy UNIQUE constraint on
-        # leaderboard_entries.user_id. SQLite has no DROP CONSTRAINT, so we
-        # rebuild the table when needed.
-        #
-        # Detection uses sqlite_master (the actual stored CREATE TABLE SQL)
-        # rather than PRAGMA index_list — autoindex naming was unreliable on
-        # prod, leaving column-level UNIQUE undetected and the IntegrityError
-        # surfacing on every second-site join. Also pulls the live column list
-        # so the rebuild only copies columns that actually exist in the source
-        # table, even on partially-migrated DBs.
-        import re as _re
+        # leaderboard_entries.user_id. Delegated to the shared helper so the
+        # join endpoint can also self-heal on first IntegrityError without a
+        # restart.
         try:
-            sql_row = (await conn.execute(
-                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='leaderboard_entries'")
-            )).fetchone()
-            create_sql: str = (sql_row[0] or "") if sql_row else ""
-            normalized = " ".join(create_sql.split())  # collapse whitespace for regex
-            has_unique_user_id = bool(
-                _re.search(r"\buser_id\b[^,\)]*\bUNIQUE\b", normalized, _re.IGNORECASE)
-                or _re.search(r"\bUNIQUE\s*\(\s*user_id\s*\)", normalized, _re.IGNORECASE)
-            )
-
-            if has_unique_user_id:
-                # Snapshot existing columns so we can build a column list that
-                # matches the source even if it's missing some new columns
-                # (defensive — covers the case where ALTERs above ran partially).
-                col_rows = (await conn.execute(
-                    text("PRAGMA table_info(leaderboard_entries)")
-                )).fetchall()
-                existing_cols = [str(r[1]) for r in col_rows]
-
-                target_cols = [
-                    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
-                    ("user_id", "INTEGER NOT NULL"),
-                    ("slug", "VARCHAR(150)"),
-                    ("startup_name", "VARCHAR(100) NOT NULL"),
-                    ("description", "TEXT"),
-                    ("website_url", "VARCHAR(500)"),
-                    ("logo_url", "VARCHAR(500)"),
-                    ("category", "VARCHAR(50)"),
-                    ("mrr_range", "VARCHAR(30)"),
-                    ("looking_for", "TEXT"),
-                    ("twitter_handle", "VARCHAR(100)"),
-                    ("founder_name", "VARCHAR(100)"),
-                    ("contact_email", "VARCHAR(255)"),
-                    ("ga_property_id", "VARCHAR(100)"),
-                    ("monthly_visitors", "INTEGER DEFAULT 0"),
-                    ("monthly_pageviews", "INTEGER DEFAULT 0"),
-                    ("engagement_rate", "FLOAT DEFAULT 0.0"),
-                    ("bounce_rate", "FLOAT DEFAULT 0.0"),
-                    ("avg_session_duration", "FLOAT DEFAULT 0.0"),
-                    ("visitor_trend", "FLOAT DEFAULT 0.0"),
-                    ("verified_host", "VARCHAR(255)"),
-                    ("verification_status", "VARCHAR(20) DEFAULT 'pending'"),
-                    ("primary_country", "VARCHAR(2)"),
-                    ("is_verified", "BOOLEAN DEFAULT 0"),
-                    ("is_active", "BOOLEAN DEFAULT 1"),
-                    ("last_refreshed", "DATETIME"),
-                    ("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
-                    ("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
-                ]
-                target_def = ",\n                        ".join(
-                    f"{name} {col_def}" for name, col_def in target_cols
-                )
-                # Only copy columns that exist in BOTH the new schema and the
-                # source — anything new gets its DEFAULT (or NULL).
-                copy_cols = [name for name, _ in target_cols if name in existing_cols]
-                copy_cols_csv = ", ".join(copy_cols)
-
-                await conn.execute(text("PRAGMA foreign_keys = OFF"))
-                await conn.execute(text(f"CREATE TABLE leaderboard_entries_v2 (\n                        {target_def}\n                    )"))
-                await conn.execute(text(
-                    f"INSERT INTO leaderboard_entries_v2 ({copy_cols_csv}) "
-                    f"SELECT {copy_cols_csv} FROM leaderboard_entries"
-                ))
-                await conn.execute(text("DROP TABLE leaderboard_entries"))
-                await conn.execute(text("ALTER TABLE leaderboard_entries_v2 RENAME TO leaderboard_entries"))
-                await conn.execute(text(
-                    "CREATE INDEX IF NOT EXISTS ix_leaderboard_entries_user_id "
-                    "ON leaderboard_entries(user_id)"
-                ))
-                await conn.execute(text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_leaderboard_entries_slug "
-                    "ON leaderboard_entries(slug) WHERE slug IS NOT NULL"
-                ))
-                await conn.execute(text("PRAGMA foreign_keys = ON"))
-                print("[startup] leaderboard_entries: dropped legacy UNIQUE on user_id (multi-site enabled).")
-            else:
-                print("[startup] leaderboard_entries: multi-site schema already in place.")
+            result = await _ensure_multisite_leaderboard_schema(conn)
+            print(f"[startup] leaderboard multi-site migration: {result}")
         except Exception as exc:
             print(f"[startup] multi-site leaderboard migration FAILED: {type(exc).__name__}: {exc}")
 
@@ -3441,16 +3441,84 @@ async def join_leaderboard_for_user(
         )
         db.add(entry)
 
-    # Guard the commit — a schema-drifted prod (missing verified_host /
-    # verification_status / slug, etc.) would otherwise raise an OperationalError
-    # that uvicorn surfaces as a non-JSON response, which the upstream proxy
-    # then turns into a 502 with HTML. Catch and return clean JSON so the web
-    # layer can show an actionable message.
+    # Guard the commit — a schema-drifted prod can otherwise raise either an
+    # OperationalError (missing column) or IntegrityError (legacy UNIQUE on
+    # user_id from before multi-site shipped). The latter is fully self-healing
+    # now: we run the migration inline, then retry the insert in a fresh
+    # session so the user gets a successful response on this same request
+    # instead of having to wait for a deploy.
     try:
         await db.commit()
         await db.refresh(entry)
     except Exception as exc:
         await db.rollback()
+        msg = str(exc)
+        is_legacy_unique = (
+            "UNIQUE constraint failed: leaderboard_entries.user_id" in msg
+            or "leaderboard_entries.user_id" in msg and "UNIQUE" in msg
+        )
+        if is_legacy_unique:
+            print(f"[join] legacy UNIQUE(user_id) detected — running self-heal migration")
+            try:
+                async with engine.begin() as mig_conn:
+                    result = await _ensure_multisite_leaderboard_schema(mig_conn)
+                print(f"[join] self-heal migration: {result}")
+            except Exception as mig_exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Self-heal migration failed: {type(mig_exc).__name__}: {str(mig_exc)[:200]}",
+                )
+
+            # Retry the insert in a brand-new session — the previous one's
+            # state is poisoned by the rollback + the table no longer exists
+            # under the same identity after the rebuild.
+            try:
+                async with async_session() as retry_db:
+                    if data.ga_property_id:
+                        existing = await retry_db.execute(
+                            select(LeaderboardEntry).where(
+                                LeaderboardEntry.user_id == user.id,
+                                LeaderboardEntry.ga_property_id == data.ga_property_id,
+                            )
+                        )
+                        retry_entry = existing.scalar_one_or_none()
+                    else:
+                        retry_entry = None
+
+                    if retry_entry is None:
+                        slug = await _generate_unique_slug(retry_db, data.startup_name)
+                        retry_entry = LeaderboardEntry(
+                            user_id=user.id,
+                            slug=slug,
+                            startup_name=data.startup_name,
+                            description=data.description,
+                            website_url=data.website_url,
+                            logo_url=data.logo_url,
+                            category=data.category or "Other",
+                            mrr_range=data.mrr_range or "$0-500",
+                            looking_for=json.dumps(data.looking_for or []),
+                            twitter_handle=data.twitter_handle,
+                            founder_name=data.founder_name,
+                            contact_email=data.contact_email,
+                            ga_property_id=data.ga_property_id,
+                            verification_status=data.verification_status or "pending",
+                            verified_host=data.verified_host,
+                            is_verified=(data.verification_status == "verified"),
+                        )
+                        retry_db.add(retry_entry)
+                    await retry_db.commit()
+                    await retry_db.refresh(retry_entry)
+                    return {
+                        "success": True,
+                        "id": retry_entry.id,
+                        "message": "Joined leaderboard (auto-migrated)",
+                    }
+            except Exception as retry_exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Insert after self-heal failed: {type(retry_exc).__name__}: {str(retry_exc)[:200]}",
+                )
+
         raise HTTPException(
             status_code=500,
             detail=f"Database write failed (likely missing migration): {type(exc).__name__}: {str(exc)[:200]}",
