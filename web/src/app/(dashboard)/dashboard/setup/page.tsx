@@ -1,21 +1,27 @@
 'use client';
 
 /**
- * /dashboard/setup — Unified workspace selection.
+ * /dashboard/setup — Named workspace selection.
  *
- * Single screen where the user picks a GA4 property and/or a GSC site. The
- * selection becomes the dashboard's single source of truth (see
- * useWorkspace() in dashboard/layout.tsx). At least one of the two is
- * required before Continue is enabled. Reachable both as a guarded
- * post-login step (no saved workspace yet) and as the workspace switcher
- * pill in the dashboard sidebar.
+ * The user assembles a workspace by:
+ *   1. Naming it (label, e.g. "antigravity.codes" or "Client: Acme")
+ *   2. Optionally connecting GA4
+ *   3. Optionally connecting GSC
+ *
+ * Continue enables when at least ONE of GA4 / GSC is chosen. The label is
+ * recommended but not required (auto-derived from selection if blank).
+ *
+ * No more auto-match auto-fill — instead, when one side is picked, we surface
+ * a SOFT SUGGESTION below the other card ("We found X — pair?"). The user
+ * always explicitly accepts or ignores. Mismatch warning is gone; if the user
+ * paired things on purpose, they get to do that.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
 import {
     CheckCircle2, Search, Sparkles, ArrowRight, AlertTriangle,
-    BarChart3, Globe as GlobeIcon, ScanSearch,
+    BarChart3, Globe as GlobeIcon, ScanSearch, X as XIcon,
 } from 'lucide-react';
 import { useWorkspace } from '../layout';
 import {
@@ -37,6 +43,21 @@ function siteHostTokens(siteUrl: string): { host: string; tokens: Set<string> } 
 function tokensOverlap(a: Set<string>, b: Set<string>): boolean {
     for (const t of a) if (b.has(t)) return true;
     return false;
+}
+
+function propertyTokens(p: PropertyOption | undefined): Set<string> {
+    if (!p?.displayName) return new Set();
+    return new Set(
+        p.displayName
+            .toLowerCase()
+            .split(/[\s.\-_/]+/)
+            .filter((t) => t.length >= 3)
+    );
+}
+
+function rootDomainFromSite(siteUrl: string): string {
+    const cleaned = siteUrl.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return cleaned.split('/')[0].toLowerCase();
 }
 
 type Star = { id: number; x: number; y: number; size: number; opMin: number; opMax: number; dur: number; delay: number };
@@ -85,6 +106,7 @@ export default function SetupPage() {
     const {
         selectedProperty,
         selectedSite,
+        workspaceLabel: serverLabel,
         saveWorkspace,
         isWorkspaceLoaded,
     } = useWorkspace();
@@ -105,11 +127,13 @@ export default function SetupPage() {
 
     const [chosenProperty, setChosenProperty] = useState(selectedProperty);
     const [chosenSite, setChosenSite] = useState(selectedSite);
+    const [label, setLabel] = useState(serverLabel || '');
+    const [labelManuallyEdited, setLabelManuallyEdited] = useState(Boolean(serverLabel));
     const [propSearch, setPropSearch] = useState('');
     const [siteSearch, setSiteSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    const [autoMatched, setAutoMatched] = useState<{ property: string; site: string } | null>(null);
+    const [dismissedSuggestion, setDismissedSuggestion] = useState<string | null>(null);
 
     const userName = session?.user?.name?.split(' ')[0] || 'there';
     const greeting = (() => {
@@ -124,52 +148,66 @@ export default function SetupPage() {
         if (!isWorkspaceLoaded) return;
         if (selectedProperty && !chosenProperty) setChosenProperty(selectedProperty);
         if (selectedSite && !chosenSite) setChosenSite(selectedSite);
-    }, [isWorkspaceLoaded, selectedProperty, selectedSite, chosenProperty, chosenSite]);
-
-    // Single-property + single-site auto-select on first paint.
-    useEffect(() => {
-        if (chosenProperty || chosenSite) return;
-        if (propsLoading || sitesLoading) return;
-        if (properties.length === 1 && properties[0].property) {
-            setChosenProperty(properties[0].property);
+        if (serverLabel && !label) {
+            setLabel(serverLabel);
+            setLabelManuallyEdited(true);
         }
-        if (sites.length === 1 && sites[0].siteUrl) {
-            setChosenSite(sites[0].siteUrl);
-        }
-    }, [propsLoading, sitesLoading, properties, sites, chosenProperty, chosenSite]);
+    }, [isWorkspaceLoaded, selectedProperty, selectedSite, serverLabel, chosenProperty, chosenSite, label]);
 
-    // Auto-match GSC site when a GA4 property is picked and no site selected.
+    // Auto-suggest the workspace label from what's been picked, but only if
+    // the user hasn't typed something themselves. Picking GSC site
+    // sc-domain:antigrav.io seeds the label with "antigrav.io". GA4 picks
+    // seed it with the property's displayName.
     useEffect(() => {
-        if (!chosenProperty || chosenSite) return;
-        if (!sites.length) return;
-        const propObj = properties.find((p) => p.property === chosenProperty);
-        if (!propObj?.displayName) return;
-        const propTokens = new Set(
-            (propObj.displayName || '')
-                .toLowerCase()
-                .split(/[\s.\-_/]+/)
-                .filter((t) => t.length >= 3)
-        );
-        for (const site of sites) {
-            const { tokens } = siteHostTokens(site.siteUrl);
-            if (tokensOverlap(propTokens, tokens)) {
-                setChosenSite(site.siteUrl);
-                setAutoMatched({ property: chosenProperty, site: site.siteUrl });
-                return;
+        if (labelManuallyEdited) return;
+        if (chosenSite) {
+            setLabel(rootDomainFromSite(chosenSite));
+            return;
+        }
+        if (chosenProperty) {
+            const prop = properties.find((p) => p.property === chosenProperty);
+            if (prop?.displayName) setLabel(prop.displayName);
+        }
+    }, [chosenProperty, chosenSite, properties, labelManuallyEdited]);
+
+    // Suggestion: when one side is picked and the other is not, find a
+    // token-overlap match in the inventory and surface it as a hint card.
+    // The user explicitly accepts. No silent auto-fill.
+    const suggestion = useMemo<{ kind: 'site' | 'property'; siteUrl?: string; propertyId?: string; label: string } | null>(() => {
+        // GA4 picked, no GSC yet → suggest a GSC site.
+        if (chosenProperty && !chosenSite && sites.length > 0) {
+            const prop = properties.find((p) => p.property === chosenProperty);
+            const propTokens = propertyTokens(prop);
+            if (!propTokens.size) return null;
+            for (const site of sites) {
+                const { tokens } = siteHostTokens(site.siteUrl);
+                if (tokensOverlap(propTokens, tokens)) {
+                    if (dismissedSuggestion === site.siteUrl) return null;
+                    return { kind: 'site', siteUrl: site.siteUrl, label: formatSiteLabel(site.siteUrl) };
+                }
             }
         }
-    }, [chosenProperty, chosenSite, sites, properties]);
-
-    // Reverse auto-match: when a GSC site is picked first, find a GA4 property.
-    useEffect(() => {
-        if (!chosenSite || chosenProperty) return;
-        if (!properties.length) return;
-        const match = matchPropertyToSite(chosenSite, properties);
-        if (match?.property) {
-            setChosenProperty(match.property);
-            setAutoMatched({ property: match.property, site: chosenSite });
+        // GSC picked, no GA4 yet → suggest a GA4 property.
+        if (chosenSite && !chosenProperty && properties.length > 0) {
+            const match = matchPropertyToSite(chosenSite, properties);
+            if (match?.property && match.displayName) {
+                if (dismissedSuggestion === match.property) return null;
+                return { kind: 'property', propertyId: match.property, label: match.displayName };
+            }
         }
-    }, [chosenSite, chosenProperty, properties]);
+        return null;
+    }, [chosenProperty, chosenSite, properties, sites, dismissedSuggestion]);
+
+    const acceptSuggestion = () => {
+        if (!suggestion) return;
+        if (suggestion.kind === 'site' && suggestion.siteUrl) setChosenSite(suggestion.siteUrl);
+        if (suggestion.kind === 'property' && suggestion.propertyId) setChosenProperty(suggestion.propertyId);
+    };
+
+    const dismissSuggestion = () => {
+        if (!suggestion) return;
+        setDismissedSuggestion(suggestion.kind === 'site' ? (suggestion.siteUrl || '') : (suggestion.propertyId || ''));
+    };
 
     const filteredProperties = useMemo(() => {
         const q = propSearch.trim().toLowerCase();
@@ -188,24 +226,6 @@ export default function SetupPage() {
 
     const canContinue = Boolean(chosenProperty || chosenSite);
 
-    // Mismatch warning: both picked but tokens don't overlap.
-    const showMismatch = useMemo(() => {
-        if (!chosenProperty || !chosenSite) return false;
-        const propObj = properties.find((p) => p.property === chosenProperty);
-        if (!propObj?.displayName) return false;
-        const propTokens = new Set(
-            (propObj.displayName || '')
-                .toLowerCase()
-                .split(/[\s.\-_/]+/)
-                .filter((t) => t.length >= 3)
-        );
-        const { tokens: siteTokens } = siteHostTokens(chosenSite);
-        return propTokens.size > 0 && siteTokens.size > 0 && !tokensOverlap(propTokens, siteTokens);
-    }, [chosenProperty, chosenSite, properties]);
-
-    // Mark workspace_setup_completed=true server-side so the redirect-guard
-    // in dashboard/layout never sends this user back to /dashboard/setup
-    // unless they click the sidebar pill again.
     const markSetupCompleted = () => fetch('/api/user/workspace', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -216,9 +236,16 @@ export default function SetupPage() {
         if (!canContinue || saving) return;
         setSaving(true);
         setSaveError(null);
+        // Auto-derive label if user didn't type one — pick best-effort guess.
+        const finalLabel = label.trim() || (() => {
+            if (chosenSite) return rootDomainFromSite(chosenSite);
+            const prop = properties.find((p) => p.property === chosenProperty);
+            return prop?.displayName || 'My workspace';
+        })();
         const ok = await saveWorkspace({
             property: chosenProperty || null,
             site: chosenSite || null,
+            label: finalLabel,
         });
         if (ok) await markSetupCompleted();
         setSaving(false);
@@ -237,7 +264,11 @@ export default function SetupPage() {
 
     const onContinueWithDemo = async () => {
         setSaving(true);
-        const ok = await saveWorkspace({ property: DEMO_PROPERTY_ID, site: DEMO_SITE_URL });
+        const ok = await saveWorkspace({
+            property: DEMO_PROPERTY_ID,
+            site: DEMO_SITE_URL,
+            label: 'Demo workspace',
+        });
         if (ok) await markSetupCompleted();
         setSaving(false);
         if (ok) router.push('/dashboard/ai-chat');
@@ -254,7 +285,7 @@ export default function SetupPage() {
         </div>
     );
 
-    // ─── Render branches ──────────────────────────────────────────────
+    // ─── No-Google branch ─────────────────────────────────────────────
 
     if (!hasGoogleConnection) {
         return cosmicShell(
@@ -274,7 +305,7 @@ export default function SetupPage() {
                     <button
                         type="button"
                         onClick={() => signIn('google', { callbackUrl: '/dashboard/setup' }, { prompt: 'select_account consent' })}
-                        className="group relative px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)]"
+                        className="px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)]"
                     >
                         Connect Google
                     </button>
@@ -327,20 +358,20 @@ export default function SetupPage() {
         );
     }
 
-    // ─── Main two-column picker ───────────────────────────────────────
+    // ─── Main flow: name → connect sources ───────────────────────────
 
     return cosmicShell(
-        <div className="max-w-5xl mx-auto py-10 sm:py-16 px-4 pb-32 sm:pb-16">
-            <div className="text-center mb-10 sm:mb-14">
+        <div className="max-w-5xl mx-auto py-10 sm:py-14 px-4 pb-32 sm:pb-14">
+            <div className="text-center mb-10 sm:mb-12">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-3">
                     {greeting}, {userName}
                 </p>
                 <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
-                    Pick your workspace
+                    Set up your workspace
                 </h1>
                 <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                    Choose a Google Analytics property and a Search Console site. Both are
-                    recommended, but either alone will work.
+                    Name your workspace and connect data sources. Either Google Analytics or
+                    Search Console works on its own — both is even better.
                 </p>
                 <button
                     type="button"
@@ -351,96 +382,137 @@ export default function SetupPage() {
                 </button>
             </div>
 
-            {autoMatched && chosenProperty === autoMatched.property && chosenSite === autoMatched.site && (
-                <div className="mb-6 mx-auto max-w-3xl rounded-2xl border border-[#14C4E1]/24 bg-[#14C4E1]/[0.06] px-4 py-3 flex items-center gap-2.5 text-xs text-[#7AD9DA] backdrop-blur">
-                    <Sparkles className="w-4 h-4 flex-shrink-0" />
-                    <span>We auto-matched a GA4 property to your Search Console site. Change either side below if it&apos;s wrong.</span>
+            {/* Step 1 — name */}
+            <div className="mx-auto max-w-2xl mb-8">
+                <div className="rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-5 shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
+                    <div className="flex items-baseline gap-2 mb-3">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7AD9DA]">Step 1</span>
+                        <h2 className="text-sm font-semibold text-white">Name your workspace</h2>
+                    </div>
+                    <input
+                        type="text"
+                        value={label}
+                        onChange={(e) => { setLabel(e.target.value); setLabelManuallyEdited(true); }}
+                        placeholder="e.g. antigravity.codes, Client: Acme, My blog"
+                        maxLength={120}
+                        className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-base text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#14C4E1]/50 focus:bg-white/[0.05] transition-colors"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-2">
+                        Used everywhere you see this workspace — sidebar, chat, exports.
+                        We&apos;ll auto-fill from your selection if you leave it blank.
+                    </p>
                 </div>
-            )}
-
-            <div className="grid md:grid-cols-2 gap-5">
-                <PickerColumn
-                    icon={BarChart3}
-                    iconColor="#7AD9DA"
-                    title="GA4 property"
-                    subtitle="Realtime, retention, conversions"
-                    badge={chosenProperty ? properties.find((p) => p.property === chosenProperty)?.displayName || 'Selected' : 'None selected'}
-                    error={propsError ? 'Could not load GA4 properties.' : null}
-                    loading={propsLoading}
-                    search={propSearch}
-                    onSearch={setPropSearch}
-                    emptyText="No GA4 properties on this account."
-                >
-                    {filteredProperties.map((p) => {
-                        const id = p.property || p.propertyId || '';
-                        const isSelected = chosenProperty === id;
-                        return (
-                            <button
-                                key={id || p.displayName}
-                                type="button"
-                                disabled={!id}
-                                onClick={() => setChosenProperty(isSelected ? '' : id)}
-                                className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 ${
-                                    isSelected
-                                        ? 'border-[#14C4E1]/50 bg-[#14C4E1]/[0.10] text-white shadow-[0_0_24px_rgba(20,196,225,0.18)]'
-                                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
-                                }`}
-                            >
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium truncate">{p.displayName || '(unnamed)'}</div>
-                                    <div className="text-[10.5px] text-zinc-500 truncate font-mono">{id}</div>
-                                </div>
-                                {isSelected && <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />}
-                            </button>
-                        );
-                    })}
-                </PickerColumn>
-
-                <PickerColumn
-                    icon={ScanSearch}
-                    iconColor="#7AD9DA"
-                    title="Search Console site"
-                    subtitle="Queries, pages, rankings"
-                    badge={chosenSite ? formatSiteLabel(chosenSite) : 'None selected'}
-                    error={sitesError ? 'Could not load Search Console sites.' : null}
-                    loading={sitesLoading}
-                    search={siteSearch}
-                    onSearch={setSiteSearch}
-                    emptyText="No Search Console sites on this account."
-                >
-                    {filteredSites.map((s) => {
-                        const isSelected = chosenSite === s.siteUrl;
-                        return (
-                            <button
-                                key={s.siteUrl}
-                                type="button"
-                                onClick={() => setChosenSite(isSelected ? '' : s.siteUrl)}
-                                className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 ${
-                                    isSelected
-                                        ? 'border-[#14C4E1]/50 bg-[#14C4E1]/[0.10] text-white shadow-[0_0_24px_rgba(20,196,225,0.18)]'
-                                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
-                                }`}
-                            >
-                                <GlobeIcon className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium truncate">{formatSiteLabel(s.siteUrl)}</div>
-                                    <div className="text-[10.5px] text-zinc-500 truncate font-mono">{s.siteUrl}</div>
-                                </div>
-                                {isSelected && <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />}
-                            </button>
-                        );
-                    })}
-                </PickerColumn>
             </div>
 
-            {showMismatch && (
-                <div className="mt-5 mx-auto max-w-3xl rounded-xl border border-yellow-500/30 bg-yellow-500/[0.06] px-4 py-3 flex items-start gap-2.5 text-xs text-yellow-300 backdrop-blur">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span>
-                        These don&apos;t look like the same site — your GA4 property and Search Console site appear to be different domains. Continue anyway if that&apos;s intentional.
-                    </span>
+            {/* Step 2 — sources */}
+            <div className="mx-auto max-w-5xl">
+                <div className="text-center mb-5">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7AD9DA]">Step 2</span>
+                    <h2 className="text-sm font-semibold text-white inline-block ml-2">Connect data sources</h2>
                 </div>
-            )}
+
+                <div className="grid md:grid-cols-2 gap-5">
+                    <PickerColumn
+                        icon={BarChart3}
+                        iconColor="#7AD9DA"
+                        title="Google Analytics"
+                        subtitle="Realtime, retention, conversions"
+                        badge={chosenProperty ? properties.find((p) => p.property === chosenProperty)?.displayName || 'Selected' : 'Optional'}
+                        error={propsError ? 'Could not load GA4 properties.' : null}
+                        loading={propsLoading}
+                        search={propSearch}
+                        onSearch={setPropSearch}
+                        emptyText="No GA4 properties on this account."
+                    >
+                        {filteredProperties.map((p) => {
+                            const id = p.property || p.propertyId || '';
+                            const isSelected = chosenProperty === id;
+                            return (
+                                <button
+                                    key={id || p.displayName}
+                                    type="button"
+                                    disabled={!id}
+                                    onClick={() => setChosenProperty(isSelected ? '' : id)}
+                                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 ${
+                                        isSelected
+                                            ? 'border-[#14C4E1]/50 bg-[#14C4E1]/[0.10] text-white shadow-[0_0_24px_rgba(20,196,225,0.18)]'
+                                            : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
+                                    }`}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium truncate">{p.displayName || '(unnamed)'}</div>
+                                        <div className="text-[10.5px] text-zinc-500 truncate font-mono">{id}</div>
+                                    </div>
+                                    {isSelected && <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />}
+                                </button>
+                            );
+                        })}
+                    </PickerColumn>
+
+                    <PickerColumn
+                        icon={ScanSearch}
+                        iconColor="#7AD9DA"
+                        title="Search Console"
+                        subtitle="Queries, pages, rankings"
+                        badge={chosenSite ? formatSiteLabel(chosenSite) : 'Optional'}
+                        error={sitesError ? 'Could not load Search Console sites.' : null}
+                        loading={sitesLoading}
+                        search={siteSearch}
+                        onSearch={setSiteSearch}
+                        emptyText="No Search Console sites on this account."
+                    >
+                        {filteredSites.map((s) => {
+                            const isSelected = chosenSite === s.siteUrl;
+                            return (
+                                <button
+                                    key={s.siteUrl}
+                                    type="button"
+                                    onClick={() => setChosenSite(isSelected ? '' : s.siteUrl)}
+                                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 ${
+                                        isSelected
+                                            ? 'border-[#14C4E1]/50 bg-[#14C4E1]/[0.10] text-white shadow-[0_0_24px_rgba(20,196,225,0.18)]'
+                                            : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
+                                    }`}
+                                >
+                                    <GlobeIcon className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium truncate">{formatSiteLabel(s.siteUrl)}</div>
+                                        <div className="text-[10.5px] text-zinc-500 truncate font-mono">{s.siteUrl}</div>
+                                    </div>
+                                    {isSelected && <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />}
+                                </button>
+                            );
+                        })}
+                    </PickerColumn>
+                </div>
+
+                {/* Soft suggestion — explicit accept, never silent fill */}
+                {suggestion && (
+                    <div className="mt-5 mx-auto max-w-3xl rounded-xl border border-[#14C4E1]/24 bg-[#14C4E1]/[0.06] px-4 py-3 flex items-center gap-3 text-xs text-[#7AD9DA] backdrop-blur">
+                        <Sparkles className="w-4 h-4 flex-shrink-0" />
+                        <span className="flex-1 min-w-0">
+                            {suggestion.kind === 'site'
+                                ? <>We found a Search Console site that looks related: <span className="font-semibold text-white">{suggestion.label}</span>. Pair it?</>
+                                : <>We found a GA4 property that looks related: <span className="font-semibold text-white">{suggestion.label}</span>. Pair it?</>}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={acceptSuggestion}
+                            className="px-3 py-1.5 rounded-lg bg-[#14C4E1]/20 hover:bg-[#14C4E1]/30 border border-[#14C4E1]/30 text-[#7AD9DA] hover:text-white text-[11px] font-semibold transition-colors flex-shrink-0"
+                        >
+                            Pair
+                        </button>
+                        <button
+                            type="button"
+                            onClick={dismissSuggestion}
+                            aria-label="Dismiss suggestion"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.08] transition-colors flex-shrink-0"
+                        >
+                            <XIcon className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {saveError && (
                 <div className="mt-5 mx-auto max-w-3xl rounded-xl border border-red-500/30 bg-red-500/[0.06] px-4 py-3 text-xs text-red-300">

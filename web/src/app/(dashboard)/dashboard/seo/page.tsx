@@ -245,7 +245,7 @@ export default function SEOPage() {
 
     // 1. Fetch Sites (only when Google connected)
     const { sites, isLoading: sitesLoading } = useSiteList(hasGoogleConnection);
-    const { selectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
+    const { selectedSite, range, isDemoWorkspace, demoDomainLabel, workspaceLabel } = useRegistration();
     const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
     const [activeOppTab, setActiveOppTab] = useState<'striking' | 'ctr' | 'decay'>('striking');
     const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
@@ -409,7 +409,9 @@ export default function SEOPage() {
                         >
                             <span className="text-zinc-500">Workspace:</span>
                             <span className="truncate max-w-[180px]">
-                                {selectedSite ? selectedSite.replace('sc-domain:', '') : isDemoWorkspace ? demoDomainLabel : 'Pick one'}
+                                {workspaceLabel
+                                    || (selectedSite ? selectedSite.replace('sc-domain:', '') : '')
+                                    || (isDemoWorkspace ? demoDomainLabel : 'Pick one')}
                             </span>
                             <span className="text-[#7AD9DA]">→</span>
                         </Link>
