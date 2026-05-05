@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 import ErrorBoundary from '@/components/ErrorBoundary';
+import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import Image from 'next/image';
@@ -151,7 +152,6 @@ export default function DashboardLayout({
 }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
-    const router = useRouter();
     const isOverviewRoute = pathname === '/dashboard';
     const isSetupRoute = pathname === '/dashboard/setup';
     const isAnalyticsMainRoute = pathname === '/dashboard/analytics';
@@ -201,10 +201,10 @@ export default function DashboardLayout({
 
     // Workspace persistence — server is source of truth, localStorage is fast first-paint cache.
     const [isWorkspaceLoaded, setIsWorkspaceLoaded] = useState(false);
-    // True only when the user has explicitly finished /dashboard/setup at least
-    // once (server flag). Used by the redirect-guard so that an auto-picked
-    // first-inventory site does NOT count as "user chose a workspace."
-    const [serverSetupCompleted, setServerSetupCompleted] = useState(false);
+    // workspace_setup_completed is read by the middleware off the JWT claim
+    // (see web/src/middleware.ts). The layout no longer needs to track it
+    // for redirect purposes; the server flag still flows back via loadWorkspace
+    // for any client-side branches that may need it later.
     const [serverWelcomeSeen, setServerWelcomeSeen] = useState(true);
     // User-chosen friendly name shown in the sidebar pill, AI chat, exports.
     // Falls back to formatSiteLabel(displaySiteUrl) or the GA4 displayName
@@ -236,7 +236,6 @@ export default function DashboardLayout({
                     localStorage.setItem(getUserKey('tc-last-range'), data.selected_range);
                 }
             }
-            setServerSetupCompleted(Boolean(data?.workspace_setup_completed));
             setServerWelcomeSeen(Boolean(data?.welcome_seen));
             if (typeof data?.workspace_label === 'string') {
                 setWorkspaceLabel(data.workspace_label);
@@ -355,7 +354,7 @@ export default function DashboardLayout({
     }, [bellOpen]);
 
     // Alerts for notification bell
-    const { hasGoogleConnection, isLoading: containerStatusLoading } = useContainerStatus();
+    const { hasGoogleConnection } = useContainerStatus();
     const {
         sites: gscSites,
         isLoading: siteInventoryLoading,
@@ -393,28 +392,9 @@ export default function DashboardLayout({
         && typedProperties.length === 0;
     const displaySiteUrl = resolvedSiteUrl || (siteInventoryError ? selectedSite : '');
 
-    // Redirect-to-setup guard — every freshly-signed-in user gets routed to the
-    // /dashboard/setup screen before landing in the dashboard until they
-    // explicitly finish setup (server flag `workspace_setup_completed`). The
-    // local `selectedSite`/`selectedProperty` state can be auto-filled by the
-    // inventory effect below (resolveDashboardSelection picks validSites[0]),
-    // so we MUST gate on the server flag, not on local state — otherwise a
-    // fresh user would skip /dashboard/setup as soon as their inventory loads.
-    useEffect(() => {
-        if (!user || !isWorkspaceLoaded) return;
-        if (isSetupRoute) return;
-        if (containerStatusLoading) return;
-        if (!serverSetupCompleted) {
-            router.replace('/dashboard/setup');
-        }
-    }, [
-        user,
-        isWorkspaceLoaded,
-        isSetupRoute,
-        containerStatusLoading,
-        serverSetupCompleted,
-        router,
-    ]);
+    // Redirect-to-setup guard lives in middleware now — see web/src/middleware.ts.
+    // Reading the JWT claim before the RSC ships avoids the layout-effect race
+    // where AI chat would render before the redirect could land.
 
     useEffect(() => {
         if (!user) return;
@@ -955,6 +935,7 @@ export default function DashboardLayout({
                             loadWorkspace,
                             isWorkspaceLoaded,
                         }}>
+                            {!isSetupRoute && <WorkspaceIncompleteBanner />}
                             <ErrorBoundary>{children}</ErrorBoundary>
                         </WorkspaceContext.Provider>
                     </div>

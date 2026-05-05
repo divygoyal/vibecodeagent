@@ -26,6 +26,31 @@ interface ExtendedUser {
     email?: string | null;
     image?: string | null;
     refreshToken?: string;
+    // Read by middleware to gate /dashboard/* before /dashboard/setup is done.
+    // Refreshed via NextAuth's update() trigger after the setup PATCH.
+    workspaceSetupCompleted?: boolean;
+}
+
+const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+
+async function fetchWorkspaceSetupCompleted(userIdentifier: string): Promise<boolean> {
+    if (!ADMIN_API_KEY || !userIdentifier) return false;
+    try {
+        const res = await fetch(
+            `${ADMIN_API_URL}/api/users/${encodeURIComponent(userIdentifier)}/workspace`,
+            {
+                headers: { 'X-API-Key': ADMIN_API_KEY },
+                cache: 'no-store',
+                signal: AbortSignal.timeout(4000),
+            }
+        );
+        if (!res.ok) return false;
+        const data = await res.json().catch(() => null);
+        return Boolean(data?.workspace_setup_completed);
+    } catch {
+        return false;
+    }
 }
 
 export const authOptions: NextAuthOptions = {
@@ -85,11 +110,14 @@ export const authOptions: NextAuthOptions = {
                 user.githubAccountId = token.githubAccountId as string;
                 user.googleAccountId = token.googleAccountId as string;
                 user.githubLogin = token.githubLogin as string;
+                // Workspace setup gate — read by client-side guards. Middleware
+                // reads the same value off the JWT directly.
+                user.workspaceSetupCompleted = Boolean(token.workspaceSetupCompleted);
             }
             return session;
         },
 
-        async jwt({ token, profile, account, user }) {
+        async jwt({ token, profile, account, user, trigger, session }) {
             if (account) {
                 // Capture PRIMARY identity exactly once (the first provider this JWT signs in with).
                 // Later sign-ins for a different provider are treated as "connect a data source"
@@ -137,6 +165,26 @@ export const authOptions: NextAuthOptions = {
 
                 // Keep `token.provider` reflecting the PRIMARY provider, not the latest sign-in.
                 token.provider = token.primaryProvider as string;
+
+                // Hydrate the workspace-setup flag once on sign-in. Middleware
+                // reads this to gate /dashboard/* — see web/src/middleware.ts.
+                // We use the PRIMARY identity as user_identifier (matches the
+                // admin's get_user_by_identifier resolution).
+                const userIdentifier = (token.primarySub as string) || (token.sub as string) || '';
+                if (userIdentifier) {
+                    token.workspaceSetupCompleted = await fetchWorkspaceSetupCompleted(userIdentifier);
+                }
+            }
+
+            // Client-triggered refresh: useSession().update({ workspaceSetupCompleted: true })
+            // fires this branch with trigger === 'update' and the merge in `session`.
+            // Used by /dashboard/setup after PATCH so middleware sees the new value
+            // on the very next request, without waiting for a re-login.
+            if (trigger === 'update' && session && typeof session === 'object') {
+                const incoming = (session as { workspaceSetupCompleted?: boolean }).workspaceSetupCompleted;
+                if (typeof incoming === 'boolean') {
+                    token.workspaceSetupCompleted = incoming;
+                }
             }
             return token;
         },

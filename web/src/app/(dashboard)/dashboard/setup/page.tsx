@@ -16,7 +16,7 @@
  * always explicitly accepts or ignores. Mismatch warning is gone; if the user
  * paired things on purpose, they get to do that.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, useCallback, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
 import {
@@ -102,7 +102,7 @@ function MiniStarField() {
 
 export default function SetupPage() {
     const router = useRouter();
-    const { data: session } = useSession();
+    const { data: session, update: updateSession } = useSession();
     const {
         selectedProperty,
         selectedSite,
@@ -226,11 +226,26 @@ export default function SetupPage() {
 
     const canContinue = Boolean(chosenProperty || chosenSite);
 
-    const markSetupCompleted = () => fetch('/api/user/workspace', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mark_setup_completed: true }),
-    }).catch(() => { /* non-fatal */ });
+    // Mark workspace_setup_completed=true server-side AND refresh the JWT
+    // claim via NextAuth's update() trigger. Middleware reads the claim on
+    // every dashboard request — without the JWT refresh it would still see
+    // the old `false` value and bounce the user back here.
+    const markSetupCompleted = useCallback(async () => {
+        try {
+            await fetch('/api/user/workspace', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mark_setup_completed: true }),
+            });
+        } catch {
+            /* non-fatal — the layout-effect guard is a fallback. */
+        }
+        try {
+            await updateSession({ workspaceSetupCompleted: true });
+        } catch {
+            /* non-fatal — JWT will refresh on next sign-in. */
+        }
+    }, [updateSession]);
 
     const onContinue = async () => {
         if (!canContinue || saving) return;
