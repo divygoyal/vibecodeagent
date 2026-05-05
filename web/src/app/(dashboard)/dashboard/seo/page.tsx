@@ -390,37 +390,39 @@ export default function SEOPage() {
                 />
             ) : null}
 
-            {/* ─── Premium Hero Header ─── */}
-            <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[linear-gradient(135deg,rgba(52,211,153,0.06),rgba(34,211,238,0.04)_40%,rgba(167,139,250,0.04)_70%,transparent_95%)] p-5 sm:p-7">
-                <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-emerald-500/[0.06] blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-24 -left-12 h-72 w-72 rounded-full bg-violet-500/[0.05] blur-3xl" />
-                <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+            {/* Header — neutral palette, single subtle cyan accent stripe.
+                Replaced the rainbow gradient + glow blobs + hyperbole copy
+                ("engineered for the 2026 search landscape") with a clean
+                title row. Keeps the live status pill, site selector, and
+                export button. */}
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-5 sm:p-6">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-3 flex-wrap">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/[0.08] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-emerald-300">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
                                 <span className="relative flex h-1.5 w-1.5">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
                                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
                                 </span>
                                 Live · Search Console
                             </span>
                             {seoData && <LastUpdated timestamp={new Date()} />}
                         </div>
-                        <h1 className="gradient-text text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-[1.05]">
+                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
                             SEO Intelligence
                         </h1>
-                        <p className="mt-2 max-w-2xl text-sm text-zinc-400 leading-relaxed">
-                            Three-pillar coverage across Google rankings, AI Overviews, and LLM citations — engineered for the 2026 search landscape.
+                        <p className="mt-1 max-w-2xl text-[12.5px] text-zinc-500 leading-relaxed">
+                            Rankings, AI Overviews, and LLM citations — diagnose what's leaking and where to ship next.
                         </p>
                     </div>
 
-                    <div className="flex items-stretch gap-2 sm:gap-3 flex-wrap lg:justify-end">
+                    <div className="flex items-stretch gap-2 flex-wrap lg:justify-end">
                         <div className="relative w-full sm:w-auto">
                             <select
                                 value={selectedSite}
                                 onChange={(e) => setSelectedSite(e.target.value)}
                                 disabled={sitesLoading || sites.length === 0}
-                                className="appearance-none bg-[#0a0d12] border border-white/[0.1] rounded-xl pl-3 pr-9 py-2.5 text-sm text-zinc-200 hover:border-white/[0.16] focus:outline-none focus:border-emerald-500/50 transition w-full sm:min-w-[220px] sm:w-auto max-w-full font-medium"
+                                className="appearance-none rounded-lg border border-white/[0.08] bg-[#05080b] pl-3 pr-9 py-2 text-[12.5px] font-medium text-zinc-200 hover:border-white/[0.16] focus:outline-none focus:border-white/[0.24] transition w-full sm:min-w-[220px] sm:w-auto max-w-full"
                             >
                                 {sitesLoading ? (
                                     <option>Loading sites…</option>
@@ -439,7 +441,7 @@ export default function SEOPage() {
                         <button
                             onClick={() => exportSeoData(seoData)}
                             disabled={!seoData}
-                            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] hover:border-white/[0.16] transition disabled:opacity-30"
+                            className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-200 bg-white/[0.03] border border-white/[0.08] rounded-lg hover:bg-white/[0.06] hover:border-white/[0.16] transition disabled:opacity-30"
                         >
                             <Download className="w-3.5 h-3.5" />
                             Export

@@ -5,7 +5,12 @@ import { isBlockedUrl } from '@/lib/urlValidation';
 
 export const dynamic = 'force-dynamic';
 
-const PSI_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY || process.env.GEMINI_API_KEY || '';
+// PageSpeed Insights API is its own thing — DO NOT fall back to GEMINI_API_KEY,
+// those are different keys served by different products. PSI v5 also works
+// without a key (just rate-limited to 1 query/second per IP) so missing key
+// isn't fatal. Previously we were sending GEMINI_API_KEY here and getting
+// 400/403 from Google → bubbled to the client as 502 Bad Gateway.
+const PSI_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY || '';
 
 type Strategy = 'mobile' | 'desktop';
 
@@ -101,29 +106,62 @@ export async function POST(req: NextRequest) {
         }
         if (PSI_API_KEY) psiUrl.searchParams.set('key', PSI_API_KEY);
 
-        // Cap at 25s — most reverse proxies (Cloudflare/nginx/Coolify) drop the connection
-        // around 30s, and the client retries on timeout cleanly.
+        // PSI is slow on cold cache (first run for a URL can take 30-50s).
+        // Strategy: try once with a generous 35s budget. If that times out or
+        // returns 5xx, retry ONCE with a tighter 20s budget — the server
+        // usually has the result cached by then. Don't retry on 4xx (won't help).
+        const fetchPsi = async (timeoutMs: number): Promise<Response> => {
+            return fetch(psiUrl.toString(), { signal: AbortSignal.timeout(timeoutMs) });
+        };
+
         let psiRes: Response;
+        let lastError: unknown = null;
         try {
-            psiRes = await fetch(psiUrl.toString(), {
-                signal: AbortSignal.timeout(25000),
-            });
-        } catch (fetchErr) {
-            const isTimeout = fetchErr instanceof Error && (fetchErr.name === 'AbortError' || fetchErr.name === 'TimeoutError');
-            return NextResponse.json(
-                {
-                    error: isTimeout
-                        ? 'PageSpeed Insights took longer than 25 seconds to respond. Try again — Google\'s API is sometimes slow on the first run for a new URL.'
-                        : `Network error reaching PageSpeed Insights: ${fetchErr instanceof Error ? fetchErr.message : 'unknown'}`,
-                },
-                { status: 504 }
-            );
+            psiRes = await fetchPsi(35_000);
+        } catch (firstErr) {
+            lastError = firstErr;
+            const isTimeoutOr5xx = firstErr instanceof Error && (firstErr.name === 'AbortError' || firstErr.name === 'TimeoutError');
+            if (!isTimeoutOr5xx) {
+                return NextResponse.json(
+                    { error: `Network error reaching PageSpeed Insights: ${firstErr instanceof Error ? firstErr.message : 'unknown'}` },
+                    { status: 504 }
+                );
+            }
+            // Retry once with a tighter budget — Google often warm-cached the URL by now.
+            try {
+                psiRes = await fetchPsi(20_000);
+            } catch (secondErr) {
+                lastError = secondErr;
+                return NextResponse.json(
+                    {
+                        error: 'PageSpeed Insights is slow right now. Google\'s API takes 30-60s on cold cache for new URLs. Try again in a moment, or audit a different page first to warm the cache.',
+                        detail: secondErr instanceof Error ? secondErr.message : 'timeout',
+                    },
+                    { status: 504 }
+                );
+            }
         }
 
         if (!psiRes.ok) {
             const text = await psiRes.text().catch(() => '');
-            return NextResponse.json({ error: `PageSpeed API error: ${psiRes.status}`, detail: text.slice(0, 200) }, { status: 502 });
+            // Classify upstream errors so the user gets actionable copy instead of "502 Bad Gateway".
+            let userMessage = `PageSpeed Insights returned ${psiRes.status}.`;
+            if (psiRes.status === 400) {
+                userMessage = 'PageSpeed Insights couldn\'t analyze this URL. Make sure it returns a 2xx status and isn\'t blocked by robots.txt or a paywall.';
+            } else if (psiRes.status === 403) {
+                userMessage = PSI_API_KEY
+                    ? 'PageSpeed Insights API key is invalid or doesn\'t have the PageSpeed Insights API enabled. Check the GOOGLE_PAGESPEED_API_KEY env var.'
+                    : 'PageSpeed Insights rate-limited this request. Add a GOOGLE_PAGESPEED_API_KEY env var (free at console.cloud.google.com) for higher quota.';
+            } else if (psiRes.status === 429) {
+                userMessage = 'PageSpeed Insights rate limit hit. Wait a minute, then try again.';
+            } else if (psiRes.status >= 500) {
+                userMessage = 'Google\'s PageSpeed Insights service is having issues. Try again in a few minutes.';
+            }
+            console.error('[psi] upstream error', psiRes.status, text.slice(0, 200));
+            return NextResponse.json({ error: userMessage, status: psiRes.status, detail: text.slice(0, 200) }, { status: 502 });
         }
+        // (lastError is intentionally unused here — successful response.)
+        void lastError;
 
         const psiData = await psiRes.json();
         const lh = psiData.lighthouseResult;
