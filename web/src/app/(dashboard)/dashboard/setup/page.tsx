@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
 import {
     CheckCircle2, Search, Sparkles, ArrowRight, AlertTriangle,
-    BarChart3, Globe as GlobeIcon,
+    BarChart3, Globe as GlobeIcon, Loader2, AlertCircle,
 } from 'lucide-react';
 import { useWorkspace } from '../layout';
 import {
@@ -60,6 +60,21 @@ function propertyTokens(p: PropertyOption | undefined): Set<string> {
 function rootDomainFromSite(siteUrl: string): string {
     const cleaned = siteUrl.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
     return cleaned.split('/')[0].toLowerCase();
+}
+
+// Best-effort hostname-token match between a GA4 property and the user's
+// GSC site list. Returns the first overlapping site or null. Used to power
+// the per-card "Search Console connected?" pill on Step 1 — no extra
+// fetches; reuses the inventories we already have.
+function gscMatchForProperty(prop: PropertyOption | undefined, sites: SiteOption[]): SiteOption | null {
+    if (!prop) return null;
+    const propTokens = propertyTokens(prop);
+    if (!propTokens.size) return null;
+    for (const site of sites) {
+        const { tokens } = siteHostTokens(site.siteUrl);
+        if (tokensOverlap(propTokens, tokens)) return site;
+    }
+    return null;
 }
 
 // Compact KPI formatter — 37424 → "37.4k", 1_240_000 → "1.2M". Avoids pulling
@@ -144,15 +159,26 @@ export default function SetupPage() {
 
     const [chosenProperty, setChosenProperty] = useState(selectedProperty);
     const [chosenSite, setChosenSite] = useState(selectedSite);
+    // Pre-selected secondary on Step 2 (the GSC site clicked, or GA4
+    // property in inverted mode). Commit happens via the bottom button.
+    const [selectedSecondary, setSelectedSecondary] = useState('');
     const [propSearch, setPropSearch] = useState('');
     const [siteSearch, setSiteSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    // Wizard step. 'pick-website' = Step 1 (pick GA4, or GSC in inverted
-    // mode). 'pair-gsc' = Step 2 (pair the secondary source, optional).
-    const [step, setStep] = useState<'pick-website' | 'pair-gsc'>(
-        selectedProperty || selectedSite ? 'pair-gsc' : 'pick-website'
-    );
+    // Wizard step. 'pick-website' = Step 1, 'pair-gsc' = Step 2,
+    // 'done' = Step 3 (confirmation). The Done screen waits for a click
+    // before routing to /dashboard/ai-chat. Always starts at Step 1 so the
+    // sidebar workspace pill consistently lands users on the website
+    // picker — they can always change either side from the start.
+    const [step, setStep] = useState<'pick-website' | 'pair-gsc' | 'done'>('pick-website');
+    // Snapshot of what was saved, frozen for the Done screen so it
+    // shows what *was* committed, not whatever the form holds now.
+    const [doneSnapshot, setDoneSnapshot] = useState<{ label: string; hasGa4: boolean; hasGsc: boolean }>({
+        label: '',
+        hasGa4: false,
+        hasGsc: false,
+    });
 
     const userName = session?.user?.name?.split(' ')[0] || 'there';
     const greeting = (() => {
@@ -259,7 +285,13 @@ export default function SetupPage() {
             setSaveError('Could not save your workspace. Try again.');
             return;
         }
-        router.push('/dashboard/ai-chat');
+        // Transition to Done — the user clicks "Go to workspace" to leave.
+        setDoneSnapshot({
+            label,
+            hasGa4: Boolean(finalProperty),
+            hasGsc: Boolean(finalSite),
+        });
+        setStep('done');
     };
 
     const onContinueWithDemo = async () => {
@@ -271,7 +303,10 @@ export default function SetupPage() {
         });
         if (ok) await markSetupCompleted();
         setSaving(false);
-        if (ok) router.push('/dashboard/ai-chat');
+        if (ok) {
+            setDoneSnapshot({ label: 'Demo workspace', hasGa4: true, hasGsc: true });
+            setStep('done');
+        }
     };
 
     const cosmicShell = (children: React.ReactNode) => (
@@ -379,19 +414,42 @@ export default function SetupPage() {
         return [match, ...filteredProperties.filter((p) => p.property !== matchId)];
     }, [filteredProperties, suggestion]);
 
+    // Three-pill step indicator. Done step renders a check when the
+    // step is in the past; the active step glows cyan; future steps are muted.
+    const stepDone1 = step === 'pair-gsc' || step === 'done';
+    const stepDone2 = step === 'done';
+    const pill = (active: boolean, done: boolean, n: number, label: string) => (
+        <span className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${active ? 'text-[#7AD9DA]' : done ? 'text-zinc-300' : 'text-zinc-600'}`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${active ? 'bg-[#14C4E1]/20 border border-[#14C4E1]/30' : done ? 'bg-[#14C4E1]/[0.10] border border-[#14C4E1]/20' : 'bg-white/[0.04] border border-white/[0.08]'}`}>
+                {done ? <CheckCircle2 className="w-3 h-3 text-[#7AD9DA]" /> : n}
+            </span>
+            {label}
+        </span>
+    );
     const stepBadge = (
         <div className="flex items-center justify-center gap-2 mb-4">
-            <span className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${step === 'pick-website' ? 'text-[#7AD9DA]' : 'text-zinc-600'}`}>
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${step === 'pick-website' ? 'bg-[#14C4E1]/20 border border-[#14C4E1]/30' : 'bg-white/[0.04] border border-white/[0.08]'}`}>
-                    {step === 'pair-gsc' ? <CheckCircle2 className="w-3 h-3 text-[#7AD9DA]" /> : '1'}
-                </span>
-                Pick website
-            </span>
-            <span className="w-8 h-px bg-white/[0.08]" />
-            <span className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${step === 'pair-gsc' ? 'text-[#7AD9DA]' : 'text-zinc-600'}`}>
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${step === 'pair-gsc' ? 'bg-[#14C4E1]/20 border border-[#14C4E1]/30' : 'bg-white/[0.04] border border-white/[0.08]'}`}>2</span>
-                {gscOnlyMode ? 'Add GA4' : 'Add Search Console'}
-            </span>
+            {pill(step === 'pick-website', stepDone1, 1, 'Website')}
+            <span className={`w-6 h-px ${stepDone1 ? 'bg-[#14C4E1]/30' : 'bg-white/[0.08]'}`} />
+            {pill(step === 'pair-gsc', stepDone2, 2, gscOnlyMode ? 'GA4' : 'Search Console')}
+            <span className={`w-6 h-px ${stepDone2 ? 'bg-[#14C4E1]/30' : 'bg-white/[0.08]'}`} />
+            {pill(step === 'done', false, 3, 'Done')}
+        </div>
+    );
+
+    // Bottom captions — three muted columns under the wizard card. Active
+    // step gets a brighter title; the rest stay zinc.
+    const stepCaptions = (
+        <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto text-center">
+            {[
+                { active: step === 'pick-website', title: 'Step 1 — Select website', sub: 'Pick the website you want to analyze.' },
+                { active: step === 'pair-gsc', title: gscOnlyMode ? 'Step 2 — Connect GA4' : 'Step 2 — Connect GSC', sub: 'Choose the matching property if you have one.' },
+                { active: step === 'done', title: 'Step 3 — Ready', sub: 'We sync your data and build your dashboard.' },
+            ].map((c) => (
+                <div key={c.title}>
+                    <div className={`text-[12px] font-semibold mb-1 ${c.active ? 'text-[#7AD9DA]' : 'text-zinc-500'}`}>{c.title}</div>
+                    <div className="text-[11px] text-zinc-600 leading-relaxed">{c.sub}</div>
+                </div>
+            ))}
         </div>
     );
 
@@ -401,32 +459,47 @@ export default function SetupPage() {
         const step1Loading = gscOnlyMode ? sitesLoading : propsLoading;
         const step1Error = gscOnlyMode ? sitesError : propsError;
 
+        // Step 1 cards now toggle a selection state instead of advancing.
+        // Bottom Continue button commits the pick and moves to Step 2.
         const onPickProperty = (id: string) => {
             setChosenProperty(id);
-            setChosenSite(''); // clear stale selection from previous flow
-            setStep('pair-gsc');
+            setChosenSite('');
         };
         const onPickSite = (url: string) => {
             setChosenSite(url);
             setChosenProperty('');
+        };
+        const step1HasSelection = gscOnlyMode ? Boolean(chosenSite) : Boolean(chosenProperty);
+        const onStep1Continue = () => {
+            if (!step1HasSelection) return;
+            setSelectedSecondary(''); // fresh slate for Step 2
             setStep('pair-gsc');
         };
 
         return cosmicShell(
             <div className="max-w-5xl mx-auto py-10 sm:py-14 px-4 pb-24 sm:pb-14">
                 <div className="text-center mb-8">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-3">
-                        {greeting}, {userName}
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
+                        TrafficClaw
                     </p>
                     <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
-                        Pick your website
+                        A better onboarding experience
                     </h1>
-                    <p className="text-sm sm:text-base text-zinc-400 max-w-md mx-auto leading-relaxed">
-                        Choose the website you want TrafficClaw to analyze.
+                    <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                        Connect your data in three simple steps and unlock powerful SEO insights.
                     </p>
                 </div>
 
                 {stepBadge}
+
+                <div className="text-center mb-6">
+                    <h2 className="text-xl sm:text-2xl font-semibold text-white mb-1.5">Choose your website workspace</h2>
+                    <p className="text-[12.5px] text-zinc-500 max-w-md mx-auto">
+                        {gscOnlyMode
+                            ? 'Select the Search Console site TrafficClaw should analyze. We’ll connect GA4 next.'
+                            : 'Select the GA4 property TrafficClaw should analyze. We’ll connect search data next.'}
+                    </p>
+                </div>
 
                 {/* Search */}
                 <div className="max-w-xl mx-auto mb-6 relative">
@@ -449,7 +522,7 @@ export default function SetupPage() {
                 ) : step1Loading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {[0, 1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="rounded-2xl border border-white/[0.06] bg-[#0a0d12]/80 p-4 h-[164px] animate-pulse">
+                            <div key={i} className="rounded-2xl border border-white/[0.06] bg-[#0a0d12]/80 p-4 h-[180px] animate-pulse">
                                 <div className="h-3.5 w-32 rounded bg-white/[0.05]" />
                                 <div className="mt-4 h-12 w-full rounded bg-white/[0.03]" />
                                 <div className="mt-4 h-3 w-24 rounded bg-white/[0.04]" />
@@ -467,6 +540,7 @@ export default function SetupPage() {
                                 <WebsiteCardGsc
                                     key={s.siteUrl}
                                     siteUrl={s.siteUrl}
+                                    selected={chosenSite === s.siteUrl}
                                     onClick={() => onPickSite(s.siteUrl)}
                                 />
                             ))}
@@ -481,12 +555,15 @@ export default function SetupPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                             {filteredProperties.map((p) => {
                                 const id = p.property || p.propertyId || '';
+                                const gscMatch = gscMatchForProperty(p, sites);
                                 return (
                                     <WebsiteCardGa4
                                         key={id || p.displayName}
                                         propertyId={id}
                                         displayName={p.displayName || '(unnamed)'}
                                         disabled={!id}
+                                        selected={chosenProperty === id}
+                                        gscMatch={gscMatch}
                                         onClick={() => onPickProperty(id)}
                                     />
                                 );
@@ -494,6 +571,21 @@ export default function SetupPage() {
                         </div>
                     )
                 )}
+
+                {/* Bottom Continue */}
+                <div className="mt-8 flex justify-center">
+                    <button
+                        type="button"
+                        onClick={onStep1Continue}
+                        disabled={!step1HasSelection}
+                        className="group inline-flex items-center gap-2 px-7 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)] disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
+                    >
+                        Continue
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                </div>
+
+                {stepCaptions}
             </div>
         );
     }
@@ -525,27 +617,90 @@ export default function SetupPage() {
         setStep('pick-website');
     };
 
-    const onUseStep2Site = (url: string) => finishSetup(chosenProperty || null, url);
-    const onUseStep2Property = (id: string) => finishSetup(id, chosenSite || null);
-    const onSkipStep2 = () => finishSetup(chosenProperty || null, chosenSite || null);
+    // Step 2 commits via bottom button. Row click pre-selects with a ring.
+    const onConnectStep2 = () => {
+        if (!selectedSecondary || saving) return;
+        if (askingAboutGsc) finishSetup(chosenProperty || null, selectedSecondary);
+        else finishSetup(selectedSecondary, chosenSite || null);
+    };
+    const onSkipStep2 = () => {
+        if (saving) return;
+        finishSetup(chosenProperty || null, chosenSite || null);
+    };
+
+    // ─── STEP 3 (Done) ───────────────────────────────────────────────
+
+    if (step === 'done') {
+        return cosmicShell(
+            <div className="max-w-3xl mx-auto py-10 sm:py-14 px-4 pb-24 sm:pb-14">
+                <div className="text-center mb-8">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
+                        TrafficClaw
+                    </p>
+                    <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
+                        Your SEO workspace is ready
+                    </h1>
+                    <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                        We connected your analytics and search data.
+                    </p>
+                </div>
+
+                {stepBadge}
+
+                <div className="mx-auto max-w-md rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-8 shadow-[0_22px_60px_rgba(0,0,0,0.45)] text-center">
+                    {/* Animated check ring */}
+                    <div className="mx-auto mb-5 w-20 h-20 rounded-full border-2 border-[#14C4E1]/40 bg-[#14C4E1]/[0.08] flex items-center justify-center shadow-[0_0_36px_rgba(20,196,225,0.32)]">
+                        <CheckCircle2 className="w-10 h-10 text-[#7AD9DA]" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-5 truncate">
+                        {doneSnapshot.label || 'Your workspace'}
+                    </h2>
+                    <div className="space-y-2.5 mb-6">
+                        <div className={`flex items-center justify-center gap-2 text-[12.5px] ${doneSnapshot.hasGa4 ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                            <CheckCircle2 className={`w-4 h-4 ${doneSnapshot.hasGa4 ? 'text-[#7AD9DA]' : 'text-zinc-600'}`} />
+                            {doneSnapshot.hasGa4 ? 'GA4 connected' : 'GA4 — skipped'}
+                        </div>
+                        <div className={`flex items-center justify-center gap-2 text-[12.5px] ${doneSnapshot.hasGsc ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                            <CheckCircle2 className={`w-4 h-4 ${doneSnapshot.hasGsc ? 'text-[#7AD9DA]' : 'text-zinc-600'}`} />
+                            {doneSnapshot.hasGsc ? 'Search Console connected' : 'Search Console — skipped'}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => router.push('/dashboard/ai-chat')}
+                        className="group w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)]"
+                    >
+                        Go to workspace
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                    <p className="mt-4 text-[11px] text-zinc-500 inline-flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        TrafficClaw is preparing your dashboard.
+                    </p>
+                </div>
+
+                {stepCaptions}
+            </div>
+        );
+    }
 
     return cosmicShell(
         <div className="max-w-2xl mx-auto py-10 sm:py-14 px-4 pb-32 sm:pb-14">
             <div className="text-center mb-8">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-3">
-                    {greeting}, {userName}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
+                    TrafficClaw
                 </p>
-                <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white mb-2">
-                    {stepTitle}
+                <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
+                    Connect {askingAboutGsc ? 'Search Console' : 'Google Analytics'}
                 </h1>
-                <p className="text-sm text-zinc-400 max-w-md mx-auto leading-relaxed">
+                <p className="text-sm sm:text-base text-zinc-400 max-w-md mx-auto leading-relaxed">
                     {stepSub}
                 </p>
             </div>
 
             {stepBadge}
 
-            <div className="mb-4">
+            <div className="mb-4 flex justify-center">
                 <button
                     type="button"
                     onClick={goBack}
@@ -555,15 +710,21 @@ export default function SetupPage() {
                 </button>
             </div>
 
+            {/* Selected-website summary card */}
+            <div className="mb-3 rounded-2xl border border-[#14C4E1]/22 bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
+                <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-2">
+                    Selected website
+                </div>
+                {chosenProperty ? (
+                    <SelectedGa4Summary propertyId={chosenProperty} displayName={primaryLabel} />
+                ) : chosenSite ? (
+                    <SelectedGscSummary siteUrl={chosenSite} />
+                ) : null}
+            </div>
+
             <div className="rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-5 shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
-                <div className="mb-4 flex items-center gap-2.5 px-1">
-                    <div className="w-7 h-7 rounded-lg border border-[#14C4E1]/20 bg-[#14C4E1]/[0.08] flex items-center justify-center flex-shrink-0">
-                        <GlobeIcon className="w-3.5 h-3.5 text-[#7AD9DA]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="text-[10px] uppercase tracking-wider text-zinc-500">Your website</div>
-                        <div className="text-sm font-semibold text-white truncate">{primaryLabel}</div>
-                    </div>
+                <div className="text-[12.5px] font-semibold text-white mb-3">
+                    {stepTitle}
                 </div>
 
                 <div className="relative mb-3">
@@ -572,7 +733,7 @@ export default function SetupPage() {
                         type="text"
                         value={askingAboutGsc ? siteSearch : propSearch}
                         onChange={(e) => (askingAboutGsc ? setSiteSearch : setPropSearch)(e.target.value)}
-                        placeholder={askingAboutGsc ? 'Search your Search Console sites…' : 'Search your GA4 properties…'}
+                        placeholder={askingAboutGsc ? 'Search your Search Console properties…' : 'Search your GA4 properties…'}
                         className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#14C4E1]/30"
                     />
                 </div>
@@ -595,36 +756,43 @@ export default function SetupPage() {
                         <>
                             {orderedStep2Sites.length === 0 && (
                                 <div className="text-xs text-zinc-500 italic px-3 py-6 text-center">
-                                    No Search Console sites found on this account.
+                                    No Search Console properties found on this account.
                                 </div>
                             )}
                             {orderedStep2Sites.map((s) => {
                                 const isMatch = suggestion?.kind === 'site' && suggestion.siteUrl === s.siteUrl;
+                                const isSelected = selectedSecondary === s.siteUrl;
                                 return (
                                     <button
                                         key={s.siteUrl}
                                         type="button"
-                                        onClick={() => onUseStep2Site(s.siteUrl)}
+                                        onClick={() => setSelectedSecondary(isSelected ? '' : s.siteUrl)}
                                         className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 group ${
-                                            isMatch
-                                                ? 'border-[#14C4E1]/40 bg-[#14C4E1]/[0.08] text-white shadow-[0_0_20px_rgba(20,196,225,0.12)]'
-                                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
+                                            isSelected
+                                                ? 'border-[#14C4E1]/55 bg-[#14C4E1]/[0.12] text-white shadow-[0_0_24px_rgba(20,196,225,0.20)] ring-2 ring-[#14C4E1]/40'
+                                                : isMatch
+                                                    ? 'border-[#14C4E1]/30 bg-[#14C4E1]/[0.05] text-white hover:bg-[#14C4E1]/[0.10]'
+                                                    : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
                                         }`}
                                     >
-                                        <GlobeIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isMatch ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
+                                        <GlobeIcon className={`w-3.5 h-3.5 flex-shrink-0 ${(isSelected || isMatch) ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm font-medium truncate flex items-center gap-2">
                                                 {formatSiteLabel(s.siteUrl)}
-                                                {isMatch && (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#14C4E1]/15 border border-[#14C4E1]/30 text-[9px] font-semibold uppercase tracking-wider text-[#7AD9DA]">
+                                                {isMatch && !isSelected && (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">
                                                         <Sparkles className="w-2.5 h-2.5" />
-                                                        Best match
+                                                        Recommended
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="text-[10.5px] text-zinc-500 truncate font-mono">{s.siteUrl}</div>
                                         </div>
-                                        <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                                        {isSelected ? (
+                                            <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />
+                                        ) : (
+                                            <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                                        )}
                                     </button>
                                 );
                             })}
@@ -640,32 +808,39 @@ export default function SetupPage() {
                             {orderedStep2Properties.map((p) => {
                                 const id = p.property || p.propertyId || '';
                                 const isMatch = suggestion?.kind === 'property' && suggestion.propertyId === id;
+                                const isSelected = selectedSecondary === id;
                                 return (
                                     <button
                                         key={id || p.displayName}
                                         type="button"
                                         disabled={!id}
-                                        onClick={() => onUseStep2Property(id)}
+                                        onClick={() => setSelectedSecondary(isSelected ? '' : id)}
                                         className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 group ${
-                                            isMatch
-                                                ? 'border-[#14C4E1]/40 bg-[#14C4E1]/[0.08] text-white shadow-[0_0_20px_rgba(20,196,225,0.12)]'
-                                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
+                                            isSelected
+                                                ? 'border-[#14C4E1]/55 bg-[#14C4E1]/[0.12] text-white shadow-[0_0_24px_rgba(20,196,225,0.20)] ring-2 ring-[#14C4E1]/40'
+                                                : isMatch
+                                                    ? 'border-[#14C4E1]/30 bg-[#14C4E1]/[0.05] text-white hover:bg-[#14C4E1]/[0.10]'
+                                                    : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12]'
                                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                                     >
-                                        <BarChart3 className={`w-3.5 h-3.5 flex-shrink-0 ${isMatch ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
+                                        <BarChart3 className={`w-3.5 h-3.5 flex-shrink-0 ${(isSelected || isMatch) ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm font-medium truncate flex items-center gap-2">
                                                 {p.displayName || '(unnamed)'}
-                                                {isMatch && (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#14C4E1]/15 border border-[#14C4E1]/30 text-[9px] font-semibold uppercase tracking-wider text-[#7AD9DA]">
+                                                {isMatch && !isSelected && (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">
                                                         <Sparkles className="w-2.5 h-2.5" />
-                                                        Best match
+                                                        Recommended
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="text-[10.5px] text-zinc-500 truncate font-mono">{id}</div>
                                         </div>
-                                        <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                                        {isSelected ? (
+                                            <CheckCircle2 className="w-4 h-4 text-[#7AD9DA] flex-shrink-0" />
+                                        ) : (
+                                            <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                                        )}
                                     </button>
                                 );
                             })}
@@ -680,18 +855,28 @@ export default function SetupPage() {
                 </div>
             )}
 
-            {/* Skip — no need to make picking the easy path; many users don't have GSC */}
-            <div className="mt-6 text-center">
+            {/* Primary connect + Skip-for-now stack */}
+            <div className="mt-5 flex flex-col items-center gap-3">
+                <button
+                    type="button"
+                    onClick={onConnectStep2}
+                    disabled={!selectedSecondary || saving}
+                    className="group w-full max-w-md inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)] disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                    {saving ? 'Saving…' : <>Connect selected property <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>}
+                </button>
                 <button
                     type="button"
                     onClick={onSkipStep2}
                     disabled={saving}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 hover:text-white text-sm font-medium transition-colors disabled:opacity-50"
+                    className="text-[12px] text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50"
                 >
-                    {saving ? 'Saving…' : <>Skip — I don&apos;t have one <ArrowRight className="w-3.5 h-3.5" /></>}
+                    Skip for now
                 </button>
-                <p className="text-[11px] text-zinc-600 mt-2">{skipSub}</p>
+                <p className="text-[11px] text-zinc-600">{skipSub}</p>
             </div>
+
+            {stepCaptions}
         </div>
     );
 }
@@ -711,11 +896,15 @@ function WebsiteCardGa4({
     displayName,
     onClick,
     disabled,
+    selected,
+    gscMatch,
 }: {
     propertyId: string;
     displayName: string;
     onClick: () => void;
     disabled?: boolean;
+    selected?: boolean;
+    gscMatch?: SiteOption | null;
 }) {
     const { data, isLoading, isError } = useAnalyticsData('all', propertyId, true, '30d', false);
     const traffic: Ga4TrafficPoint[] = Array.isArray(data?.traffic) ? data.traffic : [];
@@ -729,16 +918,27 @@ function WebsiteCardGa4({
     }, [data, sparkData]);
     const hasSpark = sparkData.length > 1 && sparkData.some((p) => p.v > 0);
     const gradId = sparkGradId(propertyId);
+    const hasGsc = Boolean(gscMatch);
 
     return (
         <button
             type="button"
             onClick={onClick}
             disabled={disabled}
-            className="group text-left rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_22px_60px_rgba(0,0,0,0.30)] hover:border-[#14C4E1]/30 hover:bg-[#0c1219] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`group relative text-left rounded-2xl border bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_22px_60px_rgba(0,0,0,0.30)] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                selected
+                    ? 'border-[#14C4E1]/55 bg-[#0c1a22] shadow-[0_0_28px_rgba(20,196,225,0.25)] ring-2 ring-[#14C4E1]/40'
+                    : 'border-white/[0.08] hover:border-[#14C4E1]/30 hover:bg-[#0c1219]'
+            }`}
+            aria-pressed={selected}
             aria-label={`Pick ${displayName}`}
         >
-            <div className="flex items-center gap-2 mb-3">
+            {selected && (
+                <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#14C4E1]/30 border border-[#14C4E1]/50 flex items-center justify-center">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#7AD9DA]" />
+                </div>
+            )}
+            <div className="flex items-center gap-2 mb-3 pr-6">
                 <div className="w-6 h-6 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
                     <GlobeIcon className="w-3 h-3 text-[#7AD9DA]" />
                 </div>
@@ -775,7 +975,7 @@ function WebsiteCardGa4({
                 )}
             </div>
 
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3">
                 <span className="text-[12.5px] text-zinc-300">
                     {isLoading ? <span className="inline-block w-12 h-3 rounded bg-white/[0.05] animate-pulse" /> : (
                         <>
@@ -784,7 +984,26 @@ function WebsiteCardGa4({
                         </>
                     )}
                 </span>
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all" />
+            </div>
+
+            {/* Connection-status pills — informational so the user knows what
+                data is paired with this website before they pick it. */}
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    GA4 connected
+                </span>
+                {hasGsc ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        Search Console connected
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.08] border border-amber-500/25 text-[10px] font-medium text-amber-300">
+                        <AlertCircle className="w-2.5 h-2.5" />
+                        Search Console not connected
+                    </span>
+                )}
             </div>
         </button>
     );
@@ -799,9 +1018,11 @@ type GscTrendPoint = { date?: string; clicks?: number };
 function WebsiteCardGsc({
     siteUrl,
     onClick,
+    selected,
 }: {
     siteUrl: string;
     onClick: () => void;
+    selected?: boolean;
 }) {
     const { data, isLoading, isError } = useSeoData('all', siteUrl, true, '30d', false);
     const trend: GscTrendPoint[] = Array.isArray(data?.trend) ? data.trend : [];
@@ -821,10 +1042,20 @@ function WebsiteCardGsc({
         <button
             type="button"
             onClick={onClick}
-            className="group text-left rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_22px_60px_rgba(0,0,0,0.30)] hover:border-[#14C4E1]/30 hover:bg-[#0c1219] hover:-translate-y-0.5 transition-all"
+            className={`group relative text-left rounded-2xl border bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_22px_60px_rgba(0,0,0,0.30)] hover:-translate-y-0.5 transition-all ${
+                selected
+                    ? 'border-[#14C4E1]/55 bg-[#0c1a22] shadow-[0_0_28px_rgba(20,196,225,0.25)] ring-2 ring-[#14C4E1]/40'
+                    : 'border-white/[0.08] hover:border-[#14C4E1]/30 hover:bg-[#0c1219]'
+            }`}
+            aria-pressed={selected}
             aria-label={`Pick ${label}`}
         >
-            <div className="flex items-center gap-2 mb-3">
+            {selected && (
+                <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#14C4E1]/30 border border-[#14C4E1]/50 flex items-center justify-center">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#7AD9DA]" />
+                </div>
+            )}
+            <div className="flex items-center gap-2 mb-3 pr-6">
                 <div className="w-6 h-6 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center flex-shrink-0">
                     <GlobeIcon className="w-3 h-3 text-[#7AD9DA]" />
                 </div>
@@ -861,7 +1092,7 @@ function WebsiteCardGsc({
                 )}
             </div>
 
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3">
                 <span className="text-[12.5px] text-zinc-300">
                     {isLoading ? <span className="inline-block w-12 h-3 rounded bg-white/[0.05] animate-pulse" /> : (
                         <>
@@ -870,9 +1101,74 @@ function WebsiteCardGsc({
                         </>
                     )}
                 </span>
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-[#7AD9DA] group-hover:translate-x-0.5 transition-all" />
+            </div>
+
+            {/* Connection-status pills — GSC-only inverted branch always
+                has GSC; GA4 is amber/not-connected by definition. */}
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    Search Console connected
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.08] border border-amber-500/25 text-[10px] font-medium text-amber-300">
+                    <AlertCircle className="w-2.5 h-2.5" />
+                    GA4 not connected
+                </span>
             </div>
         </button>
+    );
+}
+
+// ─── SelectedGa4Summary / SelectedGscSummary ────────────────────────
+// Small "what you picked" cards rendered above Step 2's list. Reuse the
+// SWR cache from the Step 1 cards (same URL, same dedupe key) so the
+// summary appears instantly without an extra fetch.
+
+function SelectedGa4Summary({ propertyId, displayName }: { propertyId: string; displayName: string }) {
+    const { data } = useAnalyticsData('all', propertyId, true, '30d', false);
+    const total = typeof data?.kpis?.totalUsers === 'number' ? data.kpis.totalUsers : 0;
+    return (
+        <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl border border-[#14C4E1]/22 bg-[#14C4E1]/[0.10] flex items-center justify-center flex-shrink-0">
+                <GlobeIcon className="w-4 h-4 text-[#7AD9DA]" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{displayName}</div>
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        GA4 connected
+                    </span>
+                    {total > 0 && (
+                        <span className="text-[10.5px] text-zinc-500">·  {formatCompact(total)} visitors</span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SelectedGscSummary({ siteUrl }: { siteUrl: string }) {
+    const { data } = useSeoData('all', siteUrl, true, '30d', false);
+    const total = typeof data?.kpis?.totalClicks === 'number' ? data.kpis.totalClicks : 0;
+    return (
+        <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl border border-[#14C4E1]/22 bg-[#14C4E1]/[0.10] flex items-center justify-center flex-shrink-0">
+                <GlobeIcon className="w-4 h-4 text-[#7AD9DA]" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{formatSiteLabel(siteUrl)}</div>
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        Search Console connected
+                    </span>
+                    {total > 0 && (
+                        <span className="text-[10.5px] text-zinc-500">·  {formatCompact(total)} clicks</span>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
 
