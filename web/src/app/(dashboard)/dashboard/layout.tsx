@@ -16,7 +16,7 @@ import {
     Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Target, Trophy, Share2, type LucideIcon
+    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, type LucideIcon
 } from 'lucide-react';
 import {
     type Ga4Availability,
@@ -140,7 +140,6 @@ const sidebarGroups: SidebarGroup[] = [
         { icon: Globe, label: 'Globe API', href: '/dashboard/globe' },
     ]},
     { label: 'Growth', items: [
-        { icon: Target, label: 'Opportunities', href: '/dashboard/opportunities' },
         { icon: Trophy, label: 'Leaderboard', href: '/leaderboard' },
     ]},
 ];
