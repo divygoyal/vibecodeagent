@@ -250,6 +250,32 @@ export default function SetupPage() {
         return sites.filter((s) => formatSiteLabel(s.siteUrl).toLowerCase().includes(q));
     }, [sites, siteSearch]);
 
+    // Suggestion-aware list ordering for Step 2 (GSC list when GA4 is picked,
+    // or GA4 list in inverted mode). The matched item moves to the top with
+    // a "best match" badge.
+    //
+    // These two useMemos MUST live above the early returns below
+    // (`!hasGoogleConnection` and `inventoryEmpty`). When SWR transitions from
+    // pending → resolved, those guards flip from true → false, and any hook
+    // declared below them changes its call-order between renders → React
+    // throws #310 ("Rendered more hooks than during the previous render"),
+    // which is exactly the crash users hit on /dashboard/setup after signup.
+    const orderedStep2Sites = useMemo(() => {
+        if (!suggestion || suggestion.kind !== 'site') return filteredSites;
+        const matchUrl = suggestion.siteUrl;
+        const match = filteredSites.find((s) => s.siteUrl === matchUrl);
+        if (!match) return filteredSites;
+        return [match, ...filteredSites.filter((s) => s.siteUrl !== matchUrl)];
+    }, [filteredSites, suggestion]);
+
+    const orderedStep2Properties = useMemo(() => {
+        if (!suggestion || suggestion.kind !== 'property') return filteredProperties;
+        const matchId = suggestion.propertyId;
+        const match = filteredProperties.find((p) => p.property === matchId);
+        if (!match) return filteredProperties;
+        return [match, ...filteredProperties.filter((p) => p.property !== matchId)];
+    }, [filteredProperties, suggestion]);
+
     // Mark workspace_setup_completed=true server-side AND refresh the JWT
     // claim via NextAuth's update() trigger. Middleware reads the claim on
     // every dashboard request — without the JWT refresh it would still see
@@ -431,25 +457,9 @@ export default function SetupPage() {
     }
 
     // ─── Main flow: two-step linear wizard ───────────────────────────
-
-    // Suggestion-aware list ordering for Step 2 (GSC list when GA4 is picked,
-    // or GA4 list in inverted mode). The matched item moves to the top with
-    // a "best match" badge.
-    const orderedStep2Sites = useMemo(() => {
-        if (!suggestion || suggestion.kind !== 'site') return filteredSites;
-        const matchUrl = suggestion.siteUrl;
-        const match = filteredSites.find((s) => s.siteUrl === matchUrl);
-        if (!match) return filteredSites;
-        return [match, ...filteredSites.filter((s) => s.siteUrl !== matchUrl)];
-    }, [filteredSites, suggestion]);
-
-    const orderedStep2Properties = useMemo(() => {
-        if (!suggestion || suggestion.kind !== 'property') return filteredProperties;
-        const matchId = suggestion.propertyId;
-        const match = filteredProperties.find((p) => p.property === matchId);
-        if (!match) return filteredProperties;
-        return [match, ...filteredProperties.filter((p) => p.property !== matchId)];
-    }, [filteredProperties, suggestion]);
+    // (orderedStep2Sites / orderedStep2Properties are declared above the
+    // early returns — they must run on every render to keep the hook order
+    // stable.)
 
     // Journey-style three-step indicator. Active pill pulses; connectors
     // animate their fill (left→right) the moment they flip to "done", so
