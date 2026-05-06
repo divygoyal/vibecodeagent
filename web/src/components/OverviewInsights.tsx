@@ -135,7 +135,8 @@ export default memo(function OverviewInsights({
                 mood,
                 event,
                 changeClicks: Math.round(changeClicks),
-                newKeywords: Math.max(0, Math.floor(Math.random() * 6 + (mood === 'surge' ? 4 : 1))),
+                // Deterministic — Math.random() during render is a hydration footgun.
+                newKeywords: Math.max(0, Math.round((t.clicks || 0) / 100) + (mood === 'surge' ? 4 : 1)),
             };
         });
 

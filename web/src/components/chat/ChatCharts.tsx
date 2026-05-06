@@ -299,13 +299,37 @@ const COUNTRY_FLAGS: Record<string, string> = {
 export const CountryBarChart = memo(function CountryBarChart({ rows }: { rows: any[] }) {
     const data = useMemo(() => {
         if (!rows?.length) return [];
-        return rows.slice(0, 6).map(r => {
-            const code = (r.country || r.name || '').toLowerCase().slice(0, 3);
-            return {
-                name: `${COUNTRY_FLAGS[code] || '\u{1F30D}'} ${r.country || r.name || 'Unknown'}`,
-                Clicks: r.clicks || r.value || 0,
-            };
-        }).sort((a, b) => b.Clicks - a.Clicks);
+
+        // Tolerate the wide variety of GA4 / Search Console / OpenPanel / Umami
+        // shapes the assistant might pass us: { country, sessions } from GA4,
+        // { country, clicks } from GSC, { name, users } from OpenPanel, etc.
+        const valueOf = (r: any): number => {
+            const n = Number(r.clicks ?? r.sessions ?? r.users ?? r.value ?? r.count ?? r.pageviews ?? 0);
+            return Number.isFinite(n) ? n : 0;
+        };
+        const labelOf = (r: any): string => r.country || r.name || r.region || 'Unknown';
+
+        // Some upstream sources return city- or region-level rows tagged with
+        // the country name, which produces visible duplicates in the chart
+        // ("Singapore" twice, "India" three times). Collapse by country and
+        // sum the values so the bar chart actually shows top countries.
+        const collapsed = new Map<string, number>();
+        for (const r of rows) {
+            const label = labelOf(r);
+            collapsed.set(label, (collapsed.get(label) || 0) + valueOf(r));
+        }
+
+        return Array.from(collapsed.entries())
+            .map(([label, clicks]) => {
+                const code = label.toLowerCase().slice(0, 3);
+                return {
+                    name: `${COUNTRY_FLAGS[code] || '\u{1F30D}'} ${label}`,
+                    Clicks: clicks,
+                };
+            })
+            .filter(d => d.Clicks > 0)
+            .sort((a, b) => b.Clicks - a.Clicks)
+            .slice(0, 6);
     }, [rows]);
 
     if (data.length === 0) return null;

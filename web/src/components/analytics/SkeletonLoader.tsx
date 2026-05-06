@@ -29,7 +29,9 @@ export function SkeletonChart() {
                     <div
                         key={i}
                         className="flex-1 animate-pulse bg-white/[0.04] rounded-t"
-                        style={{ height: `${20 + Math.random() * 60}%`, animationDelay: `${i * 50}ms` }}
+                        // Deterministic — keyed off `i` — so the SSR HTML matches the
+                        // first CSR paint and we don't trigger React #418 hydration.
+                        style={{ height: `${30 + ((i * 17) % 55)}%`, animationDelay: `${i * 50}ms` }}
                     />
                 ))}
             </div>

@@ -43,15 +43,24 @@ interface SiteOption {
 const WELCOME_MESSAGE: Message = {
     role: 'assistant',
     content: "👋 **Hey! I'm your AI Analyst.**\n\nI have your live analytics & SEO data loaded. Ask me anything — I give **verdicts**, not advice.\n\n*Select a website above, then ask away.*",
-    timestamp: new Date().toISOString(),
+    // Stable across SSR & CSR — the live timestamp is filled in by useEffect on mount.
+    timestamp: '',
 };
 
 export default function AIChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const { messages: storeMessages, setMessages, clearChat: storeClearChat } = useChatStore();
+    // Compute the welcome bubble's timestamp client-side to avoid the
+    // module-load `new Date()` from baking different values into SSR vs CSR
+    // HTML — the source of React #418 (hydration mismatch) → #310 on the
+    // segment-level error boundary.
+    const [welcomeStamp, setWelcomeStamp] = useState('');
+    useEffect(() => { setWelcomeStamp(new Date().toISOString()); }, []);
     // Show welcome message when store is empty
-    const messages = storeMessages.length > 0 ? storeMessages : [WELCOME_MESSAGE];
+    const messages = storeMessages.length > 0
+        ? storeMessages
+        : [{ ...WELCOME_MESSAGE, timestamp: welcomeStamp }];
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [credits, setCredits] = useState<number | null>(null);
