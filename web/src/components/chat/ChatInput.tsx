@@ -26,8 +26,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(functio
     textareaRef,
 ) {
     return (
-        <div className="px-3 py-3 border-t border-[var(--card-border)] bg-[var(--sidebar-bg)]">
-            <div className="flex items-end gap-2 bg-[var(--input-bg)] rounded-2xl px-4 py-3 border border-transparent focus-within:border-[var(--input-border)] transition-colors">
+        <div className="px-3 py-3 border-t border-white/[0.06] bg-[var(--sidebar-bg,#0a0b0e)]">
+            <div className="flex items-end gap-2 bg-[var(--input-bg,rgba(255,255,255,0.04))] rounded-2xl px-4 py-3 border border-transparent focus-within:border-[var(--input-border,rgba(255,255,255,0.12))] transition-colors">
                 <textarea
                     ref={textareaRef}
                     value={input}
@@ -38,7 +38,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(functio
                             onSubmit();
                         }
                     }}
-                    placeholder="Ask anything..."
+                    placeholder="Ask anything… (Shift+Enter for newline)"
                     className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
                     disabled={isLoading}
                     rows={1}

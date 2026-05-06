@@ -13,7 +13,7 @@ import { useContainerStatus, usePropertyList, useAnalyticsData, useSeoData, useS
 import { findBestRepoMatch } from '@/lib/githubApi';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
-import { buildSnapshot } from '@/lib/chatUtils';
+import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from '@/components/chat/ReasoningTrace';
 
@@ -927,20 +927,16 @@ export default function AIChat() {
                     selectedSite: currentSite,
                     selectedRepo: selectedRepo,
                     repoIsAuto: repoIsAuto,
-                    analyticsContext: currentAnalytics ? (isFirstUserMessage ? {
-                        kpis: currentAnalytics.kpis,
-                        topSources: currentAnalytics.sources?.slice(0, 8),
-                        topPages: currentAnalytics.pages?.slice(0, 10),
-                        topCountries: currentAnalytics.countries?.slice(0, 8),
-                        devices: currentAnalytics.devices,
-                        channels: currentAnalytics.channels?.slice(0, 6),
-                    } : { kpis: currentAnalytics.kpis }) : null,
-                    seoContext: currentSeo ? (isFirstUserMessage ? {
-                        kpis: currentSeo.kpis,
-                        topQueries: currentSeo.queries?.slice(0, 15),
-                        topPages: currentSeo.pages?.slice(0, 8),
-                        recommendations: currentSeo.recommendations,
-                    } : { kpis: currentSeo.kpis }) : null,
+                    // After the first user message we shrink the context to KPIs only —
+                    // the model already has the full snapshot from turn 1 and re-sending
+                    // it bloats every request. Both shapes go through the shared helper
+                    // so the chat widget and full-screen page stay in lockstep.
+                    analyticsContext: currentAnalytics
+                        ? (isFirstUserMessage ? buildAnalyticsContext(currentAnalytics) : { kpis: currentAnalytics.kpis })
+                        : null,
+                    seoContext: currentSeo
+                        ? (isFirstUserMessage ? buildSeoContext(currentSeo) : { kpis: currentSeo.kpis })
+                        : null,
                     history: currentMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                     mode: options?.mode,
                 }),

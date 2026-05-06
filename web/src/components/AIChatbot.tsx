@@ -21,7 +21,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
-import { buildSnapshot } from '@/lib/chatUtils';
+import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, persistMessage, getOrCreateThreadId, setActiveThreadId, type ChatMessage } from '@/stores/chatStore';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
@@ -135,6 +135,10 @@ export default function AIChatbot() {
     // ── Streaming batching: accumulate chunks and flush via rAF ──
     const streamBufferRef = useRef('');
     const rafIdRef = useRef<number | null>(null);
+    // Set to false in the unmount cleanup. flushStreamBuffer + the SSE catch
+    // block consult this before calling setMessages so we don't update a
+    // disposed component when the user closes the chat mid-stream.
+    const mountedRef = useRef(true);
 
     // B5-thin: lifted AbortController so the Stop button can abort the
     // in-flight fetch from outside sendMessage's closure. Reset per-turn.
@@ -175,6 +179,7 @@ export default function AIChatbot() {
 
     const flushStreamBuffer = useCallback(() => {
         rafIdRef.current = null;
+        if (!mountedRef.current) return;
         const buffered = streamBufferRef.current;
         if (!buffered) return;
         streamBufferRef.current = '';
@@ -194,10 +199,15 @@ export default function AIChatbot() {
         }
     }, [flushStreamBuffer]);
 
-    // Cleanup rAF on unmount
+    // Cleanup rAF + abort any in-flight stream on unmount
     useEffect(() => {
         return () => {
+            mountedRef.current = false;
             if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+            if (abortRef.current) {
+                try { abortRef.current.abort(); } catch { /* already aborted */ }
+                abortRef.current = null;
+            }
         };
     }, []);
 
@@ -266,20 +276,8 @@ export default function AIChatbot() {
                 body: JSON.stringify({
                     message: messageText,
                     selectedSite: currentSite,
-                    analyticsContext: currentAnalytics ? {
-                        kpis: currentAnalytics.kpis,
-                        topSources: currentAnalytics.sources?.slice(0, 6),
-                        topPages: currentAnalytics.pages?.slice(0, 5),
-                        topCountries: currentAnalytics.countries?.slice(0, 6),
-                        devices: currentAnalytics.devices,
-                        channels: currentAnalytics.channels?.slice(0, 5),
-                    } : null,
-                    seoContext: currentSeo ? {
-                        kpis: currentSeo.kpis,
-                        topQueries: currentSeo.queries?.slice(0, 8),
-                        topPages: currentSeo.pages?.slice(0, 5),
-                        recommendations: currentSeo.recommendations?.slice(0, 3),
-                    } : null,
+                    analyticsContext: buildAnalyticsContext(currentAnalytics),
+                    seoContext: buildSeoContext(currentSeo),
                     history: currentMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                     mode: options?.mode,
                     // B1-full: pass the thread id so the server can load this thread's
@@ -486,6 +484,16 @@ export default function AIChatbot() {
             } catch { /* persistence is best-effort */ }
         } catch (err: any) {
             const isTimeout = err?.name === 'AbortError';
+            // Server refunds the credit on stream error. Re-fetch the balance so
+            // the UI doesn't keep showing the deducted (lower) value until the
+            // user reloads.
+            try {
+                const balanceRes = await fetch('/api/credits', { cache: 'no-store' });
+                if (balanceRes.ok) {
+                    const body = await balanceRes.json();
+                    if (typeof body?.credits === 'number') setCredits(body.credits);
+                }
+            } catch { /* best-effort */ }
             setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -511,6 +519,9 @@ export default function AIChatbot() {
         } finally {
             setIsLoading(false);
             setIsPlanning(false);
+            // Don't leak AbortController instances — release the ref so the
+            // GC can reclaim it and the next send starts from a clean slate.
+            abortRef.current = null;
         }
     }, [appendStreamText, flushStreamBuffer]); // stable deps only
 
@@ -570,40 +581,63 @@ export default function AIChatbot() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
 
+    const [historyError, setHistoryError] = useState<string | null>(null);
+
     const fetchHistory = useCallback(async () => {
         setHistoryLoading(true);
+        setHistoryError(null);
         try {
             const res = await fetch('/api/chat-store?action=list_threads&limit=30');
-            if (res.ok) {
-                const data = await res.json();
-                setHistoryThreads(Array.isArray(data?.threads) ? data.threads : []);
+            if (!res.ok) {
+                setHistoryError('Couldn\'t load past conversations. Try again.');
+                return;
             }
-        } catch { /* offline ok */ }
-        finally { setHistoryLoading(false); }
+            const data = await res.json();
+            setHistoryThreads(Array.isArray(data?.threads) ? data.threads : []);
+        } catch {
+            setHistoryError('Couldn\'t load past conversations. Try again.');
+        } finally { setHistoryLoading(false); }
     }, []);
 
     const loadThread = useCallback(async (threadId: string) => {
+        // Cancel any in-flight stream from the previous thread — otherwise
+        // the next chunk lands in the wrong thread's message list.
+        if (abortRef.current) {
+            try { abortRef.current.abort(); } catch { /* already aborted */ }
+            abortRef.current = null;
+        }
         setHistoryLoading(true);
         try {
             const res = await fetch(`/api/chat-store?action=list_messages&thread=${encodeURIComponent(threadId)}&limit=200`);
-            if (res.ok) {
-                const data = await res.json();
-                const msgs = Array.isArray(data?.messages) ? data.messages : [];
-                // Map server messages → client ChatMessage shape
-                const mapped: Message[] = msgs
-                    .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-                    .map((m: any) => ({
-                        role: m.role,
-                        content: m.content || '',
-                        timestamp: m.created_at || new Date().toISOString(),
-                        tools: m.tools_json ? (() => { try { return JSON.parse(m.tools_json); } catch { return undefined; } })() : undefined,
-                    }));
-                setActiveThreadId(threadId);
-                setMessages(mapped.length > 0 ? mapped : []);
-                setShowHistory(false);
+            if (!res.ok) {
+                toast.error('Couldn\'t load that conversation. Try again.');
+                return;
             }
-        } catch { /* swallow */ }
-        finally { setHistoryLoading(false); }
+            const data = await res.json();
+            const msgs = Array.isArray(data?.messages) ? data.messages : [];
+            // Carry the thread's site context forward so subsequent messages
+            // talk to the right site instead of inheriting the previous one.
+            const threadSite = (data?.thread?.site_url ?? data?.site_url) as string | undefined;
+            if (threadSite && typeof threadSite === 'string') {
+                setSelectedChatSite(threadSite);
+            }
+            // Map server messages → client ChatMessage shape
+            const mapped: Message[] = msgs
+                .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+                .map((m: any) => ({
+                    role: m.role,
+                    content: m.content || '',
+                    timestamp: m.created_at || new Date().toISOString(),
+                    // Return [] on parse error so MessageBubble still renders the row;
+                    // returning undefined here previously dropped tool history silently.
+                    tools: m.tools_json ? (() => { try { return JSON.parse(m.tools_json); } catch { return []; } })() : undefined,
+                }));
+            setActiveThreadId(threadId);
+            setMessages(mapped.length > 0 ? mapped : []);
+            setShowHistory(false);
+        } catch {
+            toast.error('Couldn\'t load that conversation. Try again.');
+        } finally { setHistoryLoading(false); }
     }, [setMessages]);
 
     const clearChat = useCallback(() => {
@@ -673,6 +707,8 @@ export default function AIChatbot() {
                     <HistoryPanel
                         threads={historyThreads}
                         loading={historyLoading}
+                        error={historyError}
+                        onRetry={fetchHistory}
                         onSelect={loadThread}
                         onClose={() => setShowHistory(false)}
                     />
@@ -723,6 +759,7 @@ export default function AIChatbot() {
                         briefingDoneToday={briefingDoneToday}
                         onBriefingClick={requestBriefing}
                         onPromptClick={(prompt) => sendMessage(prompt)}
+                        siteLabel={selectedChatSite ? selectedChatSite.replace(/^sc-domain:|^https?:\/\//, '').replace(/\/$/, '') : null}
                     />
                 )}
 

@@ -144,7 +144,12 @@ function loadFromStorage(): ChatMessage[] {
         const stored = localStorage.getItem(getStorageKey());
         if (stored) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                // Enforce MAX_MESSAGES on load too. Previously the cap only
+                // applied on save, so a localStorage entry written before the
+                // cap was added (or shrunk) could load 100+ messages.
+                return parsed.slice(-MAX_MESSAGES);
+            }
         }
     } catch { /* corrupted */ }
     return [];

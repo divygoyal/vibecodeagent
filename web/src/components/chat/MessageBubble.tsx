@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import ChatMessageRenderer from '../ChatMessageRenderer';
+import ChatErrorBoundary from './ChatErrorBoundary';
 import type { ChatMessage } from '@/stores/chatStore';
 import type { DashboardSnapshot } from './SnapshotChartRenderer';
 
@@ -33,16 +34,18 @@ export const MessageBubble = memo(function MessageBubble({
                 : 'text-zinc-300 px-1 py-1'
             }`}>
                 {msg.role === 'assistant' ? (
-                    <ChatMessageRenderer
-                        content={msg.content}
-                        tools={msg.tools}
-                        thinking={msg.thinking}
-                        plan={msg.plan}
-                        critic={msg.critic}
-                        isStreaming={isStreaming}
-                        snapshot={snapshot}
-                        onSuggestionClick={onSuggestionClick}
-                    />
+                    <ChatErrorBoundary label="message">
+                        <ChatMessageRenderer
+                            content={msg.content}
+                            tools={msg.tools}
+                            thinking={msg.thinking}
+                            plan={msg.plan}
+                            critic={msg.critic}
+                            isStreaming={isStreaming}
+                            snapshot={snapshot}
+                            onSuggestionClick={onSuggestionClick}
+                        />
+                    </ChatErrorBoundary>
                 ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}

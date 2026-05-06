@@ -55,7 +55,9 @@ export const ReasoningTrace = memo(function ReasoningTrace({ lines, active }: Re
     // tool-heavy turns. Older lines slide off the top, opacity fades from
     // 0.35 (oldest) → 1.0 (newest) — rolling-status-update pattern.
     const hasLines = lines.length > 0;
-    const VISIBLE_MAX = 3;
+    // Bumped from 3 → 5 so multi-tool runs leave more breadcrumbs on screen
+    // for the user to follow.
+    const VISIBLE_MAX = 5;
     const visibleLines = hasLines
         ? lines.slice(-VISIBLE_MAX)
         : [{ id: 'fb-' + phase, text: FALLBACK_PHRASES[phase] }];

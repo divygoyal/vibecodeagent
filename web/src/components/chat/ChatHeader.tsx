@@ -52,6 +52,9 @@ export function ChatHeader({
                         <button
                             onClick={() => setShowSiteDropdown(prev => !prev)}
                             className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors mt-0.5"
+                            aria-label="Switch website context for the chat"
+                            aria-expanded={showSiteDropdown}
+                            aria-haspopup="listbox"
                         >
                             <Globe className="w-2.5 h-2.5" />
                             <span className="max-w-[120px] truncate">{currentSiteLabel}</span>

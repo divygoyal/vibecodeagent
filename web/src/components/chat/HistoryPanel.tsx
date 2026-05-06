@@ -1,6 +1,6 @@
 'use client';
 
-import { History, Loader2, X } from 'lucide-react';
+import { AlertTriangle, History, Loader2, RotateCcw, X } from 'lucide-react';
 
 export interface HistoryThread {
     id: string;
@@ -14,6 +14,8 @@ export interface HistoryThread {
 interface HistoryPanelProps {
     threads: HistoryThread[];
     loading: boolean;
+    error?: string | null;
+    onRetry?: () => void;
     onSelect: (id: string) => void;
     onClose: () => void;
 }
@@ -25,7 +27,7 @@ interface HistoryPanelProps {
  *
  * Extracted from AIChatbot.tsx during B5-full split.
  */
-export function HistoryPanel({ threads, loading, onSelect, onClose }: HistoryPanelProps) {
+export function HistoryPanel({ threads, loading, error, onRetry, onSelect, onClose }: HistoryPanelProps) {
     return (
         <div className="absolute inset-x-0 top-[57px] bottom-0 z-40 bg-[var(--sidebar-bg)] border-t border-[var(--card-border)] flex flex-col">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--card-border)]">
@@ -44,7 +46,23 @@ export function HistoryPanel({ threads, loading, onSelect, onClose }: HistoryPan
                         <Loader2 className="w-4 h-4 animate-spin" />
                     </div>
                 )}
-                {!loading && threads.length === 0 && (
+                {!loading && error && (
+                    <div className="px-4 py-8 text-center">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
+                        <p className="text-[12px] text-zinc-400 mb-3">{error}</p>
+                        {onRetry && (
+                            <button
+                                type="button"
+                                onClick={onRetry}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[11px] text-zinc-200 hover:bg-white/[0.08] transition"
+                            >
+                                <RotateCcw className="w-3 h-3" />
+                                Retry
+                            </button>
+                        )}
+                    </div>
+                )}
+                {!loading && !error && threads.length === 0 && (
                     <div className="px-4 py-8 text-center text-[12px] text-zinc-500">
                         No saved conversations yet. Send a message to start one.
                     </div>

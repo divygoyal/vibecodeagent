@@ -14,7 +14,43 @@ function normalizeCtr(ctr: unknown): number {
     // Threshold: values < 1 are definitely decimals. Values >= 1 could be either,
     // but fetchSeoDashboard already converts to percentage, so treat >= 1 as-is.
     const result = val < 1 ? val * 100 : val;
-    return Math.min(100, Math.round(result * 10) / 10);
+    // Clamp on BOTH sides — a malformed upstream sending negative values
+    // would otherwise produce a negative-CTR chart.
+    return Math.max(0, Math.min(100, Math.round(result * 10) / 10));
+}
+
+/**
+ * Compact analytics context used in the /api/ai-chat request body.
+ * Centralised here so AIChatbot.tsx and the full-screen ai-chat page send
+ * the same shape — previously each surface inlined slightly different
+ * slice() sizes and field shapes, so the assistant saw subtly different
+ * snapshots depending on which entry point the user came from.
+ */
+export function buildAnalyticsContext(analytics: any): Record<string, unknown> | null {
+    if (!analytics) return null;
+    return {
+        kpis: analytics.kpis,
+        topSources: analytics.sources?.slice(0, 8),
+        topPages: analytics.pages?.slice(0, 8),
+        topCountries: analytics.countries?.slice(0, 8),
+        devices: analytics.devices,
+        channels: analytics.channels?.slice(0, 6),
+    };
+}
+
+/**
+ * Compact SEO context for /api/ai-chat. Same rationale as
+ * `buildAnalyticsContext` — single source of truth for the assistant
+ * payload shape.
+ */
+export function buildSeoContext(seo: any): Record<string, unknown> | null {
+    if (!seo) return null;
+    return {
+        kpis: seo.kpis,
+        topQueries: seo.queries?.slice(0, 15),
+        topPages: seo.pages?.slice(0, 8),
+        recommendations: seo.recommendations?.slice(0, 3),
+    };
 }
 
 /**

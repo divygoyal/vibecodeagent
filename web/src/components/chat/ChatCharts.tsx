@@ -159,15 +159,26 @@ export const HorizontalBarChart = memo(function HorizontalBarChart({ rows, dimKe
 }) {
     const data = useMemo(() => {
         if (!rows?.length) return [];
+        // Tolerate the field-name drift across upstreams (GSC: clicks, GA4:
+        // sessions, OpenPanel: users, Umami: pageviews, internal: value).
+        const valueOf = (r: any): number => {
+            const n = Number(r.clicks ?? r.sessions ?? r.users ?? r.value ?? r.count ?? r.pageviews ?? 0);
+            return Number.isFinite(n) ? n : 0;
+        };
+        const imprOf = (r: any): number => {
+            const n = Number(r.impressions ?? r.views ?? 0);
+            return Number.isFinite(n) ? n : 0;
+        };
         return rows.slice(0, 8).map(r => {
             const label = String(r[dimKey] || r.query || r.page || '');
             return {
                 name: label.length > 32 ? label.slice(0, 32) + '…' : label,
                 fullName: label,
-                Clicks: r.clicks || 0,
-                Impressions: r.impressions || 0,
+                Clicks: valueOf(r),
+                Impressions: imprOf(r),
             };
-        }).sort((a, b) => b.Clicks - a.Clicks); // ensure descending; reverse() at render time
+        }).filter(d => d.Clicks > 0 || d.Impressions > 0)
+          .sort((a, b) => b.Clicks - a.Clicks); // ensure descending; reverse() at render time
     }, [rows, dimKey]);
 
     if (data.length === 0) return null;
@@ -231,13 +242,17 @@ export const HorizontalBarChart = memo(function HorizontalBarChart({ rows, dimKe
 export const DeviceDonutChart = memo(function DeviceDonutChart({ rows }: { rows: any[] }) {
     const data = useMemo(() => {
         if (!rows?.length) return [];
-        const total = rows.reduce((s, r) => s + (r.clicks || r.value || 0), 0);
+        const valueOf = (r: any): number => {
+            const n = Number(r.clicks ?? r.sessions ?? r.users ?? r.value ?? r.count ?? r.pageviews ?? 0);
+            return Number.isFinite(n) ? n : 0;
+        };
+        const total = rows.reduce((s, r) => s + valueOf(r), 0);
         return rows.map(r => {
             const raw = (r.device || r.name || 'Unknown') as string;
             const name = raw.charAt(0).toUpperCase() + raw.slice(1);
-            const value = r.clicks || r.value || 0;
+            const value = valueOf(r);
             return { name, value, pct: total > 0 ? ((value / total) * 100).toFixed(1) : (r.percentage || 0) };
-        });
+        }).filter(d => d.value > 0);
     }, [rows]);
 
     if (data.length === 0) return null;
@@ -594,5 +609,51 @@ export const SmartChartPanel = memo(function SmartChartPanel({ result }: { resul
     }
     if (hasPage) return <div className="chat-charts-panel"><HorizontalBarChart rows={rows} dimKey="page" title="Top Pages by Clicks" /></div>;
     if (hasPositionData(rows)) return <div className="chat-charts-panel"><PositionDistributionChart rows={rows} /></div>;
-    return null;
+    // Generic fallback so we never render nothing when rows are present —
+    // previously SmartChartPanel returned null for unknown dimension
+    // shapes and the user saw the assistant answer with no chart at all.
+    return <div className="chat-charts-panel"><GenericRowsTable rows={rows} dimensions={dimensions} /></div>;
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   GENERIC FALLBACK TABLE — last resort for unknown dimension shapes
+   so the user always sees the data, even when no specialised chart
+   matches.
+   ═══════════════════════════════════════════════════════════════ */
+
+const GenericRowsTable = memo(function GenericRowsTable({ rows, dimensions }: { rows: any[]; dimensions: string[] }) {
+    const cols = useMemo(() => {
+        if (!rows.length) return [];
+        const keys = Object.keys(rows[0]).slice(0, 6);
+        // Surface dimension keys first if present, then the rest.
+        return [...dimensions.filter(d => keys.includes(d)), ...keys.filter(k => !dimensions.includes(k))].slice(0, 6);
+    }, [rows, dimensions]);
+    if (!cols.length) return null;
+    return (
+        <div className={`${CARD} my-3 p-4 pl-5 overflow-x-auto`}>
+            <div className={ACCENT_BAR} />
+            <ChartHeader title="Result" sub={`${rows.length} rows`} />
+            <table className="w-full text-[12px] text-zinc-300">
+                <thead>
+                    <tr className="border-b border-white/[0.06] text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                        {cols.map(c => <th key={c} className="px-2 py-1.5 text-left">{c}</th>)}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.slice(0, 12).map((r, i) => (
+                        <tr key={i} className="border-b border-white/[0.04] last:border-b-0">
+                            {cols.map(c => (
+                                <td key={c} className="px-2 py-1.5 truncate max-w-[200px] tabular-nums">
+                                    {typeof r[c] === 'number' ? r[c].toLocaleString() : String(r[c] ?? '—')}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {rows.length > 12 && (
+                <p className="mt-2 text-[11px] text-zinc-600">+ {rows.length - 12} more rows</p>
+            )}
+        </div>
+    );
 });

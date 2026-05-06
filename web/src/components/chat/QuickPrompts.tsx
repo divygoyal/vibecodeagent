@@ -1,23 +1,32 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Sun } from 'lucide-react';
 
-const QUICK_PROMPTS = [
-    '🎯 What is the ONE thing I should do today to grow?',
-    '🚨 Why did my traffic drop?',
-    '💰 Which pages are money pits? (high impressions, low clicks)',
-    '📈 Keywords on page 2 I can push to page 1',
-    '📝 Give me 5 blog post ideas based on my data',
-    '📊 Grade my SEO (A-F)',
-    '⚡ Are my Core Web Vitals hurting my rankings?',
-    '🔮 Growth opportunities I am missing',
-];
+function buildPrompts(siteLabel: string | null): string[] {
+    // When we know the user's site, name it explicitly so the prompts feel
+    // bespoke. Falls back to generic copy when no site is selected.
+    const tag = siteLabel ? `for ${siteLabel}` : '';
+    const ownership = siteLabel ? `${siteLabel}'s` : 'my';
+    return [
+        `🎯 What is the ONE thing I should do today to grow ${ownership} traffic?`,
+        `🚨 Why did ${ownership} traffic drop?`,
+        `💰 Which ${ownership} pages are money pits? (high impressions, low clicks)`,
+        `📈 Keywords on page 2 I can push to page 1 ${tag}`.trim(),
+        `📝 Give me 5 blog post ideas based on ${ownership} data`,
+        `📊 Grade ${ownership} SEO (A-F)`,
+        `⚡ Are ${ownership} Core Web Vitals hurting rankings?`,
+        `🔮 Growth opportunities ${ownership} site is missing`,
+    ];
+}
 
 interface QuickPromptsProps {
     dataReady: boolean;
     briefingDoneToday: boolean;
     onBriefingClick: () => void;
     onPromptClick: (prompt: string) => void;
+    /** Optional friendly site label (e.g. "antigravity.codes") used to personalise prompts. */
+    siteLabel?: string | null;
 }
 
 /**
@@ -26,7 +35,8 @@ interface QuickPromptsProps {
  *
  * Extracted from AIChatbot.tsx during B5-full split.
  */
-export function QuickPrompts({ dataReady, briefingDoneToday, onBriefingClick, onPromptClick }: QuickPromptsProps) {
+export function QuickPrompts({ dataReady, briefingDoneToday, onBriefingClick, onPromptClick, siteLabel }: QuickPromptsProps) {
+    const prompts = useMemo(() => buildPrompts(siteLabel ?? null), [siteLabel]);
     return (
         <div className="px-4 pb-2">
             {!dataReady && (
@@ -45,7 +55,7 @@ export function QuickPrompts({ dataReady, briefingDoneToday, onBriefingClick, on
                     <Sun className="w-3 h-3" />
                     {briefingDoneToday ? 'Briefing — already viewed' : 'Daily Briefing'}
                 </button>
-                {QUICK_PROMPTS.map((prompt, i) => (
+                {prompts.map((prompt, i) => (
                     <button
                         key={i}
                         onClick={() => onPromptClick(prompt)}

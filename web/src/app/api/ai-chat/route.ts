@@ -667,7 +667,9 @@ CRITICAL SYSTEM CONTEXT:
                             } catch (modelErr: any) {
                                 lastError = modelErr;
                                 if (isRetryableError(modelErr)) {
-                                    console.warn(`[AI-CHAT] ${model} unavailable (${modelErr?.message?.slice(0, 80)}), trying next fallback...`);
+                                    if (process.env.NODE_ENV === 'development') {
+                                        console.warn(`[AI-CHAT] ${model} unavailable (${modelErr?.message?.slice(0, 80)}), trying next fallback...`);
+                                    }
                                     continue;
                                 }
                                 throw modelErr; // non-retryable error, propagate
@@ -765,11 +767,23 @@ CRITICAL SYSTEM CONTEXT:
                                         'analyze_pr_seo_diff', 'compute_site_health_score',
                                     ]);
                                     let progressTimer: ReturnType<typeof setInterval> | null = null;
+                                    let slowWarningEmitted = false;
                                     if (SLOW_TOOLS.has(fcName)) {
                                         progressTimer = setInterval(() => {
                                             const elapsed = Math.round((Date.now() - toolStartedAt) / 1000);
                                             try {
                                                 controller.enqueue(encodeSSE({ type: 'tool_progress', name: fcName, elapsedSec: elapsed }));
+                                                // Tell the user we're about to give up so the abort at the
+                                                // 90s deadline isn't a surprise.
+                                                if (!slowWarningEmitted && elapsed >= 75) {
+                                                    slowWarningEmitted = true;
+                                                    controller.enqueue(encodeSSE({
+                                                        type: 'tool_progress',
+                                                        name: fcName,
+                                                        elapsedSec: elapsed,
+                                                        warning: 'Stopping soon — this tool is unusually slow.',
+                                                    }));
+                                                }
                                             } catch { /* controller may be closed */ }
                                         }, 2500);
                                     }
@@ -871,7 +885,9 @@ CRITICAL SYSTEM CONTEXT:
                                 });
                             }
                         } catch (rescueErr: any) {
-                            console.warn('[AI-CHAT] rescue pass failed:', rescueErr?.message?.slice(0, 100));
+                            if (process.env.NODE_ENV === 'development') {
+                                console.warn('[AI-CHAT] rescue pass failed:', rescueErr?.message?.slice(0, 100));
+                            }
                         }
                     }
                     // If even the rescue produced no text, surface a graceful note
@@ -976,7 +992,9 @@ CRITICAL SYSTEM CONTEXT:
                     }
                 } catch (error: any) {
                     try {
-                        console.error('[AI-CHAT] Stream error:', error?.message || error, error?.name);
+                        if (process.env.NODE_ENV === 'development') {
+                            console.error('[AI-CHAT] Stream error:', error?.message || error, error?.name);
+                        }
                         // Refund the credit since the request failed
                         if (ADMIN_API_KEY && userId) {
                             const refunded = await refundCredits(String(userId));

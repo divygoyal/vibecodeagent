@@ -41,18 +41,24 @@ const CHART_TAG_RE = /<!--\s*chart:(\w+)(?::([^-][^>]*?))?\s*-->/g;
 /**
  * Split markdown content on `<!-- chart:xxx -->` tags.
  * Returns interleaved text and chart segments.
- * Handles incomplete tags during streaming by hiding them.
+ * Handles incomplete tags during streaming by hiding them — including
+ * tags that are split across stream chunks (e.g. "<!-- char" arrives in
+ * one chunk and "t:countries -->" in the next; without the carry-over
+ * check the half-tag would render as visible text in the meantime).
  */
 export function splitContentOnChartTags(content: string): Segment[] {
     if (!content) return [];
 
-    // Check for incomplete chart tag at end (streaming)
-    const incompleteIdx = content.lastIndexOf('<!--');
-    const hasComplete = incompleteIdx >= 0 && content.indexOf('-->', incompleteIdx) >= 0;
+    // Check for incomplete chart tag at end (streaming). Look only at the
+    // final ~120 chars so a comment block earlier in the message doesn't
+    // hide the rest of the body.
+    const tail = content.slice(-120);
+    const tailIncompleteIdx = tail.lastIndexOf('<!--');
+    const tailHasComplete = tailIncompleteIdx >= 0 && tail.indexOf('-->', tailIncompleteIdx) >= 0;
     let safeContent = content;
-    if (incompleteIdx >= 0 && !hasComplete) {
-        // Hide the partial tag while streaming
-        safeContent = content.slice(0, incompleteIdx);
+    if (tailIncompleteIdx >= 0 && !tailHasComplete) {
+        // Hide the partial tag (and anything after it in the tail) while streaming.
+        safeContent = content.slice(0, content.length - tail.length + tailIncompleteIdx);
     }
 
     const segments: Segment[] = [];
