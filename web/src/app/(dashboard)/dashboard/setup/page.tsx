@@ -179,6 +179,12 @@ export default function SetupPage() {
         hasGa4: false,
         hasGsc: false,
     });
+    // Loading state for the Done-screen "Go to workspace" button. The button
+    // re-runs markSetupCompleted before navigating (in case finishSetup's
+    // 12s timeout cut off updateSession() and left the JWT claim stale —
+    // without the refreshed claim, middleware.ts bounces /dashboard/ai-chat
+    // straight back to /dashboard/setup and the click looks dead.
+    const [navigating, setNavigating] = useState(false);
 
     // greeting + userName must be CLIENT-ONLY. `new Date().getHours()` returns
     // the server's UTC hour during SSR and the client's local hour after
@@ -701,16 +707,37 @@ export default function SetupPage() {
                     </div>
                     <button
                         type="button"
-                        onClick={() => router.push('/dashboard/ai-chat')}
-                        className="group w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)]"
+                        onClick={async () => {
+                            if (navigating) return;
+                            setNavigating(true);
+                            // Idempotent retry — if finishSetup's withTimeout
+                            // raced past updateSession() the JWT claim is still
+                            // false on disk. Re-running the PATCH + session
+                            // update guarantees the cookie is fresh before we
+                            // navigate, otherwise middleware bounces us right
+                            // back to /dashboard/setup and the click looks dead.
+                            await markSetupCompleted();
+                            // Hard navigation rather than router.push so the
+                            // browser ships the just-refreshed JWT cookie with
+                            // the request. router.push can race the cookie
+                            // write and hit middleware with the stale value.
+                            window.location.href = '/dashboard/ai-chat';
+                        }}
+                        disabled={navigating}
+                        className="group w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)] disabled:opacity-80 disabled:cursor-wait"
                     >
-                        Go to workspace
-                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                        {navigating ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Opening workspace…
+                            </>
+                        ) : (
+                            <>
+                                Go to workspace
+                                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                            </>
+                        )}
                     </button>
-                    <p className="mt-4 text-[11px] text-zinc-500 inline-flex items-center gap-1.5">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        TrafficClaw is preparing your dashboard.
-                    </p>
                 </div>
 
 
