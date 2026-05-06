@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Eye, Hash, MousePointer, Search, type LucideIcon } from 'lucide-react';
 import { formatCompactNumber, formatPercent } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import type { SeoTrendPoint } from './SeoTrendPanel';
@@ -101,7 +101,13 @@ function KpiCard({ icon: Icon, iconTone, label, value, rangeLabel, change, inver
 }
 
 export default function SeoKpiGrid({ kpis, trend, rangeDays }: SeoKpiGridProps) {
-    const rangeLabel = useMemo(() => formatRangeLabel(rangeDays), [rangeDays]);
+    // Compute the comparison-period label client-side only — `new Date()`
+    // would otherwise produce different output on the server vs the client
+    // (different render times) and trigger a hydration mismatch (#418) → #310.
+    const [rangeLabel, setRangeLabel] = useState('');
+    useEffect(() => {
+        setRangeLabel(formatRangeLabel(rangeDays));
+    }, [rangeDays]);
 
     return (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

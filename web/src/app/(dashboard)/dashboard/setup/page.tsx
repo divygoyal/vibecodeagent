@@ -295,17 +295,27 @@ export default function SetupPage() {
     };
 
     const onContinueWithDemo = async () => {
+        if (saving) return;
         setSaving(true);
-        const ok = await saveWorkspace({
-            property: DEMO_PROPERTY_ID,
-            site: DEMO_SITE_URL,
-            label: 'Demo workspace',
-        });
-        if (ok) await markSetupCompleted();
-        setSaving(false);
-        if (ok) {
-            setDoneSnapshot({ label: 'Demo workspace', hasGa4: true, hasGsc: true });
-            setStep('done');
+        setSaveError(null);
+        try {
+            const ok = await saveWorkspace({
+                property: DEMO_PROPERTY_ID,
+                site: DEMO_SITE_URL,
+                label: 'Demo workspace',
+            });
+            if (!ok) {
+                setSaveError('Could not save the demo workspace. Try again.');
+                setSaving(false);
+                return;
+            }
+            await markSetupCompleted();
+            // Skip the intermediate "Done" screen — the user explicitly chose demo,
+            // they want to land on the dashboard immediately.
+            router.push('/dashboard/ai-chat');
+        } catch {
+            setSaveError('Could not save the demo workspace. Try again.');
+            setSaving(false);
         }
     };
 
@@ -350,9 +360,12 @@ export default function SetupPage() {
                         disabled={saving}
                         className="px-6 py-3 rounded-2xl bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.08] transition-colors text-sm font-medium disabled:opacity-50"
                     >
-                        Continue with demo data →
+                        {saving ? 'Loading demo workspace…' : 'Continue with demo data →'}
                     </button>
                 </div>
+                {saveError && (
+                    <p className="mt-4 text-[12px] text-red-300">{saveError}</p>
+                )}
             </div>
         );
     }
@@ -386,9 +399,12 @@ export default function SetupPage() {
                         disabled={saving}
                         className="px-6 py-3 rounded-2xl bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.08] transition-colors text-sm font-medium disabled:opacity-50"
                     >
-                        Continue with demo data →
+                        {saving ? 'Loading demo workspace…' : 'Continue with demo data →'}
                     </button>
                 </div>
+                {saveError && (
+                    <p className="mt-4 text-[12px] text-red-300">{saveError}</p>
+                )}
             </div>
         );
     }
