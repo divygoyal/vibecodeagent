@@ -625,17 +625,9 @@ export default function SetupPage() {
 
     // ─── STEP 2 ──────────────────────────────────────────────────────
 
-    // The "primary" pick from Step 1 (always set on this step)
-    const primaryLabel = chosenProperty
-        ? (properties.find((p) => p.property === chosenProperty)?.displayName || chosenProperty)
-        : (chosenSite ? formatSiteLabel(chosenSite) : '');
-
     const askingAboutGsc = !gscOnlyMode; // GA4 was Step 1, ask about GSC in Step 2
     const step2Loading = askingAboutGsc ? sitesLoading : propsLoading;
     const step2Error = askingAboutGsc ? sitesError : propsError;
-    const stepTitle = askingAboutGsc
-        ? 'Got Search Console for this site?'
-        : 'Got Google Analytics for this site?';
     const stepSub = askingAboutGsc
         ? "If you have a Search Console property for this site, pick it. Otherwise skip — you can always add it later."
         : "If you have a GA4 property for this site, pick it. Otherwise skip — you can always add it later.";
@@ -784,23 +776,7 @@ export default function SetupPage() {
                 </button>
             </div>
 
-            {/* Selected-website summary card */}
-            <div className="mb-3 rounded-2xl border border-[#14C4E1]/22 bg-[#0a0d12]/80 backdrop-blur-sm p-4 shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
-                <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-2">
-                    Selected website
-                </div>
-                {chosenProperty ? (
-                    <SelectedGa4Summary propertyId={chosenProperty} displayName={primaryLabel} />
-                ) : chosenSite ? (
-                    <SelectedGscSummary siteUrl={chosenSite} />
-                ) : null}
-            </div>
-
             <div className="rounded-2xl border border-white/[0.08] bg-[#0a0d12]/80 backdrop-blur-sm p-5 shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
-                <div className="text-[12.5px] font-semibold text-white mb-3">
-                    {stepTitle}
-                </div>
-
                 <div className="relative mb-4 group">
                     <span aria-hidden className="pointer-events-none absolute -inset-px rounded-xl bg-gradient-to-r from-[#14C4E1]/0 via-[#14C4E1]/15 to-[#14C4E1]/0 opacity-0 group-focus-within:opacity-100 blur-md transition-opacity duration-300" />
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10 w-4 h-4 text-zinc-400 group-focus-within:text-[#7AD9DA] transition-colors" />
@@ -1154,59 +1130,6 @@ function WebsiteCardGsc({
                 </span>
             </div>
         </button>
-    );
-}
-
-// ─── SelectedGa4Summary / SelectedGscSummary ────────────────────────
-// Small "what you picked" cards rendered above Step 2's list. Reuse the
-// SWR cache from the Step 1 cards (same URL, same dedupe key) so the
-// summary appears instantly without an extra fetch.
-
-function SelectedGa4Summary({ propertyId, displayName }: { propertyId: string; displayName: string }) {
-    const { data } = useAnalyticsData('all', propertyId, true, '30d', false);
-    const total = typeof data?.kpis?.totalUsers === 'number' ? data.kpis.totalUsers : 0;
-    return (
-        <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl border border-[#14C4E1]/22 bg-[#14C4E1]/[0.10] flex items-center justify-center flex-shrink-0">
-                <GlobeIcon className="w-4 h-4 text-[#7AD9DA]" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white truncate">{displayName}</div>
-                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
-                        <CheckCircle2 className="w-2.5 h-2.5" />
-                        GA4 connected
-                    </span>
-                    {total > 0 && (
-                        <span className="text-[10.5px] text-zinc-500">·  {formatCompact(total)} visitors</span>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function SelectedGscSummary({ siteUrl }: { siteUrl: string }) {
-    const { data } = useSeoData('all', siteUrl, true, '30d', false);
-    const total = typeof data?.kpis?.totalClicks === 'number' ? data.kpis.totalClicks : 0;
-    return (
-        <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl border border-[#14C4E1]/22 bg-[#14C4E1]/[0.10] flex items-center justify-center flex-shrink-0">
-                <GlobeIcon className="w-4 h-4 text-[#7AD9DA]" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white truncate">{formatSiteLabel(siteUrl)}</div>
-                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/[0.10] border border-emerald-500/25 text-[10px] font-medium text-emerald-300">
-                        <CheckCircle2 className="w-2.5 h-2.5" />
-                        Search Console connected
-                    </span>
-                    {total > 0 && (
-                        <span className="text-[10.5px] text-zinc-500">·  {formatCompact(total)} clicks</span>
-                    )}
-                </div>
-            </div>
-        </div>
     );
 }
 
