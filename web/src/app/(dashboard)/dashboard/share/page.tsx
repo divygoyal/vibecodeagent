@@ -8,9 +8,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ShareData } from '@/lib/shareTypes';
-import { DEFAULT_SHARE_ACCENT } from '@/lib/shareTypes';
+import { DEFAULT_SHARE_ACCENT, OVERVIEW_SHARE_CONFIG } from '@/lib/shareTypes';
 import { getPublicShareUrl } from '@/lib/shareUrls';
-import ShareDashboardModal from '@/components/ShareDashboardModal';
 import { useRegistration } from '../layout';
 
 function formatSiteLabel(url: string): string {
@@ -36,8 +35,12 @@ export default function ShareLandingPage() {
   const [shares, setShares] = useState<ShareData[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [recentlyCreated, setRecentlyCreated] = useState<Set<string>>(new Set());
+  // "+ New shared dashboard" — POSTs /api/share with the default config and
+  // routes straight to the customization studio. No intermediate modal: the
+  // studio IS the creation surface, and Save there opens the share-links
+  // popup. `creating` powers the inline button spinner so a slow POST
+  // doesn't look like the click did nothing.
+  const [creating, setCreating] = useState(false);
 
   const fetchShares = useCallback(async () => {
     try {
@@ -45,21 +48,49 @@ export default function ShareLandingPage() {
       const data = await res.json();
       const list: ShareData[] = data.shares ?? [];
       setShares(list);
-      const fresh = list.find((s) => recentlyCreated.has(s.token));
-      if (fresh) {
-        router.push(`/dashboard/share/${fresh.token}`);
-      }
     } catch (err) {
       console.error('Failed to fetch shares:', err);
       toast.error('Failed to load shares');
     } finally {
       setLoading(false);
     }
-  }, [recentlyCreated, router]);
+  }, []);
 
   useEffect(() => {
     fetchShares();
   }, [fetchShares]);
+
+  const handleCreate = useCallback(async () => {
+    if (creating) return;
+    if (!resolvedPropertyId) {
+      toast.error('Pick a property in the sidebar first');
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyId: resolvedPropertyId,
+          siteUrl: resolvedSiteUrl || '',
+          config: OVERVIEW_SHARE_CONFIG,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create shared dashboard');
+      }
+      const token = data?.share?.token;
+      if (!token) throw new Error('Share created but no token returned');
+      router.push(`/dashboard/share/${token}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create shared dashboard');
+      setCreating(false);
+    }
+    // No `finally` — on success we're navigating away, leaving the spinner
+    // visible covers the gap between the POST resolving and the route change.
+  }, [creating, resolvedPropertyId, resolvedSiteUrl, router]);
 
   const handleCopyLink = useCallback((token: string) => {
     if (typeof navigator === 'undefined' || !navigator.clipboard) return;
@@ -128,14 +159,23 @@ export default function ShareLandingPage() {
           </div>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
-            disabled={!canCreate}
+            onClick={handleCreate}
+            disabled={!canCreate || creating}
             title={canCreate ? undefined : 'Pick a property in the sidebar first'}
             className="group flex flex-shrink-0 items-center gap-2 self-start rounded-full border border-[#14C4E1]/30 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-4 py-2.5 text-sm font-semibold text-[#031017] shadow-[0_18px_44px_rgba(20,196,225,0.18)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
           >
-            <Plus className="h-4 w-4" />
-            New shared dashboard
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            {creating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating…
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                New shared dashboard
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -153,13 +193,22 @@ export default function ShareLandingPage() {
           </p>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
-            disabled={!canCreate}
+            onClick={handleCreate}
+            disabled={!canCreate || creating}
             title={canCreate ? undefined : 'Pick a property in the sidebar first'}
             className="inline-flex items-center gap-1.5 rounded-full border border-[#14C4E1]/30 bg-[#14C4E1]/15 px-4 py-2 text-xs font-medium text-[#7AD9DA] transition-colors hover:bg-[#14C4E1]/25 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            Create your first share
+            {creating ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Creating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" />
+                Create your first share
+              </>
+            )}
           </button>
         </div>
       ) : (
@@ -262,28 +311,6 @@ export default function ShareLandingPage() {
         </div>
       )}
 
-      <ShareDashboardModal
-        open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          const previousTokens = new Set(shares.map((s) => s.token));
-          fetch('/api/share')
-            .then((res) => res.json())
-            .then((data) => {
-              const list: ShareData[] = data.shares ?? [];
-              const fresh = list.find((s) => !previousTokens.has(s.token));
-              if (fresh) {
-                setRecentlyCreated((prev) => new Set(prev).add(fresh.token));
-                router.push(`/dashboard/share/${fresh.token}`);
-              } else {
-                setShares(list);
-              }
-            })
-            .catch(() => fetchShares());
-        }}
-        propertyId={resolvedPropertyId}
-        siteUrl={resolvedSiteUrl}
-      />
     </div>
   );
 }

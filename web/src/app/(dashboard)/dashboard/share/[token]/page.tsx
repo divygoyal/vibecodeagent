@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Palette, Sparkles, Link2, SlidersHorizontal, Save, Loader2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Layers, Palette, Sparkles, Link2, SlidersHorizontal, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { NormalizedShareConfig, ShareData } from '@/lib/shareTypes';
 import { useCredits } from '@/lib/useDashboardData';
@@ -11,6 +11,7 @@ import ShareThemePanel from '@/components/share-studio/ShareThemePanel';
 import ShareBrandingPanel from '@/components/share-studio/ShareBrandingPanel';
 import ShareDefaultsPanel from '@/components/share-studio/ShareDefaultsPanel';
 import ShareLinkPanel from '@/components/share-studio/ShareLinkPanel';
+import ShareLinksDialog from '@/components/share-studio/ShareLinksDialog';
 import SharePreviewIframe from '@/components/share-studio/SharePreviewIframe';
 
 type StudioTab = 'layout' | 'theme' | 'branding' | 'defaults' | 'links';
@@ -43,7 +44,11 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<StudioTab>('layout');
-  const [showPreview, setShowPreview] = useState(true);
+  // Share-links popup that opens after the user clicks Save. The Preview/
+  // Discard toggles were removed in favour of a streamlined save → share
+  // flow; the live preview is now always visible to the right of the
+  // editor panels.
+  const [linksDialogOpen, setLinksDialogOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState<string>('init');
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -117,7 +122,13 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
   const isDirty = useMemo(() => !configsEqual(draft, savedConfig), [draft, savedConfig]);
 
   const handleSave = useCallback(async () => {
-    if (!draft || !isDirty) return;
+    if (!draft) return;
+    // Skip the network round-trip when nothing changed — the user might be
+    // clicking Save just to re-open the share-links dialog.
+    if (!isDirty) {
+      setLinksDialogOpen(true);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/share?token=${encodeURIComponent(token)}`, {
@@ -137,17 +148,13 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
       }
       setReloadKey(`${Date.now()}`);
       toast.success('Saved');
+      setLinksDialogOpen(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
   }, [draft, isDirty, token]);
-
-  const handleDiscard = useCallback(() => {
-    if (!savedConfig) return;
-    setDraft(savedConfig);
-  }, [savedConfig]);
 
   /* Cmd/Ctrl+S to save */
   useEffect(() => {
@@ -212,26 +219,8 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setShowPreview((p) => !p)}
-            className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
-              showPreview ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/60 hover:bg-white/5'
-            }`}
-          >
-            {showPreview ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            Preview
-          </button>
-          <button
-            type="button"
-            onClick={handleDiscard}
-            disabled={!isDirty}
-            className="rounded-lg px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            Discard
-          </button>
-          <button
-            type="button"
             onClick={handleSave}
-            disabled={!isDirty || saving}
+            disabled={saving}
             className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
@@ -296,25 +285,25 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
           </div>
         </div>
 
-        {/* Preview pane */}
-        {showPreview ? (
-          <div className="hidden min-w-0 flex-1 lg:flex">
-            <div className="min-w-0 flex-1">
-              <SharePreviewIframe ref={iframeRef} token={token} reloadKey={reloadKey} />
-            </div>
+        {/* Preview pane — always rendered now that the Preview toggle is gone. */}
+        <div className="hidden min-w-0 flex-1 lg:flex">
+          <div className="min-w-0 flex-1">
+            <SharePreviewIframe ref={iframeRef} token={token} reloadKey={reloadKey} />
           </div>
-        ) : (
-          <div className="hidden flex-1 items-center justify-center text-xs text-white/30 lg:flex">
-            <button
-              type="button"
-              onClick={() => setShowPreview(true)}
-              className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 hover:bg-white/[0.05]"
-            >
-              Show live preview
-            </button>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Share-links popup. Opens after a successful Save (or directly on
+          Save when the draft is clean). Closing it returns the user to the
+          dashboard list, where the freshly-saved share appears as a card. */}
+      <ShareLinksDialog
+        open={linksDialogOpen}
+        token={token}
+        onClose={() => {
+          setLinksDialogOpen(false);
+          router.push('/dashboard/share');
+        }}
+      />
     </div>
   );
 }
