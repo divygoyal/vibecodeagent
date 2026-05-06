@@ -180,13 +180,25 @@ export default function SetupPage() {
         hasGsc: false,
     });
 
-    const userName = session?.user?.name?.split(' ')[0] || 'there';
-    const greeting = (() => {
+    // greeting + userName must be CLIENT-ONLY. `new Date().getHours()` returns
+    // the server's UTC hour during SSR and the client's local hour after
+    // hydration; if they differ React throws hydration error #418 → recovery
+    // loop → "Something went wrong" boundary. Same problem for `userName`,
+    // which is null during SSR (useSession() hasn't resolved yet) and the
+    // real name after mount. Both are deferred to a useEffect — empty
+    // string on first render, populated post-mount. Mirrors the timeOfDay
+    // fix at ai-chat/page.tsx:689.
+    const [greeting, setGreeting] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string>('');
+    useEffect(() => {
         const hr = new Date().getHours();
-        if (hr < 12) return 'Good morning';
-        if (hr < 17) return 'Good afternoon';
-        return 'Good evening';
-    })();
+        setGreeting(hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening');
+    }, []);
+    useEffect(() => {
+        const name = session?.user?.name?.split(' ')[0];
+        if (name) setUserName(name);
+        else setUserName('there');
+    }, [session?.user?.name]);
 
     // Inverted mode — user has only GSC sites, no GA4 inventory at all.
     // Step 1 picks a GSC site, Step 2 (optional) pairs a GA4 property.
@@ -259,6 +271,16 @@ export default function SetupPage() {
         }
     }, [updateSession]);
 
+    // Hard 12s cap on any save — the admin API has been seen to take 8s+
+    // with 504s under load. Without this, the button can stick at "Saving…"
+    // for the user's perceived eternity.
+    const withTimeout = <T,>(p: Promise<T>, ms = 12000): Promise<T | 'timeout'> => {
+        const timeoutPromise = new Promise<'timeout'>((resolve) => {
+            setTimeout(() => resolve('timeout'), ms);
+        });
+        return Promise.race<T | 'timeout'>([p, timeoutPromise]);
+    };
+
     // Helper used by both Step 2 buttons — saves with the explicit values
     // passed in (so we don't race React state updates from the Use/Skip click).
     // Computes the label from the explicit values too.
@@ -274,17 +296,19 @@ export default function SetupPage() {
         } else if (finalSite) {
             label = rootDomainFromSite(finalSite);
         }
-        const ok = await saveWorkspace({
-            property: finalProperty,
-            site: finalSite,
-            label,
-        });
-        if (ok) await markSetupCompleted();
-        setSaving(false);
-        if (!ok) {
-            setSaveError('Could not save your workspace. Try again.');
+        // Save the workspace first — the mark-setup PATCH depends on the row
+        // existing. After save succeeds, mark-completed and JWT refresh run
+        // in parallel since they don't depend on each other.
+        const saved = await withTimeout(saveWorkspace({ property: finalProperty, site: finalSite, label }));
+        if (saved === 'timeout' || !saved) {
+            setSaving(false);
+            setSaveError(saved === 'timeout'
+                ? 'The server is taking too long. Please try again in a moment.'
+                : 'Could not save your workspace. Try again.');
             return;
         }
+        await withTimeout(markSetupCompleted());
+        setSaving(false);
         // Transition to Done — the user clicks "Go to workspace" to leave.
         setDoneSnapshot({
             label,
@@ -295,18 +319,25 @@ export default function SetupPage() {
     };
 
     const onContinueWithDemo = async () => {
+        if (saving) return;
         setSaving(true);
-        const ok = await saveWorkspace({
+        setSaveError(null);
+        const saved = await withTimeout(saveWorkspace({
             property: DEMO_PROPERTY_ID,
             site: DEMO_SITE_URL,
             label: 'Demo workspace',
-        });
-        if (ok) await markSetupCompleted();
-        setSaving(false);
-        if (ok) {
-            setDoneSnapshot({ label: 'Demo workspace', hasGa4: true, hasGsc: true });
-            setStep('done');
+        }));
+        if (saved === 'timeout' || !saved) {
+            setSaving(false);
+            setSaveError(saved === 'timeout'
+                ? 'Could not load the demo workspace — the server is slow. Try again in a moment.'
+                : 'Could not load the demo workspace. Try again.');
+            return;
         }
+        await withTimeout(markSetupCompleted());
+        setSaving(false);
+        setDoneSnapshot({ label: 'Demo workspace', hasGa4: true, hasGsc: true });
+        setStep('done');
     };
 
     const cosmicShell = (children: React.ReactNode) => (
@@ -325,8 +356,8 @@ export default function SetupPage() {
     if (!hasGoogleConnection) {
         return cosmicShell(
             <div className="max-w-2xl mx-auto py-16 sm:py-24 px-4 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-4">
-                    {greeting}, {userName}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 mb-4 min-h-[16px]">
+                    {greeting ? `${greeting}, ${userName}` : ''}
                 </p>
                 <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4">
                     Let&apos;s set up your workspace
