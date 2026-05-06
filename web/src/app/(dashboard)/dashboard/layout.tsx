@@ -16,7 +16,7 @@ import {
     Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, type LucideIcon
+    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, type LucideIcon
 } from 'lucide-react';
 import {
     type Ga4Availability,
@@ -160,9 +160,25 @@ export default function DashboardLayout({
     const brandAccentColor = '#7AD9DA';
     const sidebarActiveItemClasses = 'border border-[#14C4E1]/24 bg-[linear-gradient(180deg,rgba(20,196,225,0.16),rgba(7,48,60,0.16))] text-[#7AD9DA] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_14px_28px_rgba(5,24,34,0.24)]';
     const sidebarInactiveItemClasses = 'border border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04] hover:border-white/[0.06]';
-    const { credits, plan: userPlan, subscriptionCancelled } = useCredits();
+    const { credits, plan: userPlan, subscriptionCancelled, isLoading: creditsLoading } = useCredits();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    // First-paint settling gate. Without this the dashboard flickers through
+    // "no property" → "connect Google" → final UI as the four primary SWR
+    // queries (container, sites, properties, credits) resolve at different
+    // times. We hold a unified loader on the very first dashboard hit per
+    // session and lift it once those queries settle, capped at 1.5s so a
+    // slow request can't strand the user. Stored in sessionStorage so
+    // subsequent navigation within the dashboard is instant.
+    //
+    // Initial state MUST be deterministic across SSR & CSR — reading
+    // sessionStorage in the useState initializer would make SSR (no window)
+    // and CSR (returning user with the flag) disagree, which is the same
+    // hydration-mismatch class of bug we just fixed for #418/#310. Instead
+    // we always start with the gate "not yet settled" and let a useEffect
+    // below decide whether to lift it immediately (returning user) or run
+    // the timer (first dashboard hit).
+    const [settled, setSettled] = useState<boolean>(false);
     // User-scoped localStorage helper — prevents cross-user data leaks
     const user = session?.user as SessionUser | undefined;
     const getUserKey = useCallback((key: string) => {
@@ -353,7 +369,7 @@ export default function DashboardLayout({
     }, [bellOpen]);
 
     // Alerts for notification bell
-    const { hasGoogleConnection } = useContainerStatus();
+    const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
     const {
         sites: gscSites,
         isLoading: siteInventoryLoading,
@@ -364,6 +380,41 @@ export default function DashboardLayout({
         isLoading: propertyInventoryLoading,
         error: propertyInventoryRequestError,
     } = usePropertyList(hasGoogleConnection);
+
+    // Drive the settling gate (declared above with the other useStates so
+    // the hook order is stable). Three lift conditions, any of which wins:
+    //   1) sessionStorage already says we settled in this tab — returning
+    //      navigation, lift immediately so the user doesn't sit through a
+    //      gate they've already paid for.
+    //   2) On /dashboard/setup — never gate the wizard.
+    //   3) All four primary SWR queries (container, credits, sites,
+    //      properties) have resolved — first paint is now coherent.
+    //   4) Cap: 1.5s elapsed regardless. Better to show partially-loaded
+    //      UI than strand the user behind a stuck spinner.
+    useEffect(() => {
+        if (settled) return;
+        if (typeof window !== 'undefined' && sessionStorage.getItem('tc-dashboard-settled') === 'true') {
+            setSettled(true);
+            return;
+        }
+        if (isSetupRoute) {
+            setSettled(true);
+            return;
+        }
+        const allSettled = !containerLoading && !creditsLoading
+            && !siteInventoryLoading && !propertyInventoryLoading;
+        const cap = setTimeout(() => {
+            sessionStorage.setItem('tc-dashboard-settled', 'true');
+            setSettled(true);
+        }, 1500);
+        if (allSettled) {
+            clearTimeout(cap);
+            sessionStorage.setItem('tc-dashboard-settled', 'true');
+            setSettled(true);
+        }
+        return () => clearTimeout(cap);
+    }, [settled, isSetupRoute, containerLoading, creditsLoading, siteInventoryLoading, propertyInventoryLoading]);
+
     const typedSites = gscSites as SiteOption[];
     const typedProperties = properties as PropertyOption[];
     const siteInventoryError = getInventoryErrorMessage(siteInventoryRequestError);
@@ -943,6 +994,24 @@ export default function DashboardLayout({
 
             {/* Global AI Chatbot — available on every page */}
             <AIChatbot />
+
+            {/* First-paint settling overlay — see settled state above. Sits
+                on top of everything (z-200) and lifts once SWR has caught up
+                or after 1.5s, so users see one clean paint instead of the
+                "no property → connect → final UI" flicker chain. */}
+            {!settled && !isSetupRoute && (
+                <div
+                    aria-hidden
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--background)]"
+                >
+                    <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-7 h-7 text-[#7AD9DA] animate-spin" />
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                            Loading workspace
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
