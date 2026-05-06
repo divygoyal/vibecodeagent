@@ -1543,3 +1543,30 @@ select:focus-visible {
   50% { transform: translateX(100%); }
   100% { transform: translateX(300%); }
 }
+
+/* ========== Setup wizard stepper — active pill pulse ========== */
+@keyframes stepPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(20, 196, 225, 0.45),
+                0 0 18px rgba(20, 196, 225, 0.30);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(20, 196, 225, 0),
+                0 0 24px rgba(20, 196, 225, 0.50);
+  }
+}
+.tc-step-pulse {
+  animation: stepPulse 2.4s ease-in-out infinite;
+}
+@keyframes stepConnectorFill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.tc-step-connector-fill {
+  transform-origin: left center;
+  animation: stepConnectorFill 600ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-step-pulse { animation: none; }
+  .tc-step-connector-fill { animation: none; transform: scaleX(1); }
+}
