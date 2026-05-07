@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     CheckCircle2, Coins, Bot, Zap, TrendingUp, Shield,
     History, AlertTriangle, X, Loader2, ArrowRight, Check,
-    Minus, Sparkles, Lightbulb, GitBranch, Users, Globe, Layers,
+    Sparkles, Lightbulb, GitBranch, Users, Globe, Layers,
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
 
@@ -114,51 +114,6 @@ const SUBSCRIPTION_PLANS = [
 
 /** Comparison matrix — drives the side-by-side table below the cards.
  *  `value` per plan is either a string (rendered as text) or boolean (✓ / —). */
-const COMPARISON_GROUPS: Array<{
-    title: string;
-    rows: Array<{ feature: string; free: string | boolean; starter: string | boolean; growth: string | boolean; pro: string | boolean }>;
-}> = [
-    {
-        title: 'AI capabilities',
-        rows: [
-            { feature: 'AI credits / month', free: '0', starter: '50', growth: '150', pro: '300' },
-            { feature: 'Cost per AI message', free: '—', starter: '$0.18', growth: '$0.13', pro: '$0.10' },
-            { feature: 'Strategic diagnoses (root-cause)', free: false, starter: 'Basic', growth: 'Full', pro: 'Full' },
-            { feature: 'Cross-source insights (deploy × traffic)', free: false, starter: false, growth: true, pro: true },
-            { feature: 'Surprise-engine "did you know" findings', free: false, starter: 'Limited', growth: true, pro: true },
-            { feature: 'AI response priority', free: '—', starter: 'Standard', growth: 'Priority', pro: 'Priority' },
-        ],
-    },
-    {
-        title: 'Data & coverage',
-        rows: [
-            { feature: 'Connected sites', free: '1', starter: '1', growth: '3', pro: 'Unlimited' },
-            { feature: 'GA4 + Search Console', free: true, starter: true, growth: true, pro: true },
-            { feature: 'Schema / AEO visibility audit', free: false, starter: true, growth: true, pro: true },
-            { feature: 'Page-level CWV / PageSpeed batch', free: false, starter: 'On-demand', growth: 'Auto-cached', pro: 'Auto-cached' },
-            { feature: 'Cohort retention + journey analysis', free: false, starter: false, growth: true, pro: true },
-            { feature: 'GitHub deploy correlation', free: false, starter: false, growth: true, pro: true },
-        ],
-    },
-    {
-        title: 'Workflow & alerts',
-        rows: [
-            { feature: 'Daily AI briefing', free: false, starter: true, growth: true, pro: true },
-            { feature: 'Site audit reports (50+ checks)', free: 'View only', starter: true, growth: true, pro: true },
-            { feature: 'Telegram bot — mobile alerts', free: false, starter: false, growth: false, pro: true },
-            { feature: 'Beta feature access', free: false, starter: false, growth: false, pro: true },
-        ],
-    },
-    {
-        title: 'Support',
-        rows: [
-            { feature: 'Email support', free: false, starter: true, growth: true, pro: true },
-            { feature: 'Priority response (24h)', free: false, starter: false, growth: false, pro: true },
-            { feature: 'Cancel anytime', free: true, starter: true, growth: true, pro: true },
-        ],
-    },
-];
-
 export default function PlanPage() {
     return (
         <Suspense>
@@ -464,9 +419,6 @@ function PlanPageContent() {
                 </p>
             </section>
 
-            {/* Compare-everything table — clearer side-by-side decision-making */}
-            <ComparisonTable currentPlan={plan} />
-
             {/* Plan FAQ — addresses the questions that keep users from upgrading */}
             <PlanFaq />
 
@@ -512,80 +464,6 @@ function Banner({ tone, title, body, onClose }: { tone: 'success' | 'warning'; t
                 </button>
             )}
         </div>
-    );
-}
-
-function ComparisonTable({ currentPlan }: { currentPlan: string }) {
-    // Highlight the user's current plan column so they can see what they have at a glance.
-    const currentCol = currentPlan === 'starter' ? 'starter'
-        : currentPlan === 'growth' ? 'growth'
-        : currentPlan === 'pro' ? 'pro'
-        : 'free';
-
-    const renderCell = (val: string | boolean) => {
-        if (val === true) return <Check className="h-3.5 w-3.5 text-emerald-300 mx-auto" />;
-        if (val === false) return <Minus className="h-3.5 w-3.5 text-zinc-700 mx-auto" />;
-        return <span className="tabular-nums text-zinc-200">{val}</span>;
-    };
-
-    const colHeader = (key: 'free' | 'starter' | 'growth' | 'pro', label: string) => (
-        <th
-            key={key}
-            className={`px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider ${
-                currentCol === key
-                    ? 'bg-cyan-500/[0.06] text-[#7AD9DA] border-b border-cyan-400/30'
-                    : 'text-zinc-400 border-b border-white/[0.06]'
-            }`}
-        >
-            <div className="flex flex-col items-center gap-0.5">
-                <span>{label}</span>
-                {currentCol === key && (
-                    <span className="text-[8.5px] font-bold tracking-wider rounded-full bg-cyan-400/15 text-cyan-200 px-1.5 py-0">
-                        Your plan
-                    </span>
-                )}
-            </div>
-        </th>
-    );
-
-    return (
-        <section className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/[0.05]">
-                <h2 className="text-[13px] font-semibold text-white">Compare every feature</h2>
-                <p className="mt-0.5 text-[11.5px] text-zinc-500">Pick the tier that matches your scale — switch up or down anytime.</p>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-[12px] min-w-[640px]">
-                    <thead>
-                        <tr>
-                            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500 border-b border-white/[0.06]">Feature</th>
-                            {colHeader('free', 'Free')}
-                            {colHeader('starter', 'Starter $9')}
-                            {colHeader('growth', 'Growth $19')}
-                            {colHeader('pro', 'Pro $29')}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {COMPARISON_GROUPS.flatMap((group) => [
-                            <tr key={`group-${group.title}`}>
-                                <td colSpan={5} className="px-4 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 bg-white/[0.01]">
-                                    {group.title}
-                                </td>
-                            </tr>,
-                            ...group.rows.map((row, i) => (
-                                <tr key={`${group.title}-${i}`} className="border-t border-white/[0.04]">
-                                    <td className="px-4 py-2.5 text-zinc-300">{row.feature}</td>
-                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'free' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.free)}</td>
-                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'starter' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.starter)}</td>
-                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'growth' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.growth)}</td>
-                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'pro' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.pro)}</td>
-                                </tr>
-                            )),
-                        ])}
-                    </tbody>
-                </table>
-            </div>
-        </section>
     );
 }
 
