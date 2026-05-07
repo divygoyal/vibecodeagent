@@ -75,6 +75,30 @@ export function resolveDashboardSelection({
     const hasGa4Properties = validProperties.length > 0;
 
     if (resolvedSiteUrl) {
+        // PRIORITY 1: user has EXPLICITLY paired this site with a property in their
+        // workspace setup. Respect the explicit pairing even when the property's
+        // display name doesn't fuzzy-match the site domain (e.g., GA4 property
+        // "bhagwadgeeta" paired with site "bhagavadgitaexplained.com" — different
+        // names, same workspace). Without this, the dashboard incorrectly shows
+        // "No GA4 property matches this site" despite the user having matched
+        // them deliberately.
+        if (isSelectedPropertyValid) {
+            const explicitProperty = validProperties.find((property) => property.property === selectedProperty) || null;
+            if (explicitProperty) {
+                return {
+                    resolvedSiteUrl,
+                    resolvedPropertyId: selectedProperty,
+                    matchedProperty: explicitProperty,
+                    hasGa4Properties,
+                    ga4Availability: 'available',
+                    isSelectedSiteValid,
+                    isSelectedPropertyValid,
+                };
+            }
+        }
+
+        // PRIORITY 2: fall back to fuzzy name matching (e.g., GA4 "antigravity"
+        // automatically pairs with GSC "antigravity.codes" without explicit setup).
         if (matchedProperty?.property) {
             return {
                 resolvedSiteUrl,
@@ -87,6 +111,7 @@ export function resolveDashboardSelection({
             };
         }
 
+        // PRIORITY 3: no explicit pairing AND no fuzzy match. Genuinely unmatched.
         return {
             resolvedSiteUrl,
             resolvedPropertyId: '',

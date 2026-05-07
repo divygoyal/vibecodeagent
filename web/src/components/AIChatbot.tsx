@@ -22,6 +22,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
+import { useWorkspace } from '@/app/(dashboard)/dashboard/layout';
 import { useChatStore, persistMessage, getOrCreateThreadId, setActiveThreadId, type ChatMessage } from '@/stores/chatStore';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
@@ -77,6 +78,19 @@ export default function AIChatbot() {
     const { properties: ga4Properties, isLoading: propertiesLoading } = usePropertyList(hasGoogleConnection);
     const hasRealGa4Property = ga4Properties.length > 0;
 
+    // ── Workspace context — the source of truth for the user's saved site + property pairing ──
+    // Reading from useWorkspace() (instead of independently fuzzy-matching from the
+    // SWR site list) fixes three bugs at once:
+    //   1. After workspace switch, chat re-syncs to the new pairing automatically.
+    //   2. After browser reload, chat uses the saved workspace (not "first site in inventory").
+    //   3. Explicit user pairing is honored even when GA4 display name doesn't fuzzy-match
+    //      the GSC domain (e.g., "bhagwadgeeta" GA4 ↔ "bhagavadgitaexplained.com" GSC).
+    const {
+        selectedSite: workspaceSite,
+        selectedProperty: workspaceProperty,
+        isWorkspaceLoaded,
+    } = useWorkspace();
+
     // Derive combined site list from SWR hooks
     const allSites = useMemo<SiteOption[]>(() => {
         const sites = Array.isArray(gscSites) ? gscSites : [];
@@ -88,25 +102,47 @@ export default function AIChatbot() {
         ];
     }, [gscSites, ga4Properties]);
 
-    // Auto-select first site when list loads
+    // ── Sync selectedChatSite from workspace context ──
+    // When the workspace context tells us which site the user has saved, mirror it.
+    // This handles: initial load (after browser reopen), workspace switch, and
+    // explicit user changes via the layout's site picker.
     useEffect(() => {
-        if (allSites.length > 0 && !selectedChatSite) {
+        if (!isWorkspaceLoaded) return; // wait for server-side workspace load to settle
+        if (workspaceSite && workspaceSite !== selectedChatSite) {
+            setSelectedChatSite(workspaceSite);
+            return;
+        }
+        // Fallback: only auto-select first site when workspace explicitly has no saved site.
+        if (!workspaceSite && !selectedChatSite && allSites.length > 0) {
             setSelectedChatSite(allSites[0].id);
         }
-    }, [allSites, selectedChatSite]);
+    }, [workspaceSite, isWorkspaceLoaded, allSites, selectedChatSite]);
 
-    // Match selected GSC site to GA4 property (same logic as page.tsx)
+    // ── Match selected site to GA4 property ──
+    // Priority: (1) workspace's explicit selectedProperty when valid, (2) fuzzy name match,
+    // (3) first property as last resort. Honoring the explicit pairing prevents the
+    // "No GA4 property matches this site" failure mode when the user has manually paired
+    // a GA4 property whose display name doesn't share tokens with the GSC site domain.
     const matchedProperty = useMemo(() => {
-        if (!selectedChatSite || ga4Properties.length === 0) return ga4Properties[0];
-        const domain = selectedChatSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
-        const domainRoot = domain.split('.')[0];
-        return (
-            ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
-            ga4Properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-            ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase())) ||
-            ga4Properties[0]
-        );
-    }, [selectedChatSite, ga4Properties]);
+        if (ga4Properties.length === 0) return undefined;
+        // Priority 1: explicit workspace pairing
+        if (workspaceProperty) {
+            const explicit = ga4Properties.find((p: any) => p.property === workspaceProperty);
+            if (explicit) return explicit;
+        }
+        // Priority 2: fuzzy name match against the selected site
+        if (selectedChatSite) {
+            const domain = selectedChatSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
+            const domainRoot = domain.split('.')[0];
+            const fuzzy =
+                ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
+                ga4Properties.find((p: any) => (p.propertyId || p.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
+                ga4Properties.find((p: any) => p.displayName?.toLowerCase().includes(domainRoot.toLowerCase()));
+            if (fuzzy) return fuzzy;
+        }
+        // Priority 3: first available — last resort fallback
+        return ga4Properties[0];
+    }, [workspaceProperty, selectedChatSite, ga4Properties]);
 
     // Fetch analytics & SEO data for the chatbot's selected site
     const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedChatSite);
