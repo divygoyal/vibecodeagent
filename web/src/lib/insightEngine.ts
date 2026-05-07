@@ -126,8 +126,9 @@ export interface InsightInput {
     /** Optional: GA4 cohort retention (day-1, day-7, day-30 averages + curves).
      *  Drives `cohort_decay` strategic detector. */
     cohortRetention?: { averages: { day1: number; day7: number; day14: number; day30: number }; curve: any[]; cohorts: any[] } | null;
-    /** Optional: GA4 journey data. Drives `journey_dead_end` strategic detector. */
-    journey?: { landingPages: any[]; exitPages: any[]; journeys: any[]; totalSessions: number; avgPathLength: number; avgBounce: number } | null;
+    /** Optional: GA4 journey data. Drives `journey_dead_end` strategic detector.
+     *  Shape mirrors fetchJourneyData() return: overview is nested. */
+    journey?: { landingPages: any[]; exitPages: any[]; journeys: any[]; overview?: { avgPathLength?: number; avgTimeOnSite?: number; bounceRate?: number; mostCommonPath?: any } } | null;
     /** Optional: GA4 events. Drives `event_misalignment` strategic detector. */
     events?: { topEvents: Array<{ name: string; count: number; isKey: boolean }>; conversionEvents: string[]; totalEventCount: number } | null;
     /** Optional: GA4 geo conversion data. */
@@ -1964,9 +1965,9 @@ function detectInternalReferrerLift(input: InsightInput): RankedInsight[] {
     // We can't perfectly reconstruct internal referrer chains without GA4 path data,
     // but we approximate: a landing page with avgPagesAfter much higher than the
     // site average implies its visitors browse deeper — the candidate "salesperson page".
-    const j = input.journey;
+    const j = input.journey as any;
     if (!j?.landingPages || j.landingPages.length < 3) return [];
-    const overallAvgPath = j.avgPathLength || 0;
+    const overallAvgPath = (j.overview?.avgPathLength as number | undefined) ?? 0;
     if (overallAvgPath < 1.5) return [];
 
     // Find a landing page whose avgPagesAfter is ≥1.6× the site average

@@ -646,7 +646,13 @@ export async function POST(req: NextRequest) {
 
         // Resolve enrichment (best-effort) and prefer the rich block; fall back to
         // the legacy compact context if enrichment failed/unavailable.
-        let enrichedSnapshot = await enrichmentPromise;
+        let enrichedSnapshot: EnrichedSnapshot | null = null;
+        try {
+            enrichedSnapshot = await enrichmentPromise;
+        } catch (err) {
+            console.error('[ai-chat] enrichment failed:', err instanceof Error ? err.message : err);
+            enrichedSnapshot = null;
+        }
 
         // ── Edge-case persona overrides + telemetry ──
         // Infant site (< 100 imp/mo OR < 5 distinct queries): server-side override to
@@ -710,8 +716,21 @@ export async function POST(req: NextRequest) {
             : null;
         const effectiveDataContext = richDataContext || dataContext;
         const surfacedBlock = surfacedRecentlyBlock ? `\n${surfacedRecentlyBlock}\n` : '';
-        const contextBlock = effectiveDataContext
-            ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${effectiveDataContext}${availableSitesContext}\n---\n${message}`
+        // Wrap rich-context build in try/catch so a single bad field rendering can
+        // never take down the entire chat — fall back to legacy buildDataContext.
+        let safeRichContext = effectiveDataContext;
+        if (enrichedSnapshot && richDataContext) {
+            try {
+                // Re-build defensively (richDataContext was built above; this is a guard
+                // for any sub-block throwing on null/undefined fields we missed).
+                safeRichContext = `\n${buildRichChatContext(enrichedSnapshot, { siteUrl: selectedSite })}\n`;
+            } catch (err) {
+                console.error('[ai-chat] buildRichChatContext failed; falling back to legacy data block:', err instanceof Error ? err.message : err);
+                safeRichContext = dataContext;
+            }
+        }
+        const contextBlock = safeRichContext
+            ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${safeRichContext}${availableSitesContext}\n---\n${message}`
             : `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
@@ -1289,8 +1308,18 @@ CRITICAL SYSTEM CONTEXT:
             },
         });
 
-    } catch {
-        return new Response(JSON.stringify({ error: 'Failed to process request' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    } catch (err) {
+        // Log the actual error so production failures are diagnosable.
+        // Previously this caught silently and returned a generic message, making
+        // every server-side throw indistinguishable from "Failed to process request".
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const errStack = err instanceof Error ? err.stack : undefined;
+        console.error('[ai-chat] Top-level error:', errMsg, errStack ? `\nStack: ${errStack}` : '');
+        return new Response(JSON.stringify({
+            error: 'Failed to process request',
+            // Surface the message in non-prod for debugging without leaking stacks.
+            ...(process.env.NODE_ENV !== 'production' ? { detail: errMsg } : {}),
+        }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 }
 

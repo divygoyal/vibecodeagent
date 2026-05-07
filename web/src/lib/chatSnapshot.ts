@@ -64,8 +64,9 @@ export interface EnrichedSnapshot {
     psi: Map<string, PsiResult>;
     /** GA4 cohort retention (day-1, day-7, day-30 averages + curves). */
     cohortRetention: { averages: { day1: number; day7: number; day14: number; day30: number }; curve: any[]; cohorts: any[] } | null;
-    /** GA4 journey data (landing pages, exit pages, top paths). */
-    journey: { landingPages: any[]; exitPages: any[]; journeys: any[]; totalSessions: number; avgPathLength: number; avgBounce: number } | null;
+    /** GA4 journey data (landing pages, exit pages, top paths). Shape mirrors
+     *  fetchJourneyData() return: overview is nested. */
+    journey: { landingPages: any[]; exitPages: any[]; journeys: any[]; overview?: { avgPathLength?: number; avgTimeOnSite?: number; bounceRate?: number; mostCommonPath?: any } } | null;
     /** Top GA4 events (with counts), and which ones are marked conversions. */
     events: { topEvents: Array<{ name: string; count: number; isKey: boolean }>; conversionEvents: string[]; totalEventCount: number } | null;
     /** Geo conversion: top countries by sessions + by conversions (when available). */
@@ -1006,10 +1007,12 @@ export function buildRichChatContext(snapshot: EnrichedSnapshot, opts?: { siteUr
         const failingMobile: string[] = [];
         const failingDesktop: string[] = [];
         for (const [key, r] of snapshot.psi.entries()) {
-            if (!r.fetched) continue;
+            if (!r?.fetched) continue;
             const fail = r.lcpVerdict === 'POOR' || r.clsVerdict === 'POOR';
             if (!fail) continue;
-            const label = `${r.url} (LCP ${(r.lcpMs / 1000).toFixed(1)}s ${r.lcpVerdict}, CLS ${r.cls.toFixed(2)} ${r.clsVerdict})`;
+            const lcpMs = typeof r.lcpMs === 'number' ? r.lcpMs : 0;
+            const cls = typeof r.cls === 'number' ? r.cls : 0;
+            const label = `${r.url || '(unknown)'} (LCP ${(lcpMs / 1000).toFixed(1)}s ${r.lcpVerdict}, CLS ${cls.toFixed(2)} ${r.clsVerdict})`;
             if (key.startsWith('mobile:')) failingMobile.push(label);
             else failingDesktop.push(label);
         }
@@ -1023,34 +1026,46 @@ export function buildRichChatContext(snapshot: EnrichedSnapshot, opts?: { siteUr
 
     // ── COHORT RETENTION ──
     if (snapshot.cohortRetention?.averages) {
-        const a = snapshot.cohortRetention.averages;
+        const a = snapshot.cohortRetention.averages || {} as any;
+        const d1 = typeof a.day1 === 'number' ? a.day1 : 0;
+        const d7 = typeof a.day7 === 'number' ? a.day7 : 0;
+        const d14 = typeof a.day14 === 'number' ? a.day14 : 0;
+        const d30 = typeof a.day30 === 'number' ? a.day30 : 0;
         lines.push('');
-        lines.push(`COHORT RETENTION (avg): D1 ${a.day1}% / D7 ${a.day7}% / D14 ${a.day14}% / D30 ${a.day30}% (${snapshot.cohortRetention.cohorts?.length || 0} cohorts)`);
+        lines.push(`COHORT RETENTION (avg): D1 ${d1}% / D7 ${d7}% / D14 ${d14}% / D30 ${d30}% (${snapshot.cohortRetention.cohorts?.length || 0} cohorts)`);
     }
 
     // ── JOURNEY ──
     if (snapshot.journey) {
         const j = snapshot.journey;
+        const ov = (j as any).overview || {};
+        const avgPath = typeof ov.avgPathLength === 'number' ? ov.avgPathLength : 0;
+        const bounce = typeof ov.bounceRate === 'number' ? ov.bounceRate : 0;
         lines.push('');
-        lines.push(`USER JOURNEY: ${j.totalSessions.toLocaleString()} sessions, avg ${j.avgPathLength.toFixed(1)} pages/session, bounce ${j.avgBounce}%`);
+        lines.push(`USER JOURNEY: avg ${avgPath.toFixed(1)} pages/session, bounce ${bounce}%`);
         if (j.landingPages?.length) {
-            lines.push(`  top landings: ${j.landingPages.slice(0, 3).map((lp: any) => `${lp.page} (${lp.entries} entries, ${lp.percentage}%)`).join(' | ')}`);
+            lines.push(`  top landings: ${j.landingPages.slice(0, 3).map((lp: any) => `${lp.page || '/'} (${lp.entries || 0} entries${lp.percentage != null ? `, ${lp.percentage}%` : ''})`).join(' | ')}`);
         }
         if (j.exitPages?.length) {
-            lines.push(`  top exits: ${j.exitPages.slice(0, 3).map((ep: any) => `${ep.page} (${ep.exits} exits)`).join(' | ')}`);
+            lines.push(`  top exits: ${j.exitPages.slice(0, 3).map((ep: any) => `${ep.page || '/'} (${ep.exits || 0} exits)`).join(' | ')}`);
         }
     }
 
     // ── EVENTS ──
     if (snapshot.events) {
         const e = snapshot.events;
-        lines.push('');
-        const top = e.topEvents.slice(0, 5).map(ev => `${ev.name}${ev.isKey ? '★' : ''}:${ev.count}`).join(', ');
-        lines.push(`GA4 EVENTS: total=${e.totalEventCount.toLocaleString()}, top=${top}`);
-        if (e.conversionEvents.length === 0) {
-            lines.push(`  ⚠ No events flagged as conversions — measurement is opaque.`);
-        } else {
-            lines.push(`  conversion events: ${e.conversionEvents.join(', ')}`);
+        const topEvents = Array.isArray(e.topEvents) ? e.topEvents : [];
+        const conversionEvents = Array.isArray(e.conversionEvents) ? e.conversionEvents : [];
+        const totalCount = typeof e.totalEventCount === 'number' ? e.totalEventCount : 0;
+        if (topEvents.length > 0) {
+            lines.push('');
+            const top = topEvents.slice(0, 5).map(ev => `${ev.name || '(unknown)'}${ev.isKey ? '★' : ''}:${ev.count || 0}`).join(', ');
+            lines.push(`GA4 EVENTS: total=${totalCount.toLocaleString()}, top=${top}`);
+            if (conversionEvents.length === 0) {
+                lines.push(`  ⚠ No events flagged as conversions — measurement is opaque.`);
+            } else {
+                lines.push(`  conversion events: ${conversionEvents.join(', ')}`);
+            }
         }
     }
 
@@ -1063,7 +1078,7 @@ export function buildRichChatContext(snapshot: EnrichedSnapshot, opts?: { siteUr
 
     // ── GEO CONVERSION ──
     if (snapshot.geoConversion?.byCountry?.length) {
-        const top = snapshot.geoConversion.byCountry.slice(0, 5).map(c => `${c.country}: ${c.sessions} sess / ${c.conversionRate}% conv`).join(' | ');
+        const top = snapshot.geoConversion.byCountry.slice(0, 5).map(c => `${c.country || '(unknown)'}: ${c.sessions || 0} sess / ${c.conversionRate || 0}% conv`).join(' | ');
         lines.push('');
         lines.push(`GEO CONVERSION: ${top}`);
     }
