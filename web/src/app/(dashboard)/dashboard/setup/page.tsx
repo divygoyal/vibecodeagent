@@ -339,7 +339,12 @@ export default function SetupPage() {
                 : 'Could not save your workspace. Try again.');
             return;
         }
-        await withTimeout(markSetupCompleted());
+        // markSetupCompleted refreshes the JWT claim that middleware checks.
+        // Don't withTimeout this — if updateSession() is cut off the cookie
+        // is never re-issued and the Done-screen "Go to workspace" button
+        // bounces straight back to /setup. The Done button does retry, but
+        // letting this complete the first time is much smoother.
+        await markSetupCompleted();
         setSaving(false);
         // Transition to Done — the user clicks "Go to workspace" to leave.
         setDoneSnapshot({
@@ -366,10 +371,16 @@ export default function SetupPage() {
                 : 'Could not load the demo workspace. Try again.');
             return;
         }
-        await withTimeout(markSetupCompleted());
-        // Demo path skips the intermediate Done screen — the user explicitly
-        // picked demo, they want to land on the dashboard immediately.
-        router.push('/dashboard/ai-chat');
+        // markSetupCompleted runs the workspace_setup_completed PATCH AND
+        // updateSession() to refresh the JWT claim that middleware reads.
+        // Do NOT wrap this in withTimeout — if the timer fires before
+        // updateSession() finishes, the JWT cookie is never re-issued and
+        // middleware bounces /dashboard/ai-chat straight back to /setup,
+        // which is what was leaving demo users stuck on the setup page.
+        await markSetupCompleted();
+        // Hard navigation so the just-refreshed JWT cookie ships with the
+        // request (router.push can race the cookie write).
+        window.location.href = '/dashboard/ai-chat';
     };
 
     const cosmicShell = (children: React.ReactNode) => (
