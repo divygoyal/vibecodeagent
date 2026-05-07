@@ -31,6 +31,7 @@ import {
 } from './content';
 import { JourneyLine, JourneyNode } from './JourneyTimeline';
 import BadgeMarquee from './BadgeMarquee';
+import PricingTierCards from '@/components/marketing/pricing/PricingTierCards';
 
 type FeaturedReason = {
     number: string;
@@ -774,6 +775,34 @@ export default function LandingHomepage() {
                                 ))}
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="pricing" className="relative border-t border-white/[0.06]">
+                <div className="mx-auto max-w-[1380px] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+                    <div className="mx-auto max-w-[820px] text-center">
+                        <SectionLabel>Pricing</SectionLabel>
+                        <h2 className="mt-5 text-[2.2rem] font-semibold tracking-[-0.06em] text-white sm:text-5xl lg:text-[4.2rem] lg:leading-[0.98]">
+                            Simple, transparent pricing
+                        </h2>
+                        <p className="mt-5 text-base leading-7 text-zinc-400 sm:text-lg sm:leading-8">
+                            Start free with 10 messages. Upgrade when you need more AI power. No hidden fees, cancel anytime.
+                        </p>
+                    </div>
+
+                    <div className="mx-auto mt-12 max-w-6xl">
+                        <PricingTierCards />
+                    </div>
+
+                    <div className="mt-10 text-center">
+                        <Link
+                            href="/pricing"
+                            className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-5 py-2.5 text-sm text-zinc-300 transition hover:border-white/[0.18] hover:bg-white/[0.06] hover:text-white"
+                        >
+                            See full plan comparison
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
                     </div>
                 </div>
             </section>
