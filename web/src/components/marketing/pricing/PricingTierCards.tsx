@@ -2,10 +2,8 @@
 
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { signIn, useSession } from 'next-auth/react';
-import { getSafeRedirectUrl } from '@/lib/checkout';
-import Link from 'next/link';
 import { Zap, TrendingUp, Shield, CheckCircle2, X, Sparkles } from 'lucide-react';
+import GoogleAuthButton from '@/components/marketing/GoogleAuthButton';
 
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
@@ -112,16 +110,6 @@ const PLANS = [
 export default function PricingTierCards() {
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true, margin: '-80px' });
-    const { data: session } = useSession();
-
-    const handleCheckout = (productId: string) => {
-        if (!session?.user?.email) {
-            signIn('github', { callbackUrl: `/dashboard/plan` });
-            return;
-        }
-        const checkoutUrl = `https://checkout.dodopayments.com/buy/${productId}?email=${encodeURIComponent(session.user.email)}&redirect_url=${encodeURIComponent(getSafeRedirectUrl('/dashboard/plan?upgraded=true'))}`;
-        window.open(checkoutUrl, '_blank');
-    };
 
     return (
         <motion.div
@@ -184,23 +172,25 @@ export default function PricingTierCards() {
                         )}
 
                         {'freeForever' in plan ? (
-                            <Link
-                                href="/dashboard"
-                                className="w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20"
+                            <GoogleAuthButton
+                                callbackUrl="/dashboard"
+                                signedInLabel="Open dashboard"
+                                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold mb-6 transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 cursor-pointer"
                             >
                                 Start Free
-                            </Link>
+                            </GoogleAuthButton>
                         ) : (
-                            <button
-                                onClick={() => 'productId' in plan && handleCheckout(plan.productId as string)}
-                                className={`w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all cursor-pointer ${
+                            <GoogleAuthButton
+                                callbackUrl="/dashboard/plan"
+                                signedInLabel={`Get ${plan.name}`}
+                                className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold mb-6 transition-all cursor-pointer ${
                                     plan.key === 'pro'
                                         ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]'
                                         : 'bg-white/[0.06] text-white hover:bg-white/[0.12] border border-white/[0.06]'
                                 }`}
                             >
                                 Get {plan.name}
-                            </button>
+                            </GoogleAuthButton>
                         )}
 
                         <ul className="space-y-3 flex-1">
