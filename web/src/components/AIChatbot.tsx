@@ -410,6 +410,46 @@ export default function AIChatbot() {
                             // B2-thin: server-side IntentRouter result (one of 7 labels).
                             // We just stash it for telemetry / future per-intent UI tweaks.
                             lastIntentRef.current = data.value || null;
+                        } else if (data.type === 'source_loading') {
+                            // WS-7: per-source ghost chip in trace (replaces generic "Processing...")
+                            const SOURCE_LABELS: Record<string, string> = {
+                                gscEnrichments: 'Loading GSC (winners/losers, cannibalization, mobile gap)…',
+                                schemaAudit: 'Auditing structured data (schema/AEO)…',
+                                psi: 'Running PageSpeed (mobile + desktop)…',
+                                cohortRetention: 'Loading GA4 cohort retention…',
+                                journey: 'Loading GA4 user journey…',
+                                events: 'Loading GA4 events…',
+                                geoConversion: 'Loading geo conversion…',
+                                timePatterns: 'Loading time-of-day patterns…',
+                                pageMeta: 'Fetching top pages\' titles…',
+                            };
+                            pushTraceLine(SOURCE_LABELS[data.source] || `Loading ${data.source}…`);
+                        } else if (data.type === 'repetition_detected') {
+                            // WS-7: badge for "you asked this Nm ago — fresh angle below"
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                (last as any).repetition = {
+                                    priorAgeMin: data.priorAgeMin || 0,
+                                    priorInsightId: data.priorInsightId || null,
+                                };
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
+                            pushTraceLine(`Detected repeated question — picking a fresh angle…`);
+                        } else if (data.type === 'tool_aborted') {
+                            // WS-5: stream was aborted mid-tool; mark the tool's UI state
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const last = { ...updated[updated.length - 1] };
+                                last.tools = (last.tools || []).map(t =>
+                                    t.name === data.name && !t.result
+                                        ? ({ ...t, result: 'Tool was interrupted', error: 'aborted' } as any)
+                                        : t
+                                );
+                                updated[updated.length - 1] = last;
+                                return updated;
+                            });
                         } else if (data.type === 'tool_progress') {
                             // A6: heartbeat for slow tools — annotate the in-flight tool
                             // with its elapsed seconds so the UI can show "Running X… (12s)".

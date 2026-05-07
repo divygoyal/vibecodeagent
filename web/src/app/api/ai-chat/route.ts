@@ -19,6 +19,11 @@ import {
 import { resolvePersona } from '@/services/chat/personas';
 import { runPlanner } from '@/services/chat/planner';
 import { runCritic } from '@/services/chat/critic';
+import { buildEnrichedSnapshot, buildRichChatContext, injectDeployCorrelation, type EnrichedSnapshot } from '@/lib/chatSnapshot';
+import { loadThreadState, saveThreadState, formatThreadStateForPrompt, type ChatThreadState } from '@/lib/chatThreadState';
+import { logChatTelemetry } from '@/lib/chatTelemetry';
+import { makeFingerprint, findRepetitionMatch, formatRepetitionTag } from '@/lib/questionFingerprint';
+import { correlateDeploysWithLosers, shouldRunDeployCorrelation } from '@/lib/dataSources/deployCorrelation';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -42,7 +47,8 @@ const CHAT_MODELS = [
 // cheapest model. Output is plaintext "INTENT_LABEL"; we whitelist on parse.
 const INTENT_LABELS = [
     'CASUAL_GREETING', 'DIAGNOSTIC', 'OPPORTUNITY', 'CONTENT_BRIEF',
-    'EXECUTIVE_SUMMARY', 'TECHNICAL_AUDIT', 'META_QUESTION',
+    'EXECUTIVE_SUMMARY', 'TECHNICAL_AUDIT', 'META_QUESTION', 'DEEP_DIVE',
+    'COACHING', 'COMPARISON', 'HYPOTHETICAL',
 ] as const;
 type IntentLabel = typeof INTENT_LABELS[number];
 
@@ -53,12 +59,21 @@ async function classifyIntent(genai: GoogleGenAI, userMessage: string): Promise<
             contents: [{ role: 'user', parts: [{ text:
                 `Classify this user message into ONE of these intent labels and respond with JUST the label, nothing else:\n` +
                 `CASUAL_GREETING — pleasantries, "hi", "thanks", small talk, no analytical question.\n` +
-                `DIAGNOSTIC — a "why did X happen / what broke" investigation request.\n` +
-                `OPPORTUNITY — "what should I do / find me wins / growth opportunities".\n` +
+                `DEEP_DIVE — wants the SINGLE highest-impact move ("what is the ONE thing", "biggest leak", "where do I focus first", "highest priority", "most impactful fix"). Singular, specific.\n` +
+                `OPPORTUNITY — wants a LIST of growth wins ("show me opportunities", "what should I do" plural, "find me wins", "growth opportunities" without "ONE/single/biggest").\n` +
+                `DIAGNOSTIC — a "why did X happen / what broke / why dropped / regression" investigation request.\n` +
                 `CONTENT_BRIEF — write a brief, generate meta tags, blog ideas, content outline.\n` +
                 `EXECUTIVE_SUMMARY — "summarize", "top-line", "executive snapshot", "TLDR".\n` +
                 `TECHNICAL_AUDIT — "audit my site", "is my SEO good", "find issues".\n` +
-                `META_QUESTION — asks about the chat itself ("what can you do", "which tools").\n\n` +
+                `META_QUESTION — asks about the chat itself ("what can you do", "which tools").\n` +
+                `COMPARISON — wants benchmark context ("how am I doing", "is this good", "vs my industry", "is my CTR normal", "what's typical").\n` +
+                `HYPOTHETICAL — asks "what if" / projection / forecast ("what if I publish more", "if I doubled traffic", "should I translate", "what would happen if").\n\n` +
+                `IMPORTANT:\n` +
+                `- "What is the ONE thing I should do today to grow?" → DEEP_DIVE (singular).\n` +
+                `- "Show me 3 things I don't know about my site" → DEEP_DIVE (singular discovery).\n` +
+                `- "Am I doing well?" / "How does this compare?" → COMPARISON.\n` +
+                `- "What if I rewrote all my titles?" → HYPOTHETICAL.\n` +
+                `(COACHING is auto-selected server-side for infant sites — DO NOT pick this label.)\n\n` +
                 `MESSAGE: ${userMessage.slice(0, 800)}\n\n` +
                 `Respond with exactly one label from the list above. No quotes, no commentary.`
             }] }],
@@ -123,7 +138,49 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // B3-full: persona-specific blocks live in services/chat/personas/*.ts
 // and are composed in via composePromptForPersona() per turn.
 // ═══════════════════════════════════════════════════════════════
-const SHARED_PREAMBLE = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Say "Do this NOW", "This is bleeding money". Answer general questions from your knowledge.`;
+const SHARED_PREAMBLE = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Answer general questions from your knowledge.
+
+READ THE SITE PROFILE FIRST. The snapshot starts with a SITE PROFILE block declaring whether this is a COMMERCIAL site (sells/captures), a CONTENT site (blog/portfolio/docs/magazine), a MIXED site, or UNKNOWN. The profile dictates which diagnoses make sense:
+- COMMERCIAL site → buyer-intent gap, funnel disconnect, missing /pricing/vs/alternative pages, conversion opacity ARE the right diagnoses.
+- CONTENT site → publishing cadence, audience capture (email/RSS), topical breadth, content decay, retention ARE the right diagnoses. NEVER recommend "build a pricing page" or "you have no buyer-intent traffic" for a blog/portfolio — they don't WANT buyers.
+- MIXED site → both apply.
+- UNKNOWN → ask the user about their growth goal before recommending strategic moves. Tactical SEO fixes still apply.
+
+ROOT-CAUSE THINKING (this is the difference between a generic AI answer and a "wow" answer):
+- Diagnose WHY growth isn't happening, not WHAT tweak to make.
+- Tactical wins (CTR fixes, position bumps, meta rewrites) are surface-level. They matter when growth is healthy and you're optimizing.
+- Strategic gaps are root causes. They explain why a site with traffic still isn't growing — but the SHAPE of those gaps depends on site type.
+- The snapshot's RANKED INSIGHTS block mixes strategic + tactical, sorted by impact. The detector ALREADY GATED itself by site type, so you can trust everything you see — if a buyer-intent diagnosis appears, this site is commercial.
+- When picking what to talk about, prefer the diagnosis that makes the user say "I missed that".
+
+CONNECT DOTS ACROSS DATA — that's what makes you a consultant, not a tool:
+- Don't read GSC and GA4 separately. Read them together with the SITE PROFILE in mind.
+- For a commercial site: "Your top GSC query is informational, your top GA4 landing page is the blog, bounce is 71%, no conversion events. Pattern: positioning problem — attracting research not buying intent."
+- For a content site: "Your top 3 posts last refreshed 18 months ago, your new-query count this month is zero, branded share is 78%. Pattern: a loyal-but-shrinking audience — you stopped publishing, so you stopped reaching new readers."
+- Look for the cross-source surprise.
+
+SPECIFICITY MANDATE — every recommendation must be concrete:
+- NEVER recommend an action you cannot tie to a SPECIFIC URL, keyword, or number from the snapshot.
+- NEVER use vague phrases: "improve content quality", "build backlinks", "better keywords", "fix your meta", "update your titles", "do more SEO". They are banned.
+- For commercial: "You have ZERO commercial-intent ranking pages — 92% of impressions are informational. Build /pricing, /vs/[competitor], /alternatives in that order."
+- For content: "Refresh /blog/your-top-post — last updated 2024-01, lost 340 clicks vs prior period, was your #1 traffic page. Add a 2026 update section, 3 new H2s on related sub-topics."
+- If you cannot be specific from the snapshot, CALL A TOOL until you can. NEVER hand-wave.
+
+CONFIDENCE TRANSCRIPTION — never invent confidence; transcribe what the snapshot tells you:
+- Each insight in the snapshot ships with a "confidence: high/medium/low" tag and a one-line reason.
+- When confidence is medium or low, LEAD with that fact — don't bury it. Example: "I'm medium-confidence on this — only 17 days of data. The pattern looks real but watch the next 2 weeks before committing budget."
+- High-confidence insights speak with full conviction. Don't hedge those.
+- NEVER add your own "I think" or "probably" hedging when the snapshot says high. NEVER claim high confidence when the snapshot says low.
+- Honest uncertainty is a feature, not a flaw. The user trusts you more when you say "I don't have enough data to be sure" than when you fake certainty.
+
+SAME-QUESTION HANDLING — if the snapshot includes a [REPETITION_DETECTED] tag:
+- Open the response with a short acknowledgment: "I covered the [prior topic] X minutes ago — picking a different angle now."
+- Pick a DIFFERENT insight than last time. The snapshot's ranker has already demoted the prior one, so the top-ranked insight is genuinely fresh — trust it.
+- If the user asked the same question intentionally, they want a NEW lens, not a repeat.
+
+SUGGESTION DEDUP — if the snapshot includes [SURFACED_RECENTLY] suggestions_already_emitted:
+- Your follow-up suggestions block (\`<!-- suggestions: [...] -->\`) MUST NOT include any of those phrases or near-paraphrases.
+- Pick fresh angles the user hasn't seen yet.`;
 
 const SHARED_RULES = `RULES:
 1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools only when the snapshot is insufficient.
@@ -500,6 +557,46 @@ export async function POST(req: NextRequest) {
               ])
             : Promise.resolve([[] as Awaited<ReturnType<typeof loadUserFacts>>, null, [] as RecalledHit[]]);
 
+        // Anti-repetition: load per-thread runtime state (surfaced insight IDs,
+        // suggestion dedup list, prior question fingerprints) in parallel with
+        // intent + memory. Best-effort — empty state on failure.
+        const threadStatePromise: Promise<ChatThreadState> = (userId && threadId)
+            ? loadThreadState(String(userId), threadId)
+            : Promise.resolve({
+                threadId: threadId || '',
+                surfacedInsightIds: [],
+                surfacedSuggestionQuestions: [],
+                surfacedSurprises: [],
+                lastQuestionFingerprints: [],
+                lastUpdated: null,
+            });
+
+        // ── Enrichment pipeline: fetch winners-losers + cannibalization + mobile-gap +
+        //    schema-audit + PSI + cohort/journey/events/geo/time + brand split +
+        //    page-meta + ranked insights. Each source has its own cache key + TTL.
+        //    The ranker reads thread-state's recentlySurfacedIds (when available) and
+        //    demotes prior-turn insights so the next turn's #1 is genuinely fresh. ──
+        // Auto-pick the first GA4 property when the client didn't send one. The new
+        // GA4 sources (cohort/journey/events/...) are skipped silently if no propertyId.
+        const ga4PropertyId = (cachedGa4Properties?.[0]?.property as string | undefined)
+            || (cachedGa4Properties?.[0]?.propertyId as string | undefined);
+        // Defer the enrichment loading SSE events to AFTER we open the stream
+        // (otherwise they'd be lost). Capture them into a buffer here and flush
+        // on stream open inside the ReadableStream below.
+        const sourceLoadEvents: string[] = [];
+        const enrichmentPromise: Promise<EnrichedSnapshot | null> = (selectedSite && validGoogleToken && userId && seoContext)
+            ? threadStatePromise.then(state => buildEnrichedSnapshot({
+                userId: String(userId),
+                siteUrl: selectedSite,
+                propertyId: ga4PropertyId,
+                googleToken: validGoogleToken,
+                seoContext,
+                analyticsContext,
+                recentlySurfacedIds: state.surfacedInsightIds,
+                onSourceLoading: (source: string) => { sourceLoadEvents.push(source); },
+            })).catch(() => null)
+            : Promise.resolve(null);
+
         // User message with injected data context
         const siteTag = selectedSite ? `[Site: ${selectedSite}]` : '';
         const githubTag = `[GitHub:${githubConnected ? 'connected' : 'not_connected'}]`;
@@ -509,15 +606,113 @@ export async function POST(req: NextRequest) {
         const intentLabel = await intentPromise;
         const intentTag = intentLabel ? `[INTENT: ${intentLabel}]` : '';
         const [userFacts, threadSummary, recalledHits] = await memoryPromise;
+        const threadState = await threadStatePromise;
         // B1-full: persistent memory injection. Goes BEFORE the dashboard data
         // so the model reads "what we know about you" first, then "what's
         // happening right now."
         const memoryBlock = formatMemoryBlock(userFacts, threadSummary, recalledHits);
         // B3-full: resolve persona for this intent (falls back to DIAGNOSTIC if unknown).
-        const persona = resolvePersona(intentLabel);
-        const contextBlock = dataContext
-            ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${dataContext}${availableSitesContext}\n---\n${message}`
-            : `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${availableSitesContext}\n${message}`;
+        // Note: COACHING is auto-selected below for infant sites, overriding the LLM's intent pick.
+        let persona = resolvePersona(intentLabel);
+
+        // ── Anti-repetition: compute fingerprint vs prior turns. Triple-AND gate
+        //    (cosine ≥ 0.85 AND jaccard ≥ 0.7 AND temporal anchor match AND <24h).
+        //    When tripped, inject [REPETITION_DETECTED] tag so the persona prompt
+        //    forces an acknowledgment + different angle. The deterministic ranker
+        //    in insightEngine ALSO demotes prior insight IDs as a separate guard. ──
+        const currentFingerprint = makeFingerprint(message);
+        const cosineSimByIndex = recalledHits.map((h: any) => h?.score || 0);
+        const repetitionMatch = threadState.lastQuestionFingerprints.length > 0
+            ? findRepetitionMatch(currentFingerprint, threadState.lastQuestionFingerprints, cosineSimByIndex)
+            : null;
+        let repetitionTag = '';
+        if (repetitionMatch) {
+            repetitionTag = `\n${formatRepetitionTag(repetitionMatch)}\n`;
+            logChatTelemetry({
+                event: 'repetition_detected',
+                userId,
+                threadId,
+                payload: {
+                    priorInsightId: repetitionMatch.prior.insightId,
+                    priorAgeMs: Date.now() - repetitionMatch.prior.ts,
+                    cosineSim: repetitionMatch.comparison.cosineSim,
+                    jaccardSim: repetitionMatch.comparison.jaccardSim,
+                },
+            });
+        }
+
+        // ── Surfaced-recently block (insight IDs already shown, suggestions to avoid) ──
+        const surfacedRecentlyBlock = formatThreadStateForPrompt(threadState);
+
+        // Resolve enrichment (best-effort) and prefer the rich block; fall back to
+        // the legacy compact context if enrichment failed/unavailable.
+        let enrichedSnapshot = await enrichmentPromise;
+
+        // ── Edge-case persona overrides + telemetry ──
+        // Infant site (< 100 imp/mo OR < 5 distinct queries): server-side override to
+        // COACHING regardless of intent classifier — there's not enough data for
+        // analysis, the right move is a setup checklist.
+        if (enrichedSnapshot?.siteProfile?.infantSite) {
+            persona = resolvePersona('COACHING');
+            logChatTelemetry({
+                event: 'edge_case_triggered',
+                userId, threadId,
+                payload: { kind: 'new_site', totalImpressions: enrichedSnapshot.siteProfile.signals.totalImpressions, distinctQueries: enrichedSnapshot.siteProfile.signals.distinctQueries },
+            });
+        }
+        // Telemetry for other edge cases (no persona override; just observability).
+        if (enrichedSnapshot?.siteProfile?.partialConnection === 'gsc_only') {
+            logChatTelemetry({ event: 'edge_case_triggered', userId, threadId, payload: { kind: 'partial_connection_gsc_only' } });
+        } else if (enrichedSnapshot?.siteProfile?.partialConnection === 'ga4_only') {
+            logChatTelemetry({ event: 'edge_case_triggered', userId, threadId, payload: { kind: 'partial_connection_ga4_only' } });
+        }
+        if (enrichedSnapshot?.siteProfile?.monolingualNonEnglish) {
+            logChatTelemetry({
+                event: 'edge_case_triggered',
+                userId, threadId,
+                payload: { kind: 'multilingual', detected: enrichedSnapshot.siteProfile.monolingualNonEnglish.detected },
+            });
+        }
+        if (cachedSites.length > 1) {
+            logChatTelemetry({ event: 'edge_case_triggered', userId, threadId, payload: { kind: 'multi_site_user', siteCount: cachedSites.length } });
+        }
+
+        // ── Deploy correlation (conditional). Only fires for DIAGNOSTIC intent OR
+        //    when the user message contains regression keywords (drop/regress/broke).
+        //    Uses snapshot.winnersLosers as the input. Adds deploy_traffic_correlation
+        //    insights to the snapshot via the deterministic ranker. ──
+        if (enrichedSnapshot && selectedSite && userId && shouldRunDeployCorrelation(intentLabel, message)) {
+            try {
+                // Approximate the period boundary as 28 days ago (start of current period).
+                const periodStart = new Date(Date.now() - 28 * 86400_000);
+                const losers = enrichedSnapshot.winnersLosers?.losers || [];
+                if (losers.length > 0) {
+                    const dc = await correlateDeploysWithLosers({
+                        userId: String(userId),
+                        siteUrl: selectedSite,
+                        githubToken: githubAccessToken,
+                        losers,
+                        periodStartDate: periodStart,
+                    });
+                    if (dc.hasCorrelation) {
+                        enrichedSnapshot = injectDeployCorrelation(enrichedSnapshot, dc);
+                        logChatTelemetry({
+                            event: 'surprise_surfaced',
+                            userId, threadId,
+                            payload: { kind: 'deploy_traffic_correlation', matchCount: dc.matches.length, repo: dc.repo },
+                        });
+                    }
+                }
+            } catch { /* fail open — correlation is best-effort */ }
+        }
+        const richDataContext = enrichedSnapshot
+            ? `\n${buildRichChatContext(enrichedSnapshot, { siteUrl: selectedSite })}\n`
+            : null;
+        const effectiveDataContext = richDataContext || dataContext;
+        const surfacedBlock = surfacedRecentlyBlock ? `\n${surfacedRecentlyBlock}\n` : '';
+        const contextBlock = effectiveDataContext
+            ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${effectiveDataContext}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],
@@ -553,6 +748,28 @@ CRITICAL SYSTEM CONTEXT:
                 try {
                     // Signal client immediately that we're alive
                     controller.enqueue(encodeSSE({ type: 'status', message: 'Processing...' }));
+
+                    // Flush any per-source loading events captured during enrichment
+                    // (which started BEFORE the stream opened, so its onSourceLoading
+                    // callbacks pushed into a buffer). These let the UI render
+                    // per-source ghost chips ("Loading schema audit...") instead of
+                    // a generic spinner.
+                    for (const src of sourceLoadEvents) {
+                        controller.enqueue(encodeSSE({ type: 'source_loading', source: src }));
+                    }
+
+                    // Repetition detection: if a near-duplicate question was found earlier
+                    // in this thread, surface that to the client so the UI can render the
+                    // "You asked this Nm ago — fresh angle below" badge.
+                    if (repetitionMatch) {
+                        const priorAgeMin = Math.max(1, Math.round((Date.now() - repetitionMatch.prior.ts) / 60000));
+                        controller.enqueue(encodeSSE({
+                            type: 'repetition_detected',
+                            priorAgeMin,
+                            priorInsightId: repetitionMatch.prior.insightId,
+                            jaccardSim: repetitionMatch.comparison.jaccardSim,
+                        }));
+                    }
 
                     // Send credit update immediately
                     if (creditBalance !== null) {
@@ -798,6 +1015,10 @@ CRITICAL SYSTEM CONTEXT:
                                         // without re-querying APIs.
                                         seoContext,
                                         analyticsContext,
+                                        // find_top_money_move serves directly from the enriched snapshot
+                                        // (winners/losers, cannibalization, mobile-gap, page-meta, ranked
+                                        // insights). enrichedSnapshot is null when no siteUrl is selected.
+                                        enrichedSnapshot,
                                     });
 
                                     if (progressTimer) clearInterval(progressTimer);
@@ -928,10 +1149,48 @@ CRITICAL SYSTEM CONTEXT:
                                     groundedness: verdict.groundedness,
                                     completeness: verdict.completeness,
                                     format: verdict.format,
+                                    specificity: verdict.specificity,
                                     notes: verdict.notes,
                                 }));
                             }
                         } catch { /* critic failure is non-fatal */ }
+                    }
+
+                    // ── Anti-repetition: persist surfaced insight IDs + new fingerprint
+                    //    SYNCHRONOUSLY before [DONE]. This is critical: a fast follow-up
+                    //    turn that arrives before the post-DONE writes complete still
+                    //    needs to see this turn's surfaced state. ~30ms cost is acceptable.
+                    if (userId && threadId) {
+                        const topInsightId = enrichedSnapshot?.insights?.[0]?.id || null;
+                        const surfacedThisTurn = (enrichedSnapshot?.insights || [])
+                            .slice(0, 5)
+                            .map((i: any) => i.id)
+                            .filter(Boolean);
+                        const surprisesThisTurn = (enrichedSnapshot?.insights || [])
+                            .filter((i: any) => i.category === 'cross_source_surprise')
+                            .map((i: any) => i.id)
+                            .filter(Boolean);
+                        // Parse follow-up suggestions out of the assistant text so we can dedupe later turns.
+                        const suggestionMatch = assistantText.match(/<!--\s*suggestions:\s*(\[[^\]]+\])\s*-->/i);
+                        let suggestionsThisTurn: string[] = [];
+                        if (suggestionMatch) {
+                            try {
+                                const arr = JSON.parse(suggestionMatch[1]);
+                                if (Array.isArray(arr)) suggestionsThisTurn = arr.filter((s: any) => typeof s === 'string').slice(0, 3);
+                            } catch { /* ignore parse failure */ }
+                        }
+                        const fpToStore = { ...currentFingerprint, insightId: topInsightId };
+                        try {
+                            await saveThreadState({
+                                userId: String(userId),
+                                threadId,
+                                addSurfacedInsightIds: surfacedThisTurn,
+                                addSurfacedSuggestions: suggestionsThisTurn,
+                                addSurfacedSurprises: surprisesThisTurn,
+                                addQuestionFingerprint: fpToStore,
+                                prior: threadState,
+                            });
+                        } catch { /* swallow — best-effort */ }
                     }
 
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));

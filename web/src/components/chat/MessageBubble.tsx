@@ -35,6 +35,12 @@ export const MessageBubble = memo(function MessageBubble({
             }`}>
                 {msg.role === 'assistant' ? (
                     <ChatErrorBoundary label="message">
+                        {msg.repetition && (
+                            <div className="mb-2 inline-flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-md border border-amber-500/[0.20] bg-amber-500/[0.05] text-amber-300">
+                                <span className="text-amber-400">↻</span>
+                                You asked this ~{msg.repetition.priorAgeMin}m ago — picking a different angle below.
+                            </div>
+                        )}
                         <ChatMessageRenderer
                             content={msg.content}
                             tools={msg.tools}

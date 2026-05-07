@@ -10,13 +10,13 @@ function buildPrompts(siteLabel: string | null): string[] {
     const ownership = siteLabel ? `${siteLabel}'s` : 'my';
     return [
         `🎯 What is the ONE thing I should do today to grow ${ownership} traffic?`,
+        `✨ Show me 3 things I don't know about ${ownership} site`,
         `🚨 Why did ${ownership} traffic drop?`,
         `💰 Which ${ownership} pages are money pits? (high impressions, low clicks)`,
         `📈 Keywords on page 2 I can push to page 1 ${tag}`.trim(),
         `📝 Give me 5 blog post ideas based on ${ownership} data`,
         `📊 Grade ${ownership} SEO (A-F)`,
         `⚡ Are ${ownership} Core Web Vitals hurting rankings?`,
-        `🔮 Growth opportunities ${ownership} site is missing`,
     ];
 }
 

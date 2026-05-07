@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func, or_
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -5284,6 +5284,163 @@ class ChatEmbeddingQuery(BaseModel):
     vector: list[float]
     top_k: int = 5
     source_kinds: Optional[list[str]] = None  # filter to ['turn','fact'] etc.
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Chat thread state (anti-repetition runtime state)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ChatThreadStateUpsert(BaseModel):
+    user_identifier: str
+    thread_id: str
+    surfaced_insight_ids: Optional[list[str]] = None
+    surfaced_suggestion_questions: Optional[list[str]] = None
+    surfaced_surprises: Optional[list[str]] = None
+    last_question_fingerprints: Optional[list[dict]] = None
+
+
+def _serialize_thread_state(s: ChatThreadState) -> dict:
+    import json as _json
+    def _parse(v):
+        if not v: return []
+        try: return _json.loads(v)
+        except Exception: return []
+    return {
+        "thread_id": s.thread_id,
+        "surfaced_insight_ids": _parse(s.surfaced_insight_ids),
+        "surfaced_suggestion_questions": _parse(s.surfaced_suggestion_questions),
+        "surfaced_surprises": _parse(s.surfaced_surprises),
+        "last_question_fingerprints": _parse(s.last_question_fingerprints),
+        "last_updated": s.last_updated.isoformat() if s.last_updated else None,
+    }
+
+
+@app.get("/api/chat/thread-state")
+async def get_chat_thread_state(
+    user_identifier: str,
+    thread_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Load runtime state for a thread (surfaced insights, suggestions, fingerprints).
+    Returns empty defaults when no state exists yet (first turn of a thread)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"thread_id": thread_id, "surfaced_insight_ids": [], "surfaced_suggestion_questions": [], "surfaced_surprises": [], "last_question_fingerprints": [], "last_updated": None}
+    res = await db.execute(
+        select(ChatThreadState).where(
+            ChatThreadState.thread_id == thread_id,
+            ChatThreadState.user_id == user.id,
+        )
+    )
+    s = res.scalar_one_or_none()
+    if not s:
+        return {"thread_id": thread_id, "surfaced_insight_ids": [], "surfaced_suggestion_questions": [], "surfaced_surprises": [], "last_question_fingerprints": [], "last_updated": None}
+    return _serialize_thread_state(s)
+
+
+@app.post("/api/chat/thread-state")
+async def upsert_chat_thread_state(
+    data: ChatThreadStateUpsert,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Upsert runtime state. Lists are caller-managed (route.ts trims to N items
+    before sending). Multi-tenant safe via (user_id, thread_id) scoping."""
+    import json as _json
+    user = await get_user_by_identifier(db, data.user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    res = await db.execute(
+        select(ChatThreadState).where(
+            ChatThreadState.thread_id == data.thread_id,
+            ChatThreadState.user_id == user.id,
+        )
+    )
+    s = res.scalar_one_or_none()
+    if not s:
+        s = ChatThreadState(thread_id=data.thread_id, user_id=user.id)
+        db.add(s)
+    if data.surfaced_insight_ids is not None:
+        s.surfaced_insight_ids = _json.dumps(data.surfaced_insight_ids[:25])
+    if data.surfaced_suggestion_questions is not None:
+        s.surfaced_suggestion_questions = _json.dumps(data.surfaced_suggestion_questions[:30])
+    if data.surfaced_surprises is not None:
+        s.surfaced_surprises = _json.dumps(data.surfaced_surprises[:25])
+    if data.last_question_fingerprints is not None:
+        s.last_question_fingerprints = _json.dumps(data.last_question_fingerprints[:10])
+    s.last_updated = datetime.utcnow()
+    await db.commit()
+    await db.refresh(s)
+    return _serialize_thread_state(s)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Chat telemetry events (observability — was that feature actually useful?)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ChatTelemetryCreate(BaseModel):
+    user_identifier: Optional[str] = None
+    thread_id: Optional[str] = None
+    event_name: str
+    payload: Optional[dict] = None
+
+
+@app.post("/api/chat/telemetry/event")
+async def log_chat_telemetry_event(
+    data: ChatTelemetryCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Best-effort write of a single telemetry event. Failures are silent at
+    the caller; this just acks. Cap event_name + payload sizes defensively."""
+    import json as _json
+    if not data.event_name or len(data.event_name) > 60:
+        raise HTTPException(status_code=400, detail="event_name required, ≤60 chars")
+    user_id = None
+    if data.user_identifier:
+        user = await get_user_by_identifier(db, data.user_identifier)
+        if user:
+            user_id = user.id
+    payload_str = None
+    if data.payload is not None:
+        try:
+            payload_str = _json.dumps(data.payload)[:4000]
+        except Exception:
+            payload_str = None
+    evt = ChatTelemetryEvent(
+        user_id=user_id,
+        thread_id=(data.thread_id or '')[:36] or None,
+        event_name=data.event_name[:60],
+        payload_json=payload_str,
+    )
+    db.add(evt)
+    await db.commit()
+    return {"ok": True, "id": evt.id}
+
+
+@app.get("/api/chat/telemetry/summary")
+async def get_chat_telemetry_summary(
+    days: int = 7,
+    user_identifier: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Quick aggregate: event counts in the last N days, optionally per-user.
+    Lets you check 'did adding repetition detection actually fire?' """
+    cutoff = datetime.utcnow() - timedelta(days=max(1, min(days, 90)))
+    q = select(ChatTelemetryEvent.event_name, func.count(ChatTelemetryEvent.id)).where(
+        ChatTelemetryEvent.created_at >= cutoff,
+    )
+    if user_identifier:
+        user = await get_user_by_identifier(db, user_identifier)
+        if user:
+            q = q.where(ChatTelemetryEvent.user_id == user.id)
+    q = q.group_by(ChatTelemetryEvent.event_name)
+    result = await db.execute(q)
+    rows = result.all()
+    return {"days": days, "events": [{"event": r[0], "count": r[1]} for r in rows]}
 
 
 @app.post("/api/chat/embeddings")

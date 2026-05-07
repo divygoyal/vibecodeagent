@@ -25,6 +25,7 @@ import {
 import { computeAlerts } from '@/lib/alertEngine';
 import { runSiteAudit } from '@/lib/siteAudit';
 import { wrapUntrusted } from '@/lib/chatSafety';
+import { detectTopInsights } from '@/lib/insightEngine';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -896,6 +897,41 @@ REQUIRES: GitHub connected + repo specified. Do NOT call without [Repo:] tag set
         },
     },
     {
+        name: 'find_top_money_move',
+        description: `Return the SINGLE highest-$/mo opportunity (or top N ranked by $) from the deterministic insightEngine. Computed from the enriched dashboard snapshot — covers CTR leaks, striking-distance keywords, cannibalization, content decay, mobile gap, branded overdependence, position regressions, and page-2 breakthroughs. Each insight comes pre-loaded with: page URL, query, evidence numbers, $/mo lost estimate, projected click gain, effort minutes, difficulty, and (when available) the page's CURRENT title/meta/H1 so you can recommend a specific rewrite.
+
+WHEN TO USE:
+- "What is the ONE thing I should do today to grow?" / "biggest leak" / "highest-impact fix" / "where do I focus first?"
+- DEEP_DIVE intent — this is the tool you call FIRST. It returns the receipt-ready payload.
+- Whenever you need to pick a SINGLE concrete move with $-math attached.
+
+EFFICIENCY: 0 API calls — pure deterministic computation on the already-enriched snapshot. Always cheaper than searching the snapshot yourself for the highest-value pattern.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                limit: {
+                    type: 'INTEGER' as const,
+                    description: 'How many ranked insights to return. Default 1 (just THE top move). Use 5 only when the user explicitly asked for "top N opportunities".',
+                },
+                category: {
+                    type: 'STRING' as const,
+                    enum: ['ctr_leak', 'striking_distance', 'cannibalization', 'content_decay', 'mobile_gap', 'branded_overdependence', 'new_query_opportunity', 'position_regression', 'page_2_breakthrough', 'untapped_geo'],
+                    description: 'Optional: restrict to a single insight category. Default: any.',
+                },
+                minMonthlyValue: {
+                    type: 'NUMBER' as const,
+                    description: 'Optional: minimum $/mo threshold. Default 30.',
+                },
+                excludeInsightIds: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const },
+                    description: 'Optional: insight IDs to hard-exclude (in addition to thread-state-tracked recently-surfaced IDs which are excluded automatically). Use when the user explicitly asks for "a different angle" or "something else".',
+                },
+            },
+            required: [],
+        },
+    },
+    {
         name: 'compute_site_health_score',
         description: `Aggregate health-roll-up: combines run_site_audit (HTML/SEO checks) + get_alerts (anomalies) + recent commit count → single 0-100 score with sub-scores per dimension. Gives executives one number; gives the chat a cheap "is anything on fire?" entry point.
 
@@ -944,6 +980,10 @@ export interface GscContext {
     seoContext?: any;
     /** Pre-fetched dashboard analytics data (kpis/sources/devices/etc.). */
     analyticsContext?: any;
+    /** Pre-computed enriched snapshot (winners-losers, cannibalization, mobile-gap, page-meta,
+     *  ranked insights, branded split). When present, find_top_money_move serves directly from
+     *  this without re-fetching GSC. Built by chatSnapshot.buildEnrichedSnapshot() in route.ts. */
+    enrichedSnapshot?: any;
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -991,6 +1031,12 @@ const ARG_VALIDATORS: Record<string, ArgValidator> = {
         return null;
     },
     get_alerts: () => null, // all params optional
+    find_top_money_move: (a) => {
+        if (a.limit !== undefined && (!Number.isInteger(a.limit) || a.limit < 1 || a.limit > 10)) return 'limit must be an integer between 1 and 10';
+        if (a.minMonthlyValue !== undefined && (typeof a.minMonthlyValue !== 'number' || a.minMonthlyValue < 0)) return 'minMonthlyValue must be a non-negative number';
+        if (a.excludeInsightIds !== undefined && !Array.isArray(a.excludeInsightIds)) return 'excludeInsightIds must be an array of strings';
+        return null;
+    },
     compare_time_periods: (a) => {
         if (typeof a.siteUrl !== 'string') return 'siteUrl is required';
         for (const k of ['period1Start', 'period1End', 'period2Start', 'period2End']) {
@@ -1953,6 +1999,90 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             };
         } catch (e: any) {
             return { error: 'compute_failed', message: e?.message || 'Failed to compute alerts.' };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // find_top_money_move — DEEP_DIVE-grade ranked insights (no API call)
+    //   Reads gscContext.enrichedSnapshot (built once per turn in route.ts)
+    //   and returns the top-N insights pre-ranked by $/mo lost.
+    // ═══════════════════════════════════════════════════════════════
+    if (name === 'find_top_money_move') {
+        try {
+            const limit = Math.min(Math.max(args.limit || 1, 1), 10);
+            const minValue = typeof args.minMonthlyValue === 'number' ? args.minMonthlyValue : 30;
+            const categoryFilter: string | undefined = args.category;
+            const explicitExcludeIds: string[] = Array.isArray(args.excludeInsightIds) ? args.excludeInsightIds : [];
+
+            // Prefer the enriched snapshot built in route.ts. When absent (e.g., tools
+            // invoked outside the chat route), fall back to recomputing from raw context.
+            const snap = gscContext?.enrichedSnapshot;
+            let insights = snap?.insights;
+            if (!Array.isArray(insights)) {
+                insights = detectTopInsights({
+                    seoContext: gscContext?.seoContext,
+                    analyticsContext: gscContext?.analyticsContext,
+                    winnersLosers: snap?.winnersLosers,
+                    cannibalization: snap?.cannibalization,
+                    mobileGap: snap?.mobileGap,
+                    brand: snap?.brand,
+                    pageMeta: snap?.pageMeta,
+                }, 10);
+            }
+
+            // Hard exclusion: prior-surfaced IDs from thread state PLUS any IDs the
+            // model explicitly asked to exclude. Soft demotion already handles the
+            // ranker, but DEEP_DIVE persona can request hard skip when the user is
+            // explicitly chasing a different angle.
+            const excludeSet = new Set<string>([
+                ...(snap?.recentlySurfacedIds || []),
+                ...explicitExcludeIds,
+            ]);
+
+            const filtered = insights
+                .filter((i: any) => !excludeSet.has(i.id))
+                .filter((i: any) => i.monthlyValueLost >= minValue || i.isStrategic === true || i.category === 'branded_overdependence')
+                .filter((i: any) => !categoryFilter || i.category === categoryFilter)
+                .slice(0, limit);
+
+            if (filtered.length === 0) {
+                // Honest no-result path — let the model say "nothing significant" instead
+                // of fabricating something.
+                return {
+                    result: {
+                        task: 'No insight cleared the minimum-value threshold. Tell the user honestly: "Your data is healthy — no obvious money leak right now. Closest opportunity is X with $Y/mo." Then deep-dive that opportunity.',
+                        expectedFormat: 'Plain-prose acknowledgment + the closest insight (which may be below threshold). DO NOT invent a leak that does not exist.',
+                        topInsights: [],
+                        closestBelowThreshold: insights[0] || null,
+                        snapshotComputedAt: snap?.computedAt || null,
+                    },
+                };
+            }
+
+            const topInsight = filtered[0];
+            const isTopStrategic = topInsight.isStrategic === true;
+
+            return {
+                result: {
+                    task: isTopStrategic
+                        ? 'The top insight is STRATEGIC (root-cause growth blocker). Narrate in the DEEP_DIVE shape but ADAPT: 🎯 The diagnosis (name the root cause, not a $ figure) → 📊 Receipts (the distribution/breakdown that proves it) → 🧭 The cost of not fixing (what stays the same if ignored — not $/mo math) → 🔧 The fix (specific pages or actions, not meta rewrites) → 🔮 What\'s adjacent (cross-source observation).'
+                        : 'The top insight is TACTICAL ($-quantifiable SEO fix). Narrate in the DEEP_DIVE shape: 🎯 The move (name URL/keyword + $/mo) → 📊 Receipts table (numbers from evidence) → 💰 The math (current → target → lift, with the $ formula) → 🔧 The fix (with before/after when fix.before is set) → 🔮 What\'s adjacent.',
+                    expectedFormat: isTopStrategic
+                        ? 'Markdown sections in the order above. Receipts is a table showing the breakdown that proves the diagnosis (e.g., intent-class distribution, channel mix, content vs conversion views). NO $-math section — replace with 🧭 cost-of-inaction prose. Fix names specific pages/actions, not meta tweaks.'
+                        : 'Markdown sections in the order above. Receipts must be a table with the exact evidence numbers. The fix MUST name the URL and (when available) show before/after meta-tag text.',
+                    insightKind: isTopStrategic ? 'strategic' : 'tactical',
+                    insightCount: filtered.length,
+                    topInsights: filtered,
+                    snapshotComputedAt: snap?.computedAt || null,
+                    note: isTopStrategic
+                        ? 'Top insight is STRATEGIC — these are root-cause growth blockers, not tactical fixes. Do NOT call run_site_audit; the proof is in the snapshot. Do NOT compute $/mo math (none meaningful here). The "wow" is in the diagnosis itself.'
+                        : (topInsight.fix.before
+                            ? 'Page-meta was fetched — fix.before contains the page\'s current title/description/H1. Use them in your before/after comparison.'
+                            : 'Page-meta NOT fetched for this insight. If recommending a meta rewrite, you must call run_site_audit on the page URL first to get the current title before suggesting a replacement.'),
+                },
+            };
+        } catch (e: any) {
+            return { error: 'money_move_failed', message: e?.message || 'Insight detection failed.' };
         }
     }
 

@@ -495,6 +495,53 @@ class ChatFeedback(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ChatThreadState(Base):
+    """Per-thread runtime state for the AI chat — drives anti-repetition.
+
+    The deterministic re-ranker reads `surfaced_insight_ids` and demotes
+    matching items so the next turn's top-ranked insight is genuinely fresh.
+    Suggestion deduplication uses `surfaced_suggestion_questions`.
+
+    Question fingerprints (cosine seed + jaccard tokens + temporal anchor)
+    let us detect repeated questions deterministically WITHOUT relying on
+    LLM compliance with "do not repeat" instructions.
+
+    Writes happen synchronously before [DONE] so a fast follow-up turn
+    sees the prior turn's state. Reads happen alongside loadThreadSummary.
+    """
+    __tablename__ = "chat_thread_state"
+
+    thread_id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    surfaced_insight_ids = Column(Text)            # JSON array, last 5 turns of insight IDs
+    surfaced_suggestion_questions = Column(Text)   # JSON array, last 3 turns of suggestion chips
+    surfaced_surprises = Column(Text)              # JSON array of surprise insight IDs already revealed
+    last_question_fingerprints = Column(Text)      # JSON array of {cosineSeed, jaccardTokens, temporalAnchor, ts, insightId}
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ChatTelemetryEvent(Base):
+    """Observability events emitted by the chat pipeline.
+
+    Each row records a single named event from the AI-chat path so we can
+    answer "did adding feature X actually move the needle?" without guessing.
+    Best-effort writes (fire-and-forget); failures are silent. Volume is
+    bounded by the per-turn event budget (8-10 events/turn typical).
+
+    event_name examples: 'repetition_detected', 'surprise_surfaced',
+    'confidence_downgraded', 'edge_case_triggered', 'insight_demoted',
+    'tool_aborted', 'cache_miss_per_source'.
+    """
+    __tablename__ = "chat_telemetry_events"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, index=True)
+    thread_id = Column(String(36), index=True)
+    event_name = Column(String(60), nullable=False, index=True)
+    payload_json = Column(Text)                    # JSON object with event-specific fields
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class LeaderboardStatsHistory(Base):
     """Per-day snapshot of a leaderboard entry's stats — powers sparkline + weekly digest."""
     __tablename__ = "leaderboard_stats_history"

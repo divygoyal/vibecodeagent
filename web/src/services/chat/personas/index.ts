@@ -27,10 +27,15 @@ import { executiveSummary } from './executiveSummary';
 import { technicalAudit } from './technicalAudit';
 import { casualGreeting } from './casualGreeting';
 import { metaQuestion } from './metaQuestion';
+import { deepDive } from './deepDive';
+import { coaching } from './coaching';
+import { comparison } from './comparison';
+import { hypothetical } from './hypothetical';
 
 export type IntentLabel =
     | 'CASUAL_GREETING' | 'DIAGNOSTIC' | 'OPPORTUNITY' | 'CONTENT_BRIEF'
-    | 'EXECUTIVE_SUMMARY' | 'TECHNICAL_AUDIT' | 'META_QUESTION';
+    | 'EXECUTIVE_SUMMARY' | 'TECHNICAL_AUDIT' | 'META_QUESTION' | 'DEEP_DIVE'
+    | 'COACHING' | 'COMPARISON' | 'HYPOTHETICAL';
 
 export interface Persona {
     label: IntentLabel;
@@ -57,6 +62,10 @@ const REGISTRY: Record<IntentLabel, Persona> = {
     EXECUTIVE_SUMMARY: executiveSummary,
     TECHNICAL_AUDIT: technicalAudit,
     META_QUESTION: metaQuestion,
+    DEEP_DIVE: deepDive,
+    COACHING: coaching,
+    COMPARISON: comparison,
+    HYPOTHETICAL: hypothetical,
 };
 
 /** Resolve a Persona for an intent label. Falls back to DIAGNOSTIC (the

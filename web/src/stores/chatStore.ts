@@ -23,7 +23,13 @@ export interface ChatMessage {
         groundedness: number;
         completeness: number;
         format: number;
+        specificity?: number;
         notes: string;
+    };
+    /** WS-7: repetition badge — when present, render "You asked this Nm ago — fresh angle" above the message. */
+    repetition?: {
+        priorAgeMin: number;
+        priorInsightId: string | null;
     };
     hasError?: boolean;
 }
