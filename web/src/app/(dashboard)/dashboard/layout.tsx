@@ -29,6 +29,7 @@ import { DEMO_DOMAIN_LABEL } from '@/lib/demoWorkspace';
 import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList } from '@/lib/useDashboardData';
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
 import { useChatStore } from '@/stores/chatStore';
+import { CreditsCard } from '@/components/sidebar/CreditsCard';
 
 // Extended user type — id is added via JWT callback in auth.ts
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
@@ -751,8 +752,8 @@ export default function DashboardLayout({
                     ))}
                 </nav>
 
-                {/* Bottom section: Settings + Credits + User + Collapse */}
-                <div className="relative z-10 border-t border-[var(--divider)] p-2.5 space-y-1.5">
+                {/* Bottom section: Settings + Credits + User + Collapse — sticky at viewport bottom */}
+                <div className="relative z-10 border-t border-[var(--divider)] p-2.5 space-y-1.5 sticky bottom-0 bg-[var(--app-bg,#06090d)] backdrop-blur supports-[backdrop-filter]:bg-[var(--app-bg,#06090d)]/95">
                     {/* Settings link */}
                     {(() => {
                         const isSettingsActive = pathname.startsWith('/dashboard/settings');
@@ -770,21 +771,11 @@ export default function DashboardLayout({
                         );
                     })()}
 
-                    {/* Credits badge */}
-                    {credits !== null && !collapsed && (
-                        <Link
-                            href="/dashboard/plan"
-                            className={`flex items-center gap-2.5 px-3 py-2 ${shellRadiusClass} border transition-all hover:opacity-80 ${credits < 20
-                                ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                                : credits < 50
-                                    ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
-                                    : 'bg-[#14C4E1]/[0.08] border-[#14C4E1]/[0.18]'
-                            }`}
-                        >
-                            <Coins className={`w-3.5 h-3.5 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`} />
-                            <span className={`text-[11px] font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`}>{credits} msgs</span>
-                        </Link>
-                    )}
+                    {/* Credits card — sticky right below Settings.
+                        Replaces the old "{N} msgs" pill with a full card that shows credits left,
+                        progress bar, plan badge, and an upgrade CTA (visible on Free or when running low). */}
+                    <CreditsCard credits={credits} plan={userPlan} collapsed={collapsed} />
+
 
                     {/* User profile */}
                     {session?.user && !collapsed && (
@@ -1137,24 +1128,15 @@ export default function DashboardLayout({
                                 </div>
                             </nav>
 
-                            {/* Credits display in mobile sidebar */}
+                            {/* Credits card — mobile sidebar (mirrors desktop card sticky below Settings) */}
                             {credits !== null && (
                                 <div className="border-t border-[var(--divider)] px-3 py-3">
-                                    <Link
-                                        href="/dashboard/plan"
-                                        onClick={() => setMobileOpen(false)}
-                                        className={`flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-lg border hover:opacity-80 transition-opacity ${credits < 20
-                                        ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                                        : credits < 50
-                                            ? 'bg-amber-500/[0.08] border-amber-500/[0.15]'
-                                            : 'bg-[#14C4E1]/[0.08] border-[#14C4E1]/[0.18]'
-                                        }`}>
-                                        <Coins className={`w-4 h-4 ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`} />
-                                        <span className={`text-xs font-bold ${credits < 20 ? 'text-red-400' : credits < 50 ? 'text-amber-400' : 'text-[#7AD9DA]'}`}>{credits} messages</span>
-                                        {userPlan === 'free' && (
-                                            <Sparkles className="w-3 h-3 text-amber-400/70 ml-auto" />
-                                        )}
-                                    </Link>
+                                    <CreditsCard
+                                        credits={credits}
+                                        plan={userPlan}
+                                        mobile
+                                        onNavigate={() => setMobileOpen(false)}
+                                    />
                                 </div>
                             )}
 

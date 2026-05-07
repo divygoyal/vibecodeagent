@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     CheckCircle2, Coins, Bot, Zap, TrendingUp, Shield,
     History, AlertTriangle, X, Loader2, ArrowRight, Check,
+    Minus, Sparkles, Lightbulb, GitBranch, Users, Globe, Layers,
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
 
@@ -25,33 +26,136 @@ interface PlanInfo {
     icon: typeof Zap;
     credits: number;
     price: string;
+    /** Short tagline shown under the plan name. */
     blurb: string;
+    /** "Best for" persona — drives the green tag at the top of each card. */
+    bestFor: string;
+    /** Per-message cost for credit-economics framing on the page. */
+    costPerMsg: string;
+    /** Cost framing — what you'd typically save vs. agency fees / tools at this tier. */
+    valueLine: string;
 }
 
 const PLAN_CONFIG: Record<string, PlanInfo> = {
-    free:    { label: 'Free',    icon: Zap,         credits: 0,   price: '$0',  blurb: 'Free tier — no AI credits' },
-    starter: { label: 'Starter', icon: Zap,         credits: 50,  price: '$9',  blurb: 'For side projects' },
-    growth:  { label: 'Growth',  icon: TrendingUp,  credits: 150, price: '$19', blurb: 'For growing businesses' },
-    pro:     { label: 'Pro',     icon: Shield,      credits: 300, price: '$29', blurb: 'Telegram bot + everything' },
+    free: {
+        label: 'Free', icon: Zap, credits: 0, price: '$0',
+        blurb: 'Browse the dashboard — no AI',
+        bestFor: 'Trying TrafficClaw',
+        costPerMsg: '—',
+        valueLine: 'See your data; AI is locked',
+    },
+    starter: {
+        label: 'Starter', icon: Zap, credits: 50, price: '$9',
+        blurb: 'Solo founders, side projects',
+        bestFor: 'Indie maker · 1 site',
+        costPerMsg: '$0.18 / AI message',
+        valueLine: 'One CTR fix from this tier ≈ recovers your $9 in week one',
+    },
+    growth: {
+        label: 'Growth', icon: TrendingUp, credits: 150, price: '$19',
+        blurb: 'Small businesses scaling SEO',
+        bestFor: 'Founder + ops · up to 3 sites',
+        costPerMsg: '$0.13 / AI message',
+        valueLine: '$19/mo replaces $200/mo of analyst tools — 3× the volume of Starter for 2× the price',
+    },
+    pro: {
+        label: 'Pro', icon: Shield, credits: 300, price: '$29',
+        blurb: 'Agencies, serious operators',
+        bestFor: 'Multi-site · agency · power users',
+        costPerMsg: '$0.10 / AI message',
+        valueLine: 'Cheapest per-message tier + Telegram bot for daily mobile alerts',
+    },
 };
 
+/** Detailed feature list per tier — drives the card bullets AND the comparison table. */
 const SUBSCRIPTION_PLANS = [
     {
         key: 'starter',
         productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
-        features: ['50 AI credits / month', 'Full dashboard access', 'SEO & analytics tools', 'Site audit reports'],
+        features: [
+            { label: '50 AI credits / month', highlight: true, icon: Coins },
+            { label: 'Full dashboard (analytics + SEO)', icon: Layers },
+            { label: 'AEO & schema audits', icon: Sparkles },
+            { label: 'Site audit reports (50+ checks)', icon: Check },
+            { label: '1 connected site', icon: Globe },
+            { label: 'Daily AI briefing', icon: Zap },
+            { label: 'Email support', icon: Users },
+        ],
     },
     {
         key: 'growth',
         productId: 'pdt_0NaLMM1bLW9wAbmxcsebm',
-        features: ['150 AI credits / month', 'Everything in Starter', 'Priority AI responses', 'Advanced SEO intelligence'],
+        features: [
+            { label: '150 AI credits / month', highlight: true, icon: Coins },
+            { label: 'Everything in Starter', icon: Check },
+            { label: 'Priority AI queue (faster responses)', icon: Zap },
+            { label: 'Up to 3 connected sites', icon: Globe },
+            { label: 'Cross-source insights (Deploy ↔ Traffic)', icon: GitBranch },
+            { label: 'Strategic root-cause diagnoses', icon: Lightbulb },
+            { label: 'Surprise-engine cross-source insights', icon: Sparkles },
+        ],
         recommended: true,
     },
     {
         key: 'pro',
         productId: 'pdt_0NaLMM4r23kncRahthuyj',
-        features: ['300 AI credits / month', 'Everything in Growth', 'Telegram bot included', 'Priority support'],
+        features: [
+            { label: '300 AI credits / month', highlight: true, icon: Coins },
+            { label: 'Everything in Growth', icon: Check },
+            { label: 'Telegram bot — alerts on the go', highlight: true, icon: Bot },
+            { label: 'Unlimited connected sites', icon: Globe },
+            { label: 'Priority support (24h response)', icon: Users },
+            { label: 'Beta features (early access)', icon: Sparkles },
+            { label: 'Cheapest per-message rate ($0.10)', icon: TrendingUp },
+        ],
         telegramBot: true,
+    },
+];
+
+/** Comparison matrix — drives the side-by-side table below the cards.
+ *  `value` per plan is either a string (rendered as text) or boolean (✓ / —). */
+const COMPARISON_GROUPS: Array<{
+    title: string;
+    rows: Array<{ feature: string; free: string | boolean; starter: string | boolean; growth: string | boolean; pro: string | boolean }>;
+}> = [
+    {
+        title: 'AI capabilities',
+        rows: [
+            { feature: 'AI credits / month', free: '0', starter: '50', growth: '150', pro: '300' },
+            { feature: 'Cost per AI message', free: '—', starter: '$0.18', growth: '$0.13', pro: '$0.10' },
+            { feature: 'Strategic diagnoses (root-cause)', free: false, starter: 'Basic', growth: 'Full', pro: 'Full' },
+            { feature: 'Cross-source insights (deploy × traffic)', free: false, starter: false, growth: true, pro: true },
+            { feature: 'Surprise-engine "did you know" findings', free: false, starter: 'Limited', growth: true, pro: true },
+            { feature: 'AI response priority', free: '—', starter: 'Standard', growth: 'Priority', pro: 'Priority' },
+        ],
+    },
+    {
+        title: 'Data & coverage',
+        rows: [
+            { feature: 'Connected sites', free: '1', starter: '1', growth: '3', pro: 'Unlimited' },
+            { feature: 'GA4 + Search Console', free: true, starter: true, growth: true, pro: true },
+            { feature: 'Schema / AEO visibility audit', free: false, starter: true, growth: true, pro: true },
+            { feature: 'Page-level CWV / PageSpeed batch', free: false, starter: 'On-demand', growth: 'Auto-cached', pro: 'Auto-cached' },
+            { feature: 'Cohort retention + journey analysis', free: false, starter: false, growth: true, pro: true },
+            { feature: 'GitHub deploy correlation', free: false, starter: false, growth: true, pro: true },
+        ],
+    },
+    {
+        title: 'Workflow & alerts',
+        rows: [
+            { feature: 'Daily AI briefing', free: false, starter: true, growth: true, pro: true },
+            { feature: 'Site audit reports (50+ checks)', free: 'View only', starter: true, growth: true, pro: true },
+            { feature: 'Telegram bot — mobile alerts', free: false, starter: false, growth: false, pro: true },
+            { feature: 'Beta feature access', free: false, starter: false, growth: false, pro: true },
+        ],
+    },
+    {
+        title: 'Support',
+        rows: [
+            { feature: 'Email support', free: false, starter: true, growth: true, pro: true },
+            { feature: 'Priority response (24h)', free: false, starter: false, growth: false, pro: true },
+            { feature: 'Cancel anytime', free: true, starter: true, growth: true, pro: true },
+        ],
     },
 ];
 
@@ -262,7 +366,9 @@ function PlanPageContent() {
                                 className={`relative flex flex-col rounded-2xl border p-5 transition-colors ${
                                     isCurrent
                                         ? 'border-cyan-400/30 bg-cyan-500/[0.04]'
-                                        : 'border-white/[0.06] bg-[#0a0d12] hover:border-white/[0.12]'
+                                        : p.recommended
+                                            ? 'border-cyan-400/20 bg-[#0a0d12] hover:border-cyan-400/40 ring-1 ring-cyan-500/[0.08]'
+                                            : 'border-white/[0.06] bg-[#0a0d12] hover:border-white/[0.12]'
                                 }`}
                             >
                                 {p.recommended && !isCurrent && (
@@ -281,6 +387,9 @@ function PlanPageContent() {
                                 </div>
                                 <h3 className="text-[15px] font-semibold text-white">{info.label}</h3>
                                 <p className="mt-0.5 text-[11px] text-zinc-500">{info.blurb}</p>
+                                <p className="mt-1.5 text-[10.5px] text-emerald-300/90 font-medium uppercase tracking-wide">
+                                    Best for: <span className="text-emerald-200/90 normal-case font-semibold">{info.bestFor}</span>
+                                </p>
 
                                 <div className="mt-4 flex items-baseline gap-1">
                                     <span className="text-[28px] font-semibold tabular-nums text-white leading-none">
@@ -290,6 +399,9 @@ function PlanPageContent() {
                                 </div>
                                 <div className="mt-1 text-[11px] text-zinc-400 tabular-nums">
                                     {info.credits} AI credits / month
+                                </div>
+                                <div className="mt-0.5 text-[10.5px] text-zinc-500">
+                                    {info.costPerMsg}
                                 </div>
 
                                 <div className="mt-4">
@@ -320,27 +432,43 @@ function PlanPageContent() {
 
                                 <ul className="mt-4 space-y-2">
                                     {p.features.map((f, i) => {
-                                        const isTelegram = f.toLowerCase().includes('telegram');
+                                        const FeatureIcon = f.icon || Check;
                                         return (
-                                            <li key={i} className="flex items-start gap-2 text-[11.5px] text-zinc-300">
-                                                {isTelegram ? (
-                                                    <Bot className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-zinc-300" />
-                                                ) : (
-                                                    <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-zinc-500" />
-                                                )}
-                                                <span>{f}</span>
+                                            <li
+                                                key={i}
+                                                className={`flex items-start gap-2 text-[11.5px] ${
+                                                    f.highlight ? 'text-zinc-100 font-medium' : 'text-zinc-300'
+                                                }`}
+                                            >
+                                                <FeatureIcon
+                                                    className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${
+                                                        f.highlight ? 'text-cyan-300' : 'text-zinc-500'
+                                                    }`}
+                                                />
+                                                <span>{f.label}</span>
                                             </li>
                                         );
                                     })}
                                 </ul>
+
+                                {/* Per-tier value framing — helps the user judge ROI */}
+                                <p className="mt-4 pt-4 border-t border-white/[0.05] text-[10.5px] leading-relaxed text-zinc-500">
+                                    {info.valueLine}
+                                </p>
                             </article>
                         );
                     })}
                 </div>
                 <p className="text-center text-[10.5px] text-zinc-600">
-                    Secure payments by Dodo Payments
+                    Secure payments by Dodo Payments · Cancel anytime · Switch tiers freely
                 </p>
             </section>
+
+            {/* Compare-everything table — clearer side-by-side decision-making */}
+            <ComparisonTable currentPlan={plan} />
+
+            {/* Plan FAQ — addresses the questions that keep users from upgrading */}
+            <PlanFaq />
 
             {/* Credit usage history */}
             <CreditUsageHistory />
@@ -384,6 +512,127 @@ function Banner({ tone, title, body, onClose }: { tone: 'success' | 'warning'; t
                 </button>
             )}
         </div>
+    );
+}
+
+function ComparisonTable({ currentPlan }: { currentPlan: string }) {
+    // Highlight the user's current plan column so they can see what they have at a glance.
+    const currentCol = currentPlan === 'starter' ? 'starter'
+        : currentPlan === 'growth' ? 'growth'
+        : currentPlan === 'pro' ? 'pro'
+        : 'free';
+
+    const renderCell = (val: string | boolean) => {
+        if (val === true) return <Check className="h-3.5 w-3.5 text-emerald-300 mx-auto" />;
+        if (val === false) return <Minus className="h-3.5 w-3.5 text-zinc-700 mx-auto" />;
+        return <span className="tabular-nums text-zinc-200">{val}</span>;
+    };
+
+    const colHeader = (key: 'free' | 'starter' | 'growth' | 'pro', label: string) => (
+        <th
+            key={key}
+            className={`px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider ${
+                currentCol === key
+                    ? 'bg-cyan-500/[0.06] text-[#7AD9DA] border-b border-cyan-400/30'
+                    : 'text-zinc-400 border-b border-white/[0.06]'
+            }`}
+        >
+            <div className="flex flex-col items-center gap-0.5">
+                <span>{label}</span>
+                {currentCol === key && (
+                    <span className="text-[8.5px] font-bold tracking-wider rounded-full bg-cyan-400/15 text-cyan-200 px-1.5 py-0">
+                        Your plan
+                    </span>
+                )}
+            </div>
+        </th>
+    );
+
+    return (
+        <section className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/[0.05]">
+                <h2 className="text-[13px] font-semibold text-white">Compare every feature</h2>
+                <p className="mt-0.5 text-[11.5px] text-zinc-500">Pick the tier that matches your scale — switch up or down anytime.</p>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-[12px] min-w-[640px]">
+                    <thead>
+                        <tr>
+                            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500 border-b border-white/[0.06]">Feature</th>
+                            {colHeader('free', 'Free')}
+                            {colHeader('starter', 'Starter $9')}
+                            {colHeader('growth', 'Growth $19')}
+                            {colHeader('pro', 'Pro $29')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {COMPARISON_GROUPS.flatMap((group) => [
+                            <tr key={`group-${group.title}`}>
+                                <td colSpan={5} className="px-4 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 bg-white/[0.01]">
+                                    {group.title}
+                                </td>
+                            </tr>,
+                            ...group.rows.map((row, i) => (
+                                <tr key={`${group.title}-${i}`} className="border-t border-white/[0.04]">
+                                    <td className="px-4 py-2.5 text-zinc-300">{row.feature}</td>
+                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'free' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.free)}</td>
+                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'starter' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.starter)}</td>
+                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'growth' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.growth)}</td>
+                                    <td className={`px-3 py-2.5 text-center ${currentCol === 'pro' ? 'bg-cyan-500/[0.03]' : ''}`}>{renderCell(row.pro)}</td>
+                                </tr>
+                            )),
+                        ])}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+}
+
+const FAQ_ITEMS: Array<{ q: string; a: string }> = [
+    {
+        q: 'What counts as one credit?',
+        a: 'One AI message = one credit. Tool calls (audits, schema checks, GA4 reports) inside a message are free — only the user-visible message counts. Briefings + auto-generated insights also use credits.',
+    },
+    {
+        q: 'What happens to my credits if I cancel or downgrade?',
+        a: 'Cancellation keeps your plan active until the end of the billing cycle — credits stay usable. Downgrades take effect at the next renewal; remaining credits roll into the new tier (capped at the new monthly limit).',
+    },
+    {
+        q: 'Can I upgrade mid-cycle?',
+        a: 'Yes — upgrades are instant and prorated. New credits land in your account within seconds of payment.',
+    },
+    {
+        q: 'Why pick Growth over Starter?',
+        a: '3× the credits at 2× the price ($0.13 vs $0.18 per message), priority AI queue, cross-source insights (deploy ↔ traffic), and up to 3 sites. The line where most growing businesses land.',
+    },
+    {
+        q: 'Why pick Pro over Growth?',
+        a: 'Telegram bot for mobile alerts, unlimited sites, cheapest per-message rate ($0.10), priority support, and beta-feature early access. Built for agencies and operators running multiple properties.',
+    },
+    {
+        q: 'Is the data secure?',
+        a: 'OAuth tokens stay encrypted server-side. Payments handled by Dodo Payments — we never see your card. Your GA4/GSC data is read-only and never shared.',
+    },
+];
+
+function PlanFaq() {
+    return (
+        <section className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-5">
+            <h2 className="text-[13px] font-semibold text-white">Frequently asked</h2>
+            <p className="mt-0.5 text-[11.5px] text-zinc-500">If something's unclear, ask — credits are flexible.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {FAQ_ITEMS.map((item, i) => (
+                    <details key={i} className="group rounded-xl border border-white/[0.05] bg-white/[0.015] open:border-white/[0.10] transition-colors">
+                        <summary className="cursor-pointer list-none px-4 py-3 flex items-start justify-between gap-3 text-[12px] font-medium text-zinc-200 hover:text-white">
+                            <span>{item.q}</span>
+                            <span className="flex-shrink-0 text-zinc-500 group-open:rotate-45 transition-transform text-base leading-none">+</span>
+                        </summary>
+                        <p className="px-4 pb-3.5 text-[11.5px] leading-relaxed text-zinc-400">{item.a}</p>
+                    </details>
+                ))}
+            </div>
+        </section>
     );
 }
 
