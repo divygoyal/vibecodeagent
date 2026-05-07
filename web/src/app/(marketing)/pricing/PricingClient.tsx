@@ -44,19 +44,22 @@ const PLANS = [
         name: 'Starter',
         price: '$9',
         credits: 50,
+        perMessage: '$0.18',
         icon: Zap,
         color: 'cyan',
         gradient: 'from-cyan-400 to-blue-500',
-        description: 'For creators who need AI power.',
+        description: 'Solo founders, side projects',
+        bestFor: 'Indie maker · 1 site',
+        valueProp: 'One CTR fix from this tier ≈ recovers your $9 in week one',
         productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
         features: [
-            { text: '50 AI messages / month', included: true },
-            { text: 'Globe embed — no watermark', included: true },
-            { text: 'AI-powered SEO chat', included: true },
-            { text: 'AI content generation tools', included: true },
-            { text: 'CSV & JSON data export', included: true },
-            { text: 'Site audit reports (3/day)', included: true },
-            { text: 'Telegram bot', included: false },
+            { text: '50 AI credits / month', included: true },
+            { text: 'Full dashboard (analytics + SEO)', included: true },
+            { text: 'AEO & schema audits', included: true },
+            { text: 'Site audit reports (50+ checks)', included: true },
+            { text: '1 connected site', included: true },
+            { text: 'Daily AI briefing', included: true },
+            { text: 'Email support', included: true },
         ],
     },
     {
@@ -64,20 +67,22 @@ const PLANS = [
         name: 'Growth',
         price: '$19',
         credits: 150,
+        perMessage: '$0.13',
         icon: TrendingUp,
         color: 'emerald',
         gradient: 'from-emerald-400 to-cyan-400',
-        description: 'For growing businesses serious about SEO.',
-        popular: true,
+        description: 'Small businesses scaling SEO',
+        bestFor: 'Founder + ops · up to 3 sites',
+        valueProp: '$19/mo replaces $200/mo of analyst tools — 3× the volume of Starter for 2× the price',
         productId: 'pdt_0NaLMM1bLW9wAbmxcsebm',
         features: [
-            { text: '150 AI messages / month', included: true },
-            { text: 'Everything in Starter +', included: true },
-            { text: 'Priority AI responses', included: true },
-            { text: 'Advanced SEO intelligence', included: true },
-            { text: 'Multi-site support', included: true },
-            { text: 'AEO optimization tools', included: true },
-            { text: 'Telegram bot', included: false },
+            { text: '150 AI credits / month', included: true },
+            { text: 'Everything in Starter', included: true },
+            { text: 'Priority AI queue (faster responses)', included: true },
+            { text: 'Up to 3 connected sites', included: true },
+            { text: 'Cross-source insights (Deploy ↔ Traffic)', included: true },
+            { text: 'Strategic root-cause diagnoses', included: true },
+            { text: 'Surprise-engine cross-source insights', included: true },
         ],
     },
     {
@@ -85,20 +90,23 @@ const PLANS = [
         name: 'Pro',
         price: '$29',
         credits: 300,
+        perMessage: '$0.10',
         icon: Shield,
         color: 'violet',
         gradient: 'from-violet-400 to-purple-500',
-        description: 'Everything unlocked. Full power.',
+        description: 'Agencies, serious operators',
+        bestFor: 'Multi-site · agency · power users',
+        valueProp: 'Cheapest per-message tier + Telegram bot for daily mobile alerts',
         bestValue: true,
         productId: 'pdt_0NaLMM4r23kncRahthuyj',
         features: [
-            { text: '300 AI messages / month', included: true },
-            { text: 'Everything in Growth +', included: true },
-            { text: 'Telegram AI SEO bot', included: true },
-            { text: 'Custom alert rules', included: true },
-            { text: 'Unlimited site audits', included: true },
-            { text: 'Priority support', included: true },
-            { text: 'Early access to features', included: true },
+            { text: '300 AI credits / month', included: true },
+            { text: 'Everything in Growth', included: true },
+            { text: 'Telegram bot — alerts on the go', included: true },
+            { text: 'Unlimited connected sites', included: true },
+            { text: 'Priority support (24h response)', included: true },
+            { text: 'Beta features (early access)', included: true },
+            { text: 'Cheapest per-message rate ($0.10)', included: true },
         ],
     },
 ];
@@ -223,8 +231,6 @@ export default function PricingClient() {
                                 className={`relative flex flex-col p-6 rounded-2xl border transition-all group ${
                                     plan.key === 'free'
                                         ? 'bg-gradient-to-b from-emerald-500/[0.06] to-transparent border-emerald-500/20 pt-8'
-                                        : plan.popular
-                                        ? 'bg-gradient-to-b from-emerald-500/[0.08] via-emerald-500/[0.02] to-transparent border-2 border-emerald-500/30'
                                         : plan.key === 'pro'
                                         ? 'bg-gradient-to-b from-violet-500/[0.06] to-transparent border-violet-500/20 pt-8'
                                         : 'bg-white/[0.02] border-white/[0.06]'
@@ -235,14 +241,9 @@ export default function PricingClient() {
                                         Free Forever
                                     </span>
                                 )}
-                                {plan.popular && (
-                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[9px] font-bold text-black uppercase tracking-wider z-10">
-                                        Most Popular
-                                    </span>
-                                )}
                                 {'bestValue' in plan && plan.bestValue && (
                                     <span className="absolute -top-3 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-violet-400 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg shadow-violet-500/20 z-10">
-                                        Best Value
+                                        Recommended
                                     </span>
                                 )}
 
@@ -254,18 +255,24 @@ export default function PricingClient() {
                                 </div>
 
                                 <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
-                                <p className="text-xs text-zinc-500 mb-4">{plan.description}</p>
+                                <p className={`text-xs text-zinc-500 ${'bestFor' in plan && plan.bestFor ? 'mb-1' : 'mb-4'}`}>{plan.description}</p>
+                                {'bestFor' in plan && plan.bestFor && (
+                                    <p className="text-[11px] text-zinc-600 mb-4">Best for: {plan.bestFor}</p>
+                                )}
 
                                 <div className="flex items-baseline gap-1 mb-1">
                                     <span className="text-4xl font-bold text-white">{plan.price}</span>
                                     <span className="text-sm text-zinc-500">{'freeForever' in plan ? '/forever' : '/month'}</span>
                                 </div>
-                                <p className={`text-xs font-medium mb-6 ${
+                                <p className={`text-xs font-medium ${'perMessage' in plan && plan.perMessage ? 'mb-1' : 'mb-6'} ${
                                     plan.color === 'emerald' ? 'text-emerald-400' :
                                     plan.color === 'violet' ? 'text-violet-400' : 'text-cyan-400'
                                 }`}>
                                     {'freeForever' in plan ? `${plan.credits} AI credits to start` : `${plan.credits} AI credits/month`}
                                 </p>
+                                {'perMessage' in plan && plan.perMessage && (
+                                    <p className="text-[11px] text-zinc-500 mb-6">{plan.perMessage} / AI message</p>
+                                )}
 
                                 {'freeForever' in plan ? (
                                     <Link
@@ -278,9 +285,7 @@ export default function PricingClient() {
                                     <button
                                         onClick={() => 'productId' in plan && handleCheckout(plan.productId as string)}
                                         className={`w-full py-3 rounded-xl text-sm font-bold text-center block mb-6 transition-all cursor-pointer ${
-                                            plan.popular
-                                                ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:shadow-[0_0_20px_rgba(52,211,153,0.3)]'
-                                                : plan.key === 'pro'
+                                            plan.key === 'pro'
                                                 ? 'bg-gradient-to-r from-violet-400 to-purple-500 text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]'
                                                 : 'bg-white/[0.06] text-white hover:bg-white/[0.12] border border-white/[0.06]'
                                         }`}
@@ -304,6 +309,14 @@ export default function PricingClient() {
                                         </li>
                                     ))}
                                 </ul>
+                                {'valueProp' in plan && plan.valueProp && (
+                                    <p className={`mt-6 pt-4 border-t border-white/[0.05] text-[11px] italic leading-relaxed ${
+                                        plan.color === 'emerald' ? 'text-emerald-400/90' :
+                                        plan.color === 'violet' ? 'text-violet-400/90' : 'text-cyan-400/90'
+                                    }`}>
+                                        {plan.valueProp}
+                                    </p>
+                                )}
                             </motion.div>
                         );
                     })}
