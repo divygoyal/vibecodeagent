@@ -165,7 +165,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]" style={themeCSS as React.CSSProperties}>
+    <div className="flex flex-col h-[calc(100dvh-3.5rem)]" style={themeCSS as React.CSSProperties}>
       {/* Toolbar */}
       <DashboardToolbar
         isPreview={isPreview}
@@ -174,9 +174,12 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar (edit mode only) */}
+        {/* Left sidebar (edit mode only) — hidden on mobile because the
+            240 px palette swallows the grid and HTML5 drag is awkward on
+            touch. Mobile users see the grid in single-column stack mode
+            (react-grid-layout's `sm: 0 → 1 col` breakpoint). */}
         {!isPreview && (
-          <div className="w-60 border-r border-white/[0.06] bg-zinc-950/50 flex flex-col flex-shrink-0">
+          <div className="hidden md:flex w-60 border-r border-white/[0.06] bg-zinc-950/50 flex-col flex-shrink-0">
             {/* Panel tabs */}
             <div className="flex border-b border-white/[0.06]">
               <button

@@ -135,7 +135,7 @@ function PreviewShell({
     accentGlowClassName: string;
 }) {
     return (
-        <div className="relative mx-auto w-full max-w-[500px]">
+        <div className="relative mx-auto w-full max-w-full sm:max-w-[500px]">
             <div className={`pointer-events-none absolute inset-x-[12%] bottom-2 h-20 rounded-full opacity-40 blur-[80px] ${accentGlowClassName}`} />
             <div
                 className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(16,20,28,0.98),rgba(7,10,15,1))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-5"
@@ -167,7 +167,7 @@ function XPreviewCard({
                     </div>
                     <XMark className="h-3.5 w-3.5 text-zinc-500" />
                 </div>
-                <div className="mx-auto max-w-[300px] overflow-hidden rounded-[16px] border border-white/[0.06] bg-[#0b1016] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div className="mx-auto max-w-full sm:max-w-[300px] overflow-hidden rounded-[16px] border border-white/[0.06] bg-[#0b1016] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                     <OfficialXTweetEmbed
                         tweetId={DEFAULT_TRAFFICCLAW_X_TWEET_ID}
                         className="w-full"

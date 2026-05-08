@@ -4,6 +4,64 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Touch-target helper — apply to icon-only buttons that would otherwise
+   be smaller than the 44 px minimum. */
+.tap-44 {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Horizontal-scroll wrapper for tables/grids that exceed mobile width.
+   Use on a div around a <table> or grid-table when content can be wider
+   than the viewport. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Dynamic viewport height — works around iOS Safari's collapsing URL bar
+   that makes 100vh extend below the visible fold. Use anywhere we'd
+   otherwise reach for `min-h-screen` or `100vh`. */
+.min-h-screen-dvh {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.h-screen-dvh {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Prevent iOS Safari from auto-zooming when the user focuses a form
+   field with text smaller than 16 px. Scoped to mobile so desktop
+   typography (text-sm = 14 px) is untouched. The !important is
+   intentional — Tailwind utilities like `text-[15px]` would otherwise
+   win the specificity battle against the element selector and let
+   iOS zoom in on every input focus. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Reserves space at the bottom of mobile main content for the
+   MobileBottomBar (~64 px bar + dynamic iPhone home-indicator safe area).
+   No-op on md+ where the bar is hidden — keeps desktop content flush. */
+.pb-mobile-bar {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .pb-mobile-bar {
+    padding-bottom: 1.5rem;
+  }
+}
+
 /* ── AI chat empty-state cosmic background ───────────────────────────── */
 @keyframes tc-twinkle {
   0%, 100% { opacity: var(--tw-opacity-min, 0.15); transform: scale(0.85); }

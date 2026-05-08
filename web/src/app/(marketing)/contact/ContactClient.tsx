@@ -80,7 +80,7 @@ export default function ContactClient() {
                             GET IN TOUCH
                         </div>
 
-                        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                        <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-4">
                             Got a{' '}
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                                 question?

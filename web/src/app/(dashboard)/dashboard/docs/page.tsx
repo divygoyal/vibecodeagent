@@ -190,7 +190,7 @@ export default function DocsPage() {
                                 your GA4 properties and start pulling data. You can switch between properties using the dropdown.
                             </p>
                             <h3 className="text-sm font-semibold text-white mt-4">Metrics Tracked</h3>
-                            <ul className="grid grid-cols-2 gap-2 text-sm text-zinc-400">
+                            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-zinc-400">
                                 <li>Active users & sessions</li>
                                 <li>Page views & engagement</li>
                                 <li>Bounce rate</li>

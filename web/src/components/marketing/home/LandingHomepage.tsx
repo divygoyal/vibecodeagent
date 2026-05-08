@@ -326,7 +326,7 @@ function FeaturedReasonCard({
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-balance max-w-[16ch] text-[1.9rem] font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-[3rem] lg:leading-[1.05]">
+                        <h3 className="text-balance max-w-[16ch] text-2xl font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-[3rem] lg:leading-[1.05]">
                             {reason.title}
                         </h3>
                         <p className="max-w-xl text-[15px] leading-7 text-zinc-400 sm:text-base">{reason.description}</p>
@@ -416,7 +416,7 @@ function MentionReasonCard({ card }: { card: HomepageCompactReason & { kind: 'me
                 {isReddit && <RedditLogo className="h-11 w-11 text-[#ff4500] drop-shadow-[0_0_16px_rgba(255,69,0,0.4)]" />}
             </div>
 
-            <h3 className="mb-4 text-balance text-[1.9rem] font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+            <h3 className="mb-4 text-balance text-2xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
                 {card.title}
             </h3>
             
@@ -606,7 +606,7 @@ export default function LandingHomepage() {
 
                 <div className="relative mx-auto max-w-[1380px] px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8 lg:pb-24 lg:pt-36">
                     <div className="mx-auto max-w-[1040px] text-center">
-                        <h1 className="text-[2.8rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
+                        <h1 className="text-[2.25rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
                             {HOMEPAGE_CONTENT.hero.title}
                         </h1>
                         <div className="mt-8 flex justify-center sm:mt-10">

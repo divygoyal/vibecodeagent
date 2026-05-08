@@ -152,7 +152,7 @@ function Navbar() {
                     )
                 ) : (
                     <button
-                        className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-white md:hidden"
+                        className="rounded-lg flex items-center justify-center w-11 h-11 text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-white md:hidden"
                         onClick={() => setMobileOpen((open) => !open)}
                         aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={mobileOpen}

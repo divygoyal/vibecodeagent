@@ -104,7 +104,7 @@ export default function FeaturesClient() {
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 text-xs font-medium mb-6 border border-violet-500/20">
                             FEATURES
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
+                        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
                             Everything you need to{' '}
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                                 grow your traffic

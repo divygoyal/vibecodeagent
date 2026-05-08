@@ -466,7 +466,7 @@ export default function GlobeApiPage() {
             {/* ══════════════════════════════════════════════════════ */}
             {/* ─── SECTION 1: LIVE DEMO ─── */}
             {/* ══════════════════════════════════════════════════════ */}
-            <div className="flex flex-col relative w-full h-[calc(100vh-140px)] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-[var(--card-border)] overflow-hidden" style={{ background: '#080c18' }}>
+            <div className="flex flex-col relative w-full h-[calc(100dvh-160px)] min-h-[420px] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-[var(--card-border)] overflow-hidden" style={{ background: '#080c18' }}>
                 {/* Globe Component */}
                 <div className="relative flex-1 min-h-0 sm:absolute sm:inset-0 rounded-2xl overflow-hidden order-0">
                 <div className="absolute inset-0">
@@ -574,9 +574,11 @@ export default function GlobeApiPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 hidden sm:block"
+                    className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"
                 >
                     <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-xl p-1 border border-white/10">
+                        {/* Decorative buttons (Share/Sound/Timer) only on desktop —
+                            on mobile we keep the bar tight to the essentials. */}
                         <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" title="Share">
                             <Share2 className="w-3.5 h-3.5" />
                         </button>
@@ -588,17 +590,19 @@ export default function GlobeApiPage() {
                         </button>
                         <button
                             onClick={toggleAutoPan}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${isAutoPanning ? 'bg-emerald-500/15 text-emerald-400' : 'hover:bg-white/[0.08] text-zinc-500 hover:text-white'}`}
+                            className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition ${isAutoPanning ? 'bg-emerald-500/15 text-emerald-400' : 'hover:bg-white/[0.08] text-zinc-500 hover:text-white'}`}
                             title={isAutoPanning ? 'Stop auto-panning' : 'Auto-pan'}
+                            aria-label={isAutoPanning ? 'Stop auto-panning' : 'Auto-pan'}
                         >
-                            <Navigation className="w-3.5 h-3.5" />
+                            <Navigation className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         </button>
                         <button
                             onClick={toggleFullscreen}
-                            className="w-8 h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition"
+                            className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition"
                             title="Fullscreen"
+                            aria-label="Toggle fullscreen"
                         >
-                            <Maximize2 className="w-3.5 h-3.5" />
+                            <Maximize2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         </button>
                     </div>
                 </motion.div>
@@ -613,7 +617,7 @@ export default function GlobeApiPage() {
                     className="relative z-10 flex-shrink-0 order-1 sm:absolute sm:bottom-4 sm:left-4 sm:z-20 max-w-full sm:max-w-sm"
                 >
                     <div className="sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:border sm:border-white/10 overflow-hidden">
-                        <div className="max-h-[180px] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                        <div className="max-h-[40dvh] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                             {displayActivity.map((item, i) => (
                                 <motion.div
                                     key={item.id}

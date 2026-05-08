@@ -37,7 +37,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(functio
     const canSend = Boolean(input.trim()) && !tooLong;
 
     return (
-        <div className="px-3 py-3 border-t border-white/[0.06] bg-[var(--sidebar-bg,#0a0b0e)]">
+        <div
+            className="px-3 py-3 border-t border-white/[0.06] bg-[var(--sidebar-bg,#0a0b0e)]"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
+        >
             <div
                 className={`flex items-end gap-2 bg-[var(--input-bg,rgba(255,255,255,0.04))] rounded-2xl px-4 py-3 border transition-colors ${
                     tooLong

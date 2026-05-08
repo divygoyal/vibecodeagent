@@ -95,7 +95,7 @@ export default function MagnitudeTable<T>({
     const gridTemplate = isSingleColumn
         ? 'minmax(0,1fr)'
         : ['minmax(0,1fr)', ...columns.slice(1).map(c => c.width || '88px')].join(' ');
-    const mobileGridTemplate = isSingleColumn ? 'minmax(0,1fr)' : 'minmax(0,1fr) 104px';
+    const mobileGridTemplate = isSingleColumn ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(80px,140px)';
 
     function toggleSort(key: string) {
         const col = columns.find(c => c.key === key);
@@ -152,7 +152,7 @@ export default function MagnitudeTable<T>({
                 </div>
 
                 {/* Mobile header */}
-                <div className={`grid gap-2 border-b border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[11px] font-medium text-zinc-400 md:hidden ${isSingleColumn ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_104px]'}`}>
+                <div className={`grid gap-2 border-b border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[11px] font-medium text-zinc-400 md:hidden ${isSingleColumn ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_minmax(80px,140px)]'}`}>
                     <span>{columns[0]?.label}</span>
                     {!isSingleColumn ? <span className="text-right">{columns[1]?.label}</span> : null}
                 </div>

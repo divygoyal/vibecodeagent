@@ -11,6 +11,9 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
+import MobileBottomBar from '@/components/dashboard/MobileBottomBar';
+import { useSWRConfig } from 'swr';
+import { toast } from 'sonner';
 import Image from 'next/image';
 import {
     Bot, BarChart3, Search, Settings,
@@ -156,6 +159,12 @@ export default function DashboardLayout({
     const isOverviewRoute = pathname === '/dashboard';
     const isSetupRoute = pathname === '/dashboard/setup';
     const isAnalyticsMainRoute = pathname === '/dashboard/analytics';
+    // The dedicated AI-chat page has its own bottom-anchored input, so the
+    // MobileBottomBar is suppressed there to avoid two stacked action bars.
+    const isAiChatRoute = pathname === '/dashboard/ai-chat';
+    // The dashboard-builder edit/preview screens take over the full viewport
+    // height and have their own toolbar — hide the bottom bar there too.
+    const isDashboardBuilderRoute = pathname?.startsWith('/dashboard/dashboards/') ?? false;
     const shellRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-xl';
     const shellCompactRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-lg';
     const shellBadgeRadiusClass = isOverviewRoute ? 'rounded-none' : 'rounded-full';
@@ -336,6 +345,49 @@ export default function DashboardLayout({
         }
     }, [user, getUserKey]);
     const [bellOpen, setBellOpen] = useState(false);
+
+    // ─── Mobile bottom bar handlers ───
+    // The MobileBottomBar (md:hidden, replaces the floating AI-chat sparkle on
+    // small screens) emits four actions. Refresh hits SWR's global mutate so
+    // every cached query revalidates. AskAI navigates to /dashboard/ai-chat —
+    // we deliberately route to the dedicated page rather than dispatching the
+    // `open-ai-chat` event the desktop floating button uses, because the
+    // floating <AIChatbot> early-returns null when GA4 isn't connected, which
+    // would silently swallow the click. The dedicated page handles every
+    // connection state with its own connector orbs. Notifications opens the
+    // bell dropdown already wired to the desktop top-bar. Export dispatches a
+    // custom event that pages with export support listen for, falling back to
+    // a toast hint when no listener is mounted.
+    const swr = useSWRConfig();
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleMobileRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        try {
+            await swr.mutate(() => true, undefined, { revalidate: true });
+        } catch {
+            // non-fatal — SWR will retry on next focus
+        } finally {
+            setTimeout(() => setIsRefreshing(false), 600);
+        }
+    }, [swr]);
+    const handleMobileAskAI = useCallback(() => {
+        if (pathname === '/dashboard/ai-chat') {
+            // Already on the dedicated page — no-op.
+            return;
+        }
+        router.push('/dashboard/ai-chat');
+    }, [router, pathname]);
+    const handleMobileExport = useCallback(() => {
+        let handled = false;
+        const listener = () => { handled = true; };
+        window.addEventListener('dashboard:export-handled', listener, { once: true });
+        window.dispatchEvent(new CustomEvent('dashboard:export'));
+        // If no listener responded synchronously, hint the user.
+        setTimeout(() => {
+            window.removeEventListener('dashboard:export-handled', listener);
+            if (!handled) toast.info('Export is not available on this page');
+        }, 50);
+    }, []);
 
     // Logout handler — clears user-scoped data to prevent cross-user leaks
     const handleSignOut = useCallback(() => {
@@ -851,9 +903,9 @@ export default function DashboardLayout({
                 {/* Top bar — minimal: just date picker + bell */}
                 <header className={`border-b border-[var(--card-border)] ${isOverviewRoute ? 'bg-[#020305]/95' : 'bg-[var(--header-bg)]'} backdrop-blur-xl sticky top-0 z-40`}>
                     <div className="flex h-12 items-center px-3 sm:px-4 md:px-6">
-                        {/* Mobile menu button */}
+                        {/* Mobile menu button — wrapped in 44 px tap area */}
                         <button
-                            className="lg:hidden text-zinc-400 hover:text-white flex-shrink-0 mr-auto"
+                            className="lg:hidden flex items-center justify-center -ml-1.5 w-11 h-11 text-zinc-400 hover:text-white flex-shrink-0 mr-auto"
                             onClick={() => setMobileOpen(!mobileOpen)}
                             aria-label="Open navigation menu"
                             aria-expanded={mobileOpen}
@@ -873,7 +925,7 @@ export default function DashboardLayout({
                             <div className="relative" ref={bellRef}>
                                 <button
                                     onClick={() => setBellOpen(!bellOpen)}
-                                    className={`relative w-8 h-8 ${shellCompactRadiusClass} flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0`}
+                                    className={`relative w-11 h-11 sm:w-8 sm:h-8 ${shellCompactRadiusClass} flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all flex-shrink-0`}
                                     aria-label={`Alerts${criticalAlertCount > 0 ? ` (${criticalAlertCount} active)` : ''}`}
                                     aria-expanded={bellOpen}
                                     aria-haspopup="true"
@@ -887,7 +939,7 @@ export default function DashboardLayout({
                                     )}
                                 </button>
                                 {bellOpen && (
-                                    <div className="absolute right-0 mt-2 z-50 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0d12] shadow-2xl shadow-black/60">
+                                    <div className="absolute right-0 mt-2 z-50 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0d12] shadow-2xl shadow-black/60">
                                         <div className="flex items-center justify-between border-b border-white/[0.05] px-4 py-2.5">
                                             <span className="text-[12px] font-semibold text-white">Alerts</span>
                                             {alertCount > 0 && (
@@ -961,8 +1013,18 @@ export default function DashboardLayout({
                     )}
                 </header>
 
-                {/* Page content */}
-                <main id="main-content" className={`flex-1 overflow-y-auto overflow-x-hidden p-3 max-w-full sm:p-4 md:p-6 ${isOverviewRoute ? 'bg-[#010203]' : ''}`} role="main">
+                {/* Page content — reserves space for MobileBottomBar (~64 px
+                    bar + safe-area-inset-bottom on notched devices) via the
+                    `.pb-mobile-bar` utility, which auto-clears on md+ where
+                    the bar is hidden. Suppressed on routes where we've
+                    hidden the bar to avoid double-padding. */}
+                <main
+                    id="main-content"
+                    className={`flex-1 overflow-y-auto overflow-x-hidden p-3 max-w-full sm:p-4 md:p-6 ${
+                        !isSetupRoute && !isAiChatRoute && !isDashboardBuilderRoute ? 'pb-mobile-bar' : ''
+                    } ${isOverviewRoute ? 'bg-[#010203]' : ''}`}
+                    role="main"
+                >
                     <div className="max-w-7xl mx-auto">
                         <WorkspaceContext.Provider value={{
                             ...registrationState,
@@ -994,6 +1056,22 @@ export default function DashboardLayout({
                     </div>
                 </main>
             </div>
+
+            {/* Mobile bottom bar — replaces the floating AI-chat sparkle on
+                small screens. Always mounted on mobile (component self-gates
+                via md:hidden); hidden on tablet/desktop. Suppressed on the
+                AI-chat and dashboard-builder routes — both have their own
+                bottom-anchored UI that would compete with this bar. */}
+            {!isSetupRoute && !isAiChatRoute && !isDashboardBuilderRoute && (
+                <MobileBottomBar
+                    onRefresh={handleMobileRefresh}
+                    onAskAI={handleMobileAskAI}
+                    onExport={handleMobileExport}
+                    onNotifications={() => setBellOpen(true)}
+                    isRefreshing={isRefreshing}
+                    alertCount={criticalAlertCount}
+                />
+            )}
 
             {/* Global AI Chatbot — available on every page */}
             <AIChatbot />
@@ -1044,7 +1122,7 @@ export default function DashboardLayout({
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setMobileOpen(false); }}
                     />
-                    <div className="fixed left-0 top-0 bottom-0 z-50 flex w-[296px] max-w-[88vw] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[linear-gradient(180deg,#050914_0%,#060b12_18%,#020306_100%)] shadow-[0_30px_70px_rgba(0,0,0,0.45)] lg:hidden">
+                    <div className="fixed left-0 top-0 bottom-0 z-50 flex w-[min(296px,88vw)] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[linear-gradient(180deg,#050914_0%,#060b12_18%,#020306_100%)] shadow-[0_30px_70px_rgba(0,0,0,0.45)] lg:hidden safe-area-bottom">
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(20,196,225,0.18),transparent_64%),radial-gradient(circle_at_top_right,rgba(122,217,218,0.1),transparent_48%)]" />
                         {/* Header with logo and close */}
                         <div className="relative z-10 flex h-16 items-center justify-between border-b border-white/[0.06] px-4 pt-[env(safe-area-inset-top,0px)]">

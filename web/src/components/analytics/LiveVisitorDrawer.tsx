@@ -52,7 +52,7 @@ export default function LiveVisitorDrawer({ open, onClose, data, isLoading }: Pr
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="fixed right-0 top-0 bottom-0 z-50 w-[400px] max-w-[90vw] bg-[#0a0a0a] border-l border-white/[0.08] shadow-2xl flex flex-col"
+                        className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[400px] sm:max-w-[90vw] bg-[#0a0a0a] border-l border-white/[0.08] shadow-2xl flex flex-col"
                     >
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] shrink-0">

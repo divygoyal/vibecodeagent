@@ -1,11 +1,16 @@
 'use client';
 
 import { Toaster } from 'sonner';
+import { useIsMobile } from '@/lib/useIsMobile';
 
 export default function ToastProvider() {
+  // On mobile we anchor toasts to the top so they don't overlap the
+  // MobileBottomBar (md:hidden, fixed bottom-0). Desktop keeps the
+  // canonical bottom-right anchor.
+  const isMobile = useIsMobile();
   return (
     <Toaster
-      position="bottom-right"
+      position={isMobile ? 'top-center' : 'bottom-right'}
       toastOptions={{
         style: {
           background: 'rgba(10, 10, 15, 0.95)',

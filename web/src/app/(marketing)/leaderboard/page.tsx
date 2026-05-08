@@ -688,7 +688,7 @@ function LeaderboardPageInner() {
                                 <button
                                     disabled={page <= 1}
                                     onClick={() => updateParams({ page: String(page - 1) })}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     <ChevronLeft className="h-3.5 w-3.5" />
                                     Previous
@@ -699,7 +699,7 @@ function LeaderboardPageInner() {
                                 <button
                                     disabled={page >= totalPages}
                                     onClick={() => updateParams({ page: String(page + 1) })}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-[#14C4E1]/30 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     Next
                                     <ChevronRight className="h-3.5 w-3.5" />

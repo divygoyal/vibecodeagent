@@ -93,7 +93,7 @@ export default function GlobeDemoSection({ className = '' }: GlobeDemoSectionPro
 
     return (
         <div
-            className={`flex flex-col relative w-full h-[700px] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-white/[0.06] overflow-hidden ${className}`.trim()}
+            className={`flex flex-col relative w-full h-[60dvh] min-h-[420px] sm:block sm:h-[500px] lg:h-[600px] rounded-2xl border border-white/[0.06] overflow-hidden ${className}`.trim()}
             style={{ background: '#080c18' }}
         >
             <div className="relative flex-1 min-h-0 sm:absolute sm:inset-0 rounded-2xl overflow-hidden order-0">
@@ -114,7 +114,7 @@ export default function GlobeDemoSection({ className = '' }: GlobeDemoSectionPro
                 transition={{ delay: 0.1, duration: 0.4 }}
                 className="relative z-10 flex-shrink-0 -order-1 sm:absolute sm:top-4 sm:left-4 sm:z-20"
             >
-                <div className="p-3 sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:p-4 sm:border sm:border-white/10 sm:max-w-xs">
+                <div className="p-3 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10 sm:p-4 sm:max-w-xs">
                     <div className="flex items-center gap-2 mb-2">
                         <div className="flex items-center gap-1.5">
                             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -177,14 +177,15 @@ export default function GlobeDemoSection({ className = '' }: GlobeDemoSectionPro
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 hidden sm:block"
+                className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"
             >
                 <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-xl p-1 border border-white/10">
-                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition"><Share2 className="w-3.5 h-3.5" /></button>
-                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition"><Music className="w-3.5 h-3.5" /></button>
-                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition"><History className="w-3.5 h-3.5" /></button>
-                    <button onClick={toggleAutoPan} className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${isAutoPanning ? 'bg-emerald-500/15 text-emerald-400' : 'hover:bg-white/[0.08] text-zinc-500 hover:text-white'}`}><Navigation className="w-3.5 h-3.5" /></button>
-                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition"><Maximize2 className="w-3.5 h-3.5" /></button>
+                    {/* Decorative buttons stay desktop-only — mobile keeps the bar tight to essentials. */}
+                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" aria-label="Share"><Share2 className="w-3.5 h-3.5" /></button>
+                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" aria-label="Sound"><Music className="w-3.5 h-3.5" /></button>
+                    <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] hidden sm:flex items-center justify-center text-zinc-500 hover:text-white transition" aria-label="History"><History className="w-3.5 h-3.5" /></button>
+                    <button onClick={toggleAutoPan} aria-label={isAutoPanning ? 'Stop auto-panning' : 'Auto-pan'} className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition ${isAutoPanning ? 'bg-emerald-500/15 text-emerald-400' : 'hover:bg-white/[0.08] text-zinc-500 hover:text-white'}`}><Navigation className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
+                    <button aria-label="Toggle fullscreen" className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition"><Maximize2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                 </div>
             </motion.div>
 
@@ -194,8 +195,8 @@ export default function GlobeDemoSection({ className = '' }: GlobeDemoSectionPro
                 transition={{ delay: 0.3, duration: 0.4 }}
                 className="relative z-10 flex-shrink-0 order-1 sm:absolute sm:bottom-4 sm:left-4 sm:z-20 max-w-full sm:max-w-sm"
             >
-                <div className="sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:border sm:border-white/10 overflow-hidden">
-                    <div className="max-h-[180px] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                <div className="bg-black/60 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+                    <div className="max-h-[40dvh] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                         {DEMO_ACTIVITY.map((item, index) => (
                             <motion.div
                                 key={item.id}

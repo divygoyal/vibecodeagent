@@ -1106,7 +1106,7 @@ export default function AIChat() {
     const isGa4Locked = showGa4LockedState;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-black">
+        <div className="flex flex-col h-[calc(100dvh-64px)] max-h-[calc(100dvh-64px)] bg-black">
 
             {/* ── GA4-required alert banner (replaces the old full-page lock) ── */}
             {isGa4Locked && (
@@ -1359,7 +1359,10 @@ export default function AIChat() {
 
             {/* ── Bottom input (only when chatting) ── */}
             {!showEmpty && (
-                <div className="flex-shrink-0 bg-black px-4 sm:px-6 pb-5 pt-2">
+                <div
+                    className="flex-shrink-0 bg-black px-4 sm:px-6 pt-2"
+                    style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px))' }}
+                >
                     <div className="max-w-[760px] mx-auto">
                         <div className="flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-3 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
                             <textarea

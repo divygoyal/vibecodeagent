@@ -774,7 +774,7 @@ export default function AIChatbot() {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-[4.75rem] right-4 z-50 group sm:bottom-24 sm:right-6 lg:bottom-6"
+                className="hidden md:block fixed right-6 z-50 group sm:bottom-24 lg:bottom-6"
                 aria-label="Open AI chat"
             >
                 <div className="relative">
@@ -793,7 +793,9 @@ export default function AIChatbot() {
 
     // ─── Chat window ───
     return (
-        <div className={`fixed z-50 ${isExpanded ? 'inset-4 lg:inset-8' : 'bottom-0 right-0 w-full h-full sm:bottom-6 sm:right-6 sm:w-[440px] sm:h-[640px]'} transition-all duration-300`}>
+        <div className={`fixed z-50 ${isExpanded
+            ? 'inset-2 sm:inset-4 lg:inset-8'
+            : 'inset-0 h-[100dvh] sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[440px] sm:h-[640px]'} transition-all duration-300`}>
             <div className="w-full h-full bg-[var(--sidebar-bg)] border border-[var(--card-border)] rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden relative">
                 <ChatHeader
                     currentSiteLabel={currentSiteLabel}

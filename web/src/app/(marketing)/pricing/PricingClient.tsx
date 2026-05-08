@@ -93,7 +93,7 @@ export default function PricingClient() {
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium mb-6 border border-emerald-500/20">
                             PRICING
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
+                        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
                             Simple, transparent{' '}
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                                 pricing

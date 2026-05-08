@@ -70,7 +70,7 @@ export default function ToolsIndexPage() {
             >
                 <motion.h1
                     variants={fadeUp}
-                    className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
+                    className="text-3xl sm:text-5xl font-bold tracking-tight mb-4"
                 >
                     Free{' '}
                     <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
