@@ -364,7 +364,12 @@ export async function POST(req: Request) {
         }
 
         if (action === 'send-report-email') {
-            const { userId, period } = body as { userId?: string; period?: string }
+            const { userId, period, propertyId, siteUrl } = body as {
+                userId?: string
+                period?: string
+                propertyId?: string
+                siteUrl?: string
+            }
             if (!userId) {
                 return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
             }
@@ -373,8 +378,15 @@ export async function POST(req: Request) {
             }
             // Long-running: GA4/GSC fetch + Gemini synth + PDF render typically
             // takes 20-90 s. Run synchronously and return when done so the UI
-            // can show success/failure inline.
-            const result = await sendUserReportEmail({ userId: String(userId), period })
+            // can show success/failure inline. propertyId + siteUrl are
+            // optional overrides — when omitted, sendUserReportEmail falls back
+            // to the user's saved workspace selection.
+            const result = await sendUserReportEmail({
+                userId: String(userId),
+                period,
+                propertyId: propertyId ? String(propertyId) : undefined,
+                siteUrl: siteUrl ? String(siteUrl) : undefined,
+            })
             if (!result.ok) {
                 return NextResponse.json({ error: result.error || 'Send failed' }, { status: 500 })
             }

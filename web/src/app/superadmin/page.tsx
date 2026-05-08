@@ -1369,7 +1369,7 @@ interface GenerateReportOptions {
     label?: string
 }
 
-function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, reportLoadingKey, weeklyKey, monthlyKey, onGenerate }: {
+function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, reportLoadingKey, weeklyKey, monthlyKey, onGenerate, userEmail, emailLoadingKey, emailWeeklyKey, emailMonthlyKey, onEmailReport }: {
     property: GooglePropertyData
     gscSites: SearchConsoleSiteData[]
     hasGsc: boolean
@@ -1378,11 +1378,20 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
     weeklyKey: string
     monthlyKey: string
     onGenerate: (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => void
+    userEmail: string | null
+    emailLoadingKey: string | null
+    emailWeeklyKey: string
+    emailMonthlyKey: string
+    onEmailReport: (period: 'weekly' | 'monthly', siteUrl: string, propertyId: string) => void
 }) {
     const [selectedSite, setSelectedSite] = useState(defaultSiteUrl)
     const isLoadingWeekly = reportLoadingKey === weeklyKey
     const isLoadingMonthly = reportLoadingKey === monthlyKey
     const isAnyLoading = !!reportLoadingKey
+    const isEmailingWeekly = emailLoadingKey === emailWeeklyKey
+    const isEmailingMonthly = emailLoadingKey === emailMonthlyKey
+    const isAnyEmailLoading = !!emailLoadingKey
+    const canEmail = Boolean(userEmail)
 
     return (
         <div className="rounded-xl border border-white/[0.05] bg-black/25 p-4 space-y-3">
@@ -1409,23 +1418,54 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
                     {gscSites.length === 1 && (
                         <div className="text-xs text-zinc-500">GSC: {defaultSiteUrl}</div>
                     )}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            onClick={() => onGenerate('weekly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
-                            disabled={isAnyLoading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                            {isLoadingWeekly ? 'Generating...' : 'Weekly'}
-                        </button>
-                        <button
-                            onClick={() => onGenerate('monthly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
-                            disabled={isAnyLoading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                            {isLoadingMonthly ? 'Generating...' : 'Monthly'}
-                        </button>
+                    {/* Download flow — admin downloads the PDF locally */}
+                    <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">Download PDF</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={() => onGenerate('weekly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
+                                disabled={isAnyLoading}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                                {isLoadingWeekly ? 'Generating...' : 'Weekly'}
+                            </button>
+                            <button
+                                onClick={() => onGenerate('monthly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
+                                disabled={isAnyLoading}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                                {isLoadingMonthly ? 'Generating...' : 'Monthly'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Email flow — same renderer ships through Brevo to user.email */}
+                    <div className="border-t border-white/[0.04] pt-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">
+                            Email to user{userEmail ? ` (${userEmail})` : ' — no email on file'}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={() => onEmailReport('weekly', selectedSite, property.property_id)}
+                                disabled={isAnyEmailLoading || !canEmail}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title={canEmail ? 'Email weekly report to user' : 'User has no email on file'}
+                            >
+                                {isEmailingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                {isEmailingWeekly ? 'Sending...' : 'Email weekly'}
+                            </button>
+                            <button
+                                onClick={() => onEmailReport('monthly', selectedSite, property.property_id)}
+                                disabled={isAnyEmailLoading || !canEmail}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title={canEmail ? 'Email monthly report to user' : 'User has no email on file'}
+                            >
+                                {isEmailingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                {isEmailingMonthly ? 'Sending...' : 'Email monthly'}
+                            </button>
+                        </div>
                     </div>
                 </>
             ) : (
@@ -1435,17 +1475,26 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
     )
 }
 
-function SearchConsoleReportCard({ site, reportLoadingKey, weeklyKey, monthlyKey, onGenerate }: {
+function SearchConsoleReportCard({ site, reportLoadingKey, weeklyKey, monthlyKey, onGenerate, userEmail, emailLoadingKey, emailWeeklyKey, emailMonthlyKey, onEmailReport }: {
     site: SearchConsoleSiteData
     reportLoadingKey: string | null
     weeklyKey: string
     monthlyKey: string
     onGenerate: (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => void
+    userEmail: string | null
+    emailLoadingKey: string | null
+    emailWeeklyKey: string
+    emailMonthlyKey: string
+    onEmailReport: (period: 'weekly' | 'monthly', siteUrl: string) => void
 }) {
     const siteUrl = site.site_url || ''
     const isLoadingWeekly = reportLoadingKey === weeklyKey
     const isLoadingMonthly = reportLoadingKey === monthlyKey
     const isAnyLoading = !!reportLoadingKey
+    const isEmailingWeekly = emailLoadingKey === emailWeeklyKey
+    const isEmailingMonthly = emailLoadingKey === emailMonthlyKey
+    const isAnyEmailLoading = !!emailLoadingKey
+    const canEmail = Boolean(userEmail) && Boolean(siteUrl)
 
     return (
         <div className="rounded-xl border border-white/[0.05] bg-black/25 p-4 space-y-3">
@@ -1456,23 +1505,49 @@ function SearchConsoleReportCard({ site, reportLoadingKey, weeklyKey, monthlyKey
                 <SignalPill tone="amber">SEO only</SignalPill>
             </div>
             <p className="text-xs text-zinc-500">GA4 property unavailable for this user, so this generates a Search Console-only PDF.</p>
-            <div className="flex flex-wrap items-center gap-2">
-                <button
-                    onClick={() => onGenerate('weekly', siteUrl, { label: siteUrl })}
-                    disabled={isAnyLoading || !siteUrl}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                    {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                    {isLoadingWeekly ? 'Generating...' : 'Weekly'}
-                </button>
-                <button
-                    onClick={() => onGenerate('monthly', siteUrl, { label: siteUrl })}
-                    disabled={isAnyLoading || !siteUrl}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                    {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                    {isLoadingMonthly ? 'Generating...' : 'Monthly'}
-                </button>
+            <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">Download PDF</div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={() => onGenerate('weekly', siteUrl, { label: siteUrl })}
+                        disabled={isAnyLoading || !siteUrl}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                        {isLoadingWeekly ? 'Generating...' : 'Weekly'}
+                    </button>
+                    <button
+                        onClick={() => onGenerate('monthly', siteUrl, { label: siteUrl })}
+                        disabled={isAnyLoading || !siteUrl}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                        {isLoadingMonthly ? 'Generating...' : 'Monthly'}
+                    </button>
+                </div>
+            </div>
+            <div className="border-t border-white/[0.04] pt-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">
+                    Email to user{userEmail ? ` (${userEmail})` : ' — no email on file'}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={() => onEmailReport('weekly', siteUrl)}
+                        disabled={isAnyEmailLoading || !canEmail}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isEmailingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                        {isEmailingWeekly ? 'Sending...' : 'Email weekly'}
+                    </button>
+                    <button
+                        onClick={() => onEmailReport('monthly', siteUrl)}
+                        disabled={isAnyEmailLoading || !canEmail}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isEmailingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                        {isEmailingMonthly ? 'Sending...' : 'Email monthly'}
+                    </button>
+                </div>
             </div>
         </div>
     )
@@ -1497,6 +1572,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
     onAddCredits: () => void
 }) {
     const [reportLoadingKey, setReportLoadingKey] = useState<string | null>(null)
+    const [emailLoadingKey, setEmailLoadingKey] = useState<string | null>(null)
     const [reportError, setReportError] = useState('')
     const [tokenInput, setTokenInput] = useState('')
     const [showToken, setShowToken] = useState(false)
@@ -1505,6 +1581,36 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
         setTokenInput('')
         setShowToken(false)
     }, [user?.github_id])
+
+    // Per-property email send. Wraps the same orchestrator that the row-level
+    // Mail icon uses, but lets the admin pick a specific GA4 property + GSC
+    // site (otherwise the user's saved workspace selection is the default).
+    const handleEmailReport = async (
+        period: 'weekly' | 'monthly',
+        siteUrl: string,
+        propertyId?: string,
+    ) => {
+        if (!user || emailLoadingKey) return
+        const key = `email-${propertyId || siteUrl}:${period}`
+        setEmailLoadingKey(key)
+        setReportError('')
+        try {
+            await apiPost('send-report-email', {
+                userId: user.github_id,
+                period,
+                ...(propertyId ? { propertyId } : {}),
+                ...(siteUrl ? { siteUrl } : {}),
+            })
+            alert(`${period[0].toUpperCase()}${period.slice(1)} report emailed to ${user.email}.`)
+        } catch (err) {
+            const message = getErrorMessage(err, 'Email send failed')
+            if (isSuperadminAuthError(message)) return
+            setReportError(message)
+            alert(`Failed to send: ${message}`)
+        } finally {
+            setEmailLoadingKey(null)
+        }
+    }
 
     const handleGenerateReport = async (period: 'weekly' | 'monthly', siteUrl: string, options?: GenerateReportOptions) => {
         if (!user || reportLoadingKey) return
@@ -1753,6 +1859,8 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                     const defaultSiteUrl = matchGscSite(property.display_name, gscSites)
                                                     const weeklyKey = `${property.property_id}:weekly`
                                                     const monthlyKey = `${property.property_id}:monthly`
+                                                    const emailWeeklyKey = `email-${property.property_id}:weekly`
+                                                    const emailMonthlyKey = `email-${property.property_id}:monthly`
                                                     return (
                                                         <PropertyReportCard
                                                             key={property.property_id}
@@ -1764,6 +1872,11 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                             weeklyKey={weeklyKey}
                                                             monthlyKey={monthlyKey}
                                                             onGenerate={handleGenerateReport}
+                                                            userEmail={user.email || null}
+                                                            emailLoadingKey={emailLoadingKey}
+                                                            emailWeeklyKey={emailWeeklyKey}
+                                                            emailMonthlyKey={emailMonthlyKey}
+                                                            onEmailReport={handleEmailReport}
                                                         />
                                                     )
                                                 })}
@@ -1779,6 +1892,8 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                     const siteKey = site.site_url || `site-${site.permission_level || 'unknown'}`
                                                     const weeklyKey = `${siteKey}:weekly`
                                                     const monthlyKey = `${siteKey}:monthly`
+                                                    const emailWeeklyKey = `email-${siteKey}:weekly`
+                                                    const emailMonthlyKey = `email-${siteKey}:monthly`
                                                     return profile.google_inventory.ga_properties.length === 0 ? (
                                                         <SearchConsoleReportCard
                                                             key={siteKey}
@@ -1787,6 +1902,11 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                             weeklyKey={weeklyKey}
                                                             monthlyKey={monthlyKey}
                                                             onGenerate={handleGenerateReport}
+                                                            userEmail={user.email || null}
+                                                            emailLoadingKey={emailLoadingKey}
+                                                            emailWeeklyKey={emailWeeklyKey}
+                                                            emailMonthlyKey={emailMonthlyKey}
+                                                            onEmailReport={handleEmailReport}
                                                         />
                                                     ) : (
                                                         <div key={siteKey} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">

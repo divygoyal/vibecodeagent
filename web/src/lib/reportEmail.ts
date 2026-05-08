@@ -29,6 +29,11 @@ export interface SendUserReportEmailInput {
     /** OAuth provider ID string (session.user.id-equivalent) — admin API resolves to DB user. */
     userId: string;
     period: 'weekly' | 'monthly';
+    /** Optional override — when not set, the user's saved selected_property_id is used.
+     *  Set when the superadmin picks a specific property in the user-profile drawer. */
+    propertyId?: string | null;
+    /** Optional override — same idea, falls back to the user's saved selected_site_url. */
+    siteUrl?: string | null;
 }
 
 export interface SendUserReportEmailResult {
@@ -232,8 +237,15 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
     const user = await fetchUserDetails(userId);
     if (!user) return { ok: false, error: 'Could not load user from admin API' };
     if (!user.email) return { ok: false, error: 'User has no email on file' };
-    if (!user.selected_property_id || !user.selected_site_url) {
-        return { ok: false, error: 'User has not finished workspace setup (no GA4 property + GSC site).' };
+
+    // Caller-supplied property/site overrides (from the user-profile drawer's
+    // per-property buttons) take precedence over the user's saved workspace
+    // selection. Falling back to the saved selection lets the row-level Mail
+    // icon keep working for "send for primary site" without overrides.
+    const propertyId = (input.propertyId || user.selected_property_id || '').trim();
+    const siteUrl = (input.siteUrl || user.selected_site_url || '').trim();
+    if (!propertyId || !siteUrl) {
+        return { ok: false, error: 'No GA4 property + GSC site available for this user (and none provided).' };
     }
 
     const tokens = await fetchGoogleTokensFromDb(userId);
@@ -254,10 +266,10 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
     let analysis: ReportAnalysis;
     let pdfBuffer: Uint8Array;
     try {
-        rawData = await fetchReportData(accessToken, user.selected_property_id, user.selected_site_url, reportPeriod);
+        rawData = await fetchReportData(accessToken, propertyId, siteUrl, reportPeriod);
         analysis = analyzeReportData(rawData);
-        const gemini = await synthesizeWithGemini(analysis, reportPeriod, user.selected_site_url, rawData);
-        pdfBuffer = await generateReportPdf({ analysis, gemini, period: reportPeriod, siteUrl: user.selected_site_url });
+        const gemini = await synthesizeWithGemini(analysis, reportPeriod, siteUrl, rawData);
+        pdfBuffer = await generateReportPdf({ analysis, gemini, period: reportPeriod, siteUrl });
     } catch (err) {
         return { ok: false, error: `Report generation failed: ${(err as Error).message}` };
     }
@@ -266,7 +278,7 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
     const periodLabel = period === 'weekly' ? 'Weekly' : 'Monthly';
     const periodPhrase = period === 'weekly' ? 'this week' : 'this month';
     const dateRange = formatDateRange(reportPeriod);
-    const slug = siteSlug(user.selected_site_url);
+    const slug = siteSlug(siteUrl);
     const pdfFilename = `${slug}-${period}-${reportPeriod.endDate}.pdf`;
     const firstName = (user.github_username || user.email.split('@')[0] || 'there').trim();
 
