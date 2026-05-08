@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
@@ -152,6 +152,7 @@ export default function DashboardLayout({
 }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
+    const router = useRouter();
     const isOverviewRoute = pathname === '/dashboard';
     const isSetupRoute = pathname === '/dashboard/setup';
     const isAnalyticsMainRoute = pathname === '/dashboard/analytics';
@@ -258,12 +259,23 @@ export default function DashboardLayout({
             } else {
                 setWorkspaceLabel('');
             }
+
+            // If the user record exists but no GA4 property is saved, force them
+            // back through /dashboard/setup. Without this, dashboardSelection
+            // would have to either auto-pick an arbitrary first property (the
+            // re-login bug we're fixing) or leave the AI chat unscoped — both
+            // wrong. The setup flow is the only place that actually persists a
+            // deliberate selection.
+            if (data?.exists && !data?.selected_property_id && !isSetupRoute) {
+                router.replace('/dashboard/setup');
+                return;
+            }
         } catch {
             // Network errors are non-fatal — we keep whatever localStorage gave us.
         } finally {
             setIsWorkspaceLoaded(true);
         }
-    }, [user, getUserKey]);
+    }, [user, getUserKey, isSetupRoute, router]);
 
     useEffect(() => {
         if (!user || workspaceLoadAttempted.current) return;

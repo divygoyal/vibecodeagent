@@ -135,23 +135,11 @@ export function resolveDashboardSelection({
         };
     }
 
-    if (validProperties[0]?.property) {
-        return {
-            resolvedSiteUrl: '',
-            resolvedPropertyId: validProperties[0].property,
-            matchedProperty: validProperties[0],
-            hasGa4Properties,
-            ga4Availability: 'available',
-            isSelectedSiteValid,
-            isSelectedPropertyValid,
-        };
-    }
-
     return {
         resolvedSiteUrl: siteInventoryError ? selectedSite : '',
         resolvedPropertyId: '',
         matchedProperty: null,
-        hasGa4Properties: false,
+        hasGa4Properties,
         ga4Availability: propertyInventoryError ? 'inventory_error' : 'inventory_empty',
         isSelectedSiteValid,
         isSelectedPropertyValid,
