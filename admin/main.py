@@ -780,11 +780,19 @@ async def send_welcome_email_task(user_id: int) -> None:
             if user.welcome_email_sent_at:
                 return  # Already sent — nothing to do.
 
-            first_name = (
+            raw_first = (
                 (user.github_username or "").strip()
                 or (user.email.split("@")[0] if user.email else "there")
             )
-            template_id_raw = os.getenv("BREVO_WELCOME_TEMPLATE_ID", "").strip()
+            # Title-case the email-derived prefix so "chatgptairtel" → "Chatgptairtel"
+            # and "alice-smith" → "Alice-Smith". GitHub usernames already round-trip
+            # nicely through .title() because they're single tokens.
+            first_name = raw_first.title() if raw_first else raw_first
+            # Default to template id 5 — the polished welcome template I created in
+            # Brevo. Override via env var only if you swap to a different template.
+            # An explicit empty string (or any non-digit value) opts back into the
+            # inline-HTML fallback below — useful for local dev without templates.
+            template_id_raw = os.getenv("BREVO_WELCOME_TEMPLATE_ID", "5").strip()
             template_id = int(template_id_raw) if template_id_raw.isdigit() else None
             dashboard_url = os.getenv("PUBLIC_DASHBOARD_URL", "https://trafficclaw.com/dashboard")
             params = {"first_name": first_name, "dashboard_url": dashboard_url}
