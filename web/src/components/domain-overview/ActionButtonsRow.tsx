@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ScanSearch, PenTool, MessageSquare } from 'lucide-react'
+import { buildAskAiUrl } from '@/lib/askAi'
 
 interface ActionButtonsRowProps {
   domain: string
@@ -66,10 +67,7 @@ export default function ActionButtonsRow({ domain, auditUrl }: ActionButtonsRowP
     if (action.type === 'link') {
       router.push(`/dashboard/audit?url=${encodeURIComponent(auditUrl)}`)
     } else {
-      const question = `${action.promptPrefix} ${domain}`
-      window.dispatchEvent(
-        new CustomEvent('trafficclaw:ask-ai', { detail: { question } })
-      )
+      router.push(buildAskAiUrl(`${action.promptPrefix} ${domain}`))
     }
   }
 

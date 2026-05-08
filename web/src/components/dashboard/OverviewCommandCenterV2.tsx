@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { buildAskAiUrl } from '@/lib/askAi';
 import {
   Activity,
   AlertTriangle,
@@ -569,6 +571,7 @@ export default function OverviewCommandCenter({
   onOpenLiveDrawer,
   onExportReport,
 }: OverviewCommandCenterProps) {
+  const router = useRouter();
   const [chartMode, setChartMode] = useState<'traffic' | 'seo' | 'conversions'>('seo');
 
   // Responsive breakpoint — true on screens < 640px (mobile)
@@ -1370,14 +1373,7 @@ export default function OverviewCommandCenter({
                         <button
                           type="button"
                           onClick={() =>
-                            window.dispatchEvent(
-                              new CustomEvent('trafficclaw:ask-ai', {
-                                detail: {
-                                  question: `${action.title}. ${action.why} ${action.impact} Please analyze this for my site and give specific, actionable recommendations.`,
-                                  site: selectedSiteLabel,
-                                },
-                              })
-                            )
+                            router.push(buildAskAiUrl(`${action.title}. ${action.why} ${action.impact} Please analyze this for my site and give specific, actionable recommendations.`))
                           }
                           className="dashboard-hover-link inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-emerald-300"
                         >

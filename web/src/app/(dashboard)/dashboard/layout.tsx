@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-const AIChatbot = dynamic(() => import('@/components/AIChatbot'), { ssr: false });
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
@@ -1130,8 +1129,8 @@ export default function DashboardLayout({
                 propertyId={selectedProperty}
             />
 
-            {/* Global AI Chatbot — available on every page */}
-            <AIChatbot />
+            {/* Floating AIChatbot widget removed — every "Ask AI" entry
+                point now navigates to /dashboard/ai-chat?q=… (see lib/askAi.ts). */}
 
             {/* First-paint settling overlay — see settled state above. Sits
                 on top of everything (z-200) and lifts once SWR has caught up

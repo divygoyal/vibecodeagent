@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, Fragment } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   Target,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 import { DomainOverviewData, difficultyBadge, intentColor } from './types'
 import TableActionMenu, { useTableActions } from '@/components/TableActionMenu'
+import { buildAskAiUrl } from '@/lib/askAi'
 
 interface KeywordTableProps {
   data: DomainOverviewData
@@ -19,6 +21,7 @@ interface KeywordTableProps {
 }
 
 export default function KeywordTable({ data, domain }: KeywordTableProps) {
+  const router = useRouter()
   const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null)
   const { generateContent, trackKeyword, analyzeWithAI, copyToClipboard } = useTableActions()
 
@@ -69,9 +72,7 @@ export default function KeywordTable({ data, domain }: KeywordTableProps) {
                           className="text-xs sm:text-sm text-[var(--text-primary)] hover:text-emerald-400 cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
-                            window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
-                              detail: { question: `Analyze the keyword "${kw.keyword}" for ${domain}. Volume: ${kw.volume}, Difficulty: ${kw.difficulty}, Intent: ${kw.intent}. What's the best strategy to target this keyword?` }
-                            }))
+                            router.push(buildAskAiUrl(`Analyze the keyword "${kw.keyword}" for ${domain}. Volume: ${kw.volume}, Difficulty: ${kw.difficulty}, Intent: ${kw.intent}. What's the best strategy to target this keyword?`))
                           }}
                         >
                           {kw.keyword}

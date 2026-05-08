@@ -1,11 +1,13 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { Brain } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ScoreRing } from './ScoreRing'
 import { geoBarColor, geoTextColor } from './types'
 import type { DomainOverviewData } from './types'
 import FixWithBotButton from '../FixWithBotButton'
+import { buildAskAiUrl } from '@/lib/askAi'
 
 interface GeoReadinessProps {
   data: DomainOverviewData
@@ -20,11 +22,12 @@ const categories = [
 ] as const
 
 export default function GeoReadiness({ data, domain }: GeoReadinessProps) {
+  const router = useRouter()
   const geo = data.geoReadiness
 
   const handleCategoryClick = (label: string, score: number) => {
     const question = `How can I improve my "${label}" score for AI search readiness (GEO)? Current score: ${score}/100. Give me specific, actionable steps.`
-    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question } }))
+    router.push(buildAskAiUrl(question))
   }
 
   return (

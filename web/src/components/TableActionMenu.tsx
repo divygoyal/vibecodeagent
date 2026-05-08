@@ -6,6 +6,7 @@ import {
     MoreHorizontal, ScanSearch, Sparkles, TrendingUp, Copy,
     ExternalLink, BarChart3, FileText, Target, Zap, RefreshCw, Ghost, Smartphone
 } from 'lucide-react';
+import { buildAskAiUrl } from '@/lib/askAi';
 
 interface ActionItem {
     label: string;
@@ -77,32 +78,35 @@ export function useTableActions() {
         onClick: () => router.push(`/dashboard/audit?url=${encodeURIComponent(url)}`),
     });
 
-    const analyzeWithAI = (context: string, site?: string) => ({
+    // Note: the previous `site` param is no longer threaded through — the
+    // dedicated /dashboard/ai-chat page reads the active site/property from
+    // the workspace context, which is the single source of truth.
+    const analyzeWithAI = (context: string, _site?: string) => ({
         label: 'Analyze with AI',
         icon: Sparkles,
         color: 'text-cyan-400',
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: context, site } })),
+        onClick: () => router.push(buildAskAiUrl(context)),
     });
 
     const trackKeyword = (keyword: string) => ({
         label: 'Track Keyword',
         icon: Target,
         color: 'text-amber-400',
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `Set up tracking and analysis for the keyword "${keyword}". What's the best strategy to improve its ranking?` } })),
+        onClick: () => router.push(buildAskAiUrl(`Set up tracking and analysis for the keyword "${keyword}". What's the best strategy to improve its ranking?`)),
     });
 
     const optimizePage = (url: string) => ({
         label: 'Optimize Page',
         icon: Zap,
         color: 'text-violet-400',
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `Analyze and provide optimization recommendations for ${url}` } })),
+        onClick: () => router.push(buildAskAiUrl(`Analyze and provide optimization recommendations for ${url}`)),
     });
 
     const viewTrend = (query: string) => ({
         label: 'View Trend',
         icon: TrendingUp,
         color: 'text-blue-400',
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `Show me the detailed trend and analysis for "${query}" keyword performance` } })),
+        onClick: () => router.push(buildAskAiUrl(`Show me the detailed trend and analysis for "${query}" keyword performance`)),
     });
 
     const copyToClipboard = (text: string) => ({
@@ -124,7 +128,7 @@ export function useTableActions() {
         icon: FileText,
         color: 'text-emerald-400',
         divider: true,
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: `Generate an SEO-optimized blog post outline targeting the keyword "${keyword}"` } })),
+        onClick: () => router.push(buildAskAiUrl(`Generate an SEO-optimized blog post outline targeting the keyword "${keyword}"`)),
     });
 
     const viewAnalytics = (page: string) => ({
@@ -134,28 +138,26 @@ export function useTableActions() {
         onClick: () => router.push(`/dashboard/analytics`),
     });
 
+    // The pre-migration code passed `detail.message` here, which the
+    // AIChatbot listener never read (it consumed `detail.question`) — so
+    // these three actions silently no-op'd before. Migration to
+    // buildAskAiUrl fixes that latent bug at the same time.
     const refreshContent = (url: string) => ({
         label: 'Refresh Content',
         icon: RefreshCw,
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
-            detail: { message: `Suggest content refresh strategies for this page: ${url}` }
-        })),
+        onClick: () => router.push(buildAskAiUrl(`Suggest content refresh strategies for this page: ${url}`)),
     });
 
     const zombieAction = (url: string, diagnosis: string) => ({
         label: `Fix ${diagnosis}`,
         icon: Ghost,
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
-            detail: { message: `This page is classified as a "${diagnosis}" page (0 clicks). Suggest what to do with: ${url}` }
-        })),
+        onClick: () => router.push(buildAskAiUrl(`This page is classified as a "${diagnosis}" page (0 clicks). Suggest what to do with: ${url}`)),
     });
 
     const mobileOptimize = (query: string) => ({
         label: 'Optimize for Mobile',
         icon: Smartphone,
-        onClick: () => window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
-            detail: { message: `Suggest mobile optimization strategies for the keyword: ${query}` }
-        })),
+        onClick: () => router.push(buildAskAiUrl(`Suggest mobile optimization strategies for the keyword: ${query}`)),
     });
 
     return {

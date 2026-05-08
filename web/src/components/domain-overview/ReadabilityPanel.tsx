@@ -1,10 +1,12 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { BookOpen } from 'lucide-react'
 import { ScoreRing } from './ScoreRing'
 import { readabilityRatingStyle, readabilityRecommendation } from './types'
 import type { DomainOverviewData } from './types'
 import FixWithBotButton from '../FixWithBotButton'
+import { buildAskAiUrl } from '@/lib/askAi'
 
 interface ReadabilityPanelProps {
   data: DomainOverviewData
@@ -12,12 +14,13 @@ interface ReadabilityPanelProps {
 }
 
 export default function ReadabilityPanel({ data, domain }: ReadabilityPanelProps) {
+  const router = useRouter()
   const r = data.readability
 
   const handleScoreRingClick = () => {
     if (!r) return
     const question = `Improve content readability for my site. Current readability score: ${r.score}/100 (${r.rating}), grade level: ${r.grade}. What specific changes should I make?`
-    window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question } }))
+    router.push(buildAskAiUrl(question))
   }
 
   return (

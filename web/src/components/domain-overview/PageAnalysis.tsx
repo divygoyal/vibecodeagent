@@ -1,8 +1,10 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { FileText } from 'lucide-react'
 import { DomainOverviewData, formatBytes } from './types'
 import FixWithBotButton from '@/components/FixWithBotButton'
+import { buildAskAiUrl } from '@/lib/askAi'
 
 interface PageAnalysisProps {
   data: DomainOverviewData
@@ -17,6 +19,7 @@ function charColor(len: number, good: number, warn: number) {
 }
 
 export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
+  const router = useRouter()
   const meta = data.audit?.meta
 
   if (!meta) {
@@ -118,9 +121,7 @@ export default function PageAnalysis({ data, domain }: PageAnalysisProps) {
           <div
             key={s.label}
             onClick={() => {
-              window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
-                detail: { question: `Analyze the ${s.label} metric for ${domain}. Current value: ${s.value}. Is this good? How can it be improved?` }
-              }))
+              router.push(buildAskAiUrl(`Analyze the ${s.label} metric for ${domain}. Current value: ${s.value}. Is this good? How can it be improved?`))
             }}
             className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] cursor-pointer hover:border-emerald-500/30 transition-colors"
           >

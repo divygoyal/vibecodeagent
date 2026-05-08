@@ -7,6 +7,7 @@ import {
   ScanSearch, Settings, Book, Newspaper, Command, ArrowRight,
   Sparkles
 } from 'lucide-react';
+import { buildAskAiUrl } from '@/lib/askAi';
 
 interface CommandItem {
   id: string;
@@ -42,10 +43,7 @@ export default function CommandPalette() {
     { id: 'docs', label: 'Docs', description: 'Documentation', icon: Book, action: () => navigate('/dashboard/docs'), section: 'Resources', keywords: ['help', 'documentation', 'guide'] },
     { id: 'blog', label: 'Blog', description: 'Latest updates', icon: Newspaper, action: () => navigate('/dashboard/blog'), section: 'Resources', keywords: ['news', 'updates', 'articles'] },
     { id: 'ask-ai', label: 'Ask AI: What should I do today?', description: 'Get AI recommendation', icon: Sparkles, action: () => {
-      window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', {
-        detail: { question: 'What is the ONE thing I should do today to grow?' }
-      }));
-      setOpen(false);
+      navigate(buildAskAiUrl('What is the ONE thing I should do today to grow?'));
     }, section: 'Actions', keywords: ['ai', 'recommend', 'grow', 'action'] },
   ], [navigate]);
 

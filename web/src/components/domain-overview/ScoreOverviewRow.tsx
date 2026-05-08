@@ -1,8 +1,10 @@
 'use client'
 
 import React from 'react'
+import { useRouter } from 'next/navigation'
 import { ScoreRing } from './ScoreRing'
 import type { DomainOverviewData } from './types'
+import { buildAskAiUrl } from '@/lib/askAi'
 
 interface Props { data: DomainOverviewData; domain: string }
 type Level = 'good' | 'mid' | 'bad'
@@ -55,11 +57,10 @@ const Bar = ({ value, max, level }: { value: number; max: number; level: Level }
   </div>
 )
 
-function askAI(prompt: string) {
-  window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question: prompt } }))
-}
-
 export function ScoreOverviewRow({ data }: Props) {
+  const router = useRouter()
+  const askAI = (prompt: string) => router.push(buildAskAiUrl(prompt))
+
   const seoScore = data.audit?.score ?? 0
   const perfScore = data.pagespeed?.performance ?? 0
   const issueCount = data.audit?.summary.total ?? 0

@@ -1,10 +1,13 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
+import { buildAskAiUrl } from '@/lib/askAi';
 
 interface FixWithBotButtonProps {
     label?: string;
     context?: string;
+    /** @deprecated site is now read from workspace context on the chat page. */
     site?: string;
     size?: 'sm' | 'md';
     variant?: 'solid' | 'ghost' | 'link';
@@ -13,10 +16,10 @@ interface FixWithBotButtonProps {
 export default function FixWithBotButton({
     label = 'Ask AI',
     context,
-    site,
     size = 'sm',
     variant = 'solid',
 }: FixWithBotButtonProps) {
+    const router = useRouter();
     const sizeClasses = size === 'sm'
         ? 'px-3 py-1.5 text-[11px] gap-1.5'
         : 'px-4 py-2.5 text-xs gap-2 w-full justify-center';
@@ -29,7 +32,7 @@ export default function FixWithBotButton({
 
     const handleClick = () => {
         const question = context || 'Analyze this issue and tell me how to fix it';
-        window.dispatchEvent(new CustomEvent('trafficclaw:ask-ai', { detail: { question, site } }));
+        router.push(buildAskAiUrl(question));
     };
 
     return (
