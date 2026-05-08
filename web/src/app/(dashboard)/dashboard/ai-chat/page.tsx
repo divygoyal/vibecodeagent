@@ -659,16 +659,65 @@ function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
         const qs = params.toString();
         router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
 
+        const labelFromSite = (s: string) =>
+            s.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+        // Pre-flight validation: confirm the property/site from the email
+        // are still in the user's GA4 + GSC inventory. Catches the case where
+        // the admin sent a report for property X but the user has since
+        // revoked Google permission or removed it from their account.
+        // Without this, saveWorkspace blindly persists a stale ID and the
+        // first chat tool fails with a confusing 403 / "no data" answer.
+        const validateInventory = async (): Promise<{ propertyOk: boolean; siteOk: boolean }> => {
+            try {
+                const [propRes, siteRes] = await Promise.all([
+                    fetch('/api/analytics/properties', {
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(5_000),
+                    }),
+                    fetch('/api/seo/sites', {
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(5_000),
+                    }),
+                ]);
+                const propJson = propRes.ok ? await propRes.json() : null;
+                const siteJson = siteRes.ok ? await siteRes.json() : null;
+                const properties: unknown[] = Array.isArray(propJson?.properties) ? propJson.properties : [];
+                const sites: unknown[] = Array.isArray(siteJson?.sites) ? siteJson.sites : [];
+                const propertyIds = properties
+                    .map((p) => (p as { property?: string }).property)
+                    .filter((x): x is string => typeof x === 'string' && x.length > 0);
+                const siteUrls = sites
+                    .map((s) => (s as { siteUrl?: string }).siteUrl)
+                    .filter((x): x is string => typeof x === 'string' && x.length > 0);
+                return {
+                    propertyOk: !reqProperty || propertyIds.includes(reqProperty),
+                    siteOk: !reqSite || siteUrls.includes(reqSite),
+                };
+            } catch {
+                // Inventory fetch failed — fail-open and let saveWorkspace try
+                // anyway. Worse case: the chat tools surface a 403/no-data
+                // error like they would without this guard.
+                return { propertyOk: true, siteOk: true };
+            }
+        };
+
         const fire = async () => {
             if (needSwitch && reqProperty && reqSite) {
-                try {
-                    const ok = await saveWorkspace({ property: reqProperty, site: reqSite });
-                    if (ok) {
-                        const label = reqSite.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-                        toast.info(`Switched workspace to ${label}`);
+                const { propertyOk, siteOk } = await validateInventory();
+                if (!propertyOk || !siteOk) {
+                    toast.warning(
+                        `${labelFromSite(reqSite)} is no longer available — answering with your current workspace instead.`,
+                    );
+                } else {
+                    try {
+                        const ok = await saveWorkspace({ property: reqProperty, site: reqSite });
+                        if (ok) {
+                            toast.info(`Switched workspace to ${labelFromSite(reqSite)}`);
+                        }
+                    } catch {
+                        /* best-effort — fall through to fire onPrompt anyway */
                     }
-                } catch {
-                    /* best-effort — fall through to fire onPrompt anyway */
                 }
             }
             // Tiny delay so the scroll/layout settles + dataReady + workspace

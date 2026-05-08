@@ -133,8 +133,30 @@ function MiniStarField() {
     );
 }
 
+// Same-origin guard for the returnTo URL we let the middleware bounce in.
+// Only paths starting with "/dashboard/" are accepted, so a malicious caller
+// can't send users to an arbitrary external site after setup completes.
+function safeReturnTo(raw: string | null): string {
+    if (!raw) return '/dashboard/ai-chat';
+    if (!raw.startsWith('/dashboard/')) return '/dashboard/ai-chat';
+    // Reject protocol-relative paths and embedded URLs.
+    if (raw.startsWith('//') || raw.includes('\\') || /:\/\//.test(raw)) return '/dashboard/ai-chat';
+    return raw;
+}
+
 export default function SetupPage() {
     const router = useRouter();
+    // Where to send the user once setup is complete. Middleware appends
+    // ?returnTo=<original-url> when it bounces a setup-incomplete user away
+    // from a deep link (e.g. /dashboard/ai-chat?q=…&property=…&site=… from a
+    // report-email CTA). Resolved on click, not in state — keeps the page
+    // statically pre-renderable (no useSearchParams) and avoids the
+    // cascading-render hit of useState+useEffect.
+    const resolveReturnTo = useCallback(() => {
+        if (typeof window === 'undefined') return '/dashboard/ai-chat';
+        const params = new URLSearchParams(window.location.search);
+        return safeReturnTo(params.get('returnTo'));
+    }, []);
     const { data: session, update: updateSession } = useSession();
     const {
         selectedProperty,
@@ -379,8 +401,10 @@ export default function SetupPage() {
         // which is what was leaving demo users stuck on the setup page.
         await markSetupCompleted();
         // Hard navigation so the just-refreshed JWT cookie ships with the
-        // request (router.push can race the cookie write).
-        window.location.href = '/dashboard/ai-chat';
+        // request (router.push can race the cookie write). Honour ?returnTo
+        // when it was passed in (e.g. from a report-email deep link bounced
+        // through setup); otherwise default to /dashboard/ai-chat.
+        window.location.href = resolveReturnTo();
     };
 
     const cosmicShell = (children: React.ReactNode) => (
@@ -724,7 +748,9 @@ export default function SetupPage() {
                             // browser ships the just-refreshed JWT cookie with
                             // the request. router.push can race the cookie
                             // write and hit middleware with the stale value.
-                            window.location.href = '/dashboard/ai-chat';
+                            // Honours ?returnTo when middleware bounced a deep
+                            // link (e.g. /dashboard/ai-chat?q=…) through here.
+                            window.location.href = resolveReturnTo();
                         }}
                         disabled={navigating}
                         className="group w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#14C4E1] to-[#0AA0BA] text-[#031318] hover:from-[#26D5F0] hover:to-[#14C4E1] transition-all text-sm font-semibold shadow-[0_0_24px_rgba(20,196,225,0.32)] hover:shadow-[0_0_36px_rgba(20,196,225,0.55)] disabled:opacity-80 disabled:cursor-wait"

@@ -3,15 +3,22 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   // Auth gate for dashboard / admin / superadmin
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) {
     const token = await getToken({ req: request });
 
+    // Preserve the FULL original URL (path + query string) so deep-link
+    // emails like /dashboard/ai-chat?q=…&property=…&site=… survive both
+    // the auth round-trip and the workspace-setup gate. Without this,
+    // NextAuth would land users on a bare /dashboard/ai-chat after login
+    // and AutoPromptFromQuery would never fire.
+    const originalPathPlusSearch = `${pathname}${search}`;
+
     if (!token) {
       const signInUrl = new URL('/', request.url);
-      signInUrl.searchParams.set('callbackUrl', pathname);
+      signInUrl.searchParams.set('callbackUrl', originalPathPlusSearch);
       return NextResponse.redirect(signInUrl);
     }
 
@@ -27,6 +34,9 @@ export async function middleware(request: NextRequest) {
       && !token.workspaceSetupCompleted
     ) {
       const setupUrl = new URL('/dashboard/setup', request.url);
+      // Preserve where the user was trying to go so the setup page can
+      // bounce them back after completion (see /dashboard/setup/page.tsx).
+      setupUrl.searchParams.set('returnTo', originalPathPlusSearch);
       return NextResponse.redirect(setupUrl);
     }
   }

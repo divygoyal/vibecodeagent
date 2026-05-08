@@ -775,6 +775,21 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
         return { ok: false, error: `Report generation failed: ${(err as Error).message}` };
     }
 
+    // Brevo's wire-payload cap is 10 MB. The base64-encoded PDF inflates the
+    // raw buffer by ~4/3, plus the HTML body, plus payload framing. Anything
+    // raw-PDF > 7 MB is risky; we cut at 7.0 MB to leave headroom for the
+    // HTML body (~30-50 KB once rendered) and Brevo's overhead. Without this
+    // guard a too-large send returns a generic "Brevo send failed" with no
+    // clue why — admin had no signal that the size was the problem.
+    const PDF_MAX_BYTES = 7_000_000;
+    if (pdfBuffer.byteLength > PDF_MAX_BYTES) {
+        const mb = (pdfBuffer.byteLength / 1024 / 1024).toFixed(1);
+        return {
+            ok: false,
+            error: `Report PDF is ${mb} MB which exceeds the 7 MB email-attachment limit (Brevo caps total payload at 10 MB). Try Weekly instead of Monthly, or download the PDF from the user-detail drawer and forward it manually.`,
+        };
+    }
+
     // ─── Build all template params (plain strings only) ───
     const periodLabel = period === 'weekly' ? 'Weekly' : 'Monthly';
     const periodPhrase = period === 'weekly' ? 'this week' : 'this month';
