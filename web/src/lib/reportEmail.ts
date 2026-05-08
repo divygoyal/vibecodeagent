@@ -290,7 +290,7 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
     const chartUrl = buildChartUrl(analysis.dailySessions);
     const highlightText = buildHighlightText(analysis, period);
 
-    const ok = await sendTransactional({
+    const sendResult = await sendTransactional({
         toEmail: user.email,
         toName: user.github_username || firstName,
         templateId: BREVO_REPORT_TEMPLATE_ID,
@@ -331,5 +331,8 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
         ],
     });
 
-    return ok ? { ok: true } : { ok: false, error: 'Brevo send failed (see server logs).' };
+    if (sendResult.ok) {
+        return { ok: true, messageId: sendResult.messageId };
+    }
+    return { ok: false, error: sendResult.error || 'Brevo send failed (see server logs).' };
 }

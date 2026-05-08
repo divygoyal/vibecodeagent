@@ -34,19 +34,34 @@ export function isBrevoConfigured(): boolean {
     return Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
 }
 
-export async function sendTransactional(input: BrevoSendInput): Promise<boolean> {
+export interface BrevoSendResult {
+    ok: boolean;
+    /** Human-readable failure reason — surfaced into the superadmin UI so admins
+     *  don't have to dig in logs. Only set when ok=false. */
+    error?: string;
+    /** Brevo's accepted-message ID, present on success. */
+    messageId?: string;
+}
+
+export async function sendTransactional(input: BrevoSendInput): Promise<BrevoSendResult> {
     const apiKey = process.env.BREVO_API_KEY;
     const senderEmail = process.env.BREVO_SENDER_EMAIL;
     const senderName = process.env.BREVO_SENDER_NAME || 'TrafficClaw';
 
     if (!apiKey || !senderEmail) {
-        console.warn('[brevo] skipped — BREVO_API_KEY or BREVO_SENDER_EMAIL not set', { toEmail: input.toEmail });
-        return false;
+        const missing = [
+            !apiKey ? 'BREVO_API_KEY' : null,
+            !senderEmail ? 'BREVO_SENDER_EMAIL' : null,
+        ].filter(Boolean).join(' + ');
+        const msg = `${missing} not set on the web service env. Add them in Coolify → web service → Env Vars and redeploy.`;
+        console.warn('[brevo] skipped —', msg, { toEmail: input.toEmail });
+        return { ok: false, error: msg };
     }
 
     if (!input.templateId && !(input.subject && input.htmlContent)) {
-        console.error('[brevo] send called without templateId or subject+htmlContent');
-        return false;
+        const msg = 'sendTransactional called without templateId or (subject + htmlContent)';
+        console.error('[brevo]', msg);
+        return { ok: false, error: msg };
     }
 
     type BrevoPayload = {
@@ -87,8 +102,9 @@ export async function sendTransactional(input: BrevoSendInput): Promise<boolean>
             signal: AbortSignal.timeout(15_000),
         });
     } catch (err) {
-        console.error('[brevo] network error', { toEmail: input.toEmail, err: err instanceof Error ? err.message : err });
-        return false;
+        const detail = err instanceof Error ? err.message : String(err);
+        console.error('[brevo] network error', { toEmail: input.toEmail, err: detail });
+        return { ok: false, error: `Network error reaching Brevo: ${detail}` };
     }
 
     if (res.ok) {
@@ -98,13 +114,20 @@ export async function sendTransactional(input: BrevoSendInput): Promise<boolean>
             messageId = body?.messageId || '';
         } catch { /* ignore */ }
         console.info('[brevo] sent', { toEmail: input.toEmail, templateId: input.templateId, messageId });
-        return true;
+        return { ok: true, messageId };
     }
 
-    let bodyPreview = '';
+    // Try to surface Brevo's own error message — they return JSON like
+    // { code: "invalid_parameter", message: "..." } on 4xx.
+    let detail = '';
     try {
-        bodyPreview = (await res.text()).slice(0, 500);
-    } catch { /* ignore */ }
-    console.error('[brevo] non-2xx', { toEmail: input.toEmail, status: res.status, body: bodyPreview });
-    return false;
+        const body = await res.json();
+        detail = body?.message || body?.error || JSON.stringify(body).slice(0, 300);
+    } catch {
+        try {
+            detail = (await res.text()).slice(0, 500);
+        } catch { /* ignore */ }
+    }
+    console.error('[brevo] non-2xx', { toEmail: input.toEmail, status: res.status, body: detail });
+    return { ok: false, error: `Brevo returned ${res.status}${detail ? `: ${detail}` : ''}` };
 }
