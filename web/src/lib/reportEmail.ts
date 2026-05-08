@@ -291,13 +291,30 @@ export function buildSubjectLine(
 }
 
 interface FindingCard {
-    icon: string;            // emoji
-    accentColor: string;     // hex
-    accentTint: string;      // rgba
+    /** Lucide icon slug — rendered via Iconify's hosted-SVG endpoint so the
+     *  email gets a clean line-style mark in every modern client. The SVG is
+     *  served from api.iconify.design and recoloured via query string to the
+     *  brand cyan (#0891B2). Outlook desktop (which can't render SVG-via-img)
+     *  shows a broken-image silhouette but layout stays intact. */
+    icon: string;
     title: string;
     body: string;
     ctaLabel: string;
     ctaUrl: string;
+    /** Right-side number callout, e.g. "+420", "~280", "-630". Optional. */
+    metricValue?: string;
+    /** Small caps label under the number, e.g. "EST. CLICKS / MO". */
+    metricLabel?: string;
+    /** true → green (positive), false → red (negative), undefined → cyan. */
+    metricPositive?: boolean;
+}
+
+/** Build the Iconify hosted-SVG URL for a Lucide icon, recolored to the
+ *  brand cyan and sized for the email. Used by both card renderers and by
+ *  the section eyebrow. Kept as a single source of truth so swapping CDN
+ *  later (or self-hosting under /icons/) is a one-line change. */
+function iconUrl(slug: string, size: number = 22, hexNoHash: string = '0891B2'): string {
+    return `https://api.iconify.design/lucide/${slug}.svg?color=%23${hexNoHash}&width=${size}&height=${size}`;
 }
 
 export function buildFindings(
@@ -307,17 +324,18 @@ export function buildFindings(
 ): FindingCard[] {
     const cards: FindingCard[] = [];
 
+    // Priority order — first card is most important. Visual treatment is
+    // identical for every card; hierarchy comes from position, not color.
+
     // 1. Critical alert — biggest "you have a problem" signal
     if (analysis.criticalAlerts && analysis.criticalAlerts.length > 0) {
         const a = analysis.criticalAlerts[0];
         const detail = (a.detail || '').replace(/\s+/g, ' ').trim();
         cards.push({
-            icon: '🚨',
-            accentColor: '#dc2626',
-            accentTint: 'rgba(220,38,38,0.07)',
+            icon: 'alert-triangle',
             title: a.title,
             body: detail || 'Open the dashboard for the full breakdown.',
-            ctaLabel: 'Why? Run AI investigation →',
+            ctaLabel: 'Run AI investigation',
             ctaUrl: buildAiChatUrl(
                 `Why ${a.title.toLowerCase().replace(/[?.!]+$/, '')}? ${detail ? detail + ' ' : ''}Help me understand the cause and what to do about it.`,
                 propertyId,
@@ -330,18 +348,20 @@ export function buildFindings(
     const sdOpp = analysis.opportunities?.find((o) => o.type === 'striking_distance');
     if (sdOpp) {
         const slots = Math.max(1, Math.ceil(sdOpp.position - 10));
+        const extra = Math.round(sdOpp.potentialClicks);
         cards.push({
-            icon: '🎯',
-            accentColor: '#0891b2',
-            accentTint: 'rgba(8,145,178,0.07)',
+            icon: 'search',
             title: `"${sdOpp.query}" is ${slots} ${slots === 1 ? 'spot' : 'spots'} from page 1`,
-            body: `Currently #${sdOpp.position.toFixed(1)} with ${sdOpp.impressions.toLocaleString()} impressions. Push it to top-10 → ~${Math.round(sdOpp.potentialClicks)} extra clicks.`,
-            ctaLabel: 'Get the push-to-page-1 plan →',
+            body: `Currently #${sdOpp.position.toFixed(1)} with ${sdOpp.impressions.toLocaleString()} impressions.`,
+            ctaLabel: 'Get the push-to-page-1 plan',
             ctaUrl: buildAiChatUrl(
-                `My biggest opportunity is "${sdOpp.query}" at position #${sdOpp.position.toFixed(1)} with ${Math.round(sdOpp.potentialClicks)} clicks of upside. Give me a 3-step plan to push it onto page 1.`,
+                `My biggest opportunity is "${sdOpp.query}" at position #${sdOpp.position.toFixed(1)} with ${extra} clicks of upside. Give me a 3-step plan to push it onto page 1.`,
                 propertyId,
                 siteUrl,
             ),
+            metricValue: `~${extra.toLocaleString()}`,
+            metricLabel: 'Extra clicks',
+            metricPositive: true,
         });
     }
 
@@ -350,18 +370,20 @@ export function buildFindings(
         const d = analysis.decayPages[0];
         const pct = Math.round(((d.currentClicks - d.prevClicks) / Math.max(d.prevClicks, 1)) * -100);
         if (pct > 5) {
+            const lost = Math.max(d.prevClicks - d.currentClicks, 0);
             cards.push({
-                icon: '📉',
-                accentColor: '#d97706',
-                accentTint: 'rgba(217,119,6,0.07)',
+                icon: 'trending-down',
                 title: `${d.page} is decaying`,
                 body: `Clicks down ${pct}% (${d.prevClicks.toLocaleString()} → ${d.currentClicks.toLocaleString()}). Position drift from #${d.prevPosition.toFixed(1)} to #${d.currentPosition.toFixed(1)}.`,
-                ctaLabel: 'Refresh content with AI →',
+                ctaLabel: 'Refresh content with AI',
                 ctaUrl: buildAiChatUrl(
                     `Help me refresh ${d.page} — clicks dropped ${pct}% and the page slipped from #${d.prevPosition.toFixed(1)} to #${d.currentPosition.toFixed(1)}. What specifically should I update first?`,
                     propertyId,
                     siteUrl,
                 ),
+                metricValue: `-${lost.toLocaleString()}`,
+                metricLabel: 'Clicks lost',
+                metricPositive: false,
             });
         }
     }
@@ -370,18 +392,24 @@ export function buildFindings(
     if (cards.length < 3 && analysis.cannibalization && analysis.cannibalization.length > 0) {
         const c = analysis.cannibalization[0];
         const sample = c.pages.slice(0, 5).map((p) => p.page).join(', ');
+        // Rough estimate: consolidating 4 splintered pages typically lifts the
+        // surviving one ~50% of total combined clicks (the rest is duplication
+        // that won't survive consolidation). Used only as the right-side
+        // callout — the body still tells the user the underlying mechanic.
+        const potentialLift = Math.round(c.totalClicks * 0.5);
         cards.push({
-            icon: '⚔️',
-            accentColor: '#7c3aed',
-            accentTint: 'rgba(124,58,237,0.07)',
+            icon: 'layers',
             title: `${c.pages.length} pages compete for "${c.query}"`,
             body: `${c.totalClicks.toLocaleString()} clicks split across ${c.pages.length} pages. Consolidate to one and lift authority.`,
-            ctaLabel: 'See competing pages →',
+            ctaLabel: 'See the consolidation plan',
             ctaUrl: buildAiChatUrl(
                 `I have ${c.pages.length} pages competing for "${c.query}": ${sample}. Which should I consolidate to and what's the redirect/canonical strategy?`,
                 propertyId,
                 siteUrl,
             ),
+            metricValue: `+${potentialLift.toLocaleString()}`,
+            metricLabel: 'Potential clicks',
+            metricPositive: true,
         });
     }
 
@@ -389,17 +417,18 @@ export function buildFindings(
     if (cards.length < 3 && analysis.keywordVelocity?.accelerating?.length) {
         const k = analysis.keywordVelocity.accelerating[0];
         cards.push({
-            icon: '🚀',
-            accentColor: '#059669',
-            accentTint: 'rgba(5,150,105,0.07)',
+            icon: 'trending-up',
             title: `"${k.query}" is climbing fast`,
-            body: `Position improved by ${Math.abs(k.positionDelta).toFixed(1)} (now #${k.currentPosition.toFixed(1)}); +${k.clickDelta.toLocaleString()} clicks vs prior period. Push it before momentum fades.`,
-            ctaLabel: 'How to keep climbing →',
+            body: `Position improved by ${Math.abs(k.positionDelta).toFixed(1)} (now #${k.currentPosition.toFixed(1)}). Push it before momentum fades.`,
+            ctaLabel: 'How to keep climbing',
             ctaUrl: buildAiChatUrl(
                 `"${k.query}" climbed from #${k.prevPosition.toFixed(1)} to #${k.currentPosition.toFixed(1)}. What's the playbook to keep it moving toward #1 before momentum fades?`,
                 propertyId,
                 siteUrl,
             ),
+            metricValue: `+${k.clickDelta.toLocaleString()}`,
+            metricLabel: 'Extra clicks',
+            metricPositive: true,
         });
     }
 
@@ -416,36 +445,42 @@ export function buildHighestImpactMove(
         .slice()
         .sort((a, b) => (b.revenueEstimate || 0) - (a.revenueEstimate || 0))[0];
     if (opp && opp.revenueEstimate > 100) {
+        const extra = Math.round(opp.potentialClicks);
         return {
-            icon: '⭐',
-            accentColor: '#0891b2',
-            accentTint: 'rgba(8,145,178,0.06)',
+            icon: 'rocket',
             title: `Push "${opp.query}" to page 1`,
-            body: `At #${opp.position.toFixed(1)} today. Estimated impact: +${Math.round(opp.potentialClicks)} clicks/mo (~$${Math.round(opp.revenueEstimate)}/mo at typical CTR).`,
-            ctaLabel: 'Open AI chat with this question →',
+            body: `At #${opp.position.toFixed(1)} today. Estimated impact: +${extra} clicks/mo (~$${Math.round(opp.revenueEstimate)}/mo at typical CTR).`,
+            ctaLabel: 'Open AI plan',
             ctaUrl: buildAiChatUrl(
                 `My single highest-impact move: "${opp.query}" at #${opp.position.toFixed(1)} with $${Math.round(opp.revenueEstimate)}/mo upside. Give me the concrete 3-step plan to win it.`,
                 propertyId,
                 siteUrl,
             ),
+            metricValue: `+${extra.toLocaleString()}`,
+            metricLabel: 'Est. clicks / mo',
+            metricPositive: true,
         };
     }
     if (analysis.decayPages && analysis.decayPages.length > 0) {
         const d = analysis.decayPages[0];
         const pct = Math.round(((d.currentClicks - d.prevClicks) / Math.max(d.prevClicks, 1)) * -100);
         if (pct > 15) {
+            // Body claims 30-60% recovery on refresh — pick the midpoint (45%)
+            // for the right-side stat so the number ties to the body claim.
+            const recoverable = Math.round(Math.max(d.prevClicks - d.currentClicks, 0) * 0.45);
             return {
-                icon: '⭐',
-                accentColor: '#d97706',
-                accentTint: 'rgba(217,119,6,0.06)',
+                icon: 'refresh-cw',
                 title: `Refresh ${d.page}`,
                 body: `Clicks down ${pct}%. A targeted refresh typically recovers 30-60% of lost traffic.`,
-                ctaLabel: 'Open AI chat with this question →',
+                ctaLabel: 'Open AI plan',
                 ctaUrl: buildAiChatUrl(
                     `${d.page} lost ${pct}% clicks. Help me refresh it — what specifically should change first?`,
                     propertyId,
                     siteUrl,
                 ),
+                metricValue: `+${recoverable.toLocaleString()}`,
+                metricLabel: 'Recoverable / mo',
+                metricPositive: true,
             };
         }
     }
@@ -497,46 +532,91 @@ interface RenderInput {
     dashboardUrl: string;
 }
 
-function renderFindingCard(f: FindingCard): string {
-    return `
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
-          <tr><td bgcolor="#ffffff" style="background:${f.accentTint};border:1px solid ${f.accentColor};border-left-width:4px;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:14px;font-weight:700;color:#0a0d12;line-height:1.3;margin-bottom:4px;">
-              <span style="margin-right:6px;">${f.icon}</span>${esc(f.title)}
-            </div>
-            <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#3f3f46;">
-              ${esc(f.body)}
-            </p>
-            <a href="${f.ctaUrl}" style="display:inline-block;font-size:12px;font-weight:600;color:${f.accentColor};text-decoration:none;letter-spacing:-0.005em;" target="_blank">
-              ${esc(f.ctaLabel)}
-            </a>
-          </td></tr>
-        </table>`;
+/** Color for the right-side metric callout: green/red for positive/negative
+ *  click signals, brand cyan as the neutral default. */
+function metricColor(positive?: boolean): string {
+    if (positive === true) return '#059669';   // emerald-600
+    if (positive === false) return '#dc2626';  // red-600
+    return '#0891B2';                          // cyan-600
 }
 
-function renderHighestImpactCard(f: FindingCard): string {
+/** Compact horizontal row used for the "Other findings" list under the
+ *  highest-impact card. Layout: cyan-tinted icon circle | title + body |
+ *  big colored metric + label | chevron. Whole row is wrapped in <a> so any
+ *  click in the row deep-links to the AI-chat plan for that finding. */
+function renderFindingCard(f: FindingCard): string {
+    const m = f.metricValue ? `
+              <td valign="middle" align="right" width="100" style="padding:14px 6px 14px 6px;">
+                <div style="font-size:18px;font-weight:700;letter-spacing:-0.02em;color:${metricColor(f.metricPositive)};line-height:1.1;white-space:nowrap;">${esc(f.metricValue)}</div>
+                ${f.metricLabel ? `<div style="font-size:9px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;margin-top:4px;">${esc(f.metricLabel)}</div>` : ''}
+              </td>` : '';
     return `
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:18px;">
-          <tr><td bgcolor="#0a0d12" style="background:linear-gradient(135deg,#0a0d12 0%,#0e1a2c 100%);border-radius:14px;padding:18px 20px;">
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:#7AD9DA;margin-bottom:6px;">
-              ⭐ Highest-impact move ${esc('this period')}
-            </div>
-            <div style="font-size:16px;font-weight:700;color:#ffffff;line-height:1.3;margin-bottom:6px;letter-spacing:-0.01em;">
-              ${esc(f.title)}
-            </div>
-            <p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#a1a1aa;">
-              ${esc(f.body)}
-            </p>
-            <a href="${f.ctaUrl}" style="display:inline-block;background:#14C4E1;background-image:linear-gradient(135deg,#14C4E1 0%,#7AD9DA 100%);color:#031017;text-decoration:none;font-weight:600;font-size:13px;padding:10px 18px;border-radius:9999px;letter-spacing:-0.01em;" target="_blank">
-              ${esc(f.ctaLabel)}
-            </a>
-          </td></tr>
+        <a href="${f.ctaUrl}" style="display:block;text-decoration:none;color:inherit;margin-bottom:8px;" target="_blank">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background:#ffffff;border:1px solid #eef0f3;border-radius:10px;border-collapse:separate;">
+            <tr>
+              <td width="48" valign="middle" align="center" style="padding:14px 0 14px 14px;">
+                <div style="width:34px;height:34px;border-radius:9999px;background:rgba(20,196,225,0.1);text-align:center;line-height:34px;">
+                  <img src="${iconUrl(f.icon, 18)}" alt="" width="18" height="18" style="display:inline-block;vertical-align:middle;border:0;outline:none;">
+                </div>
+              </td>
+              <td valign="middle" style="padding:14px 10px 14px 10px;">
+                <div style="font-size:14px;font-weight:600;color:#0a0d12;line-height:1.35;letter-spacing:-0.01em;margin-bottom:2px;">${esc(f.title)}</div>
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#71717a;">${esc(f.body)}</p>
+              </td>
+              ${m}
+              <td valign="middle" align="center" width="24" style="padding:14px 12px 14px 4px;color:#a1a1aa;font-size:16px;line-height:1;font-family:Georgia,serif;">&rsaquo;</td>
+            </tr>
+          </table>
+        </a>`;
+}
+
+/** Hero card for the single highest-impact move. Layout: rocket-in-cyan-circle
+ *  | pill + title + body + filled cyan CTA | big cyan metric. Cyan-tinted
+ *  background plus a 4px solid cyan left stripe makes it the visual anchor
+ *  of the opportunities section without resorting to a darker fill. */
+function renderHighestImpactCard(f: FindingCard): string {
+    const metricCol = f.metricValue ? `
+              <td valign="middle" align="right" width="116" style="padding:20px 20px 20px 6px;">
+                <div style="font-size:30px;font-weight:700;color:${metricColor(f.metricPositive)};letter-spacing:-0.025em;line-height:1.05;white-space:nowrap;">${esc(f.metricValue)}</div>
+                ${f.metricLabel ? `<div style="font-size:9px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#52525b;margin-top:5px;">${esc(f.metricLabel)}</div>` : ''}
+              </td>` : '';
+    return `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0fbfd" style="background:#f0fbfd;border:1px solid rgba(20,196,225,0.25);border-left:4px solid #14C4E1;border-radius:12px;border-collapse:separate;margin-bottom:14px;">
+          <tr>
+            <td width="68" valign="top" align="center" style="padding:20px 0 20px 16px;">
+              <div style="width:46px;height:46px;border-radius:9999px;background:rgba(20,196,225,0.18);text-align:center;line-height:46px;">
+                <img src="${iconUrl(f.icon || 'rocket', 24)}" alt="" width="24" height="24" style="display:inline-block;vertical-align:middle;border:0;outline:none;">
+              </div>
+            </td>
+            <td valign="top" style="padding:20px 12px 20px 12px;">
+              <span style="display:inline-block;padding:3px 10px;border-radius:9999px;background:#ffffff;border:1px solid rgba(8,145,178,0.4);color:#0891B2;font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:8px;">Highest Impact</span>
+              <div style="font-size:15px;font-weight:700;color:#0a0d12;line-height:1.3;letter-spacing:-0.01em;margin-bottom:5px;">${esc(f.title)}</div>
+              <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:#52525b;">${esc(f.body)}</p>
+              <a href="${f.ctaUrl}" style="display:inline-block;background:#14C4E1;background-image:linear-gradient(135deg,#14C4E1 0%,#0891B2 100%);color:#ffffff;text-decoration:none;font-weight:600;font-size:12px;padding:8px 14px;border-radius:9999px;letter-spacing:-0.005em;" target="_blank">${esc(f.ctaLabel)} &rarr;</a>
+            </td>
+            ${metricCol}
+          </tr>
         </table>`;
 }
 
 export function renderReportEmailHtml(input: RenderInput): string {
     const findingsHtml = input.findings.map(renderFindingCard).join('\n');
     const highestImpactHtml = input.highestImpact ? renderHighestImpactCard(input.highestImpact) : '';
+    const hasOpportunities = !!input.highestImpact || input.findings.length > 0;
+    const opportunitiesSection = hasOpportunities ? `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 12px;">
+          <tr><td>
+            <p class="section-eyebrow" style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:#0891B2;">
+              &#10022; ${esc(input.periodLabel)} Opportunities
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:#71717a;">
+              Top opportunities to grow your organic traffic
+            </p>
+          </td></tr>
+        </table>
+        ${highestImpactHtml}
+        ${findingsHtml}
+        ` : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -656,14 +736,7 @@ export function renderReportEmailHtml(input: RenderInput): string {
           </tr>
         </table>
 
-        ${input.findings.length > 0 ? `
-        <p class="section-eyebrow" style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:#0891B2;">
-          What we found ${esc(input.periodPhrase)}
-        </p>
-        ${findingsHtml}
-        ` : ''}
-
-        ${highestImpactHtml}
+        ${opportunitiesSection}
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0fbfd" style="background:#f0fbfd;border:1px solid rgba(20,196,225,0.25);border-radius:12px;margin-top:6px;">
           <tr>
