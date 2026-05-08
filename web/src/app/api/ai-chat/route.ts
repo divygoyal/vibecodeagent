@@ -24,6 +24,7 @@ import { loadThreadState, saveThreadState, formatThreadStateForPrompt, type Chat
 import { logChatTelemetry } from '@/lib/chatTelemetry';
 import { makeFingerprint, findRepetitionMatch, formatRepetitionTag } from '@/lib/questionFingerprint';
 import { correlateDeploysWithLosers, shouldRunDeployCorrelation } from '@/lib/dataSources/deployCorrelation';
+import { MAX_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -419,8 +420,16 @@ export async function POST(req: NextRequest) {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 
-        if (message.length > 4000) {
-            return new Response(JSON.stringify({ error: 'Message too long (max 4000 chars)' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        if (message.length > MAX_INPUT_CHARS) {
+            return new Response(
+                JSON.stringify({
+                    error: `Message is ${message.length} characters; the limit is ${MAX_INPUT_CHARS}. Trim your input or split it into multiple messages.`,
+                    code: ERR_MESSAGE_TOO_LONG,
+                    limit: MAX_INPUT_CHARS,
+                    length: message.length,
+                }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } },
+            );
         }
 
         if (history && (!Array.isArray(history) || history.length > 50)) {

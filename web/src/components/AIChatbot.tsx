@@ -32,6 +32,7 @@ import { QuickPrompts } from './chat/QuickPrompts';
 import { ChatInput } from './chat/ChatInput';
 import { MessageBubble } from './chat/MessageBubble';
 import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from './chat/ReasoningTrace';
+import { MAX_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
 
 type Message = ChatMessage;
 
@@ -275,6 +276,16 @@ export default function AIChatbot() {
         const messageText = text || inputRef2.current.trim();
         if (!messageText || isLoadingRef.current) return;
 
+        // Defense in depth — Send is already disabled in the UI past this
+        // length, but programmatic callers (briefing, retry, suggestion clicks
+        // replaying old messages) bypass the textarea, so guard here too.
+        if (messageText.length > MAX_INPUT_CHARS) {
+            toast.error(
+                `Message is ${messageText.length.toLocaleString()} characters; the limit is ${MAX_INPUT_CHARS.toLocaleString()}. Trim it or split into multiple messages.`,
+            );
+            return;
+        }
+
         const currentAnalytics = analyticsRef.current;
         const currentSeo = seoRef.current;
         const currentMessages = messagesRef.current;
@@ -348,6 +359,28 @@ export default function AIChatbot() {
                             return updated;
                         });
                     }
+                    setIsLoading(false);
+                    return;
+                }
+                if (res.status === 400) {
+                    // Surface the server's specific 400 message (e.g. message_too_long)
+                    // instead of the generic "connection lost" path. Without this branch,
+                    // pasting a 30k-char message reads as a network failure to the user.
+                    let detail = '';
+                    let isTooLong = false;
+                    try {
+                        const errorData = await res.json();
+                        detail = typeof errorData?.error === 'string' ? errorData.error : '';
+                        isTooLong = errorData?.code === ERR_MESSAGE_TOO_LONG;
+                    } catch { /* fall through to generic */ }
+                    setMessages(prev => {
+                        const updated = [...prev];
+                        const fallback = isTooLong
+                            ? `⚠️ **Message too long.** ${detail || 'Trim your input or split into multiple messages.'}`
+                            : `⚠️ **Couldn't process that message.** ${detail || 'Please try rephrasing.'}`;
+                        updated[updated.length - 1] = { ...updated[updated.length - 1], content: fallback, hasError: true };
+                        return updated;
+                    });
                     setIsLoading(false);
                     return;
                 }
