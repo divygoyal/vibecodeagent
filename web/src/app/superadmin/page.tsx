@@ -802,6 +802,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
     const [profileError, setProfileError] = useState('')
     const [creditInputs, setCreditInputs] = useState<Record<string, string>>({})
     const [showCreditInput, setShowCreditInput] = useState<string | null>(null)
+    const [emailMenuUser, setEmailMenuUser] = useState<string | null>(null)
 
     const loadUserProfile = useCallback(async (user: UserData, force = false) => {
         if (!force && profileCache[user.github_id]) {
@@ -890,6 +891,26 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         setShowCreditInput(null)
     }
 
+    const handleSendReportEmail = async (githubId: string, period: 'weekly' | 'monthly') => {
+        const key = `email-report-${period}-${githubId}`
+        setActionLoading(key)
+        setEmailMenuUser(null)
+        try {
+            // Send is synchronous server-side (PDF render + Gemini synth + Brevo).
+            // Typically 20-90s — UI button stays in loading state until the
+            // request resolves so the admin sees inline feedback.
+            await apiPost('send-report-email', { userId: githubId, period })
+            alert(`${period[0].toUpperCase()}${period.slice(1)} report emailed.`)
+        } catch (err) {
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                alert(`Failed to send: ${message}`)
+            }
+        } finally {
+            setActionLoading('')
+        }
+    }
+
     const containerStatusColor = (status: string | undefined | null) => {
         if (!status) return 'bg-zinc-700 text-zinc-400'
         const s = status.toLowerCase()
@@ -958,6 +979,9 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                                     onToggleCreditInput={() => setShowCreditInput(showCreditInput === user.github_id ? null : user.github_id)}
                                     onCreditInputChange={(v) => setCreditInputs(prev => ({ ...prev, [user.github_id]: v }))}
                                     onAddCredits={() => handleAddCredits(user.github_id)}
+                                    emailMenuOpen={emailMenuUser === user.github_id}
+                                    onToggleEmailMenu={() => setEmailMenuUser(emailMenuUser === user.github_id ? null : user.github_id)}
+                                    onSendReportEmail={(period) => handleSendReportEmail(user.github_id, period)}
                                 />
                             ))}
                         </tbody>
@@ -1083,7 +1107,7 @@ function UserSignals({ user }: { user: UserData }) {
     )
 }
 
-function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
+function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail }: {
     user: UserData
     selected: boolean
     actionLoading: string
@@ -1096,6 +1120,9 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
     onToggleCreditInput: () => void
     onCreditInputChange: (v: string) => void
     onAddCredits: () => void
+    emailMenuOpen: boolean
+    onToggleEmailMenu: () => void
+    onSendReportEmail: (period: 'weekly' | 'monthly') => void
 }) {
     const containerStatus = user.container?.status || null
     const isRunning = containerStatus?.toLowerCase() === 'running'
@@ -1220,6 +1247,50 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
                     >
                         <RotateCw className="w-4 h-4" />
                     </button>
+                    {/* Email Report — opens a tiny inline picker (Weekly / Monthly).
+                        The send is synchronous server-side (~30-90s) so we keep the
+                        button in a loading state until the request resolves. */}
+                    <div className="relative">
+                        <button
+                            onClick={onToggleEmailMenu}
+                            disabled={
+                                actionLoading === `email-report-weekly-${user.github_id}` ||
+                                actionLoading === `email-report-monthly-${user.github_id}`
+                            }
+                            className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-30"
+                            title="Email report"
+                        >
+                            {actionLoading === `email-report-weekly-${user.github_id}` ||
+                            actionLoading === `email-report-monthly-${user.github_id}` ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Mail className="w-4 h-4" />
+                            )}
+                        </button>
+                        {emailMenuOpen && (
+                            <div className="absolute right-0 top-full mt-1 z-30 w-44 rounded-lg border border-white/[0.08] bg-[#0a0d12] shadow-2xl shadow-black/60 overflow-hidden">
+                                <div className="px-3 py-2 border-b border-white/[0.05] text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.18em]">
+                                    Email report to {user.email ? 'user' : '(no email)'}
+                                </div>
+                                <button
+                                    onClick={() => onSendReportEmail('weekly')}
+                                    disabled={!user.email}
+                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <span className="font-medium">Weekly report</span>
+                                    <span className="block text-[10px] text-zinc-500">Last 7 days vs prior week</span>
+                                </button>
+                                <button
+                                    onClick={() => onSendReportEmail('monthly')}
+                                    disabled={!user.email}
+                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed border-t border-white/[0.04]"
+                                >
+                                    <span className="font-medium">Monthly report</span>
+                                    <span className="block text-[10px] text-zinc-500">Last 30 days vs prior month</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <button
                         onClick={onDelete}
                         className="p-1.5 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors"

@@ -60,6 +60,11 @@ class User(Base):
     # clears, sign-outs, and new devices.
     workspace_setup_completed = Column(Boolean, default=False)
     welcome_seen = Column(Boolean, default=False)
+    # Set the moment the Brevo welcome email is successfully delivered (2xx).
+    # Belt-and-suspenders idempotency key on top of the create_user upsert
+    # guard — prevents a second send if anything ever races the path.
+    # NULL = never sent.
+    welcome_email_sent_at = Column(DateTime, nullable=True)
 
     # Subscription (Dodo Payments)
     subscription_id = Column(String(100), nullable=True)  # Dodo subscription ID

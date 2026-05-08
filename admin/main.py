@@ -30,6 +30,7 @@ from services.github_app_tokens import (
     list_installation_repositories as github_app_list_installation_repositories,
     invalidate as github_app_invalidate_token,
 )
+from services import brevo as brevo_service
 from security.github_app_jwt import is_configured as github_app_is_configured
 from docker_manager import docker_manager
 
@@ -753,6 +754,62 @@ def get_container_health_summary(user: User) -> Dict[str, Any]:
 
 
 # ============= User Endpoints =============
+
+# Brevo welcome-email background task. Fires once per user, the first time
+# create_user inserts a row with an email. Best-effort: a Brevo outage must
+# never break signup, so this swallows every error and logs.
+async def send_welcome_email_task(user_id: int) -> None:
+    """Send the Brevo welcome email and stamp users.welcome_email_sent_at on
+    success. Idempotent — re-checks the column inside the task in case
+    multiple fires race (shouldn't happen, but cheap insurance)."""
+    if not brevo_service.is_configured():
+        print(f"[welcome] skipped user_id={user_id} — Brevo not configured")
+        return
+
+    try:
+        async with async_session() as db:
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if not user or not user.email:
+                return
+            if user.welcome_email_sent_at:
+                return  # Already sent — nothing to do.
+
+            first_name = (
+                (user.github_username or "").strip()
+                or (user.email.split("@")[0] if user.email else "there")
+            )
+            template_id_raw = os.getenv("BREVO_WELCOME_TEMPLATE_ID", "").strip()
+            template_id = int(template_id_raw) if template_id_raw.isdigit() else None
+            dashboard_url = os.getenv("PUBLIC_DASHBOARD_URL", "https://trafficclaw.com/dashboard")
+            params = {"first_name": first_name, "dashboard_url": dashboard_url}
+
+            ok = brevo_service.send_transactional(
+                to_email=user.email,
+                to_name=user.github_username or first_name,
+                template_id=template_id,
+                params=params if template_id is not None else None,
+                # Inline-HTML fallback for environments where the template id
+                # is not configured (e.g. local dev, CI). Keeps the path
+                # functional without a Brevo template.
+                subject=None if template_id is not None else f"Welcome to TrafficClaw, {first_name}",
+                html_content=None if template_id is not None else (
+                    f"<p>Hi {first_name},</p>"
+                    f"<p>Welcome to TrafficClaw. Your dashboard is ready at "
+                    f"<a href='{dashboard_url}'>{dashboard_url}</a>.</p>"
+                    f"<p>&mdash; The TrafficClaw team</p>"
+                ),
+            )
+
+            if ok:
+                user.welcome_email_sent_at = datetime.utcnow()
+                await db.commit()
+            else:
+                print(f"[welcome] Brevo returned non-2xx for user_id={user_id}; will not retry")
+    except Exception as exc:
+        print(f"[welcome] error sending to user_id={user_id}: {exc!r}")
+
+
 @app.post("/api/users", response_model=UserResponse)
 async def create_user(
     user_data: UserCreate,
@@ -767,9 +824,13 @@ async def create_user(
     raw_identifier = user_data.provider_id or user_data.github_id or user_data.email
     if not raw_identifier:
         raise HTTPException(status_code=400, detail="Missing user identifier (provider_id, github_id, or email)")
-        
+
     user_identifier = sanitize_identifier(raw_identifier)
     print(f"[DEBUG] create_user: raw='{raw_identifier}', sanitized='{user_identifier}', email='{user_data.email}'")
+
+    # Tracked so we know whether to enqueue the Brevo welcome email after commit.
+    # Compared to existing_user *after* the upsert lookup below.
+    was_new_user = False
 
     # 2. Check if user already exists (by email or github_id)
     existing_user = None
@@ -855,7 +916,8 @@ async def create_user(
                     background_sync_reason = f"provider_linked:{user_data.provider}"
     else:
         # Create new user
-        
+        was_new_user = True
+
         # Validate plan
         if user_data.plan not in PLANS:
             raise HTTPException(status_code=400, detail=f"Invalid plan. Options: {list(PLANS.keys())}")
@@ -924,6 +986,12 @@ async def create_user(
 
     if should_queue_sync:
         background_tasks.add_task(sync_user_container_in_background, user.id, background_sync_reason)
+
+    # Welcome email — only on FIRST create_user call for this user, only when
+    # we have an email to deliver to, and only when we haven't already sent
+    # one (the column is the belt-and-suspenders idempotency guard).
+    if was_new_user and user.email and not user.welcome_email_sent_at:
+        background_tasks.add_task(send_welcome_email_task, user.id)
 
     # 4. Fast-return if no telegram token is configured
     if not user.telegram_bot_token:

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createSuperadminToken, verifySuperadminToken } from '@/lib/superadminToken'
+import { sendUserReportEmail } from '@/lib/reportEmail'
 
 export const dynamic = 'force-dynamic'
+// Report-email path renders a PDF + Gemini-synthesised analysis; the same 5-min
+// budget the user-facing /api/report/user-generate route uses.
+export const maxDuration = 300
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -357,6 +361,24 @@ export async function POST(req: Request) {
                 headers: { 'X-API-Key': ADMIN_API_KEY },
             })
             return NextResponse.json(await res.json())
+        }
+
+        if (action === 'send-report-email') {
+            const { userId, period } = body as { userId?: string; period?: string }
+            if (!userId) {
+                return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+            }
+            if (period !== 'weekly' && period !== 'monthly') {
+                return NextResponse.json({ error: 'period must be "weekly" or "monthly"' }, { status: 400 })
+            }
+            // Long-running: GA4/GSC fetch + Gemini synth + PDF render typically
+            // takes 20-90 s. Run synchronously and return when done so the UI
+            // can show success/failure inline.
+            const result = await sendUserReportEmail({ userId: String(userId), period })
+            if (!result.ok) {
+                return NextResponse.json({ error: result.error || 'Send failed' }, { status: 500 })
+            }
+            return NextResponse.json({ ok: true })
         }
 
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
