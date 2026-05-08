@@ -936,6 +936,27 @@ export default function DashboardLayout({
                             <div className={`hidden md:block ${isAnalyticsMainRoute ? 'invisible pointer-events-none w-0 overflow-hidden' : ''}`}>
                                 <DatePicker range={range} setRange={setRange} />
                             </div>
+                            {/* Help & Support — always-visible global shortcut.
+                                Lives in the dashboard layout so it follows the user
+                                across every page. Same unread badge as the sidebar. */}
+                            <Link
+                                href="/dashboard/support"
+                                aria-label={`Help & Support${supportUnread > 0 ? ` (${supportUnread} new)` : ''}`}
+                                title="Help & Support"
+                                className={`relative w-11 h-11 sm:w-8 sm:h-8 ${shellCompactRadiusClass} flex items-center justify-center transition-all flex-shrink-0 ${
+                                    pathname === '/dashboard/support'
+                                        ? 'text-emerald-300 bg-emerald-500/15 ring-1 ring-emerald-500/30'
+                                        : 'text-zinc-500 hover:text-emerald-300 hover:bg-emerald-500/10'
+                                }`}
+                            >
+                                <LifeBuoy className="w-4 h-4" />
+                                {supportUnread > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-black ring-2 ring-[var(--background)]">
+                                        {supportUnread > 9 ? '9+' : supportUnread}
+                                    </span>
+                                )}
+                            </Link>
+
                             {/* Notification Bell — clickable rows that route to the
                                 AI chat with a pre-filled question about the alert.
                                 Falls back to the relevant dashboard route per category. */}
