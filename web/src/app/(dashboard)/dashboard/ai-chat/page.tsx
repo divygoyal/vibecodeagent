@@ -1364,7 +1364,10 @@ export default function AIChat() {
                     style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px))' }}
                 >
                     <div className="max-w-[760px] mx-auto">
-                        <div className="flex items-center bg-[#1a1a1a] rounded-2xl px-5 py-3 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
+                        {/* On mobile we stack textarea + actions vertically so the
+                            typing area always gets full width. On sm+ they sit on
+                            one row in the original layout. */}
+                        <div className="flex flex-col sm:flex-row sm:items-center bg-[#1a1a1a] rounded-2xl px-3 sm:px-5 py-3 gap-2 sm:gap-0 border border-transparent focus-within:border-white/[0.08] focus-within:bg-[#1e1e1e] transition-all">
                             <textarea
                                 value={input}
                                 onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
@@ -1372,9 +1375,9 @@ export default function AIChat() {
                                 placeholder={isGa4Locked ? 'Connect a GA4 property to start chatting…' : 'Ask about traffic, pages, channels, or conversions'}
                                 disabled={isLoading || isGa4Locked}
                                 rows={1}
-                                className="flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed"
+                                className="w-full sm:flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed px-1 sm:px-0"
                             />
-                            <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                            <div className="flex items-center gap-2 sm:ml-3 flex-shrink-0 justify-end flex-wrap">
                                 {/* Workspace pill — read-only display + click-through to /dashboard/setup. */}
                                 <Link
                                     href="/dashboard/setup"
@@ -1396,14 +1399,15 @@ export default function AIChat() {
                                     onPick={pickRepo}
                                 />
                                 {messages.length > 0 && (
-                                    <button onClick={clearChat} className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-zinc-800 transition-colors" title="New chat">
+                                    <button onClick={clearChat} className="w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-zinc-800 transition-colors" title="New chat" aria-label="New chat">
                                         <RotateCcw className="w-3.5 h-3.5" />
                                     </button>
                                 )}
                                 <button
                                     onClick={() => sendMessage()}
                                     disabled={!input.trim() || isLoading || isGa4Locked}
-                                    className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
+                                    className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
+                                    aria-label="Send message"
                                 >
                                     <ArrowUp className="w-4 h-4" />
                                 </button>
