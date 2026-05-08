@@ -614,27 +614,69 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 
 
 /**
  * AutoPromptFromQuery — when the page is opened with ?q=<text>
- * (e.g. from an alert in the bell), auto-send the question once and
- * scrub the URL. Suspense-isolated like ProviderConnectionCallback.
+ * (e.g. from an alert in the bell, or from a report-email "Run AI
+ * investigation" CTA), auto-send the question once and scrub the URL.
+ * Suspense-isolated like ProviderConnectionCallback.
+ *
+ * Workspace switch: callers can pass &property=<id>&site=<url> alongside
+ * ?q to force the chat into a specific workspace before firing the
+ * question. This is critical for report-email CTAs — the email is about
+ * property A, the user might currently be on workspace B; without the
+ * switch, the AI would answer using B's data and confuse everyone.
+ * On switch we surface a toast so the user knows what happened.
  */
 function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const {
+        selectedProperty,
+        selectedSite,
+        saveWorkspace,
+        isWorkspaceLoaded,
+    } = useRegistration();
     const firedRef = useRef(false);
+
     useEffect(() => {
         if (firedRef.current) return;
+        // Wait for the saved workspace to load — otherwise selectedProperty/Site
+        // are still '' and we'd unconditionally trigger a switch on every load.
+        if (!isWorkspaceLoaded) return;
         const q = searchParams.get('q');
         if (!q || !q.trim()) return;
         firedRef.current = true;
-        // Scrub ?q first so a refresh doesn't re-fire.
+
+        const reqProperty = (searchParams.get('property') || '').trim();
+        const reqSite = (searchParams.get('site') || '').trim();
+        const needSwitch =
+            (reqProperty && reqProperty !== selectedProperty) ||
+            (reqSite && reqSite !== selectedSite);
+
+        // Scrub everything we just consumed so a refresh / back nav doesn't re-fire.
         const params = new URLSearchParams(searchParams.toString());
         params.delete('q');
+        params.delete('property');
+        params.delete('site');
         const qs = params.toString();
         router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
-        // Tiny delay so the scroll/layout settles + dataReady has a chance.
-        const t = setTimeout(() => onPrompt(q), 250);
-        return () => clearTimeout(t);
-    }, [searchParams, router, onPrompt]);
+
+        const fire = async () => {
+            if (needSwitch && reqProperty && reqSite) {
+                try {
+                    const ok = await saveWorkspace({ property: reqProperty, site: reqSite });
+                    if (ok) {
+                        const label = reqSite.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+                        toast.info(`Switched workspace to ${label}`);
+                    }
+                } catch {
+                    /* best-effort — fall through to fire onPrompt anyway */
+                }
+            }
+            // Tiny delay so the scroll/layout settles + dataReady + workspace
+            // context propagates to the chat tools that read selectedProperty.
+            setTimeout(() => onPrompt(q), 350);
+        };
+        void fire();
+    }, [searchParams, router, onPrompt, saveWorkspace, selectedProperty, selectedSite, isWorkspaceLoaded]);
     return null;
 }
 
