@@ -252,41 +252,19 @@ function buildAiChatUrl(question: string, propertyId: string, siteUrl: string): 
     return u.toString();
 }
 
-/** Highest-signal subject line — pulled from the analysis itself. */
+/** Branded, predictable subject line. The earlier high-CTR variant pulled
+ *  the loudest finding into the subject ("best ai coding agent is 1 spot
+ *  from page 1") which made every email read like a hook instead of a
+ *  report — back to the steady "Your {Weekly|Monthly} TrafficClaw report —
+ *  {date range}" format. analysis + siteLabel kept on the signature so we
+ *  can re-introduce per-period flavour later without touching callers. */
 export function buildSubjectLine(
-    analysis: ReportAnalysis,
+    _analysis: ReportAnalysis,
     period: 'weekly' | 'monthly',
-    siteLabel: string,
+    _siteLabel: string,
     dateRange: string,
 ): string {
-    const phrase = period === 'weekly' ? 'this week' : 'this month';
     const periodCap = period === 'weekly' ? 'Weekly' : 'Monthly';
-
-    // Priority 1: a critical alert (the loudest signal)
-    if (analysis.criticalAlerts && analysis.criticalAlerts.length > 0) {
-        const top = analysis.criticalAlerts[0];
-        const t = (top.title || '').trim();
-        if (t) return t.length > 70 ? t.slice(0, 67).replace(/\s+\S*$/, '') + '…' : t;
-    }
-
-    // Priority 2: a meaningful sessions delta either direction
-    const sd = analysis.kpis?.sessionsDelta ?? 0;
-    if (sd >= 25) return `+${sd}% sessions on ${siteLabel} ${phrase}`;
-    if (sd <= -15) return `Sessions down ${Math.abs(sd)}% on ${siteLabel} — what changed`;
-
-    // Priority 3: striking-distance keyword on the cusp of page 1
-    const sdOpp = analysis.opportunities?.find((o) => o.type === 'striking_distance');
-    if (sdOpp && sdOpp.position > 5 && sdOpp.position < 16 && sdOpp.potentialClicks > 50) {
-        const slots = Math.max(1, Math.ceil(sdOpp.position - 10));
-        return `"${sdOpp.query}" is ${slots} ${slots === 1 ? 'spot' : 'spots'} from page 1`;
-    }
-
-    // Priority 4: revenue on the table
-    if ((analysis.totalRevenueEstimate || 0) > 500) {
-        return `$${Math.round(analysis.totalRevenueEstimate)} in revenue on the table for ${siteLabel}`;
-    }
-
-    // Default
     return `Your ${periodCap} TrafficClaw report — ${dateRange}`;
 }
 
