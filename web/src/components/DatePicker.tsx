@@ -9,28 +9,33 @@ interface DatePickerProps {
     compact?: boolean;
 }
 
-type PresetItem = { label: string; value: string } | { separator: true };
+// Each preset can carry a single-letter shortcut that's both displayed on
+// the right of the dropdown row and registered for keyboard activation
+// while the dropdown is open. Mirrors OpenPanel's "Time window" UX.
+type PresetItem =
+    | { label: string; value: string; shortcut?: string }
+    | { separator: true };
 
 const PRESETS: PresetItem[] = [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
+    { label: 'Today', value: 'today', shortcut: 'D' },
+    { label: 'Yesterday', value: 'yesterday', shortcut: 'E' },
     { separator: true },
-    { label: 'Last 7 days', value: '7d' },
+    { label: 'Last 7 days', value: '7d', shortcut: 'W' },
     { label: 'Last 14 days', value: '14d' },
-    { label: 'Last 30 days', value: '30d' },
+    { label: 'Last 30 days', value: '30d', shortcut: 'T' },
     { label: 'Last 60 days', value: '60d' },
     { label: 'Last 90 days', value: '90d' },
     { separator: true },
     { label: 'This week', value: 'this_week' },
     { label: 'Last week', value: 'last_week' },
-    { label: 'This month', value: 'this_month' },
+    { label: 'This month', value: 'this_month', shortcut: 'M' },
     { label: 'Last month', value: 'last_month' },
-    { label: 'This year', value: 'this_year' },
+    { label: 'This year', value: 'this_year', shortcut: 'Y' },
     { label: 'Last year', value: 'last_year' },
     { separator: true },
-    { label: 'Last 6 months', value: '6m' },
-    { label: 'Last 12 months', value: '12m' },
-    { label: 'All time', value: 'all' },
+    { label: 'Last 6 months', value: '6m', shortcut: '6' },
+    { label: 'Last 12 months', value: '12m', shortcut: '0' },
+    { label: 'All time', value: 'all', shortcut: 'A' },
 ];
 
 // Ordered list of navigable preset values (excludes separators)
@@ -128,15 +133,38 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
         return () => document.removeEventListener('mousedown', handler);
     }, [open]);
 
-    // Close on Escape
+    // Keyboard handlers for the open dropdown:
+    //   Escape       — close
+    //   D/E/W/T/M/Y/6/0/A — jump to that preset and close (OpenPanel-style)
+    // We only listen while the dropdown is open so single-letter keys don't
+    // hijack typing elsewhere on the page.
     useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'Escape') {
+                setOpen(false);
+                return;
+            }
+            // Bail if focused inside a text input — never steal letter keys
+            // from a user typing.
+            const target = e.target as HTMLElement | null;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+                return;
+            }
+            const key = e.key.toUpperCase();
+            const match = PRESETS.find(
+                (p): p is { label: string; value: string; shortcut?: string } =>
+                    'value' in p && !!p.shortcut && p.shortcut === key,
+            );
+            if (match) {
+                e.preventDefault();
+                setRange(match.value);
+                setOpen(false);
+            }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
-    }, [open]);
+    }, [open, setRange]);
 
     const currentIndex = PRESET_VALUES.indexOf(range);
     const canGoBack = currentIndex < PRESET_VALUES.length - 1;
@@ -213,7 +241,10 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
             {open && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-                    <div className="absolute right-0 z-50 mt-2 max-h-[360px] min-w-[190px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#0b1015]/98 p-1.5 shadow-[0_28px_56px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+                    <div className="absolute left-0 z-50 mt-2 max-h-[440px] min-w-[230px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#0b1015]/98 p-1.5 shadow-[0_28px_56px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+                        <div className="px-3 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                            Time window
+                        </div>
                         {PRESETS.map((item, i) => {
                             if ('separator' in item) {
                                 return <div key={`sep-${i}`} className="my-1.5 border-t border-white/[0.06]" />;
@@ -223,13 +254,18 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
                                     key={item.value}
                                     type="button"
                                     onClick={() => { setRange(item.value); setOpen(false); }}
-                                    className={`w-full rounded-xl px-3 py-2.5 text-left text-[11px] transition ${
+                                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] transition ${
                                         range === item.value
                                             ? 'border border-cyan-400/20 bg-cyan-400/[0.12] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-                                            : 'border border-transparent text-zinc-400 hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white'
+                                            : 'border border-transparent text-zinc-300 hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white'
                                     }`}
                                 >
-                                    {item.label}
+                                    <span>{item.label}</span>
+                                    {item.shortcut ? (
+                                        <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+                                            {item.shortcut}
+                                        </span>
+                                    ) : null}
                                 </button>
                             );
                         })}

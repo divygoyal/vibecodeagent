@@ -31,7 +31,6 @@ import {
     Globe2,
     Map as MapIcon,
     MousePointer2,
-    Plus,
     Search,
     Share2,
     TableProperties,
@@ -66,7 +65,6 @@ import {
     serializeShareOverviewEventNames,
     serializeShareOverviewFilters,
     type ShareOverviewFilter,
-    type ShareOverviewFilterOperator,
 } from '@/lib/shareOverviewFilters';
 import {
     DEFAULT_SHARE_ACCENT,
@@ -97,12 +95,6 @@ const OVERVIEW_PRIMARY_ACCENT_PREVIEW = '#14C4E1';
 const OVERVIEW_PRIMARY_GLOW = 'rgba(20,196,225,0.22)';
 const OVERVIEW_COMPARISON_ACCENT = '#FFFFFF';
 const TALL_MINI_BAR_METRICS = new Set(['avg_session_duration', 'new_users']);
-const INTERVAL_OPTIONS = [
-    { value: 'hour', label: 'Hour' },
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-] as const;
 const METRICS = [
     { key: 'unique_visitors', label: 'Active Users', unit: 'number', invert: false, icon: Users, accent: '#45c48c' },
     { key: 'total_sessions', label: 'Sessions', unit: 'number', invert: false, icon: Activity, accent: '#38bdf8' },
@@ -254,15 +246,6 @@ const OVERVIEW_QUERY_STALE_MS = 30_000;
 const OVERVIEW_TABLE_ROW_LIMIT = 15;
 const OVERVIEW_MINI_BAR_COUNT = 14;
 const OVERVIEW_LIVE_BAR_COUNT = 12;
-const FILTER_OPERATOR_OPTIONS: Array<{ value: ShareOverviewFilterOperator; label: string; needsValue: boolean }> = [
-    { value: 'is', label: 'is', needsValue: true },
-    { value: 'isNot', label: 'is not', needsValue: true },
-    { value: 'contains', label: 'contains', needsValue: true },
-    { value: 'notContains', label: 'not contains', needsValue: true },
-    { value: 'isNull', label: 'is empty', needsValue: false },
-    { value: 'isNotNull', label: 'is not empty', needsValue: false },
-];
-const FILTER_FIELD_OPTIONS = SHARE_OVERVIEW_FILTER_NAMES.filter((name) => name !== 'name');
 
 function cx(...values: Array<string | false | null | undefined>) {
     return values.filter(Boolean).join(' ');
@@ -1114,201 +1097,6 @@ function FooterDetailsButton({
     );
 }
 
-function normalizeFilterInputValues(raw: string) {
-    return raw
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-}
-
-function EditableFilterPill({
-    filter,
-    upsertFilter,
-    removeFilter,
-}: {
-    filter: ShareOverviewFilter;
-    upsertFilter: (filter: ShareOverviewFilter) => void;
-    removeFilter: (name: ShareOverviewFilter['name'], value?: string) => void;
-}) {
-    const [draftValue, setDraftValue] = useState(filter.value.join(', '));
-    const operatorMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === filter.operator);
-
-    function commitValue(nextValue: string) {
-        const nextValues = operatorMeta?.needsValue ? normalizeFilterInputValues(nextValue) : [];
-        if (operatorMeta?.needsValue && !nextValues.length) {
-            setDraftValue(filter.value.join(', '));
-            return;
-        }
-
-        upsertFilter({
-            ...filter,
-            value: nextValues,
-        });
-    }
-
-    return (
-        <div className="dashboard-hover-chip inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-1.5 py-1 text-[11px] text-zinc-300">
-            <select
-                value={filter.name}
-                onChange={(event) => upsertFilter({ ...filter, name: event.target.value as ShareOverviewFilter['name'] })}
-                className="rounded border-0 bg-transparent pr-1 text-[11px] text-zinc-400 outline-none"
-            >
-                {FILTER_FIELD_OPTIONS.map((field) => (
-                    <option key={`pill-field:${field}`} value={field}>
-                        {FILTER_LABELS[field] || field}
-                    </option>
-                ))}
-            </select>
-            <select
-                value={filter.operator}
-                onChange={(event) => {
-                    const nextOperator = event.target.value as ShareOverviewFilterOperator;
-                    const nextMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === nextOperator);
-                    upsertFilter({
-                        ...filter,
-                        operator: nextOperator,
-                        value: nextMeta?.needsValue ? filter.value : [],
-                    });
-                }}
-                className="rounded border-0 bg-transparent pr-1 text-[11px] text-zinc-500 outline-none"
-            >
-                {FILTER_OPERATOR_OPTIONS.map((item) => (
-                    <option key={`pill-operator:${item.value}`} value={item.value}>
-                        {item.label}
-                    </option>
-                ))}
-            </select>
-            <input
-                value={draftValue}
-                onChange={(event) => setDraftValue(event.target.value)}
-                onBlur={() => commitValue(draftValue)}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        commitValue(draftValue);
-                    }
-                    if (event.key === 'Escape') {
-                        setDraftValue(filter.value.join(', '));
-                    }
-                }}
-                disabled={!operatorMeta?.needsValue}
-                placeholder={operatorMeta?.needsValue ? 'value' : 'empty'}
-                className={cx(
-                    'min-w-[120px] bg-transparent text-[11px] font-medium text-zinc-100 outline-none placeholder:text-zinc-600',
-                    !operatorMeta?.needsValue ? 'cursor-not-allowed text-zinc-600' : '',
-                )}
-            />
-            <button
-                type="button"
-                onClick={() => removeFilter(filter.name)}
-                className="rounded p-1 text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-200"
-            >
-                <X className="h-3 w-3" />
-            </button>
-        </div>
-    );
-}
-
-function EditableEventPill({
-    value,
-    eventNames,
-    setEventNames,
-    removeEventName,
-}: {
-    value: string;
-    eventNames: string[];
-    setEventNames: (values: string[]) => void;
-    removeEventName: (value: string) => void;
-}) {
-    const [draftValue, setDraftValue] = useState(value);
-
-    function commitValue(nextValue: string) {
-        const normalized = nextValue.trim();
-        if (!normalized) {
-            removeEventName(value);
-            return;
-        }
-
-        if (normalized === value) {
-            return;
-        }
-
-        setEventNames(
-            eventNames
-                .map((item) => (item === value ? normalized : item))
-                .filter((item, index, array) => array.indexOf(item) === index),
-        );
-    }
-
-    return (
-        <div className="dashboard-hover-chip inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-1 text-[11px] text-emerald-100">
-            <span className="text-emerald-300/70">Event</span>
-            <input
-                value={draftValue}
-                onChange={(event) => setDraftValue(event.target.value)}
-                onBlur={() => commitValue(draftValue)}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        commitValue(draftValue);
-                    }
-                    if (event.key === 'Escape') {
-                        setDraftValue(value);
-                    }
-                }}
-                className="min-w-[110px] bg-transparent font-medium text-emerald-50 outline-none placeholder:text-emerald-200/40"
-            />
-            <button
-                type="button"
-                onClick={() => removeEventName(value)}
-                className="rounded p-1 text-emerald-300/70 transition hover:bg-emerald-500/[0.12] hover:text-emerald-50"
-            >
-                <X className="h-3 w-3" />
-            </button>
-        </div>
-    );
-}
-
-function FilterPills({
-    filters,
-    eventNames,
-    upsertFilter,
-    setEventNames,
-    removeFilter,
-    removeEventName,
-}: {
-    filters: ShareOverviewFilter[];
-    eventNames: string[];
-    upsertFilter: (filter: ShareOverviewFilter) => void;
-    setEventNames: (values: string[]) => void;
-    removeFilter: (name: ShareOverviewFilter['name'], value?: string) => void;
-    removeEventName: (value: string) => void;
-}) {
-    if (!filters.length && !eventNames.length) return null;
-
-    return (
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:overflow-visible md:pb-0">
-            {filters.map((filter) => (
-                <EditableFilterPill
-                    key={`${filter.name}:${filter.operator}:${filter.value.join('|')}`}
-                    filter={filter}
-                    upsertFilter={upsertFilter}
-                    removeFilter={removeFilter}
-                />
-            ))}
-            {eventNames.map((value) => (
-                <EditableEventPill
-                    key={`event:${value}`}
-                    value={value}
-                    eventNames={eventNames}
-                    setEventNames={setEventNames}
-                    removeEventName={removeEventName}
-                />
-            ))}
-        </div>
-    );
-}
-
 function DetailModal({
     open,
     title,
@@ -1391,285 +1179,6 @@ function nextSortState(column: string, currentColumn: string | null, currentDire
         return { column, direction: 'asc' as const };
     }
     return { column: null, direction: null };
-}
-
-function FilterEditorModal({
-    open,
-    onClose,
-    filters,
-    eventNames,
-    upsertFilter,
-    removeFilter,
-    setEventNames,
-}: {
-    open: boolean;
-    onClose: () => void;
-    filters: ShareOverviewFilter[];
-    eventNames: string[];
-    upsertFilter: (filter: ShareOverviewFilter) => void;
-    removeFilter: (name: ShareOverviewFilter['name'], value?: string) => void;
-    setEventNames: (values: string[]) => void;
-}) {
-    const [draftField, setDraftField] = useState<(typeof FILTER_FIELD_OPTIONS)[number]>('referrer_name');
-    const [draftOperator, setDraftOperator] = useState<ShareOverviewFilterOperator>('is');
-    const [draftValue, setDraftValue] = useState('');
-    const [draftEventName, setDraftEventName] = useState('');
-
-    if (!open) {
-        return null;
-    }
-
-    const operatorMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === draftOperator);
-
-    function normalizeValues(raw: string) {
-        return raw
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean);
-    }
-
-    function addDraftFilter() {
-        const values = operatorMeta?.needsValue ? normalizeValues(draftValue) : [];
-        if (operatorMeta?.needsValue && !values.length) {
-            return;
-        }
-
-        upsertFilter({
-            name: draftField,
-            operator: draftOperator,
-            value: values,
-        });
-        setDraftValue('');
-    }
-
-    function addEventName() {
-        const next = draftEventName.trim();
-        if (!next || eventNames.includes(next)) {
-            return;
-        }
-        setEventNames([...eventNames, next]);
-        setDraftEventName('');
-    }
-
-    return (
-        <DetailModal
-            open={open}
-            onClose={onClose}
-            title="Filters"
-            description="Edit property filters and event filters using the same shared URL state the overview uses."
-        >
-            <div className="grid gap-4 p-4 sm:gap-5 sm:p-5">
-                <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5 sm:p-4">
-                    <div className="mb-3 text-sm font-semibold text-zinc-100">Event filters</div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                        {eventNames.length ? eventNames.map((event) => (
-                            <button
-                                key={`editor-event:${event}`}
-                                type="button"
-                                onClick={() => setEventNames(eventNames.filter((value) => value !== event))}
-                                className="inline-flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1.5 text-xs text-emerald-100 transition hover:bg-emerald-500/[0.12]"
-                            >
-                                <span>{event}</span>
-                                <X className="h-3 w-3 text-emerald-300/70" />
-                            </button>
-                        )) : <div className="text-xs text-zinc-500">No event-specific filters yet.</div>}
-                    </div>
-                    <div className="flex flex-col gap-2 md:flex-row">
-                        <input
-                            value={draftEventName}
-                            onChange={(event) => setDraftEventName(event.target.value)}
-                            placeholder="Add event name"
-                            className="h-9 flex-1 rounded-md border border-white/[0.08] bg-[#0c1015] px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-white/[0.16]"
-                        />
-                        <button
-                            type="button"
-                            onClick={addEventName}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.12] px-3 text-sm text-emerald-100 transition hover:bg-emerald-500/[0.18]"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add event
-                        </button>
-                    </div>
-                </div>
-
-                <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5 sm:p-4">
-                    <div className="mb-3 text-sm font-semibold text-zinc-100">Property filters</div>
-                    <div className="space-y-3">
-                        {filters.length ? filters.map((filter) => {
-                            const operator = FILTER_OPERATOR_OPTIONS.find((item) => item.value === filter.operator);
-                            const valueString = filter.value.join(', ');
-
-                            return (
-                                <div key={`editor-filter:${filter.name}`} className="grid gap-2 rounded-lg border border-white/[0.06] bg-[#0b0f14] p-3 md:grid-cols-[170px_140px_minmax(0,1fr)_auto]">
-                                    <select
-                                        value={filter.name}
-                                        onChange={(event) => upsertFilter({
-                                            ...filter,
-                                            name: event.target.value as ShareOverviewFilter['name'],
-                                        })}
-                                        className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
-                                    >
-                                        {FILTER_FIELD_OPTIONS.map((field) => (
-                                            <option key={`field:${field}`} value={field}>
-                                                {FILTER_LABELS[field] || field}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={filter.operator}
-                                        onChange={(event) => {
-                                            const nextOperator = event.target.value as ShareOverviewFilterOperator;
-                                            const nextMeta = FILTER_OPERATOR_OPTIONS.find((item) => item.value === nextOperator);
-                                            upsertFilter({
-                                                ...filter,
-                                                operator: nextOperator,
-                                                value: nextMeta?.needsValue ? filter.value : [],
-                                            });
-                                        }}
-                                        className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
-                                    >
-                                        {FILTER_OPERATOR_OPTIONS.map((item) => (
-                                            <option key={`operator:${item.value}`} value={item.value}>
-                                                {item.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <input
-                                        value={valueString}
-                                        onChange={(event) => upsertFilter({
-                                            ...filter,
-                                            value: operator?.needsValue ? normalizeValues(event.target.value) : [],
-                                        })}
-                                        disabled={!operator?.needsValue}
-                                        placeholder={operator?.needsValue ? 'Comma-separated values' : 'No value needed'}
-                                        className={cx(
-                                            'h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600',
-                                            !operator?.needsValue ? 'cursor-not-allowed text-zinc-600' : '',
-                                        )}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeFilter(filter.name)}
-                                        className="inline-flex h-9 items-center justify-center rounded-md border border-rose-500/20 bg-rose-500/[0.08] px-3 text-sm text-rose-200 transition hover:bg-rose-500/[0.12]"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            );
-                        }) : <div className="text-xs text-zinc-500">No property filters applied yet.</div>}
-                    </div>
-
-                    <div className="mt-4 grid gap-2 rounded-lg border border-dashed border-white/[0.08] bg-[#0b0f14] p-3 md:grid-cols-[170px_140px_minmax(0,1fr)_auto]">
-                        <select
-                            value={draftField}
-                            onChange={(event) => setDraftField(event.target.value as (typeof FILTER_FIELD_OPTIONS)[number])}
-                            className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
-                        >
-                            {FILTER_FIELD_OPTIONS.map((field) => (
-                                <option key={`draft-field:${field}`} value={field}>
-                                    {FILTER_LABELS[field] || field}
-                                </option>
-                            ))}
-                        </select>
-                        <select
-                            value={draftOperator}
-                            onChange={(event) => setDraftOperator(event.target.value as ShareOverviewFilterOperator)}
-                            className="h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none"
-                        >
-                            {FILTER_OPERATOR_OPTIONS.map((item) => (
-                                <option key={`draft-operator:${item.value}`} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
-                        <input
-                            value={draftValue}
-                            onChange={(event) => setDraftValue(event.target.value)}
-                            disabled={!operatorMeta?.needsValue}
-                            placeholder={operatorMeta?.needsValue ? 'Comma-separated values' : 'No value needed'}
-                            className={cx(
-                                'h-9 rounded-md border border-white/[0.08] bg-[#0f1319] px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600',
-                                !operatorMeta?.needsValue ? 'cursor-not-allowed text-zinc-600' : '',
-                            )}
-                        />
-                        <button
-                            type="button"
-                            onClick={addDraftFilter}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.05] px-3 text-sm text-zinc-100 transition hover:bg-white/[0.08]"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </DetailModal>
-    );
-}
-
-function IntervalButtons({
-    value,
-    onChange,
-    className,
-}: {
-    value: string;
-    onChange: (value: (typeof INTERVAL_OPTIONS)[number]['value']) => void;
-    className?: string;
-}) {
-    return (
-        <div
-            className={cx(
-                'inline-flex items-center rounded-[14px] border border-white/[0.1] bg-[#0b1015]/95 p-1 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl',
-                className,
-            )}
-        >
-            {INTERVAL_OPTIONS.map((option) => (
-                <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => onChange(option.value)}
-                    className={cx(
-                        'dashboard-hover-chip rounded-[10px] border px-3 py-1.5 text-[11px] font-medium transition sm:px-3.5 sm:text-[12px]',
-                        value === option.value
-                            ? 'border-white/[0.08] bg-white/[0.08] text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_18px_rgba(0,0,0,0.18)]'
-                            : 'border-transparent text-zinc-500 hover:text-zinc-200',
-                    )}
-                >
-                    {option.label}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function FiltersButton({
-    onClick,
-    activeCount,
-    compact = false,
-}: {
-    onClick: () => void;
-    activeCount: number;
-    compact?: boolean;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cx(
-                'dashboard-hover-action inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/[0.1] bg-[#0b1015]/95 font-medium text-zinc-200 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100',
-                compact ? 'h-10 px-3 text-[12px]' : 'h-10 px-3.5 text-sm',
-            )}
-            data-variant="ghost"
-        >
-            <Filter className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-            <span>Filters</span>
-            {activeCount ? (
-                <span className="rounded-full border border-cyan-400/18 bg-cyan-400/[0.12] px-1.5 py-0.5 text-[11px] text-cyan-100">
-                    {activeCount}
-                </span>
-            ) : null}
-        </button>
-    );
 }
 
 function LiveNowPill({
@@ -3573,22 +3082,16 @@ function ShareOverviewPage() {
     const {
         range,
         setRange,
-        interval,
         setInterval,
         setMetric,
         filters,
         eventNames,
-        removeFilter,
-        removeEventName,
         upsertFilter,
-        setEventNames,
         getFilterValues,
     } = useShareOverviewState();
-    const [filtersOpen, setFiltersOpen] = useState(false);
     const didHydrateRangeRef = useRef(false);
     const didSeedDefaultsRef = useRef(false);
     const handleRangeChange = (value: string) => setRange(value as ShareOverviewRange);
-    const activeFilterCount = filters.length + eventNames.length;
 
     /* ─── Live-preview overrides (Share Studio postMessage) ─── */
     const [previewOverrides, setPreviewOverrides] = useState<StudioPreviewOverrides>({});
@@ -3691,6 +3194,14 @@ function ShareOverviewPage() {
     });
     const debouncedLiveVisitors = useDebouncedLiveValue(liveQuery.data?.activeUsers || 0, 1_000, LIVE_RECONCILE_INTERVAL_MS);
 
+    // OpenPanel-style minimal controls: just a date picker (with the
+    // "Time window" dropdown) and the LiveNowPill. The granularity tabs
+    // (Hour/Day/Week/Month) and Filters button were removed — granularity
+    // falls back to the default `interval` from useShareOverviewState, and
+    // any filters that arrive via the `?f=` URL param are still applied
+    // server-side, just not exposed in the UI. The branded [Logo]
+    // TrafficClaw strip on top is shown ONLY for iframe embeds — the full
+    // /share/[token] page already has its own richer header above this.
     const controls = (
         <div className={cx(
             isEmbeddedShare
@@ -3700,12 +3211,21 @@ function ShareOverviewPage() {
                 : 'sticky top-0 z-20 rounded-[14px] border border-white/[0.08] bg-[#070a0d]/94 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl',
         )}>
             <div className={cx(runtime.mode === 'share' && !isEmbeddedShare ? 'mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'px-3 py-3 sm:px-4 sm:py-4')}>
-                <div className="hidden items-center justify-between gap-4 md:flex">
-                    <div className="flex items-center gap-2">
-                        <DatePicker range={range} setRange={handleRangeChange} />
-                        <IntervalButtons value={interval} onChange={setInterval} />
-                        <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} />
+                {isEmbeddedShare ? (
+                    <div className="mb-3 flex items-center">
+                        <a
+                            href="https://trafficclaw.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center rounded-md transition hover:opacity-90"
+                            aria-label="TrafficClaw home"
+                        >
+                            <Logo size="sm" />
+                        </a>
                     </div>
+                ) : null}
+                <div className="hidden items-center justify-between gap-3 md:flex">
+                    <DatePicker range={range} setRange={handleRangeChange} />
                     <div className="flex items-center gap-2">
                         {runtime.mode === 'dashboard' && runtime.onShareDashboard ? (
                             <ShareDashboardButton onClick={runtime.onShareDashboard} />
@@ -3713,50 +3233,15 @@ function ShareOverviewPage() {
                         <LiveNowPill activeUsers={debouncedLiveVisitors} />
                     </div>
                 </div>
-                <div className="space-y-2.5 md:hidden">
-                    {runtime.mode === 'share' && !isEmbeddedShare ? (
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2">
-                            <div className="min-w-0">
-                                <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">TrafficClaw share</div>
-                                <div className="truncate text-[12px] text-zinc-300">
-                                    {runtime.siteUrl ? runtime.siteUrl : 'Shared analytics dashboard'}
-                                </div>
-                            </div>
-                            <LiveNowPill activeUsers={debouncedLiveVisitors} compact />
-                        </div>
-                    ) : null}
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                        <div className="min-w-0">
-                            <DatePicker range={range} setRange={handleRangeChange} compact />
-                        </div>
-                        <FiltersButton onClick={() => setFiltersOpen(true)} activeCount={activeFilterCount} compact />
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:hidden">
+                    <DatePicker range={range} setRange={handleRangeChange} compact />
+                    <div className="flex items-center gap-2">
+                        {runtime.mode === 'dashboard' && runtime.onShareDashboard ? (
+                            <ShareDashboardButton onClick={runtime.onShareDashboard} compact />
+                        ) : null}
+                        <LiveNowPill activeUsers={debouncedLiveVisitors} compact />
                     </div>
-                    <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        <IntervalButtons value={interval} onChange={setInterval} className="min-w-max" />
-                    </div>
-                    {runtime.mode === 'dashboard' ? (
-                        <div className="space-y-2">
-                            {runtime.onShareDashboard ? (
-                                <ShareDashboardButton onClick={runtime.onShareDashboard} compact />
-                            ) : null}
-                            <div className="flex justify-end">
-                                <LiveNowPill activeUsers={debouncedLiveVisitors} compact />
-                            </div>
-                        </div>
-                    ) : null}
                 </div>
-                {(filters.length || eventNames.length) ? (
-                    <div className="mt-3 border-t border-white/[0.06] pt-3">
-                        <FilterPills
-                            filters={filters}
-                            eventNames={eventNames}
-                            upsertFilter={upsertFilter}
-                            setEventNames={setEventNames}
-                            removeFilter={removeFilter}
-                            removeEventName={removeEventName}
-                        />
-                    </div>
-                ) : null}
             </div>
         </div>
     );
@@ -3855,15 +3340,6 @@ function ShareOverviewPage() {
                     )}
                     <div className={cx(isEmbeddedShare ? 'mx-auto w-full max-w-7xl' : '')}>
                         {controls}
-                        <FilterEditorModal
-                            open={filtersOpen}
-                            onClose={() => setFiltersOpen(false)}
-                            filters={filters}
-                            eventNames={eventNames}
-                            upsertFilter={upsertFilter}
-                            removeFilter={removeFilter}
-                            setEventNames={setEventNames}
-                        />
                         {contentGrid}
                         {watermarkFooter}
                     </div>
@@ -3871,15 +3347,6 @@ function ShareOverviewPage() {
             ) : (
                 <div className="space-y-4 text-zinc-100" style={accentStyle}>
                     {controls}
-                    <FilterEditorModal
-                        open={filtersOpen}
-                        onClose={() => setFiltersOpen(false)}
-                        filters={filters}
-                        eventNames={eventNames}
-                        upsertFilter={upsertFilter}
-                        removeFilter={removeFilter}
-                        setEventNames={setEventNames}
-                    />
                     {contentGrid}
                 </div>
             )}
