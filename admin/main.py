@@ -168,6 +168,11 @@ async def init_db():
             ("workspace_label", "VARCHAR(120)"),
             ("workspace_setup_completed", "BOOLEAN DEFAULT 0"),
             ("welcome_seen", "BOOLEAN DEFAULT 0"),
+            # Brevo welcome-email idempotency key (015_add_welcome_email_sent_at.sql).
+            # NULL on existing rows; stamped to NOW() once Brevo returns 2xx for
+            # this user's welcome send. Required so SELECT * FROM users doesn't
+            # trip "no such column" after the User model adds this attribute.
+            ("welcome_email_sent_at", "DATETIME"),
         ]:
             try:
                 await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_def}"))
