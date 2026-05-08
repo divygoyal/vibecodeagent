@@ -2,24 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Palette, Sparkles, Link2, SlidersHorizontal, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Layers, Palette, Link2, SlidersHorizontal, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { NormalizedShareConfig, ShareData } from '@/lib/shareTypes';
-import { useCredits } from '@/lib/useDashboardData';
 import ShareSectionList from '@/components/share-studio/ShareSectionList';
 import ShareThemePanel from '@/components/share-studio/ShareThemePanel';
-import ShareBrandingPanel from '@/components/share-studio/ShareBrandingPanel';
 import ShareDefaultsPanel from '@/components/share-studio/ShareDefaultsPanel';
 import ShareLinkPanel from '@/components/share-studio/ShareLinkPanel';
 import ShareLinksDialog from '@/components/share-studio/ShareLinksDialog';
 import SharePreviewIframe from '@/components/share-studio/SharePreviewIframe';
 
-type StudioTab = 'layout' | 'theme' | 'branding' | 'defaults' | 'links';
+type StudioTab = 'layout' | 'theme' | 'defaults' | 'links';
 
 const TABS: { id: StudioTab; label: string; icon: typeof Layers }[] = [
   { id: 'layout', label: 'Layout', icon: Layers },
   { id: 'theme', label: 'Theme', icon: Palette },
-  { id: 'branding', label: 'Branding', icon: Sparkles },
   { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'links', label: 'Links', icon: Link2 },
 ];
@@ -35,7 +32,6 @@ function configsEqual(a: NormalizedShareConfig | null, b: NormalizedShareConfig 
 export default function ShareStudioPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const router = useRouter();
-  const { plan: userPlan } = useCredits();
 
   const [share, setShare] = useState<ShareData | null>(null);
   const [draft, setDraft] = useState<NormalizedShareConfig | null>(null);
@@ -271,9 +267,6 @@ export default function ShareStudioPage({ params }: { params: Promise<{ token: s
           <div className="flex-1 overflow-y-auto p-3">
             {activeTab === 'layout' && <ShareSectionList draft={draft} onChange={setDraft} />}
             {activeTab === 'theme' && <ShareThemePanel draft={draft} onChange={setDraft} />}
-            {activeTab === 'branding' && (
-              <ShareBrandingPanel token={token} draft={draft} onChange={setDraft} userPlan={userPlan} />
-            )}
             {activeTab === 'defaults' && <ShareDefaultsPanel draft={draft} onChange={setDraft} />}
             {activeTab === 'links' && (
               <ShareLinkPanel
