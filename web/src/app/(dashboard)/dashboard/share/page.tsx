@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Plus, Share2, Copy, ExternalLink, Loader2, Sparkles, Check, Eye, Trash2, ArrowRight,
+  Link as LinkIcon, Code,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ShareData } from '@/lib/shareTypes';
 import { DEFAULT_SHARE_ACCENT, OVERVIEW_SHARE_CONFIG } from '@/lib/shareTypes';
-import { getPublicShareUrl } from '@/lib/shareUrls';
+import { getPublicShareUrl, getEmbedUrl, getEmbedIframeSnippet } from '@/lib/shareUrls';
 import { useRegistration } from '../layout';
 
 function formatSiteLabel(url: string): string {
@@ -99,6 +100,31 @@ export default function ShareLandingPage() {
       setCopied(token);
       toast.success('Public link copied');
       window.setTimeout(() => setCopied((c) => (c === token ? null : c)), 2000);
+    });
+  }, []);
+
+  // Discriminated copy for the 3 labelled action buttons (Share / Embed /
+  // Iframe). The `copied` state is keyed `${token}:${kind}` so each button
+  // tracks its own check-mark feedback independently.
+  const handleCopy = useCallback((token: string, kind: 'share' | 'embed' | 'iframe') => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+    let text = '';
+    let label = '';
+    if (kind === 'share') {
+      text = getPublicShareUrl(token);
+      label = 'Share link copied';
+    } else if (kind === 'embed') {
+      text = getEmbedUrl(token);
+      label = 'Embed URL copied';
+    } else {
+      text = getEmbedIframeSnippet(token);
+      label = 'Iframe snippet copied';
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      const key = `${token}:${kind}`;
+      setCopied(key);
+      toast.success(label);
+      window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 2000);
     });
   }, []);
 
@@ -303,6 +329,34 @@ export default function ShareLandingPage() {
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
+                  </div>
+
+                  {/* Labelled copy actions — each grabs a different
+                      shareable snippet so users don't have to guess what the
+                      icon-only copy button does above. */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['share', 'embed', 'iframe'] as const).map((kind) => {
+                      const isCopied = copied === `${s.token}:${kind}`;
+                      const Icon = isCopied ? Check : kind === 'share' ? Share2 : kind === 'embed' ? LinkIcon : Code;
+                      const label = kind === 'share' ? 'Share' : kind === 'embed' ? 'Embed' : 'Iframe';
+                      return (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => handleCopy(s.token, kind)}
+                          className={`flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors ${
+                            isCopied
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                              : 'border-white/[0.06] bg-white/[0.03] text-zinc-400 hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-zinc-200'
+                          }`}
+                          title={kind === 'share' ? 'Copy public share URL' : kind === 'embed' ? 'Copy embed URL' : 'Copy <iframe> HTML snippet'}
+                          aria-label={kind === 'share' ? 'Copy share link' : kind === 'embed' ? 'Copy embed URL' : 'Copy iframe snippet'}
+                        >
+                          <Icon className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{isCopied ? 'Copied' : label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </motion.div>
