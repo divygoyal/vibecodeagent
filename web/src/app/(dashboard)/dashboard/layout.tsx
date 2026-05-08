@@ -12,6 +12,7 @@ import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import MobileBottomBar from '@/components/dashboard/MobileBottomBar';
+import MobileExportModal from '@/components/dashboard/MobileExportModal';
 import { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -377,16 +378,9 @@ export default function DashboardLayout({
         }
         router.push('/dashboard/ai-chat');
     }, [router, pathname]);
+    const [exportModalOpen, setExportModalOpen] = useState(false);
     const handleMobileExport = useCallback(() => {
-        let handled = false;
-        const listener = () => { handled = true; };
-        window.addEventListener('dashboard:export-handled', listener, { once: true });
-        window.dispatchEvent(new CustomEvent('dashboard:export'));
-        // If no listener responded synchronously, hint the user.
-        setTimeout(() => {
-            window.removeEventListener('dashboard:export-handled', listener);
-            if (!handled) toast.info('Export is not available on this page');
-        }, 50);
+        setExportModalOpen(true);
     }, []);
 
     // Logout handler — clears user-scoped data to prevent cross-user leaks
@@ -1072,6 +1066,16 @@ export default function DashboardLayout({
                     alertCount={criticalAlertCount}
                 />
             )}
+
+            {/* PDF report export modal — opens from the MobileBottomBar's
+                Export button. Hits /api/report/user-generate which renders
+                a weekly/monthly PDF from live GA4 + GSC data. */}
+            <MobileExportModal
+                isOpen={exportModalOpen}
+                onClose={() => setExportModalOpen(false)}
+                siteUrl={selectedSite}
+                propertyId={selectedProperty}
+            />
 
             {/* Global AI Chatbot — available on every page */}
             <AIChatbot />
