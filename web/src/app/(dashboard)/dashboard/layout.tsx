@@ -21,7 +21,7 @@ import {
     Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, type LucideIcon
+    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, Headphones, type LucideIcon
 } from 'lucide-react';
 import {
     type Ga4Availability,
@@ -938,23 +938,32 @@ export default function DashboardLayout({
                             </div>
                             {/* Help & Support — always-visible global shortcut.
                                 Lives in the dashboard layout so it follows the user
-                                across every page. Same unread badge as the sidebar. */}
+                                across every page. Renders as a "Need Help?" pill on
+                                desktop, icon-only on mobile so the header stays tight.
+                                The headset-in-gradient-circle treatment matches the
+                                spec the user supplied. */}
                             <Link
                                 href="/dashboard/support"
                                 aria-label={`Help & Support${supportUnread > 0 ? ` (${supportUnread} new)` : ''}`}
                                 title="Help & Support"
-                                className={`relative w-11 h-11 sm:w-8 sm:h-8 ${shellCompactRadiusClass} flex items-center justify-center transition-all flex-shrink-0 ${
+                                className={`group inline-flex items-center gap-2 rounded-full transition-all flex-shrink-0 h-11 sm:h-8 px-1.5 sm:pl-1 sm:pr-3 border ${
                                     pathname === '/dashboard/support'
-                                        ? 'text-emerald-300 bg-emerald-500/15 ring-1 ring-emerald-500/30'
-                                        : 'text-zinc-500 hover:text-emerald-300 hover:bg-emerald-500/10'
+                                        ? 'border-emerald-500/40 bg-emerald-500/[0.08]'
+                                        : 'border-white/[0.06] bg-white/[0.02] hover:border-emerald-500/25 hover:bg-emerald-500/[0.05]'
                                 }`}
                             >
-                                <LifeBuoy className="w-4 h-4" />
-                                {supportUnread > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-black ring-2 ring-[var(--background)]">
-                                        {supportUnread > 9 ? '9+' : supportUnread}
-                                    </span>
-                                )}
+                                <span className="relative flex h-7 w-7 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+                                    <Headphones className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                                    {supportUnread > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80 animate-ping" />
+                                            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-1 ring-[var(--app-bg,#06090d)]" />
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="hidden sm:inline text-[12px] font-medium text-emerald-300 group-hover:text-emerald-200 transition-colors">
+                                    Need Help?
+                                </span>
                             </Link>
 
                             {/* Notification Bell — clickable rows that route to the
