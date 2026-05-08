@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func, or_
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -5648,6 +5648,285 @@ async def update_user_workspace(
         "workspace_setup_completed": bool(user.workspace_setup_completed),
         "welcome_seen": bool(user.welcome_seen),
     }
+
+
+# ============= Support Messages =============
+
+# Hard cap mirrors web/src/lib/chatLimits.ts MAX_INPUT_CHARS — keeps body
+# size + Gemini-style downstream costs predictable. Anything past this is a
+# 400 with a parseable code so the web layer can render a real error.
+SUPPORT_MESSAGE_MAX_CHARS = 24_000
+
+
+class SupportMessageCreate(BaseModel):
+    content: str
+
+
+class SupportReply(BaseModel):
+    content: str
+    admin_id: Optional[str] = None  # label of the admin replying (free-form)
+
+
+def _serialize_support_message(msg: SupportMessage) -> Dict[str, Any]:
+    return {
+        "id": msg.id,
+        "author_type": msg.author_type,
+        "author_admin_id": msg.author_admin_id,
+        "content": msg.content,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+        "read_at": msg.read_at.isoformat() if msg.read_at else None,
+    }
+
+
+@app.get("/api/users/{user_identifier}/support/messages")
+async def list_support_messages(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Full thread for one user, oldest first."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"messages": [], "exists": False}
+    result = await db.execute(
+        select(SupportMessage)
+        .where(SupportMessage.user_id == user.id)
+        .order_by(SupportMessage.created_at.asc())
+    )
+    messages = list(result.scalars().all())
+    return {
+        "messages": [_serialize_support_message(m) for m in messages],
+        "exists": True,
+    }
+
+
+@app.post("/api/users/{user_identifier}/support/messages")
+async def create_support_message(
+    user_identifier: str,
+    data: SupportMessageCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """User posts a new support message."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    content = (data.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Message is empty")
+    if len(content) > SUPPORT_MESSAGE_MAX_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Message is {len(content)} characters; the limit is {SUPPORT_MESSAGE_MAX_CHARS}.",
+        )
+
+    msg = SupportMessage(
+        user_id=user.id,
+        author_type="user",
+        content=content,
+    )
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+    return _serialize_support_message(msg)
+
+
+@app.patch("/api/users/{user_identifier}/support/messages/read")
+async def mark_user_admin_replies_read(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """User opened the support page → mark every admin reply read."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"updated": 0, "exists": False}
+    result = await db.execute(
+        update(SupportMessage)
+        .where(
+            SupportMessage.user_id == user.id,
+            SupportMessage.author_type == "admin",
+            SupportMessage.read_at.is_(None),
+        )
+        .values(read_at=datetime.utcnow())
+    )
+    await db.commit()
+    return {"updated": result.rowcount or 0, "exists": True}
+
+
+@app.get("/api/users/{user_identifier}/support/unread-count")
+async def get_user_unread_count(
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Count of admin replies the user hasn't seen yet — drives the sidebar badge."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        return {"unread": 0}
+    result = await db.execute(
+        select(func.count(SupportMessage.id)).where(
+            SupportMessage.user_id == user.id,
+            SupportMessage.author_type == "admin",
+            SupportMessage.read_at.is_(None),
+        )
+    )
+    return {"unread": int(result.scalar() or 0)}
+
+
+@app.get("/api/admin/support/threads")
+async def list_support_threads(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Superadmin inbox: every user with at least one message, sorted by
+    oldest unread user message first so nobody sits waiting longest."""
+    # Pull every message — at expected support volume this is fine. If volume
+    # grows, swap for a per-user aggregate query.
+    result = await db.execute(
+        select(SupportMessage).order_by(SupportMessage.created_at.asc())
+    )
+    messages = list(result.scalars().all())
+    if not messages:
+        return {"threads": [], "total": 0}
+
+    user_ids = sorted({m.user_id for m in messages})
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users_by_id = {u.id: u for u in users_result.scalars().all()}
+
+    by_user: Dict[int, list] = {}
+    for m in messages:
+        by_user.setdefault(m.user_id, []).append(m)
+
+    threads = []
+    for uid, msgs in by_user.items():
+        u = users_by_id.get(uid)
+        if not u:
+            continue
+        unread_user_msgs = [m for m in msgs if m.author_type == "user" and m.read_at is None]
+        oldest_unread = unread_user_msgs[0].created_at if unread_user_msgs else None
+        last_msg = msgs[-1]
+        threads.append({
+            "user_id": u.id,
+            "github_id": u.github_id,
+            "github_username": u.github_username,
+            "email": u.email,
+            "plan": u.plan,
+            "message_count": len(msgs),
+            "unread_user_count": len(unread_user_msgs),
+            "oldest_unread_at": oldest_unread.isoformat() if oldest_unread else None,
+            "last_message_at": last_msg.created_at.isoformat() if last_msg.created_at else None,
+            "last_message_preview": (last_msg.content or "")[:120],
+            "last_message_author": last_msg.author_type,
+        })
+
+    # Oldest-unread first (None goes to the end), then by latest-message-desc.
+    threads.sort(key=lambda t: (
+        t["oldest_unread_at"] is None,
+        t["oldest_unread_at"] or "",
+        # negative-ish: reverse the ISO string so "latest first" within the no-unread bucket
+        -1 * (1 if t["last_message_at"] else 0),
+        t["last_message_at"] or "",
+    ))
+    return {"threads": threads, "total": len(threads)}
+
+
+@app.get("/api/admin/support/threads/{user_id}")
+async def get_support_thread(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Superadmin: full thread for one user (by internal DB id) + user info."""
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    msg_result = await db.execute(
+        select(SupportMessage)
+        .where(SupportMessage.user_id == user_id)
+        .order_by(SupportMessage.created_at.asc())
+    )
+    messages = list(msg_result.scalars().all())
+    return {
+        "user": {
+            "id": user.id,
+            "github_id": user.github_id,
+            "github_username": user.github_username,
+            "email": user.email,
+            "plan": user.plan,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        },
+        "messages": [_serialize_support_message(m) for m in messages],
+    }
+
+
+@app.post("/api/admin/support/threads/{user_id}/reply")
+async def reply_to_support_thread(
+    user_id: int,
+    data: SupportReply,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Superadmin replies to a user's support thread."""
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    content = (data.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Reply is empty")
+    if len(content) > SUPPORT_MESSAGE_MAX_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Reply is {len(content)} characters; the limit is {SUPPORT_MESSAGE_MAX_CHARS}.",
+        )
+
+    msg = SupportMessage(
+        user_id=user.id,
+        author_type="admin",
+        author_admin_id=(data.admin_id or "support")[:64],
+        content=content,
+    )
+    db.add(msg)
+
+    # Reading the thread to reply implicitly acknowledges the user's open
+    # questions, so flush their unread bucket in the same transaction.
+    await db.execute(
+        update(SupportMessage)
+        .where(
+            SupportMessage.user_id == user.id,
+            SupportMessage.author_type == "user",
+            SupportMessage.read_at.is_(None),
+        )
+        .values(read_at=datetime.utcnow())
+    )
+
+    await db.commit()
+    await db.refresh(msg)
+    return _serialize_support_message(msg)
+
+
+@app.patch("/api/admin/support/threads/{user_id}/read")
+async def mark_thread_read(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Superadmin opened a thread → mark all of that user's messages as read."""
+    result = await db.execute(
+        update(SupportMessage)
+        .where(
+            SupportMessage.user_id == user_id,
+            SupportMessage.author_type == "user",
+            SupportMessage.read_at.is_(None),
+        )
+        .values(read_at=datetime.utcnow())
+    )
+    await db.commit()
+    return {"updated": result.rowcount or 0}
 
 
 # ============= Health Check =============

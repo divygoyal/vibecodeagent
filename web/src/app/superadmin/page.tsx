@@ -7,7 +7,7 @@ import {
     Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
     Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check,
     Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Loader2,
-    Trophy, ShieldCheck, ShieldOff
+    Trophy, ShieldCheck, ShieldOff, LifeBuoy, Send
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,6 +59,41 @@ interface QueryData {
     status: string
     ip_address: string | null
     created_at: string | null
+}
+
+interface SupportThread {
+    user_id: number
+    github_id: string | null
+    github_username: string | null
+    email: string | null
+    plan: string | null
+    message_count: number
+    unread_user_count: number
+    oldest_unread_at: string | null
+    last_message_at: string | null
+    last_message_preview: string
+    last_message_author: 'user' | 'admin'
+}
+
+interface SupportThreadMessage {
+    id: number
+    author_type: 'user' | 'admin'
+    author_admin_id: string | null
+    content: string
+    created_at: string | null
+    read_at: string | null
+}
+
+interface SupportThreadDetail {
+    user: {
+        id: number
+        github_id: string | null
+        github_username: string | null
+        email: string | null
+        plan: string | null
+        created_at: string | null
+    }
+    messages: SupportThreadMessage[]
 }
 
 interface ProviderData {
@@ -520,12 +555,13 @@ export default function SuperAdminPage() {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({ onSignOut }: { onSignOut: () => void }) {
-    const [tab, setTab] = useState<'users' | 'events' | 'system' | 'queries' | 'leaderboard'>('users')
+    const [tab, setTab] = useState<'users' | 'events' | 'system' | 'queries' | 'leaderboard' | 'support'>('users')
     const [status, setStatus] = useState<StatusData | null>(null)
     const [users, setUsers] = useState<UserData[]>([])
     const [events, setEvents] = useState<EventData[]>([])
     const [queries, setQueries] = useState<QueryData[]>([])
     const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardModerationEntry[]>([])
+    const [supportThreads, setSupportThreads] = useState<SupportThread[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
@@ -534,12 +570,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     const fetchData = useCallback(async () => {
         try {
             setError('')
-            const [statusData, usersData, eventsData, queriesData, leaderboardData] = await Promise.all([
+            const [statusData, usersData, eventsData, queriesData, leaderboardData, supportData] = await Promise.all([
                 apiGet('status'),
                 apiGet('users'),
                 apiGet('events'),
                 apiGet('queries').catch(() => []),
-                apiGet('leaderboard').catch(() => ({ entries: [] }))
+                apiGet('leaderboard').catch(() => ({ entries: [] })),
+                apiGet('support-threads').catch(() => ({ threads: [] }))
             ])
             setStatus(statusData)
             setUsers(Array.isArray(usersData) ? usersData : [])
@@ -547,6 +584,8 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             setQueries(Array.isArray(queriesData) ? queriesData : [])
             const lbEntries = leaderboardData?.entries
             setLeaderboardEntries(Array.isArray(lbEntries) ? lbEntries : [])
+            const sThreads = supportData?.threads
+            setSupportThreads(Array.isArray(sThreads) ? sThreads : [])
         } catch (err) {
             const message = getErrorMessage(err)
             if (isSuperadminAuthError(message)) {
@@ -584,8 +623,11 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
         (e) => e.is_active && e.verification_status !== 'verified',
     ).length
 
+    const unreadSupportCount = supportThreads.reduce((sum, t) => sum + (t.unread_user_count || 0), 0)
+
     const tabs = [
         { key: 'users' as const, label: 'Users', icon: Users, badge: 0 },
+        { key: 'support' as const, label: 'Support', icon: LifeBuoy, badge: unreadSupportCount },
         { key: 'queries' as const, label: 'Queries', icon: MessageSquare, badge: newQueryCount },
         { key: 'leaderboard' as const, label: 'Leaderboard', icon: Trophy, badge: pendingLeaderboardCount },
         { key: 'events' as const, label: 'Events', icon: Clock, badge: 0 },
@@ -705,6 +747,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                             />
                         )}
                         {tab === 'queries' && <QueriesTab queries={queries} onRefresh={fetchData} />}
+                        {tab === 'support' && <SupportTab threads={supportThreads} onRefresh={fetchData} />}
                         {tab === 'leaderboard' && <LeaderboardTab entries={leaderboardEntries} onRefresh={fetchData} />}
                         {tab === 'events' && <EventsTab events={events} />}
                         {tab === 'system' && <SystemTab status={status} capacity={capacity} />}
@@ -2048,6 +2091,278 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
             </AnimatePresence>
         </div>
     )
+}
+
+// ─── Support Tab (in-app help & support inbox) ───────────────────────────────
+
+function SupportTab({ threads, onRefresh }: { threads: SupportThread[]; onRefresh: () => void }) {
+    const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+    const [detail, setDetail] = useState<SupportThreadDetail | null>(null)
+    const [loadingDetail, setLoadingDetail] = useState(false)
+    const [reply, setReply] = useState('')
+    const [sending, setSending] = useState(false)
+    const [error, setError] = useState('')
+
+    // Auto-select the first thread on mount / refresh if nothing's selected.
+    useEffect(() => {
+        if (!selectedUserId && threads.length > 0) {
+            setSelectedUserId(threads[0].user_id)
+        }
+    }, [threads, selectedUserId])
+
+    // Load detail + mark user-side messages read whenever the selection changes.
+    useEffect(() => {
+        if (!selectedUserId) {
+            setDetail(null)
+            return
+        }
+        let cancelled = false
+        setLoadingDetail(true)
+        setError('')
+        ;(async () => {
+            try {
+                const data = await apiGet('support-thread', String(selectedUserId)) as SupportThreadDetail
+                if (cancelled) return
+                setDetail(data)
+                // Don't await — best-effort. The next inbox refresh will reflect the new read state.
+                void apiPost('support-mark-read', { userId: selectedUserId })
+                onRefresh()
+            } catch (err) {
+                if (cancelled) return
+                const message = getErrorMessage(err)
+                if (!isSuperadminAuthError(message)) setError(message)
+            } finally {
+                if (!cancelled) setLoadingDetail(false)
+            }
+        })()
+        return () => { cancelled = true }
+        // onRefresh intentionally omitted — its identity changes every fetchData call and would
+        // re-trigger this effect, causing a refresh loop.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedUserId])
+
+    const handleReply = async () => {
+        const content = reply.trim()
+        if (!content || !selectedUserId || sending) return
+        setSending(true)
+        setError('')
+        try {
+            await apiPost('support-reply', { userId: selectedUserId, content })
+            setReply('')
+            // Refetch the thread detail so the new admin reply appears immediately.
+            const data = await apiGet('support-thread', String(selectedUserId)) as SupportThreadDetail
+            setDetail(data)
+            onRefresh()
+        } catch (err) {
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) setError(message)
+        } finally {
+            setSending(false)
+        }
+    }
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-260px)] min-h-[520px]">
+            {/* Inbox rail */}
+            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-3">
+                    <div className="flex items-center gap-2">
+                        <LifeBuoy className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm font-semibold text-white">Inbox</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-500">{threads.length} {threads.length === 1 ? 'user' : 'users'}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    {threads.length === 0 ? (
+                        <div className="p-12 text-center">
+                            <LifeBuoy className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+                            <p className="text-zinc-600 text-sm">No support messages yet</p>
+                        </div>
+                    ) : (
+                        threads.map((t) => (
+                            <SupportThreadRow
+                                key={t.user_id}
+                                thread={t}
+                                selected={t.user_id === selectedUserId}
+                                onSelect={() => setSelectedUserId(t.user_id)}
+                            />
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Thread + reply pane */}
+            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden flex flex-col">
+                {!selectedUserId ? (
+                    <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
+                        Select a thread on the left to start replying.
+                    </div>
+                ) : loadingDetail && !detail ? (
+                    <div className="flex-1 flex items-center justify-center text-zinc-500">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                ) : !detail ? (
+                    <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
+                        Couldn’t load thread.
+                    </div>
+                ) : (
+                    <>
+                        {/* User header */}
+                        <div className="border-b border-white/[0.04] px-5 py-3.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-sm font-semibold text-white truncate">
+                                    {detail.user.github_username || detail.user.email || `User #${detail.user.id}`}
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-zinc-500 mt-0.5">
+                                    {detail.user.email && <span className="truncate">{detail.user.email}</span>}
+                                    {detail.user.plan && (
+                                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-semibold uppercase">
+                                            {detail.user.plan}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="text-[10px] text-zinc-600">
+                                {detail.messages.length} {detail.messages.length === 1 ? 'message' : 'messages'}
+                            </div>
+                        </div>
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+                            {detail.messages.map((m) => (
+                                <SupportInboxMessage key={m.id} msg={m} />
+                            ))}
+                        </div>
+
+                        {/* Reply composer */}
+                        {error && (
+                            <div className="mx-3 mb-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
+                                {error}
+                            </div>
+                        )}
+                        <div className="border-t border-white/[0.04] p-3">
+                            <div className="flex items-end gap-2 bg-white/[0.03] border border-white/[0.04] rounded-xl px-3 py-2.5 focus-within:border-emerald-500/30 transition-colors">
+                                <textarea
+                                    value={reply}
+                                    onChange={(e) => setReply(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                            e.preventDefault()
+                                            void handleReply()
+                                        }
+                                    }}
+                                    placeholder="Type your reply… (⌘/Ctrl+Enter to send)"
+                                    className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
+                                    rows={2}
+                                    disabled={sending}
+                                    style={{ minHeight: '44px', maxHeight: '160px' }}
+                                />
+                                <button
+                                    onClick={handleReply}
+                                    disabled={!reply.trim() || sending}
+                                    className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-emerald-500 enabled:text-white text-zinc-500 transition-all enabled:hover:bg-emerald-400 flex-shrink-0"
+                                    aria-label="Send reply"
+                                >
+                                    {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function SupportThreadRow({
+    thread,
+    selected,
+    onSelect,
+}: {
+    thread: SupportThread
+    selected: boolean
+    onSelect: () => void
+}) {
+    const hasUnread = thread.unread_user_count > 0
+    return (
+        <button
+            onClick={onSelect}
+            className={`w-full text-left px-4 py-3 border-b border-white/[0.03] transition-colors ${
+                selected ? 'bg-emerald-500/[0.06]' : 'hover:bg-white/[0.02]'
+            }`}
+        >
+            <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${hasUnread ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
+                    <span className="text-sm font-semibold text-white truncate">
+                        {thread.github_username || thread.email || `User #${thread.user_id}`}
+                    </span>
+                </div>
+                {hasUnread && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-bold leading-none flex-shrink-0">
+                        {thread.unread_user_count}
+                    </span>
+                )}
+            </div>
+            <p className="text-[12px] text-zinc-500 line-clamp-2 leading-snug">
+                {thread.last_message_author === 'admin' ? 'You: ' : ''}
+                {thread.last_message_preview}
+            </p>
+            <div className="flex items-center gap-2 mt-1.5 text-[10px] text-zinc-600">
+                {thread.plan && <span className="uppercase tracking-wide">{thread.plan}</span>}
+                <span>·</span>
+                <span>{formatRelativeTime(thread.last_message_at)}</span>
+            </div>
+        </button>
+    )
+}
+
+function SupportInboxMessage({ msg }: { msg: SupportThreadMessage }) {
+    const isAdmin = msg.author_type === 'admin'
+    return (
+        <div className={`flex gap-3 ${isAdmin ? 'flex-row-reverse' : 'flex-row'}`}>
+            <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                    isAdmin ? 'bg-gradient-to-br from-emerald-400 to-cyan-400 text-black' : 'bg-cyan-500/15 text-cyan-300'
+                }`}
+            >
+                {isAdmin ? 'TC' : 'U'}
+            </div>
+            <div className={`min-w-0 max-w-[80%] flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
+                <div className="flex items-center gap-2 mb-1 px-1">
+                    <span className="text-[11px] font-semibold text-zinc-400">
+                        {isAdmin ? 'You (Support)' : 'User'}
+                    </span>
+                    <span className="text-[10px] text-zinc-600">
+                        {formatRelativeTime(msg.created_at)}
+                    </span>
+                </div>
+                <div
+                    className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                        isAdmin
+                            ? 'bg-emerald-500/15 text-emerald-50 border border-emerald-500/20 rounded-tr-md'
+                            : 'bg-white/[0.04] text-zinc-100 border border-white/[0.06] rounded-tl-md'
+                    }`}
+                >
+                    {msg.content}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function formatRelativeTime(iso: string | null): string {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    const diffMin = Math.round((Date.now() - d.getTime()) / 60000)
+    if (diffMin < 1) return 'just now'
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHr = Math.round(diffMin / 60)
+    if (diffHr < 24) return `${diffHr}h ago`
+    const diffDay = Math.round(diffHr / 24)
+    if (diffDay < 7) return `${diffDay}d ago`
+    return d.toLocaleDateString()
 }
 
 // ─── Leaderboard Tab ─────────────────────────────────────────────────────────

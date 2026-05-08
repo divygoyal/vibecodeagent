@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react';
+import useSWR from 'swr';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -20,7 +21,7 @@ import {
     Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, type LucideIcon
+    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, type LucideIcon
 } from 'lucide-react';
 import {
     type Ga4Availability,
@@ -147,6 +148,9 @@ const sidebarGroups: SidebarGroup[] = [
     { label: 'Growth', items: [
         { icon: Trophy, label: 'Leaderboard', href: '/leaderboard' },
     ]},
+    { label: 'Help', items: [
+        { icon: LifeBuoy, label: 'Support', href: '/dashboard/support' },
+    ]},
 ];
 
 export default function DashboardLayout({
@@ -173,6 +177,16 @@ export default function DashboardLayout({
     const sidebarActiveItemClasses = 'border border-[#14C4E1]/24 bg-[linear-gradient(180deg,rgba(20,196,225,0.16),rgba(7,48,60,0.16))] text-[#7AD9DA] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_14px_28px_rgba(5,24,34,0.24)]';
     const sidebarInactiveItemClasses = 'border border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04] hover:border-white/[0.06]';
     const { credits, plan: userPlan, subscriptionCancelled, isLoading: creditsLoading } = useCredits();
+
+    // Sidebar badge for unread admin replies on the user's support thread.
+    // Polled lightly (60s) — best-effort; never break the dashboard render on a fetch hiccup.
+    const { data: supportUnreadData } = useSWR<{ unread: number }>(
+        '/api/support/unread-count',
+        (url: string) => fetch(url, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ unread: 0 })),
+        { refreshInterval: 60_000, revalidateOnFocus: true, shouldRetryOnError: false },
+    );
+    const supportUnread = Math.max(0, Number(supportUnreadData?.unread || 0));
+
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     // First-paint settling gate. Without this the dashboard flickers through
@@ -791,17 +805,26 @@ export default function DashboardLayout({
                                 {group.items.map((item) => {
                                     const isActive = pathname === item.href ||
                                         (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                                    const showSupportBadge = item.href === '/dashboard/support' && supportUnread > 0;
                                     return (
                                         <Link
                                             key={item.href}
                                             href={item.href}
-                                            className={`flex items-center gap-3 px-3 py-2.5 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isActive
+                                            className={`relative flex items-center gap-3 px-3 py-2.5 ${shellRadiusClass} text-sm font-medium transition-all duration-200 group ${isActive
                                                 ? sidebarActiveItemClasses
                                                 : sidebarInactiveItemClasses
                                             }`}
                                         >
                                             <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-[#7AD9DA]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
                                             {!collapsed && <span className="truncate">{item.label}</span>}
+                                            {showSupportBadge && !collapsed && (
+                                                <span className="ml-auto px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-bold leading-none">
+                                                    {supportUnread > 99 ? '99+' : supportUnread}
+                                                </span>
+                                            )}
+                                            {showSupportBadge && collapsed && (
+                                                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[var(--app-bg,#06090d)]" />
+                                            )}
                                         </Link>
                                     );
                                 })}
@@ -1188,6 +1211,7 @@ export default function DashboardLayout({
                                             {group.items.map((item) => {
                                                 const isActive = pathname === item.href ||
                                                     (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                                                const showSupportBadge = item.href === '/dashboard/support' && supportUnread > 0;
                                                 return (
                                                     <Link
                                                         key={item.href}
@@ -1200,6 +1224,11 @@ export default function DashboardLayout({
                                                     >
                                                         <item.icon className={`w-5 h-5 ${isActive ? 'text-[#7AD9DA]' : 'text-zinc-500'}`} />
                                                         <span>{item.label}</span>
+                                                        {showSupportBadge && (
+                                                            <span className="ml-auto px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-bold leading-none">
+                                                                {supportUnread > 99 ? '99+' : supportUnread}
+                                                            </span>
+                                                        )}
                                                     </Link>
                                                 );
                                             })}

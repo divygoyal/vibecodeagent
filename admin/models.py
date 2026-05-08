@@ -237,6 +237,27 @@ class ContactQuery(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class SupportMessage(Base):
+    """In-app support thread between a signed-in user and the support team.
+
+    Single ongoing thread per user (no separate ticket model) — the (user_id,
+    created_at) ordering IS the thread. Admin replies and user messages share
+    the same table, distinguished by author_type. read_at is "when the OTHER
+    party read this": for author_type='admin' rows it's when the user opened
+    the support page; for author_type='user' rows it's when an admin marked
+    it read in the inbox. Drives the unread-badge counters on both sides.
+    """
+    __tablename__ = "support_messages"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    author_type = Column(String(10), nullable=False)  # 'user' | 'admin'
+    author_admin_id = Column(String(64), nullable=True)  # admin identifier (label) when author_type='admin'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    read_at = Column(DateTime, nullable=True)
+
+
 class Annotation(Base):
     """User annotations on analytics charts (product launches, campaigns, algorithm updates, etc.)"""
     __tablename__ = "annotations"

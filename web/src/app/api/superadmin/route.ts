@@ -141,6 +141,27 @@ export async function GET(req: Request) {
             return NextResponse.json(await res.json())
         }
 
+        if (endpoint === 'support-threads') {
+            const res = await fetch(`${ADMIN_API_URL}/api/admin/support/threads`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) throw new Error('Failed to load support threads')
+            return NextResponse.json(await res.json())
+        }
+
+        if (endpoint === 'support-thread') {
+            const userId = searchParams.get('id')
+            if (!userId) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+            const res = await fetch(`${ADMIN_API_URL}/api/admin/support/threads/${encodeURIComponent(userId)}`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Failed to load thread' }))
+                throw new Error(err.detail || err.error || 'Failed to load thread')
+            }
+            return NextResponse.json(await res.json())
+        }
+
         return NextResponse.json({ error: 'Invalid endpoint' }, { status: 400 })
 
     } catch (err: unknown) {
@@ -301,6 +322,39 @@ export async function POST(req: Request) {
             const res = await fetch(`${ADMIN_API_URL}/contact/${queryId}`, {
                 method: 'DELETE',
                 headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            return NextResponse.json(await res.json())
+        }
+
+        if (action === 'support-reply') {
+            const { userId, content, adminId } = body
+            if (!userId || typeof content !== 'string' || !content.trim()) {
+                return NextResponse.json({ error: 'Missing userId or content' }, { status: 400 })
+            }
+            const res = await fetch(`${ADMIN_API_URL}/api/admin/support/threads/${encodeURIComponent(userId)}/reply`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': ADMIN_API_KEY,
+                },
+                body: JSON.stringify({ content, admin_id: adminId || 'support' }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+                return NextResponse.json(
+                    { error: data.detail || data.error || 'Failed to reply' },
+                    { status: res.status },
+                )
+            }
+            return NextResponse.json(data)
+        }
+
+        if (action === 'support-mark-read') {
+            const { userId } = body
+            if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+            const res = await fetch(`${ADMIN_API_URL}/api/admin/support/threads/${encodeURIComponent(userId)}/read`, {
+                method: 'PATCH',
+                headers: { 'X-API-Key': ADMIN_API_KEY },
             })
             return NextResponse.json(await res.json())
         }
