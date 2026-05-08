@@ -4,6 +4,7 @@ import { getShareData } from '@/app/api/share/route';
 import SharedOverviewClient from '@/components/share-overview/openpanel/SharedOverviewClient';
 import SharedUmamiClient from '@/components/share-overview/umami/SharedUmamiClient';
 import SharedDashboardClient from './SharedDashboardClient';
+import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +19,19 @@ export default async function SharedDashboardPage({
     searchParams,
 }: {
     params: Promise<{ token: string }>;
-    searchParams?: Promise<{ embed?: string | string[] }>;
+    searchParams?: Promise<{ embed?: string | string[]; _b?: string | string[] }>;
 }) {
     const { token } = await params;
     const resolvedSearchParams = searchParams ? await searchParams : undefined;
     const embedParam = resolvedSearchParams?.embed;
     const isEmbed = Array.isArray(embedParam) ? embedParam.includes('true') : embedParam === 'true';
+    // Owner-watermark suppression: the `_b` param is an HMAC of the token
+    // signed with SHARE_WATERMARK_SECRET. Only our marketing site can mint
+    // a valid sig; customer iframes never include it, so their watermark
+    // always stays visible.
+    const watermarkParam = resolvedSearchParams?._b;
+    const watermarkSig = Array.isArray(watermarkParam) ? watermarkParam[0] : watermarkParam;
+    const hideOwnerLogo = verifyShareWatermarkSignature(token, watermarkSig);
     const share = await getShareData(token, { incrementView: true });
 
     /* ─── Invalid / revoked token ─── */
@@ -61,6 +69,7 @@ export default async function SharedDashboardPage({
                 views={share.views}
                 embedMode={isEmbed}
                 config={share.config}
+                hideOwnerLogo={hideOwnerLogo}
             />
         );
     }

@@ -236,6 +236,11 @@ type OverviewRuntime = {
     onRangeChange?: (value: string) => void;
     onShareDashboard?: () => void;
     config?: NormalizedShareConfig | null;
+    /** When true, the iframe-only "[Logo] TrafficClaw" strip is suppressed.
+     *  Server-side gated by an HMAC signature on the `_b` URL param so
+     *  only the marketing site can flip it. Customer embeds never carry
+     *  the signature → they always see the watermark. */
+    hideOwnerLogo?: boolean;
 };
 
 const OverviewRuntimeContext = createContext<OverviewRuntime | null>(null);
@@ -3211,8 +3216,8 @@ function ShareOverviewPage() {
                 : 'sticky top-0 z-20 rounded-[14px] border border-white/[0.08] bg-[#070a0d]/94 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl',
         )}>
             <div className={cx(runtime.mode === 'share' && !isEmbeddedShare ? 'mx-auto max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'px-3 py-3 sm:px-4 sm:py-4')}>
-                {isEmbeddedShare ? (
-                    <div className="mb-3 flex items-center">
+                {isEmbeddedShare && !runtime.hideOwnerLogo ? (
+                    <div className="mb-5 flex items-center">
                         <a
                             href="https://trafficclaw.com"
                             target="_blank"
@@ -3225,7 +3230,7 @@ function ShareOverviewPage() {
                     </div>
                 ) : null}
                 <div className="hidden items-center justify-between gap-3 md:flex">
-                    <DatePicker range={range} setRange={handleRangeChange} />
+                    <DatePicker range={range} setRange={handleRangeChange} chevrons={false} />
                     <div className="flex items-center gap-2">
                         {runtime.mode === 'dashboard' && runtime.onShareDashboard ? (
                             <ShareDashboardButton onClick={runtime.onShareDashboard} />
@@ -3234,7 +3239,7 @@ function ShareOverviewPage() {
                     </div>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:hidden">
-                    <DatePicker range={range} setRange={handleRangeChange} compact />
+                    <DatePicker range={range} setRange={handleRangeChange} compact chevrons={false} />
                     <div className="flex items-center gap-2">
                         {runtime.mode === 'dashboard' && runtime.onShareDashboard ? (
                             <ShareDashboardButton onClick={runtime.onShareDashboard} compact />
@@ -3366,6 +3371,7 @@ export default function SharedOverviewClient({
     onShareDashboard,
     embedMode = false,
     config = null,
+    hideOwnerLogo = false,
 }: {
     mode?: SharedOverviewMode;
     token?: string;
@@ -3378,6 +3384,7 @@ export default function SharedOverviewClient({
     onShareDashboard?: () => void;
     embedMode?: boolean;
     config?: NormalizedShareConfig | null;
+    hideOwnerLogo?: boolean;
 }) {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
@@ -3424,8 +3431,9 @@ export default function SharedOverviewClient({
             views,
             embedMode,
             config,
+            hideOwnerLogo,
         };
-    }, [config, demoMode, embedMode, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
+    }, [config, demoMode, embedMode, hideOwnerLogo, initialRange, mode, onRangeChange, onShareDashboard, propertyId, siteUrl, token, views]);
 
     if (!runtime) {
         return null;

@@ -29,6 +29,7 @@ import {
     type HomepageCompactReason,
     type HomepageProofCard,
 } from './content';
+import { signShareEmbedUrl } from '@/lib/shareWatermark';
 import { JourneyLine, JourneyNode } from './JourneyTimeline';
 import BadgeMarquee from './BadgeMarquee';
 import PricingTierCards from '@/components/marketing/pricing/PricingTierCards';
@@ -587,6 +588,12 @@ function ProofCard({ card }: { card: HomepageProofCard }) {
 }
 
 export default function LandingHomepage() {
+    // The marketing iframe URL gets a server-signed `_b=<hmac>` param so
+    // the share view suppresses the TrafficClaw [logo] watermark inside
+    // the dashboard mockup. Customer-given embed URLs never carry this
+    // signature, so their watermark always renders. See
+    // `lib/shareWatermark.ts` for the threat model.
+    const watermarkedEmbedUrl = signShareEmbedUrl(HOMEPAGE_CONTENT.analyticsEmbedUrl);
     return (
         <div className="relative overflow-x-clip bg-[#010101] text-white">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_18%),linear-gradient(180deg,#030303_0%,#010101_24%,#000000_100%)]" />
@@ -628,7 +635,7 @@ export default function LandingHomepage() {
                             </div>
 
                             <DeferredEmbed
-                                src={HOMEPAGE_CONTENT.analyticsEmbedUrl}
+                                src={watermarkedEmbedUrl}
                                 title="TrafficClaw shared analytics dashboard"
                                 mountStrategy="idle"
                                 className="h-[300px] min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]"

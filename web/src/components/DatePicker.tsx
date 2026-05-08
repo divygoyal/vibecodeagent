@@ -7,6 +7,12 @@ interface DatePickerProps {
     range: string;
     setRange: (r: string) => void;
     compact?: boolean;
+    /** When false, render only the calendar + label pill — no prev/next
+     *  chevrons flanking it, no chevron-down inside, no date subtitle.
+     *  Used by the share-overview iframe for the OpenPanel-style minimal
+     *  look. Defaults to true so the internal dashboard's date picker
+     *  keeps its quick-nav chevrons. */
+    chevrons?: boolean;
 }
 
 // Each preset can carry a single-letter shortcut that's both displayed on
@@ -117,7 +123,7 @@ export function getDateRangeText(range: string): string {
     }
 }
 
-export default function DatePicker({ range, setRange, compact = false }: DatePickerProps) {
+export default function DatePicker({ range, setRange, compact = false, chevrons = true }: DatePickerProps) {
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -184,10 +190,24 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
 
     const dateText = getDateRangeText(range);
 
+    // Main button corner-radius depends on whether the chevron buttons
+    // flank it: with chevrons we round only the inner edges so the three
+    // buttons read as a single pill; without, the main button is fully
+    // rounded on all sides.
+    const mainButtonClass = chevrons
+        ? `dashboard-hover-action flex h-10 border border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 ${
+              compact
+                  ? 'w-full items-center justify-between gap-2 rounded-[14px] px-3 sm:max-w-[180px]'
+                  : 'min-w-[170px] items-center gap-2 border-x-0 px-3.5 text-left'
+          }`
+        : `dashboard-hover-action flex h-10 items-center gap-2 rounded-[14px] border border-white/[0.1] bg-[#0b1015]/95 px-3 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 ${
+              compact ? 'w-full justify-between sm:max-w-[180px]' : 'text-left'
+          }`;
+
     return (
         <div className="relative" ref={containerRef}>
             <div className={compact ? 'w-full' : 'inline-flex items-center'}>
-                {!compact && (
+                {chevrons && !compact && (
                     <button
                         type="button"
                         onClick={goBack}
@@ -203,28 +223,26 @@ export default function DatePicker({ range, setRange, compact = false }: DatePic
                 <button
                     type="button"
                     onClick={() => setOpen(!open)}
-                    className={`dashboard-hover-action flex border border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 ${
-                        compact
-                            ? 'h-10 w-full items-center justify-between gap-2 rounded-[14px] px-3 sm:max-w-[180px]'
-                            : 'h-10 min-w-[170px] items-center gap-2 border-x-0 px-3.5 text-left'
-                    }`}
+                    className={mainButtonClass}
                     data-variant="ghost"
                 >
                     <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
-                        <div className={`truncate font-medium text-zinc-100 ${compact ? 'text-[12px]' : 'text-[12px]'}`}>
+                        <div className="truncate text-[12px] font-medium text-zinc-100">
                             {getRangeLabel(range)}
                         </div>
-                        {!compact && dateText ? (
+                        {chevrons && !compact && dateText ? (
                             <div className="truncate text-[10px] text-zinc-500">
                                 {dateText}
                             </div>
                         ) : null}
                     </div>
-                    <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                    {chevrons ? (
+                        <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                    ) : null}
                 </button>
 
-                {!compact && (
+                {chevrons && !compact && (
                     <button
                         type="button"
                         onClick={goForward}
