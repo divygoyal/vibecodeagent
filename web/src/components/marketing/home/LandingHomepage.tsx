@@ -21,6 +21,7 @@ import {
 
 import DeferredEmbed from './DeferredEmbed';
 import HeroGalaxy from './HeroGalaxy';
+import TypewriterAccent from './TypewriterAccent';
 import LazyVideoFrame from './LazyVideoFrame';
 import GoogleAuthButton from '@/components/marketing/GoogleAuthButton';
 import {
@@ -134,7 +135,7 @@ function GoogleStartButton({
 }) {
     return (
         <GoogleAuthButton className={className}>
-            <GoogleGMark className="h-4 w-4 shrink-0" />
+            <GoogleGMark className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />
             {label}
             {showArrow ? <ArrowRight className="h-4 w-4" /> : null}
         </GoogleAuthButton>
@@ -606,22 +607,37 @@ export default function LandingHomepage() {
                 }}
             />
 
-            <section id="dashboard" className="relative overflow-hidden border-b border-white/[0.06]">
+            <section id="dashboard" className="relative isolate overflow-hidden border-b border-white/[0.06] bg-black">
                 <div className="absolute inset-0 hidden lg:block">
                     <HeroGalaxy />
                 </div>
 
                 <div className="relative mx-auto max-w-[1380px] px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8 lg:pb-24 lg:pt-36">
                     <div className="mx-auto max-w-[1040px] text-center">
+                        <div className="mb-6 inline-flex items-center rounded-full border border-[#14C4E1]/25 bg-[#07131d]/80 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#dff9ff] shadow-[0_8px_24px_rgba(20,196,225,0.12)] backdrop-blur-sm sm:text-xs">
+                            {HOMEPAGE_CONTENT.hero.eyebrow}
+                        </div>
                         <h1 className="text-[2.25rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
-                            {HOMEPAGE_CONTENT.hero.title}
+                            <span className="block text-white">
+                                {HOMEPAGE_CONTENT.hero.titleLead}
+                            </span>
+                            <span className="inline-block bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_55%,#e9fbff_100%)] bg-clip-text pb-3 pr-2 leading-[1.05] text-transparent sm:pb-4">
+                                <TypewriterAccent phrases={['Google Analytics.', 'Search Console.']} />
+                            </span>
                         </h1>
-                        <div className="mt-8 flex justify-center sm:mt-10">
+                        <p className="mx-auto mt-6 max-w-[680px] text-base leading-7 text-zinc-400 sm:mt-7 sm:text-lg sm:leading-8">
+                            {HOMEPAGE_CONTENT.hero.subtitle}
+                        </p>
+                        <div className="mt-9 flex justify-center sm:mt-11">
                             <GoogleStartButton
-                                className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-7 text-center text-[15px] font-semibold text-[#031017] shadow-[0_18px_50px_rgba(20,196,225,0.28)] transition-all duration-200 hover:brightness-105"
+                                className="group inline-flex h-[50px] w-auto items-center justify-center gap-3 rounded-full bg-white px-8 text-[15px] font-semibold tracking-tight text-[#0a0a0a] shadow-[0_18px_44px_-18px_rgba(255,255,255,0.35),0_0_0_1px_rgba(255,255,255,0.08),inset_0_1px_0_rgba(255,255,255,0.6)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_-18px_rgba(255,255,255,0.5),0_0_0_1px_rgba(255,255,255,0.14),inset_0_1px_0_rgba(255,255,255,0.7)] sm:h-[58px] sm:gap-3.5 sm:px-9 sm:text-[17px]"
                                 label={HOMEPAGE_CONTENT.hero.primaryCta}
+                                showArrow={false}
                             />
                         </div>
+                        <p className="mt-5 text-xs text-zinc-500 sm:text-[13px]">
+                            {HOMEPAGE_CONTENT.hero.trustLine}
+                        </p>
                     </div>
 
                     <div className="mx-auto mt-8 max-w-[1280px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012))] p-2 shadow-[0_44px_140px_rgba(0,0,0,0.54)] sm:mt-10 sm:rounded-[34px] sm:p-3">
@@ -654,12 +670,12 @@ export default function LandingHomepage() {
                                 Sign In
                             </Link>
                             <GoogleStartButton
-                                className="inline-flex min-h-[48px] min-w-0 w-full items-center justify-center gap-1.5 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-3 text-center text-[13px] font-semibold leading-tight text-[#031017] transition-all duration-200 hover:brightness-105 sm:hidden"
+                                className="inline-flex min-h-[48px] min-w-0 w-full items-center justify-center gap-1.5 rounded-full bg-white px-3 text-center text-[13px] font-semibold leading-tight text-[#0a0a0a] shadow-[0_12px_30px_-10px_rgba(255,255,255,0.3),0_0_0_1px_rgba(255,255,255,0.06)] transition-all duration-200 hover:brightness-95 sm:hidden"
                                 label="Continue with Google"
                                 showArrow={false}
                             />
                             <GoogleStartButton
-                                className="hidden min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:inline-flex sm:w-auto"
+                                className="hidden min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-center text-sm font-semibold text-[#0a0a0a] shadow-[0_14px_36px_-12px_rgba(255,255,255,0.32),0_0_0_1px_rgba(255,255,255,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-12px_rgba(255,255,255,0.42),0_0_0_1px_rgba(255,255,255,0.12)] sm:inline-flex sm:w-auto"
                                 label={HOMEPAGE_CONTENT.hero.primaryCta}
                             />
                         </div>

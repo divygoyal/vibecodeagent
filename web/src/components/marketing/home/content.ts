@@ -5,9 +5,14 @@ export const MARKETING_SIGN_IN_URL = '/api/auth/signin/google?callbackUrl=%2Fdas
 
 export const HOMEPAGE_CONTENT = {
     hero: {
-        title: 'Ditch your Google Analytics',
+        eyebrow: 'AI for Google Analytics + Search Console',
+        titleLead: 'Talk to your',
+        titleAccent: 'Google Analytics.',
+        subtitle:
+            'Your AI co-pilot for Google Analytics and Search Console. Ask in plain English. Get answers, insights, and SEO wins in seconds.',
         primaryCta: 'Start with Google',
         secondaryCta: 'Open live dashboard',
+        trustLine: 'Read-only Google OAuth · 10 free AI messages · No card required',
     },
     analyticsEmbedUrl: ANALYTICS_EMBED_URL,
     reasonsIntro: {

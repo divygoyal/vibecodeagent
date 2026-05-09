@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import LandingHomepage from '@/components/marketing/home/LandingHomepage';
 
 export const metadata: Metadata = {
-    title: 'Ditch your Google Analytics | TrafficClaw',
+    title: 'Talk to your Google Analytics — AI for GA4 + Search Console | TrafficClaw',
     description:
-        'Ditch your Google Analytics and switch to TrafficClaw for AI traffic chat, live dashboards, embeddable mentions, and a premium realtime globe.',
+        'TrafficClaw is your AI co-pilot for Google Analytics and Search Console. Ask in plain English, get answers, daily insights, and SEO wins — plus a realtime globe and embeddable mentions.',
     alternates: { canonical: '/' },
     openGraph: {
-        title: 'Ditch your Google Analytics | TrafficClaw',
+        title: 'Talk to your Google Analytics — AI for GA4 + Search Console | TrafficClaw',
         description:
-            'AI traffic chat, live shareable dashboards, embeddable mention feeds, and a realtime globe built for growth teams.',
+            'Your AI co-pilot for Google Analytics and Search Console. Ask anything in plain English. Get answers, daily insights, and SEO wins in seconds.',
         url: '/',
     },
 };
