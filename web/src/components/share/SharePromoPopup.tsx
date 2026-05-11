@@ -256,7 +256,7 @@ export default function SharePromoPopup({
                             </a>
 
                             <p className="mt-3 text-center text-[11px] text-zinc-600">
-                                Free · No credit card · 10 free AI questions
+                                Free · No credit card · 5 free AI questions
                             </p>
                         </div>
                     </motion.div>

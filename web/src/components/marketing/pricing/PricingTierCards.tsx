@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Zap, TrendingUp, Shield, CheckCircle2, X, Sparkles } from 'lucide-react';
+import { TrendingUp, Shield, CheckCircle2, X, Sparkles } from 'lucide-react';
 import GoogleAuthButton from '@/components/marketing/GoogleAuthButton';
 
 const fadeUp = {
@@ -19,7 +19,7 @@ const PLANS = [
         key: 'free',
         name: 'Free',
         price: '$0',
-        credits: 10,
+        credits: 5,
         icon: Sparkles,
         color: 'emerald',
         gradient: 'from-emerald-400 to-green-500',
@@ -31,62 +31,39 @@ const PLANS = [
             { text: 'Globe embed (with watermark)', included: true },
             { text: 'SEO tools & site audit', included: true },
             { text: 'Google Search Console', included: true },
-            { text: '10 AI messages to start', included: true },
+            { text: '5 AI messages to start', included: true },
             { text: 'Remove globe watermark', included: false },
-        ],
-    },
-    {
-        key: 'starter',
-        name: 'Starter',
-        price: '$9',
-        credits: 50,
-        perMessage: '$0.18',
-        icon: Zap,
-        color: 'cyan',
-        gradient: 'from-cyan-400 to-blue-500',
-        description: 'Solo founders, side projects',
-        bestFor: 'Indie maker · 1 site',
-        valueProp: 'One CTR fix from this tier ≈ recovers your $9 in week one',
-        productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
-        features: [
-            { text: '50 AI credits / month', included: true },
-            { text: 'Full dashboard (analytics + SEO)', included: true },
-            { text: 'AEO & schema audits', included: true },
-            { text: 'Site audit reports (50+ checks)', included: true },
-            { text: '1 connected site', included: true },
-            { text: 'Daily AI briefing', included: true },
-            { text: 'Email support', included: true },
         ],
     },
     {
         key: 'growth',
         name: 'Growth',
         price: '$19',
-        credits: 150,
-        perMessage: '$0.13',
+        credits: 50,
+        perMessage: '$0.38',
         icon: TrendingUp,
         color: 'emerald',
         gradient: 'from-emerald-400 to-cyan-400',
         description: 'Small businesses scaling SEO',
         bestFor: 'Founder + ops · up to 3 sites',
-        valueProp: '$19/mo replaces $200/mo of analyst tools — 3× the volume of Starter for 2× the price',
+        valueProp: '$19/mo replaces $200/mo of analyst tools — the everyday SEO workhorse',
         productId: 'pdt_0NaLMM1bLW9wAbmxcsebm',
         features: [
-            { text: '150 AI credits / month', included: true },
-            { text: 'Everything in Starter', included: true },
+            { text: '50 AI credits / month', included: true },
+            { text: 'Full dashboard (analytics + SEO)', included: true },
+            { text: 'AEO & schema audits', included: true },
             { text: 'Priority AI queue (faster responses)', included: true },
             { text: 'Up to 3 connected sites', included: true },
             { text: 'Cross-source insights (Deploy ↔ Traffic)', included: true },
             { text: 'Strategic root-cause diagnoses', included: true },
-            { text: 'Surprise-engine cross-source insights', included: true },
         ],
     },
     {
         key: 'pro',
         name: 'Pro',
         price: '$29',
-        credits: 300,
-        perMessage: '$0.10',
+        credits: 100,
+        perMessage: '$0.29',
         icon: Shield,
         color: 'violet',
         gradient: 'from-violet-400 to-purple-500',
@@ -96,13 +73,13 @@ const PLANS = [
         bestValue: true,
         productId: 'pdt_0NaLMM4r23kncRahthuyj',
         features: [
-            { text: '300 AI credits / month', included: true },
+            { text: '100 AI credits / month', included: true },
             { text: 'Everything in Growth', included: true },
             { text: 'Telegram bot — alerts on the go', included: true },
             { text: 'Unlimited connected sites', included: true },
             { text: 'Priority support (24h response)', included: true },
             { text: 'Beta features (early access)', included: true },
-            { text: 'Cheapest per-message rate ($0.10)', included: true },
+            { text: 'Cheapest per-message rate ($0.29)', included: true },
         ],
     },
 ];
@@ -117,7 +94,7 @@ export default function PricingTierCards() {
             initial="hidden"
             animate={isInView ? 'visible' : 'hidden'}
             variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-4 gap-5"
+            className="grid grid-cols-1 md:grid-cols-3 gap-5"
         >
             {PLANS.map((plan) => {
                 const IconComp = plan.icon;

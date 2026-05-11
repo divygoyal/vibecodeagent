@@ -156,7 +156,7 @@ async def init_db():
         
         # Auto-migrate new columns for existing SQLite databases
         for col, col_def in [
-            ("credits", "INTEGER DEFAULT 10"),
+            ("credits", "INTEGER DEFAULT 5"),
             ("bot_engine", "VARCHAR(50) DEFAULT 'openclaw'"),
             ("subscription_id", "VARCHAR(100)"),
             ("telegram_bot_enabled", "BOOLEAN DEFAULT 0"),

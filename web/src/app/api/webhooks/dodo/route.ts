@@ -17,11 +17,15 @@ const client_lazy = (() => {
     };
 })();
 
-// Product ID → plan config (live mode product IDs)
+// Product ID → plan config (live mode product IDs).
+// Starter is no longer sold publicly (removed from pricing UI) but the mapping
+// stays here so any pre-existing Starter subscribers' renewals keep firing
+// correctly. Growth + Pro credit allowances were rebalanced to 50/100 in the
+// new pricing model.
 const PLANS: Record<string, { plan: string; credits: number; telegramBot: boolean }> = {
     'pdt_0NaLMLyWwiO355QaGlQwq': { plan: 'starter', credits: 50, telegramBot: false },
-    'pdt_0NaLMM1bLW9wAbmxcsebm': { plan: 'growth', credits: 150, telegramBot: false },
-    'pdt_0NaLMM4r23kncRahthuyj': { plan: 'pro', credits: 300, telegramBot: true },
+    'pdt_0NaLMM1bLW9wAbmxcsebm': { plan: 'growth', credits: 50, telegramBot: false },
+    'pdt_0NaLMM4r23kncRahthuyj': { plan: 'pro', credits: 100, telegramBot: true },
 };
 
 // Simple in-memory dedup to prevent processing the same webhook event twice

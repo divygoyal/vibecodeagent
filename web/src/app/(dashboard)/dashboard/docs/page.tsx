@@ -82,7 +82,7 @@ export default function DocsPage() {
                                 <Step num={2} title="Connect Google" desc="Link your Google account to pull Analytics (GA4) and Search Console data." />
                                 <Step num={3} title="Explore your dashboard" desc="View traffic trends, SEO metrics, AI insights, and site audits." />
                                 <Step num={4} title="Chat with AI Analyst" desc="Ask questions about your data — get verdicts backed by real numbers." />
-                                <Step num={5} title="Upgrade for more" desc="Free accounts get 10 AI messages. Upgrade for 50-300 credits/month + Telegram bot." />
+                                <Step num={5} title="Upgrade for more" desc="Free accounts get 5 AI messages. Upgrade for 50-100 credits/month + Telegram bot." />
                             </div>
                         </div>
 
@@ -90,7 +90,7 @@ export default function DocsPage() {
                             <h2 className="text-lg font-semibold text-white mb-3">What You Get for Free</h2>
                             <ul className="space-y-2 text-sm text-zinc-400">
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Full SEO & analytics dashboard</li>
-                                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> 10 free AI chat messages to start</li>
+                                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> 5 free AI chat messages to start</li>
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Site audit reports</li>
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> AI content tools (schema, blog, keywords)</li>
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> AI visibility tracking & AEO optimization</li>
@@ -139,8 +139,8 @@ export default function DocsPage() {
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-3">
                             <h2 className="text-lg font-semibold text-white">Credits</h2>
                             <p className="text-sm text-zinc-400">
-                                Each AI message costs <strong className="text-white">1 credit</strong>. Free accounts start with 10 credits.
-                                Upgrade to a paid plan for 50-300 credits/month that reset each billing cycle.
+                                Each AI message costs <strong className="text-white">1 credit</strong>. Free accounts start with 5 credits.
+                                Upgrade to a paid plan for 50-100 credits/month that reset each billing cycle.
                             </p>
                             <p className="text-sm text-zinc-400">
                                 Chat history is preserved across sections — your last conversations stay available
@@ -159,9 +159,8 @@ export default function DocsPage() {
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
                             <h2 className="text-lg font-semibold text-white mb-4">Monthly Plans</h2>
                             <div className="space-y-3">
-                                <PlanRow icon={<Zap className="w-4 h-4 text-cyan-400" />} name="Starter" price="$9/mo" credits="50" features="Full dashboard, SEO tools, site audits" />
-                                <PlanRow icon={<BarChart3 className="w-4 h-4 text-emerald-400" />} name="Growth" price="$19/mo" credits="150" features="Everything in Starter + priority AI, advanced intelligence" highlight />
-                                <PlanRow icon={<Crown className="w-4 h-4 text-violet-400" />} name="Pro" price="$29/mo" credits="300" features="Everything in Growth + Telegram bot, priority support" />
+                                <PlanRow icon={<BarChart3 className="w-4 h-4 text-emerald-400" />} name="Growth" price="$19/mo" credits="50" features="Full dashboard, SEO tools, site audits, priority AI" highlight />
+                                <PlanRow icon={<Crown className="w-4 h-4 text-violet-400" />} name="Pro" price="$29/mo" credits="100" features="Everything in Growth + Telegram bot, priority support" />
                             </div>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-3">
@@ -169,7 +168,7 @@ export default function DocsPage() {
                             <ul className="space-y-2 text-sm text-zinc-400">
                                 <li className="flex items-start gap-2"><span className="text-emerald-400 font-bold">1 credit = 1 AI message.</span></li>
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Credits reset at the start of each billing cycle (no rollover)</li>
-                                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Free accounts get 10 credits to try the AI analyst</li>
+                                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Free accounts get 5 credits to try the AI analyst</li>
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Upgrade or switch plans anytime from Settings</li>
                                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> Cancel anytime — no lock-in</li>
                             </ul>

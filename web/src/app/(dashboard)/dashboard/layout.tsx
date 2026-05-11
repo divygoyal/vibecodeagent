@@ -1167,7 +1167,7 @@ export default function DashboardLayout({
 
             {/* Credit welcome animation (first signup only) */}
             {showWelcome && (
-                <CreditWelcome credits={10} onDismiss={() => {
+                <CreditWelcome credits={5} onDismiss={() => {
                     setShowWelcome(false);
                     setServerWelcomeSeen(true);
                     // Persist the dismissal server-side so the popup never

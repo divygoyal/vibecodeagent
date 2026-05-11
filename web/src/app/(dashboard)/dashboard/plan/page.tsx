@@ -44,55 +44,47 @@ const PLAN_CONFIG: Record<string, PlanInfo> = {
         costPerMsg: '—',
         valueLine: 'See your data; AI is locked',
     },
+    // 'starter' is grandfathered for pre-existing subscribers — kept here so
+    // their dashboard renders correctly. Not shown in the upgrade grid below.
     starter: {
         label: 'Starter', icon: Zap, credits: 50, price: '$9',
         blurb: 'Solo founders, side projects',
         bestFor: 'Indie maker · 1 site',
         costPerMsg: '$0.18 / AI message',
-        valueLine: 'One CTR fix from this tier ≈ recovers your $9 in week one',
+        valueLine: 'Legacy plan — not available for new subscribers',
     },
     growth: {
-        label: 'Growth', icon: TrendingUp, credits: 150, price: '$19',
+        label: 'Growth', icon: TrendingUp, credits: 50, price: '$19',
         blurb: 'Small businesses scaling SEO',
         bestFor: 'Founder + ops · up to 3 sites',
-        costPerMsg: '$0.13 / AI message',
-        valueLine: '$19/mo replaces $200/mo of analyst tools — 3× the volume of Starter for 2× the price',
+        costPerMsg: '$0.38 / AI message',
+        valueLine: '$19/mo replaces $200/mo of analyst tools — the everyday SEO workhorse',
     },
     pro: {
-        label: 'Pro', icon: Shield, credits: 300, price: '$29',
+        label: 'Pro', icon: Shield, credits: 100, price: '$29',
         blurb: 'Agencies, serious operators',
         bestFor: 'Multi-site · agency · power users',
-        costPerMsg: '$0.10 / AI message',
+        costPerMsg: '$0.29 / AI message',
         valueLine: 'Cheapest per-message tier + Telegram bot for daily mobile alerts',
     },
 };
 
-/** Detailed feature list per tier — drives the card bullets AND the comparison table. */
+/** Detailed feature list per tier — drives the card bullets AND the comparison table.
+ *  Starter is intentionally not present: it's no longer sold publicly. Existing
+ *  Starter subscribers see their plan via PLAN_CONFIG['starter'] but the upgrade
+ *  grid below shows only Growth + Pro for everyone. */
 const SUBSCRIPTION_PLANS = [
-    {
-        key: 'starter',
-        productId: 'pdt_0NaLMLyWwiO355QaGlQwq',
-        features: [
-            { label: '50 AI credits / month', highlight: true, icon: Coins },
-            { label: 'Full dashboard (analytics + SEO)', icon: Layers },
-            { label: 'AEO & schema audits', icon: Sparkles },
-            { label: 'Site audit reports (50+ checks)', icon: Check },
-            { label: '1 connected site', icon: Globe },
-            { label: 'Daily AI briefing', icon: Zap },
-            { label: 'Email support', icon: Users },
-        ],
-    },
     {
         key: 'growth',
         productId: 'pdt_0NaLMM1bLW9wAbmxcsebm',
         features: [
-            { label: '150 AI credits / month', highlight: true, icon: Coins },
-            { label: 'Everything in Starter', icon: Check },
+            { label: '50 AI credits / month', highlight: true, icon: Coins },
+            { label: 'Full dashboard (analytics + SEO)', icon: Layers },
+            { label: 'AEO & schema audits', icon: Sparkles },
             { label: 'Priority AI queue (faster responses)', icon: Zap },
             { label: 'Up to 3 connected sites', icon: Globe },
             { label: 'Cross-source insights (Deploy ↔ Traffic)', icon: GitBranch },
             { label: 'Strategic root-cause diagnoses', icon: Lightbulb },
-            { label: 'Surprise-engine cross-source insights', icon: Sparkles },
         ],
         recommended: true,
     },
@@ -100,13 +92,13 @@ const SUBSCRIPTION_PLANS = [
         key: 'pro',
         productId: 'pdt_0NaLMM4r23kncRahthuyj',
         features: [
-            { label: '300 AI credits / month', highlight: true, icon: Coins },
+            { label: '100 AI credits / month', highlight: true, icon: Coins },
             { label: 'Everything in Growth', icon: Check },
             { label: 'Telegram bot — alerts on the go', highlight: true, icon: Bot },
             { label: 'Unlimited connected sites', icon: Globe },
             { label: 'Priority support (24h response)', icon: Users },
             { label: 'Beta features (early access)', icon: Sparkles },
-            { label: 'Cheapest per-message rate ($0.10)', icon: TrendingUp },
+            { label: 'Cheapest per-message rate ($0.29)', icon: TrendingUp },
         ],
         telegramBot: true,
     },
@@ -301,7 +293,7 @@ function PlanPageContent() {
                     <span className="text-[10.5px] text-zinc-600">Cancel anytime</span>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                     {SUBSCRIPTION_PLANS.map((p) => {
                         const info = PLAN_CONFIG[p.key];
                         const isCurrent = p.key === plan;

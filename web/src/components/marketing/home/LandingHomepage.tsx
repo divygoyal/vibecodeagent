@@ -818,7 +818,7 @@ export default function LandingHomepage() {
                             Simple, transparent pricing
                         </h2>
                         <p className="mt-5 text-base leading-7 text-zinc-400 sm:text-lg sm:leading-8">
-                            Start free with 10 messages. Upgrade when you need more AI power. No hidden fees, cancel anytime.
+                            Start free with 5 messages. Upgrade when you need more AI power. No hidden fees, cancel anytime.
                         </p>
                     </div>
 

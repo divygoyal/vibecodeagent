@@ -299,7 +299,7 @@ export default function FeaturesClient() {
                 <div className="max-w-3xl mx-auto text-center">
                     <motion.div variants={fadeUp}>
                         <h2 className="text-3xl font-bold text-white mb-4">Ready to see your data come alive?</h2>
-                        <p className="text-zinc-400 mb-8">Start free with 10 AI messages. No credit card required.</p>
+                        <p className="text-zinc-400 mb-8">Start free with 5 AI messages. No credit card required.</p>
                         <div className="flex items-center justify-center gap-4 flex-wrap">
                             <button
                                 onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}

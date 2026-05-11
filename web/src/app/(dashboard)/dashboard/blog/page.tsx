@@ -27,8 +27,8 @@ const POSTS: BlogPost[] = [
     },
     {
         slug: 'subscription-plans-launch',
-        title: 'Introducing Monthly Plans: Starter, Growth & Pro',
-        excerpt: 'We\'ve launched three subscription tiers — Starter ($9/mo, 50 credits), Growth ($19/mo, 150 credits), and Pro ($29/mo, 300 credits + Telegram bot). Every new account gets 10 free AI messages to try it out.',
+        title: 'Introducing Monthly Plans: Growth & Pro',
+        excerpt: 'We\'ve launched two subscription tiers — Growth ($19/mo, 50 credits) and Pro ($29/mo, 100 credits + Telegram bot). Every new account gets 5 free AI messages to try it out.',
         date: 'Mar 4, 2026',
         readTime: '4 min read',
         category: 'Announcement',

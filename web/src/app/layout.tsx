@@ -112,9 +112,8 @@ export default function RootLayout({
               description: 'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes.',
               featureList: 'Real-time Analytics Dashboard, SEO Intelligence, AI Chat Assistant, Site Audit, Telegram Bot, Smart Alerts, AI SEO Tools',
               offers: [
-                { '@type': 'Offer', name: 'Starter', price: '9', priceCurrency: 'USD', description: '50 AI credits/month', url: 'https://trafficclaw.com/pricing' },
-                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '150 AI credits/month', url: 'https://trafficclaw.com/pricing' },
-                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '300 AI credits/month + Telegram bot', url: 'https://trafficclaw.com/pricing' },
+                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: 'https://trafficclaw.com/pricing' },
+                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month + Telegram bot', url: 'https://trafficclaw.com/pricing' },
               ],
               aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '127', bestRating: '5', worstRating: '1' },
             }),

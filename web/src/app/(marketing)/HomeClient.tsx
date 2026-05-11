@@ -81,7 +81,7 @@ function Hero() {
                             onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
                             className="group px-5 sm:px-8 min-h-[44px] h-14 text-[15px] font-semibold text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl hover:shadow-[0_0_32px_rgba(52,211,153,0.3)] transition-all duration-300 w-full sm:w-auto flex items-center justify-center flex-shrink-0"
                         >
-                            Try Free — 10 AI Messages Included
+                            Try Free — 5 AI Messages Included
                             <ArrowRight className="inline-block ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
                         <a
@@ -1142,7 +1142,7 @@ function Pricing() {
                 {/* Discount promo */}
                 <PricingDiscountBanner />
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
 
                     {/* ── FREE ── */}
                     <div className="relative p-4 sm:p-6 rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.06] to-transparent transition-all duration-300 group">
@@ -1159,7 +1159,7 @@ function Pricing() {
                             <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">$0</span>
                             <span className="text-sm text-zinc-500">/forever</span>
                         </div>
-                        <div className="text-sm text-emerald-400 font-medium mb-6">10 AI credits to start</div>
+                        <div className="text-sm text-emerald-400 font-medium mb-6">5 AI credits to start</div>
 
                         <Link href="/dashboard"
                             className="w-full py-2.5 sm:py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all duration-200 mb-6 block text-center border border-emerald-500/20 hover:border-emerald-500/30">
@@ -1173,46 +1173,10 @@ function Pricing() {
                                 'Globe embed (with watermark)',
                                 'SEO tools & site audit',
                                 'Google Search Console',
-                                '10 AI messages to start',
+                                '5 AI messages to start',
                             ].map((f, i) => (
                                 <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500" />
-                                    {f}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-
-                    {/* ── STARTER ── */}
-                    <div className="relative p-4 sm:p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/[0.2] transition-all duration-300 group">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400/20 to-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <Zap className="w-5 h-5 text-cyan-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-white mb-1">Starter</h3>
-                        <p className="text-xs text-zinc-500 mb-5">For creators who need AI power</p>
-
-                        <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">$9</span>
-                            <span className="text-sm text-zinc-500">/mo</span>
-                        </div>
-                        <div className="text-sm text-cyan-400 font-medium mb-6">50 AI credits/month</div>
-
-                        <button onClick={() => handleCheckout('pdt_0NaLMLyWwiO355QaGlQwq')}
-                            className="w-full py-2.5 sm:py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold bg-white/[0.06] text-white hover:bg-white/[0.12] transition-all duration-200 mb-6 block text-center border border-white/[0.06] hover:border-cyan-500/[0.2] cursor-pointer">
-                            Get Starter
-                        </button>
-
-                        <ul className="space-y-3">
-                            {[
-                                '50 AI messages / month',
-                                'Globe embed — no watermark',
-                                'AI-powered SEO chat',
-                                'AI content generation tools',
-                                'CSV & JSON data export',
-                                'Site audit reports (3/day)',
-                            ].map((f, i) => (
-                                <li key={i} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-400">
-                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-cyan-500" />
                                     {f}
                                 </li>
                             ))}
@@ -1235,8 +1199,7 @@ function Pricing() {
                             <span className="text-sm text-zinc-500">/mo</span>
                         </div>
                         <div className="flex items-center gap-2 mb-6">
-                            <span className="text-sm text-emerald-400 font-medium">150 AI credits/month</span>
-                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/[0.1] text-emerald-400 border border-emerald-500/[0.15] font-semibold">3x Starter</span>
+                            <span className="text-sm text-emerald-400 font-medium">50 AI credits/month</span>
                         </div>
 
                         <button onClick={() => handleCheckout('pdt_0NaLMM1bLW9wAbmxcsebm')}
@@ -1246,8 +1209,8 @@ function Pricing() {
 
                         <ul className="space-y-3">
                             {[
-                                '150 AI messages / month',
-                                'Everything in Starter +',
+                                '50 AI messages / month',
+                                'Everything in Free +',
                                 'Priority AI responses',
                                 'Advanced SEO intelligence',
                                 'Multi-site support',
@@ -1280,8 +1243,8 @@ function Pricing() {
                                 <span className="text-sm text-zinc-500">/mo</span>
                             </div>
                             <div className="flex items-center gap-2 mb-6">
-                                <span className="text-sm text-violet-400 font-medium">300 AI credits/month</span>
-                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/[0.1] text-violet-400 border border-violet-500/[0.15] font-semibold">6x Starter</span>
+                                <span className="text-sm text-violet-400 font-medium">100 AI credits/month</span>
+                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/[0.1] text-violet-400 border border-violet-500/[0.15] font-semibold">2x Growth</span>
                             </div>
 
                             <button onClick={() => handleCheckout('pdt_0NaLMM4r23kncRahthuyj')}
@@ -1291,7 +1254,7 @@ function Pricing() {
 
                             <ul className="space-y-3">
                                 {[
-                                    '300 AI messages / month',
+                                    '100 AI messages / month',
                                     'Everything in Growth +',
                                     'Telegram AI SEO bot',
                                     'Custom alert rules',
@@ -1775,7 +1738,7 @@ function FinalCTA() {
                             Then ask AI anything about your traffic.
                         </p>
                         <p className="text-sm text-zinc-500 mb-8">
-                            No credit card required · 10 free AI messages · Cancel anytime
+                            No credit card required · 5 free AI messages · Cancel anytime
                         </p>
                         <button
                             onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}

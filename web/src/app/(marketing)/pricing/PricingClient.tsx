@@ -16,19 +16,19 @@ const stagger = {
 };
 
 const COMPARISON_FEATURES = [
-    { name: 'AI Credits', free: '10 total', starter: '50/mo', growth: '150/mo', pro: '300/mo' },
-    { name: 'Analytics Dashboard', free: true, starter: true, growth: true, pro: true },
-    { name: 'Real-time Globe', free: true, starter: true, growth: true, pro: true },
-    { name: 'Embeddable Globe Widget', free: 'With watermark', starter: 'No watermark', growth: 'No watermark', pro: 'No watermark' },
-    { name: 'SEO Intelligence', free: true, starter: true, growth: true, pro: true },
-    { name: 'Site Audit', free: '1/day', starter: '3/day', growth: '10/day', pro: 'Unlimited' },
-    { name: 'AI Chat', free: true, starter: true, growth: true, pro: true },
-    { name: 'CSV/JSON Export', free: false, starter: true, growth: true, pro: true },
-    { name: 'Multi-site Support', free: false, starter: false, growth: true, pro: true },
-    { name: 'Priority AI Responses', free: false, starter: false, growth: true, pro: true },
-    { name: 'Telegram Bot (AI SEO Assistant)', free: false, starter: false, growth: false, pro: true },
-    { name: 'Custom Alerts', free: false, starter: false, growth: false, pro: true },
-    { name: 'Priority Support', free: false, starter: false, growth: false, pro: true },
+    { name: 'AI Credits', free: '5 total', growth: '50/mo', pro: '100/mo' },
+    { name: 'Analytics Dashboard', free: true, growth: true, pro: true },
+    { name: 'Real-time Globe', free: true, growth: true, pro: true },
+    { name: 'Embeddable Globe Widget', free: 'With watermark', growth: 'No watermark', pro: 'No watermark' },
+    { name: 'SEO Intelligence', free: true, growth: true, pro: true },
+    { name: 'Site Audit', free: '1/day', growth: '10/day', pro: 'Unlimited' },
+    { name: 'AI Chat', free: true, growth: true, pro: true },
+    { name: 'CSV/JSON Export', free: false, growth: true, pro: true },
+    { name: 'Multi-site Support', free: false, growth: true, pro: true },
+    { name: 'Priority AI Responses', free: false, growth: true, pro: true },
+    { name: 'Telegram Bot (AI SEO Assistant)', free: false, growth: false, pro: true },
+    { name: 'Custom Alerts', free: false, growth: false, pro: true },
+    { name: 'Priority Support', free: false, growth: false, pro: true },
 ];
 
 function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -100,7 +100,7 @@ export default function PricingClient() {
                             </span>
                         </h1>
                         <p className="text-lg text-zinc-400 max-w-xl mx-auto">
-                            Start free with 10 messages. Upgrade when you need more AI power.
+                            Start free with 5 messages. Upgrade when you need more AI power.
                             No hidden fees. Cancel anytime.
                         </p>
                     </motion.div>
@@ -125,7 +125,7 @@ export default function PricingClient() {
                     <motion.div variants={fadeUp} className="p-8 rounded-2xl border border-white/[0.06] bg-white/[0.02]">
                         <h3 className="text-xl font-bold text-white mb-2">Start Free</h3>
                         <p className="text-sm text-zinc-400 mb-4">
-                            Get 10 free AI messages when you sign up. No credit card required.
+                            Get 5 free AI messages when you sign up. No credit card required.
                             Explore the full dashboard, run audits, and see your data.
                         </p>
                         <button
@@ -152,7 +152,6 @@ export default function PricingClient() {
                                 <tr className="border-b border-white/[0.06]">
                                     <th className="text-left py-4 pr-4 text-zinc-500 font-medium">Feature</th>
                                     <th className="text-center py-4 px-3 text-emerald-400 font-semibold">Free</th>
-                                    <th className="text-center py-4 px-3 text-cyan-400 font-semibold">Starter</th>
                                     <th className="text-center py-4 px-3 text-emerald-400 font-semibold">Growth</th>
                                     <th className="text-center py-4 px-3 text-violet-400 font-semibold">Pro</th>
                                 </tr>
@@ -161,7 +160,7 @@ export default function PricingClient() {
                                 {COMPARISON_FEATURES.map((feature, i) => (
                                     <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                                         <td className="py-3.5 pr-4 text-zinc-300">{feature.name}</td>
-                                        {(['free', 'starter', 'growth', 'pro'] as const).map(plan => {
+                                        {(['free', 'growth', 'pro'] as const).map(plan => {
                                             const val = feature[plan];
                                             return (
                                                 <td key={plan} className="text-center py-3.5 px-3">
@@ -169,7 +168,6 @@ export default function PricingClient() {
                                                         val ? (
                                                             <CheckCircle2 className={`w-4 h-4 mx-auto ${
                                                                 plan === 'free' ? 'text-emerald-400' :
-                                                                plan === 'starter' ? 'text-cyan-400' :
                                                                 plan === 'growth' ? 'text-emerald-400' : 'text-violet-400'
                                                             }`} />
                                                         ) : (
@@ -198,7 +196,7 @@ export default function PricingClient() {
                     </motion.div>
                     <motion.div variants={fadeUp} className="space-y-4">
                         {[
-                            { q: 'Is there a free plan?', a: 'Every new account gets 10 free AI messages to try TrafficClaw. No credit card required. The full analytics dashboard, SEO tools, and site audit are available on all plans.' },
+                            { q: 'Is there a free plan?', a: 'Every new account gets 5 free AI messages to try TrafficClaw. No credit card required. The full analytics dashboard, SEO tools, and site audit are available on all plans.' },
                             { q: 'What happens when I run out of credits?', a: 'You can still access your analytics dashboard, SEO data, and audit tools. AI chat responses require credits. Credits reset at the start of each billing cycle — no rollover.' },
                             { q: 'Can I upgrade or downgrade anytime?', a: 'Yes. You can switch plans at any time. When you upgrade, you get immediate access to the new credit amount. Downgrades take effect at the next billing cycle.' },
                             { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, debit cards, and select digital wallets through our payment provider Dodo Payments. All transactions are encrypted and secure.' },

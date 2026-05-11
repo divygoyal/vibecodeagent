@@ -12,7 +12,7 @@ export const HOMEPAGE_CONTENT = {
             'Your AI co-pilot for Google Analytics and Search Console. Ask in plain English. Get answers, insights, and SEO wins in seconds.',
         primaryCta: 'Start with Google',
         secondaryCta: 'Open live dashboard',
-        trustLine: 'Read-only Google OAuth · 10 free AI messages · No card required',
+        trustLine: 'Read-only Google OAuth · 5 free AI messages · No card required',
     },
     analyticsEmbedUrl: ANALYTICS_EMBED_URL,
     reasonsIntro: {

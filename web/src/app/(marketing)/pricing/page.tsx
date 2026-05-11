@@ -2,14 +2,14 @@ import type { Metadata } from 'next';
 import PricingClient from './PricingClient';
 
 export const metadata: Metadata = {
-    title: 'Pricing — Simple Plans Starting at $9/mo',
+    title: 'Pricing — Simple Plans Starting at $19/mo',
     description:
-        'Choose your TrafficClaw plan: Starter ($9/mo, 50 AI credits), Growth ($19/mo, 150 credits), or Pro ($29/mo, 300 credits + Telegram bot). Start free with 10 messages.',
+        'Choose your TrafficClaw plan: Growth ($19/mo, 50 AI credits) or Pro ($29/mo, 100 credits + Telegram bot). Start free with 5 messages.',
     alternates: { canonical: '/pricing' },
     openGraph: {
-        title: 'Pricing — Simple Plans Starting at $9/mo | TrafficClaw',
+        title: 'Pricing — Simple Plans Starting at $19/mo | TrafficClaw',
         description:
-            'Starter $9/mo, Growth $19/mo, Pro $29/mo. All plans include analytics dashboard, SEO tools, AI chat. Start free with 10 messages.',
+            'Growth $19/mo, Pro $29/mo. All plans include analytics dashboard, SEO tools, AI chat. Start free with 5 messages.',
         url: '/pricing',
     },
 };
@@ -23,7 +23,7 @@ const pricingFaqSchema = {
             name: 'Is there a free plan?',
             acceptedAnswer: {
                 '@type': 'Answer',
-                text: 'Every new account gets 10 free AI messages to try TrafficClaw. No credit card required. The full analytics dashboard, SEO tools, and site audit are available on all plans.',
+                text: 'Every new account gets 5 free AI messages to try TrafficClaw. No credit card required. The full analytics dashboard, SEO tools, and site audit are available on all plans.',
             },
         },
         {
@@ -73,24 +73,8 @@ const productSchema = [
     {
         '@context': 'https://schema.org',
         '@type': 'Product',
-        name: 'TrafficClaw Starter',
-        description: 'AI-powered SEO & analytics with 50 AI credits per month. Includes full analytics dashboard, SEO tools, audit, and AI chat.',
-        url: 'https://trafficclaw.com/pricing',
-        brand: { '@type': 'Brand', name: 'TrafficClaw' },
-        offers: {
-            '@type': 'Offer',
-            price: '9',
-            priceCurrency: 'USD',
-            priceValidUntil: '2027-12-31',
-            availability: 'https://schema.org/InStock',
-            url: 'https://trafficclaw.com/pricing',
-        },
-    },
-    {
-        '@context': 'https://schema.org',
-        '@type': 'Product',
         name: 'TrafficClaw Growth',
-        description: 'AI-powered SEO & analytics with 150 AI credits per month. Includes everything in Starter plus priority AI, advanced SEO intelligence, and multi-site support.',
+        description: 'AI-powered SEO & analytics with 50 AI credits per month. Includes full analytics dashboard, SEO tools, audit, AI chat, priority AI, advanced SEO intelligence, and multi-site support.',
         url: 'https://trafficclaw.com/pricing',
         brand: { '@type': 'Brand', name: 'TrafficClaw' },
         offers: {
@@ -106,7 +90,7 @@ const productSchema = [
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: 'TrafficClaw Pro',
-        description: 'Full-power AI SEO & analytics with 300 AI credits per month. Includes Telegram bot, priority support, custom alerts, unlimited audits, and early feature access.',
+        description: 'Full-power AI SEO & analytics with 100 AI credits per month. Includes Telegram bot, priority support, custom alerts, unlimited audits, and early feature access.',
         url: 'https://trafficclaw.com/pricing',
         brand: { '@type': 'Brand', name: 'TrafficClaw' },
         offers: {
