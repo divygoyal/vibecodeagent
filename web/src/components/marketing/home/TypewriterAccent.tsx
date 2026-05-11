@@ -47,13 +47,21 @@ export default function TypewriterAccent({
         };
     }, [text, phase, index, phrases, typeMs, holdMs, eraseMs]);
 
+    // translate="no" + notranslate class: the text state updates every ~65ms
+    // while Chrome auto-translate concurrently wraps text nodes in <font> tags.
+    // The two collide and React reconciliation either crashes (without the
+    // root-layout patch) or accumulates stale fragments from prior animation
+    // frames (with it). The rotating phrases here are product names — Google
+    // Analytics, Search Console — that aren't typically translated anyway, so
+    // leaving them English is the right call. Everything else in the hero
+    // (eyebrow, lead line, subtitle, CTAs) keeps translating normally.
     return (
-        <>
+        <span translate="no" className="notranslate">
             {text}
             <span
                 aria-hidden="true"
                 className="ml-[0.04em] inline-block w-[0.06em] h-[0.78em] translate-y-[0.06em] rounded-sm bg-[#7AD9DA] animate-pulse"
             />
-        </>
+        </span>
     );
 }
