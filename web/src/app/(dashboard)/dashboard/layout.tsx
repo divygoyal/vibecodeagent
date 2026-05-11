@@ -239,6 +239,17 @@ export default function DashboardLayout({
         if (savedRange) setRange(savedRange);
     }, [user, getUserKey]);
 
+    // Scope chat store to the active workspace. Without this, switching workspace
+    // (e.g. via /dashboard/setup → saveWorkspace) leaves the previous workspace's
+    // messages and thread id in place, so the AI keeps responding inside the old
+    // conversation. selectedProperty/Site change together via saveWorkspace, so
+    // the combined key flips atomically on a real switch.
+    useEffect(() => {
+        if (!user) return;
+        const workspaceKey = selectedProperty || selectedSite || '';
+        useChatStore.getState().setCurrentWorkspace(workspaceKey);
+    }, [user, selectedProperty, selectedSite]);
+
     // Workspace persistence — server is source of truth, localStorage is fast first-paint cache.
     const [isWorkspaceLoaded, setIsWorkspaceLoaded] = useState(false);
     // workspace_setup_completed is read by the middleware off the JWT claim
@@ -400,13 +411,17 @@ export default function DashboardLayout({
     const handleSignOut = useCallback(() => {
         // Clear chat history
         useChatStore.getState().clearChat();
-        // Clear user-scoped localStorage keys (any key containing user ID)
+        // Clear user-scoped localStorage keys (any key containing user ID).
+        // Matches both `:${uid}` (legacy + workspace-less) and `:${uid}:${workspaceKey}`
+        // (chat history / thread id scoped per workspace).
         const uid = user?.id || user?.email || '';
         if (uid) {
+            const suffix = `:${uid}`;
+            const infix = `:${uid}:`;
             const keysToRemove: string[] = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && key.endsWith(`:${uid}`)) {
+                if (key && (key.endsWith(suffix) || key.includes(infix))) {
                     keysToRemove.push(key);
                 }
             }

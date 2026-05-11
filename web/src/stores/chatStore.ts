@@ -37,11 +37,19 @@ export interface ChatMessage {
 const BASE_STORAGE_KEY = 'tc-chat-history';
 const MAX_MESSAGES = 30; // ~10 Q&A pairs + some buffer
 
-// Current user ID for scoping — set via setCurrentUser()
+// Scope state for storage keys — set via setCurrentUser() / setCurrentWorkspace().
+// Scoping by workspace too keeps each (GA4 property + GSC site) pairing in its own
+// chat bucket. Without this, switching workspace leaves the previous workspace's
+// messages and thread id in place, so the AI keeps responding inside the old
+// conversation instead of starting fresh for the new site.
 let currentUserId = '';
+let currentWorkspaceKey = '';
 
 function getStorageKey(): string {
-    return currentUserId ? `${BASE_STORAGE_KEY}:${currentUserId}` : BASE_STORAGE_KEY;
+    if (!currentUserId) return BASE_STORAGE_KEY;
+    return currentWorkspaceKey
+        ? `${BASE_STORAGE_KEY}:${currentUserId}:${currentWorkspaceKey}`
+        : `${BASE_STORAGE_KEY}:${currentUserId}`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -58,6 +66,12 @@ function getStorageKey(): string {
 
 const THREAD_ID_KEY = 'tc-chat-thread-id';
 
+function getThreadStorageKey(): string {
+    return currentWorkspaceKey
+        ? `${THREAD_ID_KEY}:${currentUserId}:${currentWorkspaceKey}`
+        : `${THREAD_ID_KEY}:${currentUserId}`;
+}
+
 function generateThreadId(): string {
     // Crypto-grade UUID (browsers >= Chrome 92 / Firefox 95 / Safari 15.4).
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -71,10 +85,10 @@ function generateThreadId(): string {
 export function getOrCreateThreadId(): string {
     if (typeof window === 'undefined') return '';
     try {
-        const existing = localStorage.getItem(`${THREAD_ID_KEY}:${currentUserId}`);
+        const existing = localStorage.getItem(getThreadStorageKey());
         if (existing) return existing;
         const fresh = generateThreadId();
-        localStorage.setItem(`${THREAD_ID_KEY}:${currentUserId}`, fresh);
+        localStorage.setItem(getThreadStorageKey(), fresh);
         return fresh;
     } catch {
         return generateThreadId();
@@ -83,7 +97,7 @@ export function getOrCreateThreadId(): string {
 
 export function resetThreadId(): string {
     if (typeof window !== 'undefined') {
-        try { localStorage.removeItem(`${THREAD_ID_KEY}:${currentUserId}`); } catch { /* skip */ }
+        try { localStorage.removeItem(getThreadStorageKey()); } catch { /* skip */ }
     }
     threadEnsuredFor = null;
     return getOrCreateThreadId();
@@ -94,7 +108,7 @@ export function resetThreadId(): string {
  *  isn't skipped if we land on a thread we haven't synced yet this session. */
 export function setActiveThreadId(id: string): void {
     if (typeof window === 'undefined' || !id) return;
-    try { localStorage.setItem(`${THREAD_ID_KEY}:${currentUserId}`, id); } catch { /* skip */ }
+    try { localStorage.setItem(getThreadStorageKey(), id); } catch { /* skip */ }
     threadEnsuredFor = id; // already exists on server (we're loading from it), no need to re-create
 }
 
@@ -186,6 +200,7 @@ interface ChatStore {
     updateLastAssistant: (updater: (msg: ChatMessage) => ChatMessage) => void;
     clearChat: () => void;
     setCurrentUser: (userId: string) => void;
+    setCurrentWorkspace: (workspaceKey: string) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -235,7 +250,24 @@ export const useChatStore = create<ChatStore>((set) => ({
     setCurrentUser: (userId: string) => {
         if (currentUserId === userId) return; // No change
         currentUserId = userId;
+        // A new user means the previously-active workspace scope no longer applies;
+        // reset it so messages don't load under the wrong (user, workspace) pair
+        // before the layout's workspace effect runs.
+        currentWorkspaceKey = '';
+        threadEnsuredFor = null;
         // Reload messages for the new user
+        const messages = loadFromStorage();
+        set({ messages });
+    },
+
+    // Call this when the active workspace (GA4 property + GSC site pairing) changes
+    // so chat history is reloaded from the bucket scoped to that workspace.
+    setCurrentWorkspace: (workspaceKey: string) => {
+        if (currentWorkspaceKey === workspaceKey) return; // No change
+        currentWorkspaceKey = workspaceKey;
+        // Force the next persistMessage call to re-ensure a thread on the server —
+        // each workspace has its own thread id (scoped via getThreadStorageKey).
+        threadEnsuredFor = null;
         const messages = loadFromStorage();
         set({ messages });
     },
