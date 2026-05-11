@@ -137,6 +137,7 @@ export default function HeroGalaxy({ className = '' }: HeroGalaxyProps) {
         const resize = () => {
             const width = container.clientWidth;
             const height = container.clientHeight;
+            if (width <= 0 || height <= 0) return;
             renderer.setSize(width, height);
             camera.perspective({ aspect: gl.canvas.width / gl.canvas.height });
         };
@@ -148,6 +149,13 @@ export default function HeroGalaxy({ className = '' }: HeroGalaxyProps) {
             mouseRef.current = { x, y };
         };
 
+        // ResizeObserver covers every cause of container size change — initial
+        // layout settling, font load reflow, DeferredEmbed iframe mounting,
+        // window resize, viewport orientation. Without it, the canvas keeps
+        // its mount-time dimensions and ends up squished or off-screen the
+        // moment anything below it grows.
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+        ro?.observe(container);
         window.addEventListener('resize', resize, { passive: true });
         container.addEventListener('mousemove', handleMouseMove);
         resize();
@@ -201,8 +209,12 @@ export default function HeroGalaxy({ className = '' }: HeroGalaxyProps) {
         let animationFrameId = 0;
         let lastTime = performance.now();
         let elapsed = 0;
+        let contextLost = false;
 
         const update = (time: number) => {
+            // Don't re-queue or render while the GPU context is gone — Chrome
+            // will fire webglcontextrestored later and we'll resume from there.
+            if (contextLost) return;
             animationFrameId = window.requestAnimationFrame(update);
             const delta = time - lastTime;
             lastTime = time;
@@ -212,15 +224,69 @@ export default function HeroGalaxy({ className = '' }: HeroGalaxyProps) {
             particles.position.x = -mouseRef.current.x * PARTICLE_HOVER_FACTOR;
             particles.position.y = -mouseRef.current.y * PARTICLE_HOVER_FACTOR;
 
-            renderer.render({ scene: particles, camera });
+            try {
+                renderer.render({ scene: particles, camera });
+            } catch {
+                // Swallow transient render failures so a single bad frame
+                // doesn't trip Next.js's global error boundary on prod.
+            }
         };
 
         animationFrameId = window.requestAnimationFrame(update);
 
+        // ── WebGL context loss / recovery ──
+        // Root cause of the "galaxy disappears after ~2s" bug: when the
+        // DeferredEmbed iframe (shared analytics dashboard) finishes mounting
+        // and Chromium's GPU process feels pressure, it evicts the LRU WebGL
+        // context — which is this one, since the iframe just got busier. The
+        // default behaviour is permanent loss. preventDefault() on the lost
+        // event tells the browser we can recover; restored fires later and
+        // we re-bind uniforms + resume the RAF loop.
+        const handleContextLost = (e: Event) => {
+            e.preventDefault();
+            contextLost = true;
+            window.cancelAnimationFrame(animationFrameId);
+        };
+        const handleContextRestored = () => {
+            contextLost = false;
+            // Re-upload uniforms — they may be reset by the driver on restore.
+            // Geometry / program / mesh references in OGL hold their own gl
+            // resources and re-create as needed on the next render call.
+            program.uniforms.uTime.value = 0;
+            lastTime = performance.now();
+            animationFrameId = window.requestAnimationFrame(update);
+        };
+        gl.canvas.addEventListener('webglcontextlost', handleContextLost as EventListener, false);
+        gl.canvas.addEventListener('webglcontextrestored', handleContextRestored as EventListener, false);
+
+        // Pause the loop when the tab is hidden — saves GPU and reduces the
+        // chance of being the LRU context targeted for eviction.
+        const handleVisibility = () => {
+            if (document.hidden) {
+                window.cancelAnimationFrame(animationFrameId);
+            } else if (!contextLost) {
+                lastTime = performance.now();
+                animationFrameId = window.requestAnimationFrame(update);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+
         return () => {
+            ro?.disconnect();
             window.removeEventListener('resize', resize);
             container.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            gl.canvas.removeEventListener('webglcontextlost', handleContextLost as EventListener);
+            gl.canvas.removeEventListener('webglcontextrestored', handleContextRestored as EventListener);
             window.cancelAnimationFrame(animationFrameId);
+
+            // Explicitly release the GL context so a re-mount (StrictMode in
+            // dev, or any future remount) doesn't pile up against the per-page
+            // WebGL context limit.
+            try {
+                const loseCtx = gl.getExtension('WEBGL_lose_context');
+                loseCtx?.loseContext();
+            } catch { /* extension unsupported — fine */ }
 
             if (container.contains(gl.canvas)) {
                 container.removeChild(gl.canvas);
