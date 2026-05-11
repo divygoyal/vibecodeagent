@@ -608,7 +608,15 @@ export default function LandingHomepage() {
             />
 
             <section id="dashboard" className="relative isolate overflow-hidden border-b border-white/[0.06] bg-black">
-                <div className="absolute inset-0 hidden lg:block">
+                {/* Galaxy is sized to the hero-TEXT region only, not the full
+                    section. With fov=15 the camera's vertical frustum is narrow,
+                    so the particle sphere only projects onto the center ~26% of
+                    the canvas. If the canvas is the full section height (~1600px)
+                    that center band lands inside the embedded iframe area, which
+                    is exactly the bug screenshot showed. Constraining the canvas
+                    height (~860px on lg) puts the center band squarely behind
+                    the eyebrow + h1 + subtitle. */}
+                <div className="absolute inset-x-0 top-0 h-[860px] hidden lg:block">
                     <HeroGalaxy />
                 </div>
 

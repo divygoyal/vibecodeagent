@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Camera, Geometry, Mesh, Program, Renderer } from 'ogl';
 
 const PARTICLE_COLORS = ['#ffffff', '#f5fbff', '#e9f6fb', '#7AD9DA'];
-const PARTICLE_COUNT = 500;
+const PARTICLE_COUNT = 400;
 const PARTICLE_SPREAD = 10;
 const PARTICLE_SPEED = 0.5;
 const PARTICLE_BASE_SIZE = 100;
