@@ -199,10 +199,14 @@ function buildGalaxyScene(
     let lastTime = performance.now();
     let elapsed = 0;
     let alive = true;
+    // Frame counter consulted by the watchdog below to detect a silently
+    // stopped RAF loop (canvas in DOM and context alive, but nothing rendering).
+    let frameCount = 0;
 
     const update = (time: number) => {
         if (!alive) return;
         animationFrameId = window.requestAnimationFrame(update);
+        frameCount += 1;
         const delta = time - lastTime;
         lastTime = time;
         elapsed += delta * PARTICLE_SPEED;
@@ -216,6 +220,10 @@ function buildGalaxyScene(
 
     animationFrameId = window.requestAnimationFrame(update);
 
+    if (typeof console !== 'undefined' && console.info) {
+        console.info('hero-galaxy: scene started');
+    }
+
     // ── WebGL context loss handler ──
     // Calling event.preventDefault() opts in to recovery (browser keeps the
     // canvas eligible for webglcontextrestored). But we DO NOT wait for that
@@ -226,8 +234,6 @@ function buildGalaxyScene(
         e.preventDefault();
         alive = false;
         window.cancelAnimationFrame(animationFrameId);
-        // Best-effort diagnostic so we can see in console whether this is the
-        // path that fires when the galaxy disappears.
         if (typeof console !== 'undefined' && console.info) {
             console.info('hero-galaxy: webglcontextlost, scheduling rebuild');
         }
@@ -246,8 +252,67 @@ function buildGalaxyScene(
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
+    // ── Diagnostic watchdog ──
+    // Production reports of "galaxy disappears after ~2s" had no console errors
+    // and no webglcontextlost event firing. This watchdog ticks every 2s and
+    // checks four things that can silently cause the canvas to stop being
+    // visible without any error surfacing:
+    //   1. canvas removed from its container (extension, external script, or
+    //      React reconciliation moving things)
+    //   2. canvas's CSS clientWidth/Height became 0 (layout shifted it out)
+    //   3. container display:none / visibility:hidden (parent class changed)
+    //   4. RAF loop silently stopped (frame counter didn't advance)
+    // On any anomaly we log to console and trigger the same rebuild path that
+    // context loss uses, so a fresh scene comes up. Logs use console.info so
+    // they show under "Default levels" in DevTools without being noisy errors.
+    let lastFrameCount = 0;
+    const watchdog = window.setInterval(() => {
+        if (!alive) return;
+        const inDom = container.contains(gl.canvas);
+        const canvasW = gl.canvas.clientWidth;
+        const canvasH = gl.canvas.clientHeight;
+        const styles = window.getComputedStyle(container);
+        const display = styles.display;
+        const visibility = styles.visibility;
+        const opacity = styles.opacity;
+        const framesIn2s = frameCount - lastFrameCount;
+        lastFrameCount = frameCount;
+
+        const stuck = framesIn2s === 0;
+        const hidden = display === 'none' || visibility === 'hidden' || Number(opacity) === 0;
+        const sized = canvasW > 0 && canvasH > 0;
+
+        if (!inDom || stuck || hidden || !sized) {
+            if (console.info) {
+                console.info('hero-galaxy: anomaly', {
+                    inDom,
+                    canvasSize: `${canvasW}x${canvasH}`,
+                    containerDisplay: display,
+                    containerVisibility: visibility,
+                    containerOpacity: opacity,
+                    framesIn2s,
+                });
+            }
+        }
+
+        if (!inDom || hidden || !sized) {
+            // Canvas isn't visible — full rebuild via the same path context
+            // loss takes. The new scene will measure the container freshly.
+            alive = false;
+            window.cancelAnimationFrame(animationFrameId);
+            window.clearInterval(watchdog);
+            onContextLost();
+        } else if (stuck) {
+            // RAF loop died but canvas is still healthy — just restart the loop
+            // without tearing down GL resources.
+            lastTime = performance.now();
+            animationFrameId = window.requestAnimationFrame(update);
+        }
+    }, 2000);
+
     const dispose = () => {
         alive = false;
+        window.clearInterval(watchdog);
         ro?.disconnect();
         window.removeEventListener('resize', resize);
         container.removeEventListener('mousemove', handleMouseMove);
