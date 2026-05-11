@@ -22,11 +22,33 @@ interface SharePromoPopupProps {
     /** Force open immediately on mount (preview / debug). */
     initialOpen?: boolean;
     /** Auto-open after this many ms once the viewer has had a chance to
-     *  engage with the dashboard. Ignored when initialOpen is true. */
+     *  engage with the dashboard. Ignored when initialOpen is true.
+     *  Exit-intent (mouse leaves the top of the viewport) also triggers
+     *  the popup — whichever fires first wins. */
     autoOpenDelayMs?: number;
     /** CTA destination — defaults to the marketing home page with utm so
      *  conversions from this surface are attributable in analytics. */
     ctaUrl?: string;
+}
+
+// sessionStorage flag: once the viewer dismisses (X / Esc / backdrop) OR clicks
+// the CTA, suppress the popup for the rest of their tab session. Persisting
+// across the tab close is too aggressive — most share-view visitors are
+// one-time anyway, and a returning viewer in a fresh tab gets a fresh chance.
+const DISMISS_KEY = 'tc-share-popup-dismissed';
+
+function isAlreadyDismissed(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        return window.sessionStorage.getItem(DISMISS_KEY) === '1';
+    } catch { return false; }
+}
+
+function markDismissed(): void {
+    if (typeof window === 'undefined') return;
+    try {
+        window.sessionStorage.setItem(DISMISS_KEY, '1');
+    } catch { /* sessionStorage blocked (private mode) — non-fatal */ }
 }
 
 // Clarity event helper — Microsoft Clarity is already wired in app/layout.tsx.
@@ -49,18 +71,52 @@ export default function SharePromoPopup({
     // Guard against double-firing the impression event in React StrictMode dev
     // re-runs and in production when the parent re-renders during open.
     const impressionFiredRef = useRef(false);
+    // Tracks which trigger opened the popup — sent with the impression event
+    // so we can compare conversion lift between timer and exit-intent paths.
+    const openTriggerRef = useRef<'timer' | 'exit-intent' | 'initial' | null>(
+        initialOpen ? 'initial' : null,
+    );
 
+    // Auto-open: timer OR exit-intent, whichever fires first. Both gated by
+    // the session-dismissed flag so a viewer who closed the popup once isn't
+    // pestered again on scroll or tab-switch.
     useEffect(() => {
         if (initialOpen || autoOpenDelayMs <= 0) return;
-        const t = window.setTimeout(() => setOpen(true), autoOpenDelayMs);
-        return () => window.clearTimeout(t);
+        if (isAlreadyDismissed()) return;
+
+        let fired = false;
+        const fire = (trigger: 'timer' | 'exit-intent') => {
+            if (fired) return;
+            fired = true;
+            openTriggerRef.current = trigger;
+            setOpen(true);
+        };
+
+        const timer = window.setTimeout(() => fire('timer'), autoOpenDelayMs);
+
+        // Exit-intent: viewer's cursor leaves the viewport via the TOP edge
+        // (clientY <= 0). That's the canonical signal for "about to switch
+        // tab / close window / hit the URL bar" — i.e. about to leave. Other
+        // mouse-leaves (sides, bottom) don't predict departure and are noisy
+        // on multi-monitor setups, so we filter to top-only.
+        // Mobile has no equivalent native signal; the timer still catches
+        // mobile viewers on its own.
+        const handleMouseLeave = (e: MouseEvent) => {
+            if (e.clientY <= 0) fire('exit-intent');
+        };
+        document.documentElement.addEventListener('mouseleave', handleMouseLeave);
+
+        return () => {
+            window.clearTimeout(timer);
+            document.documentElement.removeEventListener('mouseleave', handleMouseLeave);
+        };
     }, [initialOpen, autoOpenDelayMs]);
 
     // Fire impression once when the popup actually becomes visible.
     useEffect(() => {
         if (!open || impressionFiredRef.current) return;
         impressionFiredRef.current = true;
-        trackClarity('share-popup-shown');
+        trackClarity('share-popup-shown', { trigger: openTriggerRef.current });
     }, [open]);
 
     // Close on Escape — standard modal behaviour, no library needed.
@@ -68,6 +124,7 @@ export default function SharePromoPopup({
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
+                markDismissed();
                 trackClarity('share-popup-dismissed', { reason: 'esc' });
                 setOpen(false);
             }
@@ -77,16 +134,19 @@ export default function SharePromoPopup({
     }, [open]);
 
     const handleBackdrop = () => {
+        markDismissed();
         trackClarity('share-popup-dismissed', { reason: 'backdrop' });
         setOpen(false);
     };
 
     const handleCloseButton = () => {
+        markDismissed();
         trackClarity('share-popup-dismissed', { reason: 'x-button' });
         setOpen(false);
     };
 
     const handleCtaClick = () => {
+        markDismissed();
         trackClarity('share-popup-cta-clicked');
     };
 
@@ -125,13 +185,15 @@ export default function SharePromoPopup({
                             className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.18] to-transparent"
                         />
 
-                        {/* X close: kept understated (zinc-700) so it doesn't visually
-                            invite a reflex click — viewers can still find it on hover
-                            or use Esc / backdrop. Reduces accidental dismissals. */}
+                        {/* X close: zinc-700 was too low-contrast against the
+                            #0a0d12 background — viewers couldn't find it. Bumped
+                            to zinc-500 + a subtle background pill so it reads as
+                            a button without becoming a click-magnet. Esc and
+                            backdrop still work as redundant exits. */}
                         <button
                             type="button"
                             onClick={handleCloseButton}
-                            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-zinc-700 transition hover:bg-white/[0.06] hover:text-zinc-300"
+                            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04] text-zinc-500 ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.1] hover:text-zinc-100 hover:ring-white/[0.12]"
                             aria-label="Close"
                         >
                             <X className="h-4 w-4" />

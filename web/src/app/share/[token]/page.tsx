@@ -7,10 +7,13 @@ import SharedDashboardClient from './SharedDashboardClient';
 import SharePromoPopup from '@/components/share/SharePromoPopup';
 import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
 
-// Promo popup auto-opens 5s after a viewer lands on the public share view.
-// Only mounts when !isEmbed — never injected into customer iframes where it
-// would feel intrusive to their dashboard viewers.
-const PROMO_POPUP_DELAY_MS = 5000;
+// Promo popup auto-opens 20s after a viewer lands on the public share view,
+// OR sooner on exit-intent (mouse leaving the top of the viewport). The
+// 20s window gives them time to actually engage with the dashboard before
+// being pitched; exit-intent catches bouncers who would otherwise leave
+// without ever seeing the popup. Only mounts when !isEmbed — never
+// injected into customer iframes where it would feel intrusive.
+const PROMO_POPUP_DELAY_MS = 20000;
 
 export const dynamic = 'force-dynamic';
 
