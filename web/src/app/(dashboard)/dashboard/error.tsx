@@ -12,10 +12,17 @@ export default function DashboardError({
 }) {
   useEffect(() => {
     console.error('Dashboard error:', error);
+    // Best-effort telemetry — surface the crash in Clarity so we can see how
+    // often it fires for real users (e.g. translate-induced removeChild).
+    if (typeof window !== 'undefined' && (window as { clarity?: (...args: unknown[]) => void }).clarity) {
+      try {
+        (window as { clarity?: (...args: unknown[]) => void }).clarity?.('event', 'dashboard-error', { digest: error?.digest, message: error?.message });
+      } catch { /* clarity not loaded yet */ }
+    }
   }, [error]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
+    <div translate="no" className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
       <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
         <AlertTriangle className="w-8 h-8 text-red-400" />
       </div>

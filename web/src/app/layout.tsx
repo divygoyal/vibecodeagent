@@ -81,6 +81,24 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
+        {/*
+          Chrome / Edge / Safari auto-translate wrap text nodes in a <font> tag,
+          which steals them from React's expected parent. When React then runs
+          removeChild / insertBefore on what it thinks is its own child, the
+          browser throws "NotFoundError: ... not a child of this node" and the
+          whole tree unmounts. This is React issue #11538 (open since 2017).
+
+          Patching the two Node prototype methods to no-op on a parent
+          mismatch lets translate freely mutate the DOM while React keeps
+          rendering. Worst case is a single dropped update on a contested
+          node — vastly better than the whole page crashing. Runs synchronously
+          during HTML parse, so it is in place before React hydrates.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if(typeof Node==='undefined'||!Node.prototype)return;function warn(op){if(typeof console!=='undefined'&&console.warn){console.warn('translate-patch: '+op+' parent mismatch');}}var rc=Node.prototype.removeChild;Node.prototype.removeChild=function(c){if(c&&c.parentNode!==this){warn('removeChild');return c;}return rc.call(this,c);};var ib=Node.prototype.insertBefore;Node.prototype.insertBefore=function(n,b){if(b&&b.parentNode!==this){warn('insertBefore');return n;}return ib.call(this,n,b);};var rp=Node.prototype.replaceChild;Node.prototype.replaceChild=function(n,o){if(o&&o.parentNode!==this){warn('replaceChild');return o;}return rp.call(this,n,o);};})();`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
