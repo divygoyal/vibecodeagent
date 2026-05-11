@@ -4,7 +4,13 @@ import { getShareData } from '@/app/api/share/route';
 import SharedOverviewClient from '@/components/share-overview/openpanel/SharedOverviewClient';
 import SharedUmamiClient from '@/components/share-overview/umami/SharedUmamiClient';
 import SharedDashboardClient from './SharedDashboardClient';
+import SharePromoPopup from '@/components/share/SharePromoPopup';
 import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
+
+// Promo popup auto-opens 5s after a viewer lands on the public share view.
+// Only mounts when !isEmbed — never injected into customer iframes where it
+// would feel intrusive to their dashboard viewers.
+const PROMO_POPUP_DELAY_MS = 5000;
 
 export const dynamic = 'force-dynamic';
 
@@ -63,25 +69,31 @@ export default async function SharedDashboardPage({
 
     if (share.config.layoutMode === 'openpanel_overview') {
         return (
-            <SharedOverviewClient
-                token={token}
-                siteUrl={share.siteUrl}
-                views={share.views}
-                embedMode={isEmbed}
-                config={share.config}
-                hideOwnerLogo={hideOwnerLogo}
-            />
+            <>
+                <SharedOverviewClient
+                    token={token}
+                    siteUrl={share.siteUrl}
+                    views={share.views}
+                    embedMode={isEmbed}
+                    config={share.config}
+                    hideOwnerLogo={hideOwnerLogo}
+                />
+                {!isEmbed ? <SharePromoPopup autoOpenDelayMs={PROMO_POPUP_DELAY_MS} /> : null}
+            </>
         );
     }
 
     if (share.config.layoutMode === 'umami_fork') {
         return (
-            <SharedUmamiClient
-                token={token}
-                siteUrl={share.siteUrl}
-                views={share.views}
-                embedMode={isEmbed}
-            />
+            <>
+                <SharedUmamiClient
+                    token={token}
+                    siteUrl={share.siteUrl}
+                    views={share.views}
+                    embedMode={isEmbed}
+                />
+                {!isEmbed ? <SharePromoPopup autoOpenDelayMs={PROMO_POPUP_DELAY_MS} /> : null}
+            </>
         );
     }
 
@@ -159,6 +171,8 @@ export default async function SharedDashboardPage({
                     </Link>
                 </div>
             </footer>
+
+            <SharePromoPopup autoOpenDelayMs={PROMO_POPUP_DELAY_MS} />
         </div>
     );
 }
