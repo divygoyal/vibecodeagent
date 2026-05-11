@@ -131,7 +131,13 @@ export default function HeroGalaxy({ className = '' }: HeroGalaxyProps) {
         gl.clearColor(0, 0, 0, 0);
         container.appendChild(gl.canvas);
 
-        const camera = new Camera(gl, { fov: 15 });
+        // fov=45 (was 15): the hero rebrand made the section much taller (~1500px
+        // with the new eyebrow + 2-line h1 + subtitle + trust line + iframe).
+        // The old narrow fov clipped all but the center ~26% of the particle
+        // sphere, which after the section grew taller fell into the iframe area
+        // — so the galaxy looked "gone" from the hero text. A wider fov keeps
+        // the whole sphere visible across hero text AND iframe gutters.
+        const camera = new Camera(gl, { fov: 45 });
         camera.position.set(0, 0, 20);
 
         const resize = () => {
