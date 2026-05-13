@@ -8,7 +8,7 @@ export type PropertyOption = {
     property?: string;
 };
 
-export type Ga4Availability = 'available' | 'site_unmatched' | 'inventory_empty' | 'inventory_error';
+export type Ga4Availability = 'available' | 'site_unmatched' | 'inventory_empty' | 'inventory_error' | 'stale';
 
 export type DashboardSelectionResolution = {
     resolvedSiteUrl: string;
@@ -18,6 +18,13 @@ export type DashboardSelectionResolution = {
     ga4Availability: Ga4Availability;
     isSelectedSiteValid: boolean;
     isSelectedPropertyValid: boolean;
+    /**
+     * True when the user has a saved workspace (site, property, or both) but
+     * at least one of those saved values is no longer present in the current
+     * Google inventory. Consumers should treat this as "force re-pick"
+     * rather than silently substituting a different site/property.
+     */
+    isStaleWorkspace: boolean;
 };
 
 export function formatSiteLabel(siteUrl: string) {
@@ -66,63 +73,71 @@ export function resolveDashboardSelection({
 
     const isSelectedSiteValid = Boolean(selectedSite) && validSites.includes(selectedSite);
     const isSelectedPropertyValid = Boolean(selectedProperty) && validProperties.some((property) => property.property === selectedProperty);
-
-    const resolvedSiteUrl = isSelectedSiteValid
-        ? selectedSite
-        : validSites[0] || (siteInventoryError ? selectedSite : '');
-
-    const matchedProperty = matchPropertyToSite(resolvedSiteUrl, validProperties);
     const hasGa4Properties = validProperties.length > 0;
+    const hadSavedSelection = Boolean(selectedSite) || Boolean(selectedProperty);
 
-    if (resolvedSiteUrl) {
-        // PRIORITY 1: user has EXPLICITLY paired this site with a property in their
-        // workspace setup. Respect the explicit pairing even when the property's
-        // display name doesn't fuzzy-match the site domain (e.g., GA4 property
-        // "bhagwadgeeta" paired with site "bhagavadgitaexplained.com" — different
-        // names, same workspace). Without this, the dashboard incorrectly shows
-        // "No GA4 property matches this site" despite the user having matched
-        // them deliberately.
-        if (isSelectedPropertyValid) {
-            const explicitProperty = validProperties.find((property) => property.property === selectedProperty) || null;
-            if (explicitProperty) {
-                return {
-                    resolvedSiteUrl,
-                    resolvedPropertyId: selectedProperty,
-                    matchedProperty: explicitProperty,
-                    hasGa4Properties,
-                    ga4Availability: 'available',
-                    isSelectedSiteValid,
-                    isSelectedPropertyValid,
-                };
-            }
-        }
-
-        // PRIORITY 2: fall back to fuzzy name matching (e.g., GA4 "antigravity"
-        // automatically pairs with GSC "antigravity.codes" without explicit setup).
-        if (matchedProperty?.property) {
-            return {
-                resolvedSiteUrl,
-                resolvedPropertyId: matchedProperty.property,
-                matchedProperty,
-                hasGa4Properties,
-                ga4Availability: 'available',
-                isSelectedSiteValid,
-                isSelectedPropertyValid,
-            };
-        }
-
-        // PRIORITY 3: no explicit pairing AND no fuzzy match. Genuinely unmatched.
+    // STALE PATH — the user has a saved workspace but at least one piece is
+    // no longer in the current Google inventory (revoked access, switched
+    // Google account, site removed from Search Console, property deleted).
+    //
+    // We deliberately do NOT silently substitute a fuzzy-matched property or
+    // fall back to validSites[0] — that would silently put the user on the
+    // wrong workspace and persist the wrong pairing back to localStorage on
+    // the next save. Inventory loading errors are excluded so a transient
+    // network hiccup doesn't bounce a valid user to the picker.
+    if (
+        hadSavedSelection
+        && !siteInventoryError
+        && !propertyInventoryError
+        && ((selectedSite && !isSelectedSiteValid) || (selectedProperty && !isSelectedPropertyValid))
+    ) {
         return {
-            resolvedSiteUrl,
+            resolvedSiteUrl: '',
+            resolvedPropertyId: '',
+            matchedProperty: null,
+            hasGa4Properties,
+            ga4Availability: 'stale',
+            isSelectedSiteValid,
+            isSelectedPropertyValid,
+            isStaleWorkspace: true,
+        };
+    }
+
+    // HAPPY PATH — the user's explicit site + property pairing is intact.
+    // We respect the pairing even when the property's display name doesn't
+    // match the site domain (e.g., GA4 property "bhagwadgeeta" paired with
+    // site "bhagavadgitaexplained.com"). No fuzzy matching is performed.
+    if (isSelectedSiteValid && isSelectedPropertyValid) {
+        const explicitProperty = validProperties.find((property) => property.property === selectedProperty) || null;
+        return {
+            resolvedSiteUrl: selectedSite,
+            resolvedPropertyId: selectedProperty,
+            matchedProperty: explicitProperty,
+            hasGa4Properties,
+            ga4Availability: 'available',
+            isSelectedSiteValid,
+            isSelectedPropertyValid,
+            isStaleWorkspace: false,
+        };
+    }
+
+    // Site-only saved selection (user is mid-setup or chose to operate
+    // without a GA4 pairing). Surfaces as "site_unmatched" so the GA4-locked
+    // UI prompts them to pair a property.
+    if (isSelectedSiteValid) {
+        return {
+            resolvedSiteUrl: selectedSite,
             resolvedPropertyId: '',
             matchedProperty: null,
             hasGa4Properties,
             ga4Availability: hasGa4Properties ? 'site_unmatched' : propertyInventoryError ? 'inventory_error' : 'inventory_empty',
             isSelectedSiteValid,
             isSelectedPropertyValid,
+            isStaleWorkspace: false,
         };
     }
 
+    // Property-only saved selection (no site picked yet).
     if (isSelectedPropertyValid) {
         return {
             resolvedSiteUrl: '',
@@ -132,9 +147,14 @@ export function resolveDashboardSelection({
             ga4Availability: 'available',
             isSelectedSiteValid,
             isSelectedPropertyValid,
+            isStaleWorkspace: false,
         };
     }
 
+    // No usable saved selection. Preserve the user's last input through
+    // an inventory error so they can read what was there before the network
+    // recovered, but otherwise leave both resolved fields empty so the
+    // dashboard surfaces the right empty/error state.
     return {
         resolvedSiteUrl: siteInventoryError ? selectedSite : '',
         resolvedPropertyId: '',
@@ -143,6 +163,7 @@ export function resolveDashboardSelection({
         ga4Availability: propertyInventoryError ? 'inventory_error' : 'inventory_empty',
         isSelectedSiteValid,
         isSelectedPropertyValid,
+        isStaleWorkspace: false,
     };
 }
 
@@ -154,6 +175,11 @@ export function getGa4AvailabilityCopy(
     const siteLabel = siteUrl ? formatSiteLabel(siteUrl) : 'this site';
 
     switch (availability) {
+        case 'stale':
+            return {
+                title: 'Your previous workspace is no longer available',
+                description: 'The site or GA4 property you had selected is missing from this Google account. Pick a new workspace to continue.',
+            };
         case 'site_unmatched':
             return {
                 title: 'No GA4 property matches this site',

@@ -519,6 +519,7 @@ export default function DashboardLayout({
         resolvedPropertyId,
         hasGa4Properties,
         ga4Availability,
+        isStaleWorkspace,
     } = selection;
     const isDemoWorkspace = hasGoogleConnection
         && !siteInventoryLoading
@@ -532,6 +533,22 @@ export default function DashboardLayout({
     // Redirect-to-setup guard lives in middleware now — see web/src/middleware.ts.
     // Reading the JWT claim before the RSC ships avoids the layout-effect race
     // where AI chat would render before the redirect could land.
+
+    // Stale-workspace guard. When the user's saved site OR property is no
+    // longer present in their current Google inventory (revoked access,
+    // switched Google account, site removed from Search Console, property
+    // deleted), force them through the picker rather than silently snapping
+    // to a fuzzy-matched or first-available substitute. This declaration
+    // sits ABOVE the local-state clear effects so React runs the redirect
+    // first within a render — otherwise the clear effects would zero out
+    // selectedSite/Property, the next render's resolution would no longer
+    // be 'stale', and the redirect would never fire.
+    useEffect(() => {
+        if (!user) return;
+        if (!isStaleWorkspace) return;
+        if (isSetupRoute) return;
+        router.replace('/dashboard/setup?reason=stale');
+    }, [user, isStaleWorkspace, isSetupRoute, router]);
 
     useEffect(() => {
         if (!user) return;

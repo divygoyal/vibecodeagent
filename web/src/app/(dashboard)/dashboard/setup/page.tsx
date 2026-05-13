@@ -218,9 +218,19 @@ export default function SetupPage() {
     // fix at ai-chat/page.tsx:689.
     const [greeting, setGreeting] = useState<string | null>(null);
     const [userName, setUserName] = useState<string>('');
+    // Banner toggle for users redirected here by the layout's stale-workspace
+    // guard (?reason=stale). Read from window.location.search rather than
+    // useSearchParams to avoid pulling the page into a Suspense boundary —
+    // mirrors the resolveReturnTo pattern above.
+    const [staleReason, setStaleReason] = useState(false);
     useEffect(() => {
         const hr = new Date().getHours();
         setGreeting(hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening');
+    }, []);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('reason') === 'stale') setStaleReason(true);
     }, []);
     useEffect(() => {
         const name = session?.user?.name?.split(' ')[0];
@@ -564,6 +574,15 @@ export default function SetupPage() {
 
         return cosmicShell(
             <div className="max-w-5xl mx-auto py-10 sm:py-14 px-4 pb-24 sm:pb-14 fade-in">
+                {staleReason && (
+                    <div className="max-w-2xl mx-auto mb-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
+                        <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
+                            <span className="font-semibold text-amber-200">Your previous workspace is no longer available.</span>{' '}
+                            The site or GA4 property you had selected is missing from this Google account. Pick a new one below.
+                        </div>
+                    </div>
+                )}
                 <div className="text-center mb-8">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
                         TrafficClaw

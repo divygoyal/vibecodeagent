@@ -892,31 +892,16 @@ export default function AIChat() {
     const [repoOpen, setRepoOpen] = useState(false);
     const repoDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Match GA4 property to selected site.
-    // Priority: (1) workspace's explicitly-paired property, (2) fuzzy name match against
-    // the GSC site domain, (3) first available property. Honoring (1) prevents the
-    // "No GA4 property matches this site" failure when the user's GA4 display name
-    // doesn't share tokens with the GSC domain (e.g., "bhagwadgeeta" ↔ "bhagavadgitaexplained.com").
+    // Resolve GA4 property strictly from the user's explicit workspace pairing.
+    // No fuzzy-name match, no first-available fallback — if the saved property
+    // isn't in the current GA4 inventory the dashboard layout will have already
+    // redirected the user to /dashboard/setup?reason=stale, so by the time chat
+    // renders here either workspaceProperty is valid or there's nothing to pair
+    // and chat operates without GA4 context.
     const matchedProperty = useMemo(() => {
-        if (normalizedProperties.length === 0) return undefined;
-        // Priority 1: explicit workspace pairing
-        if (workspaceProperty) {
-            const explicit = normalizedProperties.find((property) => property.property === workspaceProperty);
-            if (explicit) return explicit;
-        }
-        // Priority 2: fuzzy name match
-        if (selectedSite) {
-            const domain = selectedSite.replace('sc-domain:', '').replace('https://', '').replace('/', '');
-            const domainRoot = domain.split('.')[0];
-            const fuzzy =
-                normalizedProperties.find((property) => property.displayName?.toLowerCase().includes(domain.toLowerCase())) ||
-                normalizedProperties.find((property) => (property.propertyId || property.property || '').toLowerCase().includes(domainRoot.toLowerCase())) ||
-                normalizedProperties.find((property) => property.displayName?.toLowerCase().includes(domainRoot.toLowerCase()));
-            if (fuzzy) return fuzzy;
-        }
-        // Priority 3: first available
-        return normalizedProperties[0];
-    }, [normalizedProperties, selectedSite, workspaceProperty]);
+        if (!workspaceProperty || normalizedProperties.length === 0) return undefined;
+        return normalizedProperties.find((property) => property.property === workspaceProperty);
+    }, [normalizedProperties, workspaceProperty]);
 
     const { data: analyticsData } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedSite);
     const { data: seoData } = useSeoData('all', selectedSite, hasGoogleConnection && !!selectedSite);

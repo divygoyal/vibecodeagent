@@ -43,7 +43,7 @@ export const AnalyticsContext = React.createContext<{
     setRange: (r: string) => void;
     hasGoogleConnection: boolean;
     hasGa4Properties: boolean;
-    ga4Availability: 'available' | 'site_unmatched' | 'inventory_empty' | 'inventory_error';
+    ga4Availability: 'available' | 'site_unmatched' | 'inventory_empty' | 'inventory_error' | 'stale';
     propertyInventoryError: string | null;
     isDemoWorkspace: boolean;
     demoDomainLabel: string;
