@@ -1215,6 +1215,16 @@ export default function AIChat() {
     return (
         <div className="flex flex-col h-[calc(100dvh-64px)] max-h-[calc(100dvh-64px)] bg-black">
 
+            {/* ── Side-effect handlers — must mount on every render path, not just the
+               empty state, otherwise ?q= / ?connected= deep-links are silently dropped
+               whenever the user already has a chat conversation in their store. ── */}
+            <Suspense fallback={null}>
+                <AutoPromptFromQuery onPrompt={(q) => sendMessage(q)} />
+            </Suspense>
+            <Suspense fallback={null}>
+                <ProviderConnectionCallback onConnected={handleProviderConnected} />
+            </Suspense>
+
             {/* ── GA4-required alert banner (replaces the old full-page lock) ── */}
             {isGa4Locked && (
                 <div className="flex-shrink-0 px-4 sm:px-6 pt-3">
@@ -1235,14 +1245,6 @@ export default function AIChat() {
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/5">
                 {showEmpty ? (
                     <div className="relative min-h-full overflow-hidden bg-black">
-                        {/* OAuth callback handler — runs after signIn() redirects back to ?connected=... */}
-                        <Suspense fallback={null}>
-                            <AutoPromptFromQuery onPrompt={(q) => sendMessage(q)} />
-                        </Suspense>
-                        <Suspense fallback={null}>
-                            <ProviderConnectionCallback onConnected={handleProviderConnected} />
-                        </Suspense>
-
                         {/* Cosmic background: stars + shooting stars */}
                         <StarField />
 
