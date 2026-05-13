@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo } from 'react';
 import { AlertTriangle, ArrowRight, Lightbulb, Search, Sparkles, TrendingUp } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { buildAskAiUrl } from '@/lib/askAi';
 import { useCannibalizationData } from '@/lib/useDashboardData';
 import type { SeoQuery } from './SeoQueriesPagesPanel';
 
@@ -11,8 +13,6 @@ interface SeoKeywordOpportunitiesPanelProps {
     siteUrl: string | null;
     /** Selected query's row from the parent table — used for the CTR-vs-expected and recommendation logic. */
     queryRow?: SeoQuery;
-    /** DOM id of the page-level recommendations panel for "View all" scroll-to. */
-    recommendationsAnchorId?: string;
 }
 
 const EXPECTED_CTR: Record<number, number> = {
@@ -51,7 +51,20 @@ function shortenPath(url: string): string {
     }
 }
 
-export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRow, recommendationsAnchorId = 'seo-recommendations' }: SeoKeywordOpportunitiesPanelProps) {
+function buildKeywordOpportunityPrompt(
+    keyword: string,
+    siteUrl: string | null,
+    queryRow: SeoQuery,
+    cannMatch: CannibalizedRow | null,
+    recommendation: { title: string; detail: string; impact: string },
+): string {
+    const site = siteUrl || 'my site';
+    const stats = `Currently ranking at position ${queryRow.position.toFixed(1)} with ${queryRow.clicks.toLocaleString()} clicks and ${queryRow.impressions.toLocaleString()} impressions (CTR ${queryRow.ctr.toFixed(1)}%).`;
+    const cannLine = cannMatch ? ` Cannibalization detected: ${cannMatch.pages.length} competing pages.` : '';
+    return `Build a step-by-step fix plan for the query "${keyword}" on ${site}. Recommended angle: "${recommendation.title}" — ${recommendation.detail} Expected impact: ${recommendation.impact}. ${stats}${cannLine} Use the right tools (find_cannibalization, generate_meta_tags, suggest_internal_links, analyze_keyword_clusters, run_page_audit) to investigate, then give me a numbered plan with effort estimate (S/M/L) and projected click lift per step.`;
+}
+
+export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRow }: SeoKeywordOpportunitiesPanelProps) {
     const { data: cannData } = useCannibalizationData(siteUrl);
     const cannMatch = useMemo<CannibalizedRow | null>(() => {
         if (!keyword) return null;
@@ -100,12 +113,6 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
             tone: 'low' as const,
         };
     }, [cannMatch, ctrAnalysis, queryRow]);
-
-    const handleViewAll = () => {
-        if (typeof document === 'undefined') return;
-        const el = document.getElementById(recommendationsAnchorId);
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
 
     return (
         <AnalyticsSubpagePanel
@@ -193,14 +200,14 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
                                     {recommendation.impact}
                                 </span>
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleViewAll}
+                            <Link
+                                href={buildAskAiUrl(buildKeywordOpportunityPrompt(keyword, siteUrl, queryRow, cannMatch, recommendation))}
                                 className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-emerald-500/25 bg-emerald-500/[0.08] py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.16]"
                             >
-                                View all recommendations
+                                <Sparkles className="h-3 w-3" />
+                                Build fix plan with AI
                                 <ArrowRight className="h-3 w-3" />
-                            </button>
+                            </Link>
                         </div>
                     ) : null}
                 </div>

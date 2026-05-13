@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo } from 'react';
-import { AlertTriangle, ExternalLink, Lightbulb, Search, Smartphone, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ExternalLink, Lightbulb, Search, Smartphone, Sparkles } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { buildAskAiUrl } from '@/lib/askAi';
 import { useCannibalizationData, useMobileGapData } from '@/lib/useDashboardData';
 import PositionPill from './PositionPill';
 
@@ -47,6 +49,20 @@ const SEVERITY_BADGE: Record<Severity, string> = {
 };
 const SEVERITY_LABEL: Record<Severity, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 
+function buildCannibalizationFixPrompt(query: string, siteUrl: string | null, row: CannibalizedRow): string {
+    const site = siteUrl || 'my site';
+    const maxPos = Math.max(...row.pages.map(p => p.position));
+    const topUrls = row.pages.slice(0, 3).map(p => p.page).join(', ');
+    return `Resolve cannibalization for the query "${query}" on ${site}. ${row.pages.length} pages compete in positions ${row.bestPosition.toFixed(1)}–${maxPos.toFixed(1)} with ${row.totalImpressions.toLocaleString()} total impressions. Top URLs: ${topUrls}. Use find_cannibalization to confirm, then tell me explicitly: (1) which page to keep, (2) which to 301-redirect or merge, (3) what canonical tags to set, (4) anchor text for new internal links, and (5) projected click recovery using calculate_revenue_impact.`;
+}
+
+function buildMobileGapFixPrompt(query: string, siteUrl: string | null, row: MobileGapRow): string {
+    const site = siteUrl || 'my site';
+    const mobileBetter = row.mobilePosition < row.desktopPosition;
+    const laggard = mobileBetter ? 'desktop' : 'mobile';
+    return `Fix the mobile-vs-desktop ranking gap for "${query}" on ${site}. Mobile ranks at position ${row.mobilePosition.toFixed(1)}, desktop at ${row.desktopPosition.toFixed(1)} — ${laggard} is the laggard by ${Math.abs(row.gap).toFixed(1)} positions. Use run_page_audit and inspect_url on the affected page (find it via get_search_performance filtered by this query). Return a numbered list of every issue with severity, the file/section to edit, and the SEO impact.`;
+}
+
 function shortenPath(url: string): string {
     try {
         const u = new URL(url);
@@ -85,15 +101,15 @@ export default function SeoIssueDetailPanel({ selection, siteUrl }: SeoIssueDeta
                     <p className="mt-1 max-w-xs text-[12px] text-zinc-500">Click any row in the Issues table to see affected pages and a recommended fix.</p>
                 </div>
             ) : selection.sourceType === 'cannibalization' ? (
-                <CannibalizationDetail row={cannMatch} query={selection.query} />
+                <CannibalizationDetail row={cannMatch} query={selection.query} siteUrl={siteUrl} />
             ) : (
-                <MobileGapDetail row={mobileMatch} query={selection.query} />
+                <MobileGapDetail row={mobileMatch} query={selection.query} siteUrl={siteUrl} />
             )}
         </AnalyticsSubpagePanel>
     );
 }
 
-function CannibalizationDetail({ row, query }: { row: CannibalizedRow | null; query: string }) {
+function CannibalizationDetail({ row, query, siteUrl }: { row: CannibalizedRow | null; query: string; siteUrl: string | null }) {
     if (!row) {
         return <div className="rounded-[14px] border border-white/[0.04] bg-[#0a0b0e] px-4 py-6 text-center text-[12px] text-zinc-500">No detail available for this query.</div>;
     }
@@ -166,12 +182,20 @@ function CannibalizationDetail({ row, query }: { row: CannibalizedRow | null; qu
                     <Sparkles className="h-2.5 w-2.5" />
                     +{Math.round(row.totalImpressions * 0.04).toLocaleString()} clicks/mo
                 </div>
+                <Link
+                    href={buildAskAiUrl(buildCannibalizationFixPrompt(query, siteUrl, row))}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-emerald-500/25 bg-emerald-500/[0.08] py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.16]"
+                >
+                    <Sparkles className="h-3 w-3" />
+                    Generate fix plan with AI
+                    <ArrowRight className="h-3 w-3" />
+                </Link>
             </div>
         </div>
     );
 }
 
-function MobileGapDetail({ row, query }: { row: MobileGapRow | null; query: string }) {
+function MobileGapDetail({ row, query, siteUrl }: { row: MobileGapRow | null; query: string; siteUrl: string | null }) {
     if (!row) {
         return <div className="rounded-[14px] border border-white/[0.04] bg-[#0a0b0e] px-4 py-6 text-center text-[12px] text-zinc-500">No detail available for this query.</div>;
     }
@@ -208,6 +232,14 @@ function MobileGapDetail({ row, query }: { row: MobileGapRow | null; query: stri
                     <Sparkles className="h-2.5 w-2.5" />
                     +{Math.round(Math.max(row.mobileImpressions, row.desktopImpressions) * 0.03).toLocaleString()} clicks/mo
                 </div>
+                <Link
+                    href={buildAskAiUrl(buildMobileGapFixPrompt(query, siteUrl, row))}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-emerald-500/25 bg-emerald-500/[0.08] py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.16]"
+                >
+                    <Sparkles className="h-3 w-3" />
+                    Generate fix plan with AI
+                    <ArrowRight className="h-3 w-3" />
+                </Link>
             </div>
         </div>
     );

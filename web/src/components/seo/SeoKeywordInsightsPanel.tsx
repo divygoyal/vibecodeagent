@@ -1,12 +1,16 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useMemo } from 'react';
 import {
     AlertCircle,
+    Edit3,
     Eye,
     ExternalLink,
+    FileText,
     Hash,
+    Link2 as LinkIcon,
     Loader2,
     MousePointer,
     Search,
@@ -16,6 +20,7 @@ import {
 } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { IntentBadge } from '@/components/IntentBadge';
+import { buildAskAiUrl } from '@/lib/askAi';
 import { useKeywordDetail } from '@/lib/useDashboardData';
 import PositionPill from './PositionPill';
 
@@ -128,6 +133,34 @@ function KpiTile({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: 
     );
 }
 
+interface KeywordSummary {
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+}
+
+function buildKeywordBriefPrompt(keyword: string, siteUrl: string | null, summary?: KeywordSummary): string {
+    const site = siteUrl || 'my site';
+    const ctx = summary
+        ? ` Current: position ${summary.position.toFixed(1)}, ${summary.clicks.toLocaleString()} clicks, ${summary.impressions.toLocaleString()} impressions, ${summary.ctr.toFixed(1)}% CTR.`
+        : '';
+    return `Write a content brief for ranking "${keyword}" on ${site}.${ctx} Use analyze_keyword_clusters and generate_content_strategy. Include search intent, target word count, H1 + H2 outline, primary entities to cover, and 5 internal links to add.`;
+}
+
+function buildKeywordMetaPrompt(keyword: string, siteUrl: string | null, summary?: KeywordSummary): string {
+    const site = siteUrl || 'my site';
+    const ctx = summary
+        ? ` Current CTR ${summary.ctr.toFixed(1)}% at position ${summary.position.toFixed(1)}.`
+        : '';
+    return `Use generate_meta_tags to rewrite the title and meta description for the page ranking for "${keyword}" on ${site}.${ctx} Give me 3 variants ranked by predicted CTR with the reasoning for each.`;
+}
+
+function buildKeywordLinksPrompt(keyword: string, siteUrl: string | null): string {
+    const site = siteUrl || 'my site';
+    return `Use suggest_internal_links to find which pages on ${site} should link to the page ranking for "${keyword}". List anchor text and source URLs in priority order, with rationale for each.`;
+}
+
 function SectionHeader({ icon: Icon, label, hint }: { icon: LucideIcon; label: string; hint?: string }) {
     return (
         <div className="mb-2 flex items-center justify-between">
@@ -229,6 +262,37 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
                         <div className="mt-2 flex gap-4 text-[11px] text-zinc-400">
                             <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Clicks</span>
                             <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cyan-400" /> Impressions</span>
+                        </div>
+                    </div>
+
+                    {/* AI actions — deep-link into the chat with this keyword's context */}
+                    <div className="rounded-[14px] border border-emerald-500/15 bg-emerald-500/[0.03] px-3.5 py-3">
+                        <div className="mb-2.5 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+                            <Sparkles className="h-3 w-3" />
+                            Ask AI
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <Link
+                                href={buildAskAiUrl(buildKeywordBriefPrompt(keyword, siteUrl, summary))}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-cyan-500/20 bg-cyan-500/[0.06] py-2 text-[11.5px] font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:bg-cyan-500/[0.14]"
+                            >
+                                <FileText className="h-3 w-3" />
+                                Generate brief
+                            </Link>
+                            <Link
+                                href={buildAskAiUrl(buildKeywordMetaPrompt(keyword, siteUrl, summary))}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-cyan-500/20 bg-cyan-500/[0.06] py-2 text-[11.5px] font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:bg-cyan-500/[0.14]"
+                            >
+                                <Edit3 className="h-3 w-3" />
+                                Rewrite meta
+                            </Link>
+                            <Link
+                                href={buildAskAiUrl(buildKeywordLinksPrompt(keyword, siteUrl))}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-cyan-500/20 bg-cyan-500/[0.06] py-2 text-[11.5px] font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:bg-cyan-500/[0.14]"
+                            >
+                                <LinkIcon className="h-3 w-3" />
+                                Internal links
+                            </Link>
                         </div>
                     </div>
 

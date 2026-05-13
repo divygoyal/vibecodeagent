@@ -1,20 +1,26 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo } from 'react';
 import {
     AlertCircle,
+    Edit3,
     Eye,
     ExternalLink,
     Hash,
+    Link2 as LinkIcon,
     Loader2,
     Monitor,
     MousePointer,
     Search,
     Smartphone,
+    Sparkles,
+    Stethoscope,
     TrendingUp,
     type LucideIcon,
 } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { buildAskAiUrl } from '@/lib/askAi';
 import { usePageDetail } from '@/lib/useDashboardData';
 import PositionPill from './PositionPill';
 
@@ -64,6 +70,34 @@ const TONE_ICON: Record<Tone, string> = {
     amber: 'text-amber-400 bg-amber-500/[0.08] border-amber-500/20',
     violet: 'text-violet-400 bg-violet-500/[0.08] border-violet-500/20',
 };
+
+interface PageSummary {
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+}
+
+function buildPageDiagnosePrompt(pageUrl: string, siteUrl: string | null, summary?: PageSummary): string {
+    const site = siteUrl || 'my site';
+    const ctx = summary
+        ? ` Current: position ${summary.position.toFixed(1)}, ${summary.clicks.toLocaleString()} clicks, ${summary.impressions.toLocaleString()} impressions, ${summary.ctr.toFixed(1)}% CTR.`
+        : '';
+    return `Diagnose performance for ${pageUrl} on ${site}.${ctx} Run a page audit with run_page_audit, check cannibalization with find_cannibalization, and use cross_source_diagnose. Give me the top 5 things to fix in priority order with effort estimate (S/M/L) and expected click lift.`;
+}
+
+function buildPageMetaPrompt(pageUrl: string, siteUrl: string | null, summary?: PageSummary): string {
+    const site = siteUrl || 'my site';
+    const ctx = summary
+        ? ` Currently CTR ${summary.ctr.toFixed(1)}% at position ${summary.position.toFixed(1)}.`
+        : '';
+    return `Use generate_meta_tags to rewrite the title and meta description for ${pageUrl} on ${site}.${ctx} First call get_search_performance to see the top queries that drive impressions to this page, then propose 3 title + description variants ranked by predicted CTR.`;
+}
+
+function buildPageLinksPrompt(pageUrl: string, siteUrl: string | null): string {
+    const site = siteUrl || 'my site';
+    return `Use suggest_internal_links to find which pages on ${site} should link to ${pageUrl}. List anchor text and source URLs in priority order with rationale for each.`;
+}
 
 function shortenPath(url: string): string {
     try {
@@ -239,6 +273,37 @@ export default function SeoPageInsightsPanel({ pageUrl, siteUrl, summary }: SeoP
                         ) : (
                             <div className="px-4 py-6 text-center text-[12px] text-zinc-500">No queries found for this page.</div>
                         )}
+                    </div>
+
+                    {/* AI actions — deep-link into the chat with this page's context */}
+                    <div className="rounded-[14px] border border-emerald-500/15 bg-emerald-500/[0.03] px-3.5 py-3">
+                        <div className="mb-2.5 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+                            <Sparkles className="h-3 w-3" />
+                            Ask AI
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <Link
+                                href={buildAskAiUrl(buildPageDiagnosePrompt(pageUrl, siteUrl, summary))}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-cyan-500/20 bg-cyan-500/[0.06] py-2 text-[11.5px] font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:bg-cyan-500/[0.14]"
+                            >
+                                <Stethoscope className="h-3 w-3" />
+                                Diagnose page
+                            </Link>
+                            <Link
+                                href={buildAskAiUrl(buildPageMetaPrompt(pageUrl, siteUrl, summary))}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-cyan-500/20 bg-cyan-500/[0.06] py-2 text-[11.5px] font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:bg-cyan-500/[0.14]"
+                            >
+                                <Edit3 className="h-3 w-3" />
+                                Rewrite meta
+                            </Link>
+                            <Link
+                                href={buildAskAiUrl(buildPageLinksPrompt(pageUrl, siteUrl))}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-cyan-500/20 bg-cyan-500/[0.06] py-2 text-[11.5px] font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:bg-cyan-500/[0.14]"
+                            >
+                                <LinkIcon className="h-3 w-3" />
+                                Internal links
+                            </Link>
+                        </div>
                     </div>
                 </div>
             )}

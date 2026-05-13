@@ -25,6 +25,7 @@ import SeoKeywordOpportunitiesPanel from '@/components/seo/SeoKeywordOpportuniti
 import SeoPageInsightsPanel from '@/components/seo/SeoPageInsightsPanel';
 import SeoPageOpportunitiesPanel from '@/components/seo/SeoPageOpportunitiesPanel';
 import SeoPageHealthPanel from '@/components/seo/SeoPageHealthPanel';
+import SeoAskAiChip from '@/components/seo/SeoAskAiChip';
 import { type SeoRecommendation } from '@/components/seo/SeoInsightsList';
 
 interface Site {
@@ -175,7 +176,7 @@ export default function SEOPage() {
             <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <SeoTrendPanel trend={trend} />
                 <div id="seo-recommendations">
-                    <SeoRecommendationsPanel items={recommendations} />
+                    <SeoRecommendationsPanel items={recommendations} siteUrl={activeSite || null} />
                 </div>
             </div>
 
@@ -249,6 +250,8 @@ export default function SEOPage() {
             </div>
 
             <SeoPageHealthPanel suggestedPages={pages.slice(0, 4).map(p => p.page)} />
+
+            <SeoAskAiChip />
         </div>
     );
 }

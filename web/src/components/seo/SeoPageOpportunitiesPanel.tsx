@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo } from 'react';
 import { ArrowRight, Lightbulb, Search, Smartphone, Sparkles, Target } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
+import { buildAskAiUrl } from '@/lib/askAi';
 import { usePageDetail } from '@/lib/useDashboardData';
 import type { SeoPageRow } from './SeoQueriesPagesPanel';
 
@@ -11,7 +13,6 @@ interface SeoPageOpportunitiesPanelProps {
     siteUrl: string | null;
     /** Selected page's row from the parent table (for fallback metrics + recommendation logic). */
     pageRow?: SeoPageRow;
-    recommendationsAnchorId?: string;
 }
 
 interface DeviceRow {
@@ -42,7 +43,22 @@ const SEVERITY_BADGE: Record<string, string> = {
 };
 const SEVERITY_LABEL: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 
-export default function SeoPageOpportunitiesPanel({ pageUrl, siteUrl, pageRow, recommendationsAnchorId = 'seo-recommendations' }: SeoPageOpportunitiesPanelProps) {
+function buildPageOpportunityPrompt(
+    pageUrl: string,
+    siteUrl: string | null,
+    pageRow: SeoPageRow,
+    deviceGap: { gap: number } | null,
+    topKeyword: { query: string; position: number } | null,
+    recommendation: { title: string; detail: string; impact: string },
+): string {
+    const site = siteUrl || 'my site';
+    const stats = `Currently ranking at position ${pageRow.position.toFixed(1)} with ${pageRow.clicks.toLocaleString()} clicks and ${pageRow.impressions.toLocaleString()} impressions (CTR ${pageRow.ctr.toFixed(1)}%).`;
+    const deviceLine = deviceGap ? ` Mobile vs desktop position gap: ${Math.abs(deviceGap.gap).toFixed(1)} positions.` : '';
+    const topKwLine = topKeyword ? ` Top driver query: "${topKeyword.query}" at position ${topKeyword.position.toFixed(1)}.` : '';
+    return `Build a step-by-step fix plan for ${pageUrl} on ${site}. Recommended angle: "${recommendation.title}" — ${recommendation.detail} Expected impact: ${recommendation.impact}. ${stats}${deviceLine}${topKwLine} Use run_page_audit, find_cannibalization, generate_meta_tags, and suggest_internal_links as appropriate. Give me a numbered plan with effort (S/M/L) and projected click lift per step.`;
+}
+
+export default function SeoPageOpportunitiesPanel({ pageUrl, siteUrl, pageRow }: SeoPageOpportunitiesPanelProps) {
     const { data } = usePageDetail(pageUrl ? siteUrl : null, pageUrl);
     const detail = data as PageDetail | undefined;
 
@@ -96,12 +112,6 @@ export default function SeoPageOpportunitiesPanel({ pageUrl, siteUrl, pageRow, r
             tone: 'low' as const,
         };
     }, [deviceGap, pageRow]);
-
-    const handleViewAll = () => {
-        if (typeof document === 'undefined') return;
-        const el = document.getElementById(recommendationsAnchorId);
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
 
     return (
         <AnalyticsSubpagePanel
@@ -180,14 +190,14 @@ export default function SeoPageOpportunitiesPanel({ pageUrl, siteUrl, pageRow, r
                                     {recommendation.impact}
                                 </span>
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleViewAll}
+                            <Link
+                                href={buildAskAiUrl(buildPageOpportunityPrompt(pageUrl, siteUrl, pageRow, deviceGap, topKeyword, recommendation))}
                                 className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-emerald-500/25 bg-emerald-500/[0.08] py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.16]"
                             >
-                                View all recommendations
+                                <Sparkles className="h-3 w-3" />
+                                Build fix plan with AI
                                 <ArrowRight className="h-3 w-3" />
-                            </button>
+                            </Link>
                         </div>
                     ) : null}
                 </div>
