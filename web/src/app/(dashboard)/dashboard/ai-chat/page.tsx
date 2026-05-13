@@ -634,16 +634,32 @@ function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
         saveWorkspace,
         isWorkspaceLoaded,
     } = useRegistration();
-    const firedRef = useRef(false);
+    // Track the LAST query string we fired for, not a one-shot boolean. The
+    // SEO and other dashboard pages now deep-link in via <Link href={?q=...}>,
+    // and same-route navigation does NOT unmount this page — React re-renders
+    // in place. A boolean ref would stay `true` forever after the first fire
+    // and silently swallow every subsequent ?q=. By keying on the query
+    // string we re-fire whenever the URL carries a new q, and we reset the
+    // ref once the URL is scrubbed so even re-clicking the same button works.
+    const firedRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (firedRef.current) return;
         // Wait for the saved workspace to load — otherwise selectedProperty/Site
         // are still '' and we'd unconditionally trigger a switch on every load.
         if (!isWorkspaceLoaded) return;
         const q = searchParams.get('q');
-        if (!q || !q.trim()) return;
-        firedRef.current = true;
+        if (!q || !q.trim()) {
+            // URL has no q (initial load, or we just scrubbed it). Reset the
+            // de-dupe key so a future ?q= — even one identical to the last —
+            // is treated as a fresh request.
+            if (firedRef.current !== null) firedRef.current = null;
+            return;
+        }
+        // Already fired this exact query in this mount? Skip — guards against
+        // React strict-mode double-invocation in dev and any in-place re-renders
+        // that happen before the URL scrub propagates.
+        if (firedRef.current === q) return;
+        firedRef.current = q;
 
         const reqProperty = (searchParams.get('property') || '').trim();
         const reqSite = (searchParams.get('site') || '').trim();
