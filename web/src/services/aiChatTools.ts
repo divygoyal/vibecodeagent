@@ -24,6 +24,7 @@ import {
 } from '@/lib/githubApi';
 import { computeAlerts } from '@/lib/alertEngine';
 import { runSiteAudit } from '@/lib/siteAudit';
+import { inspectPageHtml } from '@/lib/pageInspect';
 import { wrapUntrusted } from '@/lib/chatSafety';
 import { detectTopInsights } from '@/lib/insightEngine';
 
@@ -777,7 +778,9 @@ WHEN TO USE:
 - After a structured-data error is suspected — this confirms what Google actually saw
 - Diagnostic step in cross_source_diagnose for symptom=indexing_error
 
-EFFICIENCY: One call. Quota: 2000/day per property. The chat route caps to 3 inspections per conversation.`,
+EFFICIENCY: One call. Quota: 2000/day per property. The chat route caps to 3 inspections per conversation.
+
+NOTE: This returns Google's metadata about the page (is it indexed? mobile-friendly? schema valid?). It does NOT return the page's actual HTML — for that use \`fetch_page_html\`.`,
         parameters: {
             type: 'OBJECT' as const,
             properties: {
@@ -791,6 +794,34 @@ EFFICIENCY: One call. Quota: 2000/day per property. The chat route caps to 3 ins
                 },
             },
             required: ['siteUrl', 'pageUrl'],
+        },
+    },
+    {
+        name: 'fetch_page_html',
+        description: `Fetch a public URL and parse its actual HTML. Returns the real on-page content the user shipped: title, meta description, canonical, EVERY h1/h2/h3 (so you can flag duplicate H1s), parsed JSON-LD blocks + detected schema.org types, Open Graph + Twitter Card fields, hreflang map, internal/external link counts + sample anchor texts, image alt-text coverage, robots meta, page weight in KB.
+
+WHEN TO USE — REQUIRED before any of these:
+- Recommending changes to a SPECIFIC page's title or meta description (you need to read the current ones first).
+- Diagnosing a schema / structured-data issue (you need the JSON-LD blocks parsed).
+- Analyzing on-page SEO for a URL the user named.
+- Suggesting internal-link / anchor-text changes (you need the current anchors).
+- Comparing what's on the page vs. what the user thinks is on the page.
+
+WHEN NOT TO USE:
+- "Is /X indexed?" → use \`inspect_url\` (Google's view, not the HTML).
+- Performance / Core Web Vitals → use \`run_page_audit\`.
+- Generic SEO health score → use \`compute_site_health_score\`.
+
+Combine with inspect_url when both Google's view AND the page content matter. Cap at 3 calls per conversation to respect the user's origin.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                url: {
+                    type: 'STRING' as const,
+                    description: 'Full https:// URL of the page to fetch and parse. Must be a public URL on the user\'s site.',
+                },
+            },
+            required: ['url'],
         },
     },
     {
@@ -2150,6 +2181,59 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             };
         } catch (e: any) {
             return { error: 'inspection_failed', message: e?.message || 'GSC URL Inspection API call failed.' };
+        }
+    }
+
+    if (name === 'fetch_page_html') {
+        // Fetches the user's public URL and parses its HTML so the model can
+        // ground recommendations in actual on-page content. Returns a blank
+        // record (with `error` set) instead of throwing on network failure —
+        // a structured "couldn't reach the page" result is more useful to
+        // Gemini than a tool error.
+        try {
+            const url = typeof args.url === 'string' ? args.url.trim() : '';
+            if (!url) return { error: 'invalid_args', message: 'url is required' };
+            const data = await inspectPageHtml(url);
+            if (!data.fetched) {
+                return {
+                    result: {
+                        task: 'Tell the user the page could not be fetched and why. Suggest one specific next step (try a different URL, check that the page is public, retry).',
+                        url: data.url,
+                        statusCode: data.statusCode,
+                        error: data.error,
+                        fetched: false,
+                    },
+                };
+            }
+            return {
+                result: {
+                    task: 'Use this real on-page content to ground every recommendation. Quote the actual title / meta / H1 / schema fields when proposing changes. Never claim a field is "missing" without first checking the relevant section here.',
+                    expectedFormat: 'When recommending a meta rewrite, show CURRENT vs PROPOSED. When flagging schema gaps, name the exact missing JSON-LD field. When suggesting anchor changes, reference sampleInternalAnchors.',
+                    url: data.url,
+                    statusCode: data.statusCode,
+                    pageWeightKb: data.pageWeightKb,
+                    title: data.title,
+                    metaDescription: data.metaDescription,
+                    canonical: data.canonical,
+                    robotsMeta: data.robotsMeta,
+                    noindex: data.noindex,
+                    nofollow: data.nofollow,
+                    headings: data.headings,
+                    schemaTypes: data.schemaTypes,
+                    jsonLdCount: data.jsonLd.length,
+                    jsonLd: data.jsonLd,
+                    openGraph: data.openGraph,
+                    twitterCard: data.twitterCard,
+                    hreflang: data.hreflang,
+                    wordCount: data.wordCount,
+                    internalLinks: data.internalLinks,
+                    externalLinks: data.externalLinks,
+                    sampleInternalAnchors: data.sampleInternalAnchors,
+                    images: data.images,
+                },
+            };
+        } catch (e: any) {
+            return { error: 'fetch_failed', message: e?.message || 'Failed to fetch the page.' };
         }
     }
 

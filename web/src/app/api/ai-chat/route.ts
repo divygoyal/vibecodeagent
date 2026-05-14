@@ -168,12 +168,14 @@ SPECIFICITY MANDATE — every recommendation must be concrete:
 - If you cannot be specific from the snapshot, CALL A TOOL until you can. NEVER hand-wave.
 
 INSPECTION MANDATE — if the user references a specific URL, page path (anything starting with "/"), or names a specific keyword, you MUST inspect the artifact before recommending changes to it:
-- URL / path referenced → call \`inspect_url\` AND/OR \`run_site_audit\` on that URL.
-- Specific keyword referenced → call \`get_search_performance\` filtered to that query, then \`inspect_url\` on the page that ranks for it.
+- Recommending changes to a page's title / meta / H1 / schema / on-page content → \`fetch_page_html\` on that URL FIRST. This returns the actual current title, meta, every H1/H2/H3, parsed JSON-LD blocks, OG fields, hreflang, link anchors, and image alt coverage. You MUST quote the real current value before proposing a change.
+- "Is this page indexed?" / "Why isn't /X showing in Google?" → \`inspect_url\` (Google's view of the page).
+- Site-wide on-page audit ("audit my homepage", "missing alt?") → \`run_site_audit\` (returns ranked issues across many checks).
+- Specific keyword referenced → \`get_search_performance\` filtered to that query, then \`fetch_page_html\` on the ranking page.
 - Cannibalization mentioned → \`find_cannibalization\` first.
 - "Why did X drop" / "what broke" → \`cross_source_diagnose\` first.
 - These rules supersede "prefer fewer tools". The minimum tool count for a URL- or keyword-specific question is TWO.
-- If the tool returns an error or empty data, REPORT THAT — do not fall back to generic advice.
+- If the tool returns an error or empty data, REPORT THAT — do not fall back to generic advice. NEVER claim "your meta description is too long" without having actually fetched it via \`fetch_page_html\` and counted the chars.
 
 REFUSAL PATTERN — when data is genuinely insufficient:
 - If after inspecting you still cannot be specific, say so explicitly: "Data only shows X. To give a real diagnosis I need Y (connect GitHub / share the page URL / wait N days)."
@@ -288,6 +290,7 @@ TOOL-PICKING DECISION TABLE (use the FIRST match):
 - "Health score" / "is my site OK" / overall fitness → compute_site_health_score.
 - "Why did traffic / ranking / CTR drop on /X?" / "What broke?" → cross_source_diagnose with symptom + pagePath. ONE call returns the verdict.
 - "Is /X indexed?" / "Why isn't this in Google?" → inspect_url. (Cap: 3 per conversation.)
+- Need actual page content (title / meta / headings / schema / link anchors) → fetch_page_html on that URL. REQUIRED before proposing any title/meta/H1/schema change. (Cap: 3 per conversation.)
 - HTML/on-page audit ("audit my homepage", "missing alt?") → run_site_audit.
 - Core Web Vitals / "is my site slow" → run_page_audit (PageSpeed).
 - Funnel / "where do users drop in checkout" / sequence-of-pages → run_funnel_analysis (provide stepPages array).
@@ -888,6 +891,7 @@ CRITICAL SYSTEM CONTEXT:
                     let gscCallCount = 0;
                     let githubCallCount = 0;
                     let inspectCallCount = 0; // A9: cap inspect_url at 3/conversation (GSC quota friendliness)
+                    let fetchHtmlCallCount = 0; // Phase 2: cap fetch_page_html at 3/conversation (be polite to user's origin)
                     // Track whether ANY text was streamed across the entire turn.
                     // If we exit the tool loop without a single text chunk (the "ran 8
                     // tools but never wrote the answer" failure mode), we force a final
@@ -896,6 +900,7 @@ CRITICAL SYSTEM CONTEXT:
                     const MAX_GSC_CALLS = 8;
                     const MAX_GITHUB_CALLS = 5;
                     const MAX_INSPECT_CALLS = 3;
+                    const MAX_FETCH_HTML_CALLS = 3;
                     const MAX_LOOPS = 8;
                     // B7-min: per-turn wall-clock cost cap. The maxDuration export is 300s
                     // but a runaway tool loop shouldn't burn that. 90s is enough for the
@@ -1013,6 +1018,13 @@ CRITICAL SYSTEM CONTEXT:
                                         continue;
                                     }
 
+                                    // Phase 2: cap fetch_page_html — outbound fetches against
+                                    // the user's own origin. 3/conversation is plenty for any
+                                    // diagnostic and protects against runaway loops.
+                                    if (toolName === 'fetch_page_html' && fetchHtmlCallCount >= MAX_FETCH_HTML_CALLS) {
+                                        continue;
+                                    }
+
                                     // Dedupe
                                     const isDup = pendingFunctionCalls.some(
                                         (p: any) => p.functionCall.name === toolName && JSON.stringify(p.functionCall.args) === JSON.stringify(fc.args)
@@ -1022,6 +1034,7 @@ CRITICAL SYSTEM CONTEXT:
                                         if (toolName === 'get_search_performance') gscCallCount++;
                                         if (GITHUB_TOOL_NAMES.has(toolName)) githubCallCount++;
                                         if (toolName === 'inspect_url') inspectCallCount++;
+                                        if (toolName === 'fetch_page_html') fetchHtmlCallCount++;
                                         pendingFunctionCalls.push(part);
                                         controller.enqueue(encodeSSE({
                                             type: 'tool_start',
