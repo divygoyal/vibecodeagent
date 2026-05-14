@@ -14,6 +14,7 @@ import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
 import { ThinkingBlock } from './chat/ThinkingBlock';
 import { PlanCard, type ChatPlan } from './chat/PlanCard';
 import { MessageFeedback } from './chat/MessageFeedback';
+import { preprocessMarkers } from './chat/InlineMarkers';
 import { CriticBadge, type CriticVerdict } from './chat/CriticBadge';
 import { highlightNumbersInChildren } from './chat/HighlightedNumbers';
 import { safeParseToolResult } from '@/lib/chatUtils';
@@ -274,10 +275,17 @@ interface ChatMessageRendererProps {
 }
 
 export default memo(function ChatMessageRenderer({ content, tools, thinking, plan, critic, isStreaming, snapshot, onSuggestionClick, messageId, threadId }: ChatMessageRendererProps) {
-    const { cleanContent, suggestions } = useMemo(
-        () => isStreaming ? { cleanContent: content, suggestions: [] } : parseSuggestions(content || ''),
-        [content, isStreaming]
-    );
+    const { cleanContent, suggestions } = useMemo(() => {
+        // Phase 2: pre-process inline citation [src:tool:id] + confidence
+        // [conf:high|med|low] markers BEFORE parseSuggestions runs so the
+        // suggestions extractor sees clean text. preprocessMarkers turns
+        // each marker into a markdown italic chunk that ReactMarkdown can
+        // render natively (no rehype-raw dependency required).
+        const processed = preprocessMarkers(content || '');
+        return isStreaming
+            ? { cleanContent: processed, suggestions: [] }
+            : parseSuggestions(processed);
+    }, [content, isStreaming]);
 
     const hasLiveToolResult = tools?.some(t =>
         (t.name === 'get_search_performance' || t.name === 'run_ga4_report' || t.name === 'run_realtime_report') && (t.structuredData || t.result)

@@ -177,6 +177,29 @@ INSPECTION MANDATE — if the user references a specific URL, page path (anythin
 - These rules supersede "prefer fewer tools". The minimum tool count for a URL- or keyword-specific question is TWO.
 - If the tool returns an error or empty data, REPORT THAT — do not fall back to generic advice. NEVER claim "your meta description is too long" without having actually fetched it via \`fetch_page_html\` and counted the chars.
 
+CITATIONS + CONFIDENCE MARKERS — every fact-claim and forecast gets a tag the renderer turns into a hover/badge. These are NOT optional formatting — they're how the user trusts the answer.
+
+CITATIONS — append [src:<tool>:<id>] immediately after the sentence containing the fact:
+  - <tool> = the tool whose result you used (snake_case, e.g. get_search_performance, fetch_page_html, run_site_audit, cross_source_diagnose). Use "snapshot" when the source is the dashboard snapshot block already in this prompt (no tool call).
+  - <id> = a short row identifier the user could verify. For snapshot citations, use the JSON-PATH into the <snapshot_json> block at the end of the user-message context (e.g. snapshot.gsc.topQueries[3].position, snapshot.ga4.kpis.totalUsers). For tool-result citations, use the row id / index from the tool's structured response (q="seo for hair salons", p=/blog/foo, i=3, headings.h1[0]).
+  - Examples:
+    "Sessions are down 23% WoW [src:snapshot:gsc.kpis.changeClicks]."
+    "Your top query 'seo audit' sits at position 8.4 [src:snapshot:gsc.topQueries[0]]."
+    "Your /pricing page has duplicate H1s [src:fetch_page_html:headings.h1]."
+    "Cannibalization on 'best ai chat' across 4 pages [src:find_cannibalization:0]."
+  - Multiple citations OK if a sentence draws from several sources: [src:snapshot:gsc.topQueries[3]][src:fetch_page_html:title].
+  - DO NOT cite an opinion / hypothesis / prediction — those get [conf:...] instead.
+  - DO NOT invent a citation. If you can't tie a claim to a tool/snapshot, it's a hypothesis — say so and tag with [conf:low].
+  - The <snapshot_json> block is the structured form of the same data shown in the human-readable text above. Both contain the same numbers — cite via the JSON path because users can verify it deterministically.
+
+CONFIDENCE — append [conf:high|med|low] to opinions, predictions, and forecasts (NOT facts):
+  - high  = direct evidence in the data, would bet money on it. Example: "Your CTR will improve by 2-3pp if you fix the meta [conf:high]."
+  - med   = pattern is consistent but limited data, plausible but watch it. Example: "This looks like a Google Discover spike [conf:med]."
+  - low   = guess based on weak signal, present as a hypothesis. Example: "Could be a tracking change on /pricing [conf:low]."
+  - The snapshot's pre-tagged confidence (high/medium/low on each insight) MUST be transcribed — when the snapshot says "confidence: low", you mark [conf:low]. NEVER claim high when the snapshot said low.
+
+Markers are inline plain text. The renderer parses them out — keep them tight (no spaces inside the brackets).
+
 REFUSAL PATTERN — when data is genuinely insufficient:
 - If after inspecting you still cannot be specific, say so explicitly: "Data only shows X. To give a real diagnosis I need Y (connect GitHub / share the page URL / wait N days)."
 - Honest gap-disclosure is preferable to fabricated specificity. The user trusts a "can't tell yet" answer; they distrust a generic-but-confident answer.
@@ -338,6 +361,38 @@ NEVER skip suggestions.`;
 // ═══════════════════════════════════════════════════════════════
 // DATA CONTEXT BUILDER
 // ═══════════════════════════════════════════════════════════════
+/**
+ * Phase 2: structured-JSON view of the snapshot, emitted alongside the
+ * human-readable text block so the model can cite specific cells via
+ * stable paths (e.g. snapshot.gsc.topQueries[3].position) for the
+ * [src:snapshot:...] citation format. Compact stringify keeps the token
+ * cost under ~600 tokens for typical snapshots; we cap row counts so
+ * payload growth is bounded even for prolific accounts.
+ */
+function buildStructuredSnapshot(analyticsContext: any, seoContext: any): string {
+    if (!analyticsContext && !seoContext) return '';
+    const out: Record<string, unknown> = {};
+    if (analyticsContext) {
+        out.ga4 = {
+            kpis: analyticsContext.kpis ?? null,
+            topPages: Array.isArray(analyticsContext.topPages) ? analyticsContext.topPages.slice(0, 8) : [],
+            topSources: Array.isArray(analyticsContext.topSources) ? analyticsContext.topSources.slice(0, 6) : [],
+            channels: Array.isArray(analyticsContext.channels) ? analyticsContext.channels.slice(0, 5) : [],
+            devices: Array.isArray(analyticsContext.devices) ? analyticsContext.devices : [],
+        };
+    }
+    if (seoContext) {
+        out.gsc = {
+            kpis: seoContext.kpis ?? null,
+            topQueries: Array.isArray(seoContext.topQueries) ? seoContext.topQueries.slice(0, 12) : [],
+            topPages: Array.isArray(seoContext.topPages) ? seoContext.topPages.slice(0, 8) : [],
+            recommendations: Array.isArray(seoContext.recommendations) ? seoContext.recommendations.slice(0, 5) : [],
+        };
+    }
+    // Compact stringify — saves ~30% tokens vs pretty-printed.
+    return `\n<snapshot_json>${JSON.stringify(out)}</snapshot_json>\n`;
+}
+
 function buildDataContext(analyticsContext: any, seoContext: any): string {
     if (!analyticsContext && !seoContext) return '';
     let ctx = '';
@@ -504,6 +559,10 @@ export async function POST(req: NextRequest) {
 
         // ── Build data context ──
         const dataContext = buildDataContext(analyticsContext, seoContext);
+        // Parallel structured JSON view for deterministic [src:snapshot:path]
+        // citations. Built defensively — empty string when both contexts are
+        // null, so the wire format never inserts an empty tag.
+        const structuredSnapshotBlock = buildStructuredSnapshot(analyticsContext, seoContext);
 
         // ── Build conversation history ──
         const contents: any[] = [];
@@ -670,6 +729,16 @@ export async function POST(req: NextRequest) {
         // Note: COACHING is auto-selected below for infant sites, overriding the LLM's intent pick.
         let persona = resolvePersona(intentLabel);
 
+        // Phase 2: SEO surface override. When the user clicked an Ask AI
+        // button on the SEO dashboard panels (URL ?__from=seo:*), force
+        // the SEO_CONSULTANT persona regardless of what the intent
+        // classifier picked. The classifier was trained on free-text
+        // questions; the surface tag is a stronger signal of user intent
+        // (they specifically clicked "ask AI about this finding").
+        if (safeFromTag) {
+            persona = resolvePersona('SEO_CONSULTANT');
+        }
+
         // ── Anti-repetition: compute fingerprint vs prior turns. Triple-AND gate
         //    (cosine ≥ 0.85 AND jaccard ≥ 0.7 AND temporal anchor match AND <24h).
         //    When tripped, inject [REPETITION_DETECTED] tag so the persona prompt
@@ -785,8 +854,8 @@ export async function POST(req: NextRequest) {
             }
         }
         const contextBlock = safeRichContext
-            ? `${siteTag}${githubTag}${repoTag}${safeFromTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${safeRichContext}${availableSitesContext}\n---\n${message}`
-            : `${siteTag}${githubTag}${repoTag}${safeFromTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${availableSitesContext}\n${message}`;
+            ? `${siteTag}${githubTag}${repoTag}${safeFromTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${safeRichContext}${structuredSnapshotBlock}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${repoTag}${safeFromTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${structuredSnapshotBlock}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],
