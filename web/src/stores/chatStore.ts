@@ -204,7 +204,17 @@ interface ChatStore {
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
-    messages: loadFromStorage(),
+    // SSR-safe initial state. loadFromStorage() returns [] on the server and
+    // real messages on the client — that divergence caused React error #418
+    // (hydration mismatch) on every chat-page load and triggered a full
+    // client-side re-mount of the chat root, which silently killed in-flight
+    // UI state like the GitHub-connect nudge.
+    //
+    // Real messages load post-mount via setCurrentUser(uid), called from
+    // dashboard/layout.tsx once the NextAuth session resolves. Cost: one
+    // render cycle of empty-state on hard reload — acceptable vs. the broken
+    // status quo.
+    messages: [],
 
     setMessages: (updater) => {
         set((state) => {
