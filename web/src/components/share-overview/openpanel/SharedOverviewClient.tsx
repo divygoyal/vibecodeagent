@@ -261,20 +261,35 @@ function useShareAccent() {
 }
 
 /**
- * Convert a #RRGGBB hex to an `rgba(r,g,b,a)` string. Used by the mini-bar
- * renderers to shade the accent color at varying opacities so the
- * left-to-right depth effect persists across whatever color the user
- * picked in the Studio. Falls back to the input as-is if the format
- * doesn't parse (e.g. an `rgb()` already came in).
+ * Shade a #RRGGBB hex by mixing toward white (positive `delta`) or black
+ * (negative `delta`) at FULL opacity. Used by the mini-bar renderers so
+ * the left→right depth effect is achieved by lightness variation, not by
+ * alpha — alpha-based shading washes the bars out against the dark
+ * dashboard background, while full-opacity saturated shades keep the
+ * bars punchy and on-brand. Mirrors the look of the previous hardcoded
+ * cyan palette but parametrized on the user's accent color. Falls back
+ * to the input as-is if the format doesn't parse.
  */
-function withAccentAlpha(hex: string, alpha: number): string {
+function shadeAccent(hex: string, delta: number): string {
     const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
     if (!match) return hex;
-    const r = parseInt(match[1], 16);
-    const g = parseInt(match[2], 16);
-    const b = parseInt(match[3], 16);
-    const a = Math.max(0, Math.min(1, alpha));
-    return `rgba(${r},${g},${b},${a})`;
+    let r = parseInt(match[1], 16);
+    let g = parseInt(match[2], 16);
+    let b = parseInt(match[3], 16);
+    if (delta > 0) {
+        // Mix toward white. delta=1 → pure white, delta=0 → unchanged.
+        r = Math.round(r + (255 - r) * delta);
+        g = Math.round(g + (255 - g) * delta);
+        b = Math.round(b + (255 - b) * delta);
+    } else if (delta < 0) {
+        // Mix toward black. delta=-1 → pure black, delta=0 → unchanged.
+        const factor = 1 + delta;
+        r = Math.round(r * factor);
+        g = Math.round(g * factor);
+        b = Math.round(b * factor);
+    }
+    const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 const LIVE_DATA_POLL_INTERVAL_MS = 15_000;
@@ -445,19 +460,19 @@ function aggregateLiveMiniSeries(
 }
 
 /**
- * Mini-bar tinting. Derives each bar's fill from the user's chosen accent
- * by varying opacity left→right (older bars dimmer, recent bars solid),
- * with a faint alternating shimmer so the gradient still reads as
- * individual bars. Previously this was six hardcoded cyan hex values —
- * which is why every Studio accent choice (Forest, Solar, Rose, etc.)
- * left the KPI sparklines stuck on the default blue.
+ * Mini-bar tinting. Derives each bar from the user's chosen accent by
+ * varying LIGHTNESS at full opacity — recent bars are mixed toward white,
+ * older bars toward a darker shade of the same hue. Same shape as the
+ * previous hardcoded cyan palette ('#7BE1FF' / '#5CCEFF' / '#3CB7F6' /
+ * '#2896D8' / '#34A7E8') but parametrized on whatever color the user
+ * picked, so Forest/Solar/Rose/etc. stay punchy instead of washing out.
  */
 function miniBarColor(index: number, total: number, accent: string) {
-    if (total <= 1) return withAccentAlpha(accent, 0.85);
+    if (total <= 1) return shadeAccent(accent, 0.15);
     const progress = index / Math.max(total - 1, 1);
-    if (progress >= 0.82) return withAccentAlpha(accent, index % 2 === 0 ? 1 : 0.88);
-    if (progress >= 0.56) return withAccentAlpha(accent, index % 2 === 0 ? 0.78 : 0.66);
-    return withAccentAlpha(accent, index % 2 === 0 ? 0.5 : 0.58);
+    if (progress >= 0.82) return shadeAccent(accent, index % 2 === 0 ? 0.32 : 0.18);
+    if (progress >= 0.56) return shadeAccent(accent, index % 2 === 0 ? 0.18 : 0);
+    return shadeAccent(accent, index % 2 === 0 ? -0.18 : -0.08);
 }
 
 type MiniBarShapeProps = {
