@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { createSuperadminToken, verifySuperadminToken } from '@/lib/superadminToken'
 import { sendUserReportEmail } from '@/lib/reportEmail'
 import { sendUserFeedbackEmail } from '@/lib/feedbackEmail'
+import { runWeeklyDigestForUser } from '@/lib/weeklyDigestRunner'
 
 export const dynamic = 'force-dynamic'
 // Report-email path renders a PDF + Gemini-synthesised analysis; the same 5-min
@@ -385,6 +386,38 @@ export async function POST(req: Request) {
                 )
             }
             return NextResponse.json({ ok: true, couponCode: result.couponCode })
+        }
+
+        if (action === 'generate-weekly-digest') {
+            // Ad-hoc per-user trigger of the same pipeline the weekly cron
+            // runs. Useful for backfills, demoing the /dashboard/weekly tab
+            // for a specific user, or debugging an off-looking digest. The
+            // runner is internally catch-all and never throws — failures
+            // surface in the result object.
+            const { userId, dryRun } = body as { userId?: string; dryRun?: boolean }
+            if (!userId) {
+                return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+            }
+            // Synchronous call. Snapshot fetch + Gemini synth typically takes
+            // 10-40 s — wait for completion so the admin UI can show the
+            // headline preview + persistence status inline.
+            const result = await runWeeklyDigestForUser(
+                { github_id: String(userId) },
+                { dryRun: dryRun === true },
+            )
+            return NextResponse.json({
+                ok: result.ok,
+                persisted: result.persisted,
+                year: result.year,
+                isoWeek: result.isoWeek,
+                siteUrl: result.siteUrl,
+                headline: result.headline,
+                actionItems: result.actionItems,
+                snapshotEmpty: result.snapshotEmpty,
+                snapshotReason: result.snapshotReason,
+                snapshotChars: result.snapshotChars,
+                error: result.error,
+            })
         }
 
         if (action === 'send-report-email') {

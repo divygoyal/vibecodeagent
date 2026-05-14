@@ -932,6 +932,38 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         }
     }
 
+    const handleGenerateWeeklyDigest = async (githubId: string) => {
+        // Ad-hoc trigger of the same pipeline the weekly cron runs — fetches
+        // GSC/GA4 for last completed ISO week, calls Gemini for headline + 3
+        // actions, persists to admin → user's /dashboard/weekly tab. Synchronous
+        // (10-40 s typically). Persistence reason / headline preview surfaced
+        // inline on completion.
+        const key = `weekly-digest-${githubId}`
+        setActionLoading(key)
+        setEmailMenuUser(null)
+        try {
+            const res = await apiPost('generate-weekly-digest', { userId: githubId })
+            const wk = `Week ${res?.isoWeek ?? '?'} of ${res?.year ?? '?'}`
+            if (res?.persisted) {
+                const headlineLine = res?.headline ? `\n\nHeadline: "${res.headline}"` : ''
+                const reasonLine = res?.snapshotEmpty
+                    ? `\n(Empty snapshot: ${res?.snapshotReason || 'unknown'})`
+                    : ''
+                alert(`${wk} digest persisted to /dashboard/weekly.${headlineLine}${reasonLine}`)
+            } else {
+                const reason = res?.error || res?.snapshotReason || 'unknown'
+                alert(`${wk} digest NOT persisted. Reason: ${reason}`)
+            }
+        } catch (err) {
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                alert(`Failed to generate: ${message}`)
+            }
+        } finally {
+            setActionLoading('')
+        }
+    }
+
     const containerStatusColor = (status: string | undefined | null) => {
         if (!status) return 'bg-zinc-700 text-zinc-400'
         const s = status.toLowerCase()
@@ -1004,6 +1036,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                                     onToggleEmailMenu={() => setEmailMenuUser(emailMenuUser === user.github_id ? null : user.github_id)}
                                     onSendReportEmail={(period) => handleSendReportEmail(user.github_id, period)}
                                     onSendFeedbackEmail={() => handleSendFeedbackEmail(user.github_id)}
+                                    onGenerateWeeklyDigest={() => handleGenerateWeeklyDigest(user.github_id)}
                                 />
                             ))}
                         </tbody>
@@ -1129,7 +1162,7 @@ function UserSignals({ user }: { user: UserData }) {
     )
 }
 
-function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail, onSendFeedbackEmail }: {
+function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail, onSendFeedbackEmail, onGenerateWeeklyDigest }: {
     user: UserData
     selected: boolean
     actionLoading: string
@@ -1146,6 +1179,7 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
     onToggleEmailMenu: () => void
     onSendReportEmail: (period: 'weekly' | 'monthly') => void
     onSendFeedbackEmail: () => void
+    onGenerateWeeklyDigest: () => void
 }) {
     const containerStatus = user.container?.status || null
     const isRunning = containerStatus?.toLowerCase() === 'running'
@@ -1280,14 +1314,16 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
                             disabled={
                                 actionLoading === `email-report-weekly-${user.github_id}` ||
                                 actionLoading === `email-report-monthly-${user.github_id}` ||
-                                actionLoading === `email-feedback-${user.github_id}`
+                                actionLoading === `email-feedback-${user.github_id}` ||
+                                actionLoading === `weekly-digest-${user.github_id}`
                             }
                             className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-30"
-                            title="Email user"
+                            title="Email & report actions"
                         >
                             {actionLoading === `email-report-weekly-${user.github_id}` ||
                             actionLoading === `email-report-monthly-${user.github_id}` ||
-                            actionLoading === `email-feedback-${user.github_id}` ? (
+                            actionLoading === `email-feedback-${user.github_id}` ||
+                            actionLoading === `weekly-digest-${user.github_id}` ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                                 <Mail className="w-4 h-4" />
@@ -1321,6 +1357,15 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
                                 >
                                     <span className="font-medium">Feedback request</span>
                                     <span className="block text-[10px] text-zinc-500">Ask why they didn&rsquo;t convert + coupon</span>
+                                </button>
+                                {/* Distinct visual treatment (violet) — this one writes
+                                    to the DB rather than sending an email. */}
+                                <button
+                                    onClick={onGenerateWeeklyDigest}
+                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-violet-500/10 hover:text-violet-300 transition-colors border-t border-white/[0.04]"
+                                >
+                                    <span className="font-medium">Generate weekly digest</span>
+                                    <span className="block text-[10px] text-zinc-500">Snapshot + AI headline → /dashboard/weekly</span>
                                 </button>
                             </div>
                         )}
