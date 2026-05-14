@@ -51,6 +51,8 @@ function shortenPath(url: string): string {
     }
 }
 
+const KEYWORD_OPPORTUNITY_DISCIPLINE = 'Cite the specific tool for every site-specific claim — say "can\'t confirm" rather than fabricate. Under 350 words. No "overall" or "in conclusion" paragraphs. Don\'t restate the metrics in this prompt.';
+
 function buildKeywordOpportunityPrompt(
     keyword: string,
     siteUrl: string | null,
@@ -59,9 +61,79 @@ function buildKeywordOpportunityPrompt(
     recommendation: { title: string; detail: string; impact: string },
 ): string {
     const site = siteUrl || 'my site';
-    const stats = `Currently ranking at position ${queryRow.position.toFixed(1)} with ${queryRow.clicks.toLocaleString()} clicks and ${queryRow.impressions.toLocaleString()} impressions (CTR ${queryRow.ctr.toFixed(1)}%).`;
-    const cannLine = cannMatch ? ` Cannibalization detected: ${cannMatch.pages.length} competing pages.` : '';
-    return `Build a step-by-step fix plan for the query "${keyword}" on ${site}. Recommended angle: "${recommendation.title}" — ${recommendation.detail} Expected impact: ${recommendation.impact}. ${stats}${cannLine} Use the right tools (find_cannibalization, generate_meta_tags, suggest_internal_links, analyze_keyword_clusters, run_page_audit) to investigate, then give me a numbered plan with effort estimate (S/M/L) and projected click lift per step.`;
+    const stats = `Pos ${queryRow.position.toFixed(1)}, ${queryRow.clicks.toLocaleString()} clicks, ${queryRow.impressions.toLocaleString()} impr, CTR ${queryRow.ctr.toFixed(1)}%.`;
+    const cannCount = cannMatch?.pages.length ?? 0;
+
+    // Different recommendations need DIFFERENT investigation angles. Clicking
+    // "Improve title & meta" should never produce the same plan as clicking
+    // "Push into striking distance" even when the underlying query is the
+    // same — the issues are different (CTR vs ranking) and so should be the
+    // outputs.
+    switch (recommendation.title) {
+        case 'Consolidate cannibalized pages':
+            return `Cannibalization for "${keyword}" on ${site}. ${stats} ${cannCount} pages compete.
+
+Investigate: find_cannibalization to confirm. For each competing page, get backlinks, depth, recency, and queries it ranks for BEYOND this one (get_search_performance).
+
+Forbidden: blanket "301 to the strongest" — that breaks queries the losers actually win. Picking canonical by current position alone.
+
+Output:
+- THE WINNER: which page to keep, cited with data (backlinks, depth, other-query traffic)
+- REDIRECT MAP per remaining page: 301-redirect, canonicalize-only (protects other rankings), or content-merge. Reason per page.
+- 5 internal-link anchors to consolidate authority on the winner
+- Projected click recovery via calculate_revenue_impact
+- ONE surprise: a query where a loser page is actually the BEST performer — flag before any redirect breaks it
+
+${KEYWORD_OPPORTUNITY_DISCIPLINE}`;
+
+        case 'Improve title & meta description':
+            return `LOW CTR for "${keyword}" on ${site}. ${stats} Ranking is fine — CTR is the problem.
+
+Investigate: generate_meta_tags. Look at the SERP for this query — which feature is eating clicks (ads, snippet, PAA, sitelinks, video, image pack)?
+
+Forbidden: ranking-improvement advice — we don't have a rank problem. Pure clickbait. Repeating the same angle across variants.
+
+Output:
+- 5 title + description pairs on DISTINCT psychological angles (branded-first, benefit-led, question, number-led, problem/solution). Each:
+  - Title (≤60 chars), description (≤155 chars)
+  - Predicted CTR uplift in pp
+  - WHY this angle wins — one sentence on psychology + SERP context
+- SERP CONTEXT: which feature is suppressing CTR and how the winning variant routes around it
+- Rank the 5 by predicted total click recovery
+- ONE surprise: a structured-data tweak that would counter the SERP feature
+
+${KEYWORD_OPPORTUNITY_DISCIPLINE}`;
+
+        case 'Push into striking distance':
+            return `PAGE 2 → PAGE 1 push for "${keyword}" on ${site}. ${stats}
+
+Investigate: get_search_performance for trajectory (rising or falling?). analyze_keyword_clusters for related queries I'm already winning. inspect_url on the current ranking page. Then identify what the implied top-10 has that we don't (backlinks, depth, schema, freshness).
+
+Forbidden: title/meta advice — we don't have a clicks problem yet, we have a ranking problem. Generic "build links" without source pages and anchor text.
+
+Output:
+- HONEST AUTHORITY CHECK: can we realistically compete on page 1, or is this query above our domain's weight class? If above, say so and stop.
+- If we can: 3 actions in priority order. Each: specific change + effort (S/M/L) + projected click lift in numbers + confidence
+- ONE surprise: a related long-tail we could win RIGHT NOW for faster ROI
+
+${KEYWORD_OPPORTUNITY_DISCIPLINE}`;
+
+        default:
+            // "Maintain ranking" — current health is good. Look for leading
+            // indicators of decline + protect-flank rather than a "fix".
+            return `Health check for "${keyword}" on ${site}. ${stats} Performance is currently in line with benchmarks — investigate the FLANK, not the front.
+
+Investigate: compare_time_periods for early-warning trend signals. get_search_performance for related queries and SERP-feature changes.
+
+Forbidden: prescribing fixes for a healthy query. Generic "keep monitoring" filler.
+
+Output:
+- 3 leading indicators to watch (specific metric + threshold that triggers action)
+- ONE non-obvious risk: a related query rising in impressions could cannibalize this one, or a competitor moving up — name it with cited data
+- ONE surprise: a defensive content addition that locks in the current ranking against the most likely threat
+
+${KEYWORD_OPPORTUNITY_DISCIPLINE}`;
+    }
 }
 
 export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRow }: SeoKeywordOpportunitiesPanelProps) {

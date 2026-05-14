@@ -78,25 +78,68 @@ interface PageSummary {
     position: number;
 }
 
+const DISCIPLINE = 'Cite the specific tool for every site-specific claim — say "can\'t confirm" rather than fabricate. No "overall" or "in conclusion" paragraphs. Don\'t restate the metrics already in this prompt.';
+
 function buildPageDiagnosePrompt(pageUrl: string, siteUrl: string | null, summary?: PageSummary): string {
     const site = siteUrl || 'my site';
     const ctx = summary
-        ? ` Current: position ${summary.position.toFixed(1)}, ${summary.clicks.toLocaleString()} clicks, ${summary.impressions.toLocaleString()} impressions, ${summary.ctr.toFixed(1)}% CTR.`
+        ? ` Currently pos ${summary.position.toFixed(1)}, ${summary.clicks.toLocaleString()} clicks, ${summary.impressions.toLocaleString()} impr, CTR ${summary.ctr.toFixed(1)}%.`
         : '';
-    return `Diagnose performance for ${pageUrl} on ${site}.${ctx} Run a page audit with run_page_audit, check cannibalization with find_cannibalization, and use cross_source_diagnose. Give me the top 5 things to fix in priority order with effort estimate (S/M/L) and expected click lift.`;
+    return `Diagnose ${pageUrl} on ${site}.${ctx}
+
+Investigate: run_page_audit, find_cannibalization, and cross_source_diagnose. For each detected issue, correlate with traffic data via get_search_performance.
+
+Forbidden: a 10-bullet list of "things you could improve." Ranking-factor advice without naming the specific factor and proving it correlates with this page's underperformance. Generic SEO checklists.
+
+Output (under 350 words):
+- THE BOTTLENECK: ONE thing limiting this page's traffic, cited with data from a specific tool
+- 3 fixes in priority order. Each: specific change + effort (S/M/L) + projected click lift in numbers + confidence (high/medium/low)
+- Skip anything below medium confidence
+- ONE surprise: a hidden issue I wouldn't notice manually — cannibalization with another page, intent drift, a competitor gaming a SERP feature, etc.
+
+${DISCIPLINE}`;
 }
 
 function buildPageMetaPrompt(pageUrl: string, siteUrl: string | null, summary?: PageSummary): string {
     const site = siteUrl || 'my site';
     const ctx = summary
-        ? ` Currently CTR ${summary.ctr.toFixed(1)}% at position ${summary.position.toFixed(1)}.`
+        ? ` Currently CTR ${summary.ctr.toFixed(1)}% at pos ${summary.position.toFixed(1)}.`
         : '';
-    return `Use generate_meta_tags to rewrite the title and meta description for ${pageUrl} on ${site}.${ctx} First call get_search_performance to see the top queries that drive impressions to this page, then propose 3 title + description variants ranked by predicted CTR.`;
+    return `Title + meta rewrite for ${pageUrl} on ${site}.${ctx}
+
+Investigate: get_search_performance to find the TOP query driving impressions to this page. generate_meta_tags. Then check SERP features eating clicks for that query.
+
+Forbidden: writing meta for ALL queries — tailor for the #1 driver. Pure-clickbait variants. Generic copywriting tips.
+
+Output (under 350 words):
+- TOP DRIVER QUERY (one line) and why the current meta misses it
+- 5 title + description pairs targeting the driver on DISTINCT angles (branded-first, benefit-led, question, number-led, problem/solution). Each:
+  - Title (≤60 chars), description (≤155 chars)
+  - Predicted CTR uplift in pp
+  - WHY this angle wins (one sentence)
+- Rank the 5 by predicted total click recovery
+- ONE surprise: the meta is also affecting a SECONDARY query that needs different framing — flag the tradeoff
+
+${DISCIPLINE}`;
 }
 
 function buildPageLinksPrompt(pageUrl: string, siteUrl: string | null): string {
     const site = siteUrl || 'my site';
-    return `Use suggest_internal_links to find which pages on ${site} should link to ${pageUrl}. List anchor text and source URLs in priority order with rationale for each.`;
+    return `Internal link plan for ${pageUrl} on ${site}.
+
+Investigate: suggest_internal_links. Then identify high-authority pages on the site that DON'T currently link to this target.
+
+Forbidden: vague anchor text. Low-authority sources. Listing every page that COULD link — I want the 5 highest-ROI links.
+
+Output (under 300 words):
+- 5 link suggestions. Each:
+  - Source URL + exact anchor text
+  - WHY this transfers authority — source page's topical relevance + traffic
+  - Estimated authority lift (high/medium/low)
+- THE BIGGEST MISS: the single highest-authority page that isn't linking — fix that first
+- ONE surprise: an existing internal link HURTING this page (bad anchor, off-topic source, redirect chain)
+
+${DISCIPLINE}`;
 }
 
 function shortenPath(url: string): string {

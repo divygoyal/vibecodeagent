@@ -43,6 +43,8 @@ const SEVERITY_BADGE: Record<string, string> = {
 };
 const SEVERITY_LABEL: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 
+const PAGE_OPPORTUNITY_DISCIPLINE = 'Cite the specific tool for every site-specific claim — say "can\'t confirm" rather than fabricate. Under 350 words. No "overall" or "in conclusion" paragraphs. Don\'t restate the metrics in this prompt.';
+
 function buildPageOpportunityPrompt(
     pageUrl: string,
     siteUrl: string | null,
@@ -52,10 +54,76 @@ function buildPageOpportunityPrompt(
     recommendation: { title: string; detail: string; impact: string },
 ): string {
     const site = siteUrl || 'my site';
-    const stats = `Currently ranking at position ${pageRow.position.toFixed(1)} with ${pageRow.clicks.toLocaleString()} clicks and ${pageRow.impressions.toLocaleString()} impressions (CTR ${pageRow.ctr.toFixed(1)}%).`;
+    const stats = `Pos ${pageRow.position.toFixed(1)}, ${pageRow.clicks.toLocaleString()} clicks, ${pageRow.impressions.toLocaleString()} impr, CTR ${pageRow.ctr.toFixed(1)}%.`;
     const deviceLine = deviceGap ? ` Mobile vs desktop position gap: ${Math.abs(deviceGap.gap).toFixed(1)} positions.` : '';
-    const topKwLine = topKeyword ? ` Top driver query: "${topKeyword.query}" at position ${topKeyword.position.toFixed(1)}.` : '';
-    return `Build a step-by-step fix plan for ${pageUrl} on ${site}. Recommended angle: "${recommendation.title}" — ${recommendation.detail} Expected impact: ${recommendation.impact}. ${stats}${deviceLine}${topKwLine} Use run_page_audit, find_cannibalization, generate_meta_tags, and suggest_internal_links as appropriate. Give me a numbered plan with effort (S/M/L) and projected click lift per step.`;
+    const topKwLine = topKeyword ? ` Top driver query: "${topKeyword.query}" at pos ${topKeyword.position.toFixed(1)}.` : '';
+
+    // Match SeoKeywordOpportunitiesPanel — switch on recommendation.title so a
+    // device-gap fix isn't blurred together with a striking-distance plan.
+    if (recommendation.title.startsWith('Improve mobile') || recommendation.title.startsWith('Improve desktop')) {
+        const laggard = recommendation.title.toLowerCase().includes('mobile') ? 'mobile' : 'desktop';
+        return `Device-gap fix for ${pageUrl} on ${site}. ${stats}${deviceLine}${topKwLine} ${laggard} is the laggard.
+
+Investigate: run_page_audit on BOTH mobile and desktop. inspect_url. Find the SPECIFIC Core Web Vitals metric (LCP/INP/CLS/FCP/TTFB) hurting ${laggard}, with numbers — not a vague "Core Web Vitals issue".
+
+Forbidden: "improve Core Web Vitals" without naming the metric and target value. Generic "make it mobile-friendly". Listing all detected issues — only the ones correlated with the rank gap.
+
+Output:
+- THE CULPRIT: ONE metric, current value vs target, cited from run_page_audit
+- 3 fixes in priority order. Each: specific file/component/CSS change + effort (S/M/L) + projected position improvement + confidence (high/medium/low)
+- ONE surprise: a non-technical issue PSI doesn't catch (UX layout, font sizes, tap-target spacing, viewport-locked content) that's hurting ${laggard}
+
+${PAGE_OPPORTUNITY_DISCIPLINE}`;
+    }
+
+    if (recommendation.title === 'Push into striking distance') {
+        return `PAGE 2 → PAGE 1 push for ${pageUrl} on ${site}. ${stats}${topKwLine}
+
+Investigate: get_search_performance for trajectory + the full query cluster this page targets. inspect_url. analyze_keyword_clusters to find related queries the page is already winning. Then identify what the implied top-10 has that we don't.
+
+Forbidden: title/meta advice — we don't have a clicks problem at this rank, we have a ranking problem. Generic "build links" without source pages and anchor text.
+
+Output:
+- HONEST AUTHORITY CHECK: can we realistically compete on page 1 for the top driver, or is this above our domain's weight class? If above, say so and stop.
+- If we can: 3 actions in priority order. Each: specific change + effort (S/M/L) + projected click lift in numbers + confidence
+- ONE surprise: a related long-tail this page could win RIGHT NOW for faster ROI
+
+${PAGE_OPPORTUNITY_DISCIPLINE}`;
+    }
+
+    if (recommendation.title === 'Rewrite title & meta') {
+        return `LOW CTR for ${pageUrl} on ${site}. ${stats}${topKwLine} Ranking is fine — CTR is the problem.
+
+Investigate: get_search_performance to confirm the top driver query for this page. generate_meta_tags. Look at the SERP for that query — which feature is eating clicks (ads, snippet, PAA, sitelinks, video, image pack)?
+
+Forbidden: writing meta for ALL queries — tailor for the #1 driver. Ranking-improvement advice. Pure clickbait. Repeating the same angle across variants.
+
+Output:
+- TOP DRIVER QUERY (one line) and why the current meta misses it
+- 5 title + description pairs on DISTINCT angles (branded-first, benefit-led, question, number-led, problem/solution). Each:
+  - Title (≤60 chars), description (≤155 chars)
+  - Predicted CTR uplift in pp
+  - WHY this angle wins
+- Rank the 5 by predicted total click recovery
+- ONE surprise: a secondary query whose intent conflicts with the winning variant — flag the tradeoff
+
+${PAGE_OPPORTUNITY_DISCIPLINE}`;
+    }
+
+    // "Maintain & monitor" — current health is good. Look for leading
+    // indicators of decline, not "fixes".
+    return `Health check for ${pageUrl} on ${site}. ${stats}${topKwLine} Performance is currently in line — investigate the FLANK, not the front.
+
+Investigate: compare_time_periods for early-warning trend signals. get_search_performance for related queries and SERP-feature changes that could erode this page.
+
+Forbidden: prescribing fixes for a healthy page. Generic "keep monitoring" filler.
+
+Output:
+- 3 leading indicators to watch (specific metric + threshold that triggers action)
+- ONE non-obvious risk: a related query rising, a competitor moving up, a SERP-feature shift — name it with cited data
+- ONE surprise: a defensive content addition that locks in the current ranking against the most likely threat
+
+${PAGE_OPPORTUNITY_DISCIPLINE}`;
 }
 
 export default function SeoPageOpportunitiesPanel({ pageUrl, siteUrl, pageRow }: SeoPageOpportunitiesPanelProps) {

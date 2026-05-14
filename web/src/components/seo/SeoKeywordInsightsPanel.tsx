@@ -140,25 +140,70 @@ interface KeywordSummary {
     position: number;
 }
 
+const DISCIPLINE = 'Cite the specific tool for every site-specific claim — say "can\'t confirm" rather than fabricate. No "overall" or "in conclusion" paragraphs. Don\'t restate the metrics already in this prompt.';
+
 function buildKeywordBriefPrompt(keyword: string, siteUrl: string | null, summary?: KeywordSummary): string {
     const site = siteUrl || 'my site';
     const ctx = summary
-        ? ` Current: position ${summary.position.toFixed(1)}, ${summary.clicks.toLocaleString()} clicks, ${summary.impressions.toLocaleString()} impressions, ${summary.ctr.toFixed(1)}% CTR.`
+        ? ` Currently pos ${summary.position.toFixed(1)}, ${summary.clicks.toLocaleString()} clicks, ${summary.impressions.toLocaleString()} impr, CTR ${summary.ctr.toFixed(1)}%.`
         : '';
-    return `Write a content brief for ranking "${keyword}" on ${site}.${ctx} Use analyze_keyword_clusters and generate_content_strategy. Include search intent, target word count, H1 + H2 outline, primary entities to cover, and 5 internal links to add.`;
+    return `Content brief for "${keyword}" on ${site}.${ctx}
+
+Investigate: analyze_keyword_clusters for the full semantic territory. generate_content_strategy. Then identify what the implied top-3 pages cover that I don't.
+
+Forbidden: generic SEO copywriting advice. Boilerplate "informational/transactional" intent labels without supporting evidence. An H1/H2 outline that mirrors the top-3 — the brief needs a DIFFERENTIATING angle.
+
+Output (under 400 words):
+- SEARCH INTENT: one sentence on the SPECIFIC question users are asking
+- WORD COUNT TARGET: number + reasoning based on top-3 average
+- OUTLINE: H1 + 8–12 H2s, with the differentiating angle vs competitors (one sentence per H2)
+- 7 entities/topics that MUST appear (per topical-authority signals)
+- 5 internal links: source page → anchor text → why
+- ONE surprise: a competitor gap — something top-3 are missing that this brief should exploit
+
+${DISCIPLINE}`;
 }
 
 function buildKeywordMetaPrompt(keyword: string, siteUrl: string | null, summary?: KeywordSummary): string {
     const site = siteUrl || 'my site';
     const ctx = summary
-        ? ` Current CTR ${summary.ctr.toFixed(1)}% at position ${summary.position.toFixed(1)}.`
+        ? ` Currently CTR ${summary.ctr.toFixed(1)}% at pos ${summary.position.toFixed(1)}.`
         : '';
-    return `Use generate_meta_tags to rewrite the title and meta description for the page ranking for "${keyword}" on ${site}.${ctx} Give me 3 variants ranked by predicted CTR with the reasoning for each.`;
+    return `Title + meta rewrite for the page ranking "${keyword}" on ${site}.${ctx}
+
+Investigate: generate_meta_tags. Then look at the SERP — which features are eating clicks (ads, featured snippet, PAA, sitelinks, video, image pack)?
+
+Forbidden: pure-clickbait titles that misrepresent intent. Repeating the same angle across all 5 variants. Generic copywriting advice.
+
+Output (under 350 words):
+- 5 title + description pairs on DISTINCT psychological angles (branded-first, benefit-led, question, number-led, problem/solution). Each:
+  - Title (≤60 chars) and description (≤155 chars)
+  - Predicted CTR uplift in percentage points
+  - WHY this angle wins — one sentence on psychology + SERP context
+- SERP CONTEXT: which feature is suppressing CTR right now, and how the winning variant routes around it
+- Rank the 5 by predicted total click recovery
+- ONE surprise: a structured-data tweak that would counter the SERP feature eating clicks
+
+${DISCIPLINE}`;
 }
 
 function buildKeywordLinksPrompt(keyword: string, siteUrl: string | null): string {
     const site = siteUrl || 'my site';
-    return `Use suggest_internal_links to find which pages on ${site} should link to the page ranking for "${keyword}". List anchor text and source URLs in priority order, with rationale for each.`;
+    return `Internal link plan for the page ranking "${keyword}" on ${site}.
+
+Investigate: suggest_internal_links. Then identify which high-authority pages are NOT yet linking to the target.
+
+Forbidden: vague anchor text ("click here", "learn more"). Low-authority sources. Listing every page that COULD link — I want the 5 highest-ROI links.
+
+Output (under 300 words):
+- 5 link suggestions. Each:
+  - Source URL + exact anchor text (the specific phrase to use)
+  - WHY this transfers authority — cite the source page's topical relevance + traffic
+  - Estimated authority lift (high/medium/low)
+- THE BIGGEST MISS: the single highest-authority page that ISN'T linking — fix that first
+- ONE surprise: an existing internal link that's HURTING the target (bad anchor, off-topic source, redirect chain)
+
+${DISCIPLINE}`;
 }
 
 function SectionHeader({ icon: Icon, label, hint }: { icon: LucideIcon; label: string; hint?: string }) {

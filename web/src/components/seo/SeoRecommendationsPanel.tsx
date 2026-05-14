@@ -31,28 +31,110 @@ const SEVERITY_LABEL: Record<string, string> = {
     low: 'Low',
 };
 
+/**
+ * Discipline tail appended to every prompt in this panel. Centralised so the
+ * AI's behaviour rules (cite-or-decline, word cap, no-restating) stay
+ * consistent across recommendation types — and so we don't accidentally drop
+ * one from a single variant.
+ */
+const DISCIPLINE = 'Cite the specific tool for every site-specific claim — say "can\'t confirm" rather than fabricate. Under 350 words total. No "overall" or "in conclusion" paragraphs. Don\'t restate the metrics already in this prompt.';
+
 function buildRecommendationPrompt(rec: SeoRecommendation, siteUrl?: string | null): string {
     const site = siteUrl || 'my site';
     const pageLine = rec.page ? ` Affected page: ${rec.page}.` : '';
     switch (rec.type) {
         case 'content_decay':
-            return `Build a step-by-step fix plan for this content decay on ${site}: "${rec.title}". ${rec.description}${pageLine} Use get_search_performance to confirm the click trend, run_page_audit on the page, then propose (1) content refresh angles, (2) internal links to add via suggest_internal_links, and (3) a title/meta rewrite via generate_meta_tags. Estimate the recovery with calculate_revenue_impact.`;
+            return `Content decay on ${site}: "${rec.title}". ${rec.description}${pageLine}
+
+Investigate: WHEN did the decay start? Use compare_time_periods to find the inflection point. Was it a Google algorithm update (name the month + update), a SERP layout shift (new snippet, video carousel, ads), or a specific competitor leapfrog? Use get_search_performance for the timeline and inspect_url for current state.
+
+Forbidden: generic "refresh your content" advice without a cited cause. Listing every issue you see — give me one cause and the decision.
+
+Output:
+- THE CAUSE (one sentence, cited from a tool result)
+- THE DECISION: refresh, expand, merge, or sunset. Pick one. If sunset, say so plainly.
+- 3 actions in priority order. Each: specific change + effort (S/M/L) + projected click recovery in numbers + confidence (high/medium/low)
+- ONE surprise: a related query RISING while this one fell — audience may have moved
+
+${DISCIPLINE}`;
         case 'keyword_gap':
-            return `Build a content plan to capture the keyword gap on ${site}: "${rec.title}". ${rec.description} Use analyze_keyword_clusters to find related queries, then generate_content_strategy for a full outline (intent, H1, H2s, target length, internal links).`;
+            return `Keyword gap on ${site}: "${rec.title}". ${rec.description}
+
+Investigate: analyze_keyword_clusters for the full semantic territory. get_search_performance to find foothold queries (small share) vs zero-presence queries. Compare to the implied top-ranking pages.
+
+Forbidden: generic "create more content" advice. Listing every related keyword — I want the SPECIFIC content piece with the highest ROI.
+
+Output:
+- THE GAP: one sentence on the topical cluster I'm missing (cited)
+- 3 content pieces ranked by ROI. Each: working title, target query, monthly impressions available, effort (S/M/L), confidence (high/medium/low)
+- For piece #1: H1 + H2 outline (8 sections max) + 5 internal links to point at it
+- ONE surprise: a foothold query NO competitor is targeting — protect/expand it
+
+${DISCIPLINE}`;
         case 'cannibalization':
-            return `Resolve this cannibalization issue on ${site}: "${rec.title}". ${rec.description}${pageLine} Use find_cannibalization to confirm the affected pages, then tell me which page to keep, which to merge or 301-redirect, and what canonical decision to make. Estimate the click recovery.`;
+            return `Cannibalization on ${site}: "${rec.title}". ${rec.description}${pageLine}
+
+Investigate: find_cannibalization for the competing pages. For each, get backlinks, content depth, recency, and queries it ranks for BEYOND this one (via get_search_performance).
+
+Forbidden: blanket "301 everything to the strongest page" — that breaks queries the losers actually win. Picking canonical by position alone (ignores backlink strength).
+
+Output:
+- THE WINNER: which page to keep, cited with data (backlinks N, traffic to other queries, depth)
+- REDIRECT MAP per remaining page: 301-redirect, canonicalize-only (protects other rankings), or content-merge. Reason per page.
+- 5 internal-link anchors to consolidate authority on the winner
+- Projected click recovery via calculate_revenue_impact
+- ONE surprise: a query where a "loser" is actually the BEST performer — flag before any redirect breaks it
+
+${DISCIPLINE}`;
         case 'technical':
-            return `Build a technical SEO fix roadmap for ${site}: "${rec.title}". ${rec.description}${pageLine} Use run_page_audit and inspect_url, then list every issue with severity, the file or section to edit, and the SEO impact.`;
+            return `Technical issue on ${site}: "${rec.title}". ${rec.description}${pageLine}
+
+Investigate: run_page_audit + inspect_url. For each detected issue, correlate with traffic data (get_search_performance). I want issues PROVEN to be hurting traffic, not a generic checklist.
+
+Forbidden: "improve Core Web Vitals" without naming the metric and target. "Add schema markup" without specifying the schema type and the SERP feature it unlocks. Listing 47 broken links if only 2 are on traffic-driving pages.
+
+Output:
+- THE BLOCKER: ONE technical issue with cited measurement (e.g., "LCP 4.2s on mobile per run_page_audit, target <2.5s") AND cited correlation to the rank/CTR
+- 3 fixes in priority order. Each: specific change (file/component) + effort (S/M/L) + projected lift in numbers + confidence
+- Skip anything below medium confidence — don't pad
+- ONE surprise: a non-technical issue masquerading as technical (slow page that's actually a content gap, etc.)
+
+${DISCIPLINE}`;
         case 'opportunity':
         default:
-            return `Build a step-by-step plan to capture this SEO opportunity on ${site}: "${rec.title}". ${rec.description} Expected impact: ${rec.impact}.${pageLine} Use get_search_performance for context, then suggest_internal_links and generate_meta_tags as needed. Estimate the revenue lift with calculate_revenue_impact.`;
+            return `Striking-distance opportunity on ${site}: "${rec.title}". ${rec.description} Expected impact: ${rec.impact}.${pageLine}
+
+The page is close to top 3 — what's blocking the last push? Investigate: get_search_performance for the full query cluster, inspect_url on the ranking page, then identify what the implied top-3 pages have that we don't (backlinks depth + topical relevance, content depth, schema markup, freshness, internal-authority signal).
+
+Forbidden: title/meta rewrites — that's a CTR problem, not a ranking problem at this position. Generic "build links" without specifying source pages and anchor text. Restating the metrics already in this prompt.
+
+Output:
+- THE GAP: ONE specific thing top-3 has that we don't (cited from a tool, or stated as an inference with the data behind it)
+- 3 actions in priority order. Each: specific change + effort (S/M/L) + projected click lift via calculate_revenue_impact + confidence
+- ONE surprise: hidden cannibalization, intent mismatch with the SERP, or a competitor gaming a SERP feature — something I wouldn't notice manually
+
+${DISCIPLINE}`;
     }
 }
 
 function buildPrioritizePrompt(siteUrl?: string | null, count?: number): string {
     const site = siteUrl || 'my site';
-    const total = count && count > 0 ? `the ${count} active recommendations` : 'all my SEO recommendations';
-    return `This week on ${site}, what is the highest-ROI SEO work I should prioritize from ${total}? Use find_top_money_move and compute_site_health_score. Give me a ranked top 5 with effort estimate (S/M/L), expected click lift, and the first concrete action for each.`;
+    const total = count && count > 0 ? `the ${count} active recommendations on this dashboard` : 'my SEO recommendations';
+
+    return `Rank my SEO work for this week on ${site}. Use find_top_money_move and compute_site_health_score against ${total}.
+
+Forbidden: a flat list of 5 generic actions. Equal weighting of recommendations — some are real money, some are tinkering. Be honest about which is which.
+
+Output:
+- TOP 3 MOVES, ranked by (projected click lift × confidence) ÷ effort. For each:
+  - The specific action (one sentence)
+  - Effort (S/M/L) and projected click lift in numbers
+  - Confidence (high/medium/low) and the reason
+  - The first concrete step I can take today
+- THE NO-GO: one recommendation from the dashboard I should SKIP this week and why (low confidence, blocked by infra, etc.)
+- ONE surprise: a 5th hidden lever NOT in the dashboard recommendations that my data suggests is bigger than any of them
+
+${DISCIPLINE}`;
 }
 
 export default function SeoRecommendationsPanel({ items, siteUrl }: SeoRecommendationsPanelProps) {

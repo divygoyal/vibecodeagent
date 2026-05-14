@@ -49,18 +49,44 @@ const SEVERITY_BADGE: Record<Severity, string> = {
 };
 const SEVERITY_LABEL: Record<Severity, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 
+const ISSUE_DISCIPLINE = 'Cite the specific tool for every site-specific claim — say "can\'t confirm" rather than fabricate. Under 350 words. No "overall" or "in conclusion" paragraphs. Don\'t restate the metrics in this prompt.';
+
 function buildCannibalizationFixPrompt(query: string, siteUrl: string | null, row: CannibalizedRow): string {
     const site = siteUrl || 'my site';
     const maxPos = Math.max(...row.pages.map(p => p.position));
     const topUrls = row.pages.slice(0, 3).map(p => p.page).join(', ');
-    return `Resolve cannibalization for the query "${query}" on ${site}. ${row.pages.length} pages compete in positions ${row.bestPosition.toFixed(1)}–${maxPos.toFixed(1)} with ${row.totalImpressions.toLocaleString()} total impressions. Top URLs: ${topUrls}. Use find_cannibalization to confirm, then tell me explicitly: (1) which page to keep, (2) which to 301-redirect or merge, (3) what canonical tags to set, (4) anchor text for new internal links, and (5) projected click recovery using calculate_revenue_impact.`;
+    return `Cannibalization for "${query}" on ${site}. ${row.pages.length} pages in positions ${row.bestPosition.toFixed(1)}–${maxPos.toFixed(1)}, ${row.totalImpressions.toLocaleString()} total impr. Top URLs: ${topUrls}.
+
+Investigate: find_cannibalization to confirm. For each competing page, get backlinks, depth, recency, and queries it ranks for BEYOND this one (via get_search_performance).
+
+Forbidden: blanket "redirect everything to the strongest page" — that breaks queries the losers actually win. Picking canonical by current position alone (ignores backlink strength). Generic 301 advice.
+
+Output:
+- THE WINNER: which page to keep, cited with data (backlinks N, content depth, other-query traffic). Be specific about WHY.
+- REDIRECT MAP per remaining page: 301-redirect, canonicalize-only (don't redirect — protect other rankings), or content-merge. State the reason per page.
+- 5 internal-link anchors to consolidate authority on the winner
+- Projected click recovery via calculate_revenue_impact
+- ONE surprise: a query where a "loser" page is actually the BEST performer — flag before any redirect breaks it
+
+${ISSUE_DISCIPLINE}`;
 }
 
 function buildMobileGapFixPrompt(query: string, siteUrl: string | null, row: MobileGapRow): string {
     const site = siteUrl || 'my site';
     const mobileBetter = row.mobilePosition < row.desktopPosition;
     const laggard = mobileBetter ? 'desktop' : 'mobile';
-    return `Fix the mobile-vs-desktop ranking gap for "${query}" on ${site}. Mobile ranks at position ${row.mobilePosition.toFixed(1)}, desktop at ${row.desktopPosition.toFixed(1)} — ${laggard} is the laggard by ${Math.abs(row.gap).toFixed(1)} positions. Use run_page_audit and inspect_url on the affected page (find it via get_search_performance filtered by this query). Return a numbered list of every issue with severity, the file/section to edit, and the SEO impact.`;
+    return `Mobile vs desktop ranking gap for "${query}" on ${site}. Mobile pos ${row.mobilePosition.toFixed(1)}, desktop pos ${row.desktopPosition.toFixed(1)}. ${laggard} is the laggard by ${Math.abs(row.gap).toFixed(1)} positions.
+
+Investigate: get_search_performance filtered by this query to find the affected page. run_page_audit on BOTH mobile and desktop for that page. inspect_url. Find the SPECIFIC Core Web Vitals metric (LCP/INP/CLS/FCP/TTFB) hurting ${laggard}, with numbers — not a vague "Core Web Vitals issue".
+
+Forbidden: "improve Core Web Vitals" without naming the metric and target. Generic "make it mobile-friendly". Listing all detected issues — only the ones correlated with the rank gap.
+
+Output:
+- THE CULPRIT: ONE metric, current value vs target, cited from run_page_audit
+- 3 fixes in priority order. Each: specific file/component/CSS change + effort (S/M/L) + projected position improvement + confidence (high/medium/low)
+- ONE surprise: a non-technical issue PSI doesn't catch (UX layout, font sizes, tap-target spacing, viewport-locked content) hurting ${laggard}
+
+${ISSUE_DISCIPLINE}`;
 }
 
 function shortenPath(url: string): string {
