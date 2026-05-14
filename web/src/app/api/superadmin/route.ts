@@ -167,6 +167,31 @@ export async function GET(req: Request) {
             return NextResponse.json(await res.json())
         }
 
+        if (endpoint === 'chat-feedback-summary') {
+            // Single aggregate query for ALL users' feedback counts — avoids
+            // N+1 against /api/chat/stats when rendering the user list.
+            const res = await fetch(`${ADMIN_API_URL}/api/admin/chat-feedback-summary`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) throw new Error('Failed to load chat feedback summary')
+            return NextResponse.json(await res.json())
+        }
+
+        if (endpoint === 'user-chat-feedback') {
+            const userIdParam = searchParams.get('id')
+            if (!userIdParam) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+            const limit = searchParams.get('limit') || '20'
+            const res = await fetch(
+                `${ADMIN_API_URL}/api/admin/users/${encodeURIComponent(userIdParam)}/chat-feedback?limit=${encodeURIComponent(limit)}`,
+                { headers: { 'X-API-Key': ADMIN_API_KEY } },
+            )
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Failed to load user chat feedback' }))
+                throw new Error(err.detail || err.error || 'Failed to load user chat feedback')
+            }
+            return NextResponse.json(await res.json())
+        }
+
         return NextResponse.json({ error: 'Invalid endpoint' }, { status: 400 })
 
     } catch (err: unknown) {
