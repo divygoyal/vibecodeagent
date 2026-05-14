@@ -32,6 +32,17 @@ export interface ChatMessage {
         priorInsightId: string | null;
     };
     hasError?: boolean;
+    /** Admin DB row id (chat_messages.id), set after persistMessage resolves.
+     *  Needed by the per-message feedback widget — ChatFeedback.message_id is
+     *  NOT NULL on the admin side, so 👍/👎 can only fire once we have this. */
+    id?: number;
+}
+
+/** Shape returned by persistMessage on success — minimal slice of the admin
+ *  `_serialize_message` response that callers actually need. */
+export interface PersistedMessageRef {
+    id: number;
+    thread_id: string;
 }
 
 const BASE_STORAGE_KEY = 'tc-chat-history';
@@ -135,15 +146,22 @@ export interface PersistMessageOpts {
 }
 
 /**
- * Fire-and-forget: persist a single turn to the server. Called by AIChatbot
- * after a user sends and after an assistant message finishes streaming.
+ * Persist a single turn to the server. Returns the inserted message's DB id
+ * (chat_messages.id) so the caller can write it back onto the in-memory
+ * ChatMessage — needed by the feedback widget, which submits with the
+ * NOT-NULL message_id column. Null when the network call fails (still
+ * best-effort: a failed persist must not break the chat UI).
+ *
+ * Existing callers that `void persistMessage(...)` continue to work; they
+ * just discard the return.
  */
-export async function persistMessage(opts: PersistMessageOpts, threadOpts?: { title?: string; site_url?: string; repo?: string }): Promise<void> {
-    if (typeof window === 'undefined') return;
+export async function persistMessage(opts: PersistMessageOpts, threadOpts?: { title?: string; site_url?: string; repo?: string }): Promise<PersistedMessageRef | null> {
+    if (typeof window === 'undefined') return null;
     const threadId = getOrCreateThreadId();
+    if (!threadId) return null;
     await ensureThreadOnServer(threadId, threadOpts);
     try {
-        await fetch(`/api/chat-store?action=append_message&thread=${encodeURIComponent(threadId)}`, {
+        const res = await fetch(`/api/chat-store?action=append_message&thread=${encodeURIComponent(threadId)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -155,7 +173,15 @@ export async function persistMessage(opts: PersistMessageOpts, threadOpts?: { ti
                 latency_ms: opts.latency_ms,
             }),
         });
-    } catch { /* server-sync is best-effort */ }
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (typeof data?.id === 'number') {
+            return { id: data.id, thread_id: threadId };
+        }
+        return null;
+    } catch {
+        return null;
+    }
 }
 
 function loadFromStorage(): ChatMessage[] {

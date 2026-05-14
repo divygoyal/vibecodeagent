@@ -14,7 +14,7 @@ import { findBestRepoMatch } from '@/lib/githubApi';
 import { useRegistration } from '../layout';
 import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
-import { useChatStore, type ChatMessage } from '@/stores/chatStore';
+import { useChatStore, persistMessage, getOrCreateThreadId, type ChatMessage } from '@/stores/chatStore';
 import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from '@/components/chat/ReasoningTrace';
 import { ConnectorIntentNudge } from '@/components/chat/ConnectorIntentNudge';
 
@@ -1051,6 +1051,17 @@ export default function AIChat() {
         setIsLoading(true);
         setActiveTool(undefined);
 
+        // Persist the user turn (fire-and-forget). Mirrors AIChatbot.tsx.
+        // Failure is non-fatal — the chat continues; the user message just
+        // won't appear in admin DB. Title only set on the first message of
+        // a thread so the row doesn't get re-titled mid-conversation.
+        const turnStartedAt = Date.now();
+        const isFirstUserTurn = currentMessages.filter(m => m.role === 'user').length === 0;
+        void persistMessage(
+            { role: 'user', content: messageText },
+            isFirstUserTurn ? { title: messageText.slice(0, 80), site_url: currentSite || undefined } : undefined,
+        );
+
         try {
             const abortController = new AbortController();
             const ttfbTimeout = setTimeout(() => abortController.abort(), 30000);
@@ -1176,6 +1187,32 @@ export default function AIChat() {
                 if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
                 flushStreamBuffer();
             }
+
+            // Persist the completed assistant turn + capture its DB message_id
+            // so the feedback widget (👍/👎) on this message can submit against
+            // a real row. Best-effort: if the persist fails, the widget simply
+            // doesn't render for this message (gated on message.id presence).
+            try {
+                const latest = messagesRef.current[messagesRef.current.length - 1];
+                if (latest?.role === 'assistant' && latest.content) {
+                    const persisted = await persistMessage({
+                        role: 'assistant',
+                        content: latest.content,
+                        tools: latest.tools,
+                        latency_ms: Date.now() - turnStartedAt,
+                    });
+                    if (persisted?.id) {
+                        setMessages(prev => {
+                            const next = [...prev];
+                            const lastIdx = next.length - 1;
+                            if (lastIdx >= 0 && next[lastIdx].role === 'assistant') {
+                                next[lastIdx] = { ...next[lastIdx], id: persisted.id };
+                            }
+                            return next;
+                        });
+                    }
+                }
+            } catch { /* persistence is best-effort */ }
         } catch (err: unknown) {
             const isTimeout =
                 (err instanceof DOMException && err.name === 'AbortError') ||
@@ -1464,6 +1501,8 @@ export default function AIChat() {
                                         isStreaming={isLastAssistant && isLoading}
                                         snapshot={snapshot}
                                         onSuggestionClick={(s) => sendMessage(s)}
+                                        messageId={msg.id}
+                                        threadId={typeof window !== 'undefined' ? getOrCreateThreadId() : undefined}
                                     />
                                 </div>
                             );

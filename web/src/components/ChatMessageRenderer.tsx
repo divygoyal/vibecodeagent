@@ -13,6 +13,7 @@ import { splitContentOnChartTags, renderSnapshotChart } from './chat/SnapshotCha
 import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
 import { ThinkingBlock } from './chat/ThinkingBlock';
 import { PlanCard, type ChatPlan } from './chat/PlanCard';
+import { MessageFeedback } from './chat/MessageFeedback';
 import { CriticBadge, type CriticVerdict } from './chat/CriticBadge';
 import { highlightNumbersInChildren } from './chat/HighlightedNumbers';
 import { safeParseToolResult } from '@/lib/chatUtils';
@@ -264,9 +265,15 @@ interface ChatMessageRendererProps {
     isStreaming?: boolean;
     snapshot?: DashboardSnapshot;
     onSuggestionClick?: (suggestion: string) => void;
+    /** chat_messages.id — when present (assistant turn finished streaming AND
+     *  persistMessage resolved with a real id), renders 👍/👎 feedback row at
+     *  the bottom. Absent for in-flight / user messages / un-persisted turns. */
+    messageId?: number;
+    /** Optional thread id — flows through to ChatFeedback rows for grouping. */
+    threadId?: string;
 }
 
-export default memo(function ChatMessageRenderer({ content, tools, thinking, plan, critic, isStreaming, snapshot, onSuggestionClick }: ChatMessageRendererProps) {
+export default memo(function ChatMessageRenderer({ content, tools, thinking, plan, critic, isStreaming, snapshot, onSuggestionClick, messageId, threadId }: ChatMessageRendererProps) {
     const { cleanContent, suggestions } = useMemo(
         () => isStreaming ? { cleanContent: content, suggestions: [] } : parseSuggestions(content || ''),
         [content, isStreaming]
@@ -363,6 +370,14 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, pla
                 the user just read. Only renders for personas where critic is
                 enabled (DIAGNOSTIC, EXECUTIVE_SUMMARY). */}
             {!isStreaming && critic && <CriticBadge verdict={critic} />}
+
+            {/* B-7: per-message feedback — only when the assistant turn has
+                actually been persisted (we have a real DB message_id to attach
+                the ChatFeedback row to). Hides for streaming / user / failed-
+                persist messages. */}
+            {!isStreaming && typeof messageId === 'number' && messageId > 0 && (
+                <MessageFeedback messageId={messageId} threadId={threadId} />
+            )}
         </div>
     );
 });

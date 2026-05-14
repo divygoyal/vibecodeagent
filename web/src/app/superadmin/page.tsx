@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
@@ -356,6 +356,17 @@ function requireSuperadminToken(): string {
     }
 
     return token
+}
+
+interface FeedbackItem {
+    id: number
+    rating: 'up' | 'down'
+    reason: string | null
+    comment: string | null
+    thread_id: string | null
+    message_id: number
+    message_excerpt: string | null
+    created_at: string | null
 }
 
 async function apiGet(endpoint: string, id?: string) {
@@ -804,6 +815,56 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
     const [showCreditInput, setShowCreditInput] = useState<string | null>(null)
     const [emailMenuUser, setEmailMenuUser] = useState<string | null>(null)
 
+    // ─── Per-user chat feedback (👍/👎 counts in the row + click-to-expand
+    //    detail panel below). Counts come from a single aggregate query so the
+    //    page-load cost is fixed regardless of user count. Detail loads
+    //    on-demand and is cached per user so re-clicking the same row doesn't
+    //    refetch. ───
+    const [feedbackCountsByUserId, setFeedbackCountsByUserId] = useState<Record<number, { up: number; down: number }>>({})
+    const [expandedFeedbackUser, setExpandedFeedbackUser] = useState<string | null>(null)
+    const [feedbackDetailCache, setFeedbackDetailCache] = useState<Record<string, FeedbackItem[] | 'loading' | { error: string }>>({})
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await apiGet('chat-feedback-summary')
+                if (!cancelled && res?.by_user_id && typeof res.by_user_id === 'object') {
+                    setFeedbackCountsByUserId(res.by_user_id as Record<number, { up: number; down: number }>)
+                }
+            } catch {
+                // Non-fatal — column shows "—" until refresh.
+            }
+        })()
+        return () => { cancelled = true }
+    }, [])
+
+    const handleToggleFeedbackExpand = useCallback(async (user: UserData) => {
+        const key = user.github_id
+        if (expandedFeedbackUser === key) {
+            setExpandedFeedbackUser(null)
+            return
+        }
+        setExpandedFeedbackUser(key)
+        if (feedbackDetailCache[key] && Array.isArray(feedbackDetailCache[key])) return
+        setFeedbackDetailCache(prev => ({ ...prev, [key]: 'loading' }))
+        try {
+            const res = await apiGet('user-chat-feedback', key)
+            if (Array.isArray(res?.items)) {
+                setFeedbackDetailCache(prev => ({ ...prev, [key]: res.items as FeedbackItem[] }))
+            } else {
+                setFeedbackDetailCache(prev => ({ ...prev, [key]: { error: 'Empty response' } }))
+            }
+        } catch (err) {
+            const message = getErrorMessage(err)
+            if (!isSuperadminAuthError(message)) {
+                setFeedbackDetailCache(prev => ({ ...prev, [key]: { error: message } }))
+            } else {
+                setExpandedFeedbackUser(null)
+            }
+        }
+    }, [expandedFeedbackUser, feedbackDetailCache])
+
     const loadUserProfile = useCallback(async (user: UserData, force = false) => {
         if (!force && profileCache[user.github_id]) {
             setProfileError('')
@@ -1007,6 +1068,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Plan</th>
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Credits</th>
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Signals</th>
+                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Feedback</th>
                                 <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Container</th>
                                 <th className="text-right px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Actions</th>
                             </tr>
@@ -1014,31 +1076,47 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                         <tbody>
                             {users.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-12 text-zinc-600">No users found</td>
+                                    <td colSpan={8} className="text-center py-12 text-zinc-600">No users found</td>
                                 </tr>
                             )}
-                            {users.map(user => (
-                                <UserRow
-                                    key={user.github_id}
-                                    user={user}
-                                    selected={selectedUser?.github_id === user.github_id}
-                                    actionLoading={actionLoading}
-                                    showCreditInput={showCreditInput === user.github_id}
-                                    creditInputValue={creditInputs[user.github_id] || ''}
-                                    containerStatusColor={containerStatusColor}
-                                    onAction={handleAction}
-                                    onDelete={() => setDeleteTarget(user)}
-                                    onOpenDetails={() => handleOpenProfile(user)}
-                                    onToggleCreditInput={() => setShowCreditInput(showCreditInput === user.github_id ? null : user.github_id)}
-                                    onCreditInputChange={(v) => setCreditInputs(prev => ({ ...prev, [user.github_id]: v }))}
-                                    onAddCredits={() => handleAddCredits(user.github_id)}
-                                    emailMenuOpen={emailMenuUser === user.github_id}
-                                    onToggleEmailMenu={() => setEmailMenuUser(emailMenuUser === user.github_id ? null : user.github_id)}
-                                    onSendReportEmail={(period) => handleSendReportEmail(user.github_id, period)}
-                                    onSendFeedbackEmail={() => handleSendFeedbackEmail(user.github_id)}
-                                    onGenerateWeeklyDigest={() => handleGenerateWeeklyDigest(user.github_id)}
-                                />
-                            ))}
+                            {users.map(user => {
+                                const counts = (typeof user.id === 'number' ? feedbackCountsByUserId[user.id] : undefined) ?? null
+                                const isExpanded = expandedFeedbackUser === user.github_id
+                                const detail = feedbackDetailCache[user.github_id]
+                                return (
+                                    <Fragment key={user.github_id}>
+                                        <UserRow
+                                            user={user}
+                                            selected={selectedUser?.github_id === user.github_id}
+                                            actionLoading={actionLoading}
+                                            showCreditInput={showCreditInput === user.github_id}
+                                            creditInputValue={creditInputs[user.github_id] || ''}
+                                            containerStatusColor={containerStatusColor}
+                                            onAction={handleAction}
+                                            onDelete={() => setDeleteTarget(user)}
+                                            onOpenDetails={() => handleOpenProfile(user)}
+                                            onToggleCreditInput={() => setShowCreditInput(showCreditInput === user.github_id ? null : user.github_id)}
+                                            onCreditInputChange={(v) => setCreditInputs(prev => ({ ...prev, [user.github_id]: v }))}
+                                            onAddCredits={() => handleAddCredits(user.github_id)}
+                                            emailMenuOpen={emailMenuUser === user.github_id}
+                                            onToggleEmailMenu={() => setEmailMenuUser(emailMenuUser === user.github_id ? null : user.github_id)}
+                                            onSendReportEmail={(period) => handleSendReportEmail(user.github_id, period)}
+                                            onSendFeedbackEmail={() => handleSendFeedbackEmail(user.github_id)}
+                                            onGenerateWeeklyDigest={() => handleGenerateWeeklyDigest(user.github_id)}
+                                            feedbackCounts={counts}
+                                            isFeedbackExpanded={isExpanded}
+                                            onToggleFeedback={() => handleToggleFeedbackExpand(user)}
+                                        />
+                                        {isExpanded && (
+                                            <tr className="bg-zinc-950/40">
+                                                <td colSpan={8} className="px-4 py-3">
+                                                    <FeedbackExpandPanel detail={detail} />
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -1162,7 +1240,7 @@ function UserSignals({ user }: { user: UserData }) {
     )
 }
 
-function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail, onSendFeedbackEmail, onGenerateWeeklyDigest }: {
+function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail, onSendFeedbackEmail, onGenerateWeeklyDigest, feedbackCounts, isFeedbackExpanded, onToggleFeedback }: {
     user: UserData
     selected: boolean
     actionLoading: string
@@ -1180,6 +1258,12 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
     onSendReportEmail: (period: 'weekly' | 'monthly') => void
     onSendFeedbackEmail: () => void
     onGenerateWeeklyDigest: () => void
+    /** Aggregate 👍/👎 counts for this user (null while summary loads / no data). */
+    feedbackCounts: { up: number; down: number } | null
+    /** Whether the inline feedback-detail panel below this row is open. */
+    isFeedbackExpanded: boolean
+    /** Toggle the feedback detail panel for this user. */
+    onToggleFeedback: () => void
 }) {
     const containerStatus = user.container?.status || null
     const isRunning = containerStatus?.toLowerCase() === 'running'
@@ -1257,6 +1341,14 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
 
             <td className="px-4 py-3">
                 <UserSignals user={user} />
+            </td>
+
+            <td className="px-4 py-3">
+                <FeedbackCell
+                    counts={feedbackCounts}
+                    expanded={isFeedbackExpanded}
+                    onToggle={onToggleFeedback}
+                />
             </td>
 
             <td className="px-4 py-3">
@@ -2980,6 +3072,93 @@ function PlanBar({ label, count, total, color }: { label: string; count: number;
             <div className="w-full bg-zinc-800 rounded-full h-3">
                 <div className={`h-3 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
             </div>
+        </div>
+    )
+}
+
+/* Per-user 👍/👎 cell rendered inside UserRow. Click toggles the inline
+ * expand row below. Shows "—" until the aggregate summary loads, then
+ * "0/0" if the user has no feedback yet, then "N up / M down" once data. */
+function FeedbackCell({ counts, expanded, onToggle }: {
+    counts: { up: number; down: number } | null
+    expanded: boolean
+    onToggle: () => void
+}) {
+    const up = counts?.up ?? 0
+    const down = counts?.down ?? 0
+    const hasAny = (counts !== null) && (up > 0 || down > 0)
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            disabled={!hasAny}
+            title={hasAny ? (expanded ? 'Hide feedback' : 'Show recent feedback') : 'No feedback yet'}
+            className={`inline-flex items-center gap-2 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                hasAny
+                    ? expanded
+                        ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-200'
+                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:border-cyan-500/30 hover:bg-cyan-500/[0.08] hover:text-cyan-300'
+                    : 'border-white/[0.04] bg-transparent text-zinc-600 cursor-default'
+            }`}
+        >
+            <span className="text-emerald-400">👍 {up}</span>
+            <span className="text-zinc-700">·</span>
+            <span className="text-red-400">👎 {down}</span>
+        </button>
+    )
+}
+
+/* Inline detail panel rendered as a 2nd <tr> below the user row when the
+ * FeedbackCell is clicked. Loads recent ChatFeedback rows for this user
+ * with their reason, comment, and message excerpt. */
+function FeedbackExpandPanel({ detail }: {
+    detail: FeedbackItem[] | 'loading' | { error: string } | undefined
+}) {
+    if (detail === undefined || detail === 'loading') {
+        return <div className="text-[11px] text-zinc-500">Loading feedback…</div>
+    }
+    if (typeof detail === 'object' && !Array.isArray(detail) && 'error' in detail) {
+        return <div className="text-[11px] text-red-400">Failed to load: {detail.error}</div>
+    }
+    if (detail.length === 0) {
+        return <div className="text-[11px] text-zinc-500">No feedback recorded yet.</div>
+    }
+    return (
+        <div className="space-y-2">
+            {detail.map(item => (
+                <div
+                    key={item.id}
+                    className={`rounded-md border px-3 py-2 ${
+                        item.rating === 'up'
+                            ? 'border-emerald-500/15 bg-emerald-500/[0.04]'
+                            : 'border-red-500/15 bg-red-500/[0.04]'
+                    }`}
+                >
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider">
+                                <span className={item.rating === 'up' ? 'text-emerald-400' : 'text-red-400'}>
+                                    {item.rating === 'up' ? '👍 Helpful' : '👎 Not helpful'}
+                                </span>
+                                {item.reason ? <span className="text-zinc-500">· {item.reason}</span> : null}
+                                {item.created_at ? (
+                                    <span className="ml-auto text-zinc-600">
+                                        {new Date(item.created_at).toLocaleString()}
+                                    </span>
+                                ) : null}
+                            </div>
+                            {item.comment ? (
+                                <p className="mt-1 text-[12px] leading-relaxed text-zinc-200">{item.comment}</p>
+                            ) : null}
+                            {item.message_excerpt ? (
+                                <p className="mt-1 truncate text-[11px] text-zinc-500" title={item.message_excerpt}>
+                                    Re: {item.message_excerpt.slice(0, 180)}{item.message_excerpt.length > 180 ? '…' : ''}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
     )
 }

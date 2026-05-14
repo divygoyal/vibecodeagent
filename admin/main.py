@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update, delete, text, func, or_
+from sqlalchemy import select, update, delete, text, func, or_, case
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
@@ -5346,6 +5346,73 @@ async def chat_stats(
             "down": down,
             "rate": (up / (up + down)) if (up + down) > 0 else None,
         },
+    }
+
+
+# ============= Chat Feedback (superadmin dashboard surfaces) =============
+@app.get("/api/admin/chat-feedback-summary")
+async def chat_feedback_summary(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Aggregate up/down counts per user — single SQL GROUP BY, no N+1.
+    Used by the superadmin user list to render the FEEDBACK column without
+    fan-out queries (123 users × 1 query each was the alternative)."""
+    q = select(
+        ChatFeedback.user_id,
+        func.sum(case((ChatFeedback.rating == 'up', 1), else_=0)).label('up'),
+        func.sum(case((ChatFeedback.rating == 'down', 1), else_=0)).label('down'),
+    ).group_by(ChatFeedback.user_id)
+    rows = (await db.execute(q)).all()
+    # Returns a map keyed by user_id (int) → counts. Web layer joins this
+    # against the user list it already has, no further lookup needed.
+    return {
+        "by_user_id": {
+            int(r.user_id): {"up": int(r.up or 0), "down": int(r.down or 0)}
+            for r in rows
+        },
+    }
+
+
+@app.get("/api/admin/users/{user_identifier}/chat-feedback")
+async def user_chat_feedback(
+    user_identifier: str,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Recent feedback rows for one user, newest first. Used by the
+    superadmin inline-expand below the user row. Joins ChatMessage to
+    include a short excerpt of the message being rated so admins can see
+    context without a second click. Capped at 200 to keep the payload
+    bounded if a user gets very prolific."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    capped = max(1, min(200, limit))
+    q = (
+        select(ChatFeedback, ChatMessage.content)
+        .outerjoin(ChatMessage, ChatMessage.id == ChatFeedback.message_id)
+        .where(ChatFeedback.user_id == user.id)
+        .order_by(ChatFeedback.created_at.desc())
+        .limit(capped)
+    )
+    rows = (await db.execute(q)).all()
+    return {
+        "user_id": user.id,
+        "items": [
+            {
+                "id": fb.id,
+                "rating": fb.rating,
+                "reason": fb.reason,
+                "comment": fb.comment,
+                "thread_id": fb.thread_id,
+                "message_id": fb.message_id,
+                "message_excerpt": (msg_content[:300] if msg_content else None),
+                "created_at": fb.created_at.isoformat() if fb.created_at else None,
+            }
+            for fb, msg_content in rows
+        ],
     }
 
 
