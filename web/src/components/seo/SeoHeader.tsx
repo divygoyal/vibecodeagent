@@ -1,13 +1,18 @@
 'use client';
 
+import { type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 
 interface SeoHeaderProps {
     canExport: boolean;
     onExport: () => void;
+    /** Optional left-of-Export slot — the SEO page uses this to inject the
+     *  "Ask AI about my SEO" CTA without SeoHeader having to know about the
+     *  chat. */
+    extraActions?: ReactNode;
 }
 
-export default function SeoHeader({ canExport, onExport }: SeoHeaderProps) {
+export default function SeoHeader({ canExport, onExport, extraActions }: SeoHeaderProps) {
     return (
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-6">
             <div className="min-w-0">
@@ -20,6 +25,7 @@ export default function SeoHeader({ canExport, onExport }: SeoHeaderProps) {
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
+                {extraActions}
                 <button
                     type="button"
                     onClick={onExport}

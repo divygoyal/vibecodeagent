@@ -22,7 +22,9 @@ import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analyti
 import { IntentBadge } from '@/components/IntentBadge';
 import { buildAskAiUrl } from '@/lib/askAi';
 import { useKeywordDetail } from '@/lib/useDashboardData';
+import { keywordInsightPrompt } from '@/lib/seoAiPrompts';
 import PositionPill from './PositionPill';
+import { AskAiButton } from './AskAiButton';
 
 const LineChart = dynamic(() => import('recharts').then(m => ({ default: m.LineChart })), { ssr: false });
 const Line = dynamic(() => import('recharts').then(m => ({ default: m.Line })), { ssr: false });
@@ -244,6 +246,16 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
         };
     }, [detail, summary]);
 
+    const askAiQuestion = keyword && computed
+        ? keywordInsightPrompt({
+            keyword,
+            position: computed.position,
+            clicks: computed.clicks,
+            impressions: computed.impressions,
+            ctr: computed.ctr,
+        })
+        : '';
+
     return (
         <AnalyticsSubpagePanel
             title="Keyword detail"
@@ -251,11 +263,19 @@ export default function SeoKeywordInsightsPanel({ keyword, siteUrl, summary }: S
             tone="cyan"
             action={
                 keyword ? (
-                    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
-                        <Sparkles className="h-3 w-3" />
-                        <span className="max-w-[180px] truncate">{keyword}</span>
-                        <IntentBadge keyword={keyword} className="hidden sm:inline-flex flex-shrink-0" />
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
+                            <Sparkles className="h-3 w-3" />
+                            <span className="max-w-[140px] truncate">{keyword}</span>
+                            <IntentBadge keyword={keyword} className="hidden sm:inline-flex flex-shrink-0" />
+                        </span>
+                        <AskAiButton
+                            question={askAiQuestion}
+                            siteUrl={siteUrl}
+                            fromTag="seo:keyword_insight"
+                            enabled={!!askAiQuestion}
+                        />
+                    </div>
                 ) : null
             }
         >

@@ -634,7 +634,7 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 
  * switch, the AI would answer using B's data and confuse everyone.
  * On switch we surface a toast so the user knows what happened.
  */
-function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
+function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string, opts?: { fromTag?: string }) => void }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const {
@@ -672,6 +672,10 @@ function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
 
         const reqProperty = (searchParams.get('property') || '').trim();
         const reqSite = (searchParams.get('site') || '').trim();
+        // __from carries the SEO-surface tag (e.g. "seo:cannibalization") so the
+        // chat backend can force the right tool to fire first. Stripped from
+        // the URL alongside q/property/site to keep refresh idempotent.
+        const reqFromTag = (searchParams.get('__from') || '').trim() || undefined;
         const needSwitch =
             (reqProperty && reqProperty !== selectedProperty) ||
             (reqSite && reqSite !== selectedSite);
@@ -681,6 +685,7 @@ function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
         params.delete('q');
         params.delete('property');
         params.delete('site');
+        params.delete('__from');
         const qs = params.toString();
         router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
 
@@ -747,7 +752,7 @@ function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string) => void }) {
             }
             // Tiny delay so the scroll/layout settles + dataReady + workspace
             // context propagates to the chat tools that read selectedProperty.
-            setTimeout(() => onPrompt(q), 350);
+            setTimeout(() => onPrompt(q, { fromTag: reqFromTag }), 350);
         };
         void fire();
     }, [searchParams, router, onPrompt, saveWorkspace, selectedProperty, selectedSite, isWorkspaceLoaded]);
@@ -1030,7 +1035,7 @@ export default function AIChat() {
         } catch { /* swallow — UI is still updated */ }
     }, [selectedSite, refreshSiteRepoLinks]);
 
-    const sendMessage = useCallback(async (text?: string, options?: { mode?: string }) => {
+    const sendMessage = useCallback(async (text?: string, options?: { mode?: string; fromTag?: string }) => {
         const messageText = text || input.trim();
         if (!messageText || isLoading) return;
 
@@ -1047,7 +1052,6 @@ export default function AIChat() {
         setActiveTool(undefined);
 
         try {
-            const isFirstUserMessage = currentMessages.filter(m => m.role === 'user').length === 0;
             const abortController = new AbortController();
             const ttfbTimeout = setTimeout(() => abortController.abort(), 30000);
 
@@ -1060,18 +1064,17 @@ export default function AIChat() {
                     selectedSite: currentSite,
                     selectedRepo: selectedRepo,
                     repoIsAuto: repoIsAuto,
-                    // After the first user message we shrink the context to KPIs only —
-                    // the model already has the full snapshot from turn 1 and re-sending
-                    // it bloats every request. Both shapes go through the shared helper
-                    // so the chat widget and full-screen page stay in lockstep.
-                    analyticsContext: currentAnalytics
-                        ? (isFirstUserMessage ? buildAnalyticsContext(currentAnalytics) : { kpis: currentAnalytics.kpis })
-                        : null,
-                    seoContext: currentSeo
-                        ? (isFirstUserMessage ? buildSeoContext(currentSeo) : { kpis: currentSeo.kpis })
-                        : null,
+                    // Snapshot is sent on EVERY turn (was: first-message-only).
+                    // The KPI-only shrinkage saved tokens but caused multi-turn
+                    // diagnostic conversations to forget the keyword + page lists,
+                    // pushing the AI back to generic answers. Full snapshot stays
+                    // grounded. The shared helpers already cap row counts so
+                    // payload growth is bounded.
+                    analyticsContext: currentAnalytics ? buildAnalyticsContext(currentAnalytics) : null,
+                    seoContext: currentSeo ? buildSeoContext(currentSeo) : null,
                     history: currentMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                     mode: options?.mode,
+                    fromTag: options?.fromTag ?? null,
                 }),
             });
             clearTimeout(ttfbTimeout);
@@ -1232,7 +1235,7 @@ export default function AIChat() {
                empty state, otherwise ?q= / ?connected= deep-links are silently dropped
                whenever the user already has a chat conversation in their store. ── */}
             <Suspense fallback={null}>
-                <AutoPromptFromQuery onPrompt={(q) => sendMessage(q)} />
+                <AutoPromptFromQuery onPrompt={(q, opts) => sendMessage(q, opts)} />
             </Suspense>
             <Suspense fallback={null}>
                 <ProviderConnectionCallback onConnected={handleProviderConnected} />
