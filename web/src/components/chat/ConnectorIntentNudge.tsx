@@ -61,31 +61,36 @@ export function ConnectorIntentNudge({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    className="mb-2 flex items-center justify-between gap-3 rounded-2xl border border-cyan-400/25 bg-[#0d1117]/95 px-4 py-2.5 backdrop-blur-sm shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                    className="mb-2 flex items-center justify-between gap-3 rounded-2xl border border-cyan-400/25 bg-[#0d1117]/95 px-3.5 py-3 backdrop-blur-sm shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
                 >
                     <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-cyan-400/25 bg-cyan-400/10 text-cyan-300">
-                            <Github className="h-3.5 w-3.5" />
+                        <span
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-black/40 text-white"
+                            style={{ boxShadow: 'inset 2px 0 0 rgba(34,211,238,0.45)' }}
+                        >
+                            <Github className="h-4 w-4" />
                         </span>
-                        <span className="truncate text-[13px] text-zinc-200">
-                            <strong className="font-semibold text-white">Best answers</strong>{' '}
-                            <span className="text-zinc-400">come from your code</span>
-                        </span>
+                        <div className="min-w-0">
+                            <div className="text-[13px] font-semibold text-white">GitHub not connected</div>
+                            <div className="text-[12px] leading-snug text-zinc-400">
+                                See the exact code, commit, or change causing the issue.
+                            </div>
+                        </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                         <button
                             type="button"
                             onClick={onConnect}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-[#22d3ee] px-3.5 py-1.5 text-[12px] font-semibold text-[#06141a] shadow-[inset_0_1px_0_rgba(255,255,255,0.30),0_2px_8px_rgba(34,211,238,0.30)] transition-all hover:brightness-110"
+                            className="inline-flex items-center rounded-full border border-cyan-400/50 px-4 py-1.5 text-[12px] font-semibold text-white transition-all hover:border-cyan-400/70 hover:bg-cyan-400/10"
                             data-testid="connector-nudge-connect-github"
                         >
-                            Connect GitHub
+                            Connect
                         </button>
                         <button
                             type="button"
                             onClick={handleDismiss}
                             aria-label="Dismiss"
-                            className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300"
+                            className="rounded-full border border-white/[0.1] p-1.5 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
                             data-testid="connector-nudge-dismiss-github"
                         >
                             <X className="h-3.5 w-3.5" />
