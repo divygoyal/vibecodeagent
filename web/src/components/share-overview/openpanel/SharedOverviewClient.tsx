@@ -245,6 +245,38 @@ type OverviewRuntime = {
 
 const OverviewRuntimeContext = createContext<OverviewRuntime | null>(null);
 
+/**
+ * Live accent color, merged from the persisted share config + any Studio
+ * postMessage overrides. Lives in its own context so child components
+ * (mini-bar shapes, line charts, KPI dots, etc.) all consume the SAME
+ * up-to-the-millisecond value — previously each consumer read
+ * runtime.config?.theme.accentColor directly, which only refreshes after
+ * Save and so the live preview only updated the chart line (which read
+ * `accentColor` from the merged calc) while the mini-bars and tile
+ * sparklines stayed hardcoded blue.
+ */
+const ShareAccentContext = createContext<string>('#14C4E1');
+function useShareAccent() {
+    return useContext(ShareAccentContext);
+}
+
+/**
+ * Convert a #RRGGBB hex to an `rgba(r,g,b,a)` string. Used by the mini-bar
+ * renderers to shade the accent color at varying opacities so the
+ * left-to-right depth effect persists across whatever color the user
+ * picked in the Studio. Falls back to the input as-is if the format
+ * doesn't parse (e.g. an `rgb()` already came in).
+ */
+function withAccentAlpha(hex: string, alpha: number): string {
+    const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+    if (!match) return hex;
+    const r = parseInt(match[1], 16);
+    const g = parseInt(match[2], 16);
+    const b = parseInt(match[3], 16);
+    const a = Math.max(0, Math.min(1, alpha));
+    return `rgba(${r},${g},${b},${a})`;
+}
+
 const LIVE_DATA_POLL_INTERVAL_MS = 15_000;
 const LIVE_RECONCILE_INTERVAL_MS = 60_000;
 const OVERVIEW_QUERY_STALE_MS = 30_000;
@@ -412,20 +444,20 @@ function aggregateLiveMiniSeries(
     });
 }
 
-function miniBarColor(index: number, total: number) {
-    if (total <= 1) return '#58CBFF';
-
+/**
+ * Mini-bar tinting. Derives each bar's fill from the user's chosen accent
+ * by varying opacity left→right (older bars dimmer, recent bars solid),
+ * with a faint alternating shimmer so the gradient still reads as
+ * individual bars. Previously this was six hardcoded cyan hex values —
+ * which is why every Studio accent choice (Forest, Solar, Rose, etc.)
+ * left the KPI sparklines stuck on the default blue.
+ */
+function miniBarColor(index: number, total: number, accent: string) {
+    if (total <= 1) return withAccentAlpha(accent, 0.85);
     const progress = index / Math.max(total - 1, 1);
-
-    if (progress >= 0.82) {
-        return index % 2 === 0 ? '#7BE1FF' : '#5CCEFF';
-    }
-
-    if (progress >= 0.56) {
-        return index % 2 === 0 ? '#5CCEFF' : '#3CB7F6';
-    }
-
-    return index % 2 === 0 ? '#2896D8' : '#34A7E8';
+    if (progress >= 0.82) return withAccentAlpha(accent, index % 2 === 0 ? 1 : 0.88);
+    if (progress >= 0.56) return withAccentAlpha(accent, index % 2 === 0 ? 0.78 : 0.66);
+    return withAccentAlpha(accent, index % 2 === 0 ? 0.5 : 0.58);
 }
 
 type MiniBarShapeProps = {
@@ -1265,6 +1297,7 @@ function MetricCard({
     interval: string;
     primary: boolean;
 }) {
+    const accent = useShareAccent();
     const [currentIndex, setCurrentIndex] = useState<number | null>(null);
     const [cardHovered, setCardHovered] = useState(false);
     const [hoverLabelPosition, setHoverLabelPosition] = useState<{ left: number; top: number } | null>(null);
@@ -1449,7 +1482,7 @@ function MetricCard({
                                     <Tooltip content={() => null} cursor={false} />
                                     <Bar
                                         dataKey="current"
-                                        fill={OVERVIEW_PRIMARY_ACCENT}
+                                        fill={accent}
                                         fillOpacity={1}
                                         isAnimationActive={false}
                                         shape={<MiniBarShape />}
@@ -1458,7 +1491,7 @@ function MetricCard({
                                         barSize={10}
                                     >
                                         {miniSeries.map((_, index) => (
-                                            <Cell key={`mini-bar-${metric.key}-${index}`} fill={miniBarColor(index, miniSeries.length)} />
+                                            <Cell key={`mini-bar-${metric.key}-${index}`} fill={miniBarColor(index, miniSeries.length, accent)} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -1507,6 +1540,7 @@ function LiveMetricTile({
     total: number;
     className?: string;
 }) {
+    const accent = useShareAccent();
     const hasBreakdown = hasLiveBreakdown(data);
     const topReferrers = hasBreakdown ? data.referrers.slice(0, 2) : [];
     const liveMiniSeries = useMemo(
@@ -1573,7 +1607,7 @@ function LiveMetricTile({
                                     />
                                     <Bar
                                         dataKey="sessionCount"
-                                        fill={OVERVIEW_PRIMARY_ACCENT}
+                                        fill={accent}
                                         isAnimationActive={false}
                                         shape={<MiniBarShape />}
                                         minPointSize={5}
@@ -1581,7 +1615,7 @@ function LiveMetricTile({
                                         barSize={10}
                                     >
                                         {liveMiniSeries.map((_, index) => (
-                                            <Cell key={`live-bar-${index}`} fill={miniBarColor(index, liveMiniSeries.length)} />
+                                            <Cell key={`live-bar-${index}`} fill={miniBarColor(index, liveMiniSeries.length, accent)} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -1886,7 +1920,12 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
         ? liveData.minuteCounts.reduce((sum, item) => sum + item.sessionCount, 0)
         : liveData?.activeUsers || 0;
     const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
-    const activeMetricColor = runtime.config?.theme.accentColor || OVERVIEW_PRIMARY_ACCENT;
+    // Read the merged accent (persisted config + Studio postMessage overrides)
+    // from context — NOT runtime.config?.theme.accentColor directly. Doing it
+    // directly was the reason the Studio's live preview only painted the line
+    // after Save: the runtime is built once outside the preview-overrides
+    // state, so the persisted color was stuck until a reload.
+    const activeMetricColor = useShareAccent();
     const previousMetricColor = OVERVIEW_COMPARISON_ACCENT;
     const chartHelperText = pageScoped
         ? 'Page-scoped filters applied • Some session-level cards stay limited.'
@@ -3309,7 +3348,7 @@ function ShareOverviewPage() {
     ) : null;
 
     return (
-        <>
+        <ShareAccentContext.Provider value={accentColor}>
             {runtime.mode === 'share' ? (
                 <div
                     className="min-h-screen overflow-x-hidden bg-[#080b0e] text-zinc-100"
@@ -3355,7 +3394,7 @@ function ShareOverviewPage() {
                     {contentGrid}
                 </div>
             )}
-        </>
+        </ShareAccentContext.Provider>
     );
 }
 
