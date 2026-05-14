@@ -125,17 +125,19 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
     }
 
     return (
-        <div className="mt-2 flex items-center gap-1">
+        <div className="mt-3 flex items-center gap-2">
+            <span className="text-[11px] font-medium text-zinc-400">Was this helpful?</span>
             <button
                 type="button"
                 onClick={() => void submit('up')}
                 disabled={submitting}
                 aria-label="Helpful answer"
                 title="Helpful"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300 disabled:opacity-50"
                 data-testid="message-feedback-up"
             >
-                <ThumbsUp className="h-3 w-3" />
+                <ThumbsUp className="h-3.5 w-3.5" />
+                <span>Yes</span>
             </button>
             <button
                 type="button"
@@ -143,13 +145,14 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
                 disabled={submitting}
                 aria-label="Unhelpful answer"
                 title="Not helpful"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition-all hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
                 data-testid="message-feedback-down"
             >
-                <ThumbsDown className="h-3 w-3" />
+                <ThumbsDown className="h-3.5 w-3.5" />
+                <span>No</span>
             </button>
             {state.kind === 'error' ? (
-                <span className="ml-1.5 text-[10px] text-red-400">{state.message}</span>
+                <span className="ml-1.5 text-[11px] text-red-400">{state.message}</span>
             ) : null}
         </div>
     );
