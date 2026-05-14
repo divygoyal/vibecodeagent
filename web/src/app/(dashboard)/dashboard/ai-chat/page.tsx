@@ -763,6 +763,7 @@ const TOOL_LABELS: Record<string, string> = {
     get_search_performance: 'Searching your data',
     run_ga4_report: 'Querying analytics',
     run_page_audit: 'Running audit',
+    fetch_page_html: 'Reading the page',
     calculate_revenue_impact: 'Calculating revenue',
     generate_content_strategy: 'Building strategy',
     analyze_keyword_clusters: 'Clustering keywords',
