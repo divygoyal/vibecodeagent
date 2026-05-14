@@ -17,7 +17,6 @@ import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/cha
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from '@/components/chat/ReasoningTrace';
 import { ConnectorIntentNudge } from '@/components/chat/ConnectorIntentNudge';
-import type { IntentProvider } from '@/lib/connectorIntent';
 
 type DashboardSiteOption = {
     siteUrl: string;
@@ -867,20 +866,12 @@ export default function AIChat() {
         setOpenConnector(null);
     }, [refreshContainer]);
 
-    // Triggered when the user clicks "Connect →" in the contextual intent nudge
+    // Triggered when the user clicks "Connect GitHub" in the persistent nudge
     // above the bottom input. Skips the ConnectorCard popover (no room for it
     // above a bottom-fixed input) and fires the same OAuth flow ConnectorCard
-    // uses internally — direct route. ga4/gsc share a Google OAuth path.
-    const handleNudgeConnect = useCallback((provider: IntentProvider) => {
-        if (provider === 'github') {
-            window.location.href = '/api/auth/github-app/install';
-            return;
-        }
-        void signIn(
-            'google',
-            { callbackUrl: '/dashboard/ai-chat?connected=google' },
-            { prompt: 'select_account consent' },
-        );
+    // uses internally for GitHub.
+    const handleNudgeConnect = useCallback(() => {
+        window.location.href = '/api/auth/github-app/install';
     }, []);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
@@ -1492,15 +1483,12 @@ export default function AIChat() {
                     style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px))' }}
                 >
                     <div className="max-w-[760px] mx-auto">
-                        {/* Contextual connector nudge — only shows when the user is
-                            typing about something a not-yet-connected provider would
-                            unlock. The persistent right rail handles discovery /
-                            "always check" access; this handles intent-driven
-                            re-engagement. */}
+                        {/* Persistent GitHub-connect nudge — stays up whenever GitHub
+                            isn't connected (and the user hasn't dismissed it this
+                            session). Drives the highest-leverage connection without
+                            waiting for the user to type repo-specific keywords. */}
                         <ConnectorIntentNudge
-                            input={input}
                             githubConnected={effectiveGithub}
-                            googleConnected={effectiveGoogle}
                             disabled={isLoading || isGa4Locked}
                             onConnect={handleNudgeConnect}
                         />
