@@ -513,7 +513,9 @@ export default function DashboardLayout({
         properties: typedProperties,
         siteInventoryError,
         propertyInventoryError,
-    }), [propertyInventoryError, selectedProperty, selectedSite, siteInventoryError, typedProperties, typedSites]);
+        siteInventoryLoading,
+        propertyInventoryLoading,
+    }), [propertyInventoryError, propertyInventoryLoading, selectedProperty, selectedSite, siteInventoryError, siteInventoryLoading, typedProperties, typedSites]);
     const {
         resolvedSiteUrl,
         resolvedPropertyId,

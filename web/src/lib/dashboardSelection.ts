@@ -58,6 +58,8 @@ export function resolveDashboardSelection({
     properties,
     siteInventoryError,
     propertyInventoryError,
+    siteInventoryLoading,
+    propertyInventoryLoading,
 }: {
     selectedSite: string;
     selectedProperty: string;
@@ -65,6 +67,19 @@ export function resolveDashboardSelection({
     properties: PropertyOption[];
     siteInventoryError?: string | null;
     propertyInventoryError?: string | null;
+    /**
+     * Inventory loading flags. CRITICAL for the stale-detection path: when
+     * an inventory is still loading, its `sites`/`properties` array is
+     * legitimately empty AND `siteInventoryError`/`propertyInventoryError`
+     * is null — so without these flags the stale branch falsely fires the
+     * moment the dashboard mounts after a hard navigation (e.g. fresh
+     * setup → dashboard transition where SWR hasn't fetched inventory
+     * yet). The result was an infinite redirect loop between /setup
+     * and the dashboard. Defaulting to `false` keeps callers that don't
+     * yet pass these unchanged.
+     */
+    siteInventoryLoading?: boolean;
+    propertyInventoryLoading?: boolean;
 }): DashboardSelectionResolution {
     const validSites = sites
         .map((site) => site.siteUrl)
@@ -83,10 +98,18 @@ export function resolveDashboardSelection({
     // We deliberately do NOT silently substitute a fuzzy-matched property or
     // fall back to validSites[0] — that would silently put the user on the
     // wrong workspace and persist the wrong pairing back to localStorage on
-    // the next save. Inventory loading errors are excluded so a transient
-    // network hiccup doesn't bounce a valid user to the picker.
+    // the next save.
+    //
+    // Hard guards before classifying as stale:
+    //   - Both inventories must be FULLY LOADED (loading=false). While
+    //     loading, the arrays are legitimately empty so every saved value
+    //     would falsely look "missing" and we'd loop /setup ↔ /dashboard.
+    //   - Neither inventory may be in an error state, so a transient
+    //     network hiccup doesn't bounce a valid user to the picker.
     if (
         hadSavedSelection
+        && !siteInventoryLoading
+        && !propertyInventoryLoading
         && !siteInventoryError
         && !propertyInventoryError
         && ((selectedSite && !isSelectedSiteValid) || (selectedProperty && !isSelectedPropertyValid))
