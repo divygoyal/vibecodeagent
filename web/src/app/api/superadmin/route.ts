@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createSuperadminToken, verifySuperadminToken } from '@/lib/superadminToken'
 import { sendUserReportEmail } from '@/lib/reportEmail'
+import { sendUserFeedbackEmail } from '@/lib/feedbackEmail'
 
 export const dynamic = 'force-dynamic'
 // Report-email path renders a PDF + Gemini-synthesised analysis; the same 5-min
@@ -361,6 +362,29 @@ export async function POST(req: Request) {
                 headers: { 'X-API-Key': ADMIN_API_KEY },
             })
             return NextResponse.json(await res.json())
+        }
+
+        if (action === 'send-feedback-email') {
+            const { userId, couponPercent, expiryDays } = body as {
+                userId?: string
+                couponPercent?: number
+                expiryDays?: number
+            }
+            if (!userId) {
+                return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+            }
+            const result = await sendUserFeedbackEmail({
+                userId: String(userId),
+                couponPercent: typeof couponPercent === 'number' ? couponPercent : undefined,
+                expiryDays: typeof expiryDays === 'number' ? expiryDays : undefined,
+            })
+            if (!result.ok) {
+                return NextResponse.json(
+                    { error: result.error || 'Send failed', couponCode: result.couponCode },
+                    { status: 500 },
+                )
+            }
+            return NextResponse.json({ ok: true, couponCode: result.couponCode })
         }
 
         if (action === 'send-report-email') {
