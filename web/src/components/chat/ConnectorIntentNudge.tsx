@@ -12,9 +12,6 @@ interface ConnectorIntentNudgeProps {
     /** Whether GitHub is currently connected. The nudge stays up whenever this
      *  is false (and the user hasn't dismissed it this session). */
     githubConnected: boolean;
-    /** Suppress while the assistant is streaming or GA4 is locked — both are
-     *  blocking states where a connect prompt would compete for attention. */
-    disabled?: boolean;
     /** Fires the GitHub OAuth flow (parent handles the actual redirect). */
     onConnect: () => void;
 }
@@ -28,13 +25,17 @@ interface ConnectorIntentNudgeProps {
  * nudge now always shows until the user either (a) connects, or (b)
  * dismisses for the session.
  *
+ * Visibility is intentionally NOT gated on isLoading / streaming state —
+ * the user explicitly wanted "always till github is connected" and hiding
+ * the prompt while the AI is generating a code-blind answer is exactly the
+ * moment they'd most want to fix it.
+ *
  * Dismissal uses sessionStorage (per-tab, per-session), so a refresh brings
  * it back. The persistent right rail / mobile drawer still let users connect
  * after a dismiss.
  */
 export function ConnectorIntentNudge({
     githubConnected,
-    disabled = false,
     onConnect,
 }: ConnectorIntentNudgeProps) {
     // dismissedTick is just a re-render trigger after a dismiss — the actual
@@ -42,8 +43,7 @@ export function ConnectorIntentNudge({
     const [dismissedTick, setDismissedTick] = useState(0);
 
     const visible =
-        !disabled
-        && !githubConnected
+        !githubConnected
         // dismissedTick referenced so React tracks it for re-renders after dismiss
         && dismissedTick >= 0
         && !readDismissed('github');

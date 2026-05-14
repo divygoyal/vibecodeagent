@@ -1492,7 +1492,6 @@ export default function AIChat() {
                             waiting for the user to type repo-specific keywords. */}
                         <ConnectorIntentNudge
                             githubConnected={effectiveGithub}
-                            disabled={isLoading || isGa4Locked}
                             onConnect={handleNudgeConnect}
                         />
                         {/* On mobile we stack textarea + actions vertically so the
