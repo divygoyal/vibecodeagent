@@ -1,10 +1,12 @@
 import { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { getShareData } from '@/app/api/share/route';
 import SharedOverviewClient from '@/components/share-overview/openpanel/SharedOverviewClient';
 import SharedUmamiClient from '@/components/share-overview/umami/SharedUmamiClient';
 import SharedDashboardClient from './SharedDashboardClient';
 import SharePromoPopup from '@/components/share/SharePromoPopup';
+import ShareConversionBar from '@/components/share/ShareConversionBar';
 import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
 
 // Promo popup auto-opens 20s after a viewer lands on the public share view,
@@ -70,9 +72,23 @@ export default async function SharedDashboardPage({
         );
     }
 
+    // Show the slim conversion bar ONLY on direct viewer-facing share views.
+    // Suppress in every iframe context, whether or not the embedder used a
+    // known flag — covers third-party iframes that don't pass ?embed=true.
+    //
+    //  - !isEmbed: ?embed=true flag (customer-iframe convention)
+    //  - !hideOwnerLogo: ?_b=<sig> (our own marketing iframes)
+    //  - !isInIframe: Sec-Fetch-Dest header from the browser; catches every
+    //    other iframe regardless of flags. Sent by all modern browsers
+    //    (Chrome 76+, Firefox 90+, Safari 16.4+).
+    const h = await headers();
+    const isInIframe = h.get('sec-fetch-dest') === 'iframe';
+    const showConversionBar = !isEmbed && !hideOwnerLogo && !isInIframe;
+
     if (share.config.layoutMode === 'openpanel_overview') {
         return (
             <>
+                {showConversionBar ? <ShareConversionBar /> : null}
                 <SharedOverviewClient
                     token={token}
                     siteUrl={share.siteUrl}
@@ -89,6 +105,7 @@ export default async function SharedDashboardPage({
     if (share.config.layoutMode === 'umami_fork') {
         return (
             <>
+                {showConversionBar ? <ShareConversionBar /> : null}
                 <SharedUmamiClient
                     token={token}
                     siteUrl={share.siteUrl}
@@ -117,6 +134,7 @@ export default async function SharedDashboardPage({
 
     return (
         <div className="min-h-screen bg-[#050507] text-zinc-100">
+            {showConversionBar ? <ShareConversionBar /> : null}
             {/* Header */}
             <header className="border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-xl sticky top-0 z-50">
                 <div className="mx-auto flex max-w-[1500px] items-center justify-between px-6 py-4">
