@@ -1,12 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Github, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     dismissProvider as persistDismiss,
     isDismissed as readDismissed,
 } from '@/lib/connectorIntent';
+
+// Module-level pub/sub so a dismiss action in one mounted nudge re-renders
+// any siblings (e.g. if we mount the nudge in multiple places later). Empty
+// today; useSyncExternalStore handles the SSR/client mismatch via the
+// server-snapshot fn below.
+const dismissListeners = new Set<() => void>();
+function subscribeDismiss(cb: () => void) {
+    dismissListeners.add(cb);
+    return () => { dismissListeners.delete(cb); };
+}
+function notifyDismissed() {
+    dismissListeners.forEach(cb => cb());
+}
 
 interface ConnectorIntentNudgeProps {
     /** Whether GitHub is currently connected. The nudge stays up whenever this
@@ -38,19 +51,24 @@ export function ConnectorIntentNudge({
     githubConnected,
     onConnect,
 }: ConnectorIntentNudgeProps) {
-    // dismissedTick is just a re-render trigger after a dismiss — the actual
-    // truth lives in sessionStorage so the dismissal survives in-app nav.
-    const [dismissedTick, setDismissedTick] = useState(0);
+    // SSR/client mismatch was the bug behind "nudge never appears": reading
+    // sessionStorage inside render flipped between false (server) and the
+    // real value (client) and tripped React error #418, unmounting the
+    // component. useSyncExternalStore is React's correct API for external
+    // store reads — the third arg (server snapshot) gives a stable SSR value
+    // ("false" = not dismissed) and the client snapshot reads the actual
+    // sessionStorage after hydrate. No mismatch, no error.
+    const dismissed = useSyncExternalStore(
+        subscribeDismiss,
+        () => readDismissed('github'),
+        () => false,
+    );
 
-    const visible =
-        !githubConnected
-        // dismissedTick referenced so React tracks it for re-renders after dismiss
-        && dismissedTick >= 0
-        && !readDismissed('github');
+    const visible = !githubConnected && !dismissed;
 
     const handleDismiss = () => {
         persistDismiss('github');
-        setDismissedTick(t => t + 1);
+        notifyDismissed();
     };
 
     return (
