@@ -585,3 +585,32 @@ class LeaderboardStatsHistory(Base):
     rank_in_category = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
     __table_args__ = (UniqueConstraint('entry_id', 'recorded_on', name='uq_leaderboard_history_day'),)
+
+
+class WeeklyDigest(Base):
+    """Per-user weekly snapshot of the enriched dashboard data + AI headline.
+
+    Powers the Weekly Briefing UI (docs/WEEKLY_BRIEFING_UI_PLAN.md, Track 1).
+    One row per (user, ISO year/week, site_url) — site_url is nullable so a
+    user with no active workspace still gets one row per week. The snapshot
+    column is the full JSON blob from `buildEnrichedSnapshot()`; headline +
+    action_items are the AI-generated narrative layer.
+
+    Cleanup policy: a helper trims rows older than 26 ISO weeks on every
+    write, keeping ~6 months of history per user.
+    """
+    __tablename__ = "weekly_digests"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    year = Column(Integer, nullable=False)
+    iso_week = Column(Integer, nullable=False)  # 1..53
+    site_url = Column(String(500), nullable=True)  # GSC site or GA4 property label; null = no workspace
+    headline = Column(Text, nullable=True)  # AI-generated one-liner
+    action_items_json = Column(Text, nullable=True)  # JSON-serialized list of 3 actions
+    snapshot_json = Column(Text, nullable=False)  # full enriched snapshot blob
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "year", "iso_week", "site_url", name="uq_weekly_digest_user_week_site"),
+    )

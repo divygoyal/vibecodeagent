@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func, or_
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -6008,6 +6008,197 @@ async def mark_thread_read(
     )
     await db.commit()
     return {"updated": result.rowcount or 0}
+
+
+# ============= Weekly Digests =============
+# Per-user weekly snapshot persistence — powers the Weekly Briefing UI
+# (docs/WEEKLY_BRIEFING_UI_PLAN.md, Track 1). Keyed by (user, ISO year+week,
+# site_url). Cleanup helper prunes rows older than 26 ISO weeks on every write
+# so each user keeps ~6 months of history.
+
+WEEKLY_DIGEST_RETENTION_WEEKS = 26
+
+
+class WeeklyDigestCreate(BaseModel):
+    year: int
+    iso_week: int
+    site_url: Optional[str] = None
+    headline: Optional[str] = None
+    action_items: Optional[Any] = None  # list[str] | list[dict] — serialized as JSON
+    snapshot: Any  # enriched snapshot blob — serialized as JSON
+
+
+def _serialize_weekly_digest_summary(d: WeeklyDigest) -> Dict[str, Any]:
+    """Lightweight row shape for the list endpoint — omits the heavy snapshot."""
+    return {
+        "id": d.id,
+        "year": d.year,
+        "iso_week": d.iso_week,
+        "site_url": d.site_url,
+        "headline": d.headline,
+        "action_items": json.loads(d.action_items_json) if d.action_items_json else None,
+        "created_at": d.created_at.isoformat() if d.created_at else None,
+    }
+
+
+def _serialize_weekly_digest_full(d: WeeklyDigest) -> Dict[str, Any]:
+    """Full row shape for the single-fetch endpoint — includes the snapshot blob."""
+    return {
+        "id": d.id,
+        "year": d.year,
+        "iso_week": d.iso_week,
+        "site_url": d.site_url,
+        "headline": d.headline,
+        "action_items": json.loads(d.action_items_json) if d.action_items_json else None,
+        "snapshot": json.loads(d.snapshot_json) if d.snapshot_json else None,
+        "created_at": d.created_at.isoformat() if d.created_at else None,
+    }
+
+
+async def _prune_old_weekly_digests(db: AsyncSession, user_id: int) -> int:
+    """Delete this user's digest rows older than WEEKLY_DIGEST_RETENTION_WEEKS
+    ISO weeks. Called from the POST endpoint so each write self-trims."""
+    cutoff = datetime.utcnow() - timedelta(weeks=WEEKLY_DIGEST_RETENTION_WEEKS)
+    res = await db.execute(
+        delete(WeeklyDigest).where(
+            WeeklyDigest.user_id == user_id,
+            WeeklyDigest.created_at < cutoff,
+        )
+    )
+    return res.rowcount or 0
+
+
+@app.post("/api/users/{user_identifier}/weekly-digests")
+async def upsert_weekly_digest(
+    user_identifier: str,
+    data: WeeklyDigestCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Upsert a weekly digest keyed by (user_id, year, iso_week, site_url).
+
+    If a row already exists for that composite key, updates headline /
+    action_items / snapshot / created_at. Otherwise inserts a new row.
+    Returns the row id.
+    """
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not (1 <= data.iso_week <= 53):
+        raise HTTPException(status_code=400, detail="iso_week must be between 1 and 53")
+    if data.year < 1970 or data.year > 9999:
+        raise HTTPException(status_code=400, detail="year out of range")
+
+    action_items_json = json.dumps(data.action_items) if data.action_items is not None else None
+    snapshot_json = json.dumps(data.snapshot)
+
+    # Composite-key lookup. SQLite treats NULL ≠ NULL inside UNIQUE so we have
+    # to branch on site_url to find an existing row for the no-workspace case.
+    where_clause = [
+        WeeklyDigest.user_id == user.id,
+        WeeklyDigest.year == data.year,
+        WeeklyDigest.iso_week == data.iso_week,
+    ]
+    if data.site_url is None:
+        where_clause.append(WeeklyDigest.site_url.is_(None))
+    else:
+        where_clause.append(WeeklyDigest.site_url == data.site_url)
+
+    existing_res = await db.execute(select(WeeklyDigest).where(*where_clause))
+    existing = existing_res.scalar_one_or_none()
+
+    now = datetime.utcnow()
+    if existing:
+        existing.headline = data.headline
+        existing.action_items_json = action_items_json
+        existing.snapshot_json = snapshot_json
+        existing.created_at = now
+        await db.commit()
+        await db.refresh(existing)
+        await _prune_old_weekly_digests(db, user.id)
+        await db.commit()
+        return {"id": existing.id, "created": False}
+
+    digest = WeeklyDigest(
+        user_id=user.id,
+        year=data.year,
+        iso_week=data.iso_week,
+        site_url=data.site_url,
+        headline=data.headline,
+        action_items_json=action_items_json,
+        snapshot_json=snapshot_json,
+        created_at=now,
+    )
+    db.add(digest)
+    await db.commit()
+    await db.refresh(digest)
+    await _prune_old_weekly_digests(db, user.id)
+    await db.commit()
+    return {"id": digest.id, "created": True}
+
+
+@app.get("/api/users/{user_identifier}/weekly-digests")
+async def get_weekly_digests(
+    user_identifier: str,
+    year: Optional[int] = None,
+    iso_week: Optional[int] = None,
+    site_url: Optional[str] = None,
+    limit: int = 8,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Two modes (branched on whether year+iso_week were supplied):
+
+    - **Single-fetch**: pass `year` + `iso_week` (and optional `site_url`).
+      Returns the one matching digest including the full snapshot blob, or
+      404 if absent.
+    - **List**: omit `year`/`iso_week` and optionally pass `limit` (default 8,
+      max 26). Returns the last N digests ordered by (year DESC, iso_week DESC)
+      WITHOUT the heavy snapshot blob — clients call the single-fetch variant
+      to load a specific week.
+    """
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        if year is not None and iso_week is not None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"digests": [], "exists": False}
+
+    # Single-fetch by composite key
+    if year is not None and iso_week is not None:
+        where_clause = [
+            WeeklyDigest.user_id == user.id,
+            WeeklyDigest.year == year,
+            WeeklyDigest.iso_week == iso_week,
+        ]
+        if site_url is None:
+            where_clause.append(WeeklyDigest.site_url.is_(None))
+        else:
+            where_clause.append(WeeklyDigest.site_url == site_url)
+
+        result = await db.execute(select(WeeklyDigest).where(*where_clause))
+        digest = result.scalar_one_or_none()
+        if not digest:
+            raise HTTPException(status_code=404, detail="Weekly digest not found")
+        return _serialize_weekly_digest_full(digest)
+
+    # List mode
+    capped_limit = max(1, min(limit, WEEKLY_DIGEST_RETENTION_WEEKS))
+    query = (
+        select(WeeklyDigest)
+        .where(WeeklyDigest.user_id == user.id)
+        .order_by(WeeklyDigest.year.desc(), WeeklyDigest.iso_week.desc())
+        .limit(capped_limit)
+    )
+    if site_url is not None:
+        query = query.where(WeeklyDigest.site_url == site_url)
+
+    result = await db.execute(query)
+    digests = list(result.scalars().all())
+    return {
+        "digests": [_serialize_weekly_digest_summary(d) for d in digests],
+        "exists": True,
+    }
 
 
 # ============= Health Check =============

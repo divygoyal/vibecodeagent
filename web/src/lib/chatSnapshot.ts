@@ -32,6 +32,12 @@ import { fetchRetentionCohorts, fetchJourneyData, runFlexibleGAReport } from './
 import { auditPagesSchemaBatch, aggregateSchemaCoverage, type SchemaAuditResult, type SchemaCoverage } from './dataSources/schemaAuditBatch';
 import { fetchPsiBatch, type PsiResult } from './dataSources/psiBatch';
 
+// Re-export ISO-week helpers so callers (cron, weekly-briefing API route)
+// can pull the date-range helper from the same module they import the
+// snapshot builder from.
+export { getCompletedIsoWeekRange, getIsoWeekRange, getIsoWeekParts } from './isoWeek';
+export type { IsoWeekRange } from './isoWeek';
+
 // Per-source cache TTLs prevent eviction storms when the snapshot mixes
 // fast-rotating GSC data with slow-rotating schema/PSI data.
 const TTL = {
@@ -150,8 +156,28 @@ function fmt(d: Date): string {
     return d.toISOString().split('T')[0];
 }
 
-/** 28-day window ending yesterday + the prior 28-day window. */
-function get28dWindows() {
+/**
+ * Compute a date window + the prior comparison window of equal length.
+ *
+ * Default (no args): the rolling 28-day window ending yesterday + the prior
+ * 28-day window — preserves the original behavior of all existing callers.
+ *
+ * With `range`: the window is the given { startDate, endDate } (both inclusive),
+ * and the comparison window is the immediately preceding window of equal length.
+ * Used by the Weekly Briefing to fetch a specific ISO week (Mon-Sun) and
+ * compare it to the prior ISO week.
+ */
+function get28dWindows(range?: { startDate: Date; endDate: Date }) {
+    if (range) {
+        const startDate = new Date(range.startDate);
+        const endDate = new Date(range.endDate);
+        // Window length in days (inclusive on both ends). Math.round guards
+        // against DST drift when callers pass a Date built from local time.
+        const days = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+        const compEnd = new Date(startDate); compEnd.setDate(compEnd.getDate() - 1);
+        const compStart = new Date(compEnd); compStart.setDate(compStart.getDate() - (days - 1));
+        return { startDate, endDate, compStart, compEnd };
+    }
     const now = new Date();
     const endDate = new Date(now); endDate.setDate(endDate.getDate() - 1);
     const startDate = new Date(endDate); startDate.setDate(startDate.getDate() - 27);
@@ -162,8 +188,12 @@ function get28dWindows() {
 
 // ─── Fetchers ───
 
-async function fetchWinnersLosers(token: string, siteUrl: string): Promise<WinnersLosersData> {
-    const { startDate, endDate, compStart, compEnd } = get28dWindows();
+async function fetchWinnersLosers(
+    token: string,
+    siteUrl: string,
+    range?: { startDate: Date; endDate: Date },
+): Promise<WinnersLosersData> {
+    const { startDate, endDate, compStart, compEnd } = get28dWindows(range);
     const body = (s: Date, e: Date) => ({
         startDate: fmt(s),
         endDate: fmt(e),
@@ -242,8 +272,12 @@ async function fetchWinnersLosers(token: string, siteUrl: string): Promise<Winne
     };
 }
 
-async function fetchCannibalization(token: string, siteUrl: string): Promise<CannibalizationData> {
-    const { startDate, endDate } = get28dWindows();
+async function fetchCannibalization(
+    token: string,
+    siteUrl: string,
+    range?: { startDate: Date; endDate: Date },
+): Promise<CannibalizationData> {
+    const { startDate, endDate } = get28dWindows(range);
     const data = await gscQueryWithFallback(token, siteUrl, {
         startDate: fmt(startDate),
         endDate: fmt(endDate),
@@ -298,8 +332,12 @@ async function fetchCannibalization(token: string, siteUrl: string): Promise<Can
     return { cannibalized: cannibalized.slice(0, 30) };
 }
 
-async function fetchMobileGap(token: string, siteUrl: string): Promise<MobileGapData> {
-    const { startDate, endDate } = get28dWindows();
+async function fetchMobileGap(
+    token: string,
+    siteUrl: string,
+    range?: { startDate: Date; endDate: Date },
+): Promise<MobileGapData> {
+    const { startDate, endDate } = get28dWindows(range);
     const data = await gscQueryWithFallback(token, siteUrl, {
         startDate: fmt(startDate),
         endDate: fmt(endDate),
@@ -430,17 +468,54 @@ interface BuildArgs {
         matches: Array<{ query: string; positionPrevious: number; positionCurrent: number; clicksLost: number; suspectCommits: Array<{ sha: string; date: string; message: string; author: string; html_url: string }> }>;
         repo: string | null;
     } | null;
+    /**
+     * Optional explicit date range. Used by the Weekly Briefing cron to fetch
+     * a specific ISO week (Mon-Sun) instead of the default rolling 28-day window.
+     *
+     * Resolution order:
+     *   1. If `dateRange.startDate` + `dateRange.endDate` are both provided,
+     *      they're used as the window (inclusive on both ends). The comparison
+     *      window is automatically the immediately preceding window of equal
+     *      length.
+     *   2. Else if `dateRange.days` is provided, it's treated as "last N days
+     *      ending yesterday" — startDate is set to N-1 days before endDate.
+     *   3. Else the existing default behavior is used (rolling 28d for GSC,
+     *      28daysAgo→today for GA4).
+     *
+     * IMPORTANT — partial analyzer coverage:
+     *   - GSC analyzers (winners-losers, cannibalization, mobile-gap) honor
+     *     the explicit range.
+     *   - GA4 events/geo/timePatterns honor the explicit range.
+     *   - GA4 cohortRetention + journey currently still use their internal
+     *     defaults (cohort: 14 most-recent days ending today; journey: '28d').
+     *     These call into `googleApi.ts` helpers that are shared with other
+     *     routes and refactoring them is high-risk. For weekly-briefing use
+     *     this is acceptable since cohorts/journey are slow-rotating metrics.
+     *     See TODOs inside buildEnrichedSnapshot.
+     */
+    dateRange?: {
+        startDate?: Date;
+        endDate?: Date;
+        days?: number;
+    };
 }
 
 // ─── New GA4 fetchers (cohort, journey are reused from googleApi.ts; events / geo / time are simple flexible reports) ───
 
-async function fetchEventsTop(token: string, propertyId: string): Promise<EnrichedSnapshot['events']> {
+async function fetchEventsTop(
+    token: string,
+    propertyId: string,
+    range?: { startDate: Date; endDate: Date },
+): Promise<EnrichedSnapshot['events']> {
     try {
+        const gaRange = range
+            ? { startDate: fmt(range.startDate), endDate: fmt(range.endDate) }
+            : { startDate: '28daysAgo', endDate: 'today' };
         const data = await runFlexibleGAReport(
             token, propertyId,
             ['eventName'],
             ['eventCount'],
-            [{ startDate: '28daysAgo', endDate: 'today' }],
+            [gaRange],
             { limit: 25 },
         );
         const rows = data?.rows || [];
@@ -459,13 +534,20 @@ async function fetchEventsTop(token: string, propertyId: string): Promise<Enrich
     }
 }
 
-async function fetchGeoConversion(token: string, propertyId: string): Promise<EnrichedSnapshot['geoConversion']> {
+async function fetchGeoConversion(
+    token: string,
+    propertyId: string,
+    range?: { startDate: Date; endDate: Date },
+): Promise<EnrichedSnapshot['geoConversion']> {
     try {
+        const gaRange = range
+            ? { startDate: fmt(range.startDate), endDate: fmt(range.endDate) }
+            : { startDate: '28daysAgo', endDate: 'today' };
         const data = await runFlexibleGAReport(
             token, propertyId,
             ['country'],
             ['sessions', 'conversions', 'engagementRate'],
-            [{ startDate: '28daysAgo', endDate: 'today' }],
+            [gaRange],
             { limit: 20, orderBys: [{ field: 'sessions', type: 'metric', desc: true }] as any },
         );
         const rows = data?.rows || [];
@@ -484,21 +566,28 @@ async function fetchGeoConversion(token: string, propertyId: string): Promise<En
     }
 }
 
-async function fetchTimePatterns(token: string, propertyId: string): Promise<EnrichedSnapshot['timePatterns']> {
+async function fetchTimePatterns(
+    token: string,
+    propertyId: string,
+    range?: { startDate: Date; endDate: Date },
+): Promise<EnrichedSnapshot['timePatterns']> {
     try {
+        const gaRange = range
+            ? { startDate: fmt(range.startDate), endDate: fmt(range.endDate) }
+            : { startDate: '28daysAgo', endDate: 'today' };
         const [hourly, dow] = await Promise.all([
             runFlexibleGAReport(
                 token, propertyId,
                 ['hour'],
                 ['sessions'],
-                [{ startDate: '28daysAgo', endDate: 'today' }],
+                [gaRange],
                 { limit: 24, orderBys: [{ field: 'hour', type: 'dimension', desc: false }] as any },
             ),
             runFlexibleGAReport(
                 token, propertyId,
                 ['dayOfWeek'],
                 ['sessions'],
-                [{ startDate: '28daysAgo', endDate: 'today' }],
+                [gaRange],
                 { limit: 7, orderBys: [{ field: 'dayOfWeek', type: 'dimension', desc: false }] as any },
             ),
         ]);
@@ -539,9 +628,30 @@ export async function buildEnrichedSnapshot(args: BuildArgs): Promise<EnrichedSn
     const brand = inferBrandFromSite(siteUrl);
     const onLoad = args.onSourceLoading || (() => {});
 
+    // ── Resolve optional explicit date range. When neither startDate+endDate
+    //    nor days is provided, `resolvedRange` stays undefined and every
+    //    downstream fetcher falls back to its original default — preserving
+    //    exact pre-refactor behavior for the chat callsite. ──
+    let resolvedRange: { startDate: Date; endDate: Date } | undefined;
+    if (args.dateRange?.startDate && args.dateRange?.endDate) {
+        resolvedRange = { startDate: args.dateRange.startDate, endDate: args.dateRange.endDate };
+    } else if (typeof args.dateRange?.days === 'number' && args.dateRange.days > 0) {
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() - 1); // yesterday (matches get28dWindows default)
+        const startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - (args.dateRange.days - 1));
+        resolvedRange = { startDate, endDate };
+    }
+    // Cache-key suffix so different windows don't collide in the in-memory cache.
+    // Default (no range) emits no suffix → existing chat-thread cache keys are
+    // bit-for-bit identical to pre-refactor, so warm caches stay valid.
+    const rangeSuffix = resolvedRange
+        ? `:${fmt(resolvedRange.startDate)}_${fmt(resolvedRange.endDate)}`
+        : '';
+
     // ── GSC short-lived enrichments ──
     onLoad('gscEnrichments');
-    const gscCacheKey = `chatSnapshotGsc:${userId}:${siteUrl}`;
+    const gscCacheKey = `chatSnapshotGsc:${userId}:${siteUrl}${rangeSuffix}`;
     type GscEnrichments = {
         winnersLosers: WinnersLosersData | null;
         cannibalization: CannibalizationData | null;
@@ -549,9 +659,9 @@ export async function buildEnrichedSnapshot(args: BuildArgs): Promise<EnrichedSn
     };
     const gscPromise = cachedFetch<GscEnrichments>(gscCacheKey, TTL.GSC_SHORT, async () => {
         const [wlR, canR, mobR] = await Promise.allSettled([
-            fetchWinnersLosers(googleToken, siteUrl),
-            fetchCannibalization(googleToken, siteUrl),
-            fetchMobileGap(googleToken, siteUrl),
+            fetchWinnersLosers(googleToken, siteUrl, resolvedRange),
+            fetchCannibalization(googleToken, siteUrl, resolvedRange),
+            fetchMobileGap(googleToken, siteUrl, resolvedRange),
         ]);
         return {
             winnersLosers: wlR.status === 'fulfilled' ? wlR.value : null,
@@ -561,24 +671,38 @@ export async function buildEnrichedSnapshot(args: BuildArgs): Promise<EnrichedSn
     });
 
     // ── GA4 sources (only when propertyId is set; otherwise resolve null) ──
+    // TODO(weekly-briefing): fetchRetentionCohorts() in googleApi.ts hardcodes
+    // its cohort window to "the most-recent N periods ending today" and is
+    // shared with /api/analytics/retention. Threading an explicit window in
+    // would require adding an optional `endDate` arg there and rewriting the
+    // cohort-loop seed. Acceptable to leave as-is for v1 of the weekly UI —
+    // cohorts are slow-rotating and a "this is the last 14 days from this
+    // snapshot's run" semantic is still useful.
     const cohortPromise: Promise<EnrichedSnapshot['cohortRetention']> = propertyId
         ? (() => { onLoad('cohortRetention'); return cachedFetch(`chatSnapshot:cohort:${propertyId}`, TTL.GA4_COHORT, () => fetchRetentionCohorts(googleToken, propertyId, 'daily').catch(() => null)); })()
         : Promise.resolve(null);
 
+    // TODO(weekly-briefing): fetchJourneyData() accepts a string `range` key
+    // (e.g. '28d', 'last_week') resolved by resolveRange() in googleApi.ts —
+    // it does NOT take arbitrary { start, end } today. For weekly-briefing
+    // use we pass 'last_week' when the resolved range looks like "last 7d"
+    // so the journey window approximates the snapshot window. A fully
+    // accurate fix would add an arbitrary-range overload to fetchJourneyData.
+    const journeyRangeKey = resolvedRange ? '7d' : '28d';
     const journeyPromise: Promise<EnrichedSnapshot['journey']> = propertyId
-        ? (() => { onLoad('journey'); return cachedFetch(`chatSnapshot:journey:${propertyId}`, TTL.GA4_JOURNEY, () => fetchJourneyData(googleToken, propertyId, '28d').catch(() => null) as any); })()
+        ? (() => { onLoad('journey'); return cachedFetch(`chatSnapshot:journey:${propertyId}${rangeSuffix}`, TTL.GA4_JOURNEY, () => fetchJourneyData(googleToken, propertyId, journeyRangeKey).catch(() => null) as any); })()
         : Promise.resolve(null);
 
     const eventsPromise: Promise<EnrichedSnapshot['events']> = propertyId
-        ? (() => { onLoad('events'); return cachedFetch(`chatSnapshot:events:${propertyId}`, TTL.GA4_EVENTS, () => fetchEventsTop(googleToken, propertyId)); })()
+        ? (() => { onLoad('events'); return cachedFetch(`chatSnapshot:events:${propertyId}${rangeSuffix}`, TTL.GA4_EVENTS, () => fetchEventsTop(googleToken, propertyId, resolvedRange)); })()
         : Promise.resolve(null);
 
     const geoPromise: Promise<EnrichedSnapshot['geoConversion']> = propertyId
-        ? (() => { onLoad('geoConversion'); return cachedFetch(`chatSnapshot:geoConv:${propertyId}`, TTL.GA4_GEO, () => fetchGeoConversion(googleToken, propertyId)); })()
+        ? (() => { onLoad('geoConversion'); return cachedFetch(`chatSnapshot:geoConv:${propertyId}${rangeSuffix}`, TTL.GA4_GEO, () => fetchGeoConversion(googleToken, propertyId, resolvedRange)); })()
         : Promise.resolve(null);
 
     const timePromise: Promise<EnrichedSnapshot['timePatterns']> = propertyId
-        ? (() => { onLoad('timePatterns'); return cachedFetch(`chatSnapshot:timePat:${propertyId}`, TTL.GA4_TIME, () => fetchTimePatterns(googleToken, propertyId)); })()
+        ? (() => { onLoad('timePatterns'); return cachedFetch(`chatSnapshot:timePat:${propertyId}${rangeSuffix}`, TTL.GA4_TIME, () => fetchTimePatterns(googleToken, propertyId, resolvedRange)); })()
         : Promise.resolve(null);
 
     // ── Site profile (cheap deterministic compute over already-loaded context) ──

@@ -20,7 +20,7 @@ import {
     Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, Headphones, type LucideIcon
+    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, Headphones, CalendarDays, type LucideIcon
 } from 'lucide-react';
 import {
     type Ga4Availability,
@@ -138,6 +138,7 @@ const sidebarGroups: SidebarGroup[] = [
     { label: 'Analysis', items: [
         { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
         { icon: Search, label: 'SEO', href: '/dashboard/seo' },
+        { icon: CalendarDays, label: 'Weekly', href: '/dashboard/weekly' },
         { icon: Share2, label: 'Share Dashboard', href: '/dashboard/share' },
     ]},
     { label: 'Social APIs', items: [
