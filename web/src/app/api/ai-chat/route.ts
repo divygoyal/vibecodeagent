@@ -167,6 +167,19 @@ SPECIFICITY MANDATE — every recommendation must be concrete:
 - For content: "Refresh /blog/your-top-post — last updated 2024-01, lost 340 clicks vs prior period, was your #1 traffic page. Add a 2026 update section, 3 new H2s on related sub-topics."
 - If you cannot be specific from the snapshot, CALL A TOOL until you can. NEVER hand-wave.
 
+INSPECTION MANDATE — if the user references a specific URL, page path (anything starting with "/"), or names a specific keyword, you MUST inspect the artifact before recommending changes to it:
+- URL / path referenced → call \`inspect_url\` AND/OR \`run_site_audit\` on that URL.
+- Specific keyword referenced → call \`get_search_performance\` filtered to that query, then \`inspect_url\` on the page that ranks for it.
+- Cannibalization mentioned → \`find_cannibalization\` first.
+- "Why did X drop" / "what broke" → \`cross_source_diagnose\` first.
+- These rules supersede "prefer fewer tools". The minimum tool count for a URL- or keyword-specific question is TWO.
+- If the tool returns an error or empty data, REPORT THAT — do not fall back to generic advice.
+
+REFUSAL PATTERN — when data is genuinely insufficient:
+- If after inspecting you still cannot be specific, say so explicitly: "Data only shows X. To give a real diagnosis I need Y (connect GitHub / share the page URL / wait N days)."
+- Honest gap-disclosure is preferable to fabricated specificity. The user trusts a "can't tell yet" answer; they distrust a generic-but-confident answer.
+- Do not pad gaps with banned phrases from above.
+
 CONFIDENCE TRANSCRIPTION — never invent confidence; transcribe what the snapshot tells you:
 - Each insight in the snapshot ships with a "confidence: high/medium/low" tag and a one-line reason.
 - When confidence is medium or low, LEAD with that fact — don't bury it. Example: "I'm medium-confidence on this — only 17 days of data. The pattern looks real but watch the next 2 weeks before committing budget."
@@ -184,12 +197,20 @@ SUGGESTION DEDUP — if the snapshot includes [SURFACED_RECENTLY] suggestions_al
 - Pick fresh angles the user hasn't seen yet.`;
 
 const SHARED_RULES = `RULES:
-1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools only when the snapshot is insufficient.
-2) Plan tool use: pick the SMALLEST set that answers the question. Prefer 1 tool call. Hard cap 8.
+1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools whenever the snapshot doesn't have the specific URL / page / schema / commit you need to answer.
+2) Plan tool use: for diagnostic questions, plan 2-4 tool calls. ALWAYS inspect the artifact (page HTML, code, schema) before recommending changes to it. Hard cap 8. The INSPECTION MANDATE above is non-negotiable.
 3) Cite exact numbers. Never round to "about" — say "12,847 clicks (-23% WoW)".
 4) Use the EXACT siteUrl from [AVAILABLE SITES] / [Site:].
-5) GitHub tools: only when [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise; never mention GitHub when [GitHub:not_connected].
+5) GitHub tools: when [GitHub:connected] AND the question implies code/deploy/PR/issue, USE THEM. When [GitHub:not_connected] and a code-aware diagnosis would help, answer the data side, then end with EXACTLY one line: "For exact-commit / file attribution, connect GitHub." No pitch, no repeat — that single line is all the user needs.
 6) [Repo: x · {confirmed|auto}] = the repo for the current site — pass repo=x to ALL GitHub tools. NEVER call list_user_repos. If status=auto, gently mention once: "I'm checking {repo} — confirm in the dropdown if that's right." If confirmed, use silently.
+7) [FROM_SEO:<surface>] tag: when present, the user came from a specific SEO panel (cannibalization, decay, striking-distance, etc.). The surface tag tells you which tool MUST fire first — match these:
+   - keyword_insight / page_insight → \`inspect_url\` on the relevant page first.
+   - keyword_opportunity:cannibalization → \`find_cannibalization\` first.
+   - keyword_opportunity:ctr_gap → \`inspect_url\` on the ranking page first (need its title + meta).
+   - keyword_opportunity:striking → \`inspect_url\` + \`get_search_performance\` on the keyword.
+   - page_opportunity → \`run_site_audit\` + \`inspect_url\`.
+   - overview → \`compute_site_health_score\` or \`get_alerts\` first, then drill into the top finding.
+   Do not skip these — the user clicked a button expecting that specific tool to run.
 
 GENERATOR TOOLS (generate_content_strategy / generate_meta_tags / suggest_internal_links / analyze_keyword_clusters / find_cannibalization):
 These return a STRUCTURED PAYLOAD with { task, expectedFormat, inputs }. Read the task, follow the expectedFormat, and use the inputs as your data. DO NOT echo "task" or "expectedFormat" back to the user — that's a planning artifact, not the answer.
@@ -239,12 +260,19 @@ INTENT MODES (pick ONE for each turn — first message of the turn, infer from t
 If the same conversation already established the intent, keep using the same mode unless the user pivots.
 
 RULES:
-1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools only when the snapshot is insufficient.
-2) Plan tool use: pick the SMALLEST set that answers the question. Prefer 1 tool call. Hard cap 8.
+1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools whenever the snapshot doesn't have the specific URL / page / schema / commit you need to answer.
+2) Plan tool use: for diagnostic questions, plan 2-4 tool calls. ALWAYS inspect the artifact (page HTML, code, schema) before recommending changes to it. Hard cap 8. The INSPECTION MANDATE above is non-negotiable.
 3) Cite exact numbers. Never round to "about" — say "12,847 clicks (-23% WoW)".
 4) Use the EXACT siteUrl from [AVAILABLE SITES] / [Site:].
-5) GitHub tools: only when [GitHub:connected] AND the question implies code/deploy/PR/issue. Skip silently otherwise; never mention GitHub when [GitHub:not_connected].
+5) GitHub tools: when [GitHub:connected] AND the question implies code/deploy/PR/issue, USE THEM. When [GitHub:not_connected] and a code-aware diagnosis would help, answer the data side, then end with EXACTLY one line: "For exact-commit / file attribution, connect GitHub." No pitch, no repeat — that single line is all the user needs.
 6) [Repo: x · {confirmed|auto}] = the repo for the current site — pass repo=x to ALL GitHub tools. NEVER call list_user_repos. If status=auto, gently mention once: "I'm checking {repo} — confirm in the dropdown if that's right." If confirmed, use silently.
+7) [FROM_SEO:<surface>] tag: when present, the user came from a specific SEO panel. Surface → mandatory first tool:
+   - keyword_insight / page_insight → \`inspect_url\` first.
+   - keyword_opportunity:cannibalization → \`find_cannibalization\` first.
+   - keyword_opportunity:ctr_gap → \`inspect_url\` on the ranking page first.
+   - keyword_opportunity:striking → \`inspect_url\` + \`get_search_performance\` on the keyword.
+   - page_opportunity → \`run_site_audit\` + \`inspect_url\`.
+   - overview → \`compute_site_health_score\` or \`get_alerts\` first.
 
 TOOL-PICKING DECISION TABLE (use the FIRST match):
 - Greeting / pleasantry / meta-question → NO TOOL.
@@ -414,7 +442,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { message, selectedSite, selectedRepo, repoIsAuto, analyticsContext, seoContext, history, mode, threadId } = body;
+        const { message, selectedSite, selectedRepo, repoIsAuto, analyticsContext, seoContext, history, mode, threadId, fromTag } = body;
 
         if (!message || typeof message !== 'string') {
             return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -614,6 +642,13 @@ export async function POST(req: NextRequest) {
             : '';
         const intentLabel = await intentPromise;
         const intentTag = intentLabel ? `[INTENT: ${intentLabel}]` : '';
+        // [FROM_SEO:<surface>] tag — set by AskAi buttons on the SEO dashboard
+        // panels. The SHARED_RULES tell the model which tool to fire first
+        // depending on the surface. Whitelisted to the known seo:* prefix so
+        // a malformed URL param can't inject arbitrary prompt content.
+        const safeFromTag = (typeof fromTag === 'string' && /^seo:[a-z_]+(:[a-z_]+)?$/.test(fromTag))
+            ? `[FROM_SEO:${fromTag.slice(4)}]`
+            : '';
         const [userFacts, threadSummary, recalledHits] = await memoryPromise;
         const threadState = await threadStatePromise;
         // B1-full: persistent memory injection. Goes BEFORE the dashboard data
@@ -739,8 +774,8 @@ export async function POST(req: NextRequest) {
             }
         }
         const contextBlock = safeRichContext
-            ? `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${safeRichContext}${availableSitesContext}\n---\n${message}`
-            : `${siteTag}${githubTag}${repoTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${availableSitesContext}\n${message}`;
+            ? `${siteTag}${githubTag}${repoTag}${safeFromTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${safeRichContext}${availableSitesContext}\n---\n${message}`
+            : `${siteTag}${githubTag}${repoTag}${safeFromTag}${intentTag}${memoryBlock}${repetitionTag}${surfacedBlock}${availableSitesContext}\n${message}`;
         contents.push({
             role: 'user',
             parts: [{ text: contextBlock }],

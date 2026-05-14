@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { AlertTriangle, ArrowRight, Lightbulb, Search, Sparkles, TrendingUp } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { useCannibalizationData } from '@/lib/useDashboardData';
+import { cannibalizationPrompt, ctrGapPrompt, strikingDistancePrompt, keywordInsightPrompt, type SeoFromTag } from '@/lib/seoAiPrompts';
+import { AskAiButton } from './AskAiButton';
 import type { SeoQuery } from './SeoQueriesPagesPanel';
 
 interface SeoKeywordOpportunitiesPanelProps {
@@ -107,11 +109,71 @@ export default function SeoKeywordOpportunitiesPanel({ keyword, siteUrl, queryRo
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
+    // Pick the AskAi prompt+tag that matches the strongest signal on this row.
+    // Order matches the recommendation tier: cannibalization > CTR gap >
+    // striking-distance > generic. Falls back to keyword-insight prompt if
+    // none of the specific signals fire — the AI still gets the row's data.
+    const askAi: { q: string; tag: SeoFromTag } | null = (() => {
+        if (!keyword || !queryRow) return null;
+        if (cannMatch) {
+            return {
+                q: cannibalizationPrompt({
+                    keyword,
+                    pageCount: cannMatch.pages.length,
+                    samplePages: cannMatch.pages.map(p => p.page),
+                    totalImpressions: cannMatch.totalImpressions,
+                }),
+                tag: 'seo:keyword_opportunity:cannibalization',
+            };
+        }
+        if (ctrAnalysis && ctrAnalysis.gap >= 1) {
+            return {
+                q: ctrGapPrompt({
+                    keyword,
+                    position: ctrAnalysis.position,
+                    actualCtr: ctrAnalysis.actual,
+                    expectedCtr: ctrAnalysis.expected,
+                    impressions: queryRow.impressions,
+                }),
+                tag: 'seo:keyword_opportunity:ctr_gap',
+            };
+        }
+        if (queryRow.position >= 11 && queryRow.position <= 20) {
+            return {
+                q: strikingDistancePrompt({
+                    keyword,
+                    position: queryRow.position,
+                    impressions: queryRow.impressions,
+                }),
+                tag: 'seo:keyword_opportunity:striking',
+            };
+        }
+        return {
+            q: keywordInsightPrompt({
+                keyword,
+                position: queryRow.position,
+                clicks: queryRow.clicks,
+                impressions: queryRow.impressions,
+                ctr: queryRow.ctr,
+            }),
+            tag: 'seo:keyword_opportunity',
+        };
+    })();
+
     return (
         <AnalyticsSubpagePanel
             title="Opportunities & Risks"
             description="Cannibalization, CTR gap, and recommended actions for the selected query."
             tone="amber"
+            action={
+                askAi ? (
+                    <AskAiButton
+                        question={askAi.q}
+                        siteUrl={siteUrl}
+                        fromTag={askAi.tag}
+                    />
+                ) : null
+            }
         >
             {!keyword || !queryRow ? (
                 <div className="flex h-[280px] flex-col items-center justify-center rounded-[14px] border border-dashed border-white/[0.06] bg-[#0a0b0e] text-center">

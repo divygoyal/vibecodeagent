@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { usePageDetail } from '@/lib/useDashboardData';
+import { pageInsightPrompt } from '@/lib/seoAiPrompts';
+import { AskAiButton } from './AskAiButton';
 import PositionPill from './PositionPill';
 
 interface KeywordRow {
@@ -126,15 +128,31 @@ export default function SeoPageInsightsPanel({ pageUrl, siteUrl, summary }: SeoP
             tone="cyan"
             action={
                 pageUrl ? (
-                    <a
-                        href={pageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300 transition hover:border-cyan-500/40"
-                    >
-                        <ExternalLink className="h-3 w-3" />
-                        <span className="max-w-[200px] truncate">{shortenPath(pageUrl)}</span>
-                    </a>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={pageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300 transition hover:border-cyan-500/40"
+                        >
+                            <ExternalLink className="h-3 w-3" />
+                            <span className="max-w-[160px] truncate">{shortenPath(pageUrl)}</span>
+                        </a>
+                        <AskAiButton
+                            question={computed
+                                ? pageInsightPrompt({
+                                    page: pageUrl,
+                                    clicks: computed.clicks,
+                                    impressions: computed.impressions,
+                                    ctr: computed.ctr,
+                                    position: computed.position,
+                                })
+                                : ''}
+                            siteUrl={siteUrl}
+                            fromTag="seo:page_insight"
+                            enabled={!!computed}
+                        />
+                    </div>
                 ) : null
             }
         >

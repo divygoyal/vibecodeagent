@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { ArrowRight, Lightbulb, Search, Smartphone, Sparkles, Target } from 'lucide-react';
 import { AnalyticsSubpagePanel, formatCompactNumber } from '@/components/analytics/subpages/AnalyticsSubpageShell';
 import { usePageDetail } from '@/lib/useDashboardData';
+import { pageOpportunityPrompt } from '@/lib/seoAiPrompts';
+import { AskAiButton } from './AskAiButton';
 import type { SeoPageRow } from './SeoQueriesPagesPanel';
 
 interface SeoPageOpportunitiesPanelProps {
@@ -103,11 +105,38 @@ export default function SeoPageOpportunitiesPanel({ pageUrl, siteUrl, pageRow, r
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
+    // Pick the AskAi prompt issue-type matching the strongest signal on this
+    // page. Mirrors the recommendation calculator above: striking-distance,
+    // CTR gap, otherwise generic. Device gap doesn't have a dedicated prompt
+    // template yet — falls into "generic" with the device data still in the
+    // request body for the AI to consume via dashboard snapshot.
+    const askAiIssue: 'striking' | 'ctr_gap' | 'generic' = (() => {
+        if (!pageRow) return 'generic';
+        if (pageRow.position >= 11 && pageRow.position <= 20) return 'striking';
+        if (pageRow.ctr < 1.5 && pageRow.position <= 10) return 'ctr_gap';
+        return 'generic';
+    })();
+
     return (
         <AnalyticsSubpagePanel
             title="Opportunities & Risks"
             description="Device gap, top driver, and a recommended action for the selected page."
             tone="amber"
+            action={
+                pageUrl && pageRow ? (
+                    <AskAiButton
+                        question={pageOpportunityPrompt({
+                            page: pageUrl,
+                            issue: askAiIssue,
+                            clicks: pageRow.clicks,
+                            impressions: pageRow.impressions,
+                            position: pageRow.position,
+                        })}
+                        siteUrl={siteUrl}
+                        fromTag="seo:page_opportunity"
+                    />
+                ) : null
+            }
         >
             {!pageUrl || !pageRow ? (
                 <div className="flex h-[280px] flex-col items-center justify-center rounded-[14px] border border-dashed border-white/[0.06] bg-[#0a0b0e] text-center">

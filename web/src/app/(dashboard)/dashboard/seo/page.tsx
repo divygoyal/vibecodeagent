@@ -13,6 +13,8 @@ import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { exportSeoData } from '@/lib/exportUtils';
 
 import SeoHeader from '@/components/seo/SeoHeader';
+import { AskAiButton } from '@/components/seo/AskAiButton';
+import { seoOverviewPrompt } from '@/lib/seoAiPrompts';
 import SeoKpiGrid, { type SeoKpis } from '@/components/seo/SeoKpiGrid';
 import SeoTrendPanel, { type SeoTrendPoint } from '@/components/seo/SeoTrendPanel';
 import SeoRecommendationsPanel from '@/components/seo/SeoRecommendationsPanel';
@@ -167,6 +169,15 @@ export default function SEOPage() {
             <SeoHeader
                 canExport={!!seoData}
                 onExport={() => exportSeoData(seoData)}
+                extraActions={
+                    <AskAiButton
+                        question={seoOverviewPrompt()}
+                        siteUrl={activeSite || null}
+                        fromTag="seo:overview"
+                        variant="prominent"
+                        label="Ask AI about my SEO"
+                    />
+                }
             />
 
             {kpis ? <SeoKpiGrid kpis={kpis} trend={trend} rangeDays={rangeDays} /> : null}
