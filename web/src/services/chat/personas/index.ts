@@ -31,11 +31,12 @@ import { deepDive } from './deepDive';
 import { coaching } from './coaching';
 import { comparison } from './comparison';
 import { hypothetical } from './hypothetical';
+import { seoConsultant } from './seoConsultant';
 
 export type IntentLabel =
     | 'CASUAL_GREETING' | 'DIAGNOSTIC' | 'OPPORTUNITY' | 'CONTENT_BRIEF'
     | 'EXECUTIVE_SUMMARY' | 'TECHNICAL_AUDIT' | 'META_QUESTION' | 'DEEP_DIVE'
-    | 'COACHING' | 'COMPARISON' | 'HYPOTHETICAL';
+    | 'COACHING' | 'COMPARISON' | 'HYPOTHETICAL' | 'SEO_CONSULTANT';
 
 export interface Persona {
     label: IntentLabel;
@@ -66,6 +67,7 @@ const REGISTRY: Record<IntentLabel, Persona> = {
     COACHING: coaching,
     COMPARISON: comparison,
     HYPOTHETICAL: hypothetical,
+    SEO_CONSULTANT: seoConsultant,
 };
 
 /** Resolve a Persona for an intent label. Falls back to DIAGNOSTIC (the
