@@ -7,7 +7,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-    Globe, ChevronDown, Loader2, ArrowUp, ArrowRight, RotateCcw, Sparkles, Lock, Github, X
+    Globe, ChevronDown, Loader2, ArrowUp, ArrowRight, RotateCcw, Sparkles, Lock, Github, X, Plug
 } from 'lucide-react';
 import { useContainerStatus, usePropertyList, useAnalyticsData, useSeoData, useSiteRepoLinks, useGithubRepos, type SiteRepoLink, type GithubRepoLite } from '@/lib/useDashboardData';
 import { findBestRepoMatch } from '@/lib/githubApi';
@@ -16,6 +16,8 @@ import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
 import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from '@/components/chat/ReasoningTrace';
+import { ConnectorIntentNudge } from '@/components/chat/ConnectorIntentNudge';
+import type { IntentProvider } from '@/lib/connectorIntent';
 
 type DashboardSiteOption = {
     siteUrl: string;
@@ -297,7 +299,7 @@ function ConnectorOrb({ name, connected, isOpen, onClick }: { name: ConnectorNam
 /* ─────────────────────────────────────────────────────────────────────
  *  ConnectorCard — popover next to the orb with native Connect button
  * ───────────────────────────────────────────────────────────────────── */
-function ConnectorCard({ name, connected, onClose, onDisconnected, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; onDisconnected?: (provider?: 'github' | 'google', connected?: boolean) => void; placement?: 'right' | 'below' }) {
+function ConnectorCard({ name, connected, onClose, onDisconnected, placement = 'right' }: { name: ConnectorName; connected: boolean; onClose: () => void; onDisconnected?: (provider?: 'github' | 'google', connected?: boolean) => void; placement?: 'right' | 'below' | 'left' }) {
     const isComingSoon = COMING_SOON.has(name);
     const targetProvider = nativeProviderFor(name);
     const [disconnecting, setDisconnecting] = useState(false);
@@ -353,9 +355,17 @@ function ConnectorCard({ name, connected, onClose, onDisconnected, placement = '
 
     const positionClass = placement === 'right'
         ? 'left-16 top-1/2 -translate-y-1/2'
-        : 'left-1/2 top-[calc(100%+10px)] -translate-x-1/2';
-    const initialOffset = placement === 'right' ? { x: -12, y: '-50%' as const } : { x: '-50%' as const, y: -12 };
-    const animateOffset = placement === 'right' ? { x: 0, y: '-50%' as const } : { x: '-50%' as const, y: 0 };
+        : placement === 'left'
+            ? 'right-[calc(100%+10px)] top-1/2 -translate-y-1/2'
+            : 'left-1/2 top-[calc(100%+10px)] -translate-x-1/2';
+    const initialOffset = placement === 'right'
+        ? { x: -12, y: '-50%' as const }
+        : placement === 'left'
+            ? { x: 12, y: '-50%' as const }
+            : { x: '-50%' as const, y: -12 };
+    const animateOffset = placement === 'right' || placement === 'left'
+        ? { x: 0, y: '-50%' as const }
+        : { x: '-50%' as const, y: 0 };
 
     return (
         <motion.div
@@ -807,13 +817,23 @@ export default function AIChat() {
     const [openConnector, setOpenConnector] = useState<ConnectorName | null>(null);
     const desktopRailRef = useRef<HTMLDivElement>(null);
     const mobileRailRef = useRef<HTMLDivElement>(null);
+    // Persistent side rail (right of chat) — its card pops to the LEFT and
+    // lives in the rail's DOM subtree, so its ref also needs to participate
+    // in the outside-click check or clicking the card itself would close it.
+    const sideRailRef = useRef<HTMLElement>(null);
+    // Mobile-only: opens a right-side slide-in sheet with the same connector
+    // list as the desktop rail. We skip the card popover here (sheet width
+    // doesn't fit one cleanly) — tapping a not-connected pill fires OAuth
+    // directly.
+    const [mobileSourcesOpen, setMobileSourcesOpen] = useState(false);
     useEffect(() => {
         if (!openConnector) return;
         const handler = (e: MouseEvent) => {
             const target = e.target as Node;
             const inDesktop = desktopRailRef.current?.contains(target);
             const inMobile = mobileRailRef.current?.contains(target);
-            if (!inDesktop && !inMobile) {
+            const inSideRail = sideRailRef.current?.contains(target);
+            if (!inDesktop && !inMobile && !inSideRail) {
                 setOpenConnector(null);
             }
         };
@@ -846,6 +866,22 @@ export default function AIChat() {
         refreshContainer();
         setOpenConnector(null);
     }, [refreshContainer]);
+
+    // Triggered when the user clicks "Connect →" in the contextual intent nudge
+    // above the bottom input. Skips the ConnectorCard popover (no room for it
+    // above a bottom-fixed input) and fires the same OAuth flow ConnectorCard
+    // uses internally — direct route. ga4/gsc share a Google OAuth path.
+    const handleNudgeConnect = useCallback((provider: IntentProvider) => {
+        if (provider === 'github') {
+            window.location.href = '/api/auth/github-app/install';
+            return;
+        }
+        void signIn(
+            'google',
+            { callbackUrl: '/dashboard/ai-chat?connected=google' },
+            { prompt: 'select_account consent' },
+        );
+    }, []);
     const { properties: ga4Properties } = usePropertyList(hasGoogleConnection);
 
     const normalizedProperties = useMemo(
@@ -1197,7 +1233,8 @@ export default function AIChat() {
     const isGa4Locked = showGa4LockedState;
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-64px)] max-h-[calc(100dvh-64px)] bg-black">
+        <div className="flex h-[calc(100dvh-64px)] max-h-[calc(100dvh-64px)] bg-black">
+        <div className="flex flex-1 min-w-0 flex-col">
 
             {/* ── GA4-required alert banner (replaces the old full-page lock) ── */}
             {isGa4Locked && (
@@ -1455,6 +1492,18 @@ export default function AIChat() {
                     style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px))' }}
                 >
                     <div className="max-w-[760px] mx-auto">
+                        {/* Contextual connector nudge — only shows when the user is
+                            typing about something a not-yet-connected provider would
+                            unlock. The persistent right rail handles discovery /
+                            "always check" access; this handles intent-driven
+                            re-engagement. */}
+                        <ConnectorIntentNudge
+                            input={input}
+                            githubConnected={effectiveGithub}
+                            googleConnected={effectiveGoogle}
+                            disabled={isLoading || isGa4Locked}
+                            onConnect={handleNudgeConnect}
+                        />
                         {/* On mobile we stack textarea + actions vertically so the
                             typing area always gets full width. On sm+ they sit on
                             one row in the original layout. */}
@@ -1478,6 +1527,20 @@ export default function AIChat() {
                                     <Globe className="w-3 h-3" />
                                     <span className="max-w-[80px] truncate">{siteLabel}</span>
                                 </Link>
+                                {/* Mobile-only Sources trigger — desktop has the persistent
+                                    right rail; mobile gets a small status pill that opens
+                                    the slide-in sheet. */}
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileSourcesOpen(true)}
+                                    title="Sources"
+                                    aria-label="Open connector sources"
+                                    className="lg:hidden inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700/80 rounded-full px-3 py-1.5 transition-colors"
+                                >
+                                    <Plug className="w-3 h-3" />
+                                    <span>Sources</span>
+                                    <span className="font-mono font-semibold tabular-nums text-zinc-200">{connectedCount}/{connectors.length}</span>
+                                </button>
                                 <RepoPicker
                                     innerRef={repoDropdownRef}
                                     open={repoOpen}
@@ -1508,6 +1571,141 @@ export default function AIChat() {
                     </div>
                 </div>
             )}
+        </div>
+
+        {/* ── Persistent right connector rail ──
+            Always visible across empty + active states so users can check
+            connection status / connect new sources at any time. Hidden below
+            the lg breakpoint (mobile keeps the empty-state strip + intent
+            nudge). The card popover pops to the LEFT (placement="left") into
+            the chat content area. */}
+        <aside
+            ref={sideRailRef}
+            className="relative hidden lg:flex flex-shrink-0 w-64 flex-col border-l border-white/[0.06] bg-[#0a0d12]"
+            aria-label="Connector sources"
+        >
+            <div className="border-b border-white/[0.06] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                    Sources
+                </div>
+                <div className="mt-1.5 text-[12px] text-zinc-400">
+                    <span className="font-semibold text-zinc-200">{connectedCount}</span>
+                    <span className="text-zinc-500"> of {connectors.length} connected</span>
+                </div>
+            </div>
+            <div className="flex flex-col gap-2 p-3">
+                {connectors.map((c) => (
+                    <ConnectorPill
+                        key={c.name}
+                        name={c.name}
+                        connected={c.connected}
+                        isOpen={openConnector === c.name}
+                        onClick={() => setOpenConnector(prev => prev === c.name ? null : c.name)}
+                    />
+                ))}
+            </div>
+            <AnimatePresence>
+                {openConnector && (() => {
+                    const active = connectors.find(c => c.name === openConnector);
+                    if (!active) return null;
+                    return (
+                        <ConnectorCard
+                            placement="left"
+                            name={active.name}
+                            connected={active.connected}
+                            onClose={() => setOpenConnector(null)}
+                            onDisconnected={handleProviderConnected}
+                        />
+                    );
+                })()}
+            </AnimatePresence>
+        </aside>
+
+        {/* ── Mobile-only connector sheet — slides in from the right ──
+            Triggered by the "Sources" pill in the bottom input row. Tapping
+            an un-connected pill fires OAuth directly (no card popover —
+            doesn't fit cleanly in a 280px sheet). Connected/coming-soon pills
+            are no-ops here; users can manage from /dashboard/settings. */}
+        <AnimatePresence>
+            {mobileSourcesOpen && (
+                <div className="lg:hidden fixed inset-0 z-50">
+                    <motion.button
+                        type="button"
+                        aria-label="Close sources"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                        onClick={() => setMobileSourcesOpen(false)}
+                        className="absolute inset-0 w-full bg-black/60 backdrop-blur-sm"
+                    />
+                    <motion.div
+                        role="dialog"
+                        aria-label="Connector sources"
+                        initial={{ x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={{ x: '100%' }}
+                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                        className="absolute inset-y-0 right-0 flex w-[280px] max-w-[85vw] flex-col border-l border-white/[0.06] bg-[#0a0d12] shadow-2xl"
+                        style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                    >
+                        <div className="flex items-start justify-between border-b border-white/[0.06] px-4 py-3">
+                            <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                                    Sources
+                                </div>
+                                <div className="mt-1.5 text-[12px] text-zinc-400">
+                                    <span className="font-semibold text-zinc-200">{connectedCount}</span>
+                                    <span className="text-zinc-500"> of {connectors.length} connected</span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setMobileSourcesOpen(false)}
+                                aria-label="Close"
+                                className="-mr-1 rounded-md p-2 text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">
+                            {connectors.map((c) => {
+                                const isComingSoon = COMING_SOON.has(c.name);
+                                const handleTap = () => {
+                                    if (c.connected || isComingSoon) {
+                                        // No-op for already-connected or coming-soon pills on
+                                        // mobile. Disconnect lives in /dashboard/settings.
+                                        return;
+                                    }
+                                    setMobileSourcesOpen(false);
+                                    const target = nativeProviderFor(c.name);
+                                    if (target === 'github') {
+                                        window.location.href = '/api/auth/github-app/install';
+                                        return;
+                                    }
+                                    if (target === 'google') {
+                                        void signIn(
+                                            'google',
+                                            { callbackUrl: '/dashboard/ai-chat?connected=google' },
+                                            { prompt: 'select_account consent' },
+                                        );
+                                    }
+                                };
+                                return (
+                                    <ConnectorPill
+                                        key={c.name}
+                                        name={c.name}
+                                        connected={c.connected}
+                                        isOpen={false}
+                                        onClick={handleTap}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
         </div>
     );
 }
