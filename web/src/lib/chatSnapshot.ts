@@ -797,6 +797,11 @@ export function buildRichChatContext(snapshot: EnrichedSnapshot, opts?: { siteUr
     if (profile) {
         lines.push(`SITE PROFILE: ${profile.type.toUpperCase()} (confidence: ${profile.confidence})`);
         lines.push(`  ${profile.verdict}`);
+        // Hard marker so the AI doesn't invent a vertical / ICP / geography
+        // from query patterns. Audience can ONLY come from [USER_FACTS] which
+        // captures things the user has explicitly told us. Without that, any
+        // "your target audience is X" claim is a hallucination.
+        lines.push(`  AUDIENCE: NOT INFERABLE FROM THIS DATA — only describe a target audience / vertical / ICP / geography if [USER_FACTS] explicitly names it. Never invent one from queries or page paths.`);
         const flags: string[] = [];
         if (profile.hasCommercialPaths) flags.push('hasCommercialPaths');
         if (profile.hasContentPaths) flags.push('hasContentPaths');
