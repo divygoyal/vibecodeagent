@@ -20,7 +20,7 @@ import {
     Bot, BarChart3, Search, Settings,
     ChevronLeft, ChevronRight, LogOut, Menu, X,
     Coins, MessageSquare,
-    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, Headphones, CalendarDays, type LucideIcon
+    ChevronDown, Bell, Globe, Sparkles, Trophy, Share2, Loader2, LifeBuoy, Headphones, type LucideIcon
 } from 'lucide-react';
 import {
     type Ga4Availability,
@@ -138,7 +138,13 @@ const sidebarGroups: SidebarGroup[] = [
     { label: 'Analysis', items: [
         { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
         { icon: Search, label: 'SEO', href: '/dashboard/seo' },
-        { icon: CalendarDays, label: 'Weekly', href: '/dashboard/weekly' },
+        // TEMPORARY: /dashboard/weekly is hidden from the sidebar for now.
+        // The route still works by direct URL and via the superadmin per-user
+        // "Generate weekly digest" button. Re-add this entry once we're ready
+        // to surface it to all users:
+        //   { icon: CalendarDays, label: 'Weekly', href: '/dashboard/weekly' },
+        // (CalendarDays import in the lucide-react block above also needs
+        // restoring.)
         { icon: Share2, label: 'Share Dashboard', href: '/dashboard/share' },
     ]},
     { label: 'Social APIs', items: [
