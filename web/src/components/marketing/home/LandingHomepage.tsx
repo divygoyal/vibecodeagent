@@ -622,9 +622,26 @@ export default function LandingHomepage() {
 
                 <div className="relative mx-auto max-w-[1380px] px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8 lg:pb-24 lg:pt-36">
                     <div className="mx-auto max-w-[1040px] text-center">
-                        <div className="mb-6 inline-flex items-center rounded-full border border-[#14C4E1]/25 bg-[#07131d]/80 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#dff9ff] shadow-[0_8px_24px_rgba(20,196,225,0.12)] backdrop-blur-sm sm:text-xs">
-                            {HOMEPAGE_CONTENT.hero.eyebrow}
-                        </div>
+                        {/* Product Hunt launch badge — temporarily occupies the eyebrow
+                            slot while the daily rank is fresh. Revert to the eyebrow
+                            pill (see HOMEPAGE_CONTENT.hero.eyebrow) once the launch
+                            cools. */}
+                        <a
+                            href="https://www.producthunt.com/products/trafficclaw/launches/trafficclaw?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-trafficclaw"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="TrafficClaw on Product Hunt — view our launch"
+                            className="mb-6 inline-block transition-opacity duration-200 hover:opacity-90 focus-visible:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14C4E1]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-md"
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=1103214&theme=dark&period=daily"
+                                alt="TrafficClaw — Product of the Day on Product Hunt"
+                                width={250}
+                                height={54}
+                                style={{ width: 250, height: 54 }}
+                            />
+                        </a>
                         <h1 className="text-[2.25rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
                             <span className="block text-white">
                                 {HOMEPAGE_CONTENT.hero.titleLead}
