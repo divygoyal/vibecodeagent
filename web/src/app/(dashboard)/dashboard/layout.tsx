@@ -6,6 +6,7 @@ import { signIn, signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import Script from 'next/script';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
@@ -788,6 +789,19 @@ export default function DashboardLayout({
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex max-w-[100vw]">
             <a href="#main-content" className="skip-to-content">Skip to content</a>
+            {/* Tawk.to live chat — scoped to the authenticated dashboard shell only.
+                Marketing/landing routes intentionally do NOT load this widget. */}
+            <Script id="tawk-init" strategy="afterInteractive">
+                {`var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+                  (function(){
+                    var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
+                    s1.async=true;
+                    s1.src='https://embed.tawk.to/6a065190bb83b51c35dd7459/1jokat7nr';
+                    s1.charset='UTF-8';
+                    s1.setAttribute('crossorigin','*');
+                    s0.parentNode.insertBefore(s1,s0);
+                  })();`}
+            </Script>
             {/* ─── Sidebar (Desktop) ─── */}
             <aside
                 className={`relative hidden lg:flex flex-col border-r border-white/[0.06] bg-[linear-gradient(180deg,#04070c_0%,#050913_16%,#020306_100%)] shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)] transition-all duration-300 sticky top-0 h-screen overflow-y-auto overflow-x-visible ${collapsed ? 'w-[68px]' : 'w-[248px]'

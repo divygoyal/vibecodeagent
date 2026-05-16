@@ -157,20 +157,6 @@ export default function RootLayout({
               y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
             })(window, document, "clarity", "script", "w0bverna26");`}
         </Script>
-        {/* Tawk.to live chat widget — deferred to reduce TBT.
-            Widget ID is a public embed key (visible to every page visitor) —
-            same security model as the Clarity tag id. */}
-        <Script id="tawk-init" strategy="afterInteractive">
-          {`var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-            (function(){
-              var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
-              s1.async=true;
-              s1.src='https://embed.tawk.to/6a065190bb83b51c35dd7459/1jokat7nr';
-              s1.charset='UTF-8';
-              s1.setAttribute('crossorigin','*');
-              s0.parentNode.insertBefore(s1,s0);
-            })();`}
-        </Script>
       </head>
       <body
         suppressHydrationWarning
