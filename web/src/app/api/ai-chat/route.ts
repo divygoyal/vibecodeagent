@@ -360,10 +360,13 @@ NUMERICAL DISCIPLINE (HARD RULE — applies to every dollar amount, CTR, click c
 - Statistical sanity: a CTR or share percentage can be at most 100. "Underperforming by 4,400%" is mathematically impossible. If you compute a delta exceeding 100%, recheck — you're probably comparing the wrong direction.
 
 FORMAT (DIAGNOSTIC mode default — other INTENT MODES above override this):
-Rich markdown. Suggested sections (use as a GUIDE, not a template): 🎯 VERDICT (##, 1-2 bold sentences) → 📊 EVIDENCE (table/bullets with numbers) → 💰 REVENUE IMPACT (only if you have sourced CPC or click-delta math, see NUMERICAL DISCIPLINE) → ⚡ ACTION (numbered steps) → 🔮 BONUS (only if you have a genuine cross-source observation; OMIT this section if you don't).
+Rich markdown. Three required sections (do not skip): 🎯 VERDICT (##, 1-2 bold sentences) → 📊 EVIDENCE (table/bullets with EXACT numbers) → ⚡ ACTION (numbered steps; lead with highest impact).
+Two optional sections (include ONLY when substantive — never pad to fill the slot):
+- 💰 REVENUE IMPACT — only if you have sourced CPC or click-delta math, per NUMERICAL DISCIPLINE. Otherwise OMIT entirely.
+- 🔮 BONUS — only if you have a genuine cross-source observation that the user would call "I missed that". Restating content from above is worse than omitting.
 Labels: 🔴 CRITICAL|🟡 HIGH|🟢 OPPORTUNITY|⚪ MONITOR. Use tables for 3+ rows. Code blocks for technical recs.
-DO NOT use this 5-section template for CASUAL_GREETING, OPPORTUNITY, EXECUTIVE_SUMMARY, CONTENT_BRIEF, or META_QUESTION intents — they have their own response shapes.
-ONE-THING RULE: if the user's message contains "one thing", "single", "top priority", "the most important", or "if I had to pick", return EXACTLY ONE recommendation — no bonus section, no second action, no "while you're at it". The whole answer is 🎯 + 📊 + the single fix. Nothing else.
+DO NOT use this template for CASUAL_GREETING, OPPORTUNITY, EXECUTIVE_SUMMARY, CONTENT_BRIEF, or META_QUESTION intents — they have their own response shapes.
+ONE-THING RULE: if the user's message contains "one thing", "single", "top priority", "the most important", or "if I had to pick", return EXACTLY 🎯 + 📊 + ⚡ (one item only) — skip 💰 and 🔮 entirely. No second action.
 
 CHARTS (USE SPARINGLY — they were spammy before, now contextual):
 Emit AT MOST ONE chart per response, and ONLY when ONE of these is true:
@@ -1053,7 +1056,7 @@ CRITICAL SYSTEM CONTEXT:
                                         systemInstruction: finalSystemInstruction,
                                         tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
                                         temperature: dynamicTemperature,
-                                        maxOutputTokens: 3072, // A7: bumped from 2048 — long tables + 3 follow-ups were getting cut
+                                        maxOutputTokens: 4096, // bumped from 3072 — long tables + 3 follow-ups + tightened persona sections were getting cut
                                         httpOptions: { timeout: modelTimeout },
                                     },
                                 });
@@ -1276,6 +1279,7 @@ CRITICAL SYSTEM CONTEXT:
                                     }],
                                 },
                             ];
+                            // Rescue pass: 4096 to match the main stream's headroom.
                             const rescue = await ai.models.generateContentStream({
                                 model: 'gemini-3-flash-preview',
                                 contents: rescueContents,
@@ -1283,7 +1287,7 @@ CRITICAL SYSTEM CONTEXT:
                                     systemInstruction: finalSystemInstruction,
                                     // CRITICAL: no tools — force the model to write text.
                                     temperature: 0.4,
-                                    maxOutputTokens: 3072,
+                                    maxOutputTokens: 4096,
                                     httpOptions: { timeout: 25000 },
                                 },
                             });
