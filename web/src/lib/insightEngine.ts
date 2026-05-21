@@ -50,7 +50,10 @@ export type InsightCategory =
     | 'ai_channel_emergent'       // ChatGPT/Perplexity/Gemini in top GA4 sources but no Org/FAQ schema to capture citations
     | 'linguistic_concentration'  // one locale owns disproportionate clicks while site has multiple locales
     | 'question_query_unmet'      // interrogative queries dominate but FAQPage / question-shaped H2s absent
-    | 'trust_signal_absence_commerce'; // ecom site with no Review/AggregateRating/testimonial signals
+    | 'trust_signal_absence_commerce' // ecom site with no Review/AggregateRating/testimonial signals
+    | 'programmatic_thin_content_explosion' // 50+ pages on same path pattern with thin median content + low engagement
+    | 'top_page_fragility'        // single page accounts for >35% of all clicks — collapse risk if it slips
+    | 'pos_2_3_stuck_cluster';    // 5+ queries stuck at pos 2-3 with flat WoW deltas — needs a different lever
 
 export type InsightSeverity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -2508,6 +2511,222 @@ function detectTrustSignalAbsenceCommerce(input: InsightInput): RankedInsight[] 
     }];
 }
 
+/** Programmatic thin-content explosion: site has 50+ pages matching the same
+ *  URL path pattern, but the median page in the cluster has thin content
+ *  (low impressions/clicks).
+ *
+ *  Signal: detect URL clusters by leading 2-segment path prefix (e.g., `/products/`,
+ *  `/tutorials/`, `/cities/`). If a cluster has ≥50 pages AND median clicks/page <5
+ *  AND median impressions/page <100, fire.
+ *
+ *  Prescription: cull the bottom-quartile pages (consolidate via 301 to the
+ *  best-performing sibling, or noindex if they're truly thin), and add real
+ *  per-page differentiation for the survivors. NEVER recommend a title rewrite
+ *  for thin-content pages — the underlying content is the problem, not the title.
+ */
+function detectProgrammaticThinContentExplosion(input: InsightInput): RankedInsight[] {
+    const pages = readPages(input.seoContext);
+    if (!pages || pages.length < 50) return [];
+
+    const clusters = new Map<string, { count: number; clicks: number[]; impressions: number[]; samplePaths: string[] }>();
+    for (const p of pages) {
+        const path = String(p.page || '');
+        try {
+            const url = new URL(path);
+            // Cluster by first 2 path segments (e.g., /products/widget → /products/)
+            const segs = url.pathname.split('/').filter(Boolean);
+            if (segs.length < 2) continue;
+            const prefix = `/${segs[0]}/`;
+            const bucket = clusters.get(prefix) ?? { count: 0, clicks: [], impressions: [], samplePaths: [] };
+            bucket.count += 1;
+            bucket.clicks.push(toInt(p.clicks));
+            bucket.impressions.push(toInt(p.impressions));
+            if (bucket.samplePaths.length < 3) bucket.samplePaths.push(path);
+            clusters.set(prefix, bucket);
+        } catch { /* ignore invalid URL */ }
+    }
+
+    const out: RankedInsight[] = [];
+    for (const [prefix, bucket] of clusters) {
+        if (bucket.count < 50) continue;
+        const medianClicks = median(bucket.clicks);
+        const medianImpressions = median(bucket.impressions);
+        if (medianClicks >= 5) continue;
+        if (medianImpressions >= 100) continue;
+
+        const totalClicks = bucket.clicks.reduce((s, n) => s + n, 0);
+        const totalImpressions = bucket.impressions.reduce((s, n) => s + n, 0);
+
+        const severity: InsightSeverity = bucket.count >= 500 ? 'critical' : bucket.count >= 200 ? 'high' : 'medium';
+        const priority = STRATEGIC_PRIORITY[severity] ?? STRATEGIC_PRIORITY.medium;
+
+        out.push({
+            id: `programmatic-thin-${prefix.replace(/\//g, '')}`,
+            rank: 0,
+            category: 'programmatic_thin_content_explosion',
+            severity,
+            title: `${bucket.count} pages on ${prefix} but median page has only ${medianClicks}c / ${medianImpressions}imp — programmatic-content explosion at risk`,
+            page: null,
+            query: null,
+            evidence: {
+                cluster: prefix,
+                pageCount: bucket.count,
+                medianClicks,
+                medianImpressions,
+                totalClusterClicks: totalClicks,
+                totalClusterImpressions: totalImpressions,
+                samplePaths: bucket.samplePaths.join(', '),
+            },
+            monthlyValueLost: 0,
+            priority,
+            isStrategic: true,
+            estClicksGain: 0,
+            effortMinutes: 600,
+            difficulty: 'hard',
+            why: `You have ${bucket.count} pages under ${prefix}. The median one earns ${medianClicks} clicks/mo on ${medianImpressions} impressions/mo — that's below Google's "this page deserves to exist" threshold for most queries. At ${bucket.count}+ pages this pattern signals "programmatic SEO" to Google's quality systems. Google's playbook has been to demote whole clusters when the per-page utility is too thin. The risk isn't that any one page underperforms — it's that the entire cluster gets devalued. The fix is to cull (consolidate/noindex the bottom quartile) before you're forced to.`,
+            fix: {
+                type: 'prune_pages',
+                description: `1) Sort the ${bucket.count} pages by impressions over last 90 days. 2) Identify the bottom 25% (the ones earning ≤2 impressions/mo). 3) For each, decide: (a) 301-redirect to its best-performing sibling if topically related, or (b) noindex and remove from sitemap if it's pure template-fill. 4) For survivors, add real per-page differentiation — unique data, unique copy, unique internal links. DO NOT recommend a title/meta rewrite on a thin-content page; the content is the problem, not the title. 5) Verify in GSC's "Coverage" report that the dropped pages disappear over 4-6 weeks.`,
+            },
+            receipts: ['snapshot.gsc.topPages.byCluster'],
+        });
+    }
+
+    return out.slice(0, 2);
+}
+
+/** Top-page fragility: a SINGLE page accounts for >35% of total clicks. This is
+ *  different from topic_concentration (which checks top-5 share). When one page
+ *  IS the entire site's traffic, the collapse risk is asymmetric — a single
+ *  algorithm move or competitor outranking you can wipe out a third+ of traffic.
+ *
+ *  Signal: top page's clicks / total clicks >= 0.35 AND total clicks >= 200.
+ *
+ *  Prescription: build defensive sibling content for the hero page's topic
+ *  cluster. NEVER recommend "rewrite the hero page's title" — the title is
+ *  what's WORKING. The risk is concentration, not optimization.
+ */
+function detectTopPageFragility(input: InsightInput): RankedInsight[] {
+    const pages = readPages(input.seoContext);
+    if (!pages || pages.length < 3) return [];
+
+    const totalClicks = pages.reduce((s: number, p: any) => s + toInt(p.clicks), 0);
+    if (totalClicks < 200) return [];
+
+    const sorted = [...pages].sort((a: any, b: any) => toInt(b.clicks) - toInt(a.clicks));
+    const top = sorted[0];
+    const topClicks = toInt(top.clicks);
+    const topPct = (topClicks / totalClicks) * 100;
+    if (topPct < 35) return [];
+
+    const severity: InsightSeverity = topPct >= 60 ? 'critical' : topPct >= 45 ? 'high' : 'medium';
+    const priority = STRATEGIC_PRIORITY[severity] ?? STRATEGIC_PRIORITY.medium;
+
+    const secondPct = sorted.length > 1 ? (toInt(sorted[1].clicks) / totalClicks) * 100 : 0;
+
+    return [{
+        id: `top-page-fragility-${top.page || 'unknown'}`,
+        rank: 0,
+        category: 'top_page_fragility',
+        severity,
+        title: `${top.page} owns ${topPct.toFixed(0)}% of ALL clicks — single-page-of-failure risk`,
+        page: top.page,
+        query: null,
+        evidence: {
+            topPage: top.page,
+            topPageClicks: topClicks,
+            topPagePct: +topPct.toFixed(1),
+            secondPagePct: +secondPct.toFixed(1),
+            totalClicks,
+            distanceToSecond: +(topPct - secondPct).toFixed(1),
+        },
+        monthlyValueLost: 0,
+        priority,
+        isStrategic: true,
+        estClicksGain: 0,
+        effortMinutes: 480,
+        difficulty: 'hard',
+        why: `One page (${top.page}) is ${topPct.toFixed(0)}% of your organic traffic. If it slips one position OR a competitor outranks you OR Google's algorithm shifts on its primary query, you lose a third+ of all clicks overnight. The fix is NOT to optimize that page further — it's already winning. The fix is to BUILD DEFENSIVE DEPTH: 3-5 sibling pages targeting adjacent queries in the same topical cluster, so the cluster as a whole holds even if one page slips. Concentration risk is the most common cause of "we were doing great, then traffic crashed" stories.`,
+        fix: {
+            type: 'create_page',
+            description: `1) Pull the top 10 queries that ${top.page} ranks for. 2) Group them into 3-5 sub-topic clusters (different intent variations of the hero topic). 3) For each cluster, draft a sibling page that targets the LONG-TAIL variants the hero page can't reasonably own. 4) Each sibling links UP to the hero with descriptive anchor text. 5) Publish over 6-8 weeks, one per week. Goal: drop the top page's share below 25% within 90 days WITHOUT cannibalizing its rankings. DO NOT recommend a title or meta rewrite on the hero page — it's the winning artifact; protect it, don't tinker with it.`,
+        },
+        receipts: ['snapshot.gsc.topPages[0]', 'snapshot.gsc.pages.singlePageShare'],
+    }];
+}
+
+/** Position 2-3 stuck cluster: multiple queries hovering at positions 2-3 with
+ *  flat week-over-week movement. These are queries that have plateaued just
+ *  below #1 — and the fix is NOT a title rewrite (the page already wins the
+ *  primary intent). The fix is internal-link injection + secondary-keyword
+ *  targeting to break the plateau.
+ *
+ *  Signal: ≥5 queries with position in [2.0, 3.5] AND |clicksDeltaPct| <10%
+ *  (flat WoW) AND impressions >100 each.
+ */
+function detectPos23StuckCluster(input: InsightInput): RankedInsight[] {
+    const wl = input.winnersLosers;
+    if (!wl) return [];
+
+    // Combine winners + losers + lost (everything we have current-period data for) and
+    // filter to "stuck at pos 2-3 with flat delta".
+    const candidates: any[] = [
+        ...(wl.winners || []),
+        ...(wl.losers || []),
+        ...(wl.new || []),
+    ];
+    const stuck = candidates.filter((q: any) => {
+        const pos = toPos(q.positionCurrent ?? q.position);
+        const imp = toInt(q.impressionsCurrent ?? q.impressions);
+        const deltaPct = typeof q.clicksDeltaPct === 'number' ? q.clicksDeltaPct : 0;
+        return pos >= 2.0 && pos <= 3.5 && imp >= 100 && Math.abs(deltaPct) < 10;
+    });
+    if (stuck.length < 5) return [];
+
+    const totalImpressions = stuck.reduce((s: number, q: any) => s + toInt(q.impressionsCurrent ?? q.impressions), 0);
+    const sampleQueries = stuck.slice(0, 5)
+        .map((q: any) => `"${q.query}" (pos ${toPos(q.positionCurrent ?? q.position).toFixed(1)}, ${toInt(q.impressionsCurrent ?? q.impressions)} imp)`)
+        .join(', ');
+
+    const severity: InsightSeverity = stuck.length >= 12 ? 'high' : 'medium';
+    const priority = STRATEGIC_PRIORITY[severity] ?? STRATEGIC_PRIORITY.medium;
+
+    return [{
+        id: 'pos-2-3-stuck-cluster',
+        rank: 0,
+        category: 'pos_2_3_stuck_cluster',
+        severity,
+        title: `${stuck.length} queries stuck at positions 2-3 with flat WoW deltas — needs a non-title lever to break through`,
+        page: null,
+        query: null,
+        evidence: {
+            stuckCount: stuck.length,
+            totalStuckImpressions: totalImpressions,
+            sampleQueries,
+            avgPosition: +(stuck.reduce((s: number, q: any) => s + toPos(q.positionCurrent ?? q.position), 0) / stuck.length).toFixed(1),
+        },
+        monthlyValueLost: 0,
+        priority,
+        isStrategic: false, // tactical — there's an action that closes it
+        estClicksGain: Math.round(stuck.length * 30), // rough: each query at pos 2→1 unlocks ~30 clicks/mo
+        effortMinutes: 360,
+        difficulty: 'medium',
+        why: `${stuck.length} queries have plateaued at positions 2-3 with essentially zero week-over-week movement. At position 2 you're already winning the primary intent — a title rewrite won't move the needle, because the title is what got you to position 2 in the first place. The lever that breaks position-2 plateaus is: (a) authority redistribution via internal links from your highest-PageRank pages, (b) secondary-keyword targeting on the existing pages (adding the missing entity / sub-question Google expects at position 1), or (c) earning a relevant external link. Title work is not on that list.`,
+        fix: {
+            type: 'internal_link',
+            description: `1) For each stuck query, identify the page that owns it. 2) Find your highest-authority pages (top 3 by clicks) and verify they DON'T already link to the stuck page. 3) Add a contextual internal link from at least 2 authority pages, using the stuck query as the anchor text (varied phrasings — same anchor on every link is over-optimization). 4) On the stuck page itself, audit "People Also Ask" for the primary query — add any missing sub-questions as H2s with answers. 5) Re-check positions after 3-4 weeks. DO NOT recommend a title rewrite — the title got the page to position 2; touching it risks regression.`,
+        },
+        receipts: ['winnersLosers.flatPositions[2-3]'],
+    }];
+}
+
+function median(arr: number[]): number {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
 export function detectTopInsights(input: InsightInput, maxN = 10): RankedInsight[] {
     // Auto-compute site profile if caller didn't supply one.
     const inputWithProfile: InsightInput = {
@@ -2553,6 +2772,9 @@ export function detectTopInsights(input: InsightInput, maxN = 10): RankedInsight
         ...detectLinguisticConcentration(inputWithProfile),
         ...detectQuestionQueryUnmet(inputWithProfile),
         ...detectTrustSignalAbsenceCommerce(inputWithProfile),
+        ...detectProgrammaticThinContentExplosion(inputWithProfile),
+        ...detectTopPageFragility(inputWithProfile),
+        ...detectPos23StuckCluster(inputWithProfile),
     ].map(withDefaults);
 
     // Dedupe — same (category, page, query) triple: keep the highest-priority one
