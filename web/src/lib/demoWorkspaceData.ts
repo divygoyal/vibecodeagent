@@ -1146,5 +1146,7 @@ export function getDemoAuditReport(url = DEMO_SITE_URL): AuditReport {
                 { type: 'WebSite', data: '{"@context":"https://schema.org","@type":"WebSite","name":"Antigravity Codes"}' },
             ],
         },
+        siteType: { type: 'saas', confidence: 0.8, signals: ['demo workspace'] },
+        htmlExcerpt: 'Track growth in real time. Real-time growth tooling for startups — analytics, mentions, and SEO in one workspace.',
     };
 }

@@ -4,6 +4,7 @@
  */
 import * as cheerio from 'cheerio';
 import { isBlockedUrl } from './urlValidation';
+import { detectSiteType, type SiteTypeResult } from './siteTypeDetector';
 
 // ─── Types ───
 
@@ -47,6 +48,8 @@ export interface AuditReport {
         stylesheets: { href: string }[];
         structuredData: { type: string; data: string }[];
     };
+    siteType?: SiteTypeResult;
+    htmlExcerpt?: string;
 }
 
 // ─── Helpers ───
@@ -217,10 +220,18 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
         structuredDataDetails.push({ type: schemaType, data: text.slice(0, 500) });
     });
 
+    // Site type detection — MUST run before scripts are stripped (uses script[src] signals)
+    const siteTypeResult = detectSiteType($, html, finalUrl);
+
+    // Capture lowercased script srcs while scripts are still in the DOM (for CRO/vendor checks below)
+    const scriptSrcsLower = scriptDetails.map(s => (s.src || '').toLowerCase());
+
     // Body text
     $('script, style, noscript').remove();
     const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
     const wordCount = countWords(bodyText);
+    const bodyTextLower = bodyText.toLowerCase();
+    const htmlExcerpt = bodyText.slice(0, 8000);
 
     // Scripts and stylesheets
     const scriptCount = $('script[src]').length;
@@ -653,6 +664,233 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     }
 
     // ═══════════════════════════════════════
+    // ─── CRO / FUNNEL / TRUST / COMMERCE CHECKS (#56-#81) ───
+    // ═══════════════════════════════════════
+
+    // Shared precompute for CRO checks
+    const ctaSelector = 'button, a[class*="btn"], a[class*="button"], a[class*="cta"], [role="button"]';
+    const allCtaTexts = $(ctaSelector)
+        .map((_, el) => $(el).text().trim())
+        .get()
+        .filter(t => t.length > 0);
+    const weakCtaPattern = /^(submit|click here|learn more|read more|more info|continue|next|go|ok)\.?$/i;
+    const aboveFoldText = bodyTextLower.slice(0, 800);
+    const aboveFoldCtas = allCtaTexts.filter(t => aboveFoldText.includes(t.toLowerCase())).length;
+    const primaryCtaPattern = /class="[^"]*(primary|cta|hero)[^"]*"/gi;
+    const primaryCtaMatches = (html.slice(0, 4000).match(primaryCtaPattern) || []).length;
+
+    // ── CTA ──
+
+    // 56. No CTA above the fold
+    if (aboveFoldCtas === 0 && allCtaTexts.length > 0) {
+        issues.push({ id: 'cro-no-cta-above-fold', category: 'CRO', title: 'No CTA above the fold', description: 'No clickable call-to-action detected in the first 800 chars of body content.', severity: 'warning', recommendation: 'Place a clear primary CTA (e.g., "Start Free Trial", "Get a Quote") in the hero area to capture visitor intent.' });
+    } else if (aboveFoldCtas === 0 && allCtaTexts.length === 0) {
+        issues.push({ id: 'cro-no-cta-at-all', category: 'CRO', title: 'No CTA buttons detected anywhere', description: 'No button-like elements or CTA-styled links found on the page.', severity: 'critical', recommendation: 'Add at least one primary CTA — without it visitors have no clear next step.' });
+    }
+
+    // 57. Weak CTA copy
+    if (allCtaTexts.length > 0 && allCtaTexts.every(t => weakCtaPattern.test(t))) {
+        issues.push({ id: 'cro-cta-weak-copy', category: 'CRO', title: 'All CTAs use weak/generic copy', description: 'Every CTA uses generic verbs like "Submit", "Click here", or "Learn more".', severity: 'warning', value: `${allCtaTexts.length} CTAs`, recommendation: 'Rewrite CTA copy with action verbs and outcome ("Start my free trial", "Get my quote", "See pricing").' });
+    }
+
+    // 58. Multiple primary CTAs above the fold
+    if (primaryCtaMatches > 3) {
+        issues.push({ id: 'cro-multiple-primary-ctas', category: 'CRO', title: 'Multiple competing primary CTAs', description: `${primaryCtaMatches} elements styled as primary CTA in the top of the page.`, severity: 'info', value: `${primaryCtaMatches}`, recommendation: 'Pick one primary action and demote the rest to secondary styling so attention focuses on the highest-value step.' });
+    }
+
+    // ── Popups / Funnel ──
+
+    const popupVendorPattern = /(optimonk|sumo\.|mailchimp.*popup|klaviyo|popupally|getsitecontrol|optinmonster|wisepops|sleeknote|hellobar)/i;
+    const popupVendorHits = scriptSrcsLower.filter(s => popupVendorPattern.test(s));
+    const hasModalElement = $('[class*="modal"], [class*="popup"], [class*="lightbox"], [class*="overlay"], dialog').length > 0;
+    const exitIntentPattern = /(exit[-_]?intent|optinmonster.*exit|popupsmart.*exit|mouseleave)/i;
+    const hasExitIntent = scriptSrcsLower.some(s => exitIntentPattern.test(s)) || exitIntentPattern.test(html);
+
+    // 59. Popup detected
+    if (popupVendorHits.length > 0) {
+        issues.push({ id: 'funnel-popup-detected', category: 'Funnel', title: 'Popup/lightbox vendor detected', description: `Detected: ${popupVendorHits[0].split('/').pop()}.`, severity: 'info', recommendation: 'Audit popup timing — fire on scroll-depth or exit-intent rather than immediately on load to avoid SEO penalty and bounce.' });
+    }
+
+    // 60. No popup / lead capture
+    if (popupVendorHits.length === 0 && !hasModalElement && wordCount > 300) {
+        issues.push({ id: 'funnel-popup-missing', category: 'Funnel', title: 'No lead-capture mechanism detected', description: 'No popup, modal, or inline newsletter form found. Visitor intent leaks without a capture point.', severity: 'info', recommendation: 'Add an exit-intent popup or scroll-triggered newsletter form to convert anonymous traffic.' });
+    }
+
+    // 61. No exit-intent
+    if (!hasExitIntent && (popupVendorHits.length > 0 || hasModalElement)) {
+        issues.push({ id: 'funnel-exit-intent-missing', category: 'Funnel', title: 'Popup not exit-intent triggered', description: 'Popup mechanism exists but no exit-intent trigger detected — popups firing on load harm UX and SEO.', severity: 'info', recommendation: 'Switch popup trigger to exit-intent or 30%+ scroll depth.' });
+    }
+
+    // ── Trust signals ──
+
+    const hasReviewSchema = structuredDataDetails.some(s => /Review|AggregateRating/.test(s.type));
+    const hasTestimonialText = /testimonial|customer (?:says|story|review)/i.test(bodyTextLower);
+    const hasTestimonialClass = $('[class*="testimonial"], [class*="review"]').length > 0;
+
+    // 62. No testimonials/reviews
+    if (!hasReviewSchema && !hasTestimonialText && !hasTestimonialClass && wordCount > 200) {
+        issues.push({ id: 'trust-no-testimonials', category: 'Trust', title: 'No customer testimonials or reviews', description: 'No testimonial or review content detected anywhere on the page.', severity: 'warning', recommendation: 'Add 2-3 specific customer quotes with name, photo, and (if possible) company. Generic praise underperforms — use detail.' });
+    }
+
+    // 63. No aggregate rating / star rating
+    if (!hasReviewSchema && !/★|⭐|\b\d\.\d\s?\/\s?5\b|\brated\s+\d/i.test(bodyText)) {
+        issues.push({ id: 'trust-no-aggregate-rating', category: 'Trust', title: 'No visible star/aggregate rating', description: 'No AggregateRating schema or visible rating UI (★, "4.8/5") detected.', severity: 'info', recommendation: 'Display aggregate review rating (e.g., from Trustpilot, G2, Google Reviews) and add JSON-LD AggregateRating for rich snippets.' });
+    }
+
+    // 64. No press / "as seen on" badges
+    const hasBadges = $('img[alt*="trusted by" i], img[alt*="as seen on" i], img[alt*="featured in" i], [class*="logo-wall"], [class*="press"], [class*="featured-in"]').length > 0;
+    if (!hasBadges && wordCount > 300) {
+        issues.push({ id: 'trust-no-badges', category: 'Trust', title: 'No press/customer-logo wall', description: 'No "trusted by", "as seen on", or customer-logo wall detected.', severity: 'info', recommendation: 'If you have notable customers or press coverage, surface them as a logo wall in the hero or below — instant credibility.' });
+    }
+
+    // 65. No customer-count proof point
+    if (!/\b\d[\d,]{2,}\+?\s+(customers|users|companies|brands|happy customers|members|subscribers|teams|businesses)\b/i.test(bodyText)) {
+        issues.push({ id: 'trust-no-customer-count', category: 'Trust', title: 'No quantified social proof', description: 'No "X,XXX+ customers" / "10,000+ users" / similar quantified proof point detected.', severity: 'info', recommendation: 'Add a specific number ("Used by 8,432 teams", "Over 50,000 reels generated") to anchor credibility.' });
+    }
+
+    // 66. No guarantee / risk reversal
+    if (!/money[\s-]?back|guarantee|refund|free trial|no credit card|cancel any\s*time|risk[\s-]?free|30[\s-]?day/i.test(bodyText)) {
+        issues.push({ id: 'trust-no-guarantee', category: 'Trust', title: 'No guarantee or risk-reversal copy', description: 'No "money-back", "30-day", "guarantee", "free trial", or "cancel anytime" copy detected.', severity: 'warning', recommendation: 'Add an explicit risk-reversal line near the primary CTA — guarantees, free trials, or "cancel anytime" lift conversion measurably.' });
+    }
+
+    // 67. No security/trust badges (commerce/checkout)
+    const hasSecurityBadges = $('img[src*="ssl" i], img[src*="norton" i], img[src*="mcafee" i], img[src*="trustpilot" i], img[src*="bbb" i], img[src*="stripe" i][src*="badge" i]').length > 0;
+    if (!hasSecurityBadges && (siteTypeResult.type === 'ecom' || /\/(checkout|cart)/i.test(finalUrl))) {
+        issues.push({ id: 'trust-no-security-badges', category: 'Trust', title: 'No security/trust badges on commerce page', description: 'No SSL, Norton, McAfee, Trustpilot, or BBB badge imagery detected.', severity: 'warning', recommendation: 'Surface trust badges near the checkout button — security signals lift completion rates on transactional pages.' });
+    }
+
+    // ── Forms ──
+
+    const forms = $('form').toArray();
+    let formTooManyFields = 0;
+    let formHighRequired = 0;
+    let formMissingLabels = 0;
+    let formNoTrustNearCta = 0;
+    for (const formEl of forms) {
+        const $form = $(formEl);
+        const visibleInputs = $form.find('input, select, textarea').filter((_, el) => {
+            const type = ($(el).attr('type') || '').toLowerCase();
+            return type !== 'hidden' && type !== 'submit' && type !== 'button' && type !== 'csrf';
+        });
+        const inputCount = visibleInputs.length;
+        if (inputCount > 6) formTooManyFields++;
+        const requiredCount = visibleInputs.filter((_, el) => $(el).is('[required]')).length;
+        if (inputCount >= 3 && requiredCount / inputCount > 0.7) formHighRequired++;
+        const missingLabels = visibleInputs.filter((_, el) => {
+            const $el = $(el);
+            const id = $el.attr('id');
+            const hasLabel = id ? $form.find(`label[for="${id}"]`).length > 0 : false;
+            return !hasLabel && !$el.attr('aria-label') && !$el.attr('aria-labelledby') && !$el.attr('placeholder');
+        }).length;
+        if (missingLabels > 0) formMissingLabels += missingLabels;
+        const submitNearby = $form.text().toLowerCase();
+        if (!/secure|no spam|privacy|free|never share/i.test(submitNearby) && inputCount >= 3) formNoTrustNearCta++;
+    }
+
+    // 68. Too many fields
+    if (formTooManyFields > 0) {
+        issues.push({ id: 'form-too-many-fields', category: 'Forms', title: `${formTooManyFields} form(s) with >6 fields`, description: 'Form length correlates inversely with completion rate — each extra field shaves conversion.', severity: 'warning', value: `${formTooManyFields}`, recommendation: 'Cut to email + name + one custom question. Move secondary qualifiers to a follow-up email or progressive profiling.' });
+    }
+
+    // 69. Too many required fields
+    if (formHighRequired > 0) {
+        issues.push({ id: 'form-high-required-ratio', category: 'Forms', title: `${formHighRequired} form(s) require >70% of fields`, description: 'Heavy required-field ratio increases abandonment.', severity: 'warning', value: `${formHighRequired}`, recommendation: 'Make only the email or core identifier required. Mark the rest optional explicitly ("optional").' });
+    }
+
+    // 70. Missing form labels
+    if (formMissingLabels > 0) {
+        issues.push({ id: 'form-no-labels', category: 'Forms', title: `${formMissingLabels} form input(s) without labels`, description: 'Inputs lack <label>, aria-label, or aria-labelledby. Screen readers and form autofill suffer.', severity: 'warning', value: `${formMissingLabels}`, recommendation: 'Add explicit <label for="..."> or aria-label to every visible input. Placeholder text does not substitute.' });
+    }
+
+    // 71. No trust copy near submit
+    if (formNoTrustNearCta > 0) {
+        issues.push({ id: 'form-no-trust-near-cta', category: 'Forms', title: `${formNoTrustNearCta} form(s) lack reassurance near submit`, description: 'No "we never share your email", "no spam", "secure", or "free" wording near the form.', severity: 'info', value: `${formNoTrustNearCta}`, recommendation: 'Add a one-line reassurance under the submit button to defuse hesitation ("No spam, unsubscribe anytime").' });
+    }
+
+    // 72. No quantified social-proof counters
+    if (!/\b\d[\d,]{2,}\+/.test(bodyText)) {
+        issues.push({ id: 'social-proof-no-counters', category: 'Trust', title: 'No quantified counter ("10,000+")', description: 'No prominent "N+" social-proof counter (users, downloads, reviews, sites).', severity: 'info', recommendation: 'If you have meaningful scale numbers, surface them prominently — "12,847 sites audited", "Trusted by 5,000+ teams".' });
+    }
+
+    // ── Urgency ──
+
+    const hasCountdown = $('[class*="countdown"], [class*="timer"], [class*="urgency"]').length > 0;
+    const hasUrgencyCopy = /\b(limited time|today only|ends in|hurry|don'?t miss|last chance|while supplies last)\b/i.test(bodyText);
+    const countdownVendor = scriptSrcsLower.some(s => /evergreentimer|deadline-funnel|countdownjs/.test(s));
+
+    // 73. No urgency on commerce/promo pages
+    if (!hasCountdown && !hasUrgencyCopy && siteTypeResult.type === 'ecom') {
+        issues.push({ id: 'urgency-missing', category: 'CRO', title: 'No urgency/scarcity signals', description: 'No countdown, "limited time", or stock-scarcity language detected.', severity: 'info', recommendation: 'For promotional or seasonal offers, surface a real (not fake) urgency cue — countdown to actual deadline or genuine stock remaining.' });
+    }
+
+    // 74. Fake-urgency warning (advisory)
+    if (countdownVendor && /ends today|expires today/i.test(bodyText)) {
+        issues.push({ id: 'urgency-fake-warning', category: 'CRO', title: 'Possible evergreen "fake urgency" detected', description: 'Countdown vendor + "ends today" copy. If the deadline isn\'t real, this erodes trust and may violate FTC guidance.', severity: 'info', recommendation: 'If the deadline is genuine, ignore. If it\'s an evergreen countdown, swap for honest scarcity (real stock count, real promo dates).' });
+    }
+
+    // ── Mobile UX ──
+
+    const hasStickyCta = $('[class*="sticky"], [class*="fixed-bottom"], [class*="floating-cta"]').length > 0 || /position\s*:\s*(fixed|sticky)/.test(html);
+
+    // 75. No sticky CTA on long pages
+    if (!hasStickyCta && wordCount > 800) {
+        issues.push({ id: 'mobile-no-sticky-cta', category: 'Mobile UX', title: 'No sticky/floating CTA on long page', description: 'Long-form content without a persistent CTA forces users to scroll back to convert.', severity: 'info', recommendation: 'Add a sticky bottom-bar CTA on mobile so the primary action follows the scroll. Boosts conversion on content-heavy pages.' });
+    }
+
+    // ── Live-chat / vendor presence ──
+
+    const chatVendorPattern = /(intercom|drift\.com|tawk\.to|crisp\.chat|livechatinc|hubspot.*?messages|zendesk.*?chat|tidio|userlike|olark)/i;
+    const chatVendorHit = scriptSrcsLower.find(s => chatVendorPattern.test(s));
+
+    // 76. Chat widget detected (informational, can become an opportunity)
+    if (chatVendorHit) {
+        issues.push({ id: 'chat-widget-detected', category: 'CRO', title: 'Live-chat vendor detected', description: `Detected: ${chatVendorHit.split('/').pop()}.`, severity: 'passed', value: chatVendorHit.split('/').pop() });
+    } else if (siteTypeResult.type === 'saas' || siteTypeResult.type === 'lead-gen') {
+        issues.push({ id: 'chat-widget-missing', category: 'CRO', title: 'No live-chat widget detected', description: 'For SaaS/lead-gen, live chat captures intent that would otherwise leak.', severity: 'info', recommendation: 'Trial a lightweight chat (Crisp, Intercom Lite) and measure assisted conversions over 30 days.' });
+    }
+
+    // ── Compliance ──
+
+    const cookieVendorPattern = /(cookiebot|onetrust|cookieyes|iubenda|osano|cookiehub|usercentrics)/i;
+    const hasCookieBanner = scriptSrcsLower.some(s => cookieVendorPattern.test(s)) || $('[id*="cookie" i][role="dialog"], [class*="cookie-consent" i], [class*="cookie-banner" i]').length > 0;
+
+    // 77. Cookie banner detected (informational)
+    if (hasCookieBanner) {
+        issues.push({ id: 'cookie-banner-detected', category: 'Compliance', title: 'Cookie consent banner detected', description: 'A cookie consent mechanism is in place.', severity: 'passed' });
+    }
+
+    // ── Commerce-specific (ecom only) ──
+
+    if (siteTypeResult.type === 'ecom') {
+        // 78. Price not visible
+        const hasPrice = $('[itemprop="price"], [class*="price"]').length > 0 || /\$\s?\d|€\s?\d|£\s?\d/.test(bodyText) || structuredDataDetails.some(s => /Offer/.test(s.type) && /price/i.test(s.data));
+        if (!hasPrice) {
+            issues.push({ id: 'commerce-no-price', category: 'Commerce', title: 'No visible price', description: 'No price markup or visible currency amount detected on this commerce page.', severity: 'critical', recommendation: 'Surface the price prominently and wrap it in [itemprop="price"] or schema.org Offer for SERP price snippets.' });
+        }
+
+        // 79. No guest checkout language
+        const checkoutLinks = $('a[href*="checkout" i], a[href*="cart" i]').map((_, el) => $(el).text().trim().toLowerCase()).get().join(' ');
+        if (checkoutLinks && /create account|sign in to continue|register to continue/i.test(checkoutLinks) && !/guest|checkout as guest|no account/i.test(checkoutLinks + ' ' + bodyTextLower)) {
+            issues.push({ id: 'commerce-no-guest-checkout', category: 'Commerce', title: 'Forced account creation at checkout', description: 'Checkout flow requires account creation with no "guest checkout" option detected.', severity: 'warning', recommendation: 'Offer guest checkout — forcing accounts is the single largest cart-abandonment driver in ecom benchmarks.' });
+        }
+
+        // 80. No payment method icons
+        const hasPaymentIcons = $('img[src*="visa" i], img[src*="mastercard" i], img[src*="amex" i], img[src*="paypal" i], img[src*="apple-pay" i], img[src*="apple_pay" i], img[src*="google-pay" i], img[src*="stripe" i][src*="badge" i]').length > 0;
+        if (!hasPaymentIcons) {
+            issues.push({ id: 'commerce-no-payment-icons', category: 'Commerce', title: 'No payment-method icons visible', description: 'No Visa/Mastercard/PayPal/Apple-Pay imagery detected in the footer or near checkout.', severity: 'info', recommendation: 'Display accepted payment-method icons near the price and in the footer — reduces payment-step hesitation.' });
+        }
+    }
+
+    // ── Newsletter capture (blog / lead-gen) ──
+
+    if (siteTypeResult.type === 'blog' || siteTypeResult.type === 'lead-gen') {
+        const hasEmailInput = $('input[type="email"]').length > 0;
+        if (!hasEmailInput) {
+            issues.push({ id: 'lead-no-newsletter', category: 'Funnel', title: 'No newsletter / email capture form', description: 'No email input field detected anywhere on the page.', severity: 'warning', recommendation: 'For content sites, an inline or sticky newsletter capture compounds — every page visit becomes a chance to convert anonymous traffic into a subscriber.' });
+        }
+    }
+
+    // ═══════════════════════════════════════
     // ─── SCORE CALCULATION ───
     // ═══════════════════════════════════════
 
@@ -696,5 +934,7 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
             stylesheets: stylesheetDetails,
             structuredData: structuredDataDetails,
         },
+        siteType: siteTypeResult,
+        htmlExcerpt,
     };
 }

@@ -895,7 +895,7 @@ export async function inspectGscUrl(
     );
 }
 
-async function runGSCQuery(
+export async function runGSCQuery(
     token: string,
     siteUrl: string,
     dims: string[],
