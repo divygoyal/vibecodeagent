@@ -44,12 +44,18 @@ export type InsightCategory =
     | 'journey_dead_end'         // landing pages whose visitors leave without going deeper
     | 'event_misalignment'       // conversion events firing on wrong pages
     | 'cross_source_surprise'    // multi-source patterns: AEO gap, CWV-rank link, time anomaly, etc.
-    | 'deploy_traffic_correlation'; // a commit/PR shipped within ±2d of a position regression
+    | 'deploy_traffic_correlation' // a commit/PR shipped within ±2d of a position regression
+    // ─── Pattern-library additions (Phase X — anomaly archetypes, not tactical fixes) ───
+    | 'directory_trap'            // page ranks for broad queries it doesn't satisfy — title fix won't help
+    | 'ai_channel_emergent'       // ChatGPT/Perplexity/Gemini in top GA4 sources but no Org/FAQ schema to capture citations
+    | 'linguistic_concentration'  // one locale owns disproportionate clicks while site has multiple locales
+    | 'question_query_unmet'      // interrogative queries dominate but FAQPage / question-shaped H2s absent
+    | 'trust_signal_absence_commerce'; // ecom site with no Review/AggregateRating/testimonial signals
 
 export type InsightSeverity = 'critical' | 'high' | 'medium' | 'low';
 
 export interface InsightFix {
-    type: 'meta_title_rewrite' | 'meta_description_rewrite' | 'consolidate_pages' | 'refresh_content' | 'mobile_optimize' | 'create_page' | 'internal_link' | 'investigate' | 'configure_analytics' | 'create_funnel' | 'diversify_channels' | 'prune_pages' | 'create_buyer_intent_pages' | 'other';
+    type: 'meta_title_rewrite' | 'meta_description_rewrite' | 'consolidate_pages' | 'refresh_content' | 'mobile_optimize' | 'create_page' | 'internal_link' | 'investigate' | 'configure_analytics' | 'create_funnel' | 'diversify_channels' | 'prune_pages' | 'create_buyer_intent_pages' | 'retarget_page' | 'add_schema' | 'replicate_locale' | 'surface_trust_signals' | 'restructure_as_questions' | 'other';
     description: string;
     /** Concrete before-string when we can fetch the current state (page meta). */
     before?: string;
@@ -2165,6 +2171,343 @@ function withDefaults(ins: RankedInsight): RankedInsight {
  * themselves on profile.type so blogs/portfolios/docs don't get hit with
  * "you have no buyer-intent traffic" diagnoses they don't care about.
  */
+// ═══════════════════════════════════════════════════════════════
+// PATTERN LIBRARY — anomaly archetypes that map 1:1 to a non-generic prescription.
+//
+// These detectors exist specifically to prevent the "rewrite the H1 / fix the
+// title" failure mode the LLM falls into when no specialized pattern was
+// detected. Each insight here ships with a prescription that is structurally
+// DIFFERENT from a title rewrite — and the prompt forbids the model from
+// substituting one for the other.
+// ═══════════════════════════════════════════════════════════════
+
+/** Directory trap: page ranks for broad queries it doesn't satisfy.
+ *
+ *  Signal: position 1-10, impressions >800, CTR <0.8% (5× below position
+ *  benchmark). At those magnitudes, the cause is intent mismatch — not a weak
+ *  title. The page is appearing for queries it isn't actually about, and users
+ *  skip it in the SERP no matter what the title says.
+ *
+ *  Prescription: re-target the page content to match the queries it's actually
+ *  ranking for, OR narrow the page scope so it stops matching unrelated queries,
+ *  OR noindex if the queries aren't worth pursuing.
+ */
+function detectDirectoryTrap(input: InsightInput): RankedInsight[] {
+    const pages = readPages(input.seoContext);
+    if (!pages || pages.length === 0) return [];
+    const out: RankedInsight[] = [];
+
+    for (const p of pages) {
+        const imp = toInt(p.impressions);
+        const clicks = toInt(p.clicks);
+        const pos = toPos(p.position);
+        const ctr = toCtrPct(p.ctr);
+        if (imp < 800) continue;
+        if (pos < 1 || pos > 10) continue;
+        const benchmarkCtr = expectedCTR(pos);
+        // Fire when actual CTR is at least 5× below benchmark AND absolute CTR <0.8%.
+        if (ctr >= 0.8) continue;
+        if (benchmarkCtr / Math.max(ctr, 0.05) < 5) continue;
+
+        const severity: InsightSeverity = imp >= 5000 ? 'critical' : imp >= 1500 ? 'high' : 'medium';
+        const priority = STRATEGIC_PRIORITY[severity] ?? STRATEGIC_PRIORITY.medium;
+
+        out.push({
+            id: `directory-trap-${p.page || 'unknown'}`,
+            rank: 0,
+            category: 'directory_trap',
+            severity,
+            title: `${p.page} is a directory trap — ${imp.toLocaleString()} impressions at pos ${pos.toFixed(1)} but only ${clicks} clicks (${ctr.toFixed(2)}% CTR vs ${benchmarkCtr.toFixed(1)}% benchmark)`,
+            page: p.page,
+            query: null,
+            evidence: {
+                impressions: imp,
+                clicks,
+                ctr: +ctr.toFixed(2),
+                position: +pos.toFixed(1),
+                benchmarkCtr: +benchmarkCtr.toFixed(1),
+                ctrGapMultiplier: +(benchmarkCtr / Math.max(ctr, 0.05)).toFixed(1),
+            },
+            monthlyValueLost: 0,
+            priority,
+            isStrategic: true,
+            estClicksGain: 0,
+            effortMinutes: 240,
+            difficulty: 'hard',
+            why: `At position ${pos.toFixed(1)} the benchmark CTR is ~${benchmarkCtr.toFixed(1)}%. Your actual CTR is ${ctr.toFixed(2)}% — that's ${(benchmarkCtr / Math.max(ctr, 0.05)).toFixed(0)}× below benchmark. At that magnitude the cause is NOT title weakness — Google is matching the page to queries it doesn't satisfy, and users skip it in the SERP regardless of the title. The fix is to narrow what the page is about, re-target its content, or accept the queries aren't yours to win.`,
+            fix: {
+                type: 'retarget_page',
+                description: `Call analyze_page_intent_mismatch on ${p.page} to see WHICH queries Google is matching it to. Then choose ONE of: (a) re-target the page content to match the actual top queries, (b) narrow the page scope (remove broad sections, focus on one intent), or (c) noindex if the matched queries aren't worth pursuing. DO NOT recommend a title rewrite — at this CTR magnitude it won't help.`,
+            },
+            receipts: ['snapshot.gsc.topPages'],
+        });
+    }
+
+    // Cap at 3 — surfacing 8 directory traps overwhelms the answer.
+    return out.slice(0, 3);
+}
+
+/** AI channel emergent: ChatGPT / Perplexity / Gemini in top GA4 sources but
+ *  the site has no Organization or FAQPage schema to capture AI-search citations.
+ *
+ *  Signal: a recognized AI-answer-engine appears in the top GA4 traffic sources
+ *  AND the schema coverage shows no Organization OR no FAQPage.
+ *
+ *  Prescription: add Organization + FAQPage schema. The channel is already
+ *  bringing traffic; the goal is to make the site MORE citable so the channel
+ *  grows faster than it would organically.
+ */
+function detectAiChannelEmergent(input: InsightInput): RankedInsight[] {
+    const an = input.analyticsContext;
+    if (!an) return [];
+    const sources: any[] = an.sources || an.topSources || an.channels || [];
+    if (!Array.isArray(sources) || sources.length === 0) return [];
+
+    const AI_SOURCE_RE = /(chatgpt\.com|chat\.openai|perplexity\.ai|gemini\.google|claude\.ai|copilot\.microsoft|you\.com|phind\.com)/i;
+    const matches = sources
+        .map((s: any, idx: number) => ({
+            source: String(s.source || s.name || s.channel || ''),
+            sessions: toInt(s.sessions ?? s.users ?? 0),
+            rank: idx + 1,
+        }))
+        .filter(s => AI_SOURCE_RE.test(s.source) && s.sessions >= 50);
+    if (matches.length === 0) return [];
+
+    const schema = input.schemaCoverage;
+    const missingOrg = !schema || schema.hasOrganization === false;
+    const missingFaq = !schema || schema.hasFAQ === false;
+    if (!missingOrg && !missingFaq) return []; // schema already in place
+
+    const topMatch = matches[0];
+    const totalAiSessions = matches.reduce((s, m) => s + m.sessions, 0);
+
+    return [{
+        id: 'ai-channel-emergent',
+        rank: 0,
+        category: 'ai_channel_emergent',
+        severity: totalAiSessions >= 500 ? 'high' : 'medium',
+        title: `${topMatch.source} is bringing ${topMatch.sessions} sessions/mo — but you have ${missingOrg ? 'no Organization schema' : 'no FAQPage schema'} to capture more AI citations`,
+        page: null,
+        query: null,
+        evidence: {
+            topAiSource: topMatch.source,
+            topAiSessions: topMatch.sessions,
+            totalAiSessions,
+            aiSourcesDetected: matches.map(m => `${m.source} (${m.sessions}s)`).join(', '),
+            hasOrganization: !missingOrg,
+            hasFAQPage: !missingFaq,
+        },
+        monthlyValueLost: 0,
+        priority: totalAiSessions >= 500 ? STRATEGIC_PRIORITY.high : STRATEGIC_PRIORITY.medium,
+        isStrategic: true,
+        estClicksGain: 0,
+        effortMinutes: 180,
+        difficulty: 'medium',
+        why: `AI answer engines (ChatGPT, Perplexity, Gemini, Claude) cite sites that publish structured, machine-readable signals about themselves. ${topMatch.source} is ALREADY sending you ${topMatch.sessions} sessions/mo without optimization — meaning the underlying citation pattern is working. With Organization + FAQPage schema, the citation rate compounds: AI engines surface you more often, AND the citations are more accurate. Right now you're getting free traffic from a channel you haven't even optimized for.`,
+        fix: {
+            type: 'add_schema',
+            description: `Add JSON-LD Organization schema sitewide (logo, name, sameAs links to social, founding date) + FAQPage schema on your top 3 informational pages. Concrete steps: 1) Pick the top 3 pages by impressions matching question-shaped queries. 2) Convert their existing H2s to questions if they aren't already. 3) Wrap as schema.org FAQPage with mainEntity[].Question/acceptedAnswer.Text. 4) Add Organization to your global layout.tsx. DO NOT recommend a generic schema audit — name THE pages and THE schema types.`,
+        },
+        receipts: ['analytics.sources', 'schemaCoverage.hasOrganization', 'schemaCoverage.hasFAQ'],
+    }];
+}
+
+/** Linguistic concentration: one locale owns disproportionate clicks while
+ *  the site has pages in multiple locales.
+ *
+ *  Signal: detect locale prefixes in top page paths (/zh/, /ja/, /es/, /pt/,
+ *  /ru/, /fr/, /de/, /ar/, /hi/, /ko/). If pages exist in ≥2 locales AND one
+ *  locale (including no-prefix root) owns >35% of total clicks.
+ *
+ *  Prescription: identify what the dominant locale's winning pages do
+ *  structurally (length, schema, internal-link density) and replicate it
+ *  across the other locales.
+ */
+function detectLinguisticConcentration(input: InsightInput): RankedInsight[] {
+    const pages = readPages(input.seoContext);
+    if (!pages || pages.length < 5) return [];
+
+    const LOCALE_RE = /^\/([a-z]{2}(?:-[a-z]{2})?)\//i;
+    const localeBuckets = new Map<string, { clicks: number; pageCount: number; topPages: string[] }>();
+    let totalClicks = 0;
+
+    for (const p of pages) {
+        const path = String(p.page || '');
+        const clicks = toInt(p.clicks);
+        if (clicks <= 0) continue;
+        try {
+            const url = new URL(path);
+            const m = url.pathname.match(LOCALE_RE);
+            const locale = m ? m[1].toLowerCase() : 'root';
+            totalClicks += clicks;
+            const bucket = localeBuckets.get(locale) ?? { clicks: 0, pageCount: 0, topPages: [] };
+            bucket.clicks += clicks;
+            bucket.pageCount += 1;
+            if (bucket.topPages.length < 3) bucket.topPages.push(path);
+            localeBuckets.set(locale, bucket);
+        } catch { /* invalid URL */ }
+    }
+
+    if (totalClicks < 100 || localeBuckets.size < 2) return [];
+
+    const sorted = [...localeBuckets.entries()].sort((a, b) => b[1].clicks - a[1].clicks);
+    const [topLocale, topBucket] = sorted[0];
+    const topPct = (topBucket.clicks / totalClicks) * 100;
+    if (topPct < 35) return [];
+
+    const otherLocales = sorted.slice(1).map(([l, b]) => `${l} (${b.clicks}c, ${b.pageCount}p)`).join(', ');
+    const localeLabel = topLocale === 'root' ? 'default (no-prefix)' : `/${topLocale}/`;
+
+    return [{
+        id: `linguistic-concentration-${topLocale}`,
+        rank: 0,
+        category: 'linguistic_concentration',
+        severity: topPct >= 50 ? 'high' : 'medium',
+        title: `${localeLabel} locale owns ${topPct.toFixed(0)}% of clicks across ${localeBuckets.size} locales — replicate its structure to lift the others`,
+        page: null,
+        query: null,
+        evidence: {
+            topLocale,
+            topLocaleClicks: topBucket.clicks,
+            topLocalePct: +topPct.toFixed(1),
+            topLocalePages: topBucket.topPages.join(', '),
+            localesDetected: localeBuckets.size,
+            otherLocalesSummary: otherLocales,
+            totalClicks,
+        },
+        monthlyValueLost: 0,
+        priority: topPct >= 50 ? STRATEGIC_PRIORITY.high : STRATEGIC_PRIORITY.medium,
+        isStrategic: true,
+        estClicksGain: 0,
+        effortMinutes: 360,
+        difficulty: 'medium',
+        why: `Your ${localeLabel} pages outperform the rest of your site by a wide margin. Either the content is genuinely better, OR the other locales are missing structural elements (proper hreflang, locale-specific schema, length, internal links). Investigate the top ${localeLabel} page's structure and replicate it. The lift is asymmetric: bringing the other locales to ${localeLabel}'s level compounds the site's authority faster than publishing new pages.`,
+        fix: {
+            type: 'replicate_locale',
+            description: `1) Pull the ${localeLabel} top-3 winning pages (highest clicks). 2) For each, document: word count, H1 wording, H2 structure, schema types present, internal-link count, image count. 3) Identify the equivalent pages in 2-3 other locales (whichever locale is closest in click count). 4) Audit the equivalents against the winning pattern. 5) Bring ONE locale at a time to parity over 30 days. DO NOT translate — replicate the STRUCTURE in the locale's native language. Verify hreflang reciprocity after each batch.`,
+        },
+        receipts: ['snapshot.gsc.topPages.byLocale'],
+    }];
+}
+
+/** Question-query unmet: the site ranks for interrogative queries but the
+ *  pages lack FAQPage schema or question-shaped H2s.
+ *
+ *  Signal: ≥35% of top queries match interrogative patterns (how/what/why/when/...)
+ *  AND schemaCoverage.hasFAQ is false.
+ *
+ *  Prescription: restructure top question-matching pages with question H2s +
+ *  FAQPage schema. This unlocks Google's "People Also Ask" + "FAQ rich result"
+ *  surface area.
+ */
+function detectQuestionQueryUnmet(input: InsightInput): RankedInsight[] {
+    const queries = readQueries(input.seoContext);
+    if (queries.length < 8) return [];
+    const QUESTION_RE = /^(how|what|why|when|where|who|can|does|is|are|should|will|do)\s+\w/i;
+    const questionQueries = queries.filter((q: any) => QUESTION_RE.test(String(q.query || '')));
+    const questionShare = questionQueries.length / queries.length;
+    if (questionShare < 0.35) return [];
+
+    const schema = input.schemaCoverage;
+    if (schema && schema.hasFAQ === true) return []; // already covered
+
+    const totalQuestionImpressions = questionQueries.reduce((s: number, q: any) => s + toInt(q.impressions), 0);
+    if (totalQuestionImpressions < 200) return [];
+
+    const sampleQueries = questionQueries.slice(0, 5).map((q: any) => `"${q.query}"`).join(', ');
+
+    return [{
+        id: 'question-query-unmet',
+        rank: 0,
+        category: 'question_query_unmet',
+        severity: questionShare >= 0.55 ? 'high' : 'medium',
+        title: `${(questionShare * 100).toFixed(0)}% of your top queries are questions — but no FAQPage schema is present`,
+        page: null,
+        query: null,
+        evidence: {
+            questionQueryShare: +(questionShare * 100).toFixed(1),
+            questionQueryCount: questionQueries.length,
+            totalQueriesAnalyzed: queries.length,
+            totalQuestionImpressions,
+            sampleQueries,
+            hasFAQ: schema?.hasFAQ ?? false,
+        },
+        monthlyValueLost: 0,
+        priority: questionShare >= 0.55 ? STRATEGIC_PRIORITY.high : STRATEGIC_PRIORITY.medium,
+        isStrategic: true,
+        estClicksGain: 0,
+        effortMinutes: 240,
+        difficulty: 'medium',
+        why: `Google awards extra SERP real estate to pages that match question intent with explicit Q&A structure — both via FAQ rich results AND People Also Ask boxes. Your top queries (${sampleQueries}) are questions, but your pages don't signal it structurally. This is the cheapest "free traffic" gain available: same content, restructured. Pages without FAQPage are losing the rich-result lift to competitors who use it.`,
+        fix: {
+            type: 'restructure_as_questions',
+            description: `1) Identify the top 5 pages that own those question queries (cross-ref top pages + top queries). 2) For each page, audit its H2 structure — convert ≥3 H2s to verbatim question form ("How does X work?" not "How X Works"). 3) Add a FAQ section near the end with 5-8 Q&A pairs derived from "People Also Ask" for the page's primary query. 4) Wrap as schema.org FAQPage JSON-LD. 5) Verify in Rich Results Test. DO NOT recommend a title rewrite — the title is fine; the body structure is the gap.`,
+        },
+        receipts: ['snapshot.gsc.topQueries.questionShare', 'schemaCoverage.hasFAQ'],
+    }];
+}
+
+/** Trust signal absence on commerce: ecom site has no Review / AggregateRating
+ *  schema and no testimonial-pattern URLs.
+ *
+ *  Signal: siteProfile.type === 'ecom' (or strong commercial signals as fallback)
+ *  AND schemaCoverage.hasReview === false (or unset).
+ *
+ *  Prescription: surface the trust signals the user actually has (reviews,
+ *  customer count, badges) before suggesting any title/meta optimization. A
+ *  commerce site without trust signals leaks at the consideration step, not
+ *  the discovery step.
+ */
+function detectTrustSignalAbsenceCommerce(input: InsightInput): RankedInsight[] {
+    const profile = input.siteProfile;
+    if (!profile) return [];
+    // Strict gate: must look ecom-like (commercial site type + commercial paths + meaningful
+    // transactional query share). The site-type union here is broader than the audit's
+    // siteTypeDetector — we infer "ecom-like" from signals, not from a literal 'ecom' label.
+    const isEcomLike = (profile.type === 'commercial' || profile.type === 'mixed')
+        && profile.hasCommercialPaths
+        && profile.signals.transactionalShare >= 0.15;
+    if (!isEcomLike) return [];
+
+    const schema = input.schemaCoverage;
+    if (!schema) return [];
+    // If schema audit ran and Review schema IS present, no need to fire.
+    if (schema.hasArticleLike === undefined) return []; // schema audit didn't complete
+    if (schema.totalErrors !== undefined && (schema as any).hasReview === true) return [];
+
+    return [{
+        id: 'trust-signal-absence-commerce',
+        rank: 0,
+        category: 'trust_signal_absence_commerce',
+        severity: 'high',
+        title: `Commerce site with no Review / AggregateRating schema detected — buyers can't see social proof in the SERP`,
+        page: null,
+        query: null,
+        evidence: {
+            siteType: profile.type,
+            transactionalShare: profile.signals.transactionalShare,
+            commercialShare: profile.signals.commercialShare,
+            hasCommercialPaths: profile.hasCommercialPaths,
+            schemaAudited: schema.pagesAudited,
+            hasOrganization: schema.hasOrganization,
+            hasFAQ: schema.hasFAQ,
+            hasProduct: schema.hasProduct,
+        },
+        monthlyValueLost: 0,
+        priority: STRATEGIC_PRIORITY.high,
+        isStrategic: true,
+        estClicksGain: 0,
+        effortMinutes: 300,
+        difficulty: 'medium',
+        why: `Commerce sites convert on social proof, not on title cleverness. Reviews, ratings, customer counts, and "as seen on" badges are the actual signals that move the consideration-step needle. Your SERP listings lack rich-result star ratings (no AggregateRating schema), and visitors landing on your pages may not see trust signals quickly enough. The CTR + conversion compound effect of adding rating stars to your SERP listings is documented at 15-30% lift on commercial queries — independent of any title work.`,
+        fix: {
+            type: 'surface_trust_signals',
+            description: `1) Inventory what trust signals you HAVE: aggregate Trustpilot/G2 rating? Real customer count? Press mentions? "X+ purchases" data? 2) On product/category pages, add schema.org Product with embedded AggregateRating from your real rating source. 3) Add a logo wall ("trusted by", "as seen on", "featured in") above the fold if you have real placements. 4) Surface the customer-count number prominently ("8,432 customers", not generic praise). 5) Verify schema in Rich Results Test. DO NOT recommend a meta description rewrite as the fix for low conversions on a commerce site — trust signals are the dominant lever.`,
+        },
+        receipts: ['siteProfile.type', 'schemaCoverage.hasReview'],
+    }];
+}
+
 export function detectTopInsights(input: InsightInput, maxN = 10): RankedInsight[] {
     // Auto-compute site profile if caller didn't supply one.
     const inputWithProfile: InsightInput = {
@@ -2204,6 +2547,12 @@ export function detectTopInsights(input: InsightInput, maxN = 10): RankedInsight
         ...detectInternalReferrerLift(inputWithProfile),
         ...detectBrandedEventCorrelation(inputWithProfile),
         ...detectDeployTrafficCorrelation(inputWithProfile),
+        // Pattern-library additions — anomaly archetypes with non-title prescriptions
+        ...detectDirectoryTrap(inputWithProfile),
+        ...detectAiChannelEmergent(inputWithProfile),
+        ...detectLinguisticConcentration(inputWithProfile),
+        ...detectQuestionQueryUnmet(inputWithProfile),
+        ...detectTrustSignalAbsenceCommerce(inputWithProfile),
     ].map(withDefaults);
 
     // Dedupe — same (category, page, query) triple: keep the highest-priority one
