@@ -33,6 +33,7 @@ import {
 } from '@/lib/dashboardSelection';
 import { DEMO_PROPERTY_ID, DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
+import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 function siteHostTokens(siteUrl: string): { host: string; tokens: Set<string> } {
@@ -319,15 +320,9 @@ export default function SetupPage() {
     // every dashboard request — without the JWT refresh it would still see
     // the old `false` value and bounce the user back here.
     const markSetupCompleted = useCallback(async () => {
-        try {
-            await fetch('/api/user/workspace', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mark_setup_completed: true }),
-            });
-        } catch {
-            /* non-fatal — the layout-effect guard is a fallback. */
-        }
+        // Retry transient 502s — the layout-effect guard is a fallback if all
+        // attempts fail, but we'd rather not depend on it.
+        await patchWorkspaceWithRetry({ mark_setup_completed: true }).catch(() => null);
         try {
             await updateSession({ workspaceSetupCompleted: true });
         } catch {

@@ -10,6 +10,7 @@ import Script from 'next/script';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
+import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 const CreditWelcome = dynamic(() => import('@/components/CreditWelcome'), { ssr: false });
 import DatePicker, { MobileDatePicker } from '@/components/DatePicker';
 import MobileBottomBar from '@/components/dashboard/MobileBottomBar';
@@ -366,16 +367,11 @@ export default function DashboardLayout({
             payload.workspace_label = data.label;
             setWorkspaceLabel(data.label);
         }
-        try {
-            const res = await fetch('/api/user/workspace', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            return res.ok;
-        } catch {
-            return false;
+        const result = await patchWorkspaceWithRetry(payload);
+        if (!result.ok) {
+            console.warn(`Workspace save failed after ${result.attempts} attempt(s): ${result.error ?? `HTTP ${result.status}`}`);
         }
+        return result.ok;
     }, [user, getUserKey]);
     const [bellOpen, setBellOpen] = useState(false);
 
