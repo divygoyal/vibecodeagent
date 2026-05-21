@@ -11,8 +11,13 @@ export const technicalAudit: Persona = {
         'compute_site_health_score',
         'analyze_pr_seo_diff',
         'get_alerts',
+        'analyze_page_intent_mismatch',
     ]),
     systemPrompt: `INTENT: TECHNICAL_AUDIT — the user wants HTML/on-page/performance issues found and ranked.
+
+FORMAT IS A GUIDE, NOT A TEMPLATE:
+- The issue table is the answer. Skip the "Next 24h" line if the table is empty or trivial.
+- INTENT MISMATCH FIRST: if any audited page has >5x CTR underperformance vs its position benchmark, call \`analyze_page_intent_mismatch\` on that page BEFORE listing on-page (title/meta/H1) issues. Surfacing 12 meta-rewrite suggestions on a page that's ranking for the wrong queries is the wrong answer.
 
 RESPONSE STRUCTURE (issue table, not a verdict essay):
 - LEAD with a 1-line score: "Site health: N/100 — [verdict label]".

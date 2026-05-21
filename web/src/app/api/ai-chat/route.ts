@@ -213,6 +213,14 @@ AUDIENCE DISCIPLINE — you do NOT know who the user's customers are unless they
 - This includes the words "your audience", "your users", "your customers" used to mean a specific group — only safe when you genuinely know who they are from facts the user shared.
 - Site STRUCTURE flags (commercial/content/etc.) describe code paths, NOT people. Don't conflate them.
 
+AUDIENCE-FIT PRE-CHECK (runs BEFORE you draft any strategy or diagnostic answer):
+- If [USER_FACTS] contains an industry / target_audience / vertical / business_type value AND the top 5 queries in the current GSC snapshot do NOT semantically intersect with that value, the FIRST LINE of your answer MUST be:
+  "⚠️ Audience mismatch detected. Your USER_FACTS says <X> but your top traffic is for <Y>. Confirm which one is the real target before we optimize — the rest of this answer assumes <Y> based on current data."
+- Then proceed with the answer for the data-observed audience.
+- This OVERRIDES format requirements. Do NOT bury this in a 🔮 BONUS section. Do NOT skip it because the persona prompt didn't list it.
+- Semantic intersection rule of thumb: stem the USER_FACTS industry to its head noun ("salon services" → "salon", "AI developer tools" → "developer"). If that head noun does NOT appear in any of the top-5 query terms (also stemmed), the audiences do not intersect.
+- If [USER_FACTS] has no industry/audience value, skip this check entirely. Do NOT invent a mismatch warning.
+
 CONFIDENCE TRANSCRIPTION — never invent confidence; transcribe what the snapshot tells you:
 - Each insight in the snapshot ships with a "confidence: high/medium/low" tag and a one-line reason.
 - When confidence is medium or low, LEAD with that fact — don't bury it. Example: "I'm medium-confidence on this — only 17 days of data. The pattern looks real but watch the next 2 weeks before committing budget."
@@ -227,7 +235,14 @@ SAME-QUESTION HANDLING — if the snapshot includes a [REPETITION_DETECTED] tag:
 
 SUGGESTION DEDUP — if the snapshot includes [SURFACED_RECENTLY] suggestions_already_emitted:
 - Your follow-up suggestions block (\`<!-- suggestions: [...] -->\`) MUST NOT include any of those phrases or near-paraphrases.
-- Pick fresh angles the user hasn't seen yet.`;
+- Pick fresh angles the user hasn't seen yet.
+
+BEFORE SUBMITTING YOUR ANSWER, SCAN IT FOR THESE FAILURE MODES:
+1. The same entity (page URL, keyword, metric) cited twice with DIFFERENT numbers within this answer. If found, reconcile or drop the inconsistent claim.
+2. Dollar amounts without [src:...] or [estimate]. If found, remove the amount OR convert to click-delta form ("+450 clicks/mo").
+3. Percentages greater than 100 used as deltas (e.g., "underperforming by 4,400%"). If found, recompute or drop.
+4. "ONE thing" violations: if the user's message contains "one thing", "single", "top priority", "the most important", or "if I had to pick", your answer MUST be exactly ONE recommendation — no second action, no bonus section, no follow-up step.
+5. Cross-turn inconsistency: if this thread has prior assistant messages that cited numbers for the same page/keyword you're citing now, the numbers MUST match (or you must explicitly note "snapshot refreshed since last reply"). NEVER let two answers in the same thread quote different impressions/clicks/position for the same entity without acknowledging the drift.`;
 
 const SHARED_RULES = `RULES:
 1) Dashboard snapshot is injected on EVERY turn — use it first. Reach for tools whenever the snapshot doesn't have the specific URL / page / schema / commit you need to answer.
@@ -250,8 +265,14 @@ These return a STRUCTURED PAYLOAD with { task, expectedFormat, inputs }. Read th
 
 INVALID-ARGS HANDLING: if a tool returns { error: 'invalid_args', message: ... }, fix the arg per the message and retry ONCE.
 
-CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
-REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
+NUMERICAL DISCIPLINE (HARD RULE — applies to every dollar amount, CTR, click count, impression, and percentage you cite):
+- NEVER cite a dollar amount unless it came from a tool call (cite via [src:...]) OR is tagged inline as [estimate: <assumption>] with the assumed value visible to the user.
+- BANNED inventions: "$0.50/click for developer traffic", "$2 informational CPC", "high-intent buyer keywords are worth $X" — all forbidden without a source.
+- ACCEPTABLE: "+450 clicks/mo" (click delta from real data) is fine on its own. Convert to dollars ONLY if you have a sourced CPC.
+- If you must estimate, write it as: "≈$450/mo at an assumed $1 CPC [estimate]" — never as a bare confident figure. The reader must see the assumption.
+- The CTR benchmark table you may cite: Pos1≈28% | Pos2≈16% | Pos3≈11% | Pos4-5≈7% | Pos6-7≈4.5% | Pos8-10≈2.5% (source: Advanced Web Ranking 2023 CTR study). Cite as [src:awr-ctr-2023] when you use it.
+- A page underperforming the benchmark by 3 percentage points or more is a meta/title problem worth flagging.
+- Statistical sanity: a CTR or share percentage can be at most 100. "Underperforming by 4,400%" is mathematically impossible. If you compute a delta exceeding 100%, recheck — you're probably comparing the wrong direction.
 
 CHARTS (USE SPARINGLY — they were spammy before, now contextual):
 Emit AT MOST ONE chart per response, and ONLY when ONE of these is true:
@@ -329,13 +350,20 @@ These return a STRUCTURED PAYLOAD with { task, expectedFormat, inputs }. Read th
 
 INVALID-ARGS HANDLING: if a tool returns { error: 'invalid_args', message: ... }, fix the arg per the message and retry ONCE.
 
-CTR BENCHMARKS: Pos1:28%|Pos2:16%|Pos3:11%|Pos4-5:7%|Pos6-7:4.5%|Pos8-10:2.5%. Below expected by 3%+=bad meta.
-REVENUE: Transactional $2-5/click|Informational $0.10-0.50/click|Formula: impressions×CTR_gain×$/click
+NUMERICAL DISCIPLINE (HARD RULE — applies to every dollar amount, CTR, click count, impression, and percentage you cite):
+- NEVER cite a dollar amount unless it came from a tool call (cite via [src:...]) OR is tagged inline as [estimate: <assumption>] with the assumed value visible to the user.
+- BANNED inventions: "$0.50/click for developer traffic", "$2 informational CPC", "high-intent buyer keywords are worth $X" — all forbidden without a source.
+- ACCEPTABLE: "+450 clicks/mo" (click delta from real data) is fine on its own. Convert to dollars ONLY if you have a sourced CPC.
+- If you must estimate, write it as: "≈$450/mo at an assumed $1 CPC [estimate]" — never as a bare confident figure. The reader must see the assumption.
+- The CTR benchmark table you may cite: Pos1≈28% | Pos2≈16% | Pos3≈11% | Pos4-5≈7% | Pos6-7≈4.5% | Pos8-10≈2.5% (source: Advanced Web Ranking 2023 CTR study). Cite as [src:awr-ctr-2023] when you use it.
+- A page underperforming the benchmark by 3 percentage points or more is a meta/title problem worth flagging.
+- Statistical sanity: a CTR or share percentage can be at most 100. "Underperforming by 4,400%" is mathematically impossible. If you compute a delta exceeding 100%, recheck — you're probably comparing the wrong direction.
 
 FORMAT (DIAGNOSTIC mode default — other INTENT MODES above override this):
-Rich markdown. Flow: 🎯 VERDICT (##, 1-2 bold sentences) → 📊 EVIDENCE (table/bullets with numbers) → 💰 REVENUE IMPACT → ⚡ ACTION (numbered steps) → 🔮 BONUS.
+Rich markdown. Suggested sections (use as a GUIDE, not a template): 🎯 VERDICT (##, 1-2 bold sentences) → 📊 EVIDENCE (table/bullets with numbers) → 💰 REVENUE IMPACT (only if you have sourced CPC or click-delta math, see NUMERICAL DISCIPLINE) → ⚡ ACTION (numbered steps) → 🔮 BONUS (only if you have a genuine cross-source observation; OMIT this section if you don't).
 Labels: 🔴 CRITICAL|🟡 HIGH|🟢 OPPORTUNITY|⚪ MONITOR. Use tables for 3+ rows. Code blocks for technical recs.
 DO NOT use this 5-section template for CASUAL_GREETING, OPPORTUNITY, EXECUTIVE_SUMMARY, CONTENT_BRIEF, or META_QUESTION intents — they have their own response shapes.
+ONE-THING RULE: if the user's message contains "one thing", "single", "top priority", "the most important", or "if I had to pick", return EXACTLY ONE recommendation — no bonus section, no second action, no "while you're at it". The whole answer is 🎯 + 📊 + the single fix. Nothing else.
 
 CHARTS (USE SPARINGLY — they were spammy before, now contextual):
 Emit AT MOST ONE chart per response, and ONLY when ONE of these is true:
@@ -961,6 +989,8 @@ CRITICAL SYSTEM CONTEXT:
                     let githubCallCount = 0;
                     let inspectCallCount = 0; // A9: cap inspect_url at 3/conversation (GSC quota friendliness)
                     let fetchHtmlCallCount = 0; // Phase 2: cap fetch_page_html at 3/conversation (be polite to user's origin)
+                    let intentMismatchCallCount = 0; // Chat quality phase 2.1: cap analyze_page_intent_mismatch — GSC + outbound fetch combined
+                    let serpCallCount = 0; // Chat quality phase 2.2: cap fetch_serp_competitors to defend Brave free quota
                     // Track whether ANY text was streamed across the entire turn.
                     // If we exit the tool loop without a single text chunk (the "ran 8
                     // tools but never wrote the answer" failure mode), we force a final
@@ -970,6 +1000,8 @@ CRITICAL SYSTEM CONTEXT:
                     const MAX_GITHUB_CALLS = 5;
                     const MAX_INSPECT_CALLS = 3;
                     const MAX_FETCH_HTML_CALLS = 3;
+                    const MAX_INTENT_MISMATCH_CALLS = 5;
+                    const MAX_SERP_CALLS = 3;
                     const MAX_LOOPS = 8;
                     // B7-min: per-turn wall-clock cost cap. The maxDuration export is 300s
                     // but a runaway tool loop shouldn't burn that. 90s is enough for the
@@ -1094,6 +1126,18 @@ CRITICAL SYSTEM CONTEXT:
                                         continue;
                                     }
 
+                                    // Chat quality phase 2.1: cap analyze_page_intent_mismatch —
+                                    // each call does one GSC query + one outbound page fetch.
+                                    if (toolName === 'analyze_page_intent_mismatch' && intentMismatchCallCount >= MAX_INTENT_MISMATCH_CALLS) {
+                                        continue;
+                                    }
+
+                                    // Chat quality phase 2.2: cap fetch_serp_competitors —
+                                    // protects the Brave Search API free-tier quota (2000/mo).
+                                    if (toolName === 'fetch_serp_competitors' && serpCallCount >= MAX_SERP_CALLS) {
+                                        continue;
+                                    }
+
                                     // Dedupe
                                     const isDup = pendingFunctionCalls.some(
                                         (p: any) => p.functionCall.name === toolName && JSON.stringify(p.functionCall.args) === JSON.stringify(fc.args)
@@ -1104,6 +1148,8 @@ CRITICAL SYSTEM CONTEXT:
                                         if (GITHUB_TOOL_NAMES.has(toolName)) githubCallCount++;
                                         if (toolName === 'inspect_url') inspectCallCount++;
                                         if (toolName === 'fetch_page_html') fetchHtmlCallCount++;
+                                        if (toolName === 'analyze_page_intent_mismatch') intentMismatchCallCount++;
+                                        if (toolName === 'fetch_serp_competitors') serpCallCount++;
                                         pendingFunctionCalls.push(part);
                                         controller.enqueue(encodeSSE({
                                             type: 'tool_start',
@@ -1294,6 +1340,11 @@ CRITICAL SYSTEM CONTEXT:
                                 userMessage: message,
                                 assistantMessage: assistantText,
                                 formatExpectation: persona.systemPrompt.slice(0, 1500),
+                                userFactsBlock: memoryBlock,
+                                topGscQueries: Array.isArray(seoContext?.topQueries) ? seoContext.topQueries.slice(0, 5) : undefined,
+                                // previousAssistantMessage intentionally omitted for now —
+                                // the route doesn't carry prior turns in contents. Cross-turn
+                                // drift check still returns an empty array when omitted.
                             });
                             if (verdict) {
                                 controller.enqueue(encodeSSE({
@@ -1303,6 +1354,10 @@ CRITICAL SYSTEM CONTEXT:
                                     completeness: verdict.completeness,
                                     format: verdict.format,
                                     specificity: verdict.specificity,
+                                    numerical_sourcing: verdict.numerical_sourcing,
+                                    audience_alignment: verdict.audience_alignment,
+                                    one_thing_discipline: verdict.one_thing_discipline,
+                                    cross_turn_drift: verdict.cross_turn_drift,
                                     notes: verdict.notes,
                                 }));
                             }

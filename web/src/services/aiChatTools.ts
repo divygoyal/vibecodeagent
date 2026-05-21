@@ -27,6 +27,8 @@ import { runSiteAudit } from '@/lib/siteAudit';
 import { inspectPageHtml } from '@/lib/pageInspect';
 import { wrapUntrusted } from '@/lib/chatSafety';
 import { detectTopInsights } from '@/lib/insightEngine';
+import { analyzePageIntentMismatch } from '@/lib/pageIntentMismatch';
+import { fetchSerpCompetitors } from '@/lib/braveSearch';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -822,6 +824,72 @@ Combine with inspect_url when both Google's view AND the page content matter. Ca
                 },
             },
             required: ['url'],
+        },
+    },
+    {
+        name: 'analyze_page_intent_mismatch',
+        description: `Determine whether a page is ranking for queries it actually satisfies. Returns the page's top GSC queries (last 28 days), the page's current title/H1/meta/first-paragraph excerpt, a Jaccard token-overlap score between the two, an impression-weighted CTR vs. the position benchmark, and a categorical diagnosis (aligned / partial_mismatch / severe_mismatch / inconclusive).
+
+WHEN TO USE — REQUIRED before recommending title/meta/H1/schema changes when ANY of these is true:
+- A page has page-1 rankings (avg position ≤ 10) but CTR is more than 3 percentage points below the position benchmark.
+- A page has hundreds of impressions but <10 clicks total (the classic /mcp pattern).
+- The user asks "why is /X leaking traffic" or "this page gets impressions but no clicks".
+
+WHY THIS MATTERS: at the magnitudes seen in production (CTR >5× below benchmark at page-1 positions), the cause is almost never title/meta — it's intent fit. The page is appearing for queries it doesn't satisfy, so users skip it in the SERP regardless of the title. A title rewrite on a severely-mismatched page is wasted work. This tool tells you which problem you have.
+
+OUTPUT: returns { diagnosis, signals[], pageQueries[], pageContent, overlapScore, ctrGapPercentagePoints, ... }. Read \`diagnosis\` first; if 'severe_mismatch', do NOT recommend a title rewrite — recommend either re-targeting the page (rewrite content to match the queries) or accepting the queries aren't worth chasing.
+
+Capped at 5 calls per conversation. Combine with \`fetch_page_html\` when the user wants the full on-page audit, but for the leak-diagnosis question this tool alone is sufficient.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                siteUrl: {
+                    type: 'STRING' as const,
+                    description: 'GSC site URL from [AVAILABLE SITES] (e.g. "sc-domain:example.com" or "https://example.com/").',
+                },
+                pageUrl: {
+                    type: 'STRING' as const,
+                    description: 'Full https:// URL of the page to analyze. Must be a verified URL on the site.',
+                },
+            },
+            required: ['siteUrl', 'pageUrl'],
+        },
+    },
+    {
+        name: 'fetch_serp_competitors',
+        description: `Fetch the top organic search results for a query from Brave Search (real SERP, not scraped). Use this when the user wants to know what the pages beating them look like — title structure, snippet copy, content angle — so you can give CONCRETE rewrite suggestions instead of generic advice.
+
+WHEN TO USE:
+- "Why is /X ranking #6 when /competitor.com ranks #1 for the same query?"
+- "What does my title need to look like to beat the current page-1 results for <query>?"
+- "Show me the SERP for <query> — I want to know what's there."
+- COMPARISON intent — backing up "your title is weak" with "the #3 result for this query uses <structure>".
+
+WHEN NOT TO USE:
+- The user's own page analysis — use \`fetch_page_html\` for that.
+- "Should I rank for X?" type strategic questions — answer from the user's site data first.
+- Generic SEO advice — this tool only helps when you'll cite a SPECIFIC competitor's structure.
+
+OUTPUT: { query, country, results: [{ rank, title, url, description, favicon?, age? }], source: "brave" }. Brave's web index, real organic results. Capped at 3 calls per conversation (free-tier quota defense). Results cached 24h per (query, country, limit).
+
+NEVER cite a competitor URL or title structure you haven't actually pulled from this tool.`,
+        parameters: {
+            type: 'OBJECT' as const,
+            properties: {
+                query: {
+                    type: 'STRING' as const,
+                    description: 'The search query (max 400 chars).',
+                },
+                limit: {
+                    type: 'INTEGER' as const,
+                    description: 'How many results to return (default 10, max 20). Use 5 for "just the top results", 10-15 for "page 1", 20 for thorough analysis.',
+                },
+                country: {
+                    type: 'STRING' as const,
+                    description: 'ISO 2-letter country code (default "us"). Use the country that matches the user\'s target market when the site has regional focus.',
+                },
+            },
+            required: ['query'],
         },
     },
     {
@@ -2707,6 +2775,36 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             }
         } catch (e: any) {
             return { error: 'github_tool_failed', response: e?.message || 'GitHub tool execution failed.' };
+        }
+    }
+
+    if (name === 'analyze_page_intent_mismatch') {
+        if (!gscContext?.googleAccessToken && !gscContext?.googleRefreshToken) {
+            return { error: 'Google Account not connected. Connect it in Integrations settings.' };
+        }
+        try {
+            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const { siteUrl, pageUrl } = args;
+            if (!siteUrl || !pageUrl) {
+                return { error: 'invalid_args', message: 'Both siteUrl and pageUrl are required.', toolName: name };
+            }
+            const result = await analyzePageIntentMismatch({ token, siteUrl, pageUrl });
+            return { result };
+        } catch (e: any) {
+            return { error: 'analyze_page_intent_mismatch_failed', response: e?.message || 'Intent mismatch analysis failed.' };
+        }
+    }
+
+    if (name === 'fetch_serp_competitors') {
+        try {
+            const { query, limit, country } = args;
+            if (!query) {
+                return { error: 'invalid_args', message: 'query is required.', toolName: name };
+            }
+            const result = await fetchSerpCompetitors({ query, limit, country });
+            return { result };
+        } catch (e: any) {
+            return { error: 'fetch_serp_competitors_failed', response: e?.message || 'SERP fetch failed.' };
         }
     }
 
