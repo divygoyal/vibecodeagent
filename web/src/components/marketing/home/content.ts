@@ -1,5 +1,5 @@
 const ANALYTICS_EMBED_URL =
-    'https://trafficclaw.com/share/d26ff815d69c0d02c65f299d9228ae91?embed=true';
+    'https://trafficclaw.com/share/aaa1e9e2505785a849dcc68eeea06aa3?embed=true';
 
 export const MARKETING_SIGN_IN_URL = '/api/auth/signin/google?callbackUrl=%2Fdashboard';
 
