@@ -14,8 +14,8 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Install Nanobot from Github (latest)
-RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git
+# Install Nanobot from Github (latest) and Google Gen AI SDK for Vertex Express mode
+RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git google-genai
 
 # Pre-install plugin dependencies (eliminates Node.js cold-start on first analytics query)
 COPY plugins/google-analytics /app/plugins/google-analytics
@@ -29,7 +29,8 @@ ENV HOME=/data
 # Pre-create workspace structure
 RUN mkdir -p /data/.nanobot/workspace/skills /data/.nanobot/workspace/memory
 
-# Copy fallback entrypoint (writes sitecustomize.py patch, then exec's nanobot)
+# Copy Vertex Express provider patch and entrypoint
+COPY scripts/nanobot_sitecustomize.py /app/nanobot_sitecustomize.py
 COPY scripts/nanobot_entrypoint.sh /app/nanobot_entrypoint.sh
 RUN chmod +x /app/nanobot_entrypoint.sh
 

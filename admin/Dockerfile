@@ -25,6 +25,7 @@ COPY plugins /app/plugins
 # Layout mirrors project root so Dockerfile.nanobot COPY paths work unchanged
 COPY Dockerfile.nanobot /app/nanobot-build/Dockerfile.nanobot
 COPY scripts/nanobot_entrypoint.sh /app/nanobot-build/scripts/nanobot_entrypoint.sh
+COPY scripts/nanobot_sitecustomize.py /app/nanobot-build/scripts/nanobot_sitecustomize.py
 COPY plugins/google-analytics /app/nanobot-build/plugins/google-analytics
 COPY plugins/google-search-console /app/nanobot-build/plugins/google-search-console
 
