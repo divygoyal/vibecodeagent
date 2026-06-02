@@ -131,18 +131,70 @@ def _finish_reason(value: Any, has_tool_calls: bool) -> str:
     return reason or "stop"
 
 
+def _schema_type_for_vertex(value: str) -> str:
+    mapping = {
+        "string": "STRING",
+        "number": "NUMBER",
+        "integer": "INTEGER",
+        "boolean": "BOOLEAN",
+        "array": "ARRAY",
+        "object": "OBJECT",
+        "null": "NULL",
+    }
+    return mapping.get(value.lower(), value.upper())
+
+
+def _merge_nullable_schema(options: list[Any]) -> tuple[dict[str, Any] | None, bool]:
+    schemas = [_schema_for_vertex(option) for option in options]
+    dict_schemas = [schema for schema in schemas if isinstance(schema, dict)]
+    nullish = any(
+        isinstance(schema, dict) and schema.get("type") == "NULL"
+        for schema in dict_schemas
+    )
+    non_null = [
+        schema for schema in dict_schemas
+        if schema.get("type") != "NULL"
+    ]
+    if nullish and len(non_null) == 1:
+        return non_null[0], True
+    return None, False
+
+
 def _schema_for_vertex(value: Any) -> Any:
     if isinstance(value, list):
         return [_schema_for_vertex(v) for v in value]
     if not isinstance(value, dict):
         return value
+
+    for union_key in ("anyOf", "oneOf"):
+        options = value.get(union_key)
+        if isinstance(options, list):
+            merged, nullable = _merge_nullable_schema(options)
+            if merged is not None:
+                remainder = {
+                    k: v for k, v in value.items()
+                    if k not in {union_key, "type"}
+                }
+                merged.update(_schema_for_vertex(remainder))
+                if nullable:
+                    merged["nullable"] = True
+                return merged
+
     out: dict[str, Any] = {}
     for key, item in value.items():
-        if key == "additionalProperties":
+        if key in {"additionalProperties", "$schema", "$defs", "definitions", "title", "default", "examples"}:
             continue
-        if key == "type" and isinstance(item, str):
-            out[key] = item.upper()
-        elif key in {"properties", "items", "anyOf", "oneOf", "allOf"}:
+        if key == "type":
+            if isinstance(item, str):
+                out[key] = _schema_type_for_vertex(item)
+            elif isinstance(item, list):
+                non_null_types = [entry for entry in item if isinstance(entry, str) and entry.lower() != "null"]
+                has_null = any(isinstance(entry, str) and entry.lower() == "null" for entry in item)
+                out[key] = _schema_type_for_vertex(non_null_types[0]) if non_null_types else "NULL"
+                if has_null and non_null_types:
+                    out["nullable"] = True
+            continue
+        if key in {"properties", "items", "anyOf", "oneOf", "allOf"}:
             out[key] = _schema_for_vertex(item)
         else:
             out[key] = _schema_for_vertex(item)
