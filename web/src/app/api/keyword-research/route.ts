@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import {
+  getGoogleGenAIClient,
+  getGoogleGenAIText,
+  GOOGLE_GENAI_PRIMARY_MODEL,
+  GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,11 +32,10 @@ export async function GET(req: NextRequest) {
   const domain = req.nextUrl.searchParams.get('domain') || '';
   if (!keyword) return NextResponse.json({ error: 'Missing keyword' }, { status: 400 });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
+  const ai = getGoogleGenAIClient();
+  if (!ai) return NextResponse.json({ error: 'Google Gen AI not configured' }, { status: 500 });
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const prompt = `You are an SEO keyword research expert. Given the seed keyword "${keyword}"${domain ? ` for the domain ${domain}` : ''}, generate 15 related keyword opportunities.
 
 For each keyword, provide:
@@ -45,11 +49,16 @@ For each keyword, provide:
 Return ONLY a JSON array, no markdown, no code fences.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: GOOGLE_GENAI_PRIMARY_MODEL,
       contents: prompt,
+      config: {
+        temperature: 0.4,
+        maxOutputTokens: 2048,
+        thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
+      },
     });
 
-    const text = response.text?.trim() || '';
+    const text = getGoogleGenAIText(response).trim();
     // Clean potential markdown fences
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const keywords = JSON.parse(cleaned);

@@ -10,6 +10,7 @@
 import type { AuditReport, AuditIssue } from './siteAudit';
 import type { SiteType } from './siteTypeDetector';
 import { synthesizeWithSchema } from './geminiSynth';
+import { GOOGLE_GENAI_PRIMARY_MODEL } from './googleGenAi';
 
 export type Tier = 'tier1' | 'tier2' | 'tier3';
 
@@ -65,7 +66,7 @@ export interface SynthesizeAuditInput {
     abortSignal?: AbortSignal;
 }
 
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = GOOGLE_GENAI_PRIMARY_MODEL;
 
 // ─── Response schema (matches TieredActionPlan) ───
 // Note: we use string-literal types ('OBJECT', 'STRING', 'NUMBER', 'ARRAY')

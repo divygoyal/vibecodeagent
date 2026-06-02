@@ -7,7 +7,7 @@
  *   npm run eval:chat -- --list             # list scenarios without running
  *
  * Requires:
- *   GEMINI_API_KEY                          # for the judge
+ *   GOOGLE_VERTEX_API_KEY or GEMINI_API_KEY # for the judge
  *   EVAL_CHAT_BASE_URL=http://localhost:3000  # default; override if dev server is elsewhere
  *   EVAL_CHAT_SESSION_COOKIE=<full cookie>   # a real NextAuth session cookie value. Sign in via
  *                                             browser, copy the `__Secure-next-auth.session-token`

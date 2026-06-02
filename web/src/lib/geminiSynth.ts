@@ -9,7 +9,12 @@
  * chart annotations, keyword research) can be migrated to this later — but
  * those are currently stable, so don't refactor them in the same pass.
  */
-import { GoogleGenAI } from '@google/genai';
+import type { GoogleGenAI } from '@google/genai';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+} from './googleGenAi';
 
 export interface SynthOpts {
     model?: string;
@@ -28,15 +33,15 @@ export interface SynthResult<T> {
     attempts: number;
 }
 
-const DEFAULT_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_MODEL = GOOGLE_GENAI_PRIMARY_MODEL;
 
 export async function synthesizeWithSchema<T = unknown>(
     prompt: string,
     responseSchema: object,
     opts: SynthOpts = {},
 ): Promise<SynthResult<T>> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const ai = getGoogleGenAIClient();
+    if (!ai) {
         return { data: null, raw: '', error: 'no_api_key', attempts: 0 };
     }
 
@@ -50,7 +55,6 @@ export async function synthesizeWithSchema<T = unknown>(
         thinkingBudget,
     } = opts;
 
-    const ai = new GoogleGenAI({ apiKey });
     let lastErr: string | undefined;
     let lastRaw = '';
 
@@ -61,9 +65,7 @@ export async function synthesizeWithSchema<T = unknown>(
         responseSchema,
         httpOptions: { timeout: timeoutMs },
     };
-    if (thinkingBudget !== undefined) {
-        baseConfig.thinkingConfig = { thinkingBudget };
-    }
+    baseConfig.thinkingConfig = { thinkingBudget: thinkingBudget ?? 0 };
 
     for (let attempt = 0; attempt <= retries; attempt++) {
         if (abortSignal?.aborted) return { data: null, raw: lastRaw, error: 'aborted', attempts: attempt };
@@ -74,7 +76,7 @@ export async function synthesizeWithSchema<T = unknown>(
                 config: baseConfig as Record<string, unknown>,
             } as Parameters<typeof ai.models.generateContent>[0]);
 
-            const raw = stripFences(((res as { text?: string })?.text ?? '').trim());
+            const raw = stripFences(getGoogleGenAIText(res).trim());
             lastRaw = raw;
             if (!raw) {
                 lastErr = 'empty_response';
@@ -124,10 +126,11 @@ async function jsonModeFallback<T>(
                 temperature,
                 maxOutputTokens,
                 responseMimeType: 'application/json',
+                thinkingConfig: { thinkingBudget: 0 },
                 httpOptions: { timeout: timeoutMs },
             } as Record<string, unknown>,
         } as Parameters<typeof ai.models.generateContent>[0]);
-        const raw = stripFences(((res as { text?: string })?.text ?? '').trim());
+        const raw = stripFences(getGoogleGenAIText(res).trim());
         if (!raw) return { data: null, raw, error: 'fallback_empty', attempts: 1 };
         try {
             const data = JSON.parse(raw) as T;

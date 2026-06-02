@@ -26,6 +26,11 @@
  * overhead is ~700ms typical, ~1.8s p95.
  */
 import type { GoogleGenAI } from '@google/genai';
+import {
+    getGoogleGenAIText,
+    GOOGLE_GENAI_LIGHT_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 
 export interface CriticVerdict {
     score: number;                  // 0..5 overall (mean of scored axes)
@@ -132,17 +137,18 @@ notes: ONE sentence diagnosis (e.g. "invented $0.50/click without source — sco
 Output JSON ONLY matching the schema. No commentary.`;
 
         const res: any = await genai.models.generateContent({
-            model: 'gemini-3.1-flash-lite-preview',
+            model: GOOGLE_GENAI_LIGHT_MODEL,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 temperature: 0,
                 maxOutputTokens: 320,
                 responseMimeType: 'application/json',
                 responseSchema: CRITIC_SCHEMA as any,
+                thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                 httpOptions: { timeout: 10000 },
             } as any,
         });
-        const raw = (res?.text || '').trim();
+        const raw = getGoogleGenAIText(res).trim();
         if (!raw) return null;
         let parsed: any;
         try { parsed = JSON.parse(raw); } catch { return null; }

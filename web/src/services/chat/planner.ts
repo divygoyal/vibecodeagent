@@ -26,6 +26,10 @@
  * still has the persona system prompt.
  */
 import type { GoogleGenAI } from '@google/genai';
+import {
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PLANNER_MODEL,
+} from '@/lib/googleGenAi';
 
 export interface PlanStep {
     tool: string;
@@ -96,7 +100,7 @@ RULES:
 Output JSON ONLY matching the schema. No markdown, no commentary.`;
 
         const res: any = await genai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: GOOGLE_GENAI_PLANNER_MODEL,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 temperature: 0.2,
@@ -109,7 +113,7 @@ Output JSON ONLY matching the schema. No markdown, no commentary.`;
                 httpOptions: { timeout: 20000 },
             } as any,
         });
-        const raw = (res?.text || '').trim();
+        const raw = getGoogleGenAIText(res).trim();
         if (!raw) return null;
         let parsed: any;
         try { parsed = JSON.parse(raw); } catch { return null; }

@@ -11,16 +11,20 @@
  * Behavior is IDENTICAL to the inline cron implementation it replaced —
  * preserved verbatim per the "don't break anything" mandate.
  */
-import { GoogleGenAI } from '@google/genai';
 import { buildEnrichedSnapshot, type IsoWeekRange, getCompletedIsoWeekRange } from '@/lib/chatSnapshot';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
-// Shared Gemini client. Cheap to construct, pointless to recreate.
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+// Shared Google Gen AI client. Cheap to construct, pointless to recreate.
+const ai = getGoogleGenAIClient();
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -163,11 +167,14 @@ async function geminiHeadline(snapshot: unknown, range: IsoWeekRange, siteUrl: s
     if (!ai) return { headline: null, action_items: null };
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: GOOGLE_GENAI_PRIMARY_MODEL,
             contents: buildHeadlinePrompt(snapshot, range, siteUrl),
-            config: { temperature: 0.4 },
+            config: {
+                temperature: 0.4,
+                thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
+            },
         });
-        const text = response.text?.trim() || '';
+        const text = getGoogleGenAIText(response).trim();
         if (!text) return { headline: null, action_items: null };
         return parseNarrative(text);
     } catch (err) {

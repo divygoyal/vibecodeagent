@@ -124,7 +124,7 @@ export async function POST(req: Request) {
 
         // Stage 3: Gemini synthesis (2 parallel calls with raw data)
         const t3 = Date.now();
-        console.log(`[Report] Synthesizing with Gemini (2 parallel calls, model: gemini-3-flash-preview)...`);
+        console.log(`[Report] Synthesizing with Google Gen AI (2 parallel calls)...`);
         const gemini = await synthesizeWithGemini(analysis, period, siteUrl || propertyId || '', rawData);
         console.log(`[Report] Gemini synthesis: ${Date.now() - t3}ms`);
 

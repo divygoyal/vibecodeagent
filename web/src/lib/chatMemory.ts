@@ -16,6 +16,11 @@
  * They just enrich the next turn's context.
  */
 import type { GoogleGenAI } from '@google/genai';
+import {
+    getGoogleGenAIText,
+    GOOGLE_GENAI_LIGHT_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from './googleGenAi';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -158,15 +163,16 @@ ASSISTANT: ${assistantMessage.slice(0, 2000)}
 JSON:`;
 
         const res: any = await genai.models.generateContent({
-            model: 'gemini-3.1-flash-lite-preview',
+            model: GOOGLE_GENAI_LIGHT_MODEL,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 temperature: 0,
                 maxOutputTokens: 600,
+                thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                 httpOptions: { timeout: 12000 },
             },
         });
-        const raw = (res?.text || '').trim();
+        const raw = getGoogleGenAIText(res).trim();
         // Strip ``` fences if the model added them despite the instruction.
         const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
         let parsed: any;
@@ -344,15 +350,16 @@ ${transcript}
 SUMMARY:`;
 
         const res: any = await genai.models.generateContent({
-            model: 'gemini-3.1-flash-lite-preview',
+            model: GOOGLE_GENAI_LIGHT_MODEL,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 temperature: 0.2,
                 maxOutputTokens: 600,
+                thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                 httpOptions: { timeout: 15000 },
             },
         });
-        const summary = String(res?.text || '').trim();
+        const summary = getGoogleGenAIText(res).trim();
         if (!summary) return false;
         await adminFetch(`/api/chat/threads/${encodeURIComponent(threadId)}?user_identifier=${encodeURIComponent(userId)}`, {
             method: 'PATCH',

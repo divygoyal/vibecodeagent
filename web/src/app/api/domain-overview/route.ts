@@ -3,13 +3,16 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { runSiteAudit } from '@/lib/siteAudit';
 import { isBlockedUrl } from '@/lib/urlValidation';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 import * as cheerio from 'cheerio';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
 
 // ─── Helpers ───
 
@@ -112,7 +115,8 @@ async function analyzePageSpeed(url: string) {
 // ─── 3. AI Keyword Research ───
 
 async function analyzeKeywords(domain: string) {
-    if (!GEMINI_API_KEY) return [];
+    const ai = getGoogleGenAIClient();
+    if (!ai) return [];
 
     const prompt = `You are an SEO expert. Analyze the domain "${domain}" and suggest 10 keyword opportunities this website should target.
 
@@ -126,21 +130,18 @@ Return ONLY a JSON array (no markdown, no explanation) with objects containing:
 
 Base your analysis on what a site with this domain name likely covers.`;
 
-    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-        }),
-        signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
     try {
+        const response = await ai.models.generateContent({
+            model: GOOGLE_GENAI_PRIMARY_MODEL,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: {
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+                thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
+                httpOptions: { timeout: 15000 },
+            },
+        });
+        const text = getGoogleGenAIText(response);
         // Strip markdown code fences if present
         const cleaned = text.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
         return JSON.parse(cleaned);

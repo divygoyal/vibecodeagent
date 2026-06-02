@@ -6,7 +6,7 @@ model fallback, then exec nanobot so the patches load automatically
 in nanobot's Python process via the site-packages mechanism.
 
 Fallback chain (configurable via NANOBOT_FALLBACK_MODELS env var):
-  primary model -> gemini-2.5-flash (if primary is gemini-3)
+  primary Vertex model -> Vertex fallback models
 """
 
 import os
@@ -23,7 +23,7 @@ FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
         "NANOBOT_FALLBACK_MODELS",
-        "gemini/gemini-3-flash-preview,gemini/gemini-2.5-flash",
+        "vertex_ai/gemini-3.5-flash,vertex_ai/gemini-3-flash-preview,vertex_ai/gemini-2.5-flash",
     ).split(",")
     if m.strip()
 ]

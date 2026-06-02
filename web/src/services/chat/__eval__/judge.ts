@@ -2,15 +2,20 @@
  * Gemini-as-judge for chat evaluation scenarios.
  *
  * Takes an EvalScenario rubric and a candidate answer, calls
- * `gemini-3-flash-preview` with a structured-JSON response schema, and
+ * the configured Google Gen AI model with a structured-JSON response schema, and
  * returns yes/no/uncertain verdicts on each must / must_not item.
  *
  * The judge is intentionally separate from `synthesizeWithSchema` because
  * the chat eval lives in `__eval__` (test code) and we want it to keep
  * working even if the chat layer's shared helpers change.
  */
-import { GoogleGenAI } from '@google/genai';
 import type { EvalScenario } from './scenarios';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 
 export interface JudgeItemVerdict {
     item: string;
@@ -71,11 +76,8 @@ const JUDGE_SCHEMA = {
 } as const;
 
 export async function judgeAnswer(scenario: EvalScenario, answer: string): Promise<JudgeResult> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        throw new Error('GEMINI_API_KEY not set');
-    }
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = getGoogleGenAIClient();
+    if (!ai) throw new Error('Google Gen AI not configured');
 
     const prompt = `You are a strict QA judge for an SEO/analytics AI assistant. Grade the assistant's answer against the rubric.
 
@@ -110,18 +112,19 @@ Be STRICT. If the answer is borderline, return "fail" or "uncertain" — do not 
 Output JSON ONLY matching the schema. No commentary.`;
 
     const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: GOOGLE_GENAI_PRIMARY_MODEL,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
             temperature: 0,
             maxOutputTokens: 2048,
             responseMimeType: 'application/json',
             responseSchema: JUDGE_SCHEMA as object,
+            thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
             httpOptions: { timeout: 25000 },
         } as Record<string, unknown>,
     } as Parameters<typeof ai.models.generateContent>[0]);
 
-    const raw = ((res as { text?: string })?.text ?? '').trim();
+    const raw = getGoogleGenAIText(res).trim();
     if (!raw) throw new Error('judge returned empty response');
     let parsed: {
         must?: JudgeItemVerdict[];

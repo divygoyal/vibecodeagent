@@ -38,6 +38,29 @@ class DockerManager:
         """Generate unique container name"""
         return f"{settings.CONTAINER_PREFIX}_{user_identifier}"
 
+    def _get_llm_key(self, user_key: Optional[str] = None) -> str:
+        """Resolve the per-user key, shared Vertex key, or legacy Gemini key."""
+        return user_key or settings.GOOGLE_VERTEX_API_KEY or settings.GEMINI_API_KEY or ""
+
+    def _get_genai_model(self) -> str:
+        return settings.GOOGLE_GENAI_MODEL or "gemini-3.5-flash"
+
+    def _get_genai_fallback_model(self) -> str:
+        return settings.GOOGLE_GENAI_FALLBACK_MODEL or "gemini-3-flash-preview"
+
+    def _get_openclaw_model(self) -> str:
+        return f"google/{self._get_genai_model()}"
+
+    def _get_nanobot_model(self) -> str:
+        return f"vertex_ai/{self._get_genai_model()}"
+
+    def _get_nanobot_fallback_models(self) -> str:
+        return ",".join([
+            self._get_nanobot_model(),
+            f"vertex_ai/{self._get_genai_fallback_model()}",
+            "vertex_ai/gemini-2.5-flash",
+        ])
+
     def _start_nanobot_build(self):
         """Kick off nanobot image build in background thread. Returns an Event that is set when done."""
         import threading
@@ -572,6 +595,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # Generate gateway auth token
         import secrets
         gateway_token = secrets.token_hex(24)
+        openclaw_model = self._get_openclaw_model()
         
         # Config structure matches a vanilla OpenClaw onboard output
         config = {
@@ -589,10 +613,10 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                     },
                     "workspace": "/data/workspace",
                     "model": {
-                        "primary": "google/gemini-3-flash-preview"
+                        "primary": openclaw_model
                     },
                     "models": {
-                        "google/gemini-3-flash-preview": {
+                        openclaw_model: {
                             "alias": "gemini"
                         }
                     }
@@ -749,12 +773,12 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # Create config
         self._create_user_config(user_identifier, plan, telegram_token, custom_rules)
         
-        # Create auth-profiles.json with the actual API key
-        resolved_gemini_key = gemini_key or settings.GEMINI_API_KEY
-        if resolved_gemini_key:
-            self._create_auth_profiles(user_identifier, resolved_gemini_key)
+        # Create auth-profiles.json with the actual LLM API key
+        resolved_llm_key = self._get_llm_key(gemini_key)
+        if resolved_llm_key:
+            self._create_auth_profiles(user_identifier, resolved_llm_key)
         else:
-            logger.warning(f"No GEMINI_API_KEY available for {user_identifier} — auth-profiles.json not created")
+            logger.warning(f"No Google Gen AI key available for {user_identifier} — auth-profiles.json not created")
         
         # Copy plugins
         if enabled_plugins:
@@ -823,14 +847,20 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                     }
                 },
                 "providers": {
+                    "vertex_ai": {
+                        "enabled": True,
+                        "apiKey": resolved_llm_key,
+                        "project": settings.GOOGLE_CLOUD_PROJECT or "",
+                        "location": settings.GOOGLE_CLOUD_LOCATION or "global"
+                    },
                     "gemini": {
                         "enabled": True,
-                        "apiKey": gemini_key or settings.GEMINI_API_KEY
+                        "apiKey": resolved_llm_key
                     }
                 },
                 "agents": {
                     "defaults": {
-                        "model": "gemini-3-flash-preview",
+                        "model": self._get_nanobot_model(),
                         "systemPrompt": system_prompt,
                         "max_tokens": 4096,
                         "temperature": 1.0,
@@ -855,10 +885,21 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             # Telegram config
             "TELEGRAM_BOT_TOKEN": telegram_token,
             # Model config
-            "GEMINI_API_KEY": gemini_key or settings.GEMINI_API_KEY,
-            "OPENCLAW_MODEL": "google/gemini-3-flash-preview",
-            # LLM fallback config — retry primary once, then instant fallback to 2.5-flash
-            "NANOBOT_FALLBACK_MODELS": "gemini/gemini-3-flash-preview,gemini/gemini-2.5-flash",
+            "GOOGLE_VERTEX_API_KEY": resolved_llm_key,
+            "VERTEX_API_KEY": resolved_llm_key,
+            "VERTEXAI_API_KEY": resolved_llm_key,
+            "GOOGLE_API_KEY": resolved_llm_key,
+            "GEMINI_API_KEY": resolved_llm_key,
+            "GOOGLE_GENAI_USE_VERTEXAI": "true",
+            "GOOGLE_GENAI_MODEL": self._get_genai_model(),
+            "GOOGLE_GENAI_FALLBACK_MODEL": self._get_genai_fallback_model(),
+            "GOOGLE_CLOUD_PROJECT": settings.GOOGLE_CLOUD_PROJECT or "",
+            "GOOGLE_CLOUD_LOCATION": settings.GOOGLE_CLOUD_LOCATION or "global",
+            "VERTEXAI_PROJECT": settings.GOOGLE_CLOUD_PROJECT or "",
+            "VERTEXAI_LOCATION": settings.GOOGLE_CLOUD_LOCATION or "global",
+            "OPENCLAW_MODEL": self._get_openclaw_model(),
+            # LLM fallback config — retry primary once, then fall back through Vertex models
+            "NANOBOT_FALLBACK_MODELS": self._get_nanobot_fallback_models(),
             "NANOBOT_RETRY_COUNT": "1",
             "NANOBOT_RETRY_DELAY": "1.0",
             "NANOBOT_REQUEST_TIMEOUT": "30",
@@ -1259,7 +1300,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                 "container_port": host_port,
                 "container_status": container.status,
                 "telegram_bot_token": env.get("TELEGRAM_BOT_TOKEN", ""),
-                "gemini_api_key": env.get("GEMINI_API_KEY"),
+                "gemini_api_key": env.get("GOOGLE_VERTEX_API_KEY") or env.get("GEMINI_API_KEY"),
                 "github_token": env.get("GITHUB_TOKEN"),
                 "custom_rules": None,
                 "created_at": created_at

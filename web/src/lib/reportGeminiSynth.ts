@@ -5,14 +5,17 @@
  * Call 1: Full site diagnosis (exec summary, anomalies, traffic DNA, critical problems)
  * Call 2: Fixes, action plan, page optimizations
  */
-
-import { GoogleGenAI } from '@google/genai';
 import type { ReportAnalysis } from './reportAnalysis';
 import type { ReportPeriod, ReportRawData } from './reportDataFetcher';
 import { isLatinSafe } from './reportDataFetcher';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from './googleGenAi';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = GOOGLE_GENAI_PRIMARY_MODEL;
 const MAX_TOKENS = 8192;
 const MAX_RETRIES = 2;
 
@@ -392,17 +395,22 @@ function validateCall2(raw: unknown): Omit<GeminiReportOutput, 'executiveSummary
 // ─── Gemini Call Helper with Retry ───
 
 async function callGemini(prompt: string, label: string): Promise<unknown> {
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    const ai = getGoogleGenAIClient();
+    if (!ai) return null;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const response = await ai.models.generateContent({
                 model: MODEL,
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                config: { temperature: 0.3, maxOutputTokens: MAX_TOKENS },
+                config: {
+                    temperature: 0.3,
+                    maxOutputTokens: MAX_TOKENS,
+                    thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
+                },
             });
 
-            const text = response.text?.trim() || '';
+            const text = getGoogleGenAIText(response).trim();
             const jsonStr = text.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
             const parsed = JSON.parse(jsonStr);
             console.log(`[Report] Gemini ${label}: OK (attempt ${attempt})`);
@@ -487,8 +495,8 @@ export async function synthesizeWithGemini(
     siteUrl: string,
     rawData: ReportRawData
 ): Promise<GeminiReportOutput> {
-    if (!GEMINI_API_KEY) {
-        console.warn('[Report] No GEMINI_API_KEY — using data-driven fallback');
+    if (!getGoogleGenAIClient()) {
+        console.warn('[Report] Google Gen AI unavailable — using data-driven fallback');
         return fallbackOutput(analysis, period);
     }
 

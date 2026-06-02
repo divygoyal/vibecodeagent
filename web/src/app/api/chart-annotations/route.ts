@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { cachedFetch } from '@/lib/apiCache';
-import { GoogleGenAI } from '@google/genai';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 
 export const dynamic = 'force-dynamic';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+const ai = getGoogleGenAIClient();
 
 // 7-day cache TTL for annotations — chart data doesn't change retroactively
 const ANNOTATION_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -141,7 +145,7 @@ export async function POST(req: NextRequest) {
                 }));
 
                 const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: GOOGLE_GENAI_PRIMARY_MODEL,
                     contents: [
                         {
                             role: 'user',
@@ -153,11 +157,12 @@ export async function POST(req: NextRequest) {
                         temperature: 0.3,
                         maxOutputTokens: 1500,
                         responseMimeType: 'application/json',
+                        thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                         httpOptions: { timeout: 15000 },
                     },
                 });
 
-                const text = response.text?.trim() || '';
+                const text = getGoogleGenAIText(response).trim();
                 if (!text) {
                     return {
                         annotations: [],

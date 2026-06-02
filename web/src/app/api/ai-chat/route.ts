@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getToken } from 'next-auth/jwt';
+import type { GoogleGenAI } from '@google/genai';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
 import { fetchGoogleTokensFromDb, listSearchConsoleSites, getValidAccessToken, listAnalyticsProperties } from '@/lib/googleApi';
 import { fetchGithubTokenFromDb, fetchGithubAppToken } from '@/lib/githubApi';
-import { GoogleGenAI } from '@google/genai';
 import {
     loadUserFacts,
     loadThreadSummary,
@@ -25,23 +25,30 @@ import { logChatTelemetry } from '@/lib/chatTelemetry';
 import { makeFingerprint, findRepetitionMatch, formatRepetitionTag } from '@/lib/questionFingerprint';
 import { correlateDeploysWithLosers, shouldRunDeployCorrelation } from '@/lib/dataSources/deployCorrelation';
 import { MAX_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
+import {
+    getGoogleGenAIClient,
+    getGoogleGenAIText,
+    GOOGLE_GENAI_FALLBACK_MODEL,
+    GOOGLE_GENAI_LIGHT_MODEL,
+    GOOGLE_GENAI_PRIMARY_MODEL,
+    GOOGLE_GENAI_THINKING_DISABLED,
+} from '@/lib/googleGenAi';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-// Initialize the official Gemini SDK
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+// Initialize the official Google Gen AI SDK. Prefer Vertex AI / Express Mode.
+const ai = getGoogleGenAIClient();
 
 // A7: Trimmed model fallback chain. The pro-preview is rarely better and slower.
 // 2.5-flash is legacy. Two-step chain saves 36-43s of fallback latency on bad days.
 const CHAT_MODELS = [
-    { model: 'gemini-3-flash-preview', timeout: 25000 },
-    { model: 'gemini-3.1-flash-lite-preview', timeout: 15000 },
-] as const;
+    { model: GOOGLE_GENAI_PRIMARY_MODEL, timeout: 30000 },
+    { model: GOOGLE_GENAI_FALLBACK_MODEL, timeout: 25000 },
+].filter((entry, index, self) => self.findIndex((candidate) => candidate.model === entry.model) === index);
 
 // B2-thin: lightweight intent classifier — runs ONCE per turn before the main
 // stream so we can pin the system prompt to the right INTENT MODE. Uses the
@@ -56,7 +63,7 @@ type IntentLabel = typeof INTENT_LABELS[number];
 async function classifyIntent(genai: GoogleGenAI, userMessage: string): Promise<IntentLabel | null> {
     try {
         const res: any = await genai.models.generateContent({
-            model: 'gemini-3.1-flash-lite-preview',
+            model: GOOGLE_GENAI_LIGHT_MODEL,
             contents: [{ role: 'user', parts: [{ text:
                 `Classify this user message into ONE of these intent labels and respond with JUST the label, nothing else:\n` +
                 `CASUAL_GREETING — pleasantries, "hi", "thanks", small talk, no analytical question.\n` +
@@ -81,10 +88,11 @@ async function classifyIntent(genai: GoogleGenAI, userMessage: string): Promise<
             config: {
                 temperature: 0,
                 maxOutputTokens: 12,
+                thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                 httpOptions: { timeout: 6000 },
             },
         });
-        const raw = (res?.text || '').trim().toUpperCase();
+        const raw = getGoogleGenAIText(res).trim().toUpperCase();
         for (const label of INTENT_LABELS) {
             if (raw.includes(label)) return label;
         }
@@ -1075,6 +1083,7 @@ CRITICAL SYSTEM CONTEXT:
                                         tools: [{ functionDeclarations: AI_CHAT_TOOL_DECLARATIONS as any }],
                                         temperature: dynamicTemperature,
                                         maxOutputTokens: 4096, // bumped from 3072 — long tables + 3 follow-ups + tightened persona sections were getting cut
+                                        thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                                         httpOptions: { timeout: modelTimeout },
                                     },
                                 });
@@ -1110,10 +1119,11 @@ CRITICAL SYSTEM CONTEXT:
                             // The "live thinking" UX now comes from ReasoningTrace's
                             // narration of planner + tool events, not from gating the
                             // text stream itself — much cleaner separation.
-                            if (chunk.text) {
-                                fullText += chunk.text;
+                            const chunkText = getGoogleGenAIText(chunk);
+                            if (chunkText) {
+                                fullText += chunkText;
                                 anyTextStreamedThisTurn = true;
-                                controller.enqueue(encodeSSE({ type: 'text', content: chunk.text }));
+                                controller.enqueue(encodeSSE({ type: 'text', content: chunkText }));
                             }
 
                             // Collect function call parts from raw candidates
@@ -1299,23 +1309,25 @@ CRITICAL SYSTEM CONTEXT:
                             ];
                             // Rescue pass: 4096 to match the main stream's headroom.
                             const rescue = await ai.models.generateContentStream({
-                                model: 'gemini-3-flash-preview',
+                                model: GOOGLE_GENAI_PRIMARY_MODEL,
                                 contents: rescueContents,
                                 config: {
                                     systemInstruction: finalSystemInstruction,
                                     // CRITICAL: no tools — force the model to write text.
                                     temperature: 0.4,
                                     maxOutputTokens: 4096,
+                                    thinkingConfig: GOOGLE_GENAI_THINKING_DISABLED,
                                     httpOptions: { timeout: 25000 },
                                 },
                             });
                             let rescueText = '';
                             for await (const chunk of rescue) {
                                 if (abortSignal.aborted) break;
-                                if (chunk.text) {
+                                const chunkText = getGoogleGenAIText(chunk);
+                                if (chunkText) {
                                     anyTextStreamedThisTurn = true;
-                                    controller.enqueue(encodeSSE({ type: 'text', content: chunk.text }));
-                                    rescueText += chunk.text;
+                                    controller.enqueue(encodeSSE({ type: 'text', content: chunkText }));
+                                    rescueText += chunkText;
                                 }
                             }
                             if (rescueText) {
@@ -1534,7 +1546,7 @@ CRITICAL SYSTEM CONTEXT:
     }
 }
 
-// Fallback responses when Gemini API key is not configured
+// Fallback responses when Google Gen AI is not configured
 function generateFallbackResponse(message: string, analytics: any, seo: any, hasKey = false): string {
     const msg = message.toLowerCase();
 
@@ -1557,8 +1569,8 @@ function generateFallbackResponse(message: string, analytics: any, seo: any, has
     }
 
     const hint = hasKey
-        ? '\n\n*Your GEMINI_API_KEY is configured but the AI service returned an error.*'
-        : '\n\n*Add GEMINI_API_KEY to your environment for AI-powered responses.*';
+        ? '\n\n*Google Gen AI is configured but the AI service returned an error.*'
+        : '\n\n*Add GOOGLE_VERTEX_API_KEY to your environment for AI-powered responses.*';
 
     return `I can help you analyze your website! Ask about bounce rates, traffic sources, SEO tips, geo data, or devices.${hint}`;
 }

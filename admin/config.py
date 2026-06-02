@@ -36,7 +36,14 @@ class Settings(BaseSettings):
     CPU_LIMIT_GROWTH: float = 1.5
     CPU_LIMIT_PRO: float = 2.0
     
-    # API Keys (for shared key mode)
+    # Google Gen AI / Vertex AI (for shared key mode)
+    GOOGLE_VERTEX_API_KEY: Optional[str] = None
+    GOOGLE_GENAI_MODEL: str = "gemini-3.5-flash"
+    GOOGLE_GENAI_FALLBACK_MODEL: str = "gemini-3-flash-preview"
+    GOOGLE_CLOUD_PROJECT: Optional[str] = None
+    GOOGLE_CLOUD_LOCATION: str = "global"
+
+    # Legacy Gemini Developer API key fallback
     GEMINI_API_KEY: Optional[str] = None
     
     # OAuth Credentials (injected into containers)

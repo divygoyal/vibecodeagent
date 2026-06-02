@@ -6,7 +6,7 @@
       "heartbeat": {
         "enabled": false,
         "every": "60m",
-        "model": "gemini-3-flash-preview"
+        "model": "gemini-3.5-flash"
       },
       "session": {
         "contextTokens": 32000,
@@ -16,7 +16,7 @@
         "autoSummarizeAfter": 30
       },
       "model": {
-        "default": "gemini-3-flash-preview",
+        "default": "gemini-3.5-flash",
         "thinking": false,
         "temperature": 0.7,
         "maxOutputTokens": 2048
@@ -25,9 +25,9 @@
   },
   "models": {
     "aliases": {
-      "fast": "gemini-3-flash-preview",
-      "balanced": "gemini-3-flash-preview",
-      "smart": "gemini-3-flash-preview"
+      "fast": "gemini-3.5-flash",
+      "balanced": "gemini-3.5-flash",
+      "smart": "gemini-3.5-flash"
     },
     "routing": {
       "simple_queries": "fast",
@@ -35,7 +35,7 @@
       "complex_reasoning": "smart"
     },
     "params": {
-      "gemini-3-flash-preview": {
+      "gemini-3.5-flash": {
         "temperature": 0.7,
         "maxOutputTokens": 2048,
         "thinking": false
