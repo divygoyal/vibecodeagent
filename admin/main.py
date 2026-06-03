@@ -640,7 +640,7 @@ async def get_connected_oauth_connections(db: AsyncSession, user_id: int) -> Lis
     return [
         connection
         for connection in oauth_result.scalars().all()
-        if has_non_empty_token(connection.access_token)
+        if has_non_empty_token(connection.access_token) or has_non_empty_token(connection.refresh_token)
     ]
 
 
@@ -1426,7 +1426,7 @@ async def sync_user_container(
     res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
     connections = {}
     for c in res.scalars().all():
-        if c.access_token and c.access_token.strip():
+        if has_non_empty_token(c.access_token) or has_non_empty_token(c.refresh_token):
             connections[c.provider] = {
                 "provider_account_id": c.provider_account_id,
                 "accessToken": c.access_token,
@@ -1557,7 +1557,7 @@ async def update_user(
         )
         connections = {}
         for c in result_conns.scalars().all():
-            if c.access_token and c.access_token.strip():
+            if has_non_empty_token(c.access_token) or has_non_empty_token(c.refresh_token):
                 connections[c.provider] = {
                     "provider_account_id": c.provider_account_id,
                     "accessToken": c.access_token,
@@ -1603,7 +1603,7 @@ async def update_user(
         )
         connections = {}
         for c in result_conns.scalars().all():
-            if c.access_token and c.access_token.strip():
+            if has_non_empty_token(c.access_token) or has_non_empty_token(c.refresh_token):
                 connections[c.provider] = {
                     "provider_account_id": c.provider_account_id,
                     "accessToken": c.access_token,
@@ -2012,7 +2012,10 @@ async def get_google_inventory_for_user(user: User, db: AsyncSession) -> Dict[st
         )
     )
     google_connection = google_oauth_result.scalars().first()
-    if not google_connection or not has_non_empty_token(google_connection.access_token):
+    if not google_connection or not (
+        has_non_empty_token(google_connection.access_token)
+        or has_non_empty_token(google_connection.refresh_token)
+    ):
         return inventory
 
     inventory["connected"] = True

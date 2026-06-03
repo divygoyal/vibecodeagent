@@ -411,7 +411,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
             subprocess.run(["git", "-C", workspace, "add", "-A"], check=False, capture_output=True)
             subprocess.run(["git", "-C", workspace, "commit", "-m", "Initial workspace", "--allow-empty"], check=False, capture_output=True)
     
-    def _build_nanobot_system_prompt(self, connections: Optional[Dict[str, Any]] = None) -> str:
+    def _build_nanobot_system_prompt(self, user_identifier: str, connections: Optional[Dict[str, Any]] = None) -> str:
         """Build a lean system prompt optimized for fast responses."""
         prompt_parts = []
 
@@ -430,6 +430,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
 ## TOOL CALLING RULES (CRITICAL)
 - Tools are shell commands. Execute them using your shell/exec capability.
 - The commands are Node.js scripts. Run them exactly as shown with `node /data/.nanobot/workspace/skills/...`
+- For Google Analytics and Search Console commands, ALWAYS include `--client-id __CLIENT_ID__` so tokens are fetched from the admin API at runtime.
 - NEVER say "I can't find the module" or "skill not found". The scripts are pre-installed and WILL work.
 - NEVER try alternative paths like `python3 -m skills...` — always use the exact `node` commands listed below.
 - NEVER run `ls`, `cat package.json`, or `find` to verify skill paths — they are GUARANTEED correct.
@@ -453,9 +454,9 @@ Base command: `node /data/.nanobot/workspace/skills/google-analytics/index.js`
 
 Examples:
 ```
-node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties
-node /data/.nanobot/workspace/skills/google-analytics/index.js query 123456789 --dimensions date --metrics activeUsers,sessions,screenPageViews --startDate 2026-02-26 --endDate 2026-03-05
-node /data/.nanobot/workspace/skills/google-analytics/index.js realtime 123456789
+node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties --client-id __CLIENT_ID__
+node /data/.nanobot/workspace/skills/google-analytics/index.js query 123456789 --client-id __CLIENT_ID__ --dimensions date --metrics activeUsers,sessions,screenPageViews --startDate 2026-02-26 --endDate 2026-03-05
+node /data/.nanobot/workspace/skills/google-analytics/index.js realtime 123456789 --client-id __CLIENT_ID__
 ```
 Metrics: activeUsers, sessions, screenPageViews, bounceRate, averageSessionDuration, engagementRate, newUsers, conversions
 Dimensions: date, country, deviceCategory, pagePath, sessionSource, sessionMedium, browser, landingPage
@@ -465,9 +466,9 @@ Base command: `node /data/.nanobot/workspace/skills/google-search-console/index.
 
 Examples:
 ```
-node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites
-node /data/.nanobot/workspace/skills/google-search-console/index.js query https://example.com --dimensions query,page --startDate 2026-02-26 --endDate 2026-03-05 --limit 25
-node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url https://example.com https://example.com/page
+node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites --client-id __CLIENT_ID__
+node /data/.nanobot/workspace/skills/google-search-console/index.js query https://example.com --client-id __CLIENT_ID__ --dimensions query,page --startDate 2026-02-26 --endDate 2026-03-05 --limit 25
+node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url https://example.com https://example.com/page --client-id __CLIENT_ID__
 ```
 Dimensions: query, page, country, device, date
 Filters: `--filters '[{"dimension":"query","operator":"contains","expression":"keyword"}]'`
@@ -485,7 +486,7 @@ No Google connected. Ask user to connect Google from their TrafficClaw dashboard
             prompt_parts.append("""
 **GitHub:** Authenticated. Use git CLI. Token in OPENCLAW_CONNECTIONS env var.""")
 
-        return "\n".join(prompt_parts)
+        return "\n".join(prompt_parts).replace("__CLIENT_ID__", user_identifier)
 
     def _seed_nanobot_workspace(self, workspace: str, user_identifier: str, connections: Optional[Dict[str, Any]] = None) -> None:
         """Seed nanobot workspace with intelligence files for analytics mastery."""
@@ -821,7 +822,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             os.makedirs(os.path.join(nanobot_workspace, "skills"), exist_ok=True)
 
             # Build rich system prompt
-            system_prompt = self._build_nanobot_system_prompt(connections)
+            system_prompt = self._build_nanobot_system_prompt(user_identifier, connections)
 
             # Seed nanobot workspace with intelligence files
             self._seed_nanobot_workspace(nanobot_workspace, user_identifier, connections)
