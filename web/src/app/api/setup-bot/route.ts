@@ -1,10 +1,49 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { authOptions, ensureAdminUserSynced } from "@/lib/adminUserSync"
 
 // Admin API configuration
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
+
+type SetupBotRequest = {
+  token?: string
+  plan?: string
+  bot_engine?: string
+}
+
+type SetupBotSessionUser = {
+  id?: string
+  username?: string
+  email?: string | null
+  accessToken?: string
+  provider?: string
+  refreshToken?: string
+  githubAccessToken?: string
+  googleAccessToken?: string
+  githubAccountId?: string
+  googleAccountId?: string
+}
+
+type AdminUserPayload = {
+  email?: string | null
+  plan: string
+  telegram_bot_token: string
+  bot_engine: string
+  provider?: string
+  provider_id: string
+  access_token?: string
+  refresh_token?: string
+  github_id?: string
+  github_username?: string
+}
+
+type AdminSetupResponse = {
+  detail?: string
+  error?: string
+  container_status?: string
+  container_port?: number
+}
 
 // Validate Telegram bot token format
 function isValidTelegramToken(token: string): boolean {
@@ -20,7 +59,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { token, plan, bot_engine } = await req.json()
+    const { token, plan, bot_engine } = await req.json() as SetupBotRequest
 
     if (!token || !isValidTelegramToken(token)) {
       return NextResponse.json({
@@ -29,18 +68,13 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
-    // @ts-expect-error - id added in callbacks
-    const userId = session.user.id
-    // @ts-expect-error - username added in callbacks
-    const username = session.user.username
-    // @ts-expect-error - accessToken added in callbacks
-    const accessToken = session.user.accessToken
-    // @ts-expect-error - provider added in callbacks
-    const provider = session.user.provider
-    // @ts-expect-error - refreshToken added in callbacks
-    const refreshToken = session.user.refreshToken
-
-    const email = session.user.email
+    const sessionUser = session.user as SetupBotSessionUser
+    const userId = sessionUser.id
+    const username = sessionUser.username
+    const accessToken = sessionUser.accessToken
+    const provider = sessionUser.provider
+    const refreshToken = sessionUser.refreshToken
+    const email = sessionUser.email
 
     if (!userId) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
@@ -48,13 +82,31 @@ export async function POST(req: Request) {
 
     console.log(`[Setup-Bot] User ${userId} via ${provider}`)
 
+    const syncTargets = new Set<'github' | 'google'>()
+    if (provider === 'github' || provider === 'google') {
+      syncTargets.add(provider)
+    }
+    if (sessionUser.googleAccountId && sessionUser.googleAccessToken) {
+      syncTargets.add('google')
+    }
+    if (sessionUser.githubAccountId && sessionUser.githubAccessToken) {
+      syncTargets.add('github')
+    }
+
+    for (const targetProvider of syncTargets) {
+      const sync = await ensureAdminUserSynced(session, targetProvider)
+      if (!sync.synced) {
+        console.warn(`[Setup-Bot] ${targetProvider} provider sync degraded: ${sync.reason}`)
+      }
+    }
+
     // Call create_user (upsert) with the telegram token.
     // The backend will:
     // 1. Create/update user + OAuth connection in DB
     // 2. Create container ONLY because telegram_bot_token is now provided
     // 3. Write all connected provider tokens to OpenClaw memory (USER.md)
     // 4. Start the container with OpenClaw + Telegram
-    const payload: any = {
+    const payload: AdminUserPayload = {
       email: email,
       plan: plan || "free",
       telegram_bot_token: token,
@@ -80,7 +132,7 @@ export async function POST(req: Request) {
     })
 
     // Safely parse response (handle non-JSON responses)
-    let data: any
+    let data: AdminSetupResponse
     const responseText = await response.text()
     try {
       data = JSON.parse(responseText)

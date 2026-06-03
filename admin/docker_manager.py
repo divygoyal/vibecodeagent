@@ -393,7 +393,11 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     content += "\n".join(new_lines) + "\n"
                 else:
                     content += "\n\n## Active Connections\n\n"
-                    content += "_No integrations connected yet. Ask your human to connect GitHub or Google from the dashboard._\n"
+                    content += (
+                        "_No integrations were injected through OPENCLAW_CONNECTIONS yet. "
+                        f"For Google Analytics/Search Console, try the tool commands with `--client-id {user_identifier}` first; "
+                        "the plugins can fetch stored OAuth tokens from the admin API at runtime._\n"
+                    )
                     
                 with open(user_path, 'w') as f:
                     f.write(content)
@@ -432,6 +436,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
 - Tools are shell commands. Execute them using your shell/exec capability.
 - The commands are Node.js scripts. Run them exactly as shown with `node /data/.nanobot/workspace/skills/...`
 - For Google Analytics and Search Console commands, ALWAYS include `--client-id __CLIENT_ID__` so tokens are fetched from the admin API at runtime.
+- NEVER refuse Google Analytics/Search Console work just because `OPENCLAW_CONNECTIONS` is missing. Run the command first; the plugins can fetch OAuth tokens through the admin API.
 - NEVER say "I can't find the module" or "skill not found". The scripts are pre-installed and WILL work.
 - NEVER try alternative paths like `python3 -m skills...` — always use the exact `node` commands listed below.
 - NEVER run `ls`, `cat package.json`, or `find` to verify skill paths — they are GUARANTEED correct.
@@ -445,9 +450,9 @@ _(What do they care about? What projects are they working on? What annoys them? 
 - End with 🎯 **Action Items** when recommending changes.
 - Default: last 7 days for quick checks, last 28 days for deep analysis.""")
 
-        # Tool commands — compact format
-        if connections and "google" in connections:
-            prompt_parts.append("""
+        # Tool commands — compact format. Always expose Google tools; auth is
+        # resolved at runtime by the plugin through --client-id / USER_IDENTIFIER.
+        prompt_parts.append("""
 ## Tools — EXACT commands to run (copy-paste, don't modify paths)
 
 ### Google Analytics 4
@@ -478,10 +483,6 @@ Filters: `--filters '[{"dimension":"query","operator":"contains","expression":"k
 - Compare periods with % change: ((new-old)/old)×100
 - Traffic drops: check date trend → keyword-level → page-level
 - Default --limit 25, increase only if needed""")
-        else:
-            prompt_parts.append("""
-## Connections
-No Google connected. Ask user to connect Google from their TrafficClaw dashboard.""")
 
         if connections and "github" in connections:
             prompt_parts.append("""
@@ -551,7 +552,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
 - ⚡ Check memory/SITES.md for cached property IDs before running list-properties/list-sites
 """
         else:
-            user_content += "_No integrations connected yet. Ask your human to connect Google from the TrafficClaw dashboard._\n"
+            user_content += f"""- 🔑 Google Analytics/Search Console commands can fetch OAuth tokens from the admin API with `--client-id {user_identifier}`.
+- Do not assume Google is unavailable because `OPENCLAW_CONNECTIONS` is empty. Run the command first and report the actual command error if auth fails.
+"""
 
         if connections and "github" in connections:
             user_content += "- ✅ **GitHub** — Authenticated via OAuth. Use git CLI and GitHub API.\n"

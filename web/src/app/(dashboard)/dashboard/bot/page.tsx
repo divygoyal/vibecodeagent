@@ -2,12 +2,13 @@
 
 import { signIn, useSession } from 'next-auth/react';
 import { getSafeRedirectUrl } from '@/lib/checkout';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-    Bot, CheckCircle2, AlertCircle, Loader2, Lock,
-    MessageSquare, Github, Chrome, BarChart3, Search,
+    CheckCircle2, AlertCircle, Loader2, Lock,
+    MessageSquare, Chrome, BarChart3, Search,
     Zap, PenTool, Bug, DollarSign, Globe, Link2,
-    FileText, Shield, Sparkles, ArrowRight, ExternalLink, Crown,
+    Shield, Sparkles, Crown,
     Copy, Check, ChevronDown
 } from 'lucide-react';
 import { useRegistration } from '../layout';
@@ -32,6 +33,49 @@ const STATUS_STEPS = [
     { key: 'live', label: 'Bot', activeLabel: 'Live' },
 ];
 
+function ProviderConnectionCallback({ onSynced }: { onSynced: () => void }) {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const handledRef = useRef(false);
+
+    useEffect(() => {
+        if (handledRef.current) return;
+        const connected = searchParams.get('connected');
+        if (connected !== 'github' && connected !== 'google') return;
+        handledRef.current = true;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/auth/register-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: connected }),
+                });
+                if (!res.ok) {
+                    console.warn(`Failed to register ${connected} connection from bot page`);
+                }
+                if (!cancelled) {
+                    onSynced();
+                }
+            } catch (error) {
+                console.warn('Bot page provider registration failed:', error);
+            } finally {
+                if (!cancelled) {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete('connected');
+                    const qs = params.toString();
+                    router.replace(`/dashboard/bot${qs ? `?${qs}` : ''}`);
+                }
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [searchParams, router, onSynced]);
+
+    return null;
+}
+
 function getStatusLevel(botStatus: BotStatus | null): number {
     if (!botStatus || botStatus.status === 'not_provisioned') return -1;
     if (botStatus.status !== 'running') return 0;
@@ -44,9 +88,6 @@ function getStatusLevel(botStatus: BotStatus | null): number {
 export default function BotPage() {
     const { data: session } = useSession();
     const { isRegistered, isRegistering } = useRegistration();
-    const user = session?.user as {
-        name?: string | null; email?: string | null; image?: string | null; provider?: string;
-    } | undefined;
 
     const { plan, telegramBotEnabled } = useCredits();
     const hasProPlan = plan === 'pro' || telegramBotEnabled;
@@ -55,7 +96,7 @@ export default function BotPage() {
     const [setupStatus, setSetupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
     const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
-    const [isSyncing, setIsSyncing] = useState(false);
+    const [isSyncing] = useState(false);
     const botEngine = 'nanobot' as const;
     const [copiedUsername, setCopiedUsername] = useState(false);
     const [showAllCapabilities, setShowAllCapabilities] = useState(false);
@@ -152,6 +193,10 @@ export default function BotPage() {
 
     return (
         <div className="space-y-6 max-w-4xl">
+            <Suspense fallback={null}>
+                <ProviderConnectionCallback onSynced={fetchContainerStatus} />
+            </Suspense>
+
             <div>
                 <h1 className="text-2xl font-bold text-white mb-1">Your Analytics & SEO Bot</h1>
                 <p className="text-sm text-zinc-500">
@@ -460,7 +505,7 @@ export default function BotPage() {
                         connected={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
                         botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
-                        onConnect={() => signIn('google')}
+                        onConnect={() => signIn('google', { callbackUrl: '/dashboard/bot?connected=google' }, { prompt: 'select_account consent' })}
                     />
                     {/* Analytics (depends on Google) */}
                     <IntegrationCard
@@ -469,7 +514,7 @@ export default function BotPage() {
                         connected={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
                         botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
-                        onConnect={() => signIn('google')}
+                        onConnect={() => signIn('google', { callbackUrl: '/dashboard/bot?connected=google' }, { prompt: 'select_account consent' })}
                         dependsOn={!(botStatus?.connectedProviders?.some(c => c.provider === 'google')) ? 'Connect Google first' : undefined}
                     />
                     {/* Search Console (depends on Google) */}
@@ -479,7 +524,7 @@ export default function BotPage() {
                         connected={botStatus?.connectedProviders?.some(c => c.provider === 'google') || false}
                         botRunning={botStatus?.status === 'running'}
                         isSyncing={isSyncing}
-                        onConnect={() => signIn('google')}
+                        onConnect={() => signIn('google', { callbackUrl: '/dashboard/bot?connected=google' }, { prompt: 'select_account consent' })}
                         dependsOn={!(botStatus?.connectedProviders?.some(c => c.provider === 'google')) ? 'Connect Google first' : undefined}
                     />
                 </div>
