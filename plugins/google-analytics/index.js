@@ -27,13 +27,14 @@ class GoogleAnalytics {
             refresh_token: this.config.refresh_token
         });
 
-        try {
-            // Force refresh to verify credentials validity immediately
-            const refreshRes = await auth.refreshAccessToken();
-            auth.setCredentials(refreshRes.credentials);
-        } catch (e) {
-            console.error("Failed to refresh Google token:", e.message);
-            throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+        if (this.config.refresh_token) {
+            try {
+                const refreshRes = await auth.refreshAccessToken();
+                auth.setCredentials(refreshRes.credentials);
+            } catch (e) {
+                console.error("Failed to refresh Google token:", e.message);
+                throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+            }
         }
 
         return auth;
