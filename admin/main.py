@@ -700,7 +700,7 @@ async def sync_user_container_in_background(user_id: int, trigger: str):
                     f"Background sync completed ({trigger})",
                 )
             else:
-                user.container_status = user.container_status or "error"
+                user.container_status = "error"
                 await db.commit()
                 await log_container_event(
                     db,
@@ -713,6 +713,8 @@ async def sync_user_container_in_background(user_id: int, trigger: str):
             print(f"[ERROR] background sync failed for user_id={user_id}: {e}")
             user = await db.get(User, user_id)
             if user:
+                user.container_status = "error"
+                await db.commit()
                 await log_container_event(
                     db,
                     user.id,
