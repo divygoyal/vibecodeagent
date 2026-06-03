@@ -659,6 +659,23 @@ async def build_oauth_connection_payload(db: AsyncSession, user_id: int) -> Dict
     return payload
 
 
+async def has_connected_oauth_provider(db: AsyncSession, user_id: int, provider: str) -> bool:
+    result = await db.execute(
+        select(OAuthConnection).where(
+            OAuthConnection.user_id == user_id,
+            OAuthConnection.provider == provider,
+        )
+    )
+    connection = result.scalars().first()
+    return bool(
+        connection
+        and (
+            has_non_empty_token(connection.access_token)
+            or has_non_empty_token(connection.refresh_token)
+        )
+    )
+
+
 async def sync_user_container_in_background(user_id: int, trigger: str):
     """Recreate a bot container after the response has been returned."""
     async with async_session() as db:
@@ -992,6 +1009,16 @@ async def create_user(
     ):
         settings_sync_needed = True
         background_sync_reason = "nanobot_reconnect"
+
+    if user.telegram_bot_token and (user.bot_engine or "openclaw") == "nanobot":
+        await db.flush()
+        if not await has_connected_oauth_provider(db, user.id, "google"):
+            user.container_status = "not_provisioned"
+            await db.commit()
+            raise HTTPException(
+                status_code=400,
+                detail="Connect Google Analytics/Search Console before connecting the Telegram analytics bot."
+            )
 
     needs_container_bootstrap = bool(user.telegram_bot_token) and (
         not existing_user

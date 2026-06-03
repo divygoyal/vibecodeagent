@@ -26,6 +26,13 @@ type BotStatus = {
     error?: string;
 };
 
+type BotPageSessionUser = {
+    provider?: string;
+    accessToken?: string;
+    googleAccessToken?: string;
+    googleAccountId?: string;
+};
+
 const STATUS_STEPS = [
     { key: 'container', label: 'Container', activeLabel: 'Running' },
     { key: 'openclaw', label: 'OpenClaw', activeLabel: 'Ready' },
@@ -100,6 +107,13 @@ export default function BotPage() {
     const botEngine = 'nanobot' as const;
     const [copiedUsername, setCopiedUsername] = useState(false);
     const [showAllCapabilities, setShowAllCapabilities] = useState(false);
+    const sessionUser = session?.user as BotPageSessionUser | undefined;
+    const hasGoogleConnection = Boolean(
+        botStatus?.connectedProviders?.some(c => c.provider === 'google')
+        || sessionUser?.googleAccessToken
+        || sessionUser?.googleAccountId
+        || (sessionUser?.provider === 'google' && sessionUser?.accessToken)
+    );
 
     // Use refs to avoid re-creating the callback (and thus the interval) on every state change
     const botTokenRef = useRef(botToken);
@@ -133,6 +147,7 @@ export default function BotPage() {
     const handleSetupBot = async () => {
         const tokenToUse = botToken || botStatus?.telegramBotToken;
         if (!tokenToUse?.trim()) { setErrorMsg('Please enter your Telegram bot token'); return; }
+        if (!hasGoogleConnection) { setErrorMsg('Connect Google first, then save your Telegram bot.'); return; }
 
         setSetupStatus('loading');
         setErrorMsg('');
@@ -336,6 +351,27 @@ export default function BotPage() {
                                 </li>
                             </ol>
 
+                            {!hasGoogleConnection && (
+                                <div className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-4">
+                                    <div className="flex items-start gap-3">
+                                        <Chrome className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-amber-100">Connect Google first</p>
+                                            <p className="mt-1 text-xs leading-relaxed text-amber-100/70">
+                                                The Telegram bot needs Google Analytics and Search Console OAuth before it can answer traffic questions.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => signIn('google', { callbackUrl: '/dashboard/bot?connected=google' }, { prompt: 'select_account consent' })}
+                                                className="mt-3 rounded-lg bg-amber-300 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-amber-200"
+                                            >
+                                                Connect Google
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <label className="text-sm font-medium text-zinc-400 mb-2 block">Enter bot token</label>
                             <div className="relative">
                                 <input
@@ -344,7 +380,7 @@ export default function BotPage() {
                                     className={`w-full bg-[#050508] border rounded-xl px-4 py-3.5 text-sm focus:outline-none transition-all placeholder:text-zinc-600 mb-4 font-mono ${hasProPlan ? 'border-white/[0.08] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30' : 'border-violet-500/[0.15] opacity-60 cursor-not-allowed'}`}
                                     value={botToken}
                                     onChange={(e) => hasProPlan && setBotToken(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && hasProPlan && handleSetupBot()}
+                                    onKeyDown={(e) => e.key === 'Enter' && hasProPlan && hasGoogleConnection && handleSetupBot()}
                                     disabled={!hasProPlan}
                                 />
                                 {!hasProPlan && (
@@ -355,7 +391,7 @@ export default function BotPage() {
                             {hasProPlan ? (
                                 <button
                                     onClick={handleSetupBot}
-                                    disabled={setupStatus === 'loading'}
+                                    disabled={setupStatus === 'loading' || !hasGoogleConnection}
                                     className="w-full py-3.5 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-90 disabled:opacity-50 rounded-xl text-sm font-semibold transition-all text-black flex items-center justify-center gap-2"
                                 >
                                     {setupStatus === 'loading' ? (
@@ -473,7 +509,7 @@ export default function BotPage() {
                         <div>
                             <p className="text-sm text-zinc-300 font-medium mb-1">How it works</p>
                             <p className="text-xs text-zinc-500 leading-relaxed">
-                                1. Connect your Telegram bot above &nbsp;→&nbsp; 2. Connect Google (Analytics + Search Console) &nbsp;→&nbsp; 3. Chat with your bot naturally.
+                                1. Connect Google (Analytics + Search Console) &nbsp;→&nbsp; 2. Connect your Telegram bot above &nbsp;→&nbsp; 3. Chat with your bot naturally.
                                 Say things like <span className="text-emerald-400 font-mono">&quot;how is my traffic this week?&quot;</span>,
                                 <span className="text-emerald-400 font-mono">&quot;which keywords are dropping?&quot;</span>, or
                                 <span className="text-emerald-400 font-mono">&quot;analyze my top pages bounce rate&quot;</span> — your bot gives deep, data-driven insights.
