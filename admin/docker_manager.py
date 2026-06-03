@@ -117,6 +117,47 @@ class DockerManager:
         """Get host path for user's data directory"""
         return f"{self.base_dir}/{user_identifier}"
 
+    def _get_safe_user_data_dir(self, user_identifier: str) -> str:
+        """Resolve a user's data dir and ensure cleanup stays inside DATA_DIR."""
+        if not str(user_identifier or "").strip():
+            raise RuntimeError("Refusing to resolve an empty user data directory")
+
+        base_dir = os.path.realpath(self.base_dir)
+        user_dir = os.path.realpath(self._get_user_data_dir(user_identifier))
+        try:
+            is_inside_base = os.path.commonpath([base_dir, user_dir]) == base_dir
+        except ValueError:
+            is_inside_base = False
+
+        if not is_inside_base or user_dir == base_dir:
+            raise RuntimeError(f"Refusing unsafe user data path: {user_dir}")
+        return user_dir
+
+    def _remove_user_data_dir(self, user_identifier: str) -> bool:
+        """Remove all persisted workspace/runtime data for a user."""
+        user_dir = self._get_safe_user_data_dir(user_identifier)
+        if not os.path.exists(user_dir):
+            return False
+        shutil.rmtree(user_dir)
+        return True
+
+    def _reset_nanobot_runtime(self, user_identifier: str) -> bool:
+        """Clear Nanobot runtime/config memory while preserving the main workspace."""
+        user_dir = self._get_safe_user_data_dir(user_identifier)
+        nanobot_dir = os.path.realpath(os.path.join(user_dir, ".nanobot"))
+        try:
+            is_inside_user_dir = os.path.commonpath([user_dir, nanobot_dir]) == user_dir
+        except ValueError:
+            is_inside_user_dir = False
+
+        if not is_inside_user_dir or nanobot_dir == user_dir:
+            raise RuntimeError(f"Refusing unsafe nanobot runtime path: {nanobot_dir}")
+
+        if not os.path.exists(nanobot_dir):
+            return False
+        shutil.rmtree(nanobot_dir)
+        return True
+
     def _get_admin_network_info(self):
         """Return (network_name, admin_ip) for the running admin-api container.
 
@@ -774,6 +815,14 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         
         # Ensure directories exist
         user_dir = self._ensure_user_dir(user_identifier)
+
+        if bot_engine == "nanobot":
+            try:
+                if self._reset_nanobot_runtime(user_identifier):
+                    logger.info(f"Cleared stale Nanobot runtime for {user_identifier}")
+            except Exception as e:
+                logger.error(f"Failed to reset Nanobot runtime for {user_identifier}: {e}")
+                return {"success": False, "error": f"Failed to reset Nanobot runtime: {e}"}
         
         # Seed intelligence files
         self._seed_intelligence(user_identifier, custom_rules, connections)
@@ -1081,22 +1130,32 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
     def delete_container(self, user_identifier: str, remove_data: bool = False) -> Dict[str, Any]:
         """Delete a container (and optionally its data)"""
         container_name = self._get_container_name(user_identifier)
-        
+        container_removed = False
+        data_removed = False
+
         try:
             container = self.client.containers.get(container_name)
             container.stop(timeout=5)
             container.remove()
-            
-            if remove_data:
-                user_dir = self._get_user_data_dir(user_identifier)
-                if os.path.exists(user_dir):
-                    shutil.rmtree(user_dir)
-            
-            return {"success": True, "status": "deleted"}
+            container_removed = True
         except docker.errors.NotFound:
-            return {"success": False, "error": "Container not found"}
+            if not remove_data:
+                return {"success": False, "error": "Container not found"}
         except docker.errors.APIError as e:
             return {"success": False, "error": str(e)}
+
+        if remove_data:
+            try:
+                data_removed = self._remove_user_data_dir(user_identifier)
+            except Exception as e:
+                return {"success": False, "error": f"Failed to remove user data: {e}"}
+
+        return {
+            "success": True,
+            "status": "deleted",
+            "container_removed": container_removed,
+            "data_removed": data_removed
+        }
     
     def get_container_status(self, user_identifier: str) -> Dict[str, Any]:
         """Get container health and status"""
