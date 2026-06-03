@@ -2456,7 +2456,10 @@ async def get_user_oauth_token(
         )
     )
     oauth = result.scalars().first()
-    if not oauth or not (oauth.access_token and oauth.access_token.strip()):
+    if not oauth or not (
+        has_non_empty_token(oauth.access_token)
+        or has_non_empty_token(oauth.refresh_token)
+    ):
         raise HTTPException(status_code=404, detail=f"No {provider} connection found")
 
     return {

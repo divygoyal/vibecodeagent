@@ -5,19 +5,8 @@ class GoogleSearchConsole {
         console.log("Google Search Console Plugin Initializing...");
         this.config = config || {};
 
-        if (!this.config.access_token) {
-            try {
-                if (process.env.OPENCLAW_CONNECTIONS) {
-                    const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
-                    if (connections.google) {
-                        this.config.access_token = connections.google.accessToken || connections.google.access_token;
-                        this.config.refresh_token = connections.google.refreshToken || connections.google.refresh_token;
-                        console.log("Found Google credentials in environment.");
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
-            }
+        if (!hasGoogleCredentials(this.config)) {
+            loadEnvGoogleCredentials(this.config, true);
         }
     }
 
@@ -453,6 +442,32 @@ class GoogleSearchConsole {
 // Multi-tenant token resolver. When the CLI receives `--client-id <github_id>`,
 // the plugin fetches that client's stored Google OAuth tokens from the admin
 // API at runtime instead of using the container-owner's env-injected tokens.
+function hasGoogleCredentials(config) {
+    return Boolean(config && (config.access_token || config.refresh_token));
+}
+
+function loadEnvGoogleCredentials(config = {}, log = false) {
+    try {
+        if (process.env.OPENCLAW_CONNECTIONS) {
+            const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
+            if (connections.google) {
+                config.access_token = config.access_token || connections.google.accessToken || connections.google.access_token;
+                config.refresh_token = config.refresh_token || connections.google.refreshToken || connections.google.refresh_token;
+                if (log && hasGoogleCredentials(config)) {
+                    console.log("Found Google credentials in environment.");
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
+    }
+    return config;
+}
+
+function argsIncludeGoogleCredentials(args) {
+    return args.includes('--accessToken') || args.includes('--refreshToken');
+}
+
 async function fetchClientTokens(clientId) {
     const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
     const apiKey = process.env.ADMIN_API_KEY;
@@ -473,6 +488,39 @@ async function fetchClientTokens(clientId) {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
     };
+}
+
+async function resolveClientConfig(args) {
+    if (!args[0]) {
+        return {};
+    }
+
+    let clientId = null;
+    const ciIdx = args.indexOf('--client-id');
+    if (ciIdx !== -1 && ciIdx + 1 < args.length) {
+        clientId = args[ciIdx + 1];
+        args.splice(ciIdx, 2);
+    }
+
+    if (clientId) {
+        return fetchClientTokens(clientId);
+    }
+
+    if (argsIncludeGoogleCredentials(args)) {
+        return {};
+    }
+
+    const envConfig = loadEnvGoogleCredentials({}, false);
+    if (hasGoogleCredentials(envConfig)) {
+        return {};
+    }
+
+    const fallbackClientId = process.env.USER_IDENTIFIER || process.env.GITHUB_ID;
+    if (fallbackClientId && process.env.ADMIN_API_KEY) {
+        return fetchClientTokens(fallbackClientId);
+    }
+
+    return {};
 }
 
 // CLI Handling
@@ -508,16 +556,10 @@ if (require.main === module) {
         }
 
         try {
-            // Extract --client-id (anywhere in args) and resolve its tokens
-            // before dispatching. Removed from args so per-command parsers
-            // don't see it.
-            let clientConfig = {};
-            const ciIdx = args.indexOf('--client-id');
-            if (ciIdx !== -1 && ciIdx + 1 < args.length) {
-                const clientId = args[ciIdx + 1];
-                args.splice(ciIdx, 2);
-                clientConfig = await fetchClientTokens(clientId);
-            }
+            // Extract --client-id when present. If omitted inside a user bot
+            // container, fall back to USER_IDENTIFIER so stale bot prompts that
+            // run plain commands still fetch the right user's OAuth tokens.
+            const clientConfig = await resolveClientConfig(args);
 
             const plugin = new GoogleSearchConsole(clientConfig);
 
@@ -581,6 +623,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const plugin = new GoogleSearchConsole(clientConfig);
                 console.log(await plugin.query(siteUrl, {
                     dimensions: ['date'],
                     startDate: args[2],
@@ -591,6 +634,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const plugin = new GoogleSearchConsole(clientConfig);
                 console.log(await plugin.query(siteUrl, {
                     dimensions: ['query'],
                     startDate: args[2],
@@ -601,6 +645,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const plugin = new GoogleSearchConsole(clientConfig);
                 console.log(await plugin.listSitemaps(siteUrl));
 
             } else {

@@ -57,4 +57,4 @@ list-properties --client-id 114835151932310912436
 query 123456789 --client-id 114835151932310912436 --dimensions country --metrics activeUsers
 ```
 
-When `--client-id` is omitted the plugin behaves as before (uses `OPENCLAW_CONNECTIONS` env tokens).
+When `--client-id` is omitted inside a user bot container, the plugin falls back to `USER_IDENTIFIER` and fetches that user's stored OAuth tokens from the admin API. Outside that context it behaves as before and uses `OPENCLAW_CONNECTIONS` env tokens.

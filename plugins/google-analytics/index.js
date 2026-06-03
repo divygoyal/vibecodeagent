@@ -5,19 +5,8 @@ class GoogleAnalytics {
         this.config = config || {};
 
         // Try to load token from environment if not passed in config
-        if (!this.config.access_token) {
-            try {
-                if (process.env.OPENCLAW_CONNECTIONS) {
-                    const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
-                    if (connections.google) {
-                        this.config.access_token = connections.google.accessToken || connections.google.access_token;
-                        this.config.refresh_token = connections.google.refreshToken || connections.google.refresh_token;
-                        console.log("Found Google credentials in environment.");
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
-            }
+        if (!hasGoogleCredentials(this.config)) {
+            loadEnvGoogleCredentials(this.config, true);
         }
     }
 
@@ -574,6 +563,32 @@ class GoogleAnalytics {
 // API at runtime instead of using the container-owner's env-injected tokens.
 // Lets one OpenClaw container query data for any client whose Google account
 // is connected on the platform, without granting cross-account access in Google.
+function hasGoogleCredentials(config) {
+    return Boolean(config && (config.access_token || config.refresh_token));
+}
+
+function loadEnvGoogleCredentials(config = {}, log = false) {
+    try {
+        if (process.env.OPENCLAW_CONNECTIONS) {
+            const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
+            if (connections.google) {
+                config.access_token = config.access_token || connections.google.accessToken || connections.google.access_token;
+                config.refresh_token = config.refresh_token || connections.google.refreshToken || connections.google.refresh_token;
+                if (log && hasGoogleCredentials(config)) {
+                    console.log("Found Google credentials in environment.");
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
+    }
+    return config;
+}
+
+function argsIncludeGoogleCredentials(args) {
+    return args.includes('--accessToken') || args.includes('--refreshToken');
+}
+
 async function fetchClientTokens(clientId) {
     const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
     const apiKey = process.env.ADMIN_API_KEY;
@@ -596,6 +611,39 @@ async function fetchClientTokens(clientId) {
     };
 }
 
+async function resolveClientConfig(args) {
+    if (!args[0]) {
+        return {};
+    }
+
+    let clientId = null;
+    const ciIdx = args.indexOf('--client-id');
+    if (ciIdx !== -1 && ciIdx + 1 < args.length) {
+        clientId = args[ciIdx + 1];
+        args.splice(ciIdx, 2);
+    }
+
+    if (clientId) {
+        return fetchClientTokens(clientId);
+    }
+
+    if (argsIncludeGoogleCredentials(args)) {
+        return {};
+    }
+
+    const envConfig = loadEnvGoogleCredentials({}, false);
+    if (hasGoogleCredentials(envConfig)) {
+        return {};
+    }
+
+    const fallbackClientId = process.env.USER_IDENTIFIER || process.env.GITHUB_ID;
+    if (fallbackClientId && process.env.ADMIN_API_KEY) {
+        return fetchClientTokens(fallbackClientId);
+    }
+
+    return {};
+}
+
 // CLI Handling Logic
 if (require.main === module) {
     (async () => {
@@ -603,16 +651,10 @@ if (require.main === module) {
         const command = args[0];
 
         try {
-            // Extract --client-id (anywhere in args) and resolve its tokens
-            // before dispatching to a command. The flag pair is removed from
-            // args so the per-command parsers don't see it.
-            let clientConfig = {};
-            const ciIdx = args.indexOf('--client-id');
-            if (ciIdx !== -1 && ciIdx + 1 < args.length) {
-                const clientId = args[ciIdx + 1];
-                args.splice(ciIdx, 2);
-                clientConfig = await fetchClientTokens(clientId);
-            }
+            // Extract --client-id when present. If omitted inside a user bot
+            // container, fall back to USER_IDENTIFIER so stale bot prompts that
+            // run plain commands still fetch the right user's OAuth tokens.
+            const clientConfig = await resolveClientConfig(args);
 
             const plugin = new GoogleAnalytics(clientConfig);
 
@@ -654,6 +696,18 @@ if (require.main === module) {
             } else if (command === 'list-metrics') {
                 const propertyId = args[1];
                 if (!propertyId) { console.error("Error: propertyId required"); process.exit(1); }
+                const options = {};
+                for (let i = 2; i < args.length; i++) {
+                    if (args[i].startsWith('--') && i + 1 < args.length) {
+                        const key = args[i].substring(2);
+                        const val = args[i + 1];
+                        if (key === 'accessToken') options.access_token = val;
+                        else if (key === 'refreshToken') options.refresh_token = val;
+                        else options[key] = val;
+                        i++;
+                    }
+                }
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 console.log(await plugin.listMetrics(propertyId));
 
             } else if (command === 'query') {
@@ -678,6 +732,7 @@ if (require.main === module) {
                         }
                     }
                 }
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 console.log(await plugin.query(propertyId, options));
 
             } else if (command === 'realtime') {
@@ -759,6 +814,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const propertyId = args[1];
                 if (!propertyId) { console.error("Error: propertyId required"); process.exit(1); }
+                const plugin = new GoogleAnalytics(clientConfig);
                 console.log(await plugin.query(propertyId, {
                     dimensions: ['date'],
                     metrics: ['activeUsers', 'sessions'],

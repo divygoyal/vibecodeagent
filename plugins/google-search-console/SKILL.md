@@ -65,4 +65,4 @@ list-sites --client-id 114835151932310912436
 query sc-domain:example.com --client-id 114835151932310912436 --dimensions query --limit 50
 ```
 
-When `--client-id` is omitted the plugin behaves as before (uses `OPENCLAW_CONNECTIONS` env tokens).
+When `--client-id` is omitted inside a user bot container, the plugin falls back to `USER_IDENTIFIER` and fetches that user's stored OAuth tokens from the admin API. Outside that context it behaves as before and uses `OPENCLAW_CONNECTIONS` env tokens.

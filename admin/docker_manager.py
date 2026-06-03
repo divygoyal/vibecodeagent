@@ -370,18 +370,19 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 
                 # Build new connections section with explicit tool instructions
                 new_lines = []
+                client_id_flag = f"--client-id {user_identifier}"
                 if connections and "google" in connections:
                     new_lines.append("- ✅ **Google Analytics** — Full API access via OAuth.")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js` (no args) to see ALL available commands and examples")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to find property IDs")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <mets> ...` for ANY custom report")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId>` for live data")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId>` to discover all dimensions & metrics")
+                    new_lines.append(f"  - Always include `{client_id_flag}` so tokens are fetched from the admin API at runtime.")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties {client_id_flag}` to find property IDs")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> {client_id_flag} --dimensions <dims> --metrics <mets> ...` for ANY custom report")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId> {client_id_flag}` for live data")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId> {client_id_flag}` to discover all dimensions & metrics")
                     new_lines.append("- ✅ **Google Search Console** — Full API access via OAuth.")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js` (no args) to see ALL available commands and examples")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to find site URLs")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> --dimensions <dims> --filters <json> ...` for ANY search analytics report")
-                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url>` for URL index status")
+                    new_lines.append(f"  - Always include `{client_id_flag}` so tokens are fetched from the admin API at runtime.")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites {client_id_flag}` to find site URLs")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> {client_id_flag} --dimensions <dims> --filters <json> ...` for ANY search analytics report")
+                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url> {client_id_flag}` for URL index status")
                 if connections and "github" in connections:
                     new_lines.append("- ✅ **GitHub** — Authenticated via OAuth. Token is in `OPENCLAW_CONNECTIONS` env var.")
                     new_lines.append("  - You can clone repos, create commits, push code, and manage PRs using git CLI and GitHub API.")
@@ -511,7 +512,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # AGENTS.md — Lean session behavior (system prompt has the full instructions)
         agents_path = os.path.join(workspace, "AGENTS.md")
         if not os.path.exists(agents_path):
-            agents_content = """# AGENTS.md
+            agents_content = f"""# AGENTS.md
 
 ## Session Start
 1. Read memory/SITES.md for cached property IDs and site URLs
@@ -521,6 +522,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
 - For greetings — respond directly, no tool calls needed
 - Cache property IDs / site URLs to memory/SITES.md after first discovery
 - Run the minimum commands needed to answer the question
+- Include --client-id {user_identifier} on every Google Analytics and Search Console command
 - Default: last 7 days for quick checks, last 28 days for deep analysis
 
 ## Memory
@@ -543,8 +545,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
 
 """
         if connections and "google" in connections:
-            user_content += """- ✅ **Google Analytics 4** — Full API access via OAuth
+            user_content += f"""- ✅ **Google Analytics 4** — Full API access via OAuth
 - ✅ **Google Search Console** — Full API access via OAuth
+- 🔑 Include `--client-id {user_identifier}` on every Google Analytics and Search Console command
 - ⚡ Check memory/SITES.md for cached property IDs before running list-properties/list-sites
 """
         else:
@@ -581,8 +584,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         sites_path = os.path.join(workspace, "memory", "SITES.md")
         if not os.path.exists(sites_path):
             with open(sites_path, 'w') as f:
-                f.write("# SITES.md — Cached Property IDs & Site URLs\n\n"
+                f.write(f"# SITES.md — Cached Property IDs & Site URLs\n\n"
                         "⚡ Check here FIRST before running list-properties or list-sites!\n\n"
+                        f"🔑 Google tool commands must include `--client-id {user_identifier}`.\n\n"
                         "## GA4 Properties\n_Run list-properties and cache results here._\n\n"
                         "## GSC Sites\n_Run list-sites and cache results here._\n")
             os.chmod(sites_path, 0o666)
