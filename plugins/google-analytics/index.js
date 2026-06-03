@@ -596,7 +596,24 @@ async function fetchClientTokens(clientId) {
         throw new Error('ADMIN_API_KEY env var is not set inside this container; --client-id mode unavailable.');
     }
     const url = `${adminUrl}/api/users/${encodeURIComponent(clientId)}/oauth/google`;
-    const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+    const controller = new AbortController();
+    const timeoutMs = parseInt(process.env.ADMIN_API_TIMEOUT_MS || '8000', 10);
+    const timeout = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) ? timeoutMs : 8000);
+    let res;
+    try {
+        res = await fetch(url, {
+            headers: { 'X-API-Key': apiKey },
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (error && error.name === 'AbortError') {
+            throw new Error(`Admin API timed out fetching Google tokens for client ${clientId}.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
+
     if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error(`Admin API returned ${res.status} fetching tokens for client ${clientId}: ${body.slice(0, 200)}`);
@@ -637,7 +654,7 @@ async function resolveClientConfig(args) {
     }
 
     const fallbackClientId = process.env.USER_IDENTIFIER || process.env.GITHUB_ID;
-    if (fallbackClientId && process.env.ADMIN_API_KEY) {
+    if (fallbackClientId) {
         return fetchClientTokens(fallbackClientId);
     }
 

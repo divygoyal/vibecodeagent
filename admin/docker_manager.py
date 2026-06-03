@@ -869,7 +869,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                         "systemPrompt": system_prompt,
                         "max_tokens": 4096,
                         "temperature": 1.0,
-                        "max_tool_iterations": 25,
+                        "max_tool_iterations": 10,
                         "request_timeout": 30
                     }
                 },

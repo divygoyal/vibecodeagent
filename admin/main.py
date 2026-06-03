@@ -984,6 +984,15 @@ async def create_user(
             await db.rollback()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+    if (
+        existing_user
+        and user_data.telegram_bot_token
+        and (user.bot_engine or "openclaw") == "nanobot"
+        and not (provider_sync_needed or settings_sync_needed)
+    ):
+        settings_sync_needed = True
+        background_sync_reason = "nanobot_reconnect"
+
     needs_container_bootstrap = bool(user.telegram_bot_token) and (
         not existing_user
         or settings_sync_needed
@@ -1854,8 +1863,37 @@ async def container_action(
         result = docker_manager.stop_container(target_id)
         status = "stopped"
     elif action.action == "restart":
-        result = docker_manager.restart_container(target_id)
-        status = "running"
+        if (user.bot_engine or "openclaw") == "nanobot":
+            if not user.telegram_bot_token:
+                return {"success": False, "error": "No Telegram bot token configured. Please set up your bot first."}
+
+            if not user.container_port:
+                user.container_port = await get_next_available_port(db)
+                await db.commit()
+                await db.refresh(user)
+
+            connections = await build_oauth_connection_payload(db, user.id)
+            plan_config = PLANS.get(user.plan, PLANS["free"])
+            result = await asyncio.to_thread(
+                docker_manager.sync_container,
+                user_identifier=target_id,
+                plan=user.plan,
+                port=user.container_port,
+                telegram_token=user.telegram_bot_token,
+                gemini_key=user.gemini_api_key,
+                connections=connections,
+                custom_rules=user.custom_rules,
+                enabled_plugins=plan_config.get("features", []),
+                bot_engine=user.bot_engine,
+            )
+            if result["success"]:
+                user.container_id = result.get("container_id", user.container_id)
+                user.container_name = result.get("container_name", user.container_name)
+                user.container_port = result.get("port", user.container_port)
+            status = "running" if result["success"] else "error"
+        else:
+            result = docker_manager.restart_container(target_id)
+            status = "running"
     elif action.action == "destroy":
         # Remove the docker container only — keep User row, OAuth, credits, data dir intact.
         # Treat "container not found" as success: the goal is "no container running".
