@@ -64,7 +64,7 @@ class DockerManager:
     def _start_nanobot_build(self):
         """Kick off nanobot image build in background thread. Returns an Event that is set when done."""
         import threading
-        tag = "trafficclaw/nanobot:v12"
+        tag = "trafficclaw/nanobot:v13"
         done_event = threading.Event()
         try:
             self.client.images.get(tag)
@@ -99,7 +99,7 @@ class DockerManager:
 
     def _ensure_nanobot_image(self) -> None:
         """Wait for the background nanobot build to finish. Raises if build failed."""
-        tag = "trafficclaw/nanobot:v12"
+        tag = "trafficclaw/nanobot:v13"
         # Quick check — image may already exist
         try:
             self.client.images.get(tag)
@@ -468,11 +468,11 @@ Current date: {today.isoformat()}.
 When the user says "yesterday", use startDate={yesterday.isoformat()} and endDate={yesterday.isoformat()}.
 
 ## SPEED RULES (CRITICAL)
-1. ALWAYS read memory/SITES.md FIRST for cached property IDs and site URLs. Only real property IDs/site URLs count as cached data; placeholder lines do not.
+1. For direct traffic requests, use the one-shot GA traffic-summary command. Do NOT read memory/SITES.md first for those requests.
 2. For greetings (hi, hello, hey) — respond directly WITHOUT running any tools.
 3. Run the MINIMUM commands needed. One query is better than three.
 4. Don't narrate what you're about to do. Just DO IT and report results directly.
-5. Cache new property IDs and site URLs to memory/SITES.md immediately after discovery.
+5. Cache new property IDs and site URLs to memory/SITES.md only after successful discovery when it does not delay the answer.
 6. NEVER explore directories, check package.json, or verify skill paths. The commands below are PRE-INSTALLED and GUARANTEED to work.
 7. Combine data in a SINGLE response. Don't send partial results then follow up — gather everything first, then respond once.
 
@@ -491,10 +491,11 @@ When the user says "yesterday", use startDate={yesterday.isoformat()} and endDat
 
 ## DIRECT TRAFFIC QUERY FLOW
 - For "traffic", "users", "sessions", or "pageviews", use Google Analytics only. Do NOT call Search Console unless the user asks about SEO/search/queries/rankings.
-- If memory/SITES.md has the matching GA4 property ID, run exactly one GA4 query and answer. If it only contains placeholders, run list-properties once.
-- If the GA4 property ID is unknown, run list-properties once, pick the closest property by display name/domain, then run exactly one GA4 query.
-- For "total traffic yesterday", query one row with `--dimensions date --metrics activeUsers,sessions,screenPageViews --startDate {yesterday.isoformat()} --endDate {yesterday.isoformat()}`.
-- Do not spend tool calls writing memory if you are close to the tool-call limit; answer first.
+- For direct traffic requests, run exactly ONE command: `node /data/.nanobot/workspace/skills/google-analytics/index.js traffic-summary <site-or-domain-from-user> --startDate <date> --endDate <date>`.
+- For "total traffic yesterday", use `--startDate {yesterday.isoformat()} --endDate {yesterday.isoformat()}`.
+- For "last 7 days traffic", use the exact 7-day range ending today.
+- Do not call list-properties first; traffic-summary resolves the matching GA4 property internally.
+- Do not spend tool calls writing memory for traffic-summary requests; answer first.
 
 ## Rules
 - NEVER fabricate data. Always run actual commands. Say "I don't have access" rather than guessing.
@@ -513,6 +514,7 @@ Base command: `node /data/.nanobot/workspace/skills/google-analytics/index.js`
 
 Examples:
 ```
+node /data/.nanobot/workspace/skills/google-analytics/index.js traffic-summary <site-or-domain> --startDate YYYY-MM-DD --endDate YYYY-MM-DD
 node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties
 node /data/.nanobot/workspace/skills/google-analytics/index.js query 123456789 --dimensions date --metrics activeUsers,sessions,screenPageViews --startDate 2026-02-26 --endDate 2026-03-05
 node /data/.nanobot/workspace/skills/google-analytics/index.js realtime 123456789
@@ -555,7 +557,8 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
 - NEVER fabricate data. Run actual commands. Say "I don't have access" if you can't.
 - Lead with the verdict, not the process. Be direct and insightful.
 - Have opinions. Push back with data when you see problems.
-- Check memory/SITES.md FIRST before running list-properties or list-sites.
+- For direct traffic requests, use google-analytics traffic-summary first.
+- Check memory/SITES.md before manual list-properties or list-sites discovery.
 - Bold **key metrics**. Use emojis for visual structure. Short paragraphs for Telegram.
 - End with 🎯 **Action Items** when recommending changes.
 """
@@ -565,27 +568,27 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
 
         # AGENTS.md — Lean session behavior (system prompt has the full instructions)
         agents_path = os.path.join(workspace, "AGENTS.md")
-        if not os.path.exists(agents_path):
-            agents_content = f"""# AGENTS.md
+        agents_content = f"""# AGENTS.md
 
 ## Session Start
-1. Read memory/SITES.md for cached property IDs and site URLs
-2. If SITES.md has data, skip list-properties and list-sites entirely
+1. For direct traffic requests, use google-analytics traffic-summary and skip memory reads.
+2. For manual GA/GSC discovery, read memory/SITES.md for cached property IDs and site URLs.
 
 ## Speed Rules
 - For greetings — respond directly, no tool calls needed
 - Cache property IDs / site URLs to memory/SITES.md after first discovery
 - Run the minimum commands needed to answer the question
+- Direct traffic requests should use one command: google-analytics traffic-summary
 - Use plain Google Analytics/Search Console commands first; tokens load from OPENCLAW_CONNECTIONS
 - Default: last 7 days for quick checks, last 28 days for deep analysis
 
 ## Memory
-- **memory/SITES.md** — Cached GA4 property IDs and GSC site URLs (CHECK FIRST!)
+- **memory/SITES.md** — Cached GA4 property IDs and GSC site URLs for manual discovery
 - **memory/YYYY-MM-DD.md** — Daily analysis logs (save important findings)
 """
-            with open(agents_path, 'w') as f:
-                f.write(agents_content)
-            os.chmod(agents_path, 0o666)
+        with open(agents_path, 'w') as f:
+            f.write(agents_content)
+        os.chmod(agents_path, 0o666)
 
         # USER.md — Personalized with connections
         user_path = os.path.join(workspace, "USER.md")
@@ -602,7 +605,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             user_content += f"""- ✅ **Google Analytics 4** — Full API access via OAuth
 - ✅ **Google Search Console** — Full API access via OAuth
 - 🔑 Use plain Google Analytics/Search Console commands first; tokens load from OPENCLAW_CONNECTIONS
-- ⚡ Check memory/SITES.md for cached property IDs before running list-properties/list-sites
+- ⚡ Use google-analytics traffic-summary for direct traffic requests; use memory/SITES.md for manual discovery
 """
         else:
             user_content += """- 🔑 Google Analytics/Search Console commands should run plain first. If tokens are missing, ask the user to reconnect Google in the dashboard.
@@ -641,7 +644,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         if not os.path.exists(sites_path):
             with open(sites_path, 'w') as f:
                 f.write(f"# SITES.md — Cached Property IDs & Site URLs\n\n"
-                        "⚡ Check here FIRST before running list-properties or list-sites!\n\n"
+                        "⚡ Use traffic-summary for direct traffic questions. Check here before manual list-properties or list-sites discovery.\n\n"
                         "🔑 Google tool commands should run plain first; OPENCLAW_CONNECTIONS supplies tokens when Google is connected.\n\n"
                         "## GA4 Properties\nNo cached GA4 properties yet.\n\n"
                         "## GSC Sites\nNo cached GSC sites yet.\n")
@@ -937,7 +940,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                         "systemPrompt": system_prompt,
                         "max_tokens": 4096,
                         "temperature": 1.0,
-                        "max_tool_iterations": 20,
+                        "max_tool_iterations": 30,
                         "request_timeout": 30
                     }
                 },
@@ -1019,7 +1022,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # Create container - select image and memory limit based on engine
         if bot_engine != "openclaw":
             self._ensure_nanobot_image()
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v12"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v13"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
         # Set up volumes based on the engine

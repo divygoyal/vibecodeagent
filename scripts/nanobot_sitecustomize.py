@@ -363,7 +363,6 @@ class VertexExpressProvider:
         config: dict[str, Any] = {
             "temperature": temperature,
             "max_output_tokens": max(1, int(max_tokens or 4096)),
-            "thinking_config": {"thinking_budget": 0},
         }
         if system_instruction:
             config["system_instruction"] = system_instruction

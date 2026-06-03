@@ -230,6 +230,70 @@ class GoogleAnalytics {
     }
 
     /**
+     * One-shot traffic lookup: resolve a property by site/domain name and run the report.
+     * This keeps Telegram/Nanobot traffic questions to a single shell command.
+     */
+    async trafficSummary(target, options = {}) {
+        const targetText = String(target || '').trim();
+        if (!targetText) {
+            return "Error: target site, domain, or property name is required.";
+        }
+
+        const startDate = options.startDate || options.start || options.date || '7daysAgo';
+        const endDate = options.endDate || options.end || options.date || 'today';
+        const dimensions = normalizeListOption(options.dimensions, ['date']);
+        const metrics = normalizeListOption(options.metrics, ['activeUsers', 'sessions', 'screenPageViews']);
+        const parsedLimit = parseInt(options.limit || '100', 10);
+        const limit = Number.isFinite(parsedLimit) ? parsedLimit : 100;
+        const propertyOption = options.propertyId || options.property || options.property_id;
+
+        let selectedProperty;
+        if (propertyOption) {
+            selectedProperty = {
+                displayName: targetText,
+                property: normalizePropertyName(propertyOption),
+                score: 999,
+            };
+        } else {
+            const properties = await this.listProperties(true);
+            if (!Array.isArray(properties)) {
+                return String(properties);
+            }
+            if (properties.length === 0) {
+                return "No Google Analytics properties found for this Google account.";
+            }
+
+            selectedProperty = selectBestProperty(properties, targetText);
+            if (!selectedProperty) {
+                return [
+                    `Could not confidently match "${targetText}" to a GA4 property.`,
+                    "Available properties:",
+                    formatPropertyList(properties)
+                ].join('\n');
+            }
+        }
+
+        const propertyName = normalizePropertyName(selectedProperty.property);
+        const report = await this.query(propertyName, {
+            dimensions,
+            metrics,
+            startDate,
+            endDate,
+            limit,
+            orderBy: options.orderBy,
+            orderDirection: options.orderDirection,
+        });
+
+        return [
+            `Matched GA4 property: **${selectedProperty.displayName || propertyName}** (\`${propertyName}\`)`,
+            `Target: **${targetText}**`,
+            `Date range: **${startDate} to ${endDate}**`,
+            "",
+            report
+        ].join('\n');
+    }
+
+    /**
      * List all available dimensions and metrics for GA4.
      * Useful for the bot to discover what it can query.
      */
@@ -588,6 +652,127 @@ function argsIncludeGoogleCredentials(args) {
     return args.includes('--accessToken') || args.includes('--refreshToken');
 }
 
+function parseCliOptions(args, startIndex = 0) {
+    const options = {};
+    for (let i = startIndex; i < args.length; i++) {
+        const arg = args[i];
+        if (!arg.startsWith('--') || i + 1 >= args.length) {
+            continue;
+        }
+
+        const rawKey = arg.substring(2);
+        const value = args[++i];
+        const key = rawKey === 'accessToken'
+            ? 'access_token'
+            : rawKey === 'refreshToken'
+                ? 'refresh_token'
+                : rawKey;
+
+        if (key === 'dimensions' || key === 'metrics') {
+            options[key] = normalizeListOption(value, []);
+        } else if (key === 'limit') {
+            const parsed = parseInt(value, 10);
+            options[key] = Number.isFinite(parsed) ? parsed : value;
+        } else if (key === 'dimensionFilter' || key === 'metricFilter') {
+            options[key] = JSON.parse(value);
+        } else {
+            options[key] = value;
+        }
+    }
+    return options;
+}
+
+function normalizeListOption(value, fallback) {
+    if (Array.isArray(value)) {
+        const values = value.map(v => String(v).trim()).filter(Boolean);
+        return values.length > 0 ? values : fallback;
+    }
+    if (typeof value === 'string') {
+        const values = value.split(',').map(v => v.trim()).filter(Boolean);
+        return values.length > 0 ? values : fallback;
+    }
+    return fallback;
+}
+
+function normalizePropertyName(property) {
+    const value = String(property || '').trim();
+    if (value.startsWith('properties/')) {
+        return value;
+    }
+    return `properties/${value}`;
+}
+
+function selectBestProperty(properties, target) {
+    let best = null;
+    for (const property of properties) {
+        const score = scorePropertyForTarget(property, target);
+        if (!best || score > best.score) {
+            best = { ...property, score };
+        }
+    }
+    return best && best.score > 0 ? best : null;
+}
+
+function scorePropertyForTarget(property, target) {
+    const targetText = normalizeLookupText(target);
+    const propertyId = String(property.property || '').replace(/^properties\//, '');
+    const propertyText = normalizeLookupText([
+        property.displayName,
+        property.property,
+        property.parent
+    ].filter(Boolean).join(' '));
+
+    let score = 0;
+    if (propertyId && String(target).includes(propertyId)) {
+        score += 120;
+    }
+    if (targetText && propertyText === targetText) {
+        score += 100;
+    }
+    if (targetText && propertyText.includes(targetText)) {
+        score += 70;
+    }
+
+    const propertyTokens = new Set(propertyText.split(' ').filter(Boolean));
+    for (const token of lookupTokens(target)) {
+        if (propertyTokens.has(token)) {
+            score += 35;
+        } else if ([...propertyTokens].some(propToken => propToken.includes(token) || token.includes(propToken))) {
+            score += 15;
+        }
+    }
+
+    return score;
+}
+
+function lookupTokens(value) {
+    const genericWords = new Set([
+        'analytics', 'ga4', 'google', 'property', 'site', 'website', 'web',
+        'traffic', 'total', 'last', 'day', 'days', 'yesterday', 'today',
+        'www', 'http', 'https'
+    ]);
+    return normalizeLookupText(value)
+        .split(' ')
+        .filter(token => token.length > 2 && !genericWords.has(token));
+}
+
+function normalizeLookupText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/https?:\/\//g, ' ')
+        .replace(/\bwww\./g, ' ')
+        .replace(/\.(com|codes|io|ai|net|org|co|in|dev|app)\b/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function formatPropertyList(properties) {
+    return properties
+        .slice(0, 12)
+        .map(property => `- ${property.displayName || 'Unnamed property'} (${property.property})`)
+        .join('\n');
+}
+
 async function fetchClientTokens(clientId) {
     const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
     const apiKey = process.env.ADMIN_API_KEY;
@@ -713,6 +898,13 @@ if (require.main === module) {
                 } catch (e) {
                     console.log(JSON.stringify({ error: e.message }));
                 }
+
+            } else if (command === 'traffic-summary' || command === 'get-traffic') {
+                const target = args[1];
+                if (!target) { console.error("Error: target site/domain required"); process.exit(1); }
+                const options = parseCliOptions(args, 2);
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
+                console.log(await plugin.trafficSummary(target, options));
 
             } else if (command === 'list-metrics') {
                 const propertyId = args[1];
@@ -847,6 +1039,7 @@ if (require.main === module) {
                 console.log(`Google Analytics Plugin — Commands:
 
   list-properties                           List all GA4 properties
+  traffic-summary <site> [options]          Resolve a site/property and fetch traffic in one command
   list-metrics <propertyId>                 List all available dimensions & metrics
   query <propertyId> [options]              Run a flexible report with any dimensions/metrics
   realtime <propertyId> [options]           Get realtime active users and breakdown
@@ -870,6 +1063,8 @@ Common Metrics: activeUsers, sessions, screenPageViews, bounceRate,
   engagementRate, eventCount, newUsers, dauPerMau, wauPerMau
 
 Examples:
+  traffic-summary example.com --startDate yesterday --endDate yesterday
+  traffic-summary mysite --startDate 7daysAgo --endDate today
   query 123456789 --dimensions country --metrics activeUsers,sessions --startDate 30daysAgo
   query 123456789 --dimensions pagePath --metrics screenPageViews --orderBy screenPageViews --limit 20
   query 123456789 --dimensions deviceCategory,browser --metrics sessions,bounceRate

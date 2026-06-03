@@ -12,6 +12,9 @@ Full access to the Google Analytics 4 Data API. Run any report with any combinat
 ### `list-properties`
 List all GA4 properties you have access to. Use this to find the property ID.
 
+### `traffic-summary <site-or-domain> [options]`
+Resolve the matching GA4 property from the connected Google account and fetch traffic in one command. Use this first for direct traffic questions in Telegram/Nanobot.
+
 ### `list-metrics <propertyId>`
 Show all available dimensions and metrics for a property. Use this when you need to discover what you can query.
 
@@ -35,6 +38,8 @@ Quick traffic report shortcut (date × activeUsers × sessions).
 
 ## Examples
 ```
+traffic-summary example.com --startDate yesterday --endDate yesterday
+traffic-summary mysite --startDate 7daysAgo --endDate today
 query 123456789 --dimensions country --metrics activeUsers,sessions --startDate 30daysAgo
 query 123456789 --dimensions pagePath --metrics screenPageViews --orderBy screenPageViews --limit 20
 query 123456789 --dimensions deviceCategory,browser --metrics sessions,bounceRate
