@@ -47,8 +47,10 @@ realtime 123456789 --dimensions country --metrics activeUsers
 ## Common Metrics
 `activeUsers`, `sessions`, `screenPageViews`, `bounceRate`, `averageSessionDuration`, `conversions`, `totalRevenue`, `engagedSessions`, `totalUsers`, `eventCount`, `newUsers`
 
-## Multi-tenant: `--client-id <github_id>`
-Adds support for querying GA4 data on behalf of a different platform user (a "client") rather than using this container's baked-in Google account.
+## Auth and multi-tenant: `--client-id <github_id>`
+Inside a user bot container, run commands without `--client-id` first. The plugin uses the Google OAuth tokens injected through `OPENCLAW_CONNECTIONS`.
+
+`--client-id` is only for querying GA4 data on behalf of a different platform user (a "client") in runtimes where admin API lookup is allowed. Do not use it for the current Telegram bot user's own data.
 
 Pass `--client-id <github_id>` on any command. The plugin fetches that client's stored Google OAuth tokens from the admin API at runtime and uses those for the Google call. The client's properties become accessible without anyone granting cross-account access in Google.
 
@@ -57,4 +59,4 @@ list-properties --client-id 114835151932310912436
 query 123456789 --client-id 114835151932310912436 --dimensions country --metrics activeUsers
 ```
 
-When `--client-id` is omitted inside a user bot container, the plugin falls back to `USER_IDENTIFIER` and fetches that user's stored OAuth tokens from the admin API. Outside that context it behaves as before and uses `OPENCLAW_CONNECTIONS` env tokens.
+When `--client-id` is omitted inside a user bot container, the plugin uses `OPENCLAW_CONNECTIONS` first. If no env credentials exist, it falls back to `USER_IDENTIFIER` and the admin API only when `DISABLE_ADMIN_TOKEN_LOOKUP` is not enabled.

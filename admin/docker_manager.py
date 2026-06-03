@@ -411,19 +411,18 @@ _(What do they care about? What projects are they working on? What annoys them? 
                 
                 # Build new connections section with explicit tool instructions
                 new_lines = []
-                client_id_flag = f"--client-id {user_identifier}"
                 if connections and "google" in connections:
                     new_lines.append("- ✅ **Google Analytics** — Full API access via OAuth.")
-                    new_lines.append(f"  - Always include `{client_id_flag}` so tokens are fetched from the admin API at runtime.")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties {client_id_flag}` to find property IDs")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> {client_id_flag} --dimensions <dims> --metrics <mets> ...` for ANY custom report")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId> {client_id_flag}` for live data")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId> {client_id_flag}` to discover all dimensions & metrics")
+                    new_lines.append("  - Tokens are injected through `OPENCLAW_CONNECTIONS`; do not use `--client-id` for this user's own Google data.")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-properties` to find property IDs")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js query <propertyId> --dimensions <dims> --metrics <mets> ...` for ANY custom report")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js realtime <propertyId>` for live data")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-analytics/index.js list-metrics <propertyId>` to discover all dimensions & metrics")
                     new_lines.append("- ✅ **Google Search Console** — Full API access via OAuth.")
-                    new_lines.append(f"  - Always include `{client_id_flag}` so tokens are fetched from the admin API at runtime.")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites {client_id_flag}` to find site URLs")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> {client_id_flag} --dimensions <dims> --filters <json> ...` for ANY search analytics report")
-                    new_lines.append(f"  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url> {client_id_flag}` for URL index status")
+                    new_lines.append("  - Tokens are injected through `OPENCLAW_CONNECTIONS`; do not use `--client-id` for this user's own Google data.")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js list-sites` to find site URLs")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js query <siteUrl> --dimensions <dims> --filters <json> ...` for ANY search analytics report")
+                    new_lines.append("  - Run: `node /app/skills/workspace/google-search-console/index.js inspect-url <siteUrl> <url>` for URL index status")
                 if connections and "github" in connections:
                     new_lines.append("- ✅ **GitHub** — Authenticated via OAuth. Token is in `OPENCLAW_CONNECTIONS` env var.")
                     new_lines.append("  - You can clone repos, create commits, push code, and manage PRs using git CLI and GitHub API.")
@@ -436,8 +435,7 @@ _(What do they care about? What projects are they working on? What annoys them? 
                     content += "\n\n## Active Connections\n\n"
                     content += (
                         "_No integrations were injected through OPENCLAW_CONNECTIONS yet. "
-                        f"For Google Analytics/Search Console, try the tool commands with `--client-id {user_identifier}` first; "
-                        "the plugins can fetch stored OAuth tokens from the admin API at runtime._\n"
+                        "For Google Analytics/Search Console, run the plain tool command first and report the actual command error if auth fails._\n"
                     )
                     
                 with open(user_path, 'w') as f:
@@ -481,8 +479,9 @@ When the user says "yesterday", use startDate={yesterday.isoformat()} and endDat
 ## TOOL CALLING RULES (CRITICAL)
 - Tools are shell commands. Execute them using your shell/exec capability.
 - The commands are Node.js scripts. Run them exactly as shown with `node /data/.nanobot/workspace/skills/...`
-- For Google Analytics and Search Console commands, ALWAYS include `--client-id __CLIENT_ID__` so tokens are fetched from the admin API at runtime.
-- NEVER refuse Google Analytics/Search Console work just because `OPENCLAW_CONNECTIONS` is missing. Run the command first; the plugins can fetch OAuth tokens through the admin API.
+- For this user's own Google Analytics/Search Console data, DO NOT use `--client-id`. OAuth tokens are injected through `OPENCLAW_CONNECTIONS`, and the scripts load them automatically.
+- NEVER use `--client-id` in Nanobot Telegram mode. Internal admin API token lookup is disabled in this sandbox.
+- NEVER refuse Google Analytics/Search Console work just because `OPENCLAW_CONNECTIONS` looks missing. Run the plain command first and report the actual command error if auth fails.
 - NEVER say "I can't find the module" or "skill not found". The scripts are pre-installed and WILL work.
 - NEVER try alternative paths like `python3 -m skills...` — always use the exact `node` commands listed below.
 - NEVER run `ls`, `cat package.json`, or `find` to verify skill paths — they are GUARANTEED correct.
@@ -505,7 +504,7 @@ When the user says "yesterday", use startDate={yesterday.isoformat()} and endDat
 - Default: last 7 days for quick checks, last 28 days for deep analysis.""")
 
         # Tool commands — compact format. Always expose Google tools; auth is
-        # resolved at runtime by the plugin through --client-id / USER_IDENTIFIER.
+        # resolved from OPENCLAW_CONNECTIONS first, with admin lookup only as a fallback.
         prompt_parts.append("""
 ## Tools — EXACT commands to run (copy-paste, don't modify paths)
 
@@ -514,9 +513,9 @@ Base command: `node /data/.nanobot/workspace/skills/google-analytics/index.js`
 
 Examples:
 ```
-node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties --client-id __CLIENT_ID__
-node /data/.nanobot/workspace/skills/google-analytics/index.js query 123456789 --client-id __CLIENT_ID__ --dimensions date --metrics activeUsers,sessions,screenPageViews --startDate 2026-02-26 --endDate 2026-03-05
-node /data/.nanobot/workspace/skills/google-analytics/index.js realtime 123456789 --client-id __CLIENT_ID__
+node /data/.nanobot/workspace/skills/google-analytics/index.js list-properties
+node /data/.nanobot/workspace/skills/google-analytics/index.js query 123456789 --dimensions date --metrics activeUsers,sessions,screenPageViews --startDate 2026-02-26 --endDate 2026-03-05
+node /data/.nanobot/workspace/skills/google-analytics/index.js realtime 123456789
 ```
 Metrics: activeUsers, sessions, screenPageViews, bounceRate, averageSessionDuration, engagementRate, newUsers, conversions
 Dimensions: date, country, deviceCategory, pagePath, sessionSource, sessionMedium, browser, landingPage
@@ -526,9 +525,9 @@ Base command: `node /data/.nanobot/workspace/skills/google-search-console/index.
 
 Examples:
 ```
-node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites --client-id __CLIENT_ID__
-node /data/.nanobot/workspace/skills/google-search-console/index.js query https://example.com --client-id __CLIENT_ID__ --dimensions query,page --startDate 2026-02-26 --endDate 2026-03-05 --limit 25
-node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url https://example.com https://example.com/page --client-id __CLIENT_ID__
+node /data/.nanobot/workspace/skills/google-search-console/index.js list-sites
+node /data/.nanobot/workspace/skills/google-search-console/index.js query https://example.com --dimensions query,page --startDate 2026-02-26 --endDate 2026-03-05 --limit 25
+node /data/.nanobot/workspace/skills/google-search-console/index.js inspect-url https://example.com https://example.com/page
 ```
 Dimensions: query, page, country, device, date
 Filters: `--filters '[{"dimension":"query","operator":"contains","expression":"keyword"}]'`
@@ -577,7 +576,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
 - For greetings — respond directly, no tool calls needed
 - Cache property IDs / site URLs to memory/SITES.md after first discovery
 - Run the minimum commands needed to answer the question
-- Include --client-id {user_identifier} on every Google Analytics and Search Console command
+- Use plain Google Analytics/Search Console commands first; tokens load from OPENCLAW_CONNECTIONS
 - Default: last 7 days for quick checks, last 28 days for deep analysis
 
 ## Memory
@@ -602,12 +601,12 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         if connections and "google" in connections:
             user_content += f"""- ✅ **Google Analytics 4** — Full API access via OAuth
 - ✅ **Google Search Console** — Full API access via OAuth
-- 🔑 Include `--client-id {user_identifier}` on every Google Analytics and Search Console command
+- 🔑 Use plain Google Analytics/Search Console commands first; tokens load from OPENCLAW_CONNECTIONS
 - ⚡ Check memory/SITES.md for cached property IDs before running list-properties/list-sites
 """
         else:
-            user_content += f"""- 🔑 Google Analytics/Search Console commands can fetch OAuth tokens from the admin API with `--client-id {user_identifier}`.
-- Do not assume Google is unavailable because `OPENCLAW_CONNECTIONS` is empty. Run the command first and report the actual command error if auth fails.
+            user_content += """- 🔑 Google Analytics/Search Console commands should run plain first. If tokens are missing, ask the user to reconnect Google in the dashboard.
+- Do not assume Google is unavailable because `OPENCLAW_CONNECTIONS` is empty. Run the plain command first and report the actual command error if auth fails.
 """
 
         if connections and "github" in connections:
@@ -643,7 +642,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             with open(sites_path, 'w') as f:
                 f.write(f"# SITES.md — Cached Property IDs & Site URLs\n\n"
                         "⚡ Check here FIRST before running list-properties or list-sites!\n\n"
-                        f"🔑 Google tool commands must include `--client-id {user_identifier}`.\n\n"
+                        "🔑 Google tool commands should run plain first; OPENCLAW_CONNECTIONS supplies tokens when Google is connected.\n\n"
                         "## GA4 Properties\nNo cached GA4 properties yet.\n\n"
                         "## GSC Sites\nNo cached GSC sites yet.\n")
             os.chmod(sites_path, 0o666)
@@ -984,6 +983,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             "NODE_OPTIONS": f"--max-old-space-size={node_heap}",
             # Generic Connections
             "OPENCLAW_CONNECTIONS": connections_json,
+            "DISABLE_ADMIN_TOKEN_LOOKUP": "true" if bot_engine == "nanobot" else "false",
             # OAuth Keys (Required for refresh token flow)
             "GOOGLE_CLIENT_ID": settings.GOOGLE_CLIENT_ID or "",
             "GOOGLE_CLIENT_SECRET": settings.GOOGLE_CLIENT_SECRET or "",

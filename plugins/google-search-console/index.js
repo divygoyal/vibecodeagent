@@ -439,9 +439,9 @@ class GoogleSearchConsole {
     }
 }
 
-// Multi-tenant token resolver. When the CLI receives `--client-id <github_id>`,
-// the plugin fetches that client's stored Google OAuth tokens from the admin
-// API at runtime instead of using the container-owner's env-injected tokens.
+// Multi-tenant token resolver. Prefer env-injected OAuth tokens first because
+// Nanobot sandboxes can block internal admin API calls. `--client-id` remains
+// a fallback for contexts that do not have OPENCLAW_CONNECTIONS.
 function hasGoogleCredentials(config) {
     return Boolean(config && (config.access_token || config.refresh_token));
 }
@@ -511,16 +511,13 @@ async function resolveClientConfig(args) {
     if (!args[0]) {
         return {};
     }
+    const disableAdminLookup = ['1', 'true', 'yes'].includes(String(process.env.DISABLE_ADMIN_TOKEN_LOOKUP || '').toLowerCase());
 
     let clientId = null;
     const ciIdx = args.indexOf('--client-id');
     if (ciIdx !== -1 && ciIdx + 1 < args.length) {
         clientId = args[ciIdx + 1];
         args.splice(ciIdx, 2);
-    }
-
-    if (clientId) {
-        return fetchClientTokens(clientId);
     }
 
     if (argsIncludeGoogleCredentials(args)) {
@@ -530,6 +527,14 @@ async function resolveClientConfig(args) {
     const envConfig = loadEnvGoogleCredentials({}, false);
     if (hasGoogleCredentials(envConfig)) {
         return {};
+    }
+
+    if (disableAdminLookup) {
+        return {};
+    }
+
+    if (clientId) {
+        return fetchClientTokens(clientId);
     }
 
     const fallbackClientId = process.env.USER_IDENTIFIER || process.env.GITHUB_ID;

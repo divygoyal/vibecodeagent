@@ -55,8 +55,10 @@ inspect-url sc-domain:example.com https://example.com/my-page
 ## Search Types
 `web`, `image`, `video`, `news`, `discover`, `googleNews`
 
-## Multi-tenant: `--client-id <github_id>`
-Adds support for querying Search Console data on behalf of a different platform user (a "client") rather than using this container's baked-in Google account.
+## Auth and multi-tenant: `--client-id <github_id>`
+Inside a user bot container, run commands without `--client-id` first. The plugin uses the Google OAuth tokens injected through `OPENCLAW_CONNECTIONS`.
+
+`--client-id` is only for querying Search Console data on behalf of a different platform user (a "client") in runtimes where admin API lookup is allowed. Do not use it for the current Telegram bot user's own data.
 
 Pass `--client-id <github_id>` on any command. The plugin fetches that client's stored Google OAuth tokens from the admin API at runtime and uses those for the Google call. The client's verified sites become accessible without anyone granting cross-account access in Google.
 
@@ -65,4 +67,4 @@ list-sites --client-id 114835151932310912436
 query sc-domain:example.com --client-id 114835151932310912436 --dimensions query --limit 50
 ```
 
-When `--client-id` is omitted inside a user bot container, the plugin falls back to `USER_IDENTIFIER` and fetches that user's stored OAuth tokens from the admin API. Outside that context it behaves as before and uses `OPENCLAW_CONNECTIONS` env tokens.
+When `--client-id` is omitted inside a user bot container, the plugin uses `OPENCLAW_CONNECTIONS` first. If no env credentials exist, it falls back to `USER_IDENTIFIER` and the admin API only when `DISABLE_ADMIN_TOKEN_LOOKUP` is not enabled.
