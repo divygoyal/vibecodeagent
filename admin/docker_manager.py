@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from typing import Optional, Dict, Any
 from config import settings, PLANS
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -460,12 +460,17 @@ _(What do they care about? What projects are they working on? What annoys them? 
     def _build_nanobot_system_prompt(self, user_identifier: str, connections: Optional[Dict[str, Any]] = None) -> str:
         """Build a lean system prompt optimized for fast responses."""
         prompt_parts = []
+        today = datetime.utcnow().date()
+        yesterday = today - timedelta(days=1)
 
         # Core identity — keep it SHORT
-        prompt_parts.append("""You are TrafficClaw Bot — an expert SEO & analytics assistant. You give data-driven verdicts, not generic advice.
+        prompt_parts.append(f"""You are TrafficClaw Bot — an expert SEO & analytics assistant. You give data-driven verdicts, not generic advice.
+
+Current date: {today.isoformat()}.
+When the user says "yesterday", use startDate={yesterday.isoformat()} and endDate={yesterday.isoformat()}.
 
 ## SPEED RULES (CRITICAL)
-1. ALWAYS read memory/SITES.md FIRST for cached property IDs and site URLs. NEVER run list-properties or list-sites if SITES.md has data.
+1. ALWAYS read memory/SITES.md FIRST for cached property IDs and site URLs. Only real property IDs/site URLs count as cached data; placeholder lines do not.
 2. For greetings (hi, hello, hey) — respond directly WITHOUT running any tools.
 3. Run the MINIMUM commands needed. One query is better than three.
 4. Don't narrate what you're about to do. Just DO IT and report results directly.
@@ -482,7 +487,15 @@ _(What do they care about? What projects are they working on? What annoys them? 
 - NEVER try alternative paths like `python3 -m skills...` — always use the exact `node` commands listed below.
 - NEVER run `ls`, `cat package.json`, or `find` to verify skill paths — they are GUARANTEED correct.
 - If a command fails, report the actual error. Don't retry with made-up alternative commands.
+- If one Google command fails with auth/config/path errors, STOP tool-calling and answer with that exact error.
 - BUDGET: You have a LIMITED number of tool calls per conversation. Use them wisely — every wasted call counts.
+
+## DIRECT TRAFFIC QUERY FLOW
+- For "traffic", "users", "sessions", or "pageviews", use Google Analytics only. Do NOT call Search Console unless the user asks about SEO/search/queries/rankings.
+- If memory/SITES.md has the matching GA4 property ID, run exactly one GA4 query and answer. If it only contains placeholders, run list-properties once.
+- If the GA4 property ID is unknown, run list-properties once, pick the closest property by display name/domain, then run exactly one GA4 query.
+- For "total traffic yesterday", query one row with `--dimensions date --metrics activeUsers,sessions,screenPageViews --startDate {yesterday.isoformat()} --endDate {yesterday.isoformat()}`.
+- Do not spend tool calls writing memory if you are close to the tool-call limit; answer first.
 
 ## Rules
 - NEVER fabricate data. Always run actual commands. Say "I don't have access" rather than guessing.
@@ -631,8 +644,8 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                 f.write(f"# SITES.md — Cached Property IDs & Site URLs\n\n"
                         "⚡ Check here FIRST before running list-properties or list-sites!\n\n"
                         f"🔑 Google tool commands must include `--client-id {user_identifier}`.\n\n"
-                        "## GA4 Properties\n_Run list-properties and cache results here._\n\n"
-                        "## GSC Sites\n_Run list-sites and cache results here._\n")
+                        "## GA4 Properties\nNo cached GA4 properties yet.\n\n"
+                        "## GSC Sites\nNo cached GSC sites yet.\n")
             os.chmod(sites_path, 0o666)
 
     def _create_user_config(self, user_identifier: str, plan: str, telegram_token: str, custom_rules: Optional[str] = None) -> None:
@@ -870,6 +883,11 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             skills.append("coding")
 
         if bot_engine == "nanobot":
+            for skill in ["google-analytics", "google-search-console"]:
+                if skill not in skills:
+                    skills.append(skill)
+
+        if bot_engine == "nanobot":
             nanobot_dir = os.path.join(user_dir, ".nanobot")
             nanobot_workspace = os.path.join(nanobot_dir, "workspace")
             os.makedirs(nanobot_dir, exist_ok=True)
@@ -886,14 +904,13 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             # Copy plugins into nanobot workspace/skills
             source_plugins = "/app/plugins"
             nanobot_skills_dir = os.path.join(nanobot_workspace, "skills")
-            if connections and "google" in connections:
-                for plugin in ["google-analytics", "google-search-console"]:
-                    src = f"{source_plugins}/{plugin}"
-                    dst = os.path.join(nanobot_skills_dir, plugin)
-                    if os.path.exists(src):
-                        if os.path.exists(dst):
-                            shutil.rmtree(dst)
-                        shutil.copytree(src, dst)
+            for plugin in ["google-analytics", "google-search-console"]:
+                src = f"{source_plugins}/{plugin}"
+                dst = os.path.join(nanobot_skills_dir, plugin)
+                if os.path.exists(src):
+                    if os.path.exists(dst):
+                        shutil.rmtree(dst)
+                    shutil.copytree(src, dst)
 
             nanobot_config = {
                 "channels": {
@@ -921,7 +938,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                         "systemPrompt": system_prompt,
                         "max_tokens": 4096,
                         "temperature": 1.0,
-                        "max_tool_iterations": 10,
+                        "max_tool_iterations": 20,
                         "request_timeout": 30
                     }
                 },
