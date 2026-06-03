@@ -67,6 +67,8 @@ def _content_parts(content: Any) -> list[dict[str, Any]]:
     if content is None:
         return []
     if isinstance(content, str):
+        if not content:
+            return []
         return [{"text": content}]
     if isinstance(content, list):
         parts: list[dict[str, Any]] = []
@@ -220,19 +222,59 @@ def _tools_for_vertex(tools: list[dict[str, Any]] | None) -> list[dict[str, Any]
     return [{"function_declarations": declarations}] if declarations else None
 
 
+def _tool_call_identity(tool_call: dict[str, Any]) -> tuple[str | None, str]:
+    fn = tool_call.get("function") if isinstance(tool_call.get("function"), dict) else {}
+    name = str(fn.get("name") or tool_call.get("name") or "")
+    call_id = tool_call.get("id")
+    return (str(call_id) if isinstance(call_id, str) and call_id else None), name
+
+
+def _tool_response_part(name: str, raw_content: Any) -> dict[str, Any]:
+    response = _parse_json_object(raw_content)
+    if not response:
+        response = {"content": raw_content if raw_content is not None else ""}
+    return {"function_response": {"name": name or "tool_response", "response": response}}
+
+
+def _missing_tool_response_part(name: str) -> dict[str, Any]:
+    return {
+        "function_response": {
+            "name": name or "tool_response",
+            "response": {"content": "Tool result unavailable - call was interrupted or lost"},
+        }
+    }
+
+
 def _messages_for_vertex(messages: list[dict[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
     system_text: list[str] = []
     contents: list[dict[str, Any]] = []
     tool_names_by_id: dict[str, str] = {}
+    pending_tool_calls: list[tuple[str | None, str]] = []
 
-    for msg in messages or []:
+    def flush_missing_tool_responses() -> None:
+        nonlocal pending_tool_calls
+        if not pending_tool_calls:
+            return
+        contents.append({
+            "role": "user",
+            "parts": [_missing_tool_response_part(name) for _call_id, name in pending_tool_calls],
+        })
+        pending_tool_calls = []
+
+    idx = 0
+    source_messages = messages or []
+    while idx < len(source_messages):
+        msg = source_messages[idx]
         role = msg.get("role")
         if role == "system":
             system_text.extend(part["text"] for part in _content_parts(msg.get("content")) if part.get("text"))
+            idx += 1
             continue
 
         if role == "assistant":
+            flush_missing_tool_responses()
             parts = _content_parts(msg.get("content"))
+            pending_for_turn: list[tuple[str | None, str]] = []
             for tc in msg.get("tool_calls") or []:
                 if not isinstance(tc, dict):
                     continue
@@ -245,33 +287,45 @@ def _messages_for_vertex(messages: list[dict[str, Any]]) -> tuple[str | None, li
                     args = _parse_json_object(fn.get("arguments"))
                     if name:
                         parts.append({"function_call": {"name": name, "args": args}})
-                tc_id = tc.get("id")
-                fn = tc.get("function") if isinstance(tc.get("function"), dict) else {}
-                name = fn.get("name") or tc.get("name")
-                if isinstance(tc_id, str) and isinstance(name, str):
+                tc_id, name = _tool_call_identity(tc)
+                if tc_id and name:
                     tool_names_by_id[tc_id] = name
+                if name:
+                    pending_for_turn.append((tc_id, name))
             if parts:
                 contents.append({"role": "model", "parts": parts})
+            pending_tool_calls = pending_for_turn
+            idx += 1
             continue
 
         if role == "tool":
-            name = msg.get("name") or tool_names_by_id.get(str(msg.get("tool_call_id") or ""))
-            if not name:
-                name = "tool_response"
-            raw_content = msg.get("content")
-            response = _parse_json_object(raw_content)
-            if not response:
-                response = {"content": raw_content if raw_content is not None else ""}
-            contents.append({
-                "role": "user",
-                "parts": [{"function_response": {"name": name, "response": response}}],
-            })
+            if not pending_tool_calls:
+                idx += 1
+                continue
+
+            grouped: dict[str | None, dict[str, Any]] = {}
+            while idx < len(source_messages) and source_messages[idx].get("role") == "tool":
+                tool_msg = source_messages[idx]
+                call_id = str(tool_msg.get("tool_call_id") or "") or None
+                name = tool_msg.get("name") or (tool_names_by_id.get(call_id) if call_id else None)
+                grouped[call_id] = _tool_response_part(str(name or "tool_response"), tool_msg.get("content"))
+                idx += 1
+
+            parts = [
+                grouped.get(call_id) or _missing_tool_response_part(name)
+                for call_id, name in pending_tool_calls
+            ]
+            contents.append({"role": "user", "parts": parts})
+            pending_tool_calls = []
             continue
 
+        flush_missing_tool_responses()
         parts = _content_parts(msg.get("content"))
         if parts:
             contents.append({"role": "user", "parts": parts})
+        idx += 1
 
+    flush_missing_tool_responses()
     if not contents:
         contents.append({"role": "user", "parts": [{"text": "(empty)"}]})
     return ("\n\n".join(system_text).strip() or None), contents

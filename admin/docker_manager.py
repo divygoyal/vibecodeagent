@@ -64,7 +64,7 @@ class DockerManager:
     def _start_nanobot_build(self):
         """Kick off nanobot image build in background thread. Returns an Event that is set when done."""
         import threading
-        tag = "trafficclaw/nanobot:v11"
+        tag = "trafficclaw/nanobot:v12"
         done_event = threading.Event()
         try:
             self.client.images.get(tag)
@@ -99,7 +99,7 @@ class DockerManager:
 
     def _ensure_nanobot_image(self) -> None:
         """Wait for the background nanobot build to finish. Raises if build failed."""
-        tag = "trafficclaw/nanobot:v11"
+        tag = "trafficclaw/nanobot:v12"
         # Quick check — image may already exist
         try:
             self.client.images.get(tag)
@@ -945,7 +945,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # Create container - select image and memory limit based on engine
         if bot_engine != "openclaw":
             self._ensure_nanobot_image()
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v11"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v12"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
         # Set up volumes based on the engine
