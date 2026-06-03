@@ -43,9 +43,15 @@ class DockerManager:
         return user_key or settings.GOOGLE_VERTEX_API_KEY or settings.GEMINI_API_KEY or ""
 
     def _get_genai_model(self) -> str:
-        return settings.GOOGLE_GENAI_MODEL or "gemini-3.5-flash"
+        # Default to gemini-2.5-flash because it is stable on Vertex Express.
+        # gemini-3.5-flash is rejected by Vertex Express keys, which forces
+        # silent fallback and adds ~2s of retry latency per call.
+        return settings.GOOGLE_GENAI_MODEL or "gemini-2.5-flash"
 
     def _get_genai_fallback_model(self) -> str:
+        # gemini-3-flash-preview is what was silently catching all traffic
+        # before this fix — preview models can disappear, but it's a known
+        # working alternative when the primary is unavailable.
         return settings.GOOGLE_GENAI_FALLBACK_MODEL or "gemini-3-flash-preview"
 
     def _get_openclaw_model(self) -> str:
@@ -64,7 +70,7 @@ class DockerManager:
     def _start_nanobot_build(self):
         """Kick off nanobot image build in background thread. Returns an Event that is set when done."""
         import threading
-        tag = "trafficclaw/nanobot:v13"
+        tag = "trafficclaw/nanobot:v14"
         done_event = threading.Event()
         try:
             self.client.images.get(tag)
@@ -99,7 +105,7 @@ class DockerManager:
 
     def _ensure_nanobot_image(self) -> None:
         """Wait for the background nanobot build to finish. Raises if build failed."""
-        tag = "trafficclaw/nanobot:v13"
+        tag = "trafficclaw/nanobot:v14"
         # Quick check — image may already exist
         try:
             self.client.images.get(tag)
@@ -903,6 +909,16 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
             # Seed nanobot workspace with intelligence files
             self._seed_nanobot_workspace(nanobot_workspace, user_identifier, connections)
 
+            # Write connections to a file because Nanobot's exec tool strips
+            # host env from spawned subprocesses (security feature). The plugins
+            # read OPENCLAW_CONNECTIONS from env first, then fall back to this
+            # file when env is unavailable. Lives outside the LLM workspace
+            # tree, so the model isn't likely to stumble on it.
+            connections_file_path = os.path.join(nanobot_dir, "connections.json")
+            with open(connections_file_path, "w", encoding="utf-8") as f:
+                f.write(connections_json)
+            os.chmod(connections_file_path, 0o644)
+
             # Copy plugins into nanobot workspace/skills
             source_plugins = "/app/plugins"
             nanobot_skills_dir = os.path.join(nanobot_workspace, "skills")
@@ -1022,7 +1038,7 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
         # Create container - select image and memory limit based on engine
         if bot_engine != "openclaw":
             self._ensure_nanobot_image()
-        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v13"
+        image_name = settings.OPENCLAW_IMAGE if bot_engine == "openclaw" else "trafficclaw/nanobot:v14"
         mem_limit_bytes = plan_config["memory_limit"] if bot_engine == "openclaw" else 400 * 1024 * 1024
 
         # Set up volumes based on the engine

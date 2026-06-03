@@ -448,19 +448,40 @@ function hasGoogleCredentials(config) {
 }
 
 function loadEnvGoogleCredentials(config = {}, log = false) {
-    try {
-        if (process.env.OPENCLAW_CONNECTIONS) {
-            const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
-            if (connections.google) {
-                config.access_token = config.access_token || connections.google.accessToken || connections.google.access_token;
-                config.refresh_token = config.refresh_token || connections.google.refreshToken || connections.google.refresh_token;
-                if (log && hasGoogleCredentials(config)) {
-                    console.log("Found Google credentials in environment.");
+    let raw = process.env.OPENCLAW_CONNECTIONS;
+    let source = "env";
+    if (!raw) {
+        // Nanobot's exec tool strips host env from spawned subprocesses, so the
+        // admin API also writes connections.json to /data/.nanobot/. Fall back
+        // to reading from disk when the env var isn't visible.
+        const fs = require('fs');
+        const candidates = [
+            process.env.OPENCLAW_CONNECTIONS_FILE,
+            '/data/.nanobot/connections.json',
+            '/data/connections.json',
+        ].filter(Boolean);
+        for (const p of candidates) {
+            try {
+                if (fs.existsSync(p)) {
+                    raw = fs.readFileSync(p, 'utf8');
+                    source = p;
+                    break;
                 }
+            } catch (_) { /* try next candidate */ }
+        }
+    }
+    if (!raw) return config;
+    try {
+        const connections = JSON.parse(raw);
+        if (connections.google) {
+            config.access_token = config.access_token || connections.google.accessToken || connections.google.access_token;
+            config.refresh_token = config.refresh_token || connections.google.refreshToken || connections.google.refresh_token;
+            if (log && hasGoogleCredentials(config)) {
+                console.log(`Found Google credentials (source: ${source}).`);
             }
         }
     } catch (e) {
-        console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
+        console.error("Failed to parse OPENCLAW_CONNECTIONS source", source, e);
     }
     return config;
 }
