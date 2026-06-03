@@ -21,6 +21,7 @@ type SetupBotSessionUser = {
   refreshToken?: string
   githubAccessToken?: string
   googleAccessToken?: string
+  googleRefreshToken?: string
   githubAccountId?: string
   googleAccountId?: string
 }
@@ -75,6 +76,16 @@ export async function POST(req: Request) {
     const provider = sessionUser.provider
     const refreshToken = sessionUser.refreshToken
     const email = sessionUser.email
+    const primaryAccessToken =
+      provider === 'github'
+        ? (sessionUser.githubAccessToken || accessToken)
+        : provider === 'google'
+          ? (sessionUser.googleAccessToken || accessToken)
+          : accessToken
+    const primaryRefreshToken =
+      provider === 'google'
+        ? (sessionUser.googleRefreshToken || refreshToken)
+        : undefined
 
     if (!userId) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
@@ -113,8 +124,8 @@ export async function POST(req: Request) {
       bot_engine: bot_engine || "openclaw",
       provider: provider,
       provider_id: String(userId),
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: primaryAccessToken,
+      refresh_token: primaryRefreshToken,
     }
 
     if (provider === "github") {

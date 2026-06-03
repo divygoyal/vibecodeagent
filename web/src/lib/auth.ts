@@ -10,6 +10,10 @@ interface UserProfile {
     image?: string;
 }
 
+type GitHubProfile = UserProfile & {
+    login?: string;
+};
+
 // Extended session user type
 interface ExtendedUser {
     id?: string;
@@ -17,6 +21,7 @@ interface ExtendedUser {
     accessToken?: string; // Legacy/General
     githubAccessToken?: string; // Specific
     googleAccessToken?: string; // Specific
+    googleRefreshToken?: string; // Specific
     provider?: string;            // PRIMARY provider (the one that owns the displayed identity)
     primaryProvider?: string;     // Alias of provider — explicit naming
     githubAccountId?: string;     // GitHub user id (from OAuth) — for register-provider, NOT for display
@@ -107,6 +112,7 @@ export const authOptions: NextAuthOptions = {
                 // Per-provider tokens + ids — needed by chatbot tools and register-provider sync
                 user.githubAccessToken = token.githubAccessToken as string;
                 user.googleAccessToken = token.googleAccessToken as string;
+                user.googleRefreshToken = token.googleRefreshToken as string;
                 user.githubAccountId = token.githubAccountId as string;
                 user.googleAccountId = token.googleAccountId as string;
                 user.githubLogin = token.githubLogin as string;
@@ -137,7 +143,7 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 if (account.provider === "github") {
-                    token.githubLogin = (profile as any)?.login;
+                    token.githubLogin = (profile as GitHubProfile | undefined)?.login;
                     token.githubAccountId = account.providerAccountId;
                     token.githubAccessToken = account.access_token;
                 } else if (account.provider === "google") {

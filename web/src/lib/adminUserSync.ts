@@ -90,14 +90,6 @@ export async function ensureAdminUserSynced(
     session: AdminSyncSession,
     targetProvider?: 'github' | 'google',
 ) {
-    if (!ADMIN_API_KEY) {
-        return {
-            synced: false,
-            skipped: true,
-            reason: 'missing-admin-api-key',
-        } as const;
-    }
-
     const payload = buildAdminUserSyncPayload(session, targetProvider);
     if (!payload) {
         return {
