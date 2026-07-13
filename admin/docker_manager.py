@@ -961,7 +961,18 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
                     }
                 },
                 "tools": {
-                    "restrictToWorkspace": False  # Needs shell access for plugins
+                    "restrictToWorkspace": False,  # Needs shell access for plugins
+                    # Nanobot's exec tool runs subprocesses with a stripped env
+                    # (only HOME/LANG/TERM/PYTHONUNBUFFERED + this allow-list).
+                    # Whitelist the Google OAuth client creds so the GA4/GSC
+                    # plugins can refresh the access token; without them the
+                    # refresh fails with invalid_request and the bot reports
+                    # "Google integration needs a refresh". Tokens themselves
+                    # come from /data/.nanobot/connections.json (file fallback),
+                    # so they don't need whitelisting here.
+                    "exec": {
+                        "allowedEnvKeys": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+                    }
                 }
             }
             with open(os.path.join(nanobot_dir, "config.json"), "w", encoding="utf-8") as f:
