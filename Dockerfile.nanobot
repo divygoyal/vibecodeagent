@@ -14,8 +14,11 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Install Nanobot from Github (latest) and Google Gen AI SDK for Vertex Express mode
-RUN pip install --no-cache-dir git+https://github.com/HKUDS/nanobot.git google-genai
+# Install Nanobot (pinned commit) with the Telegram channel extra + Google Gen AI SDK for Vertex Express mode.
+# - [telegram] pulls python-telegram-bot; without it the bot silently runs websocket-only.
+# - Pinned to a known-good commit so an upstream "latest" change can't silently break the
+#   provider call signature (e.g. the on_stream_recover kwarg regression).
+RUN pip install --no-cache-dir "nanobot-ai[telegram] @ git+https://github.com/HKUDS/nanobot.git@6e462e62a65d03470226afe03b6521ecdf8ef8f5" google-genai
 
 # Pre-install plugin dependencies (eliminates Node.js cold-start on first analytics query)
 COPY plugins/google-analytics /app/plugins/google-analytics

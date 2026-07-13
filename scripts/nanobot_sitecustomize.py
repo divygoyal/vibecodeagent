@@ -380,8 +380,12 @@ class VertexExpressProvider:
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
         tool_choice: str | dict[str, Any] | None = None,
+        **kwargs: Any,
     ):
-        _ = reasoning_effort, tool_choice
+        # Absorb any newer-nanobot keyword args we don't consume (e.g.
+        # on_stream_recover). Keeps this provider forward-compatible so upstream
+        # API additions never crash the call with "unexpected keyword argument".
+        _ = reasoning_effort, tool_choice, kwargs
         from nanobot.providers.base import LLMResponse, ToolCallRequest
 
         contents, config = self._config(messages, tools, max_tokens, temperature)
