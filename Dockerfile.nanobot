@@ -26,6 +26,16 @@ COPY plugins/google-search-console /app/plugins/google-search-console
 RUN cd /app/plugins/google-analytics && npm install --production 2>/dev/null || true
 RUN cd /app/plugins/google-search-console && npm install --production 2>/dev/null || true
 
+# Wrapper commands so the bot can invoke skills by name — e.g.
+# `google-analytics list-properties` — which is nanobot's natural skill
+# convention (via exec / run_cli_app), not just the full
+# `node /data/.nanobot/workspace/skills/.../index.js` path. Without these the
+# bare-name calls fail with "command not found", which the LLM misreads as an
+# auth error and reports as invalid_request / "connections need re-auth".
+RUN printf '#!/bin/sh\nexec node /data/.nanobot/workspace/skills/google-analytics/index.js "$@"\n' > /usr/local/bin/google-analytics && \
+    printf '#!/bin/sh\nexec node /data/.nanobot/workspace/skills/google-search-console/index.js "$@"\n' > /usr/local/bin/google-search-console && \
+    chmod +x /usr/local/bin/google-analytics /usr/local/bin/google-search-console
+
 # Change HOME to /data so nanobot reads config from /data/.nanobot/config.json
 ENV HOME=/data
 
