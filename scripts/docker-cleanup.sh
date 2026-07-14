@@ -49,8 +49,13 @@ fi
     echo "--- container prune ---"
     docker container prune -f
     echo
-    echo "--- image prune (until=48h) ---"
-    docker image prune -af --filter "until=48h"
+    # NOTE: image prune is intentionally WITHOUT -a. `-a` removes every tagged
+    # image not used by a *running* container, which deletes trafficclaw/nanobot:v14
+    # during the windows when a user's bot is stopped/being recreated (this caused
+    # a full bot outage on 2026-07-13). Plain `-f` only removes dangling/untagged
+    # layers; build-cache cleanup below still reclaims the bulk of the disk.
+    echo "--- image prune (dangling only, until=48h) ---"
+    docker image prune -f --filter "until=48h"
     echo
     echo "--- builder prune (until=48h) ---"
     docker builder prune -af --filter "until=48h"
