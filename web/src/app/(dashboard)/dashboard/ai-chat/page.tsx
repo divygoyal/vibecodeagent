@@ -7,7 +7,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-    Globe, ChevronDown, Loader2, ArrowUp, ArrowRight, RotateCcw, Sparkles, Lock, Github, X, Plug
+    Globe, ChevronDown, Loader2, ArrowUp, ArrowRight, RotateCcw, Sparkles, Lock, Github, X, Plug, AlertTriangle
 } from 'lucide-react';
 import { useContainerStatus, usePropertyList, useAnalyticsData, useSeoData, useSiteRepoLinks, useGithubRepos, type SiteRepoLink, type GithubRepoLite } from '@/lib/useDashboardData';
 import { findBestRepoMatch } from '@/lib/githubApi';
@@ -936,11 +936,40 @@ export default function AIChat() {
         return normalizedProperties.find((property) => property.property === workspaceProperty);
     }, [normalizedProperties, workspaceProperty]);
 
-    const { data: analyticsData } = useAnalyticsData('all', matchedProperty?.property, hasGoogleConnection && !!selectedSite);
-    const { data: seoData } = useSeoData('all', selectedSite, hasGoogleConnection && !!selectedSite);
+    const analyticsEnabled = hasGoogleConnection && !!matchedProperty?.property;
+    const seoEnabled = hasGoogleConnection && !!selectedSite;
+    const {
+        data: analyticsData,
+        isLoading: analyticsLoading,
+        refresh: refreshAnalytics,
+    } = useAnalyticsData('all', matchedProperty?.property, analyticsEnabled);
+    const {
+        data: seoData,
+        isLoading: seoLoading,
+        refresh: refreshSeo,
+    } = useSeoData('all', selectedSite, seoEnabled);
+    const showGa4LockedState = !propertyInventoryLoading && !hasGa4Properties && !selectedSite;
+    const hasEnabledGoogleSource = analyticsEnabled || seoEnabled;
+    const enabledSourcesSettled =
+        (!analyticsEnabled || !analyticsLoading) &&
+        (!seoEnabled || !seoLoading);
     const dataReady = !!(analyticsData || seoData) || !hasGoogleConnection;
+    const dataLoadFailed =
+        !propertyInventoryLoading &&
+        !showGa4LockedState &&
+        hasEnabledGoogleSource &&
+        !dataReady &&
+        enabledSourcesSettled;
+    const dataLoading =
+        hasGoogleConnection &&
+        !dataReady &&
+        !dataLoadFailed &&
+        (propertyInventoryLoading || hasEnabledGoogleSource);
+    const retryGoogleData = useCallback(() => {
+        if (analyticsEnabled) void refreshAnalytics();
+        if (seoEnabled) void refreshSeo();
+    }, [analyticsEnabled, refreshAnalytics, refreshSeo, seoEnabled]);
     const snapshot = useMemo(() => buildSnapshot(analyticsData, seoData), [analyticsData, seoData]);
-    const showGa4LockedState = !propertyInventoryLoading && !hasGa4Properties;
 
     // Refs for stable callbacks
     const messagesRef = useRef(messages);
@@ -1285,11 +1314,35 @@ export default function AIChat() {
                     <div className="max-w-[760px] mx-auto flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
                         <Lock className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
                         <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
-                            <span className="font-semibold text-amber-200">Connect a GA4 property to use chat.</span>{' '}
-                            This account has no Google Analytics property connected yet, so chat input is paused.{' '}
+                            <span className="font-semibold text-amber-200">Connect a Google data source to use chat.</span>{' '}
+                            This workspace has neither a Google Analytics property nor a Search Console site, so chat input is paused.{' '}
                             <Link href="/dashboard/setup" className="underline font-semibold hover:text-amber-50">
                                 Pick a workspace →
                             </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {dataLoadFailed && (
+                <div className="flex-shrink-0 px-4 sm:px-6 pt-3" role="alert">
+                    <div className="max-w-[760px] mx-auto flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/[0.08] px-4 py-3">
+                        <AlertTriangle className="w-4 h-4 text-red-300 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1 text-[12.5px] text-red-100/90 leading-relaxed">
+                            <span className="font-semibold text-red-200">Couldn&apos;t load your connected Google data.</span>{' '}
+                            Try again, or switch workspaces if this property is no longer available.
+                            <div className="mt-2 flex flex-wrap items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={retryGoogleData}
+                                    className="font-semibold underline hover:text-red-50"
+                                >
+                                    Try again
+                                </button>
+                                <Link href="/dashboard/setup" className="font-semibold underline hover:text-red-50">
+                                    Switch workspace →
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1470,10 +1523,10 @@ export default function AIChat() {
                                 ))}
                             </div>
 
-                            {!dataReady && hasGoogleConnection && (
+                            {dataLoading && (
                                 <div className="mt-8 flex items-center gap-2 text-xs text-zinc-500">
                                     <Loader2 className="h-3 w-3 animate-spin" />
-                                    Loading your analytics and search data…
+                                    Loading your connected Google data…
                                 </div>
                             )}
                         </div>
@@ -1545,8 +1598,16 @@ export default function AIChat() {
                                 value={input}
                                 onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
                                 onKeyDown={handleKeyDown}
-                                placeholder={isGa4Locked ? 'Connect a GA4 property to start chatting…' : 'Ask about traffic, pages, channels, or conversions'}
-                                disabled={isLoading || isGa4Locked}
+                                placeholder={
+                                    isGa4Locked
+                                        ? 'Connect GA4 or Search Console to start chatting…'
+                                        : dataLoadFailed
+                                            ? 'Google data could not be loaded — try again above…'
+                                            : !dataReady
+                                                ? 'Loading your connected Google data…'
+                                                : 'Ask about traffic, pages, channels, or conversions'
+                                }
+                                disabled={isLoading || !dataReady || isGa4Locked}
                                 rows={1}
                                 className="w-full sm:flex-1 bg-transparent text-[15px] text-white placeholder-zinc-600 outline-none resize-none max-h-40 leading-relaxed px-1 sm:px-0"
                             />
@@ -1592,7 +1653,7 @@ export default function AIChat() {
                                 )}
                                 <button
                                     onClick={() => sendMessage()}
-                                    disabled={!input.trim() || isLoading || isGa4Locked}
+                                    disabled={!input.trim() || isLoading || !dataReady || isGa4Locked}
                                     className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-white enabled:text-black text-zinc-500 transition-all enabled:hover:bg-zinc-200"
                                     aria-label="Send message"
                                 >

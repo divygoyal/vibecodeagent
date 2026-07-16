@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Google Search Console plugin for VibeCode Agent",
   "main": "index.js",
+  "scripts": {
+    "test": "node --test credentialInput.test.js"
+  },
   "dependencies": {
     "googleapis": "^144.0.0"
   }

@@ -466,19 +466,19 @@ const FAQ_ITEMS: Array<{ q: string; a: string }> = [
     },
     {
         q: 'What happens to my credits if I cancel or downgrade?',
-        a: 'Cancellation keeps your plan active until the end of the billing cycle — credits stay usable. Downgrades take effect at the next renewal; remaining credits roll into the new tier (capped at the new monthly limit).',
+        a: 'Cancellation keeps your plan active until the end of the billing cycle, so remaining credits stay usable until then. Credits reset at the start of each billing cycle and do not roll over.',
     },
     {
         q: 'Can I upgrade mid-cycle?',
         a: 'Yes — upgrades are instant and prorated. New credits land in your account within seconds of payment.',
     },
     {
-        q: 'Why pick Growth over Starter?',
-        a: '3× the credits at 2× the price ($0.13 vs $0.18 per message), priority AI queue, cross-source insights (deploy ↔ traffic), and up to 3 sites. The line where most growing businesses land.',
+        q: 'What does Growth include?',
+        a: '50 AI credits per month ($0.38 per message), priority AI queue, cross-source insights (deploy ↔ traffic), and up to 3 connected sites.',
     },
     {
         q: 'Why pick Pro over Growth?',
-        a: 'Telegram bot for mobile alerts, unlimited sites, cheapest per-message rate ($0.10), priority support, and beta-feature early access. Built for agencies and operators running multiple properties.',
+        a: '100 AI credits per month at the lowest current rate ($0.29 per message), plus Telegram alerts, unlimited sites, priority support, and beta-feature early access.',
     },
     {
         q: 'Is the data secure?',
@@ -490,7 +490,7 @@ function PlanFaq() {
     return (
         <section className="rounded-2xl border border-white/[0.06] bg-[#0a0d12] p-5">
             <h2 className="text-[13px] font-semibold text-white">Frequently asked</h2>
-            <p className="mt-0.5 text-[11.5px] text-zinc-500">If something's unclear, ask — credits are flexible.</p>
+            <p className="mt-0.5 text-[11.5px] text-zinc-500">If something&apos;s unclear, ask — credits are flexible.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {FAQ_ITEMS.map((item, i) => (
                     <details key={i} className="group rounded-xl border border-white/[0.05] bg-white/[0.015] open:border-white/[0.10] transition-colors">
@@ -573,7 +573,7 @@ function CancelSubscriptionModal({
                 <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.015] p-3 text-[12px] text-zinc-300">
                     Your <span className="font-semibold text-white">{planLabel}</span> plan stays active until{' '}
                     <span className="font-medium text-white">{renewalDate || 'the end of your billing period'}</span>.
-                    After that you'll be downgraded to Free. Remaining credits stay usable until then.
+                    After that you&apos;ll be downgraded to Free. Remaining credits stay usable until then.
                 </div>
 
                 {cancelError && (

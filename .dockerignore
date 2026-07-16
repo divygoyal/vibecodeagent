@@ -1,0 +1,30 @@
+# The root build context is shared by admin/Dockerfile and Dockerfile.nanobot.
+# Keep it allowlisted so unrelated source, local state, and secrets never enter it.
+**
+!admin/
+!admin/**
+!templates/
+!templates/**
+!plugins/
+!plugins/**
+!scripts/
+!scripts/nanobot_entrypoint.sh
+!Dockerfile.nanobot
+
+# Defense in depth for files inside allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/.git/**
+**/node_modules
+**/node_modules/**
+**/.next
+**/.next/**
+**/__pycache__
+**/__pycache__/**
+**/*.py[cod]
+admin/data
+admin/data/**
+**/*.db
+**/*.sqlite
+**/*.sqlite3

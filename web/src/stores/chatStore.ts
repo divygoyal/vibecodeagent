@@ -126,13 +126,13 @@ export function setActiveThreadId(id: string): void {
 let threadEnsuredFor: string | null = null;
 async function ensureThreadOnServer(threadId: string, opts: { title?: string; persona?: string; site_url?: string; repo?: string } = {}): Promise<void> {
     if (threadEnsuredFor === threadId) return;
-    threadEnsuredFor = threadId;
     try {
-        await fetch(`/api/chat-store?action=create_thread`, {
+        const res = await fetch(`/api/chat-store?action=create_thread`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: threadId, ...opts }),
         });
+        if (res.ok) threadEnsuredFor = threadId;
     } catch { /* server-sync is best-effort */ }
 }
 

@@ -33,6 +33,10 @@ type AdminUserSyncPayload = {
     github_username?: string;
 };
 
+type ProviderCredentialOverrides = {
+    googleRefreshToken?: string;
+};
+
 /**
  * Build the upsert payload for a SPECIFIC target provider.
  * If targetProvider is omitted, falls back to the primary provider (legacy first-sign-in path).
@@ -44,6 +48,7 @@ type AdminUserSyncPayload = {
 function buildAdminUserSyncPayload(
     session: AdminSyncSession,
     targetProvider?: 'github' | 'google',
+    credentialOverrides: ProviderCredentialOverrides = {},
 ): AdminUserSyncPayload | null {
     const u = session?.user;
     if (!u) return null;
@@ -71,7 +76,9 @@ function buildAdminUserSyncPayload(
     if (provider === 'google') {
         const providerId = u.googleAccountId || (u.provider === 'google' ? u.id : undefined);
         const accessToken = u.googleAccessToken || (u.provider === 'google' ? u.accessToken : undefined);
-        const refreshToken = u.googleRefreshToken || (u.provider === 'google' ? u.refreshToken : undefined);
+        const refreshToken = credentialOverrides.googleRefreshToken
+            || u.googleRefreshToken
+            || (u.provider === 'google' ? u.refreshToken : undefined);
         if (!providerId || !accessToken) return null;
         return {
             provider: 'google',
@@ -89,8 +96,17 @@ function buildAdminUserSyncPayload(
 export async function ensureAdminUserSynced(
     session: AdminSyncSession,
     targetProvider?: 'github' | 'google',
+    credentialOverrides: ProviderCredentialOverrides = {},
 ) {
-    const payload = buildAdminUserSyncPayload(session, targetProvider);
+    if (!ADMIN_API_KEY) {
+        return {
+            synced: false,
+            skipped: true,
+            reason: 'missing-admin-api-key',
+        } as const;
+    }
+
+    const payload = buildAdminUserSyncPayload(session, targetProvider, credentialOverrides);
     if (!payload) {
         return {
             synced: false,

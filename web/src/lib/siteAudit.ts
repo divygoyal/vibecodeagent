@@ -209,8 +209,9 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     $('link[rel="stylesheet"]').each((_, el) => { stylesheetDetails.push({ href: $(el).attr('href') || '' }); });
 
     // Collect structured data details (before removal)
+    const jsonLdScripts = $('script[type="application/ld+json"]');
     const structuredDataDetails: { type: string; data: string }[] = [];
-    $('script[type="application/ld+json"]').each((_, el) => {
+    jsonLdScripts.each((_, el) => {
         const text = $(el).html() || '';
         let schemaType = 'Unknown';
         try {
@@ -226,20 +227,16 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
     // Capture lowercased script srcs while scripts are still in the DOM (for CRO/vendor checks below)
     const scriptSrcsLower = scriptDetails.map(s => (s.src || '').toLowerCase());
 
+    const scriptCount = scriptDetails.length;
+    const stylesheetCount = stylesheetDetails.length;
+    const hasStructuredData = jsonLdScripts.length > 0;
+
     // Body text
     $('script, style, noscript').remove();
     const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
     const wordCount = countWords(bodyText);
     const bodyTextLower = bodyText.toLowerCase();
     const htmlExcerpt = bodyText.slice(0, 8000);
-
-    // Scripts and stylesheets
-    const scriptCount = $('script[src]').length;
-    const stylesheetCount = $('link[rel="stylesheet"]').length;
-
-    // Structured data
-    const jsonLdScripts = $('script[type="application/ld+json"]');
-    let hasStructuredData = jsonLdScripts.length > 0;
 
     // Favicon
     const favicon = $('link[rel="icon"], link[rel="shortcut icon"]').attr('href') || '';

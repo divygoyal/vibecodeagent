@@ -115,7 +115,6 @@ export default function RootLayout({
                 { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: 'https://trafficclaw.com/pricing' },
                 { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month + Telegram bot', url: 'https://trafficclaw.com/pricing' },
               ],
-              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '127', bestRating: '5', worstRating: '1' },
             }),
           }}
         />

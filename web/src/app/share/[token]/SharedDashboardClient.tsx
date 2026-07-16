@@ -246,7 +246,7 @@ const RANGE_LABELS: Record<string, string> = {
     last_year: 'Last year',
     '6m': 'Last 6 months',
     '12m': 'Last 12 months',
-    all: 'All time',
+    all: 'Last 365 days',
 };
 
 const PANEL_COLORS = [

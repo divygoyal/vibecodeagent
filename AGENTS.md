@@ -51,34 +51,40 @@ npx eslint src/path/to/file.ts
 ```bash
 pip install -r admin/requirements.txt
 python admin/main.py
+python -m unittest discover -s admin/tests -p 'test_*.py'
 ```
 From inside `admin/` you can also run:
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
-- No admin-specific lint or test command is configured.
+- Admin security helpers have targeted standard-library unittest coverage; there is still no full admin integration suite.
 
 ### Plugins
 ```bash
 cd plugins/google-analytics && npm install
 cd plugins/google-search-console && npm install
 cd plugins/github-ghost && npm install
+cd plugins/google-analytics && npm test
+cd plugins/google-search-console && npm test
 ```
-- Plugin packages do not define build, lint, or test scripts.
+- The Google plugin packages have targeted credential-input tests. Other plugin packages do not define build, lint, or test scripts.
 
 ## Test Status
-- No integrated automated test suite is configured right now.
+- No integrated full-stack automated test suite is configured right now.
 - No `pytest`, `unittest`, `jest`, `vitest`, or Playwright project config is checked in.
+- `admin/tests/test_plugin_security.py` uses standard-library unittest and both Google plugins use Node's built-in test runner.
 - `web/package.json` has `dev`, `build`, and `lint`, but no `test` script.
 - `test_db.py` is an ad hoc DB inspection script, not regression coverage.
-- There is currently no supported "run one test" command.
-- Do not claim that you ran a single test unless you first add real test tooling and a real test.
+- There is no supported single-test command outside the targeted admin/plugin tests.
 - Current fallback validation:
 ```bash
 cd web && npx eslint src/path/to/file.tsx
 cd web && npx tsc --noEmit
 cd web && npm run build
 python test_db.py
+python -m unittest discover -s admin/tests -p 'test_*.py'
+cd plugins/google-analytics && npm test
+cd plugins/google-search-console && npm test
 ```
 
 ## Style Sources

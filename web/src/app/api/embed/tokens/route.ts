@@ -100,7 +100,7 @@ export async function DELETE(req: Request) {
         }
 
         const res = await fetch(
-            `${ADMIN_API_URL}/api/embed-tokens/${encodeURIComponent(token)}`,
+            `${ADMIN_API_URL}/api/embed-tokens/${encodeURIComponent(token)}?user_identifier=${encodeURIComponent(session.user.id)}`,
             {
                 method: 'DELETE',
                 headers: { 'X-API-Key': ADMIN_API_KEY },

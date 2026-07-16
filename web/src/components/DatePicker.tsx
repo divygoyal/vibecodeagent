@@ -41,7 +41,7 @@ const PRESETS: PresetItem[] = [
     { separator: true },
     { label: 'Last 6 months', value: '6m', shortcut: '6' },
     { label: 'Last 12 months', value: '12m', shortcut: '0' },
-    { label: 'All time', value: 'all', shortcut: 'A' },
+    { label: 'Last 365 days', value: 'all', shortcut: 'A' },
 ];
 
 // Ordered list of navigable preset values (excludes separators)
@@ -73,17 +73,17 @@ export function getDateRangeText(range: string): string {
         case '90d': {
             const days = parseInt(range);
             const start = new Date(now);
-            start.setDate(start.getDate() - days);
+            start.setDate(start.getDate() - (days - 1));
             return `${fmt(start)} - ${fmt(now)}`;
         }
         case '6m': {
             const start = new Date(now);
-            start.setMonth(start.getMonth() - 6);
+            start.setDate(start.getDate() - 179);
             return `${fmtYear(start)} - ${fmt(now)}`;
         }
         case '12m': {
             const start = new Date(now);
-            start.setFullYear(start.getFullYear() - 1);
+            start.setDate(start.getDate() - 364);
             return `${fmtYear(start)} - ${fmt(now)}`;
         }
         case 'this_week': {
@@ -116,8 +116,11 @@ export function getDateRangeText(range: string): string {
             const end = new Date(now.getFullYear() - 1, 11, 31);
             return `${fmtYear(start)} - ${fmtYear(end)}`;
         }
-        case 'all':
-            return 'All time';
+        case 'all': {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 364);
+            return `${fmtYear(start)} - ${fmt(now)}`;
+        }
         default:
             return '';
     }

@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const { readGoogleCredentialsFromStdin } = require('./credentialInput');
 
 class GoogleAnalytics {
     constructor(config) {
@@ -833,7 +834,7 @@ async function fetchClientTokens(clientId) {
     };
 }
 
-async function resolveClientConfig(args) {
+async function resolveClientConfig(args, protectedConfig = {}) {
     if (!args[0]) {
         return {};
     }
@@ -844,6 +845,10 @@ async function resolveClientConfig(args) {
     if (ciIdx !== -1 && ciIdx + 1 < args.length) {
         clientId = args[ciIdx + 1];
         args.splice(ciIdx, 2);
+    }
+
+    if (hasGoogleCredentials(protectedConfig)) {
+        return protectedConfig;
     }
 
     if (argsIncludeGoogleCredentials(args)) {
@@ -878,10 +883,11 @@ if (require.main === module) {
         const command = args[0];
 
         try {
-            // Extract --client-id when present. If omitted inside a user bot
-            // container, fall back to USER_IDENTIFIER so stale bot prompts that
-            // run plain commands still fetch the right user's OAuth tokens.
-            const clientConfig = await resolveClientConfig(args);
+            // The protected stdin channel takes precedence. Direct CLI
+            // credentials, scoped environment credentials, and admin lookup
+            // remain available as fallbacks for bot-container workflows.
+            const protectedConfig = await readGoogleCredentialsFromStdin();
+            const clientConfig = await resolveClientConfig(args, protectedConfig);
 
             const plugin = new GoogleAnalytics(clientConfig);
 

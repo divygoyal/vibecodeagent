@@ -70,9 +70,9 @@ export async function GET(
   const range = allowedRanges.includes(rangeParam) ? rangeParam : '30d';
 
   try {
-    // 1. Fetch dashboard config from admin API (public endpoint returns ownerIdentifier)
+    // 1. Fetch dashboard config without counting this background refresh as a view.
     const dashRes = await fetch(
-      `${ADMIN_API_URL}/api/custom-dashboards/public/${token}`,
+      `${ADMIN_API_URL}/api/custom-dashboards/public/${token}?track_view=false`,
       { headers: { 'X-API-Key': ADMIN_API_KEY } },
     );
 

@@ -114,6 +114,8 @@ services:
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CRON_SECRET=${CRON_SECRET}
+      - DODO_PAYMENTS_API_KEY=${DODO_PAYMENTS_API_KEY}
+      - DODO_PAYMENTS_WEBHOOK_KEY=${DODO_PAYMENTS_WEBHOOK_KEY}
     networks:
       - clawbot-network
     depends_on:

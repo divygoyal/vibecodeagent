@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
+import { getToken } from "next-auth/jwt"
 import { ensureAdminUserSynced, authOptions } from "@/lib/adminUserSync"
 
 /**
@@ -27,16 +28,23 @@ export async function POST(req: NextRequest) {
     } catch { /* no body, fall back to primary */ }
 
     try {
-        const sync = await ensureAdminUserSynced(session, targetProvider)
+        const jwt = await getToken({ req: req as never }) as { googleRefreshToken?: string } | null
+        const sync = await ensureAdminUserSynced(session, targetProvider, {
+            googleRefreshToken: jwt?.googleRefreshToken,
+        })
 
         if (!sync.synced) {
             console.warn("Register provider degraded:", sync.reason)
+            const status = 'status' in sync && typeof sync.status === 'number' && sync.status >= 400
+                ? sync.status
+                : 503
             return NextResponse.json({
-                registered: true,
+                registered: false,
                 synced: false,
                 degraded: true,
-                reason: sync.reason || "Admin API returned error"
-            })
+                reason: sync.reason || "Admin API returned error",
+                error: "Provider connection could not be saved",
+            }, { status })
         }
 
         return NextResponse.json({

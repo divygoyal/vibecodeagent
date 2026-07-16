@@ -206,7 +206,7 @@ const RANGE_LABELS: Record<string, string> = {
   last_month: 'Last month',
   this_year: 'This year',
   last_year: 'Last year',
-  all: 'All time',
+  all: 'Last 365 days',
 };
 
 function toNumber(value: unknown, fallback = 0) {
@@ -547,7 +547,7 @@ export default function MobileOverviewAppShell({
         title: topOpp.type === 'ctr_fix' ? `Rewrite titles for "${topOpp.query}"` : `Push "${topOpp.query}" higher`,
         why: `This query sits near position ${toNumber(topOpp.position).toFixed(1)} with ${formatCompact(topOpp.impressions)} impressions.`,
         impact: `Potential +${formatCompact(topOpp.potentialClicks)} clicks if expected demand is captured.`,
-        href: '/dashboard/opportunities',
+        href: '/dashboard/seo',
         cta: 'Review opportunity',
         tone: topOpp.type === 'ctr_fix' ? 'amber' : 'emerald',
       });
@@ -763,7 +763,7 @@ export default function MobileOverviewAppShell({
         label: 'Search movers',
         title: topQueryCard?.query || 'No keyword movers yet',
         detail: topQueryCard ? `Position ${formatCompact(topQueryCard.position)} · ${formatSigned(topQueryCard.delta, true, '')}` : 'This card will highlight the fastest-moving search term.',
-        href: '/dashboard/opportunities',
+        href: '/dashboard/seo',
         tone: 'emerald' as MetricTone,
       },
       {
@@ -910,7 +910,7 @@ export default function MobileOverviewAppShell({
 
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
-            href={topAction?.href || '/dashboard/opportunities'}
+            href={topAction?.href || '/dashboard/seo'}
             className="inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 px-4 py-3 text-sm font-semibold text-[#031014] shadow-[0_10px_24px_rgba(34,211,238,0.18)] transition-all duration-100 active:scale-[0.97] active:opacity-90"
           >
             Review top action

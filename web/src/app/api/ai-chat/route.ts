@@ -1235,23 +1235,26 @@ CRITICAL SYSTEM CONTEXT:
                                         }, 2500);
                                     }
 
-                                    const toolResult = await executeAiChatTool(fcName, fcArgs, {
-                                        googleAccessToken,
-                                        googleRefreshToken,
-                                        githubAccessToken,
-                                        userId: userId ? String(userId) : undefined,
-                                        // A2 / A10: pass dashboard snapshots so get_alerts and
-                                        // cross_source_diagnose can compute deterministically
-                                        // without re-querying APIs.
-                                        seoContext,
-                                        analyticsContext,
-                                        // find_top_money_move serves directly from the enriched snapshot
-                                        // (winners/losers, cannibalization, mobile-gap, page-meta, ranked
-                                        // insights). enrichedSnapshot is null when no siteUrl is selected.
-                                        enrichedSnapshot,
-                                    });
-
-                                    if (progressTimer) clearInterval(progressTimer);
+                                    let toolResult: Awaited<ReturnType<typeof executeAiChatTool>>;
+                                    try {
+                                        toolResult = await executeAiChatTool(fcName, fcArgs, {
+                                            googleAccessToken,
+                                            googleRefreshToken,
+                                            githubAccessToken,
+                                            userId: userId ? String(userId) : undefined,
+                                            // A2 / A10: pass dashboard snapshots so get_alerts and
+                                            // cross_source_diagnose can compute deterministically
+                                            // without re-querying APIs.
+                                            seoContext,
+                                            analyticsContext,
+                                            // find_top_money_move serves directly from the enriched snapshot
+                                            // (winners/losers, cannibalization, mobile-gap, page-meta, ranked
+                                            // insights). enrichedSnapshot is null when no siteUrl is selected.
+                                            enrichedSnapshot,
+                                        });
+                                    } finally {
+                                        if (progressTimer) clearInterval(progressTimer);
+                                    }
 
                                     controller.enqueue(encodeSSE({
                                         type: 'tool_result',

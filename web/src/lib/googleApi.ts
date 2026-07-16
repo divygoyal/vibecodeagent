@@ -24,6 +24,14 @@ function fmtDate(d: Date): string {
     return d.toISOString().split('T')[0];
 }
 
+function rollingRange(days: number): { startDate: string; endDate: string } {
+    return { startDate: `${days - 1}daysAgo`, endDate: 'today' };
+}
+
+function previousRollingRange(days: number): { startDate: string; endDate: string } {
+    return { startDate: `${(days * 2) - 1}daysAgo`, endDate: `${days}daysAgo` };
+}
+
 /** Resolve a range key to GA4-compatible { startDate, endDate } */
 export function resolveRange(range: string): { startDate: string; endDate: string } {
     const now = new Date();
@@ -33,19 +41,19 @@ export function resolveRange(range: string): { startDate: string; endDate: strin
         case 'yesterday':
             return { startDate: 'yesterday', endDate: 'yesterday' };
         case '7d':
-            return { startDate: '7daysAgo', endDate: 'today' };
+            return rollingRange(7);
         case '14d':
-            return { startDate: '14daysAgo', endDate: 'today' };
+            return rollingRange(14);
         case '30d':
-            return { startDate: '28daysAgo', endDate: 'today' };
+            return rollingRange(30);
         case '60d':
-            return { startDate: '60daysAgo', endDate: 'today' };
+            return rollingRange(60);
         case '90d':
-            return { startDate: '90daysAgo', endDate: 'today' };
+            return rollingRange(90);
         case '6m':
-            return { startDate: '180daysAgo', endDate: 'today' };
+            return rollingRange(180);
         case '12m':
-            return { startDate: '365daysAgo', endDate: 'today' };
+            return rollingRange(365);
         case 'this_week': {
             const start = new Date(now);
             start.setDate(start.getDate() - start.getDay()); // Sunday
@@ -77,9 +85,9 @@ export function resolveRange(range: string): { startDate: string; endDate: strin
             return { startDate: fmtDate(start), endDate: fmtDate(end) };
         }
         case 'all':
-            return { startDate: '365daysAgo', endDate: 'today' };
+            return rollingRange(365);
         default:
-            return { startDate: '28daysAgo', endDate: 'today' };
+            return rollingRange(30);
     }
 }
 
@@ -92,19 +100,19 @@ export function resolvePrevRange(range: string): { startDate: string; endDate: s
         case 'yesterday':
             return { startDate: '2daysAgo', endDate: '2daysAgo' };
         case '7d':
-            return { startDate: '14daysAgo', endDate: '8daysAgo' };
+            return previousRollingRange(7);
         case '14d':
-            return { startDate: '28daysAgo', endDate: '15daysAgo' };
+            return previousRollingRange(14);
         case '30d':
-            return { startDate: '56daysAgo', endDate: '29daysAgo' };
+            return previousRollingRange(30);
         case '60d':
-            return { startDate: '120daysAgo', endDate: '61daysAgo' };
+            return previousRollingRange(60);
         case '90d':
-            return { startDate: '180daysAgo', endDate: '91daysAgo' };
+            return previousRollingRange(90);
         case '6m':
-            return { startDate: '365daysAgo', endDate: '181daysAgo' };
+            return previousRollingRange(180);
         case '12m':
-            return { startDate: '730daysAgo', endDate: '366daysAgo' };
+            return previousRollingRange(365);
         case 'this_week': {
             const thisStart = new Date(now);
             thisStart.setDate(thisStart.getDate() - thisStart.getDay());
@@ -149,9 +157,9 @@ export function resolvePrevRange(range: string): { startDate: string; endDate: s
             return { startDate: fmtDate(start), endDate: fmtDate(end) };
         }
         case 'all':
-            return { startDate: '730daysAgo', endDate: '366daysAgo' };
+            return previousRollingRange(365);
         default:
-            return { startDate: '56daysAgo', endDate: '29daysAgo' };
+            return previousRollingRange(30);
     }
 }
 
@@ -496,12 +504,13 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
 
     // Run all queries in parallel for speed
     const [
-        currentTotals, prevTotals, sourcesData, pagesData, devicesData, countriesData,
+        currentTotals, prevTotals, currentTrend, sourcesData, pagesData, devicesData, countriesData,
         browsersData, osData, channelsData, referrersData, citiesData, regionsData,
         entryPagesData, languagesData
     ] = await Promise.all([
-        runGAReport(token, pid, ['date'], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration', 'newUsers'], startDate, endDate, 1000),
-        runGAReport(token, pid, ['date'], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate'], prevStartDate, prevEndDate, 1000),
+        runGAReport(token, pid, [], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'averageSessionDuration', 'newUsers'], startDate, endDate, 1),
+        runGAReport(token, pid, [], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate'], prevStartDate, prevEndDate, 1),
+        runGAReport(token, pid, ['date'], ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate'], startDate, endDate, 1000),
         runGAReport(token, pid, ['sessionSource', 'sessionMedium'], ['sessions', 'activeUsers'], startDate, endDate, 50, 'sessions').catch(() => null),
         runGAReport(token, pid, ['pagePath', 'pageTitle'], ['screenPageViews', 'averageSessionDuration', 'bounceRate', 'activeUsers'], startDate, endDate, 50, 'screenPageViews').catch(() => null),
         runGAReport(token, pid, ['deviceCategory'], ['sessions', 'activeUsers'], startDate, endDate, 10, 'sessions').catch(() => null),
@@ -517,20 +526,17 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
     ]);
 
     // KPIs + Traffic
-    let totalUsers = 0, totalSessions = 0, totalPageViews = 0;
-    let totalBounce = 0, totalDuration = 0, totalNewUsers = 0, rowCount = 0;
+    const currentValues = currentTotals.rows?.[0]?.metricValues || [];
+    const totalUsers = parseInt(currentValues[0]?.value) || 0;
+    const totalSessions = parseInt(currentValues[1]?.value) || 0;
+    const totalPageViews = parseInt(currentValues[2]?.value) || 0;
+    const avgBounce = (parseFloat(currentValues[3]?.value) || 0) * 100;
+    const avgSessionDuration = parseFloat(currentValues[4]?.value) || 0;
+    const totalNewUsers = parseInt(currentValues[5]?.value) || 0;
 
-    if (currentTotals.rows) {
-        for (const row of currentTotals.rows) {
+    if (currentTrend.rows) {
+        for (const row of currentTrend.rows) {
             const mv = row.metricValues;
-            totalUsers += parseInt(mv[0].value) || 0;
-            totalSessions += parseInt(mv[1].value) || 0;
-            totalPageViews += parseInt(mv[2].value) || 0;
-            totalBounce += parseFloat(mv[3].value) || 0;
-            totalDuration += parseFloat(mv[4].value) || 0;
-            totalNewUsers += parseInt(mv[5].value) || 0;
-            rowCount++;
-
             const dateRaw = row.dimensionValues[0].value;
             const date = dateRaw.length === 8
                 ? `${dateRaw.substring(0, 4)}-${dateRaw.substring(4, 6)}-${dateRaw.substring(6, 8)}`
@@ -545,17 +551,11 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
         }
     }
 
-    let prevUsers = 0, prevSessions = 0, prevPageViews = 0, prevBounce = 0, prevRows = 0;
-    if (prevTotals.rows) {
-        for (const row of prevTotals.rows) {
-            const mv = row.metricValues;
-            prevUsers += parseInt(mv[0].value) || 0;
-            prevSessions += parseInt(mv[1].value) || 0;
-            prevPageViews += parseInt(mv[2].value) || 0;
-            prevBounce += parseFloat(mv[3].value) || 0;
-            prevRows++;
-        }
-    }
+    const previousValues = prevTotals.rows?.[0]?.metricValues || [];
+    const prevUsers = parseInt(previousValues[0]?.value) || 0;
+    const prevSessions = parseInt(previousValues[1]?.value) || 0;
+    const prevPageViews = parseInt(previousValues[2]?.value) || 0;
+    const prevAvgBounce = (parseFloat(previousValues[3]?.value) || 0) * 100;
 
     const pctChange = (cur: number, prev: number) => {
         if (prev <= 0) return 0;
@@ -563,17 +563,14 @@ export async function fetchAnalyticsDashboard(token: string, propertyId: string,
         if (!Number.isFinite(change)) return 0;
         return +change.toFixed(1);
     };
-    const avgBounce = rowCount > 0 ? (totalBounce / rowCount) * 100 : 0;
-    const prevAvgBounce = prevRows > 0 ? (prevBounce / prevRows) * 100 : 0;
-
     result.kpis = {
         totalUsers,
         totalSessions,
         totalPageViews,
         avgBounceRate: +avgBounce.toFixed(1),
-        avgSessionDuration: rowCount > 0 ? Math.round(totalDuration / rowCount) : 0,
+        avgSessionDuration: Math.round(avgSessionDuration),
         newUsers: totalNewUsers,
-        returningUsers: totalUsers - totalNewUsers,
+        returningUsers: Math.max(0, totalUsers - totalNewUsers),
         pagesPerSession: totalSessions > 0 ? +(totalPageViews / totalSessions).toFixed(1) : 0,
         changeUsers: pctChange(totalUsers, prevUsers),
         changeSessions: pctChange(totalSessions, prevSessions),
@@ -947,20 +944,20 @@ export async function fetchSeoDashboard(token: string, siteUrl: string, range = 
     const prevPageRows = prevPageData.rows || [];
 
     // KPIs
-    let totalClicks = 0, totalImpressions = 0, totalPos = 0, curCount = 0;
+    let totalClicks = 0, totalImpressions = 0, weightedPosition = 0;
     for (const row of currentRows) {
+        const impressions = row.impressions || 0;
         totalClicks += row.clicks || 0;
-        totalImpressions += row.impressions || 0;
-        totalPos += row.position || 0;
-        curCount++;
+        totalImpressions += impressions;
+        weightedPosition += (row.position || 0) * impressions;
     }
 
-    let prevClicks = 0, prevImpressions = 0, prevPos = 0, prevCount = 0;
+    let prevClicks = 0, prevImpressions = 0, prevWeightedPosition = 0;
     for (const row of prevRows) {
+        const impressions = row.impressions || 0;
         prevClicks += row.clicks || 0;
-        prevImpressions += row.impressions || 0;
-        prevPos += row.position || 0;
-        prevCount++;
+        prevImpressions += impressions;
+        prevWeightedPosition += (row.position || 0) * impressions;
     }
 
     const pctChange = (cur: number, prev: number) => {
@@ -970,9 +967,9 @@ export async function fetchSeoDashboard(token: string, siteUrl: string, range = 
         return +change.toFixed(1);
     };
     const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    const avgPos = curCount > 0 ? totalPos / curCount : 0;
+    const avgPos = totalImpressions > 0 ? weightedPosition / totalImpressions : 0;
     const prevAvgCtr = prevImpressions > 0 ? (prevClicks / prevImpressions) * 100 : 0;
-    const prevAvgPos = prevCount > 0 ? prevPos / prevCount : 0;
+    const prevAvgPos = prevImpressions > 0 ? prevWeightedPosition / prevImpressions : 0;
 
     result.kpis = {
         totalClicks,

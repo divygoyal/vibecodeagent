@@ -157,7 +157,7 @@ export async function GET() {
             });
             if (!res.ok) {
                 console.error('Admin API list shares error:', res.status, await res.text());
-                return NextResponse.json({ shares: [] });
+                return NextResponse.json({ error: 'Failed to load shared dashboards' }, { status: res.status });
             }
             const shares = await res.json();
             const normalizedShares = (Array.isArray(shares) ? shares : shares.shares || []).map(normalizeShareData);
@@ -406,24 +406,24 @@ export async function DELETE(req: Request) {
             }
 
             if (revokeAll) {
-                const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/user/${userId}`, {
+                const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/user/${encodeURIComponent(userId)}`, {
                     method: 'DELETE',
                     headers: { 'X-API-Key': ADMIN_API_KEY },
                 });
-                const data = await res.json();
-                return NextResponse.json(data);
+                const data = await res.json().catch(() => ({ error: 'Failed to revoke shared dashboards' }));
+                return NextResponse.json(data, { status: res.status });
             }
 
             if (!token) {
                 return NextResponse.json({ error: 'token or all=true required' }, { status: 400 });
             }
 
-            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/${token}?user_identifier=${userId}`, {
+            const res = await fetch(`${ADMIN_API_URL}/api/shared-dashboards/${encodeURIComponent(token)}?user_identifier=${encodeURIComponent(userId)}`, {
                 method: 'DELETE',
                 headers: { 'X-API-Key': ADMIN_API_KEY },
             });
-            const data = await res.json();
-            return NextResponse.json(data);
+            const data = await res.json().catch(() => ({ error: 'Failed to revoke shared dashboard' }));
+            return NextResponse.json(data, { status: res.status });
         }
 
         if (!ALLOW_IN_MEMORY_SHARES) {

@@ -24,6 +24,13 @@ from contextlib import asynccontextmanager
 
 from config import settings, PLANS
 from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest
+from plugin_security import (
+    GOOGLE_PLUGINS,
+    build_google_credentials_stdin,
+    build_plugin_command,
+    redact_sensitive_data,
+    redact_sensitive_text,
+)
 from services.github_app_tokens import (
     get_installation_token as github_app_get_installation_token,
     fetch_installation_metadata as github_app_fetch_installation_metadata,
@@ -2008,13 +2015,14 @@ async def execute_plugin_command_for_user(
         except Exception:
             raise HTTPException(status_code=503, detail="Container not provisioned. Set up your bot first.")
 
-    cmd = ["node", f"/app/plugins/{plugin}/index.js", command] + [str(arg) for arg in args]
-    for key, value in options.items():
-        cmd.append(f"--{key}")
-        if value is not None and value != "":
-            cmd.append(str(value))
+    try:
+        cmd = build_plugin_command(plugin, command, args, options)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    if plugin in ["google-analytics", "google-search-console"]:
+    credential_input = None
+    sensitive_values: List[Optional[str]] = []
+    if plugin in GOOGLE_PLUGINS:
         stmt = select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
             OAuthConnection.provider == "google"
@@ -2023,25 +2031,54 @@ async def execute_plugin_command_for_user(
         oauth = result.scalars().first()
 
         if oauth:
-            if oauth.access_token:
-                cmd.extend(["--accessToken", oauth.access_token])
-            if oauth.refresh_token:
-                cmd.extend(["--refreshToken", oauth.refresh_token])
+            sensitive_values = [oauth.access_token, oauth.refresh_token]
+            credential_input = build_google_credentials_stdin(
+                oauth.access_token,
+                oauth.refresh_token,
+            )
 
     env = os.environ.copy()
+    env.pop("TRAFFICCLAW_PLUGIN_CREDENTIALS_STDIN", None)
+    if credential_input is not None:
+        env["TRAFFICCLAW_PLUGIN_CREDENTIALS_STDIN"] = "1"
 
-    print(f"Executing plugin: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60)
+    print(
+        f"Executing plugin: plugin={plugin} command={command} "
+        f"positional_args={len(args)} option_keys={sorted(options.keys())}"
+    )
+    result = await asyncio.to_thread(
+        subprocess.run,
+        cmd,
+        input=credential_input,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
     stdout = result.stdout
     stderr = result.stderr
+    safe_stderr = redact_sensitive_text(stderr, sensitive_values) if stderr else ""
 
-    print(f"Plugin stdout: {stdout[:500]}...")
-    if stderr:
-        print(f"Plugin stderr: {stderr}")
+    print(
+        f"Plugin completed: plugin={plugin} command={command} "
+        f"exit_code={result.returncode} stdout_chars={len(stdout)} "
+        f"stderr_chars={len(stderr)}"
+    )
+    if safe_stderr:
+        print(f"Plugin stderr: {safe_stderr}")
+    if result.returncode != 0:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Plugin process failed with exit code {result.returncode}",
+        )
 
     try:
         parsed = json.loads(stdout)
-        return {"status": "ok", "data": parsed, "stderr": stderr}
+        return {
+            "status": "ok",
+            "data": redact_sensitive_data(parsed, sensitive_values),
+            "stderr": safe_stderr,
+        }
     except json.JSONDecodeError:
         try:
             cleaned = stdout.strip()
@@ -2054,11 +2091,19 @@ async def execute_plugin_command_for_user(
             if start_index != -1:
                 json_candidate = cleaned[start_index:]
                 parsed = json.loads(json_candidate)
-                return {"status": "ok", "data": parsed, "stderr": stderr}
+                return {
+                    "status": "ok",
+                    "data": redact_sensitive_data(parsed, sensitive_values),
+                    "stderr": safe_stderr,
+                }
         except Exception:
             pass
 
-        return {"status": "ok", "data": stdout.strip(), "stderr": stderr}
+        return {
+            "status": "ok",
+            "data": redact_sensitive_text(stdout.strip(), sensitive_values),
+            "stderr": safe_stderr,
+        }
 
 
 async def get_google_inventory_for_user(user: User, db: AsyncSession) -> Dict[str, Any]:
@@ -2147,9 +2192,12 @@ async def exec_plugin(
     except subprocess.TimeoutExpired:
         print(f"Plugin exec timeout for {github_id}: {req.plugin} {req.command}")
         raise HTTPException(status_code=504, detail="Plugin execution timed out")
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Plugin exec error for {github_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Plugin execution failed: {str(e)}")
+        safe_error = redact_sensitive_text(e)
+        print(f"Plugin exec error for {github_id}: {safe_error}")
+        raise HTTPException(status_code=500, detail=f"Plugin execution failed: {safe_error}")
 
 
 # ============= GitHub App Installations =============
@@ -2770,12 +2818,20 @@ async def list_embed_tokens(
 @app.delete("/api/embed-tokens/{token}")
 async def revoke_embed_token(
     token: str,
+    user_identifier: str,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
     """Revoke an embed token (soft delete)."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     result = await db.execute(
-        select(EmbedToken).where(EmbedToken.token == token)
+        select(EmbedToken).where(
+            EmbedToken.token == token,
+            EmbedToken.user_id == user.id,
+        )
     )
     embed_token = result.scalar_one_or_none()
     if not embed_token:
@@ -3000,11 +3056,19 @@ async def update_social_embed_token(
 @app.delete("/api/social-embed-tokens/{token}")
 async def revoke_social_embed_token(
     token: str,
+    user_identifier: str,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     result = await db.execute(
-        select(SocialEmbedToken).where(SocialEmbedToken.token == token)
+        select(SocialEmbedToken).where(
+            SocialEmbedToken.token == token,
+            SocialEmbedToken.user_id == user.id,
+        )
     )
     social_embed_token = result.scalar_one_or_none()
     if not social_embed_token:
@@ -4940,6 +5004,7 @@ async def duplicate_custom_dashboard(
 @app.get("/api/custom-dashboards/public/{token}")
 async def get_public_custom_dashboard(
     token: str,
+    track_view: bool = True,
     db: AsyncSession = Depends(get_db),
 ):
     """Public endpoint: get a shared custom dashboard by share token. NO auth required."""
@@ -4954,9 +5019,9 @@ async def get_public_custom_dashboard(
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    # Increment views
-    dashboard.views = (dashboard.views or 0) + 1
-    await db.commit()
+    if track_view:
+        dashboard.views = (dashboard.views or 0) + 1
+        await db.commit()
 
     # Resolve owner identifier for Google token lookup
     user_result = await db.execute(select(User).where(User.id == dashboard.user_id))
@@ -5157,11 +5222,15 @@ async def list_chat_messages(
     if not t or t.user_id != user.id:
         raise HTTPException(status_code=404, detail="Thread not found")
     q = select(ChatMessage).where(ChatMessage.thread_id == thread_id) \
-        .order_by(ChatMessage.created_at.asc()) \
+        .order_by(ChatMessage.created_at.desc()) \
         .limit(min(max(1, limit), 500))
     result = await db.execute(q)
-    msgs = result.scalars().all()
-    return {"messages": [_serialize_message(m) for m in msgs], "summary": t.summary}
+    msgs = list(reversed(result.scalars().all()))
+    return {
+        "messages": [_serialize_message(m) for m in msgs],
+        "summary": t.summary,
+        "thread": _serialize_thread(t),
+    }
 
 
 @app.post("/api/chat/threads/{thread_id}/messages")
@@ -5275,10 +5344,15 @@ async def upsert_chat_fact(
     if data.scope_value:
         existing_q = existing_q.where(ChatFact.scope_value == data.scope_value[:255])
     existing = (await db.execute(existing_q)).scalars().all()
+
+    stronger_existing = next((
+        prev for prev in existing
+        if data.scope != 'correction' and prev.confidence > data.confidence + 0.15
+    ), None)
+    if stronger_existing:
+        return _serialize_fact(stronger_existing)
+
     for prev in existing:
-        # Don't replace a higher-confidence fact with a lower one (unless this is a correction)
-        if data.scope != 'correction' and prev.confidence > data.confidence + 0.15:
-            continue
         prev.superseded_at = datetime.utcnow()
 
     fact = ChatFact(
@@ -5339,15 +5413,45 @@ async def submit_chat_feedback(
         raise HTTPException(status_code=404, detail="User not found")
     if data.rating not in ('up', 'down'):
         raise HTTPException(status_code=400, detail="rating must be up or down")
-    fb = ChatFeedback(
-        user_id=user.id,
-        message_id=data.message_id,
-        thread_id=data.thread_id,
-        rating=data.rating,
-        reason=(data.reason or None) and data.reason[:40],
-        comment=(data.comment or None) and data.comment[:1000],
+
+    message_result = await db.execute(
+        select(ChatMessage)
+        .join(ChatThread, ChatThread.id == ChatMessage.thread_id)
+        .where(
+            ChatMessage.id == data.message_id,
+            ChatMessage.role == "assistant",
+            ChatThread.user_id == user.id,
+        )
     )
-    db.add(fb)
+    message = message_result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Assistant message not found")
+
+    feedback_result = await db.execute(
+        select(ChatFeedback).where(
+            ChatFeedback.user_id == user.id,
+            ChatFeedback.message_id == data.message_id,
+        ).order_by(ChatFeedback.created_at.desc())
+    )
+    fb = feedback_result.scalars().first()
+    if fb:
+        fb.rating = data.rating
+        fb.thread_id = message.thread_id
+        if data.reason is not None:
+            fb.reason = data.reason[:40] or None
+        if data.comment is not None:
+            fb.comment = data.comment[:1000] or None
+    else:
+        fb = ChatFeedback(
+            user_id=user.id,
+            message_id=data.message_id,
+            thread_id=message.thread_id,
+            rating=data.rating,
+            reason=(data.reason or None) and data.reason[:40],
+            comment=(data.comment or None) and data.comment[:1000],
+        )
+        db.add(fb)
+
     await db.commit()
     await db.refresh(fb)
     return {"id": fb.id, "ok": True}

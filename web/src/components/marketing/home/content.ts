@@ -126,7 +126,7 @@ export const HOMEPAGE_CONTENT = {
             previewLabel: 'SEO Bot Active',
             previewValue: 'ANALYZING SITE HEALTH...',
             chips: ['Keyword discovery', 'Link building', 'Decay alerts'],
-            href: '/features/seo-bot',
+            href: '/features#seo-bot',
             ctaLabel: 'Activate SEO Bot',
             features: [
                 {

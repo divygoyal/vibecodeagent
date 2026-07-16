@@ -189,7 +189,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'token parameter required' }, { status: 400 });
         }
 
-        const res = await fetch(`${ADMIN_API_URL}/api/social-embed-tokens/${encodeURIComponent(token)}`, {
+        const res = await fetch(`${ADMIN_API_URL}/api/social-embed-tokens/${encodeURIComponent(token)}?user_identifier=${encodeURIComponent(session.user.id)}`, {
             method: 'DELETE',
             headers: { 'X-API-Key': ADMIN_API_KEY },
         });

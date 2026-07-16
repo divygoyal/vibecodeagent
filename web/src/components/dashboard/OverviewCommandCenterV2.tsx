@@ -232,7 +232,7 @@ const RANGE_LABELS: Record<string, string> = {
   last_month: 'Last month',
   this_year: 'This year',
   last_year: 'Last year',
-  all: 'All time',
+  all: 'Last 365 days',
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -699,7 +699,7 @@ export default function OverviewCommandCenter({
         title: topOpp.type === 'ctr_fix' ? `Rewrite titles for "${topOpp.query}"` : `Push "${topOpp.query}" into stronger positions`,
         why: `This query sits around position ${topOppPosition.toFixed(1)} with ${formatCompact(topOpp.impressions)} impressions.`,
         impact: `Potential +${formatCompact(topOpp.potentialClicks)} clicks if the page captures expected demand.`,
-        href: '/dashboard/opportunities',
+        href: '/dashboard/seo',
         cta: 'Review opportunity',
         tone: topOpp.type === 'ctr_fix' ? 'amber' : 'emerald',
       });
@@ -1802,7 +1802,7 @@ export default function OverviewCommandCenter({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Top Search Movers</div>
                 <h3 className="mt-2 text-lg font-semibold text-white">Keywords moving the fastest</h3>
               </div>
-              <Link href="/dashboard/opportunities" className="dashboard-hover-link min-h-[44px] inline-flex items-center text-sm font-medium text-cyan-300">
+              <Link href="/dashboard/seo" className="dashboard-hover-link min-h-[44px] inline-flex items-center text-sm font-medium text-cyan-300">
                 Explore
               </Link>
             </div>

@@ -221,8 +221,9 @@ export default function FeaturesClient() {
                             return (
                                 <motion.div
                                     key={i}
+                                    id={feature.title === 'AI Content Tools' ? 'seo-bot' : undefined}
                                     variants={fadeUp}
-                                    className={`p-5 sm:p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${feature.gradient} hover:border-white/[0.12] transition-all group`}
+                                    className={`scroll-mt-24 p-5 sm:p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${feature.gradient} hover:border-white/[0.12] transition-all group`}
                                 >
                                     <div className="flex items-start gap-4">
                                         <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white/[0.06] flex-shrink-0 group-hover:scale-110 transition-transform">

@@ -33,7 +33,10 @@ export async function GET(
     }
 
     const dashboard = await res.json();
-    return NextResponse.json({ dashboard });
+    const publicDashboard = { ...dashboard };
+    delete publicDashboard.ownerIdentifier;
+    delete publicDashboard.userId;
+    return NextResponse.json({ dashboard: publicDashboard });
   } catch (err) {
     console.error('Public dashboard error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

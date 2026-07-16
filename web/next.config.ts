@@ -31,6 +31,7 @@ const EMBEDDABLE_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   trailingSlash: false,
   // Allow external images (user avatars)
   images: {

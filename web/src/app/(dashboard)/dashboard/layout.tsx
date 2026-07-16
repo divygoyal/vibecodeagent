@@ -303,13 +303,15 @@ export default function DashboardLayout({
                 setWorkspaceLabel('');
             }
 
-            // If the user record exists but no GA4 property is saved, force them
-            // back through /dashboard/setup. Without this, dashboardSelection
-            // would have to either auto-pick an arbitrary first property (the
-            // re-login bug we're fixing) or leave the AI chat unscoped — both
-            // wrong. The setup flow is the only place that actually persists a
-            // deliberate selection.
-            if (data?.exists && !data?.selected_property_id && !isSetupRoute) {
+            // A workspace may intentionally contain only GA4 or only Search
+            // Console. Return to setup only when neither source was selected.
+            // This preserves the explicit GSC-only path offered by onboarding.
+            if (
+                data?.exists &&
+                !data?.selected_property_id &&
+                !data?.selected_site_url &&
+                !isSetupRoute
+            ) {
                 router.replace('/dashboard/setup');
                 return;
             }
@@ -1048,7 +1050,7 @@ export default function DashboardLayout({
                                                 <div className="px-4 py-8 text-center">
                                                     <Bell className="mx-auto mb-2 h-4 w-4 text-zinc-700" />
                                                     <p className="text-[11px] text-zinc-500">No alerts right now</p>
-                                                    <p className="mt-0.5 text-[10px] text-zinc-600">Anomalies will surface here as they're detected.</p>
+                                                    <p className="mt-0.5 text-[10px] text-zinc-600">Anomalies will surface here as they&apos;re detected.</p>
                                                 </div>
                                             ) : (
                                                 typedAlerts.slice(0, 10).map((alert) => {

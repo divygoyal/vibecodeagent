@@ -75,11 +75,13 @@ export default function EmbedGlobePage() {
     // Always start as demo to avoid hydration mismatch (server has no search params)
     const [isDemo, setIsDemo] = useState(true);
     const lastDataRef = useRef<string>('');
+    const hasLiveDataRef = useRef(false);
     const intervalRef = useRef<number>(60_000);
 
     // ─── Adaptive polling ───
     useEffect(() => {
         if (!token) return;
+        hasLiveDataRef.current = false;
         let timeoutId: ReturnType<typeof setTimeout>;
         let cancelled = false;
 
@@ -95,11 +97,12 @@ export default function EmbedGlobePage() {
                     lastDataRef.current = dataStr;
                     setRealtimeData(data);
                     setIsDemo(false);
-                } else if (!realtimeData) {
+                    hasLiveDataRef.current = true;
+                } else if (!hasLiveDataRef.current) {
                     setIsDemo(true);
                 }
             } catch {
-                if (!realtimeData) setIsDemo(true);
+                if (!hasLiveDataRef.current) setIsDemo(true);
             }
             if (!cancelled && document.visibilityState === 'visible') {
                 timeoutId = setTimeout(fetchData, intervalRef.current);
@@ -110,7 +113,7 @@ export default function EmbedGlobePage() {
         document.addEventListener('visibilitychange', handleVisibility);
         fetchData();
         return () => { cancelled = true; clearTimeout(timeoutId); document.removeEventListener('visibilitychange', handleVisibility); };
-    }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [token]);
 
     // ─── Data conversion ───
     const realVisitors = useMemo(() => {
@@ -138,12 +141,14 @@ export default function EmbedGlobePage() {
     }, [realtimeData, isDemo]);
 
     // ─── Display data ───
-    const hasRealData = !isDemo && realVisitors.length > 0;
-    const displayVisitors = hasRealData ? realVisitors : DEMO_VISITORS;
-    const displayByCountry = hasRealData ? realByCountry : DEMO_BY_COUNTRY;
-    const displayActivity = hasRealData ? realActivity : DEMO_ACTIVITY;
-    const activeUsers = hasRealData ? (realtimeData?.activeUsers || 0) : DEMO_VISITORS.reduce((s, v) => s + (v.users ?? 1), 0);
-    const estTotalValue = Math.max(1, Math.round(activeUsers * 0.08));
+    const hasLiveResponse = !isDemo && realtimeData !== null;
+    const displayVisitors = hasLiveResponse ? realVisitors : DEMO_VISITORS;
+    const displayByCountry = hasLiveResponse ? realByCountry : DEMO_BY_COUNTRY;
+    const displayActivity = hasLiveResponse ? realActivity : DEMO_ACTIVITY;
+    const activeUsers = hasLiveResponse
+        ? Number(realtimeData.activeUsers) || 0
+        : DEMO_VISITORS.reduce((s, v) => s + (v.users ?? 1), 0);
+    const estTotalValue = Math.round(activeUsers * 0.08);
     // Show branding for free users and demo mode; paid users can remove it
     const showBranding = isDemo || !realtimeData || realtimeData.showBranding !== false;
 
@@ -232,6 +237,9 @@ export default function EmbedGlobePage() {
                                         +{displayByCountry.length - 4}
                                     </span>
                                 )}
+                                {hasLiveResponse && displayByCountry.length === 0 && (
+                                    <span className="text-[12px] text-zinc-500">No active visitors</span>
+                                )}
                             </div>
                         </div>
 
@@ -267,6 +275,11 @@ export default function EmbedGlobePage() {
             <div className="relative z-10 flex-shrink-0 order-1 sm:absolute sm:bottom-4 sm:left-4 sm:z-20 max-w-full sm:max-w-sm">
                 <div className="sm:bg-black/60 sm:backdrop-blur-sm sm:rounded-xl sm:border sm:border-white/10 overflow-hidden">
                     <div className="max-h-[180px] sm:max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                        {hasLiveResponse && displayActivity.length === 0 && (
+                            <div className="px-3 py-4 text-[12px] text-zinc-500 sm:px-4">
+                                No active visitor activity right now.
+                            </div>
+                        )}
                         {displayActivity.map((item, i) => (
                             <div key={item.id} className="px-3 sm:px-4 py-2.5 border-b border-white/[0.03] last:border-b-0 group">
                                 <div className="flex items-start gap-2.5">
