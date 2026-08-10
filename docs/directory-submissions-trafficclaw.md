@@ -57,6 +57,7 @@ Submission assets:
 | Come AI / `iatool.online` | Free public form was completed and clicked once but retained fields without a receipt, error, or redirect. Check inbox/public listing before retrying. |
 | Viesearch (DR 73 in AgentSkills CSV) | Its server-side validation rejects TrafficClaw's title/description as forbidden content. Do not retry unless the directory explains the policy and accepts a truthful fit. |
 | AIToolsRatings | Full free form redirected home and cleared after submit but showed no receipt. Treat as pending confirmation; check email/listing before any retry. |
+| PeerPush (DR 71 in Nick Launches) | Existing session created the TrafficClaw draft at `https://peerpush.com/p/trafficclaw-kinf/plans`, but the free queue action (1,625 ahead/~28 days) did not confirm or change state. Draft created only; do not retry enrollment blindly. |
 
 ## Delivery audit — websitebond@gmail.com
 
