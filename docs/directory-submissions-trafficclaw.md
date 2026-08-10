@@ -38,12 +38,21 @@ Submission assets:
 | ListAi.cc | — | Submitted — pending review | Free public Data & Analytics listing confirmed; the directory says publication/review takes 24–48 hours and will notify `trafficclaw@gmail.com`. |
 | ToolWise.ai | — | Submitted — pending review | Free public Analytics & Data / Freemium listing confirmed; directory says it will review and publish within 48 hours. |
 | AllThingsAI.work | 46 (prior candidate data) | Submitted — pending review | Official free email-only route; editorial request sent from the existing `websitebond@gmail.com` mailbox to `info@allthingsai.work`, using `trafficclaw@gmail.com` as the product contact. |
+| Moltbook-AI.com | — | Submitted — pending review | Free public AI-agent directory submission confirmed by Formspree: “The form was submitted successfully.” |
+| AIWedia | — | Submitted — pending review | Free public AI Data Analysis & BI submission confirmed; AIWedia says it will email when the listing is live. |
+| NeuronFeed | — | Submitted — pending review | Free public startup listing confirmed; admin notification sent and review promised within 48 hours. |
+| OnePlaceForAI | — | Submitted — pending review | Free Research & Data / Freemium listing confirmed: “Tool Submitted! … review it shortly.” |
+| SaaSHub | 80 (AgentSkills CSV) | Listing created — verification optional | Existing `websitebond@gmail.com` session created `https://www.saashub.com/verify/trafficclaw`. Do not add the ownership meta tag unless separately requested. |
+| NavTools AI | — | Submitted — pending review | Free Basic $0 listing confirmed; stated free review window is 30–90 days. |
+| AI Tools Directory (`aitoolsdirectory.site`) | — | Submitted — pending review | Free submission confirmed by FormSubmit: “Thanks! The form was submitted successfully.” |
+| AI Tools Daily Hub | — | Submitted — pending review | Free submission confirmed at `https://aitoolsdailyhub.com/submit-a-tool/?status=success`; stated review is 1–2 business days. |
 
 ## Attempted once — do not resubmit yet
 
 | Directory | Reason to wait |
 | --- | --- |
 | Come AI / `iatool.online` | Free public form was completed and clicked once but retained fields without a receipt, error, or redirect. Check inbox/public listing before retrying. |
+| Viesearch (DR 73 in AgentSkills CSV) | Its server-side validation rejects TrafficClaw's title/description as forbidden content. Do not retry unless the directory explains the policy and accepts a truthful fit. |
 
 ## Delivery audit — websitebond@gmail.com
 
