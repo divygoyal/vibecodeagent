@@ -242,6 +242,17 @@ function Badges() {
             <a href="https://dofollow.tools" target="_blank" rel="noopener" className={B}>
                 <img src="https://dofollow.tools/badge/badge_light.svg" alt="Featured on Dofollow.Tools" className={IMG} />
             </a>
+            <a href="https://showmebest.ai" target="_blank" rel="noopener noreferrer" className={B}>
+                <img src="https://showmebest.ai/badge/feature-badge-white.webp" alt="Featured on ShowMeBestAI" className={IMG} />
+            </a>
+            <a href="https://freeai.run" target="_blank" rel="noopener noreferrer" className={B}>
+                <img src="https://freeai.run/badge/badge_dark.svg" alt="Featured on FreeAI" className={IMG} />
+            </a>
+            <a href="https://gets.tools" target="_blank" rel="noopener noreferrer" className={B}>
+                <img src="https://gets.tools/badge/badge_dark.svg" alt="Featured on Gets.Tools" className={IMG} />
+            </a>
+            <a href="https://www.aitoolzdir.com" target="_blank" rel="noopener noreferrer" className={TXT}>AI Toolz Dir</a>
+            <a href="https://aitooltrek.com" target="_blank" rel="noopener noreferrer" className={TXT}>AI Tool Trek</a>
             <a href="https://www.aiheron.com/" target="_blank" rel="noopener" title="智鹭AI导航" className={TXT}>AiHeron</a>
             <a href="https://aitop10.tools/" target="_blank" rel="noopener" className={TXT}>AiTop10 Tools</a>
             <a href="https://navs.site" target="_blank" rel="noopener noreferrer" title="AI Sites | 2026" className={TXT}>AI Nav Site</a>
