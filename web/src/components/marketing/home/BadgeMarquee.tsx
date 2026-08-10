@@ -173,6 +173,18 @@ function Badges() {
             <a href="https://www.toolpilot.ai/" target="_blank" rel="noopener noreferrer" className={B}>
                 <img src="https://www.toolpilot.ai/cdn/shop/files/f-w_690x151_crop_center.png" alt="Featured on ToolPilot" className={IMG} />
             </a>
+            <a href="https://web-review.com" target="_blank" rel="dofollow" className={B}>
+                <img src="https://web-review.com/badge.png" alt="Featured on Web Review" className={IMG} />
+            </a>
+            <a href="https://www.aitooldiscovery.com" target="_blank" rel="noopener noreferrer" className={B}>
+                <img src="https://www.aitooldiscovery.com/badges/featured-1.svg" alt="Featured on AI Tool Discovery" className={IMG} />
+            </a>
+            <a href="https://submito.net" target="_blank" title="Listed on Submito" className={B}>
+                <img src="https://submito.net/badge/listed-light.svg" alt="Listed on Submito" className={IMG} />
+            </a>
+            <a href="https://wavel.io" target="_blank" rel="noopener" className={B}>
+                <img src="https://wavel.io/Wavel-embed-badge-with-light-bg.webp" alt="Featured on Wavel" className={IMG} />
+            </a>
             <a href="https://peerpush.net/p/trafficclaw" target="_blank" rel="noopener" className={B}>
                 <img src="https://peerpush.net/p/trafficclaw/badge.png" alt="PeerPush" className={IMG} />
             </a>
