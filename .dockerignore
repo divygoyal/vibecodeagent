@@ -11,6 +11,11 @@
 !scripts/nanobot_entrypoint.sh
 !Dockerfile.nanobot
 
+# Coolify's Nixpacks builder writes its generated package definition here
+# before creating the Docker build context. Keep that generated build input.
+!.nixpacks/
+!.nixpacks/**
+
 # Defense in depth for files inside allowed directories.
 **/.env
 **/.env.*
