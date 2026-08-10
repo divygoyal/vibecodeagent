@@ -245,11 +245,11 @@ function Badges() {
             <a href="https://showmebest.ai" target="_blank" rel="noopener noreferrer" className={B}>
                 <img src="https://showmebest.ai/badge/feature-badge-white.webp" alt="Featured on ShowMeBestAI" className={IMG} />
             </a>
-            <a href="https://freeai.run" target="_blank" rel="noopener noreferrer" className={B}>
-                <img src="https://freeai.run/badge/badge_dark.svg" alt="Featured on FreeAI" className={IMG} />
+            <a href="https://www.freeai.run" target="_blank" rel="noopener noreferrer" className={B}>
+                <img src="https://www.freeai.run/badge/badge_dark.svg" alt="Featured on FreeAI" width="200" height="54" className={IMG} />
             </a>
             <a href="https://gets.tools" target="_blank" rel="noopener noreferrer" className={B}>
-                <img src="https://gets.tools/badge/badge_dark.svg" alt="Featured on Gets.Tools" className={IMG} />
+                <img src="https://gets.tools/badge/badge_dark.svg" alt="Featured on Gets.Tools" width="200" height="54" className={IMG} />
             </a>
             <a href="https://www.aitoolzdir.com" target="_blank" rel="noopener noreferrer" className={TXT}>AI Toolz Dir</a>
             <a href="https://aitooltrek.com" target="_blank" rel="noopener noreferrer" className={TXT}>AI Tool Trek</a>
