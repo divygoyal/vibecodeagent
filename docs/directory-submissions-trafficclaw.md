@@ -42,7 +42,7 @@ Submission assets:
 | AIWedia | — | Submitted — pending review | Free public AI Data Analysis & BI submission confirmed; AIWedia says it will email when the listing is live. |
 | NeuronFeed | — | Submitted — pending review | Free public startup listing confirmed; admin notification sent and review promised within 48 hours. |
 | OnePlaceForAI | — | Submitted — pending review | Free Research & Data / Freemium listing confirmed: “Tool Submitted! … review it shortly.” |
-| SaaSHub | 80 (AgentSkills CSV) | Listing created — verification optional | Existing `websitebond@gmail.com` session created `https://www.saashub.com/verify/trafficclaw`. Do not add the ownership meta tag unless separately requested. |
+| SaaSHub | 80 (AgentSkills CSV) | Listing created — verification optional | Existing `websitebond@gmail.com` session created `https://www.saashub.com/verify/trafficclaw`. Email verification requires an active `@trafficclaw.com` mailbox; the meta-tag method requires a SaaSHub login. |
 | NavTools AI | — | Submitted — pending review | Free Basic $0 listing confirmed; stated free review window is 30–90 days. |
 | AI Tools Directory (`aitoolsdirectory.site`) | — | Submitted — pending review | Free submission confirmed by FormSubmit: “Thanks! The form was submitted successfully.” |
 | AI Tools Daily Hub | — | Submitted — pending review | Free submission confirmed at `https://aitoolsdailyhub.com/submit-a-tool/?status=success`; stated review is 1–2 business days. |
