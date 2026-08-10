@@ -35,6 +35,15 @@ Submission assets:
 | SaaS Scout | — | Live | Free public listing submitted and a public TrafficClaw page appeared immediately with a valid `trafficclaw.com` link, Analytics category, Freemium pricing, and logo. |
 | FreeStartupListing.org | — | Live | Free public listing is live immediately as TrafficClaw in AI/ML; the site confirmed “TrafficClaw is now listed”. |
 | LineZine | 40 | Submitted — pending review | Public free Marketing listing submitted; on-page confirmation says review within 48 hours. An earlier submission used `support@trafficclaw.com`; do not submit again. |
+| ListAi.cc | — | Submitted — pending review | Free public Data & Analytics listing confirmed; the directory says publication/review takes 24–48 hours and will notify `trafficclaw@gmail.com`. |
+| ToolWise.ai | — | Submitted — pending review | Free public Analytics & Data / Freemium listing confirmed; directory says it will review and publish within 48 hours. |
+| AllThingsAI.work | 46 (prior candidate data) | Submitted — pending review | Official free email-only route; editorial request sent from the existing `websitebond@gmail.com` mailbox to `info@allthingsai.work`, using `trafficclaw@gmail.com` as the product contact. |
+
+## Attempted once — do not resubmit yet
+
+| Directory | Reason to wait |
+| --- | --- |
+| Come AI / `iatool.online` | Free public form was completed and clicked once but retained fields without a receipt, error, or redirect. Check inbox/public listing before retrying. |
 
 ## Delivery audit — websitebond@gmail.com
 
