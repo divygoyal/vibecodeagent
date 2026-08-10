@@ -46,6 +46,9 @@ Submission assets:
 | NavTools AI | — | Submitted — pending review | Free Basic $0 listing confirmed; stated free review window is 30–90 days. |
 | AI Tools Directory (`aitoolsdirectory.site`) | — | Submitted — pending review | Free submission confirmed by FormSubmit: “Thanks! The form was submitted successfully.” |
 | AI Tools Daily Hub | — | Submitted — pending review | Free submission confirmed at `https://aitoolsdailyhub.com/submit-a-tool/?status=success`; stated review is 1–2 business days. |
+| PromptBulletin | — | Submitted — pending review | Free submission confirmed; directory says it will review TrafficClaw and notify `trafficclaw@gmail.com` within five business days. |
+| AI Tool Scouts | — | Submitted — pending review | Free Marketing & SEO / Freemium listing confirmed: “We'll review your tool shortly.” |
+| MyCaptionAI | — | Submitted — pending review | Free submission confirmed at `https://www.mycaptionai.com/submit?submitted=1`; stated review is within 48 hours. |
 
 ## Attempted once — do not resubmit yet
 
@@ -53,6 +56,7 @@ Submission assets:
 | --- | --- |
 | Come AI / `iatool.online` | Free public form was completed and clicked once but retained fields without a receipt, error, or redirect. Check inbox/public listing before retrying. |
 | Viesearch (DR 73 in AgentSkills CSV) | Its server-side validation rejects TrafficClaw's title/description as forbidden content. Do not retry unless the directory explains the policy and accepts a truthful fit. |
+| AIToolsRatings | Full free form redirected home and cleared after submit but showed no receipt. Treat as pending confirmation; check email/listing before any retry. |
 
 ## Delivery audit — websitebond@gmail.com
 
