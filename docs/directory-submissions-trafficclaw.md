@@ -17,7 +17,7 @@ Submission assets:
 
 | Directory | Ahrefs DR | Requirement | Status | Next step |
 | --- | ---: | --- | --- | --- |
-| ToolPilot.ai | 78 | Free directory listing with footer badge; badge already present in the active marquee. | Ready to submit | Complete public free intake and record outcome. |
+| ToolPilot.ai | 78 | Free directory listing with footer badge; badge already present in the active marquee. | Submitted — pending review | Confirmed receipt: “Your submission has been received.” Recheck email and public directory listing before any retry. |
 | Web Review | 67 | Free dofollow listing; permanent footer badge plus square icon and 16:9 image. | Badge staged | Deploy and verify the public badge, then submit with supplied logo and OG image. |
 | AI Tool Discovery | 46 | Free AI-tool listing; footer badge and logo required. | Badge staged | Deploy and verify the public badge, then submit with TrafficClaw product copy. |
 | Submito | 45 | Free link-exchange listing; visible badge and backlink-page URL required. | Badge staged | Deploy and verify the public badge, then submit with `https://trafficclaw.com` as backlink proof. |
