@@ -49,6 +49,8 @@ Submission assets:
 | PromptBulletin | — | Submitted — pending review | Free submission confirmed; directory says it will review TrafficClaw and notify `trafficclaw@gmail.com` within five business days. |
 | AI Tool Scouts | — | Submitted — pending review | Free Marketing & SEO / Freemium listing confirmed: “We'll review your tool shortly.” |
 | MyCaptionAI | — | Submitted — pending review | Free submission confirmed at `https://www.mycaptionai.com/submit?submitted=1`; stated review is within 48 hours. |
+| ShowMeBest AI | 76 (AgentSkills CSV) | Submitted — pending review | Free no-auth form confirmed “Success Submit” / `Submit review success` after the live official footer badge was found. Parallel lanes reached the same form; do not retry. |
+| AI Toolz Dir | 68 (AgentSkills CSV) | Submitted — pending review | Free Copilots submission confirmed: “Submitted! We'll review your tool and email you when it's live.” Parallel lanes reached the same form; do not retry. |
 
 ## Attempted once — do not resubmit yet
 
@@ -58,6 +60,7 @@ Submission assets:
 | Viesearch (DR 73 in AgentSkills CSV) | Its server-side validation rejects TrafficClaw's title/description as forbidden content. Do not retry unless the directory explains the policy and accepts a truthful fit. |
 | AIToolsRatings | Full free form redirected home and cleared after submit but showed no receipt. Treat as pending confirmation; check email/listing before any retry. |
 | PeerPush (DR 71 in Nick Launches) | Existing session created the TrafficClaw draft at `https://peerpush.com/p/trafficclaw-kinf/plans`, but the free queue action (1,625 ahead/~28 days) did not confirm or change state. Draft created only; do not retry enrollment blindly. |
+| AI Tool Trek | The no-auth form retained submitted values without a receipt; another live handler check showed a Google-login gate. Treat as unconfirmed and do not retry. |
 
 ## Delivery audit — websitebond@gmail.com
 
