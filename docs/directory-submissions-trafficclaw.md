@@ -51,6 +51,15 @@ Submission assets:
 | MyCaptionAI | — | Submitted — pending review | Free submission confirmed at `https://www.mycaptionai.com/submit?submitted=1`; stated review is within 48 hours. |
 | ShowMeBest AI | 76 (AgentSkills CSV) | Submitted — pending review | Free no-auth form confirmed “Success Submit” / `Submit review success` after the live official footer badge was found. Parallel lanes reached the same form; do not retry. |
 | AI Toolz Dir | 68 (AgentSkills CSV) | Submitted — pending review | Free Copilots submission confirmed: “Submitted! We'll review your tool and email you when it's live.” Parallel lanes reached the same form; do not retry. |
+| Alieradox AI Directory | — | Submitted — pending review | Free Analytics / SEO / AI Copilot listing confirmed: “Tool submitted successfully! Our team will review it shortly.” |
+| ToolSeno | — | Submitted — pending review | Free Data & Analytics listing confirmed: “Your tool has been submitted and is pending review.” |
+| AIToolGenZ | — | Submitted — pending review | Public 100% free Data & Analytics / Freemium modal submitted; the success dialog closed/reset the modal. The platform does not expose the dialog text. |
+| AIListCentral | — | Submitted — pending review | Free AI Business & Marketing Tools submission confirmed: “Your submission was successful.” |
+| LLM Relevance | — | Submitted — pending review | Free submission confirmed at `https://www.llmrelevance.com/submit/success`; review within 48 hours. |
+| AI Tools / `aitools.inc` | — | Submitted — pending review | Free Typeform submission confirmed: “Thanks! We'll be in touch over the next few days to proceed with your listing.” |
+| App Scout | — | Submitted — pending review | Public free form redirected to `/submit/?success=1`. |
+| flowtools | — | Submitted — pending review | Server created a TrafficClaw record in Draft/review status; newsletter opt-in was explicitly disabled. |
+| whattool.io | — | Submitted — pending review | Public API receipt returned `success: true`. |
 
 ## Attempted once — do not resubmit yet
 
