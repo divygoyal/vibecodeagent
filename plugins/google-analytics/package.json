@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "VibeCode Google Analytics Plugin",
   "main": "index.js",
+  "scripts": {
+    "test": "node --test credentialInput.test.js"
+  },
   "dependencies": {
     "googleapis": "^144.0.0"
   }

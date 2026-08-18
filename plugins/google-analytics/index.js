@@ -1,23 +1,13 @@
 const { google } = require('googleapis');
+const { readGoogleCredentialsFromStdin } = require('./credentialInput');
 
 class GoogleAnalytics {
     constructor(config) {
         this.config = config || {};
 
         // Try to load token from environment if not passed in config
-        if (!this.config.access_token) {
-            try {
-                if (process.env.OPENCLAW_CONNECTIONS) {
-                    const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
-                    if (connections.google) {
-                        this.config.access_token = connections.google.accessToken || connections.google.access_token;
-                        this.config.refresh_token = connections.google.refreshToken || connections.google.refresh_token;
-                        console.log("Found Google credentials in environment.");
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
-            }
+        if (!hasGoogleCredentials(this.config)) {
+            loadEnvGoogleCredentials(this.config, true);
         }
     }
 
@@ -38,13 +28,14 @@ class GoogleAnalytics {
             refresh_token: this.config.refresh_token
         });
 
-        try {
-            // Force refresh to verify credentials validity immediately
-            const refreshRes = await auth.refreshAccessToken();
-            auth.setCredentials(refreshRes.credentials);
-        } catch (e) {
-            console.error("Failed to refresh Google token:", e.message);
-            throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+        if (this.config.refresh_token) {
+            try {
+                const refreshRes = await auth.refreshAccessToken();
+                auth.setCredentials(refreshRes.credentials);
+            } catch (e) {
+                console.error("Failed to refresh Google token:", e.message);
+                throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+            }
         }
 
         return auth;
@@ -237,6 +228,70 @@ class GoogleAnalytics {
             console.error(error);
             return `Error running query: ${error.message}`;
         }
+    }
+
+    /**
+     * One-shot traffic lookup: resolve a property by site/domain name and run the report.
+     * This keeps Telegram/Nanobot traffic questions to a single shell command.
+     */
+    async trafficSummary(target, options = {}) {
+        const targetText = String(target || '').trim();
+        if (!targetText) {
+            return "Error: target site, domain, or property name is required.";
+        }
+
+        const startDate = options.startDate || options.start || options.date || '7daysAgo';
+        const endDate = options.endDate || options.end || options.date || 'today';
+        const dimensions = normalizeListOption(options.dimensions, ['date']);
+        const metrics = normalizeListOption(options.metrics, ['activeUsers', 'sessions', 'screenPageViews']);
+        const parsedLimit = parseInt(options.limit || '100', 10);
+        const limit = Number.isFinite(parsedLimit) ? parsedLimit : 100;
+        const propertyOption = options.propertyId || options.property || options.property_id;
+
+        let selectedProperty;
+        if (propertyOption) {
+            selectedProperty = {
+                displayName: targetText,
+                property: normalizePropertyName(propertyOption),
+                score: 999,
+            };
+        } else {
+            const properties = await this.listProperties(true);
+            if (!Array.isArray(properties)) {
+                return String(properties);
+            }
+            if (properties.length === 0) {
+                return "No Google Analytics properties found for this Google account.";
+            }
+
+            selectedProperty = selectBestProperty(properties, targetText);
+            if (!selectedProperty) {
+                return [
+                    `Could not confidently match "${targetText}" to a GA4 property.`,
+                    "Available properties:",
+                    formatPropertyList(properties)
+                ].join('\n');
+            }
+        }
+
+        const propertyName = normalizePropertyName(selectedProperty.property);
+        const report = await this.query(propertyName, {
+            dimensions,
+            metrics,
+            startDate,
+            endDate,
+            limit,
+            orderBy: options.orderBy,
+            orderDirection: options.orderDirection,
+        });
+
+        return [
+            `Matched GA4 property: **${selectedProperty.displayName || propertyName}** (\`${propertyName}\`)`,
+            `Target: **${targetText}**`,
+            `Date range: **${startDate} to ${endDate}**`,
+            "",
+            report
+        ].join('\n');
     }
 
     /**
@@ -569,6 +624,258 @@ class GoogleAnalytics {
     }
 }
 
+// Multi-tenant token resolver. Prefer env-injected OAuth tokens first because
+// Nanobot sandboxes can block internal admin API calls. `--client-id` remains
+// a fallback for contexts that do not have OPENCLAW_CONNECTIONS.
+function hasGoogleCredentials(config) {
+    return Boolean(config && (config.access_token || config.refresh_token));
+}
+
+function loadEnvGoogleCredentials(config = {}, log = false) {
+    let raw = process.env.OPENCLAW_CONNECTIONS;
+    let source = "env";
+    if (!raw) {
+        // Nanobot's exec tool strips host env from spawned subprocesses, so the
+        // admin API also writes connections.json to /data/.nanobot/. Fall back
+        // to reading from disk when the env var isn't visible.
+        const fs = require('fs');
+        const candidates = [
+            process.env.OPENCLAW_CONNECTIONS_FILE,
+            '/data/.nanobot/connections.json',
+            '/data/connections.json',
+        ].filter(Boolean);
+        for (const p of candidates) {
+            try {
+                if (fs.existsSync(p)) {
+                    raw = fs.readFileSync(p, 'utf8');
+                    source = p;
+                    break;
+                }
+            } catch (_) { /* try next candidate */ }
+        }
+    }
+    if (!raw) return config;
+    try {
+        const connections = JSON.parse(raw);
+        if (connections.google) {
+            config.access_token = config.access_token || connections.google.accessToken || connections.google.access_token;
+            config.refresh_token = config.refresh_token || connections.google.refreshToken || connections.google.refresh_token;
+            if (log && hasGoogleCredentials(config)) {
+                console.log(`Found Google credentials (source: ${source}).`);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to parse OPENCLAW_CONNECTIONS source", source, e);
+    }
+    return config;
+}
+
+function argsIncludeGoogleCredentials(args) {
+    return args.includes('--accessToken') || args.includes('--refreshToken');
+}
+
+function parseCliOptions(args, startIndex = 0) {
+    const options = {};
+    for (let i = startIndex; i < args.length; i++) {
+        const arg = args[i];
+        if (!arg.startsWith('--') || i + 1 >= args.length) {
+            continue;
+        }
+
+        const rawKey = arg.substring(2);
+        const value = args[++i];
+        const key = rawKey === 'accessToken'
+            ? 'access_token'
+            : rawKey === 'refreshToken'
+                ? 'refresh_token'
+                : rawKey;
+
+        if (key === 'dimensions' || key === 'metrics') {
+            options[key] = normalizeListOption(value, []);
+        } else if (key === 'limit') {
+            const parsed = parseInt(value, 10);
+            options[key] = Number.isFinite(parsed) ? parsed : value;
+        } else if (key === 'dimensionFilter' || key === 'metricFilter') {
+            options[key] = JSON.parse(value);
+        } else {
+            options[key] = value;
+        }
+    }
+    return options;
+}
+
+function normalizeListOption(value, fallback) {
+    if (Array.isArray(value)) {
+        const values = value.map(v => String(v).trim()).filter(Boolean);
+        return values.length > 0 ? values : fallback;
+    }
+    if (typeof value === 'string') {
+        const values = value.split(',').map(v => v.trim()).filter(Boolean);
+        return values.length > 0 ? values : fallback;
+    }
+    return fallback;
+}
+
+function normalizePropertyName(property) {
+    const value = String(property || '').trim();
+    if (value.startsWith('properties/')) {
+        return value;
+    }
+    return `properties/${value}`;
+}
+
+function selectBestProperty(properties, target) {
+    let best = null;
+    for (const property of properties) {
+        const score = scorePropertyForTarget(property, target);
+        if (!best || score > best.score) {
+            best = { ...property, score };
+        }
+    }
+    return best && best.score > 0 ? best : null;
+}
+
+function scorePropertyForTarget(property, target) {
+    const targetText = normalizeLookupText(target);
+    const propertyId = String(property.property || '').replace(/^properties\//, '');
+    const propertyText = normalizeLookupText([
+        property.displayName,
+        property.property,
+        property.parent
+    ].filter(Boolean).join(' '));
+
+    let score = 0;
+    if (propertyId && String(target).includes(propertyId)) {
+        score += 120;
+    }
+    if (targetText && propertyText === targetText) {
+        score += 100;
+    }
+    if (targetText && propertyText.includes(targetText)) {
+        score += 70;
+    }
+
+    const propertyTokens = new Set(propertyText.split(' ').filter(Boolean));
+    for (const token of lookupTokens(target)) {
+        if (propertyTokens.has(token)) {
+            score += 35;
+        } else if ([...propertyTokens].some(propToken => propToken.includes(token) || token.includes(propToken))) {
+            score += 15;
+        }
+    }
+
+    return score;
+}
+
+function lookupTokens(value) {
+    const genericWords = new Set([
+        'analytics', 'ga4', 'google', 'property', 'site', 'website', 'web',
+        'traffic', 'total', 'last', 'day', 'days', 'yesterday', 'today',
+        'www', 'http', 'https'
+    ]);
+    return normalizeLookupText(value)
+        .split(' ')
+        .filter(token => token.length > 2 && !genericWords.has(token));
+}
+
+function normalizeLookupText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/https?:\/\//g, ' ')
+        .replace(/\bwww\./g, ' ')
+        .replace(/\.(com|codes|io|ai|net|org|co|in|dev|app)\b/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function formatPropertyList(properties) {
+    return properties
+        .slice(0, 12)
+        .map(property => `- ${property.displayName || 'Unnamed property'} (${property.property})`)
+        .join('\n');
+}
+
+async function fetchClientTokens(clientId) {
+    const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) {
+        throw new Error('ADMIN_API_KEY env var is not set inside this container; --client-id mode unavailable.');
+    }
+    const url = `${adminUrl}/api/users/${encodeURIComponent(clientId)}/oauth/google`;
+    const controller = new AbortController();
+    const timeoutMs = parseInt(process.env.ADMIN_API_TIMEOUT_MS || '8000', 10);
+    const timeout = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) ? timeoutMs : 8000);
+    let res;
+    try {
+        res = await fetch(url, {
+            headers: { 'X-API-Key': apiKey },
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (error && error.name === 'AbortError') {
+            throw new Error(`Admin API timed out fetching Google tokens for client ${clientId}.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
+
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Admin API returned ${res.status} fetching tokens for client ${clientId}: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    if (!data.access_token && !data.refresh_token) {
+        throw new Error(`Client ${clientId} has no Google OAuth tokens stored.`);
+    }
+    return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+    };
+}
+
+async function resolveClientConfig(args, protectedConfig = {}) {
+    if (!args[0]) {
+        return {};
+    }
+    const disableAdminLookup = ['1', 'true', 'yes'].includes(String(process.env.DISABLE_ADMIN_TOKEN_LOOKUP || '').toLowerCase());
+
+    let clientId = null;
+    const ciIdx = args.indexOf('--client-id');
+    if (ciIdx !== -1 && ciIdx + 1 < args.length) {
+        clientId = args[ciIdx + 1];
+        args.splice(ciIdx, 2);
+    }
+
+    if (hasGoogleCredentials(protectedConfig)) {
+        return protectedConfig;
+    }
+
+    if (argsIncludeGoogleCredentials(args)) {
+        return {};
+    }
+
+    const envConfig = loadEnvGoogleCredentials({}, false);
+    if (hasGoogleCredentials(envConfig)) {
+        return {};
+    }
+
+    if (disableAdminLookup) {
+        return {};
+    }
+
+    if (clientId) {
+        return fetchClientTokens(clientId);
+    }
+
+    const fallbackClientId = process.env.USER_IDENTIFIER || process.env.GITHUB_ID;
+    if (fallbackClientId) {
+        return fetchClientTokens(fallbackClientId);
+    }
+
+    return {};
+}
+
 // CLI Handling Logic
 if (require.main === module) {
     (async () => {
@@ -576,7 +883,13 @@ if (require.main === module) {
         const command = args[0];
 
         try {
-            const plugin = new GoogleAnalytics();
+            // The protected stdin channel takes precedence. Direct CLI
+            // credentials, scoped environment credentials, and admin lookup
+            // remain available as fallbacks for bot-container workflows.
+            const protectedConfig = await readGoogleCredentialsFromStdin();
+            const clientConfig = await resolveClientConfig(args, protectedConfig);
+
+            const plugin = new GoogleAnalytics(clientConfig);
 
             if (command === 'list-properties') {
                 const options = {};
@@ -590,7 +903,7 @@ if (require.main === module) {
                         i++;
                     }
                 }
-                const plugin = new GoogleAnalytics(options);
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 console.log(await plugin.listProperties());
 
             } else if (command === 'list-properties-json') {
@@ -605,7 +918,7 @@ if (require.main === module) {
                         i++;
                     }
                 }
-                const plugin = new GoogleAnalytics(options);
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 try {
                     const props = await plugin.listProperties(true);
                     console.log(JSON.stringify(props));
@@ -613,9 +926,28 @@ if (require.main === module) {
                     console.log(JSON.stringify({ error: e.message }));
                 }
 
+            } else if (command === 'traffic-summary' || command === 'get-traffic') {
+                const target = args[1];
+                if (!target) { console.error("Error: target site/domain required"); process.exit(1); }
+                const options = parseCliOptions(args, 2);
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
+                console.log(await plugin.trafficSummary(target, options));
+
             } else if (command === 'list-metrics') {
                 const propertyId = args[1];
                 if (!propertyId) { console.error("Error: propertyId required"); process.exit(1); }
+                const options = {};
+                for (let i = 2; i < args.length; i++) {
+                    if (args[i].startsWith('--') && i + 1 < args.length) {
+                        const key = args[i].substring(2);
+                        const val = args[i + 1];
+                        if (key === 'accessToken') options.access_token = val;
+                        else if (key === 'refreshToken') options.refresh_token = val;
+                        else options[key] = val;
+                        i++;
+                    }
+                }
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 console.log(await plugin.listMetrics(propertyId));
 
             } else if (command === 'query') {
@@ -640,6 +972,7 @@ if (require.main === module) {
                         }
                     }
                 }
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig });
                 console.log(await plugin.query(propertyId, options));
 
             } else if (command === 'realtime') {
@@ -661,7 +994,7 @@ if (require.main === module) {
                         }
                     }
                 }
-                const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig }); // Pass options (incl. accessToken) to constructor
                 console.log(await plugin.realtime(propertyId, options));
 
             } else if (command === 'dashboard-json') {
@@ -709,7 +1042,7 @@ if (require.main === module) {
                 // Therefore, no change is made to this specific block.
 
                 const range = args[2] && !args[2].startsWith('--') ? args[2] : '30d'; // Handle positional range if present,
-                const plugin = new GoogleAnalytics(options); // Pass options (incl. accessToken) to constructor
+                const plugin = new GoogleAnalytics({ ...options, ...clientConfig }); // Pass options (incl. accessToken) to constructor
                 try {
                     const result = await plugin.dashboardJson(propertyId, range);
                     console.log(JSON.stringify(result));
@@ -721,6 +1054,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const propertyId = args[1];
                 if (!propertyId) { console.error("Error: propertyId required"); process.exit(1); }
+                const plugin = new GoogleAnalytics(clientConfig);
                 console.log(await plugin.query(propertyId, {
                     dimensions: ['date'],
                     metrics: ['activeUsers', 'sessions'],
@@ -732,6 +1066,7 @@ if (require.main === module) {
                 console.log(`Google Analytics Plugin — Commands:
 
   list-properties                           List all GA4 properties
+  traffic-summary <site> [options]          Resolve a site/property and fetch traffic in one command
   list-metrics <propertyId>                 List all available dimensions & metrics
   query <propertyId> [options]              Run a flexible report with any dimensions/metrics
   realtime <propertyId> [options]           Get realtime active users and breakdown
@@ -755,6 +1090,8 @@ Common Metrics: activeUsers, sessions, screenPageViews, bounceRate,
   engagementRate, eventCount, newUsers, dauPerMau, wauPerMau
 
 Examples:
+  traffic-summary example.com --startDate yesterday --endDate yesterday
+  traffic-summary mysite --startDate 7daysAgo --endDate today
   query 123456789 --dimensions country --metrics activeUsers,sessions --startDate 30daysAgo
   query 123456789 --dimensions pagePath --metrics screenPageViews --orderBy screenPageViews --limit 20
   query 123456789 --dimensions deviceCategory,browser --metrics sessions,bounceRate

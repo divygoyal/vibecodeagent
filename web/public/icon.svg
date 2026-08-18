@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="favicon-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="inner-shadow">
+      <feFlood flood-color="rgba(0,0,0,0.15)"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+      <feGaussianBlur stdDeviation="8"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="112" fill="url(#favicon-bg)" filter="url(#inner-shadow)"/>
+  
+  <!-- Subtle shine overlay -->
+  <rect width="512" height="256" rx="112" fill="white" opacity="0.08"/>
+  
+  <!-- Claw marks (3 diagonal slashes) -->
+  <g stroke="rgba(0,0,0,0.45)" stroke-width="36" stroke-linecap="round">
+    <line x1="130" y1="380" x2="210" y2="140"/>
+    <line x1="210" y1="380" x2="290" y2="140"/>
+    <line x1="290" y1="380" x2="370" y2="140"/>
+  </g>
+  
+  <!-- Upward trend line -->
+  <path d="M80 400 L180 310 L270 340 L400 160" 
+        stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Trend arrow dot -->
+  <circle cx="400" cy="160" r="22" fill="white"/>
+  
+  <!-- Small arrow tip -->
+  <path d="M370 130 L400 160 L370 190" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0"/>
+</svg>

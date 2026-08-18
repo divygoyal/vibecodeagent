@@ -112,9 +112,9 @@ Watchdog                Admin API             Docker              Telegram
 User Query                 Classification              Model Used
     │                           │                          │
     ▼                           ▼                          ▼
-"What time is it?"  ─────▶  Simple Query  ─────▶  gemini-2.0-flash-lite
-"Refactor this code" ─────▶  Code Task    ─────▶  gemini-2.0-flash
-"Design a system"   ─────▶  Complex      ─────▶  gemini-2.0-pro
+"What time is it?"  ─────▶  Simple Query  ─────▶  gemini-3-flash-preview
+"Refactor this code" ─────▶  Code Task    ─────▶  gemini-3-flash-preview
+"Design a system"   ─────▶  Complex      ─────▶  gemini-3-flash-preview
 ```
 
 ### 2. Context Management

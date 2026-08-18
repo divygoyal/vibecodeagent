@@ -1,14 +1,55 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { authOptions, ensureAdminUserSynced } from "@/lib/adminUserSync"
 
 // Admin API configuration
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
+type SetupBotRequest = {
+  token?: string
+  plan?: string
+  bot_engine?: string
+}
+
+type SetupBotSessionUser = {
+  id?: string
+  username?: string
+  email?: string | null
+  accessToken?: string
+  provider?: string
+  refreshToken?: string
+  githubAccessToken?: string
+  googleAccessToken?: string
+  googleRefreshToken?: string
+  githubAccountId?: string
+  googleAccountId?: string
+}
+
+type AdminUserPayload = {
+  email?: string | null
+  plan: string
+  telegram_bot_token: string
+  bot_engine: string
+  provider?: string
+  provider_id: string
+  access_token?: string
+  refresh_token?: string
+  github_id?: string
+  github_username?: string
+}
+
+type AdminSetupResponse = {
+  detail?: string
+  error?: string
+  container_status?: string
+  container_port?: number
+}
+
 // Validate Telegram bot token format
 function isValidTelegramToken(token: string): boolean {
-  return /^\d{8,10}:[A-Za-z0-9_-]{35}$/.test(token)
+  // Token format: numbers:alphanumeric string (typically 35+ chars after colon)
+  return /^\d+:[A-Za-z0-9_-]{30,}$/.test(token)
 }
 
 export async function POST(req: Request) {
@@ -19,7 +60,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { token, plan } = await req.json()
+    const { token, plan, bot_engine } = await req.json() as SetupBotRequest
 
     if (!token || !isValidTelegramToken(token)) {
       return NextResponse.json({
@@ -28,48 +69,70 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
-    // @ts-expect-error - id added in callbacks
-    const userId = session.user.id
-    // @ts-expect-error - username added in callbacks
-    const username = session.user.username
-    // @ts-expect-error - accessToken added in callbacks
-    const accessToken = session.user.accessToken
-    // @ts-expect-error - provider added in callbacks
-    const provider = session.user.provider
-    // @ts-expect-error - refreshToken added in callbacks
-    const refreshToken = session.user.refreshToken
-
-    const email = session.user.email
+    const sessionUser = session.user as SetupBotSessionUser
+    const userId = sessionUser.id
+    const username = sessionUser.username
+    const accessToken = sessionUser.accessToken
+    const provider = sessionUser.provider
+    const refreshToken = sessionUser.refreshToken
+    const email = sessionUser.email
+    const primaryAccessToken =
+      provider === 'github'
+        ? (sessionUser.githubAccessToken || accessToken)
+        : provider === 'google'
+          ? (sessionUser.googleAccessToken || accessToken)
+          : accessToken
+    const primaryRefreshToken =
+      provider === 'google'
+        ? (sessionUser.googleRefreshToken || refreshToken)
+        : undefined
 
     if (!userId) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
     }
 
-    // Log for debugging (token is masked)
-    console.log(`Setup bot for user ${username} (${userId}) via ${provider}`)
-    console.log(`Access token present: ${accessToken ? 'YES' : 'NO'}`)
-    console.log(`Refresh token present: ${refreshToken ? 'YES' : 'NO'}`)
+    console.log(`[Setup-Bot] User ${userId} via ${provider}`)
 
-    // Prepare payload for Admin API
-    const payload: any = {
+    const syncTargets = new Set<'github' | 'google'>()
+    if (provider === 'github' || provider === 'google') {
+      syncTargets.add(provider)
+    }
+    if (sessionUser.googleAccountId && sessionUser.googleAccessToken) {
+      syncTargets.add('google')
+    }
+    if (sessionUser.githubAccountId && sessionUser.githubAccessToken) {
+      syncTargets.add('github')
+    }
+
+    for (const targetProvider of syncTargets) {
+      const sync = await ensureAdminUserSynced(session, targetProvider)
+      if (!sync.synced) {
+        console.warn(`[Setup-Bot] ${targetProvider} provider sync degraded: ${sync.reason}`)
+      }
+    }
+
+    // Call create_user (upsert) with the telegram token.
+    // The backend will:
+    // 1. Create/update user + OAuth connection in DB
+    // 2. Create container ONLY because telegram_bot_token is now provided
+    // 3. Write all connected provider tokens to OpenClaw memory (USER.md)
+    // 4. Start the container with OpenClaw + Telegram
+    const payload: AdminUserPayload = {
       email: email,
       plan: plan || "free",
       telegram_bot_token: token,
-
-      // Generic provider info
+      bot_engine: bot_engine || "openclaw",
       provider: provider,
       provider_id: String(userId),
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: primaryAccessToken,
+      refresh_token: primaryRefreshToken,
     }
 
-    // Add legacy GitHub fields if applicable
     if (provider === "github") {
       payload.github_id = String(userId)
       payload.github_username = username
     }
 
-    // Call Admin API to create/update user container
     const response = await fetch(`${ADMIN_API_URL}/api/users`, {
       method: "POST",
       headers: {
@@ -79,94 +142,40 @@ export async function POST(req: Request) {
       body: JSON.stringify(payload)
     })
 
-    const data = await response.json()
+    // Safely parse response (handle non-JSON responses)
+    let data: AdminSetupResponse
+    const responseText = await response.text()
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      console.error("Admin API returned non-JSON:", responseText.substring(0, 200))
+      data = { detail: responseText.substring(0, 200) }
+    }
 
     if (!response.ok) {
-      // If user already exists, try to update their bot token
-      if (response.status === 409) {
-        // We use GitHub ID for URL in legacy API, or we need a way to look up.
-        // The Admin API currently only supports /api/users/{github_id}. 
-        // THIS IS A LIMITATION. 
-        // For now, if provider is NOT github, we might have issues updating by ID if we don't know the ID used in URL.
-        // However, if we just created them with github_id=userId (for github), it works.
-        // If google, we don't have a URL ID yet in the frontend's knowledge effectively unless we treat google sub as ID?
-        // But admin/main.py create_user uses github_id OR email to check existence.
-
-        // Construct the update URL identifier. 
-        // If github, use github_id. If google, we don't have a clear "id" to use in the URL path 
-        // because the Admin API /api/users/{id} expects the `github_id` column value (legacy).
-        // BUT, `create_user` stores `github_id` as None for Google users??
-        // Wait, `create_user` logic: `user_identifier = user_data.github_id if user_data.github_id else user_data.email`.
-        // AND `User` model has `github_id` nullable.
-        // ADMIN API `update_user` takes `github_id` in URL and searches `User.github_id == github_id`.
-        // IF `User.github_id` is None, we CANNOT update them via this endpoint!
-
-        // CRITICAL FIX REQUIRED IN ADMIN API later: allow update by email or DB ID.
-        // FOR NOW: We assume GitHub users mostly. 
-        // If Google user exists, we might fail to update if we can't target them.
-
-        // Hack: Try to use provider_id as the lookup? No, that won't match if stored as None.
-        // Let's rely on the fact that for GitHub users (our primary constraint for "update"), we have ID.
-
-        let targetId = String(userId);
-        if (provider !== 'github') {
-          // If not github, we might be stuck. 
-          // We'll try using the email if the backend supported it, but it doesn't.
-          // We'll try using the provider_id just in case we decided to store it there?
-          // No, `create_user` stores it in `container_name` maybe?
-          console.warn("Updating non-GitHub users not fully supported in legacy API yet");
-        }
-
-        const updateResponse = await fetch(`${ADMIN_API_URL}/api/users/${targetId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": ADMIN_API_KEY
-          },
-          body: JSON.stringify({
-            telegram_bot_token: token,
-            provider: provider,
-            access_token: accessToken, // Update generic token
-            refresh_token: refreshToken // Update refresh token
-          })
-        })
-
-        if (updateResponse.ok) {
-          // Start container (this will create it if it doesn't exist, or start if stopped)
-          const containerResponse = await fetch(`${ADMIN_API_URL}/api/users/${targetId}/container`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-API-Key": ADMIN_API_KEY
-            },
-            body: JSON.stringify({ action: "start" })
-          })
-
-          const containerData = await containerResponse.json()
-          console.log(`Container start result for ${targetId}:`, containerData)
-
-          return NextResponse.json({
-            message: "Bot connected and started successfully",
-            status: containerData.status || "running"
-          })
-        }
-      }
-
-      console.error("Admin API error:", data)
+      console.error("Admin API error:", response.status, data)
       return NextResponse.json({
-        error: data.detail || "Failed to setup bot"
+        error: data.detail || "Failed to setup bot",
       }, { status: response.status })
     }
 
     return NextResponse.json({
       message: "Bot connected successfully",
-      status: data.container_status,
+      status: data.container_status || "running",
       port: data.container_port
     })
 
   } catch (error) {
     const err = error as Error
     console.error("Bot setup error:", err.message)
-    return NextResponse.json({ error: "Failed to connect bot" }, { status: 500 })
+
+    let errorMessage = "Failed to connect bot"
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed')) {
+      errorMessage = "Backend API is unreachable. Please try again later."
+    } else if (err.message.includes('timeout')) {
+      errorMessage = "Request timed out. Please try again."
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

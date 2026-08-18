@@ -17,6 +17,7 @@ __pycache__/
 venv/
 ENV/
 .venv/
+.venv-admin/
 
 # Node.js
 node_modules/
@@ -75,3 +76,8 @@ htmlcov/
 *.tmp
 *.temp
 .cache/
+.gstack/
+
+# Local design / planning files
+DESIGN.md
+**/linear.app/

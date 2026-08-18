@@ -1,0 +1,27 @@
+import { NextResponse } from 'next/server';
+import { cachedFetch, CACHE_TTL } from '@/lib/apiCache';
+import { getAnalyticsOverviewContext } from '@/lib/analyticsOverviewServer';
+import { getDemoEventsData } from '@/lib/demoWorkspaceData';
+import { fetchAnalyticsEventsData } from '@/lib/analyticsSubpageServer';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+    const context = await getAnalyticsOverviewContext(req);
+    if (context.isDemoWorkspace) {
+        return NextResponse.json(getDemoEventsData(), { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
+    }
+    if (context.error || !context.userId || !context.propertyId || !context.accessToken) {
+        return context.error || NextResponse.json({ error: 'Analytics data is temporarily unavailable' }, { status: 503 });
+    }
+
+    const range = new URL(req.url).searchParams.get('range') || '30d';
+    const cacheKey = `ga:analytics-events:${context.userId}:${context.propertyId}:${range}`;
+    const data = await cachedFetch(
+        cacheKey,
+        CACHE_TTL.DASHBOARD_DATA,
+        () => fetchAnalyticsEventsData(context.accessToken!, context.propertyId!, range),
+    );
+
+    return NextResponse.json(data, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } });
+}

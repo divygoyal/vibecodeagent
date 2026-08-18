@@ -1,0 +1,7 @@
+[phases.setup]
+aptPkgs = ["python3-pip"]
+cmds = [
+  "python3 -m pip install --break-system-packages --no-cache-dir --disable-pip-version-check --root-user-action=ignore --no-warn-script-location twitter-cli rdt-cli",
+  "test -x /usr/local/bin/twitter && ln -sf /usr/local/bin/twitter /usr/bin/twitter || true",
+  "test -x /usr/local/bin/rdt && ln -sf /usr/local/bin/rdt /usr/bin/rdt || true",
+]

@@ -1,0 +1,310 @@
+import { create } from 'zustand';
+
+export interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string; // ISO string for serialization
+    tools?: { name: string; args: any; result?: string; structuredData?: any }[];
+    /** B5-full: model's pre-tool reasoning. Renders as a collapsible "Thinking…"
+     *  block above the answer. Distinct from `content` because the user can
+     *  hide it once the answer lands. */
+    thinking?: string;
+    /** B5-full: planner's structured plan (if persona.plannerEnabled). */
+    plan?: {
+        intent: string;
+        summary: string;
+        steps: { tool: string; why: string; expected: string }[];
+        est_runtime_s: number;
+        est_cost_cents: number;
+    };
+    /** B5-full: critic's verdict (if persona.criticEnabled). */
+    critic?: {
+        score: number;
+        groundedness: number;
+        completeness: number;
+        format: number;
+        specificity?: number;
+        notes: string;
+    };
+    /** WS-7: repetition badge — when present, render "You asked this Nm ago — fresh angle" above the message. */
+    repetition?: {
+        priorAgeMin: number;
+        priorInsightId: string | null;
+    };
+    hasError?: boolean;
+    /** Admin DB row id (chat_messages.id), set after persistMessage resolves.
+     *  Needed by the per-message feedback widget — ChatFeedback.message_id is
+     *  NOT NULL on the admin side, so 👍/👎 can only fire once we have this. */
+    id?: number;
+}
+
+/** Shape returned by persistMessage on success — minimal slice of the admin
+ *  `_serialize_message` response that callers actually need. */
+export interface PersistedMessageRef {
+    id: number;
+    thread_id: string;
+}
+
+const BASE_STORAGE_KEY = 'tc-chat-history';
+const MAX_MESSAGES = 30; // ~10 Q&A pairs + some buffer
+
+// Scope state for storage keys — set via setCurrentUser() / setCurrentWorkspace().
+// Scoping by workspace too keeps each (GA4 property + GSC site) pairing in its own
+// chat bucket. Without this, switching workspace leaves the previous workspace's
+// messages and thread id in place, so the AI keeps responding inside the old
+// conversation instead of starting fresh for the new site.
+let currentUserId = '';
+let currentWorkspaceKey = '';
+
+function getStorageKey(): string {
+    if (!currentUserId) return BASE_STORAGE_KEY;
+    return currentWorkspaceKey
+        ? `${BASE_STORAGE_KEY}:${currentUserId}:${currentWorkspaceKey}`
+        : `${BASE_STORAGE_KEY}:${currentUserId}`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Phase B-1: Server-side sync (additive — localStorage stays primary)
+ *
+ *   localStorage  =  fast read path on chat open (instant)
+ *   server        =  source of truth, survives cache clear, cross-device
+ *
+ * We sync threads + messages best-effort. Failures don't break the chat —
+ * they just mean this turn isn't durable until the next one succeeds.
+ * The chat thread id is generated client-side and reused across turns of
+ * a single conversation; clearing the chat starts a new thread.
+ * ────────────────────────────────────────────────────────────────────── */
+
+const THREAD_ID_KEY = 'tc-chat-thread-id';
+
+function getThreadStorageKey(): string {
+    return currentWorkspaceKey
+        ? `${THREAD_ID_KEY}:${currentUserId}:${currentWorkspaceKey}`
+        : `${THREAD_ID_KEY}:${currentUserId}`;
+}
+
+function generateThreadId(): string {
+    // Crypto-grade UUID (browsers >= Chrome 92 / Firefox 95 / Safari 15.4).
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        try { return (crypto as any).randomUUID(); } catch { /* fallthrough */ }
+    }
+    // Fallback: timestamp + 16 hex bytes.
+    const rand = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('');
+    return `${Date.now().toString(36)}-${rand}`;
+}
+
+export function getOrCreateThreadId(): string {
+    if (typeof window === 'undefined') return '';
+    try {
+        const existing = localStorage.getItem(getThreadStorageKey());
+        if (existing) return existing;
+        const fresh = generateThreadId();
+        localStorage.setItem(getThreadStorageKey(), fresh);
+        return fresh;
+    } catch {
+        return generateThreadId();
+    }
+}
+
+export function resetThreadId(): string {
+    if (typeof window !== 'undefined') {
+        try { localStorage.removeItem(getThreadStorageKey()); } catch { /* skip */ }
+    }
+    threadEnsuredFor = null;
+    return getOrCreateThreadId();
+}
+
+/** Switch the active thread (used by the sidebar when the user picks a past
+ *  conversation). Resets the ensure-on-server cache so a stale create call
+ *  isn't skipped if we land on a thread we haven't synced yet this session. */
+export function setActiveThreadId(id: string): void {
+    if (typeof window === 'undefined' || !id) return;
+    try { localStorage.setItem(getThreadStorageKey(), id); } catch { /* skip */ }
+    threadEnsuredFor = id; // already exists on server (we're loading from it), no need to re-create
+}
+
+let threadEnsuredFor: string | null = null;
+async function ensureThreadOnServer(threadId: string, opts: { title?: string; persona?: string; site_url?: string; repo?: string } = {}): Promise<void> {
+    if (threadEnsuredFor === threadId) return;
+    try {
+        const res = await fetch(`/api/chat-store?action=create_thread`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: threadId, ...opts }),
+        });
+        if (res.ok) threadEnsuredFor = threadId;
+    } catch { /* server-sync is best-effort */ }
+}
+
+export interface PersistMessageOpts {
+    role: 'user' | 'assistant';
+    content: string;
+    tools?: ChatMessage['tools'];
+    intent?: string;
+    model?: string;
+    latency_ms?: number;
+}
+
+/**
+ * Persist a single turn to the server. Returns the inserted message's DB id
+ * (chat_messages.id) so the caller can write it back onto the in-memory
+ * ChatMessage — needed by the feedback widget, which submits with the
+ * NOT-NULL message_id column. Null when the network call fails (still
+ * best-effort: a failed persist must not break the chat UI).
+ *
+ * Existing callers that `void persistMessage(...)` continue to work; they
+ * just discard the return.
+ */
+export async function persistMessage(opts: PersistMessageOpts, threadOpts?: { title?: string; site_url?: string; repo?: string }): Promise<PersistedMessageRef | null> {
+    if (typeof window === 'undefined') return null;
+    const threadId = getOrCreateThreadId();
+    if (!threadId) return null;
+    await ensureThreadOnServer(threadId, threadOpts);
+    try {
+        const res = await fetch(`/api/chat-store?action=append_message&thread=${encodeURIComponent(threadId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                role: opts.role,
+                content: opts.content,
+                tools_json: opts.tools && opts.tools.length ? JSON.stringify(opts.tools) : null,
+                model: opts.model,
+                intent: opts.intent,
+                latency_ms: opts.latency_ms,
+            }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (typeof data?.id === 'number') {
+            return { id: data.id, thread_id: threadId };
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+function loadFromStorage(): ChatMessage[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const stored = localStorage.getItem(getStorageKey());
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                // Enforce MAX_MESSAGES on load too. Previously the cap only
+                // applied on save, so a localStorage entry written before the
+                // cap was added (or shrunk) could load 100+ messages.
+                return parsed.slice(-MAX_MESSAGES);
+            }
+        }
+    } catch { /* corrupted */ }
+    return [];
+}
+
+function saveToStorage(messages: ChatMessage[]) {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(getStorageKey(), JSON.stringify(messages.slice(-MAX_MESSAGES)));
+    } catch (err) {
+        // localStorage may be full (QuotaExceededError) — try saving fewer messages
+        if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+            try {
+                // Keep only last 10 messages as emergency fallback
+                localStorage.setItem(getStorageKey(), JSON.stringify(messages.slice(-10)));
+            } catch {
+                // Storage completely full — clear old chat data to free space
+                try { localStorage.removeItem(getStorageKey()); } catch { /* truly broken */ }
+            }
+        }
+    }
+}
+
+interface ChatStore {
+    messages: ChatMessage[];
+    setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+    addMessage: (msg: ChatMessage) => void;
+    updateLastAssistant: (updater: (msg: ChatMessage) => ChatMessage) => void;
+    clearChat: () => void;
+    setCurrentUser: (userId: string) => void;
+    setCurrentWorkspace: (workspaceKey: string) => void;
+}
+
+export const useChatStore = create<ChatStore>((set) => ({
+    // SSR-safe initial state. loadFromStorage() returns [] on the server and
+    // real messages on the client — that divergence caused React error #418
+    // (hydration mismatch) on every chat-page load and triggered a full
+    // client-side re-mount of the chat root, which silently killed in-flight
+    // UI state like the GitHub-connect nudge.
+    //
+    // Real messages load post-mount via setCurrentUser(uid), called from
+    // dashboard/layout.tsx once the NextAuth session resolves. Cost: one
+    // render cycle of empty-state on hard reload — acceptable vs. the broken
+    // status quo.
+    messages: [],
+
+    setMessages: (updater) => {
+        set((state) => {
+            const next = typeof updater === 'function' ? updater(state.messages) : updater;
+            saveToStorage(next);
+            return { messages: next };
+        });
+    },
+
+    addMessage: (msg) => {
+        set((state) => {
+            const next = [...state.messages, msg];
+            saveToStorage(next);
+            return { messages: next };
+        });
+    },
+
+    updateLastAssistant: (updater) => {
+        set((state) => {
+            const msgs = [...state.messages];
+            const lastIdx = msgs.length - 1;
+            if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+                msgs[lastIdx] = updater(msgs[lastIdx]);
+            }
+            saveToStorage(msgs);
+            return { messages: msgs };
+        });
+    },
+
+    clearChat: () => {
+        // Clear both current scoped key and legacy unscoped key
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem(getStorageKey());
+            localStorage.removeItem(BASE_STORAGE_KEY);
+        }
+        // B-1: rotate thread id so next message starts a fresh server-side thread
+        threadEnsuredFor = null;
+        resetThreadId();
+        set({ messages: [] });
+    },
+
+    // Call this when user session is available to load the correct chat history
+    setCurrentUser: (userId: string) => {
+        if (currentUserId === userId) return; // No change
+        currentUserId = userId;
+        // A new user means the previously-active workspace scope no longer applies;
+        // reset it so messages don't load under the wrong (user, workspace) pair
+        // before the layout's workspace effect runs.
+        currentWorkspaceKey = '';
+        threadEnsuredFor = null;
+        // Reload messages for the new user
+        const messages = loadFromStorage();
+        set({ messages });
+    },
+
+    // Call this when the active workspace (GA4 property + GSC site pairing) changes
+    // so chat history is reloaded from the bucket scoped to that workspace.
+    setCurrentWorkspace: (workspaceKey: string) => {
+        if (currentWorkspaceKey === workspaceKey) return; // No change
+        currentWorkspaceKey = workspaceKey;
+        // Force the next persistMessage call to re-ensure a thread on the server —
+        // each workspace has its own thread id (scoped via getThreadStorageKey).
+        threadEnsuredFor = null;
+        const messages = loadFromStorage();
+        set({ messages });
+    },
+}));

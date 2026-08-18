@@ -19,27 +19,54 @@ class Settings(BaseSettings):
     
     # Network
     BASE_PORT: int = 9000  # First user gets 9000, second 9001, etc.
-    MAX_USERS: int = 6     # ~6 users at 1GB each on 8GB RAM (leave 2GB for system)
+    MAX_USERS: int = 50    # Override via MAX_USERS env var for your server capacity
     
     # Paths
     PLUGINS_DIR: str = "/home/ubuntu/vibecodeagent/plugins" # Host path for plugins (skills)
+    DATA_DIR: str = "/home/ubuntu/clawbot-data"  # Host path for per-user /data volumes
     
     # Resource Limits (per container)
     # OpenClaw needs significant RAM - Node.js heap + system overhead
     MEMORY_LIMIT_FREE: str = "1536m"     # 1.5GB for free tier (768MB heap + overhead)
     MEMORY_LIMIT_STARTER: str = "2g"     # 2GB for starter
+    MEMORY_LIMIT_GROWTH: str = "3g"      # 3GB for growth
     MEMORY_LIMIT_PRO: str = "4g"         # 4GB for pro
     CPU_LIMIT_FREE: float = 0.5
     CPU_LIMIT_STARTER: float = 1.0
+    CPU_LIMIT_GROWTH: float = 1.5
     CPU_LIMIT_PRO: float = 2.0
     
-    # API Keys (for shared key mode)
+    # Google Gen AI / Vertex AI (for shared key mode)
+    GOOGLE_VERTEX_API_KEY: Optional[str] = None
+    GOOGLE_GENAI_MODEL: str = "gemini-3.5-flash"
+    GOOGLE_GENAI_FALLBACK_MODEL: str = "gemini-3-flash-preview"
+    GOOGLE_CLOUD_PROJECT: Optional[str] = None
+    GOOGLE_CLOUD_LOCATION: str = "global"
+
+    # Legacy Gemini Developer API key fallback
     GEMINI_API_KEY: Optional[str] = None
     
     # OAuth Credentials (injected into containers)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
-    
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+
+    # GitHub App (Phase 2 — selective per-repo access via installation tokens).
+    # App ID + Client ID are NOT secret. Client Secret + Private Key MUST be in
+    # Coolify env vars only — never committed. Slug is the kebab-case App name
+    # used in the install URL (https://github.com/apps/<slug>/installations/new).
+    GITHUB_APP_ID: Optional[str] = None
+    GITHUB_APP_CLIENT_ID: Optional[str] = None
+    GITHUB_APP_CLIENT_SECRET: Optional[str] = None
+    GITHUB_APP_PRIVATE_KEY: Optional[str] = None
+    GITHUB_APP_SLUG: Optional[str] = None
+
+    # OAuth token encryption-at-rest (Fernet key, base64). Generate:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # If unset, oauth_connections tokens are stored plaintext (dev mode).
+    OAUTH_TOKEN_ENC_KEY: Optional[str] = None
+
     # Alerts
     TELEGRAM_ADMIN_BOT_TOKEN: Optional[str] = None
     TELEGRAM_ADMIN_CHAT_ID: Optional[str] = None
@@ -73,13 +100,20 @@ PLANS = {
         "cpu_limit": settings.CPU_LIMIT_STARTER,
         "max_daily_messages": 500,
         "features": ["basic_chat", "github-ghost"],
-        "price_usd": 30
+        "price_usd": 9
+    },
+    "growth": {
+        "memory_limit": settings.MEMORY_LIMIT_GROWTH,
+        "cpu_limit": settings.CPU_LIMIT_GROWTH,
+        "max_daily_messages": 2000,
+        "features": ["basic_chat", "github-ghost", "google-search-console", "google-analytics"],
+        "price_usd": 19
     },
     "pro": {
         "memory_limit": settings.MEMORY_LIMIT_PRO,
         "cpu_limit": settings.CPU_LIMIT_PRO,
         "max_daily_messages": 5000,
         "features": ["basic_chat", "github-ghost", "google-search-console", "google-analytics", "custom_rules"],
-        "price_usd": 50
+        "price_usd": 29
     }
 }

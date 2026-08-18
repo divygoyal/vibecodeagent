@@ -154,7 +154,7 @@ class Watchdog:
             
             # Update user status
             user.container_status = "restarting"
-            user.restart_count = user.restart_count + 1
+            user.restart_count = (user.restart_count or 0) + 1
             await db.commit()
             
             # Log event

@@ -7,20 +7,17 @@ export const dynamic = 'force-dynamic'
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
-const ADMIN_GITHUB_ID = process.env.ADMIN_GITHUB_ID || "86590133"
+const ADMIN_GITHUB_ID = process.env.ADMIN_GITHUB_ID || ""
 
 async function verifyAdmin() {
-    const session = await getServerSession(authOptions)
-    console.log("[ADMIN AUTH] session:", JSON.stringify(session?.user, null, 2))
-    console.log("[ADMIN AUTH] ADMIN_GITHUB_ID:", ADMIN_GITHUB_ID)
-    if (!session?.user) {
-        console.log("[ADMIN AUTH] No session/user found")
+    if (!ADMIN_GITHUB_ID) {
+        console.error("[ADMIN AUTH] ADMIN_GITHUB_ID not configured")
         return null
     }
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return null
     // @ts-expect-error - id added in callbacks
     const githubId = session.user.id
-    console.log("[ADMIN AUTH] githubId from session:", githubId, "type:", typeof githubId)
-    console.log("[ADMIN AUTH] comparison:", String(githubId), "!==", ADMIN_GITHUB_ID, "=", String(githubId) !== ADMIN_GITHUB_ID)
     if (String(githubId) !== ADMIN_GITHUB_ID) return null
     return session
 }

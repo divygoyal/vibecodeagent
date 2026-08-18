@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     }
 
     // Get current user status
-    const statusResponse = await fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
+    const statusResponse = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(githubId))}`, {
       headers: { "X-API-Key": ADMIN_API_KEY }
     })
 
@@ -50,8 +50,7 @@ export async function POST(req: Request) {
     const error = err as Error
     console.error('Provisioning error:', error.message)
     return NextResponse.json({
-      error: 'Internal Server Error',
-      details: error.message?.substring(0, 100) || 'Unknown error'
+      error: 'Internal Server Error'
     }, { status: 500 })
   }
 }
@@ -68,7 +67,7 @@ export async function GET(req: Request) {
     // @ts-expect-error - id added in callbacks
     const githubId = session.user.id
 
-    const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
+    const response = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(githubId))}`, {
       headers: { "X-API-Key": ADMIN_API_KEY }
     })
 

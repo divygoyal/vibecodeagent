@@ -24,7 +24,7 @@ TOKEN_CONFIG = {
     "compaction": "aggressive",
     "heartbeatEnabled": False,
     "heartbeatInterval": "60m",
-    "defaultModel": "gemini-2.0-flash"
+    "defaultModel": "gemini-3.5-flash"
 }
 
 def get_next_port():
@@ -128,9 +128,14 @@ def provision_user(github_id, telegram_token=None, github_token=None, api_key=No
     ]
 
     # Add API Key
-    gemini_key = api_key or os.environ.get("GEMINI_API_KEY")
-    if gemini_key:
-        cmd += ["-e", f"GEMINI_API_KEY={gemini_key}"]
+    llm_key = api_key or os.environ.get("GOOGLE_VERTEX_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    if llm_key:
+        cmd += [
+            "-e", f"GOOGLE_VERTEX_API_KEY={llm_key}",
+            "-e", "GOOGLE_GENAI_USE_VERTEXAI=true",
+            "-e", "GOOGLE_GENAI_MODEL=gemini-3.5-flash",
+            "-e", f"GEMINI_API_KEY={llm_key}",
+        ]
 
     # Add Telegram Bot Token
     if telegram_token:

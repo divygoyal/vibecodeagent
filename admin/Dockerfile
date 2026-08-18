@@ -1,13 +1,12 @@
 # Admin API Dockerfile
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install system dependencies (including build tools for Python packages)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     gcc \
-    python3-dev \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/*
@@ -21,6 +20,18 @@ RUN pip install --upgrade pip && \
 COPY admin/. .
 COPY templates /app/templates
 COPY plugins /app/plugins
+
+# Copy nanobot build assets (used by docker_manager to build nanobot image at runtime)
+# Layout mirrors project root so Dockerfile.nanobot COPY paths work unchanged
+COPY Dockerfile.nanobot /app/nanobot-build/Dockerfile.nanobot
+COPY scripts/nanobot_entrypoint.sh /app/nanobot-build/scripts/nanobot_entrypoint.sh
+COPY scripts/nanobot_sitecustomize.py /app/nanobot-build/scripts/nanobot_sitecustomize.py
+COPY plugins/google-analytics /app/nanobot-build/plugins/google-analytics
+COPY plugins/google-search-console /app/nanobot-build/plugins/google-search-console
+
+# Pre-install plugin dependencies (eliminates Node.js cold-start on exec calls)
+RUN cd /app/plugins/google-analytics && npm install --production 2>/dev/null || true
+RUN cd /app/plugins/google-search-console && npm install --production 2>/dev/null || true
 
 # Create data directory
 RUN mkdir -p data

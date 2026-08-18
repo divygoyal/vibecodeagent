@@ -1,23 +1,13 @@
 const { google } = require('googleapis');
+const { readGoogleCredentialsFromStdin } = require('./credentialInput');
 
 class GoogleSearchConsole {
     constructor(config) {
         console.log("Google Search Console Plugin Initializing...");
         this.config = config || {};
 
-        if (!this.config.access_token) {
-            try {
-                if (process.env.OPENCLAW_CONNECTIONS) {
-                    const connections = JSON.parse(process.env.OPENCLAW_CONNECTIONS);
-                    if (connections.google) {
-                        this.config.access_token = connections.google.accessToken || connections.google.access_token;
-                        this.config.refresh_token = connections.google.refreshToken || connections.google.refresh_token;
-                        console.log("Found Google credentials in environment.");
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to parse OPENCLAW_CONNECTIONS", e);
-            }
+        if (!hasGoogleCredentials(this.config)) {
+            loadEnvGoogleCredentials(this.config, true);
         }
     }
 
@@ -39,13 +29,14 @@ class GoogleSearchConsole {
             refresh_token: this.config.refresh_token
         });
 
-        try {
-            // Force refresh to verify credentials validity immediately
-            const refreshRes = await auth.refreshAccessToken();
-            auth.setCredentials(refreshRes.credentials);
-        } catch (e) {
-            console.error("Failed to refresh Google token:", e.message);
-            throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+        if (this.config.refresh_token) {
+            try {
+                const refreshRes = await auth.refreshAccessToken();
+                auth.setCredentials(refreshRes.credentials);
+            } catch (e) {
+                console.error("Failed to refresh Google token:", e.message);
+                throw new Error(`Google authentication failed: ${e.message}. Please reconnect in dashboard.`);
+            }
         }
 
         return auth;
@@ -450,6 +441,137 @@ class GoogleSearchConsole {
     }
 }
 
+// Multi-tenant token resolver. Prefer env-injected OAuth tokens first because
+// Nanobot sandboxes can block internal admin API calls. `--client-id` remains
+// a fallback for contexts that do not have OPENCLAW_CONNECTIONS.
+function hasGoogleCredentials(config) {
+    return Boolean(config && (config.access_token || config.refresh_token));
+}
+
+function loadEnvGoogleCredentials(config = {}, log = false) {
+    let raw = process.env.OPENCLAW_CONNECTIONS;
+    let source = "env";
+    if (!raw) {
+        // Nanobot's exec tool strips host env from spawned subprocesses, so the
+        // admin API also writes connections.json to /data/.nanobot/. Fall back
+        // to reading from disk when the env var isn't visible.
+        const fs = require('fs');
+        const candidates = [
+            process.env.OPENCLAW_CONNECTIONS_FILE,
+            '/data/.nanobot/connections.json',
+            '/data/connections.json',
+        ].filter(Boolean);
+        for (const p of candidates) {
+            try {
+                if (fs.existsSync(p)) {
+                    raw = fs.readFileSync(p, 'utf8');
+                    source = p;
+                    break;
+                }
+            } catch (_) { /* try next candidate */ }
+        }
+    }
+    if (!raw) return config;
+    try {
+        const connections = JSON.parse(raw);
+        if (connections.google) {
+            config.access_token = config.access_token || connections.google.accessToken || connections.google.access_token;
+            config.refresh_token = config.refresh_token || connections.google.refreshToken || connections.google.refresh_token;
+            if (log && hasGoogleCredentials(config)) {
+                console.log(`Found Google credentials (source: ${source}).`);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to parse OPENCLAW_CONNECTIONS source", source, e);
+    }
+    return config;
+}
+
+function argsIncludeGoogleCredentials(args) {
+    return args.includes('--accessToken') || args.includes('--refreshToken');
+}
+
+async function fetchClientTokens(clientId) {
+    const adminUrl = process.env.ADMIN_API_URL || 'http://admin-api:8000';
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) {
+        throw new Error('ADMIN_API_KEY env var is not set inside this container; --client-id mode unavailable.');
+    }
+    const url = `${adminUrl}/api/users/${encodeURIComponent(clientId)}/oauth/google`;
+    const controller = new AbortController();
+    const timeoutMs = parseInt(process.env.ADMIN_API_TIMEOUT_MS || '8000', 10);
+    const timeout = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) ? timeoutMs : 8000);
+    let res;
+    try {
+        res = await fetch(url, {
+            headers: { 'X-API-Key': apiKey },
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (error && error.name === 'AbortError') {
+            throw new Error(`Admin API timed out fetching Google tokens for client ${clientId}.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
+
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Admin API returned ${res.status} fetching tokens for client ${clientId}: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    if (!data.access_token && !data.refresh_token) {
+        throw new Error(`Client ${clientId} has no Google OAuth tokens stored.`);
+    }
+    return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+    };
+}
+
+async function resolveClientConfig(args, protectedConfig = {}) {
+    if (!args[0]) {
+        return {};
+    }
+    const disableAdminLookup = ['1', 'true', 'yes'].includes(String(process.env.DISABLE_ADMIN_TOKEN_LOOKUP || '').toLowerCase());
+
+    let clientId = null;
+    const ciIdx = args.indexOf('--client-id');
+    if (ciIdx !== -1 && ciIdx + 1 < args.length) {
+        clientId = args[ciIdx + 1];
+        args.splice(ciIdx, 2);
+    }
+
+    if (hasGoogleCredentials(protectedConfig)) {
+        return protectedConfig;
+    }
+
+    if (argsIncludeGoogleCredentials(args)) {
+        return {};
+    }
+
+    const envConfig = loadEnvGoogleCredentials({}, false);
+    if (hasGoogleCredentials(envConfig)) {
+        return {};
+    }
+
+    if (disableAdminLookup) {
+        return {};
+    }
+
+    if (clientId) {
+        return fetchClientTokens(clientId);
+    }
+
+    const fallbackClientId = process.env.USER_IDENTIFIER || process.env.GITHUB_ID;
+    if (fallbackClientId) {
+        return fetchClientTokens(fallbackClientId);
+    }
+
+    return {};
+}
+
 // CLI Handling
 if (require.main === module) {
     (async () => {
@@ -483,16 +605,22 @@ if (require.main === module) {
         }
 
         try {
-            const plugin = new GoogleSearchConsole();
+            // The protected stdin channel takes precedence. Direct CLI
+            // credentials, scoped environment credentials, and admin lookup
+            // remain available as fallbacks for bot-container workflows.
+            const protectedConfig = await readGoogleCredentialsFromStdin();
+            const clientConfig = await resolveClientConfig(args, protectedConfig);
+
+            const plugin = new GoogleSearchConsole(clientConfig);
 
             if (command === 'list-sites') {
                 const options = parseOptions(1);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.listSites());
 
             } else if (command === 'list-sites-json') {
                 const options = parseOptions(1);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 try {
                     const sites = await plugin.listSites(true);
                     console.log(JSON.stringify(sites));
@@ -504,14 +632,14 @@ if (require.main === module) {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
                 const options = parseOptions(2);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.query(siteUrl, options));
 
             } else if (command === 'list-sitemaps') {
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
                 const options = parseOptions(2);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.listSitemaps(siteUrl));
 
             } else if (command === 'inspect-url') {
@@ -522,7 +650,7 @@ if (require.main === module) {
                     process.exit(1);
                 }
                 const options = parseOptions(3);
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
                 console.log(await plugin.inspectUrl(siteUrl, inspectionUrl));
 
             } else if (command === 'dashboard-json') {
@@ -532,7 +660,7 @@ if (require.main === module) {
                 // Parse options specifically for dashboard-json to catch auth tokens
                 const options = parseOptions(2);
 
-                const plugin = new GoogleSearchConsole(options);
+                const plugin = new GoogleSearchConsole({ ...options, ...clientConfig });
 
                 try {
                     const result = await plugin.dashboardJson(siteUrl);
@@ -545,6 +673,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const plugin = new GoogleSearchConsole(clientConfig);
                 console.log(await plugin.query(siteUrl, {
                     dimensions: ['date'],
                     startDate: args[2],
@@ -555,6 +684,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const plugin = new GoogleSearchConsole(clientConfig);
                 console.log(await plugin.query(siteUrl, {
                     dimensions: ['query'],
                     startDate: args[2],
@@ -565,6 +695,7 @@ if (require.main === module) {
                 // Legacy shortcut
                 const siteUrl = args[1];
                 if (!siteUrl) { console.error("Error: siteUrl required"); process.exit(1); }
+                const plugin = new GoogleSearchConsole(clientConfig);
                 console.log(await plugin.listSitemaps(siteUrl));
 
             } else {

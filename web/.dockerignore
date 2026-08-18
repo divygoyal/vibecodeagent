@@ -1,0 +1,26 @@
+# The web image only needs application source and build configuration.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!next.config.ts
+!tsconfig.json
+!next-env.d.ts
+!eslint.config.mjs
+!postcss.config.mjs
+!public/
+!public/**
+!src/
+!src/**
+
+# Defense in depth for files inside allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/.git/**
+**/node_modules
+**/node_modules/**
+**/.next
+**/.next/**
+**/*.pem
+**/*.key

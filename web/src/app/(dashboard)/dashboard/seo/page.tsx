@@ -1,388 +1,268 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import {
-    TrendingUp, TrendingDown, Search, MousePointer, Eye, Hash,
-    AlertTriangle, CheckCircle2, Lightbulb, FileWarning, Shuffle,
-    ArrowUpRight, Zap, Target, BookOpen, ChevronDown, Loader2
-} from 'lucide-react';
-import { useSeoData, useSiteList } from '@/lib/useDashboardData';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 
-interface SEOKPIs {
-    totalClicks: number;
-    totalImpressions: number;
-    avgCTR: number;
-    avgPosition: number;
-    indexedPages: number;
-    crawlErrors: number;
-    changeClicks: number;
-    changeImpressions: number;
-    changeCTR: number;
-    changePosition: number;
+import DemoModeBanner from '@/components/DemoModeBanner';
+import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
+import { useRegistration } from '../layout';
+import { useContainerStatus, useSeoData, useSiteList } from '@/lib/useDashboardData';
+import { DEMO_SITE_URL } from '@/lib/demoWorkspace';
+import { exportSeoData } from '@/lib/exportUtils';
+
+import SeoHeader from '@/components/seo/SeoHeader';
+import { AskAiButton } from '@/components/seo/AskAiButton';
+import { seoOverviewPrompt } from '@/lib/seoAiPrompts';
+import SeoKpiGrid, { type SeoKpis } from '@/components/seo/SeoKpiGrid';
+import SeoTrendPanel, { type SeoTrendPoint } from '@/components/seo/SeoTrendPanel';
+import SeoRecommendationsPanel from '@/components/seo/SeoRecommendationsPanel';
+import SeoQueriesPagesPanel, { type SeoQuery, type SeoPageRow, type PerformanceTab } from '@/components/seo/SeoQueriesPagesPanel';
+import SeoMovementPanel from '@/components/seo/SeoMovementPanel';
+import SeoIssuesPanel from '@/components/seo/SeoIssuesPanel';
+import SeoIssueDetailPanel, { type IssueSelection } from '@/components/seo/SeoIssueDetailPanel';
+import SeoKeywordInsightsPanel from '@/components/seo/SeoKeywordInsightsPanel';
+import SeoKeywordOpportunitiesPanel from '@/components/seo/SeoKeywordOpportunitiesPanel';
+import SeoPageInsightsPanel from '@/components/seo/SeoPageInsightsPanel';
+import SeoPageOpportunitiesPanel from '@/components/seo/SeoPageOpportunitiesPanel';
+import SeoPageHealthPanel from '@/components/seo/SeoPageHealthPanel';
+import SeoAskAiChip from '@/components/seo/SeoAskAiChip';
+import { type SeoRecommendation } from '@/components/seo/SeoInsightsList';
+
+interface Site {
+    siteUrl: string;
 }
 
-interface Query {
-    query: string;
-    clicks: number;
-    impressions: number;
-    ctr: number;
-    position: number;
+function rangeToDays(range: string): number {
+    if (range === '7d') return 7;
+    if (range === '28d') return 28;
+    if (range === '90d') return 90;
+    if (range === '6m' || range === '180d') return 180;
+    if (range === '12m' || range === '365d') return 365;
+    return 30;
 }
-
-interface SEOPage {
-    page: string;
-    clicks: number;
-    impressions: number;
-    ctr: number;
-    position: number;
-    status: string;
-}
-
-interface Recommendation {
-    id: string;
-    type: string;
-    severity: string;
-    title: string;
-    description: string;
-    action: string;
-    impact: string;
-    page: string | null;
-}
-
-interface TrendPoint {
-    date: string;
-    clicks: number;
-    impressions: number;
-    ctr: number;
-    position: number;
-}
-
-const severityConfig: Record<string, { bg: string; border: string; icon: any; badge: string }> = {
-    high: { bg: 'bg-red-500/5', border: 'border-red-500/20', icon: AlertTriangle, badge: 'bg-red-500/10 text-red-400' },
-    medium: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', icon: FileWarning, badge: 'bg-amber-500/10 text-amber-400' },
-    low: { bg: 'bg-blue-500/5', border: 'border-blue-500/20', icon: Lightbulb, badge: 'bg-blue-500/10 text-blue-400' },
-};
-
-const typeIcons: Record<string, any> = {
-    content_decay: BookOpen,
-    keyword_gap: Target,
-    technical: Zap,
-    cannibalization: Shuffle,
-    opportunity: CheckCircle2,
-};
-
-function ChangeIndicator({ value, suffix = '%', invert = false }: { value: number; suffix?: string; invert?: boolean }) {
-    const positive = invert ? value <= 0 : value >= 0;
-    return (
-        <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-            {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {value >= 0 ? '+' : ''}{value}{suffix}
-        </span>
-    );
-}
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="bg-zinc-900 border border-white/[0.1] rounded-lg px-3 py-2 shadow-xl">
-            <p className="text-xs text-zinc-400 mb-1">{label}</p>
-            {payload.map((entry: any, i: number) => (
-                <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
-                    {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
-                </p>
-            ))}
-        </div>
-    );
-};
 
 export default function SEOPage() {
-    // 1. Fetch Sites
-    const { sites, isLoading: sitesLoading } = useSiteList();
-    const [selectedSite, setSelectedSite] = useState('');
-    const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
+    const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
+    const { sites } = useSiteList(hasGoogleConnection);
+    const typedSites = sites as Site[];
+    const { selectedSite, range, isDemoWorkspace, demoDomainLabel } = useRegistration();
 
-    // Auto-select first site
+    const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
+    const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
+    const [selectedIssue, setSelectedIssue] = useState<IssueSelection | null>(null);
+    const [perfTab, setPerfTab] = useState<PerformanceTab>('queries');
+
+    const activeSite = isDemoWorkspace ? DEMO_SITE_URL : selectedSite;
+    const rangeDays = rangeToDays(range);
+
+    const { data: seoData, isLoading, isError } = useSeoData(
+        'all',
+        activeSite,
+        hasGoogleConnection && (isDemoWorkspace || !!activeSite),
+        range,
+        isDemoWorkspace,
+    );
+
+    const queries = useMemo(
+        () => (Array.isArray(seoData?.queries) ? seoData.queries : []) as SeoQuery[],
+        [seoData],
+    );
+    const pages = useMemo(
+        () => (Array.isArray(seoData?.pages) ? seoData.pages : []) as SeoPageRow[],
+        [seoData],
+    );
+
+    // Auto-select the first row when data arrives so the right panes are never empty.
     useEffect(() => {
-        if (sites.length > 0 && !selectedSite) {
-            setSelectedSite(sites[0].siteUrl);
-        }
-    }, [sites, selectedSite]);
+        if (!selectedKeyword && queries.length > 0) setSelectedKeyword(queries[0].query);
+    }, [queries, selectedKeyword]);
+    useEffect(() => {
+        if (!selectedPageUrl && pages.length > 0) setSelectedPageUrl(pages[0].page);
+    }, [pages, selectedPageUrl]);
 
-    // 2. Fetch SEO Data
-    const { data: seoData, isLoading, isError } = useSeoData('all', selectedSite);
+    const selectedQueryRow = useMemo(
+        () => queries.find(q => q.query === selectedKeyword) ?? undefined,
+        [queries, selectedKeyword],
+    );
+    const selectedPageRow = useMemo(
+        () => pages.find(p => p.page === selectedPageUrl) ?? undefined,
+        [pages, selectedPageUrl],
+    );
 
-    if (isLoading && !seoData) {
+    if (!containerLoading && !hasGoogleConnection) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-                <span className="ml-3 text-zinc-400 text-sm">Loading SEO Data...</span>
+            <div className="min-h-[60vh] flex items-center justify-center">
+                <ConnectGoogleState feature="Search Console data and keyword rankings" />
+            </div>
+        );
+    }
+
+    if ((isLoading || containerLoading) && !seoData) {
+        return (
+            <div className="min-h-[60vh]">
+                <EmptyState variant="loading" title="Loading SEO data…" description="Fetching your Search Console rankings" />
             </div>
         );
     }
 
     if (isError && !seoData) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <p className="text-red-400 text-sm">Failed to load SEO data</p>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                    <AlertTriangle className="w-8 h-8 text-red-400" />
+                </div>
+                <div className="text-center max-w-md">
+                    <h2 className="text-xl font-semibold text-white mb-2">Couldn&apos;t load SEO data</h2>
+                    <p className="text-sm text-zinc-400 mb-1">
+                        The selected property may not be accessible or doesn&apos;t exist in your Search Console.
+                    </p>
+                    <p className="text-xs text-zinc-600">
+                        Error: {isError?.message || isError?.info?.error || 'Server returned 502'}
+                    </p>
+                </div>
+
+                <Link
+                    href="/dashboard/setup"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#7AD9DA] bg-[#14C4E1]/14 hover:bg-[#14C4E1]/22 border border-[#14C4E1]/22 rounded-xl transition-colors"
+                >
+                    Switch workspace →
+                </Link>
+
+                <button
+                    onClick={() => signIn('google')}
+                    className="text-xs text-emerald-400 hover:underline"
+                >
+                    Or re-connect your Google account →
+                </button>
             </div>
         );
     }
 
-    // Extract Data
-    const kpis: SEOKPIs | null = seoData?.kpis || null;
-    const queries: Query[] = Array.isArray(seoData?.queries) ? seoData.queries : [];
-    const pages: SEOPage[] = Array.isArray(seoData?.pages) ? seoData.pages : [];
-    const recommendations: Recommendation[] = Array.isArray(seoData?.recommendations) ? seoData.recommendations : [];
-    const trend: TrendPoint[] = Array.isArray(seoData?.trend) ? seoData.trend : [];
-
-    // Alias for UI replacement
-    const loading = isLoading;
+    const kpis = (seoData?.kpis as SeoKpis | undefined) ?? null;
+    const recommendations = (Array.isArray(seoData?.recommendations) ? seoData.recommendations : []) as SeoRecommendation[];
+    const trend = (Array.isArray(seoData?.trend) ? seoData.trend : []) as SeoTrendPoint[];
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-white">SEO Intelligence</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Search Console data with AI-powered insights</p>
-                </div>
+        <div className="space-y-6">
+            {isDemoWorkspace ? (
+                <DemoModeBanner
+                    description="You're viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
+                    secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+                />
+            ) : null}
 
-                <div className="flex items-center gap-3">
-                    {/* Site Selector */}
-                    <div className="relative">
-                        <select
-                            value={selectedSite}
-                            onChange={(e) => setSelectedSite(e.target.value)}
-                            disabled={sitesLoading || sites.length === 0}
-                            className="appearance-none bg-zinc-900 border border-white/[0.1] rounded-lg pl-3 pr-8 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 transition min-w-[200px]"
-                        >
-                            {sitesLoading ? (
-                                <option>Loading sites...</option>
-                            ) : sites.length === 0 ? (
-                                <option value="">No sites found</option>
-                            ) : (
-                                sites.map(s => (
-                                    <option key={s.siteUrl} value={s.siteUrl}>
-                                        {s.siteUrl.replace('sc-domain:', '')}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+            {/* Missing-source banner — SEO needs a Search Console site. */}
+            {!isDemoWorkspace && hasGoogleConnection && !selectedSite && typedSites.length > 0 ? (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
+                    <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
+                        <span className="font-semibold text-amber-200">SEO features need a Search Console site.</span>{' '}
+                        Pick one to see queries, pages, and rankings.{' '}
+                        <Link href="/dashboard/setup" className="underline font-semibold hover:text-amber-50">
+                            Pick one now →
+                        </Link>
                     </div>
+                </div>
+            ) : null}
+
+            <SeoHeader
+                canExport={!!seoData}
+                onExport={() => exportSeoData(seoData)}
+                extraActions={
+                    <AskAiButton
+                        question={seoOverviewPrompt()}
+                        siteUrl={activeSite || null}
+                        fromTag="seo:overview"
+                        variant="prominent"
+                        label="Ask AI about my SEO"
+                    />
+                }
+            />
+
+            {kpis ? <SeoKpiGrid kpis={kpis} trend={trend} rangeDays={rangeDays} /> : null}
+
+            {/* Trend (left, ~2/3) + Recommendations (right, ~1/3) */}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <SeoTrendPanel trend={trend} />
+                <div id="seo-recommendations">
+                    <SeoRecommendationsPanel items={recommendations} siteUrl={activeSite || null} />
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            {kpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center">
-                                <MousePointer className="w-4 h-4 text-emerald-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeClicks} />
-                        </div>
-                        <div className="text-2xl font-bold text-white">{kpis.totalClicks.toLocaleString()}</div>
-                        <div className="text-xs text-zinc-500 mt-1">Total Clicks</div>
-                    </div>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-cyan-400/10 flex items-center justify-center">
-                                <Eye className="w-4 h-4 text-cyan-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeImpressions} />
-                        </div>
-                        <div className="text-2xl font-bold text-white">{kpis.totalImpressions.toLocaleString()}</div>
-                        <div className="text-xs text-zinc-500 mt-1">Impressions</div>
-                    </div>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-violet-400/10 flex items-center justify-center">
-                                <Hash className="w-4 h-4 text-violet-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changeCTR} />
-                        </div>
-                        <div className="text-2xl font-bold text-white">{kpis.avgCTR}%</div>
-                        <div className="text-xs text-zinc-500 mt-1">Avg. CTR</div>
-                    </div>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-colors">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
-                                <Search className="w-4 h-4 text-amber-400" />
-                            </div>
-                            <ChangeIndicator value={kpis.changePosition} invert />
-                        </div>
-                        <div className="text-2xl font-bold text-white">{kpis.avgPosition}</div>
-                        <div className="text-xs text-zinc-500 mt-1">Avg. Position</div>
-                    </div>
-                </div>
-            )}
-
-            {/* AI Recommendations */}
-            <div>
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center">
-                        <Zap className="w-3.5 h-3.5 text-black" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-white">AI Recommendations</h3>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 font-medium">
-                        {recommendations.length} items
-                    </span>
-                </div>
-                <div className="space-y-3">
-                    {recommendations.map(rec => {
-                        const config = severityConfig[rec.severity] || severityConfig.low;
-                        const TypeIcon = typeIcons[rec.type] || Lightbulb;
-                        return (
-                            <div key={rec.id} className={`${config.bg} border ${config.border} rounded-xl p-4 hover:bg-opacity-10 transition`}>
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-0.5">
-                                        <TypeIcon className="w-4 h-4 text-zinc-400" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <h4 className="text-sm font-semibold text-white">{rec.title}</h4>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${config.badge}`}>
-                                                {rec.severity}
-                                            </span>
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400 font-medium">
-                                                {rec.impact}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-zinc-400 mb-2">{rec.description}</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-emerald-400 font-medium">→ {rec.action}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+            {/* Search performance — 3-col split: table | insights | opportunities & risks */}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.45fr)_minmax(0,1fr)]">
+                <SeoQueriesPagesPanel
+                    queries={queries}
+                    pages={pages}
+                    onSelectKeyword={setSelectedKeyword}
+                    onSelectPage={setSelectedPageUrl}
+                    selectedKeyword={selectedKeyword}
+                    selectedPage={selectedPageUrl}
+                    compact
+                    tab={perfTab}
+                    onTabChange={setPerfTab}
+                />
+                {perfTab === 'queries' ? (
+                    <SeoKeywordInsightsPanel
+                        keyword={selectedKeyword}
+                        siteUrl={activeSite || null}
+                        summary={selectedQueryRow ? {
+                            clicks: selectedQueryRow.clicks,
+                            impressions: selectedQueryRow.impressions,
+                            ctr: selectedQueryRow.ctr,
+                            position: selectedQueryRow.position,
+                        } : undefined}
+                    />
+                ) : (
+                    <SeoPageInsightsPanel
+                        pageUrl={selectedPageUrl}
+                        siteUrl={activeSite || null}
+                        summary={selectedPageRow ? {
+                            clicks: selectedPageRow.clicks,
+                            impressions: selectedPageRow.impressions,
+                            ctr: selectedPageRow.ctr,
+                            position: selectedPageRow.position,
+                        } : undefined}
+                    />
+                )}
+                {perfTab === 'queries' ? (
+                    <SeoKeywordOpportunitiesPanel
+                        keyword={selectedKeyword}
+                        siteUrl={activeSite || null}
+                        queryRow={selectedQueryRow}
+                    />
+                ) : (
+                    <SeoPageOpportunitiesPanel
+                        pageUrl={selectedPageUrl}
+                        siteUrl={activeSite || null}
+                        pageRow={selectedPageRow}
+                    />
+                )}
             </div>
 
-            {/* Search Trend Chart */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
-                <h3 className="text-sm font-semibold text-white mb-4">Search Performance Trend</h3>
-                <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={trend} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                            <defs>
-                                <linearGradient id="gradClicks" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="gradImp" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
-                                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} tickFormatter={(v) => v.slice(5)} />
-                            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#71717a' }} />
-                            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#71717a' }} />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Area yAxisId="left" type="monotone" dataKey="clicks" name="Clicks" stroke="#34d399" fill="url(#gradClicks)" strokeWidth={2} />
-                            <Area yAxisId="right" type="monotone" dataKey="impressions" name="Impressions" stroke="#a78bfa" fill="url(#gradImp)" strokeWidth={1.5} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
+            <SeoMovementPanel
+                activeSite={activeSite || null}
+                onSelectKeyword={setSelectedKeyword}
+            />
+
+            {/* Issues — 2-col split: table | inline detail */}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                <SeoIssuesPanel
+                    activeSite={activeSite || null}
+                    onSelectIssue={setSelectedIssue}
+                    selected={selectedIssue}
+                />
+                <SeoIssueDetailPanel
+                    selection={selectedIssue}
+                    siteUrl={activeSite || null}
+                />
             </div>
 
-            {/* Queries / Pages Tab */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
-                <div className="flex items-center gap-1 mb-4 bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5 w-fit">
-                    <button
-                        onClick={() => setActiveTab('queries')}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${activeTab === 'queries' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    >
-                        Top Queries
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('pages')}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${activeTab === 'pages' ? 'bg-emerald-400/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    >
-                        Top Pages
-                    </button>
-                </div>
+            <SeoPageHealthPanel suggestedPages={pages.slice(0, 4).map(p => p.page)} />
 
-                <div className="overflow-x-auto">
-                    {activeTab === 'queries' && (
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-xs text-zinc-500 border-b border-white/[0.06]">
-                                    <th className="text-left pb-3 font-medium">Query</th>
-                                    <th className="text-right pb-3 font-medium">Clicks</th>
-                                    <th className="text-right pb-3 font-medium">Impressions</th>
-                                    <th className="text-right pb-3 font-medium hidden sm:table-cell">CTR</th>
-                                    <th className="text-right pb-3 font-medium hidden md:table-cell">Position</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {queries.map((q, i) => (
-                                    <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
-                                        <td className="py-3">
-                                            <span className="text-zinc-300 font-medium">{q.query}</span>
-                                        </td>
-                                        <td className="text-right text-emerald-400 font-semibold">{q.clicks.toLocaleString()}</td>
-                                        <td className="text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
-                                        <td className="text-right text-zinc-400 hidden sm:table-cell">{q.ctr}%</td>
-                                        <td className="text-right hidden md:table-cell">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${q.position <= 5 ? 'bg-emerald-400/10 text-emerald-400' : q.position <= 10 ? 'bg-amber-400/10 text-amber-400' : 'bg-red-400/10 text-red-400'}`}>
-                                                {q.position.toFixed(1)}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-
-                    {activeTab === 'pages' && (
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-xs text-zinc-500 border-b border-white/[0.06]">
-                                    <th className="text-left pb-3 font-medium">Page</th>
-                                    <th className="text-right pb-3 font-medium">Clicks</th>
-                                    <th className="text-right pb-3 font-medium hidden sm:table-cell">CTR</th>
-                                    <th className="text-right pb-3 font-medium hidden md:table-cell">Position</th>
-                                    <th className="text-right pb-3 font-medium">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pages.map((p, i) => (
-                                    <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
-                                        <td className="py-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-zinc-300 font-medium truncate max-w-[240px]">{p.page}</span>
-                                                <ArrowUpRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
-                                            </div>
-                                        </td>
-                                        <td className="text-right text-emerald-400 font-semibold">{p.clicks.toLocaleString()}</td>
-                                        <td className="text-right text-zinc-400 hidden sm:table-cell">{p.ctr}%</td>
-                                        <td className="text-right hidden md:table-cell">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.position <= 5 ? 'bg-emerald-400/10 text-emerald-400' : p.position <= 10 ? 'bg-amber-400/10 text-amber-400' : 'bg-red-400/10 text-red-400'}`}>
-                                                {p.position.toFixed(1)}
-                                            </span>
-                                        </td>
-                                        <td className="text-right">
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${p.status === 'healthy' ? 'bg-emerald-400/10 text-emerald-400' :
-                                                p.status === 'warning' ? 'bg-amber-400/10 text-amber-400' :
-                                                    'bg-red-400/10 text-red-400'
-                                                }`}>
-                                                {p.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </div>
+            <SeoAskAiChip />
         </div>
     );
 }
-

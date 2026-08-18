@@ -10,16 +10,17 @@ export const dynamic = 'force-dynamic';
 // ============= Mock data for dev mode =============
 
 function getMockContainerStatus() {
+  // Dev-mode mock: Google is faked as connected so the dashboard renders;
+  // GitHub starts disconnected so the Connect GitHub flow can be tested locally.
   return {
     status: 'running',
     health: 'healthy',
     memory_usage_mb: 128,
     plan: 'free',
     telegramStatus: 'connected',
-    botUsername: 'GrowClawDevBot',
+    botUsername: 'TrafficClawDevBot',
     telegramBotToken: '',
     connectedProviders: [
-      { provider: 'github', connected: true },
       { provider: 'google', connected: true },
     ],
   };
@@ -28,62 +29,64 @@ function getMockContainerStatus() {
 // ============= Route handlers =============
 
 export async function POST(req: Request) {
-  const isProduction = !!ADMIN_API_KEY
-
-  if (isProduction) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    try {
-      const { action } = await req.json()
-      if (!["start", "stop", "restart"].includes(action)) {
-        return NextResponse.json({ error: "Invalid action" }, { status: 400 })
-      }
-
-      // @ts-expect-error - id added in callbacks
-      const githubId = session.user.id
-      const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}/container`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
-        body: JSON.stringify({ action }),
-        cache: 'no-store'
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        return NextResponse.json({ error: data.detail || "Container action failed" }, { status: response.status })
-      }
-      return NextResponse.json(data)
-
-    } catch (err: unknown) {
-      const error = err as Error
-      console.error('Container action error:', error.message)
-      return NextResponse.json({ error: 'Action failed' }, { status: 500 })
-    }
+  // Always require auth
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  // Dev mode: simulate container action
-  return NextResponse.json({ status: "ok", message: "Action simulated in dev mode" })
+  if (!ADMIN_API_KEY) {
+    // Dev mode: simulate container action
+    return NextResponse.json({ status: "ok", message: "Action simulated in dev mode" })
+  }
+
+  try {
+    const { action } = await req.json()
+    if (!["start", "stop", "restart"].includes(action)) {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    }
+
+    // @ts-expect-error - id added in callbacks
+    const githubId = session.user.id
+    const response = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(githubId))}/container`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": ADMIN_API_KEY },
+      body: JSON.stringify({ action }),
+      cache: 'no-store'
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      return NextResponse.json({ error: data.detail || "Container action failed" }, { status: response.status })
+    }
+    return NextResponse.json(data)
+
+  } catch (err: unknown) {
+    const error = err as Error
+    console.error('Container action error:', error.message)
+    return NextResponse.json({ error: 'Action failed' }, { status: 500 })
+  }
 }
 
 export async function GET() {
-  const isProduction = !!ADMIN_API_KEY
+  // Always require auth
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
-  if (isProduction) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  if (!ADMIN_API_KEY) {
+    // Dev mode: return mock container status
+    return NextResponse.json(getMockContainerStatus())
+  }
 
-    try {
-      // @ts-expect-error - id added in callbacks
-      const githubId = session.user.id
-      const response = await fetch(`${ADMIN_API_URL}/api/users/${githubId}`, {
-        headers: { "X-API-Key": ADMIN_API_KEY },
-        cache: 'no-store'
-      })
+  try {
+    // @ts-expect-error - id added in callbacks
+    const githubId = session.user.id
+    const response = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(githubId))}`, {
+      headers: { "X-API-Key": ADMIN_API_KEY },
+      cache: 'no-store'
+    })
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -105,6 +108,7 @@ export async function GET() {
         botUsername: data.container?.bot_username || data.bot_username || data.telegram_bot_username,
         telegramBotToken: data.telegram_bot_token,
         connectedProviders: data.connected_providers || [],
+        error: data.container?.error,
       })
 
     } catch (err: unknown) {
@@ -112,8 +116,4 @@ export async function GET() {
       console.error('Status check error:', error.message)
       return NextResponse.json({ error: 'Failed to check status' }, { status: 500 })
     }
-  }
-
-  // Dev mode: return mock container status
-  return NextResponse.json(getMockContainerStatus())
 }

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // ============= Mock data for local development =============
 
 function generateMockCommits() {
-  const repos = ['growclaw-web', 'growclaw-bot', 'seo-engine', 'analytics-core'];
+  const repos = ['trafficclaw-web', 'trafficclaw-bot', 'seo-engine', 'analytics-core'];
   const messages = [
     'fix: resolve SEO scoring regression in content decay module',
     'feat: add real-time keyword tracking dashboard',
@@ -36,8 +36,8 @@ function generateMockCommits() {
 
 function generateMockRepos() {
   return [
-    { name: 'growclaw-web', description: 'GrowClaw SaaS frontend — Next.js', language: 'TypeScript', stars: 42, updated: new Date().toISOString(), url: '#' },
-    { name: 'growclaw-bot', description: 'Telegram bot engine with AI integrations', language: 'Python', stars: 28, updated: new Date().toISOString(), url: '#' },
+    { name: 'trafficclaw-web', description: 'TrafficClaw SaaS frontend — Next.js', language: 'TypeScript', stars: 42, updated: new Date().toISOString(), url: '#' },
+    { name: 'trafficclaw-bot', description: 'Telegram bot engine with AI integrations', language: 'Python', stars: 28, updated: new Date().toISOString(), url: '#' },
     { name: 'seo-engine', description: 'Content decay detection & keyword gap analysis', language: 'Python', stars: 15, updated: new Date().toISOString(), url: '#' },
     { name: 'analytics-core', description: 'GA4 + GSC data pipeline', language: 'TypeScript', stars: 9, updated: new Date().toISOString(), url: '#' },
   ];
@@ -69,15 +69,29 @@ export async function GET() {
 
     try {
       // @ts-expect-error - accessToken added in callbacks
-      const accessToken = session.user.githubAccessToken
+      let accessToken = session.user.githubAccessToken
       // @ts-expect-error - username added in callbacks
-      const username = session.user.username
+      let username = session.user.username
 
-      console.log("GitHub API Debug: Using token:", accessToken ? accessToken.substring(0, 10) + "..." : "None");
-
+      // If session doesn't have GitHub token (e.g. signed in with Google),
+      // fetch the stored token from admin DB and use it directly
       if (!accessToken) {
-        console.error("GitHub API Error: No access token found in session.");
-        return NextResponse.json({ error: "No GitHub token" }, { status: 400 })
+        try {
+          // @ts-expect-error - id added in callbacks
+          const userId = session.user.id
+          const tokenRes = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}/oauth/github`, {
+            headers: { "X-API-Key": ADMIN_API_KEY }
+          })
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json()
+            accessToken = tokenData.access_token
+          }
+        } catch (e) {
+          console.error("GitHub API: Failed to fetch token from admin DB:", e)
+        }
+        if (!accessToken) {
+          return NextResponse.json({ error: "No GitHub token", code: "GITHUB_NOT_CONNECTED" }, { status: 400 })
+        }
       }
 
       const headers = {
@@ -97,34 +111,25 @@ export async function GET() {
         }
       }
 
-      console.log("GitHub API Debug: Fetching data for user:", user);
+      // If user resolution failed entirely, return error instead of fetching with undefined
+      if (!user) {
+        return NextResponse.json({ error: "Could not resolve GitHub username", code: "GITHUB_USER_RESOLUTION_FAILED" }, { status: 500 })
+      }
 
+      // Bug #9 fix: Use resolved `user` (not raw `username`) for the events endpoint.
       const [eventsRes, reposRes] = await Promise.all([
-        fetch(`https://api.github.com/users/${username}/events?per_page=50`, { headers }),
+        fetch(`https://api.github.com/users/${user}/events?per_page=50`, { headers }),
         fetch(`https://api.github.com/user/repos?sort=pushed&per_page=8&type=owner`, { headers })
       ])
 
       let allEvents: any[] = []
       if (eventsRes.ok) {
         allEvents = await eventsRes.json()
-        console.log(`GitHub Debug: Fetched ${allEvents.length} events for user ${username}`);
-        if (allEvents.length > 0) {
-          console.log(`GitHub Debug: Event types: ${allEvents.map((e: any) => e.type).slice(0, 10).join(', ')}`);
-        }
       } else {
-        console.error(`GitHub Debug: Events fetch failed: ${eventsRes.status} ${eventsRes.statusText}`);
-        const errorText = await eventsRes.text();
-        console.error(`GitHub Debug: Error details: ${errorText}`);
+        console.error(`[GitHub] Events fetch failed: ${eventsRes.status}`);
       }
 
       const pushEvents = allEvents.filter((e: any) => e.type === 'PushEvent');
-      if (pushEvents.length > 0) {
-        console.log(`GitHub Debug: First PushEvent payload keys: ${Object.keys(pushEvents[0].payload).join(', ')}`);
-        console.log(`GitHub Debug: First PushEvent commits count: ${pushEvents[0].payload.commits?.length ?? 'undefined'}`);
-        if (pushEvents[0].payload.commits && pushEvents[0].payload.commits.length > 0) {
-          console.log(`GitHub Debug: First commit sample: ${JSON.stringify(pushEvents[0].payload.commits[0])}`);
-        }
-      }
 
       const recentCommits = await Promise.all(pushEvents.slice(0, 5).map(async (e: any) => {
         try {
@@ -206,6 +211,6 @@ export async function GET() {
     commits: generateMockCommits(),
     repos: generateMockRepos(),
     heatmap: generateMockHeatmap(),
-    username: 'growclaw-dev'
+    username: 'trafficclaw-dev'
   })
 }

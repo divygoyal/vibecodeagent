@@ -134,7 +134,7 @@ export default function AdminPage() {
     /* ─── Auth check ─── */
     if (sessionStatus === 'loading' || loading) {
         return (
-            <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-10 h-10 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
                     <span className="text-zinc-400 text-sm">Loading admin panel...</span>
@@ -145,7 +145,7 @@ export default function AdminPage() {
 
     if (!session?.user) {
         return (
-            <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
                 <p className="text-zinc-500">Please sign in first.</p>
             </div>
         );
@@ -153,9 +153,9 @@ export default function AdminPage() {
 
     /* ═══════════════════════════════════════════════ */
     return (
-        <div className="min-h-screen bg-zinc-950 text-white">
+        <div className="min-h-screen bg-black text-white">
             {/* ─── Header ─── */}
-            <header className="border-b border-zinc-800/50 px-6 py-3 backdrop-blur-sm bg-zinc-950/80 sticky top-0 z-50">
+            <header className="border-b border-white/[0.04]/50 px-6 py-3 backdrop-blur-sm bg-black/80 sticky top-0 z-50">
                 <div className="max-w-[1400px] mx-auto flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <span className="text-xl">🦞</span>

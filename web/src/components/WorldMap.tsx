@@ -118,7 +118,7 @@ export default function WorldMap({ visitors = DEFAULT_VISITORS, totalOnline = 84
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-white">🌍 GrowClaw</span>
+                        <span className="text-base font-bold text-white">🌍 TrafficClaw</span>
                         <span className="text-xs text-zinc-500 border-l border-white/[0.08] pl-2 ml-1">REAL-TIME</span>
                     </div>
                 </div>

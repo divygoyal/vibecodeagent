@@ -1,68 +1,55 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-
-// Admin API configuration
-const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
+import { getToken } from "next-auth/jwt"
+import { ensureAdminUserSynced, authOptions } from "@/lib/adminUserSync"
 
 /**
  * Register the current session's provider tokens with the admin backend.
- * Called on dashboard load to eagerly store tokens before bot setup.
- * This enables the scenario: sign in with Google → connect GitHub → connect bot → both synced.
+ * Called on dashboard load to eagerly store tokens before bot setup,
+ * and from Settings → Connections after a Connect <provider> redirect.
+ *
+ * Body: { provider?: "github" | "google" } — if provided, we sync THAT provider's
+ * tokens onto the existing primary user (so connecting GitHub on a Google-primary
+ * session never replaces the user's display identity).
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    let targetProvider: 'github' | 'google' | undefined;
     try {
-        // @ts-expect-error - id added in callbacks
-        const userId = session.user.id
-        // @ts-expect-error - accessToken added in callbacks
-        const accessToken = session.user.accessToken
-        // @ts-expect-error - provider added in callbacks
-        const provider = session.user.provider
-        // @ts-expect-error - refreshToken added in callbacks
-        const refreshToken = session.user.refreshToken
-
-        if (!userId || !provider) {
-            return NextResponse.json({ error: "Missing session data" }, { status: 400 })
+        const body = await req.json().catch(() => ({}));
+        if (body?.provider === 'github' || body?.provider === 'google') {
+            targetProvider = body.provider;
         }
+    } catch { /* no body, fall back to primary */ }
 
-        // Call the create_user endpoint — it handles idempotent upsert of user & OAuth connection
-        // This ensures the user exists even if they haven't set up the bot yet
-        const response = await fetch(`${ADMIN_API_URL}/api/users`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-API-Key": ADMIN_API_KEY
-            },
-            body: JSON.stringify({
-                // Use session ID as generic identifier (it will be provider_id)
-                github_id: userId,
-                provider: provider,
-                provider_id: String(userId),
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                email: session.user?.email || undefined,
-                plan: "free"
-            })
+    try {
+        const jwt = await getToken({ req: req as never }) as { googleRefreshToken?: string } | null
+        const sync = await ensureAdminUserSynced(session, targetProvider, {
+            googleRefreshToken: jwt?.googleRefreshToken,
         })
 
-        if (!response.ok) {
-            const data = await response.json()
-            console.error("Register provider error:", data)
-            return NextResponse.json({ error: data.detail || "Failed to register provider" }, { status: response.status })
+        if (!sync.synced) {
+            console.warn("Register provider degraded:", sync.reason)
+            const status = 'status' in sync && typeof sync.status === 'number' && sync.status >= 400
+                ? sync.status
+                : 503
+            return NextResponse.json({
+                registered: false,
+                synced: false,
+                degraded: true,
+                reason: sync.reason || "Admin API returned error",
+                error: "Provider connection could not be saved",
+            }, { status })
         }
 
-        const data = await response.json()
         return NextResponse.json({
             registered: true,
-            synced: true, // Force sync status to true so frontend refreshes
-            user: data // Return full user object for debugging if needed
+            synced: true,
         })
 
     } catch (error) {
