@@ -137,6 +137,24 @@ export default function RootLayout({
             }),
           }}
         />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'TrafficClaw',
+              alternateName: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+              url: 'https://trafficclaw.com',
+              description:
+                'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated SEO fixes.',
+              inLanguage: 'en-US',
+              publisher: {
+                '@id': 'https://trafficclaw.com/#organization',
+              },
+            }),
+          }}
+        />
         {/* Google tag (gtag.js) — deferred to reduce TBT */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-CHVVXR3HD2"
