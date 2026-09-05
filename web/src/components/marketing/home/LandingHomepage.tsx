@@ -685,6 +685,7 @@ export default function LandingHomepage() {
                                 </div>
                             </div>
 
+                            {isDefaultBrand() ? (
                             <DeferredEmbed
                                 src={watermarkedEmbedUrl}
                                 title={`${BRAND_NAME} shared analytics dashboard`}
@@ -693,6 +694,11 @@ export default function LandingHomepage() {
                             >
                                 <HeroFrameFallback />
                             </DeferredEmbed>
+                            ) : (
+                            <div className="relative h-[300px] overflow-hidden min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]">
+                                <HeroFrameFallback />
+                            </div>
+                            )}
                         </div>
                     </div>
 
