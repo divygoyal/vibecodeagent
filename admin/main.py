@@ -885,6 +885,29 @@ async def create_user(
         existing_user = result.scalar_one_or_none()
         if existing_user:
             print(f"[DEBUG] Found existing user by github_id: {existing_user.id}")
+
+    # Fallback: Google-primary payloads carry the stable ID in provider_id
+    # (github_id field is None) and rows created before email capture have
+    # email NULL — match the canonical identifier and existing OAuth links
+    # so the upsert updates instead of INSERT-colliding on users.github_id.
+    if not existing_user and user_identifier:
+        result = await db.execute(select(User).where(User.github_id == user_identifier))
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            print(f"[DEBUG] Found existing user by identifier: {existing_user.id}")
+
+    if not existing_user and user_data.provider and user_data.provider_id:
+        stmt = select(OAuthConnection).where(
+            OAuthConnection.provider == user_data.provider,
+            OAuthConnection.provider_account_id == user_data.provider_id,
+        )
+        result = await db.execute(stmt)
+        oauth_link = result.scalars().first()
+        if oauth_link:
+            result = await db.execute(select(User).where(User.id == oauth_link.user_id))
+            existing_user = result.scalar_one_or_none()
+            if existing_user:
+                print(f"[DEBUG] Found existing user via OAuth link: {existing_user.id}")
         
     provider_sync_needed = False
     settings_sync_needed = False

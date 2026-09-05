@@ -60,6 +60,8 @@ export function resolveDashboardSelection({
     propertyInventoryError,
     siteInventoryLoading,
     propertyInventoryLoading,
+    siteInventoryReady = true,
+    propertyInventoryReady = true,
 }: {
     selectedSite: string;
     selectedProperty: string;
@@ -80,6 +82,16 @@ export function resolveDashboardSelection({
      */
     siteInventoryLoading?: boolean;
     propertyInventoryLoading?: boolean;
+    /**
+     * Whether each inventory has resolved at least once. Distinct from the
+     * loading flags: with a null SWR key (registration still pending) the
+     * arrays are empty AND loading is false, so without these the stale
+     * branch fires on the first dashboard mount after a hard navigation
+     * and bounces the user to /setup before inventory ever resolves.
+     * Defaults to true so callers that don't track this keep old behavior.
+     */
+    siteInventoryReady?: boolean;
+    propertyInventoryReady?: boolean;
 }): DashboardSelectionResolution {
     const validSites = sites
         .map((site) => site.siteUrl)
@@ -106,12 +118,18 @@ export function resolveDashboardSelection({
     //     would falsely look "missing" and we'd loop /setup ↔ /dashboard.
     //   - Neither inventory may be in an error state, so a transient
     //     network hiccup doesn't bounce a valid user to the picker.
+    //   - Both inventories must have RESOLVED at least once (ready flags).
+    //     Before the first fetch resolves (e.g. SWR key still null while
+    //     provider registration pends) loading is already false, so the
+    //     two checks above are insufficient on their own.
     if (
         hadSavedSelection
         && !siteInventoryLoading
         && !propertyInventoryLoading
         && !siteInventoryError
         && !propertyInventoryError
+        && siteInventoryReady !== false
+        && propertyInventoryReady !== false
         && ((selectedSite && !isSelectedSiteValid) || (selectedProperty && !isSelectedPropertyValid))
     ) {
         return {
